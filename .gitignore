@@ -41,6 +41,11 @@ build/Release
 node_modules/
 jspm_packages/
 
+# Hugo build output
+public/
+resources/_gen/
+.hugo_build.lock
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 
