@@ -3,70 +3,73 @@ title: Planes
 weight: 5
 ---
 
-CtlFlow separates domain intent, runtime mediation, and Kubernetes realization. This separation is
-the primary ownership boundary in the system.
+CtlFlow separates domain control, trusted data-plane mediation, and Kubernetes realization. These
+are ownership boundaries, not deployment marketing terms.
 
 ```text
- DOMAIN CONTROL              RUNTIME                     KUBERNETES
+ DOMAIN CONTROL                   DATA PLANE                   KUBERNETES
 
- tenants                     authentication              namespaces
- identities                  policy decisions            workloads
- packages                    event publication           scheduling
- apps and jobs               outbound HTTP               networking
- runs and evidence           evidence ingestion          volumes and Secrets
-      |                           |                            ^
-      | desired state             | direct calls               |
-      +---------------------------+----------------------------+
-                                  controller-manager
+ tenants and workspaces           external ingress            namespaces
+ identities and grants            internal service calls      workloads and scheduling
+ Packages and installations       external HTTP egress        Services and networking
+ configuration and secrets        trusted runtime context     volumes and Secrets
+ Placements, Jobs, and Runs        audit ingestion             provider-owned resources
+          |                              |                           ^
+          | domain intent                | authenticated traffic     |
+          +------------------------------+---------------------------+
+                                         execd realization
 ```
 
 ## Domain control
 
-CtlFlow domain services own records such as tenants, users, packages, Apps, Jobs, Runs, grants,
-egress policies, and audit evidence. Administrative clients reach these records through aggregated
-Kubernetes APIs. Each service persists its own records and enforces its own invariants.
+The nine kernel services own CtlFlow records and their invariants. Operator clients use aggregated
+Kubernetes APIs. Product backends use authenticated management operations over `edged`. Both
+surfaces invoke the same service semantics and never create a second record owner.
 
-Domain state is not reconstructed from Kubernetes objects. Kubernetes names, labels, and status do
-not become domain identity or authority.
+Domain records are not reconstructed from Kubernetes objects. Native names, labels, and status are
+derived realization details and never become CtlFlow identity or authority.
 
-## Runtime
+## Data plane
 
-Runtime services mediate actions performed by authenticated workloads or platform backends:
+The data plane carries authenticated traffic:
 
-- authenticate a tenant user;
-- evaluate an application-data permission;
-- publish an application event;
-- proxy an admitted outbound HTTP request; and
-- ingest trusted audit evidence.
+- `edged` terminates the CtlFlow application boundary for browser and external API requests;
+- runtime proxies validate audience-bound internal calls and deliver trusted actor context;
+- applications call resolved peer dependencies directly through Kubernetes networking;
+- `egressd` mediates admitted external HTTP; and
+- all kernel services deliver attributable evidence to `auditd`.
 
-These calls use direct service endpoints because they may be frequent or streaming. They exercise
-domain policy but do not create a second source of truth.
+An internal application call does not traverse `edged`. A browser session does not enter an
+application. Each hop receives a new credential addressed to its exact target.
 
 ## Kubernetes realization
 
-Kubernetes owns the mechanics below the domain model:
+`execd` translates admitted CtlFlow intent into Kubernetes resources and observes their status. It
+realizes:
 
-- cluster infrastructure;
-- namespace and workload isolation;
-- Pods, Deployments, StatefulSets, and Jobs;
-- scheduling and process lifecycle;
-- Services, routes, and network policy;
-- persistent volumes; and
-- native Secret custody.
+- one namespace for each materialized Placement;
+- long-running components as suitable continuous workload resources;
+- finite executions as Jobs and periodic execution through Kubernetes scheduling;
+- Services and explicitly admitted network paths;
+- workload-scoped ServiceAccounts, runtime proxies, and process-specific credentials;
+- PVCs and mounts for persistent files;
+- references to Kubernetes Secret projections written only by `configd`; and
+- provider-owned custom resources for configured external dependencies.
 
-`controller-manager` projects CtlFlow intent into these resources and reports observed state back
-to the owning domain service. No other CtlFlow component writes them.
+Kubernetes decides node placement, Pod scheduling, restart mechanics, and native object state.
+`execd` remains responsible for CtlFlow admission, desired state, Run identity, and interpretation
+of observed status. `configd` is the sole exception to its general realization ownership: it may
+write only Secret custody and an authorized Secret projection in a Placement, then returns an
+opaque binding that `execd` can reference.
 
 ## Adjacent custody
 
-Some material is referenced by CtlFlow but stored by an adjacent system:
-
 | Material | Custody | CtlFlow stores |
 | --- | --- | --- |
-| Container image | OCI registry | Digest-pinned image reference |
-| Secret value | Kubernetes Secret | Binding identity and readiness only |
-| Artifact or export bytes | Configured object store | Bounded metadata and transfer state |
-| Program logs | Configured log store | Query context, not the complete stream |
+| Container image | OCI registry | Digest-pinned image reference and provenance |
+| Secret material | Kubernetes Secret under `configd` custody | Secret identity, policy, version, and readiness |
+| Dependency implementation state | Installed provider controller or service Package | Generic claim, binding, generation, and readiness |
+| Artifact or export bytes | Configured object dependency | Bounded metadata and transfer capability |
+| Program logs | Configured log system | Query identity, cursor, and retention metadata |
 
-The boundary is strict: administrative APIs never become a transport for image, secret, artifact,
-export, or unbounded log bytes.
+Administrative APIs never transport image, secret, artifact, export, or unbounded log bytes.

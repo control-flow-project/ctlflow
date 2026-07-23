@@ -1,62 +1,32 @@
 ---
 title: Packages
-weight: 45
+weight: 50
 ---
 
-A Package is an immutable infrastructure-wide App or Job definition.
+A Package is an immutable versioned App or Job contract with explicit ownership, provenance, and
+trust.
 
 ```text
-ctlflow package list
-ctlflow package get PACKAGE
-ctlflow package publish -f FILE
-ctlflow package revoke PACKAGE [--force] [--wait]
+ctlflow get packages (--global | --tenant TENANT | --all-tenants) \
+  [--workspace WORKSPACE] [--user USER]
+ctlflow get package PACKAGE (--global | --tenant TENANT)
+ctlflow publish package (--global | --tenant TENANT) -f FILE [--wait]
+ctlflow revoke package PACKAGE (--global | --tenant TENANT) [--force] [--wait]
+ctlflow get artifacts (--global | --tenant TENANT | --all-tenants) [--package PACKAGE]
+ctlflow get artifact ARTIFACT (--global | --tenant TENANT)
+ctlflow get service-contracts (--global | --tenant TENANT | --all-tenants)
+ctlflow get service-contract CONTRACT (--global | --tenant TENANT)
+ctlflow get exposures (--global | --tenant TENANT | --all-tenants)
+ctlflow get exposure EXPOSURE (--global | --tenant TENANT)
 ```
 
-`PACKAGE` accepts an opaque Package ID or `name@version`. Republishing the same canonical document
-is idempotent; different content under the same key is a conflict. Packages are not updated or
-deleted. Revocation is terminal: it prevents new instantiation and execution, stops Apps and Jobs
-using that version, and preserves the Package and historical records for inspection. `--wait`
-waits until `execd` and `controller-manager` report that affected execution has stopped.
+The Package document declares digest-pinned artifacts, components, configuration and secret
+schemas, persistent slots, dependencies, service contracts, exposures, operation tokens, and
+resource requirements. It contains no credentials, resolved URLs, native Kubernetes names, or
+provider-specific binding output.
 
-An App Package declares one or more components. This abbreviated example shows the stable shape:
-
-```yaml
-name: chat
-version: 1.0.0
-kind: app
-images:
-  api: registry.example/chat@sha256:...
-components:
-  - key: api
-    image: api
-    lifecycle: continuous
-    identity: replaceable
-    resourceProfile: standard
-    ports: [{ name: http, protocol: http, port: 8080 }]
-declares:
-  operations: [chat.read, chat.write]
-  events: [chat.message-posted]
-```
-
-A Job Package declares one finite Run component:
-
-```yaml
-name: reviewer
-version: 1.0.0
-kind: job
-images:
-  worker: registry.example/reviewer@sha256:...
-run:
-  image: worker
-  resourceProfile: standard
-  capabilities: [files.read]
-  acceptsEvents: [files.uploaded]
-```
-
-The versioned Package schema may also declare configuration, health checks, persistent-data and
-secret slots, provided or required service endpoints, Event schemas, and Run input/output
-contracts. It contains semantic requirements only, never native Kubernetes names or credentials.
-
-OCI image bytes are published with registry tooling before Package publication. Every reference is
-digest-pinned. CtlFlow stores and validates application operation and Event vocabulary without
-interpreting its application meaning.
+Publication is idempotent for the same immutable key and canonical body. Revocation prevents new
+installation and execution, stops active realization pinned to that version, and retains records
+for evidence. No replacement version is selected automatically. OCI bytes move through registry
+tooling; administrative resource bodies carry metadata only. Artifacts, service contracts, and
+exposures are read-only projections of immutable Package declarations.

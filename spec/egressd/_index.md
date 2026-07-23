@@ -1,80 +1,101 @@
 ---
 title: egressd
-weight: 65
+weight: 75
 ---
 
-`egressd` is the controlled outbound HTTP boundary for Tenant workloads and CtlFlow components.
+`egressd` is the controlled external HTTP boundary for CtlFlow workloads and kernel services.
 
 ## Owns
 
 | Record | Meaning |
 | --- | --- |
-| Egress destination | Approved HTTPS origin, logical endpoint, credential strategy, and rewrite rules |
-| Egress policy | Workload principals, Context, methods, and paths admitted to a destination |
+| Egress destination | Approved HTTP origin and deterministic mediation rules |
+| Egress policy | Which exact principals, dependencies, Placements, methods, and paths may use it |
+| Egress review | Side-effect-free effective decision |
 
 It serves `egressdestinations`, `egresspolicies`, and create-only `egressreviews` in
 `egress.ctlflow.com/v1alpha1`.
 
+## Activities
+
+- Authenticate the calling runtime or kernel service.
+- Resolve its current principal, Placement, App or Job, and dependency through `identityd` and
+  `execd`.
+- Require one matching enabled destination and policy.
+- Canonicalize method, origin, path, query, and headers before matching.
+- Remove caller-supplied cookies and upstream authentication.
+- Apply deterministic path, query, and header rewrites.
+- Obtain exact-purpose secret material from `configd`.
+- Apply the configured upstream HTTP authentication.
+- Enforce finite request, response, connection, stream, redirect, and concurrency bounds.
+- Proxy ordinary and streaming HTTP.
+- Record every allow, deny, rewrite identity, target, status class, and timing outcome.
+
 ## Request flow
 
 ```text
- App component, Run, or CtlFlow component
+ App component, Run, or kernel service
           |
-          | logical HTTP request
+          | process-bound proxy credential
           v
        egressd
-          |
-          +-- establish workload principal and Context
-          +-- require a matching destination policy
+          +-- establish runtime and declared dependency
+          +-- enforce Placement and destination policy
           +-- remove caller authentication
-          +-- apply deterministic generic HTTP rewrites
-          +-- apply the approved credential from Secret custody
-          +-- record evidence
+          +-- apply generic HTTP rewrites
+          +-- obtain purpose-bound material from configd
+          +-- apply approved upstream authentication
           |
           v
-    approved HTTPS origin
+    exact approved HTTP origin
 ```
 
-Destinations use typed authentication and rewrite configuration, never executable scripts.
-Rewrites may change headers, path prefixes, query parameters, and derived namespace segments using
-only authenticated runtime facts and approved secret fields. They cannot let caller data select a
-different Tenant or physical origin.
+A destination is rooted at one approved origin. Rules may rewrite canonical path prefixes, query
+parameters, and headers using authenticated runtime facts and configured constants. Caller data
+cannot select another Tenant, physical namespace, credential, or origin.
 
-This model supports standard HTTP clients, including S3-compatible clients, without giving
-`egressd` provider-specific domain rules. A logical bucket or path can be rewritten into an opaque
-Tenant/Context/workload namespace before the real upstream request is signed.
+Provider-specific protocols belong to provider Packages or controllers. For example, an
+S3-compatible gateway may expose the S3 protocol to an App, derive logical object namespaces, and
+use `egressd` for its own admitted HTTP call to external storage. `egressd` contains no Files,
+bucket, model-provider, or database domain behavior.
 
-CtlFlow components use the same proxy under their component identity and owner-authorized,
-purpose-bound destination bindings. For example, an SSO provider binds `identityd` to approved
-Destinations for discovery and token exchange. This does not grant `identityd` ambient use of other
-Destinations.
+## Process-bound credentials
 
-Real upstream credentials remain in Kubernetes Secret custody. When a standard SDK requires a
-credential-shaped input, `egressd` may issue a short-lived credential that identifies one workload
-to the proxy. It is not the upstream credential and is rejected from another workload identity.
+When a standard HTTP client requires credential-shaped configuration, `identityd` issues a
+short-lived credential for one runtime, dependency, and `egressd` audience. It identifies the
+caller to `egressd`; it is not accepted by the external origin and cannot be replayed from another
+runtime.
 
-## Safety
+Real upstream secret material remains in `configd` custody. It is released only for one admitted
+destination operation and never returned to the caller.
 
-- Workload egress is default-deny except through admitted platform paths.
-- Destinations use HTTPS and an explicitly approved origin.
-- Tenant-owned destinations cannot resolve to loopback, link-local, cluster, metadata-service, or
-  private infrastructure ranges; infrastructure operators may admit an exact private range.
-- Resolved addresses are checked against the destination's admitted range on every new connection.
-- Each request is matched on canonical method and path before rewriting.
-- Caller-supplied upstream authentication is discarded.
-- Redirects are not followed automatically; a new target requires a new policy decision.
-- Request, response, connection, and concurrency bounds are finite installation policy, not part of
-  the destination's application meaning.
+## Network safety
 
-`egressd` also mediates short-lived upload and download access for Run artifacts and Audit exports.
-It transfers or authorizes bytes but owns no artifact or export metadata.
+- Workload external network access is default-deny.
+- Every destination has an exact admitted origin and address policy.
+- Tenant destinations cannot resolve to loopback, link-local, cluster, metadata-service, or
+  infrastructure-private addresses.
+- Address admission is rechecked on each new connection.
+- Policy matching occurs before rewriting and upstream authentication.
+- Redirects are rejected unless the resulting request independently matches an admitted
+  destination.
+- Non-HTTP traffic is not proxied.
+- Slow readers and writers cannot create unbounded buffering.
 
-## Boundaries and invariants
+## Direct operations
 
-- `egressd` is a generic HTTP policy proxy, not an application-specific gateway or service mesh.
-- `policyd` decides application-data operations; egress policy independently decides external
-  network use.
+| Operation | Purpose |
+| --- | --- |
+| Fetch | Proxy one bounded admitted HTTP exchange |
+| OpenHttpStream | Proxy one bounded streaming HTTP exchange |
+| Preview | Return the effective decision and rewrite identity without forwarding |
+| Health / Ready | Report local and required dependency readiness |
+
+## Invariants
+
 - No request reaches an origin without one matching enabled destination and policy.
-- Secret values never appear in records, responses, reviews, or logs.
-- A Destination referenced by an Egress policy, SSO provider, or artifact/export binding cannot be
-  deleted.
+- Caller-supplied upstream authentication is discarded.
+- Secret material never appears in records, responses, reviews, errors, or logs.
+- Rewrites derive protected namespace facts only from authenticated owner records.
+- Egress admission is independent of application-object authorization.
+- A referenced destination cannot be deleted until its policies and bindings are removed.

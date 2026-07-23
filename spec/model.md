@@ -3,191 +3,314 @@ title: Model
 weight: 10
 ---
 
-CtlFlow has a small domain model. Each noun exists because it owns durable intent or evidence that
-cannot be delegated to Kubernetes.
+CtlFlow has a small domain model. Each record exists because it owns durable intent or evidence
+that cannot be delegated to Kubernetes.
 
-## Core records
+## Record ownership
 
 | Record | Owner | Meaning |
 | --- | --- | --- |
-| Tenant | `tenantd` | Customer and isolation boundary |
-| Workspace | `tenantd` | Collaboration boundary inside a Tenant |
-| Context | `tenantd` | Concrete placement and data boundary |
-| Quota | `tenantd` | Tenant admission bounds |
-| User | `identityd` | Human or service account belonging to one Tenant |
-| Membership | `identityd` | A User's tenant or workspace standing |
+| Tenant | `tenantd` | Customer and top-level isolation boundary |
+| Workspace | `tenantd` | Collaboration boundary inside one Tenant |
+| User | `identityd` | Human or service account at global or Tenant scope |
+| Membership | `identityd` | A User's standing in a Tenant or Workspace |
+| Group and Group member | `identityd` | Reusable Tenant- or Workspace-scoped audience |
 | Identity link | `identityd` | External provider subject bound to a human User |
+| SSO provider and admission rule | `identityd` | Tenant login configuration and Workspace narrowing |
 | Session | `identityd` | Opaque human browser session |
-| SSO provider | `identityd` | Tenant identity-provider configuration |
-| Admission policy | `identityd` | Providers accepted at Tenant or Workspace entry |
-| Package | `catalogd` | Immutable versioned App or Job definition |
-| Resource profile | `catalogd` | Operator-approved execution sizing |
-| App | `execd` | Installed long-running package in one Context |
-| Job | `execd` | Reusable finite-work definition with delegated identity |
-| Trigger | `execd` | One event or schedule activation for a Job |
-| Run | `execd` | One invocation of a Job |
-| Event | `eventd` | Immutable application fact published by a workload |
-| Event delivery | `eventd` | Delivery outcome for one Event and Trigger |
-| Access grant | `policyd` | Allow-only operation on an application resource path |
-| Egress destination | `egressd` | Approved external HTTP endpoint and mediation rules |
-| Egress policy | `egressd` | Which workload principals may use a destination |
-| Audit event | `auditd` | Immutable security and activity evidence |
-| Audit export | `auditd` | Bounded asynchronous extraction of Audit Events |
+| Virtual principal | `identityd` | Stable delegated identity for one App component or Job |
+| Runtime principal | `identityd` | Identity of one concrete workload execution |
+| Role, Role binding, Access grant, and Access review | `policyd` | Path-and-operation authorization state and decision |
+| Package and artifact | `pkgd` | Immutable versioned application or finite-work contract |
+| App | `pkgd` | One App Package installed in one Placement |
+| Service contract and exposure | `pkgd` | Declared peer-service compatibility and external surface |
+| Application operation and provider contract | `pkgd` | Application operation ownership and dependency schema |
+| Configuration | `configd` | Versioned non-secret value at one supported scope |
+| Secret | `configd` | Write-only secret identity, policy, version, and custody binding |
+| Provider configuration | `configd` | Selected dependency provider and its admitted options |
+| Resolved generation | `configd` | Complete immutable configuration for one consumer |
+| Placement | `execd` | Concrete execution and persistent-state boundary |
+| Placement constraints | `execd` | Inherited typed execution and dependency ceiling |
+| Workload | `execd` | Desired long-running realization of one App component |
+| Job | `execd` | Reusable finite-work definition |
+| Schedule | `execd` | Periodic activation belonging to one Job |
+| Run | `execd` | One admitted Job invocation |
+| Dependency claim and binding | `execd` | Desired dependency and its resolved runtime outputs |
+| Endpoint | `execd` | Ready internal address for one realized component |
+| Egress destination, policy, and review | `egressd` | Approved external HTTP target, admitted callers, and decision |
+| Audit event, payload deletion event, and export | `auditd` | Authoritative evidence and bounded extraction |
 
-Identifiers are opaque, server allocated, and prefixed by kind, for example `ten-*`, `wsp-*`,
-`ctx-*`, `usr-*`, `pkg-*`, `app-*`, `job-*`, and `run-*`. Display names are never identity and do
-not determine ownership or authorization.
+Identifiers are opaque, server allocated, and prefixed by kind. Display names, slugs, Package names,
+logical bucket names, and Kubernetes names never determine ownership or authorization.
 
-```text
- Tenant
-   |
-   +-- Workspace
-   +-- User -- Membership
-   +-- Context
-   |     +-- App -- component principals
-   |     +-- Job -- Trigger -- Run
-   +-- Event
-   +-- Access grant
-   +-- Egress policy
-   +-- Audit event
+## Tenancy and Placements
 
- Package --------------------> App or Job
- Egress destination ---------> Egress policy
-```
+A Tenant owns its Workspaces and accounts; the installation owns global service accounts. A
+Placement answers one question: **where do execution and persistent state belong?** It is a fence,
+not a grant.
 
-## Context
-
-A Context answers one question: **where does this state and execution belong?** It is not an access
-grant.
-
-| Kind | Source | Boundary |
+| Placement kind | Source | Meaning |
 | --- | --- | --- |
-| `tenant` | Tenant | Shared tenant state |
-| `workspace` | Workspace | Shared state in one Workspace |
-| `tenant-user` | Tenant Membership | One User's private tenant-level state |
-| `workspace-user` | Workspace Membership | One User's private state in one Workspace |
+| `global` | CtlFlow installation | Infrastructure-wide shared execution |
+| `tenant` | Tenant | Shared Tenant execution and state |
+| `workspace` | Workspace | Shared Workspace execution and state |
+| `tenant-user` | Tenant Membership | One User's private Tenant execution and state |
+| `workspace-user` | Workspace Membership | One User's private Workspace execution and state |
 
-Contexts are derived from Tenants, Workspaces, Users, and Memberships; clients do not create them
-directly. They are materialized with their source record and retired when that source is removed.
-Each active Context maps to one opaque Kubernetes containment namespace. Removing the source of a
-Context stops new work before its containment is retired.
+There is one canonical Placement for each valid source tuple. Global, Tenant, and Workspace
+Placements materialize with their source. User Placements materialize on the first admitted private
+App, Job, or persistent resource. Each materialized Placement maps to one opaque Kubernetes
+namespace. Removing or suspending its source stops new work before retirement begins.
 
-Every App and Job has one immutable Context. Every Run inherits its Job's Context. A User's current
-membership must make that Context reachable, but reachability alone grants no application-data
-permission. Reusing one Package in several Contexts means creating a distinct App or Job in each.
+Every App and Job has one immutable Placement. Every Run inherits its Job's Placement. Installing
+the same Package at another Placement creates another App or Job with separate identity, state,
+dependencies, endpoints, and realization.
 
-Internal service bindings are explicit and may point only inward through the Context hierarchy:
+Placement constraints are typed `execd` state. They bound execution class, lifetime, scale,
+resources, persistence, dependency types and providers, exposure, and network reachability.
+Operator constraints are the hard ceiling. Tenant, Workspace, and user configuration may only
+narrow inherited choices. A request outside the effective constraints is rejected rather than
+silently modified.
 
-```text
- tenant-user ------> tenant
- workspace --------> tenant
- workspace-user ---> workspace, tenant-user, tenant
-```
+## Packages, Apps, Jobs, and Runs
 
-A binding may also remain inside its exact Context. It can never cross Tenant, Workspace, or User
-boundaries sideways. `execd` validates the binding and `controller-manager` realizes only the
-corresponding network path. Network reachability still does not replace downstream authorization.
+A Package is immutable and versioned. It is owned at global, Tenant, Workspace, or user
+scope and carries explicit provenance and trust. Visibility and permitted target Placements follow
+that ownership and policy.
 
-## Packages, Apps, and Jobs
+An App Package declares one or more components. A component may declare:
 
-A Package is an immutable, infrastructure-wide definition. It contains digest-pinned OCI images
-and one of two contracts:
+- a digest-pinned OCI image;
+- continuous or lifecycle execution intent;
+- ports, health, and external exposure;
+- configuration fields and secret slots;
+- persistent filesystem slots;
+- named dependencies and the components that use them;
+- provided service contracts;
+- application operation tokens; and
+- resource requirements within Placement constraints.
 
-- an **App package** declares one or more components intended to remain available or to run during
-  App lifecycle operations;
-- a **Job package** declares one finite component used for each Run.
+A Job Package declares one finite component and its configuration, dependencies, persistent slots,
+input, output, and resource requirements.
 
-Packages describe semantic requirements rather than native Kubernetes objects. They may declare
-configuration, ports, health checks, persistent-data slots, secret slots, provided or required
-service endpoints, application operation tokens, and event types. Provider-specific and
-Kubernetes object names are forbidden.
-
-An App installs an App package into one Context. It binds package configuration and declared
-slots, attaches to one existing User account, and owns its component status. Each component has a
-distinct virtual principal.
-
-A Job configures a Job package for repeated execution in one Context. It has one virtual principal,
-attaches to one existing User account, and may have many independent Triggers. A Run is one
-invocation and inherits the Job's Context while recording its requester or Trigger, lifecycle,
-logs, and outputs.
-
-An **agent** is a product label for a Job that uses delegated identity, persistent state, and often
-Triggers. CtlFlow has no separate Agent record, API, or CLI noun.
+An App installs one App Package at one Placement. Each App generation pins one immutable Package
+version; an explicit compatible upgrade creates a new generation without changing the App,
+Placement, attached account, or persistent-slot identities. A Job configures one immutable Job
+Package version for repeated execution at one Placement. An App component and a Job each receive a
+stable virtual principal attached to one existing User valid for that Placement. A Run is one
+invocation of a Job and records its requester, idempotency identity, attempts, status, outputs, and
+concrete runtime principal for each attempt.
 
 ```text
- App package ---- install ----> App ---- realize ----> long-running components
+ App Package ---- install ----> App ----> Workload ----> Kubernetes workload
 
- Job package ---- configure --> Job ---- invoke -----> Run ---- realize ----> finite work
+ Job Package ---- configure --> Job ----> Run ----------> Kubernetes Job
                                       ^
                                       |
-                              manual, event, schedule
+                           user, service, schedule,
+                           or product-owned automation
 ```
 
-Persistent-data, secret, and internal-endpoint bindings belong to the App or Job that consumes
-them. Their package-declared names remain stable across replacement executions. Secret values are
-write-only and remain in Kubernetes Secret custody.
+An agent is a product label for a Job with a virtual principal, persistent state, and
+product-managed activation or conversation state. CtlFlow has no separate Agent execution path.
 
-## Identity and authority
+## Configuration and secrets
 
-A User is either a human account or a service account. Every App and Job attaches to one existing,
-enabled User. User-created private workloads attach to their creator; an administrator creating a
-shared workload selects the attached account explicitly.
+Package and provider schemas are immutable declarations owned by `pkgd`. `configd` owns values
+validated against those declarations.
 
-App-component and Job principals are virtual principals, distinct from both the attached account
-and the concrete Pod identity. Their authority can only be narrower than the attached account:
+Configuration can be written at global, Tenant, Workspace, tenant-user, workspace-user, App, or Job
+scope when the declaration permits it. `configd` produces one complete, revisioned resolved
+configuration for each consumer. Inheritance is deterministic:
 
 ```text
- effective authority
-   = attached account authority
-   AND virtual-principal grants
-   AND package capability ceiling
-   AND concrete Context fence
-   AND current lifecycle policy
+ global < tenant < workspace < tenant-user < workspace-user < App-or-Job override
 ```
 
-Audit records both the virtual principal and attached account. Replacing a Pod changes runtime
-identity but not the App-component or Job principal.
+Only scopes applicable to the target Placement participate. A lower scope can override only fields
+declared overrideable there. Policy and Placement constraints are intersections, not last-writer
+configuration.
 
-## Events, logs, and artifacts
+Secret material is submitted through write-only operations. Reads return metadata, version, policy,
+and readiness, never the value. `configd` materializes a secret only into an authorized Kubernetes
+binding or an authorized `egressd` request. Rotation creates a new version and explicitly rolls
+affected consumers.
 
-An Event is an immutable fact published by an authenticated App component or Run. Its type must be
-declared by the publisher's Package. An event Trigger matches a declared type in one Context and
-asks `execd` to create one Run. Delivery is retryable; Run creation is idempotent for an
-Event/Trigger pair.
+## Dependencies
 
-Logs are program output held by the configured log system. CtlFlow exposes bounded, authorized
-queries and finite follow streams; it does not treat logs as domain records.
+A Package declares every external capability as a named dependency:
 
-Run inputs, outputs, and audit exports may refer to bulk objects in configured object storage.
-CtlFlow stores bounded metadata such as media type, size, and digest. Bytes move through
-short-lived, purpose-bound transfer paths and never through administrative resource bodies.
-Run artifacts belong to the Run's Context and cannot be attached as input across Contexts.
+```yaml
+dependencies:
+  - name: database
+    type: postgresql
+    version: ">=16"
+    options:
+      extensions: [pgvector]
+    env:
+      PGHOST: CHAT_DB_HOST
+      PGDATABASE: CHAT_DB_NAME
+```
+
+Common fields are:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Immutable Package-local dependency name |
+| `type` | Open dependency contract key |
+| `version` | Optional provider-version constraint |
+| `options` | Consumer choices allowed by the dependency contract |
+| `env` | Optional canonical-output to container-environment renames |
+
+Peer services use `service:<contract>`, for example `service:tasks`. Kernel operations use
+`kernel:<contract>`, for example `kernel:policy` or `kernel:execution`. A contract identifies
+compatibility, not a URL, Kubernetes Service, or caller-owned copy of the provider's API schema.
+
+Dependencies resolve in three ways:
+
+1. an open provider type such as `postgresql` selects an installed Kubernetes controller and an
+   exact provider Placement;
+2. `service:<contract>` selects an exact App component at an admitted provider Placement; or
+3. `kernel:<contract>` resolves to its fixed owning kernel service and has no selectable provider.
+
+`execd` creates a stable dependency claim and accepts only outputs declared by the dependency
+contract. Provider and peer-service claims name their selected provider Placement. A binding
+contains typed ordinary values, secret references, endpoint references, mounts, generation, and
+readiness. A shared provider must return consumer-specific outputs and namespaces. A kernel
+binding contains only its fixed endpoint, audience, and admitted operations. The binding contains
+no provider-specific interpretation. Only components listing the dependency in `uses` receive
+those outputs.
+
+There is no nearest-provider search, fallback provider, or allow-unless-denied behavior. Admission
+requires the dependency contract to be installed and requested by the Package. A selectable
+provider must also be explicit, allowed for the consumer and provider Placements, and fully
+configured. A kernel binding must be explicitly admitted for that Package and Placement.
+
+## Provider Placements and service bindings
+
+Every selectable external or `service:*` provider is owned at one Placement. A consumer may select
+only itself or one admitted ancestor in this table:
+
+```text
+ global          -> global
+ tenant          -> tenant, global
+ tenant-user     -> tenant-user, tenant, global
+ workspace       -> workspace, tenant, global
+ workspace-user  -> workspace-user, workspace,
+                    tenant-user for the same User, tenant, global
+```
+
+Sibling Workspace, different User, and cross-Tenant providers are forbidden. An external system may
+run outside Kubernetes, but its CtlFlow provider identity, configuration, consumer namespace, and
+lifecycle remain owned by the selected provider Placement.
+
+An App component may provide a named HTTP, gRPC, or TCP endpoint for one versioned service
+contract. A consumer names one declared `service:*` dependency. Before the consumer starts, `execd`
+resolves that dependency to one exact provider App, component, endpoint, and audience.
+
+Reachability remains separate from the receiving application's object authorization.
+
+Kubernetes DNS and Services carry internal traffic directly. `edged` is not in the internal path.
+Endpoint rotation changes derived realization without changing the Package dependency name.
+
+## Kernel bindings
+
+A `kernel:*` dependency names one versioned public kernel contract owned by its daemon. It resolves
+to the installation endpoint and exact audience, not to a Package or Placement provider. Any
+Placement may use an explicitly admitted kernel binding, but that binding grants no Tenant,
+Workspace, or application-data authority. The receiving kernel service authenticates the workload
+and Actor and authorizes each requested operation independently.
+
+## Call identity
+
+Every authenticated application call establishes:
+
+| Fact | Meaning |
+| --- | --- |
+| Actor | Principal whose authority initiated the operation |
+| Actor account | Attached account when the Actor is virtual |
+| Immediate caller | App component or Run making this hop |
+| Caller account | Account bounding that workload |
+| Source Placement | Placement of the caller |
+| Runtime principal | Concrete caller process |
+| Audience | Exact target endpoint |
+| Request, parent-call, and trace IDs | Correlation and bounded audit reconstruction |
+
+A request through an exposure explicitly admitting unauthenticated external traffic has no Actor,
+Actor account, or source Placement. `edged` remains its authenticated immediate caller. That
+request cannot be exchanged into a human delegation.
+
+A trusted runtime proxy fronts each workload endpoint. It authenticates the source, validates the
+audience-bound call credential, removes caller-supplied protected headers, and supplies trusted
+context to the application. For an outbound call, the application selects only a declared
+dependency name. `identityd` issues a new short-lived credential for the resolved target.
+
+With a valid invocation handle, the original human Actor is preserved. Without one, the calling
+virtual principal becomes the Actor. An inbound credential is never forwarded to another audience.
+Raw TCP bindings carry workload identity only because they have no portable per-request delegation
+boundary.
+
+## Persistent state and bulk data
+
+Persistent filesystem slots become Placement-owned PVCs mounted only into declared consumers.
+SQLite is an application library over such a mount. Databases, caches, and object stores outside
+the application process are dependencies.
+
+Logical resource names are local to one App or Job dependency. A provider gateway may present a
+standard S3-compatible surface while deriving the physical namespace from authenticated Tenant,
+Placement, App or Job, dependency, bucket, and key facts. Two installations using bucket `users`
+never share objects.
+
+Run artifacts and audit exports store bounded metadata such as media type, length, digest, and
+transfer state. Bytes move through short-lived purpose-bound transfer paths and never through
+administrative resource bodies.
+
+## Identity and effective authority
+
+A User is human or service. Human Users and ordinary service Users belong to one Tenant. A global
+service User belongs to the installation, cannot sign in, and can bound only global workloads.
+Every App component and Job virtual principal attaches to one existing, enabled User admitted for
+its Placement:
+
+- global work attaches to a global service User;
+- Tenant and Workspace work attaches to a User with current standing there; and
+- tenant-user and workspace-user work attaches to the exact User that owns the Placement.
+
+User-created private workloads therefore attach to their creator. An administrator creating shared
+work selects an existing admitted human or service User explicitly.
+
+```text
+ effective request authority through a workload
+   = Actor authority
+   AND Actor attached-account authority when Actor is virtual
+   AND immediate-caller attached-account authority
+   AND immediate-caller virtual-principal grants
+   AND Package capability ceiling
+   AND Placement fence and constraints
+   AND dependency and network admission
+   AND current lifecycle
+```
+
+The requester of a Run is evidence, not ambient authority. Replacing a Pod changes runtime identity
+without changing the virtual principal or attached account.
+
+Groups are reusable Tenant- or Workspace-scoped audiences. Group membership grants no authority by
+itself; `policyd` grants may name a Group. Product roles, teams, committees, and distribution lists
+use Groups rather than overloading CtlFlow administration roles.
 
 ## Lifecycle
 
-The externally meaningful lifecycle vocabulary is deliberately small:
-
 | Record | Lifecycle |
 | --- | --- |
-| Tenant, Workspace | `provisioning`, `active`, `suspended`, `deleting` |
-| Context | `active`, `retiring`, `retired` |
-| App | `pending`, `active`, `suspended`, `removing` plus readiness conditions |
+| Tenant, Workspace | `provisioning`, `active`, `suspended`, `deleting`, or `failed` |
+| Placement | `provisioning`, `active`, `suspended`, `retiring`, `retired`, or `failed` |
 | Package | `available` or terminal `revoked` |
-| Job, Trigger, User, provider, destination | Enabled or disabled |
-| Run | `admitted`, `running`, `succeeded`, `failed`, `cancelled` |
-| Audit Export | `pending`, `running`, `succeeded`, `failed`, `expired` |
-
-A deleted record no longer exists; `deleted` is not a stored state. Failure detail is a stable
-condition or reason attached to the current state, not a parallel lifecycle.
-
-Deletion follows two rules:
-
-- **Owned children follow their owner.** Removing a Job removes its Triggers and eventually its
-  retained Runs according to policy.
-- **Independent references block deletion.** A referenced account, provider, or destination cannot
-  be deleted until the reference is removed. Immutable catalog records are not deleted in this
-  architecture.
+| App | `pending`, `active`, `suspended`, `removing`, or `failed` |
+| Job, schedule, User, provider, destination | Enabled or disabled |
+| Run | `admitted`, `running`, `succeeded`, `failed`, or `cancelled` |
+| Audit export | `pending`, `running`, `succeeded`, `failed`, or `expired` |
 
 Suspension is reversible and blocks new activity without discarding records. Deletion is
-irreversible. Cross-service deletion is coordinated through explicit lifecycle state and
-idempotent acknowledgements; no service writes another service's database.
+irreversible. Owned children follow their owner; independent references block deletion until
+removed. Cross-service cleanup uses explicit lifecycle state and idempotent acknowledgements. No
+service reads or writes another service's database.

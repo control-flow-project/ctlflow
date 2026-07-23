@@ -1,31 +1,27 @@
 ---
 title: Runs
-weight: 70
+weight: 65
 ---
 
-A Run is one invocation of a Job. It records its Job, concrete Context, requester or Trigger,
-attempts, lifecycle, logs, and outputs.
+A Run is one admitted invocation of a Job.
 
 ```text
-ctlflow run list --tenant TENANT [--job JOB] [--scope CONTEXT] [--watch]
-ctlflow run get RUN --tenant TENANT
-ctlflow run wait RUN --tenant TENANT
-ctlflow run cancel RUN --tenant TENANT [--force] [--wait]
-ctlflow run logs RUN --tenant TENANT [--follow]
-ctlflow run artifacts RUN --tenant TENANT
-ctlflow run artifact get RUN ARTIFACT --tenant TENANT
-ctlflow run artifact download RUN ARTIFACT --tenant TENANT --output FILE
+ctlflow get runs (--global | --tenant TENANT | --all-tenants) \
+  [--job JOB] [--placement PLACEMENT]
+ctlflow get run RUN (--global | --tenant TENANT)
+ctlflow wait run RUN (--global | --tenant TENANT)
+ctlflow cancel run RUN (--global | --tenant TENANT) [--force] [--wait]
+ctlflow logs run RUN (--global | --tenant TENANT) [--follow]
+ctlflow get run-artifacts (--global | --tenant TENANT) --run RUN
+ctlflow get run-artifact ARTIFACT (--global | --tenant TENANT) --run RUN
+ctlflow download run-artifact ARTIFACT (--global | --tenant TENANT) \
+  --run RUN --output FILE
 ```
 
-Runs progress through admitted, running, and one terminal outcome: succeeded, failed, or cancelled.
-Retry attempts remain part of the same Run. Cancellation is an explicit domain transition and does
-not imply that a committed external side effect was undone.
+One Job and idempotency key identify at most one Run. Attempts, cancellation, logs, outputs, and
+the exact runtime principal for each attempt remain attached to that Run. Cancellation stops
+further execution but does not undo a committed external side effect. A terminal outcome is
+immutable.
 
-A Package may declare bounded Run input and output contracts. `job run` can accept a completed
-artifact from the same Context or a local input file when that contract permits it. Local bytes
-stream through a short-lived `egressd` transfer endpoint; they do not traverse the administrative
-API.
-
-Artifact reads return immutable metadata. `download` obtains short-lived transfer access from
-`egressd` and verifies the stored digest while streaming through that endpoint. A terminal Run is immutable and is
-removed only by configured retention, never by an ordinary user delete command.
+Administrative APIs carry bounded artifact metadata. Upload and download bytes use short-lived,
+purpose-bound transfer access from the configured artifact dependency.

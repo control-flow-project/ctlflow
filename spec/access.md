@@ -3,116 +3,150 @@ title: Access
 weight: 15
 ---
 
-CtlFlow separates infrastructure identity, tenant identity, delegated workload authority, and
-concrete runtime identity. None can be substituted for another.
+CtlFlow distinguishes infrastructure operators, Tenant accounts, virtual principals, concrete
+runtime principals, and external callers. None can be substituted for another.
 
 ## Infrastructure operators
 
-`ctlflow` uses standard kubeconfig and Kubernetes authentication. It does not maintain a login,
-credential, or active-tenant database.
+`ctlflow` loads standard kubeconfig and calls the selected Kubernetes API server. Kubernetes
+authenticates the request and routes CtlFlow resources to their aggregated API owners.
 
 ```text
  ctlflow --context CLUSTER
           |
-          | kubeconfig authentication
+          | kubeconfig credential
           v
  Kubernetes API server
           |
-          | RBAC + aggregated API routing
+          | authentication, RBAC, aggregation identity
           v
  owning CtlFlow service
 ```
 
-Normal operator access uses an explicit Kubernetes group and least-privilege ClusterRoles.
-Bootstrap cluster credentials are break-glass credentials, not routine CtlFlow identity.
+`ctlflow init` is the sole pre-kernel path. It applies signed CtlFlow manifests, waits for the kernel,
+and uses a one-time initialization operation to bind the authenticated Kubernetes subject as the
+first infrastructure operator. Initialization is idempotent and permanently closes after success.
 
-## Tenant users
+Routine operator access uses an explicit least-privilege Kubernetes group. CtlFlow has no operator
+password database, active-Tenant login, or reusable bootstrap token.
 
-Tenant login is owned by `identityd`. Browser sessions are opaque, secure cookies and are not
-Kubernetes credentials. A platform backend may exchange a valid session for a short-lived bearer
-credential scoped to the same Tenant principal and one named audience: the aggregated CtlFlow APIs
-or an admitted App endpoint. That credential never reaches the browser.
+The authenticated Kubernetes subject is the Actor for operator mutations and is preserved in audit
+evidence. It is not converted into an `identityd` User or virtual principal.
+
+## Accounts
+
+`identityd` owns human and service Users. Human and ordinary service Users belong to one Tenant. A
+global service User belongs to the installation, cannot sign in, and can bound only global
+workloads. A Membership gives a Tenant User standing in one Tenant or Workspace and may carry the
+built-in CtlFlow management role `admin` or `member`. Product roles, teams, committees, and
+audiences are Groups rather than management roles.
+
+Tenant login is Tenant-scoped. A login started from a Workspace returns there, but current Workspace
+Membership and admission policy still determine access. A Workspace may narrow its Tenant's enabled
+identity providers and cannot add another provider.
+
+Human browser sessions are opaque secure cookies. Service Users cannot use SSO or hold browser
+sessions. A product backend may exchange a valid session for a short-lived credential addressed to
+one CtlFlow management audience or one admitted App endpoint. The browser never receives that
+credential.
 
 ```text
- browser -- session cookie --> platform backend
-                                 |
-                                 | validate and exchange
-                                 v
-                              identityd
-                                 |
-                                 | short-lived audience-bound credential
-                                 v
-                       Kubernetes API server
-                                 |
-                                 v
-                         owning domain service
+ browser -- opaque cookie --> edged --> product backend App
+                                |               |
+                                | validate      | exchange for exact target
+                                v               v
+                            identityd       identityd
+                                                |
+                                                | audience-bound credential
+                                                v
+                                      owning service or App endpoint
 ```
 
-Login is tenant-scoped. A login started from a Workspace returns to that Workspace, but access
-still depends on current Workspace membership. Workspace admission may narrow the Tenant's enabled
-identity providers; it cannot add another provider or grant membership.
+## Management boundaries
 
-Kubernetes RBAC admits tenant principals only to the appropriate aggregated API groups. The owning
-service then enforces tenant fencing and domain management rules. Tenant configuration can never
-grant infrastructure-operator authority.
-
-## Management authority
-
-| Caller | Management boundary |
+| Caller | Maximum management boundary |
 | --- | --- |
-| Infrastructure operator | Every CtlFlow record in the selected infrastructure |
+| Infrastructure operator | Every CtlFlow record in the selected installation |
 | Tenant administrator | Tenant-owned records in one Tenant |
-| Workspace administrator | Shared records in one Workspace, within Tenant policy |
-| Ordinary user | That User's private Apps, Jobs, Runs, and evidence |
-| Service account | Runtime delegation only; no browser administration |
+| Workspace administrator | Workspace-owned records within Tenant limits |
+| Ordinary User | That User's permitted private Apps, Jobs, Runs, configuration, and evidence |
+| Tenant service User | Explicit delegated runtime operations; no browser administration |
+| Global service User | Explicit global workload delegation; no Tenant or browser standing |
 
-Tenant and Workspace administrators are expressed by Membership role, not separate account kinds.
-Management authority over CtlFlow records does not automatically grant application-data access.
-That is evaluated by `policyd`.
+Every owner enforces its own boundary after authentication. Lists, watches, logs, errors, and
+evidence use the same visibility fence as direct reads. An invisible record is reported as not
+found.
 
-Lists, watches, logs, Events, artifacts, and audit evidence use the same visibility fence as direct
-reads. A caller cannot discover an otherwise invisible record through a collection or error.
+## Delegated workload identity
 
-## Workload authority
+Every App component and Job has a stable virtual principal attached to one existing User valid for
+the target Placement. Global work requires a global service User. Tenant and Workspace work
+requires current standing in that boundary. A private user Placement requires its exact owning
+User. An administrator creating shared automation selects an existing admitted human or service
+User explicitly.
 
-Every App component and Job has a virtual principal attached to an existing human or service
-account. Private user-created workloads attach to the creator. Administrators creating shared
-workloads must select the attached account.
+Every App component or Job attempt receives a workload-scoped Kubernetes ServiceAccount. Each
+concrete Pod/process authenticates through its runtime proxy and receives a distinct runtime
+principal and process-bound credential. Replacing a Pod changes those runtime facts without
+changing the virtual principal, attached account, or workload ServiceAccount.
 
-Principal references are stable domain references:
+The effective authority is always the intersection documented in [Model](../model/). Placement,
+network reachability, Package installation, or administrator authorship never grants application
+authority by itself.
 
-- account: `usr-*`;
-- Job: `job-*`;
-- App component: `app-*/components/<component-key>`.
+## Actor-preserving calls
 
-Effective authority is the intersection defined in [Model](../model/). A Job or component cannot
-gain authority merely because it runs in a broader Context or because an administrator created it.
+An internal request distinguishes:
 
-## Runtime identity
+- the Actor whose authority initiated the operation;
+- the Actor's attached account when the Actor is virtual;
+- the immediate calling App component or Run;
+- that caller's attached account and source Placement;
+- the concrete runtime principal;
+- the exact target audience; and
+- request, parent-call, and trace identities.
 
-Each concrete execution receives a dedicated Kubernetes ServiceAccount and short-lived,
-audience-bound credential. Runtime services derive the caller from that verified workload
-identity and the controller's binding; tenant, User, Context, App, Job, and Run headers supplied by
-the caller are never trusted as identity.
+Each workload endpoint is fronted by a trusted runtime proxy realized by `execd`. It validates the
+source and target-audience credential, removes protected caller headers, and injects trusted context
+into the private application listener.
 
-App and Job code is untrusted with respect to the substrate. Its ServiceAccount has no Kubernetes
-API authority, and Package contracts cannot request privileged containers, host namespaces, host
-paths, or arbitrary native manifests. Storage, network, secret, and runtime identity bindings are
-created only by `controller-manager` from admitted domain intent.
+For an outbound call, application code requests a credential using one declared dependency name
+and, when preserving a human Actor, the current opaque invocation handle. The application cannot
+select a URL, Tenant, Placement, principal, account, or audience. `identityd` resolves those facts
+and issues a new short-lived credential for the exact endpoint.
 
-An internal App request carries a verifiable caller credential addressed to the receiving App. A
-resource-owning App may present that credential to `policyd` while authenticating as itself; it
-cannot replace the original caller with an asserted principal string. Receiving a policy decision
-does not let it exercise the caller's credential against another workload because every destination
-validates audience and concrete runtime source.
+```text
+ App A private listener
+          |
+          | dependency name + invocation handle
+          v
+ App A runtime proxy ---- exchange ----> identityd
+          |
+          | new audience-bound credential
+          v
+ Kubernetes Service -> App B runtime proxy -> App B private listener
+```
 
-Some standard clients require familiar credential fields. A proxy may issue a short-lived
-protocol-shaped credential whose only purpose is to identify one workload to that proxy. It is not
-the upstream credential and cannot grant another workload access.
+An autonomous call omits the invocation handle and acts as the calling virtual principal. An inbound
+credential is never forwarded to a second audience. Raw TCP dependencies carry workload identity
+only and cannot claim per-request human delegation.
 
-## Service identity
+## Runtime and proxy credentials
 
-Each CtlFlow component has its own Kubernetes ServiceAccount. Direct service calls use TLS and a
-short-lived credential whose audience names the destination. The receiver admits only named
-service identities for each internal operation. Shared daemon credentials and unauthenticated
-internal listeners are forbidden.
+Tenant application code has no Kubernetes API authority. It cannot create Pods, read Secrets, mount
+volumes, or inspect another namespace.
+
+Some standard clients require credential-shaped configuration. `identityd` may mint a short-lived,
+process-bound proxy credential that identifies one runtime and one dependency to a trusted proxy.
+It is not an upstream credential, cannot be used from another runtime, and grants no ambient access.
+
+`egressd` ignores caller-supplied upstream authentication and applies only the credential selected by
+the admitted destination policy. Secret material comes from `configd` and never enters domain
+records, evidence, or error text.
+
+## Kernel service identity
+
+Each kernel service has its own Kubernetes ServiceAccount and destination-specific service
+credential. The receiver accepts only named service identities for each internal operation.
+Shared daemon credentials, caller-asserted service headers, and unauthenticated internal listeners
+are forbidden.

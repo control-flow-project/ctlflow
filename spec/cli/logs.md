@@ -1,18 +1,18 @@
 ---
 title: Logs
-weight: 80
+weight: 70
 ---
 
-Program logs are exposed through their owning execution records:
+Program logs are read through their owning App, Job, or Run:
 
 ```text
-ctlflow app logs APP --tenant TENANT [--component COMPONENT] [--follow]
-ctlflow job logs JOB --tenant TENANT [--follow]
-ctlflow run logs RUN --tenant TENANT [--follow]
+ctlflow logs app APP (--global | --tenant TENANT) [--component COMPONENT] [--since TIME] [--follow]
+ctlflow logs job JOB (--global | --tenant TENANT) [--since TIME] [--follow]
+ctlflow logs run RUN (--global | --tenant TENANT) [--since TIME] [--follow]
 ```
 
-Queries are Tenant-fenced, time-bounded, and paginated. `--follow` starts a finite live stream from
-the current boundary; no command downloads all retained output implicitly.
+Every query is authorization-fenced, time-bounded, and paginated. `--follow` begins a finite stream
+at an explicit current boundary; it does not fetch all retained output.
 
-These commands read the configured product log store, not arbitrary Pod logs. CtlFlow component and
-cluster-operational logs remain in the installation observability system and `kubectl logs`.
+These commands read the configured program-log dependency. Kernel and cluster operational logs
+remain in the installation observability system and `kubectl logs`. Audit evidence is separate.

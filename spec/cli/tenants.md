@@ -3,25 +3,22 @@ title: Tenants
 weight: 10
 ---
 
-A Tenant is the customer and isolation boundary.
+A Tenant is the customer and top-level isolation boundary.
 
 ```text
-ctlflow tenant list
-ctlflow tenant get TENANT
-ctlflow tenant create --name NAME [--wait]
-ctlflow tenant update TENANT -f FILE
-ctlflow tenant suspend TENANT [--wait]
-ctlflow tenant resume TENANT [--wait]
-ctlflow tenant delete TENANT [--force] [--wait]
+ctlflow get tenants
+ctlflow get tenant TENANT
+ctlflow create tenant -f FILE [--wait]
+ctlflow apply tenant TENANT -f FILE
+ctlflow suspend tenant TENANT [--wait]
+ctlflow resume tenant TENANT [--wait]
+ctlflow delete tenant TENANT [--force] [--wait]
 ```
 
-Creation allocates an opaque Tenant ID and provisions its domain state and containment. Suspension
-blocks new tenant activity while preserving records. Deletion is irreversible, cascades through
-Tenant-owned records, and completes only after every owning service and `controller-manager`
-acknowledges cleanup.
+Creation allocates an opaque ID, establishes the initial administrator and configuration scope,
+materializes the Tenant Placement, and installs only explicitly requested baseline Apps. The
+Tenant remains visible with a stable condition until every step succeeds.
 
-The Tenant document contains a display name and versioned Tenant-level policy supported by the API.
-It never contains infrastructure placement or Kubernetes object identity.
-
-Tenant administrators are Users with a Tenant Membership whose role is `admin`; there is no
-separate Tenant-admin account type.
+Suspension blocks new Tenant activity without deleting state. Deletion is irreversible and
+completes only after each owner has retired its Tenant records and realization. A Tenant document
+contains domain policy and display metadata, never Kubernetes object identity.

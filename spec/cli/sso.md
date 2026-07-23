@@ -1,41 +1,29 @@
 ---
 title: SSO
-weight: 40
+weight: 35
 ---
 
-SSO providers and admission policy are Tenant records. Tenant administrators normally manage them
-through the platform UI; these commands are the infrastructure-operator path over the same API.
+An SSO provider belongs to one Tenant. A Workspace admission policy may narrow the enabled Tenant
+provider set but cannot add another provider.
 
 ```text
-ctlflow sso provider list --tenant TENANT
-ctlflow sso provider get PROVIDER --tenant TENANT
-ctlflow sso provider create --tenant TENANT -f FILE
-ctlflow sso provider update PROVIDER --tenant TENANT -f FILE
-ctlflow sso provider credential set PROVIDER --tenant TENANT --from-file FILE
-ctlflow sso provider credential delete PROVIDER --tenant TENANT [--force]
-ctlflow sso provider enable PROVIDER --tenant TENANT
-ctlflow sso provider disable PROVIDER --tenant TENANT [--force]
-ctlflow sso provider delete PROVIDER --tenant TENANT [--force]
+ctlflow get sso-providers --tenant TENANT
+ctlflow get sso-provider PROVIDER --tenant TENANT
+ctlflow create sso-provider --tenant TENANT -f FILE
+ctlflow apply sso-provider PROVIDER --tenant TENANT -f FILE
+ctlflow enable sso-provider PROVIDER --tenant TENANT
+ctlflow disable sso-provider PROVIDER --tenant TENANT [--force]
+ctlflow delete sso-provider PROVIDER --tenant TENANT [--force]
 
-ctlflow sso admission get --tenant TENANT [--workspace WORKSPACE]
-ctlflow sso admission allow PROVIDER --tenant TENANT [--workspace WORKSPACE]
-ctlflow sso admission remove PROVIDER --tenant TENANT [--workspace WORKSPACE] [--force]
-ctlflow sso admission delete --tenant TENANT --workspace WORKSPACE [--force]
+ctlflow get admission-policies --tenant TENANT [--workspace WORKSPACE]
+ctlflow get admission-policy --tenant TENANT [--workspace WORKSPACE]
+ctlflow apply admission-policy --tenant TENANT [--workspace WORKSPACE] -f FILE
+ctlflow delete admission-policy --tenant TENANT --workspace WORKSPACE [--force]
 ```
 
-The supported provider protocol is OIDC. A provider records issuer, client identity, claim mapping,
-requested scopes, approved Egress Destinations, enabled state, and credential-binding readiness.
-The issuer and every discovered external endpoint must match one of those Destinations. The client
-secret is submitted only through the write-only credential command and cannot be read back.
-Discovery and token exchange pass through `egressd`; `identityd` has no separate external path.
+Provider secret fields reference write-only [Secrets](../config/). Provider discovery and exchange
+use an admitted `egressd` destination; `identityd` has no independent external network path.
 
-Disabling a provider blocks new login and invalidates sessions established through it.
-
-Tenant admission selects enabled Tenant providers. A Workspace admission policy may narrow that
-set but cannot introduce another provider. Admission never creates a User or Membership
-implicitly. Deleting a provider is rejected while an admission policy or Identity link references
-it.
-
-No Workspace policy means inheritance from the Tenant. An explicit empty Workspace policy denies
-SSO entry there. Deleting the Workspace policy restores inheritance; the Tenant policy itself
-cannot be deleted.
+The Tenant policy always exists and may be empty. No Workspace policy means Tenant inheritance. An
+explicit empty Workspace policy denies SSO entry; deleting it restores inheritance. Login never
+creates a User or Membership implicitly.
