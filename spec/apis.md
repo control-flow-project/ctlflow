@@ -31,6 +31,9 @@ Kubernetes API aggregation and served by its owner.
 
 CtlFlow domain records are not CRDs and are not stored in Kubernetes etcd. Aggregated resources use
 Kubernetes discovery, metadata, status, error, list, watch, and content-negotiation conventions.
+Each aggregated listener uses Kubernetes-managed serving certificates and request-header client
+authentication. It accepts forwarded operator identity only from the authenticated Kubernetes API
+server, never from a direct caller or another service listener.
 
 ## Product administration
 
@@ -44,6 +47,16 @@ owning-service use case as the aggregated API.
 
 The product surface may offer a purpose-built form and JSON review for one operation. It cannot
 change semantics, bypass a field, or create a second record shape.
+
+## Public authentication
+
+Browser authentication uses the public HTTP contract owned by `authd`. It covers login options,
+begin, provider callback, and logout. `authd` translates those operations into private `tenantd`
+and `identityd` calls; it does not expose an administrative resource or proxy arbitrary
+`identityd` operations.
+
+`identityd` has no Ingress or public HTTP API. Its Session, identity, and invocation-token
+operations are private gRPC and aggregated administrative resources only.
 
 ## Administrative resource inventory
 
@@ -105,7 +118,8 @@ service-to-service contracts use gRPC. Public HTTP mediation remains HTTP.
 | Service | Direct operations |
 | --- | --- |
 | `tenantd` | Resolve Tenant/Workspace address and coordinate lifecycle facts |
-| `identityd` | Login, session validation, call exchange, proxy credentials, and principal resolution |
+| `authd` | Public HTTP login options, begin, callback, logout, and private operational health |
+| `identityd` | Authentication decisions for authd, Session validation, invocation JWTs, proxy credentials, and principal resolution |
 | `policyd` | Check or explain one operation on one canonical path |
 | `pkgd` | Resolve Package declaration, App installation, service contract, exposure, and provider schema |
 | `configd` | Resolve configuration and materialize an authorized secret binding |
@@ -114,9 +128,28 @@ service-to-service contracts use gRPC. Public HTTP mediation remains HTTP.
 | `egressd` | Proxy admitted HTTP, open HTTP stream, and preview a decision |
 | `auditd` | Ingest idempotent evidence batches and manage exports |
 
-Every direct request carries authenticated service or runtime identity plus request and trace IDs.
-A request may name a target record, but body fields cannot override the authenticated principal,
-attached account, source Tenant, or source Placement; the callee independently fences every target.
+Every internal direct request carries:
+
+```text
+authorization: Bearer <bound Kubernetes ServiceAccount token>
+ctlflow-invocation: Bearer <identityd invocation JWT>   when acting on behalf of an Actor
+traceparent: <W3C Trace Context>
+tracestate: <W3C vendor state>                         when present
+```
+
+The receiver validates immediate workload identity before parsing the operation. The optional
+invocation JWT has the installation's internal audience, expires no later than 60 seconds after
+issuance, and supplies subject-account and Actor context without permissions. A request may name a
+target record, but body fields cannot override authenticated workload, subject, Actor, attached
+account, Tenant, Workspace, Placement, or Run facts. The callee independently fences every target.
+
+A missing, invalid, or expired required token is unauthenticated. A valid workload or invocation
+identity that is not admitted for the operation is permission denied. A target outside the
+caller's visibility remains not found.
+
+Trace propagation follows [Telemetry](../telemetry/), whose W3C trace and span identity is the sole
+transport correlation model. Public cookies, public bearer tokens, protected identity headers, and
+W3C baggage are never forwarded into an internal operation.
 
 ## Application endpoints
 

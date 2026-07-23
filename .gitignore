@@ -41,6 +41,17 @@ build/Release
 node_modules/
 jspm_packages/
 
+# Local analysis and generated service artifacts
+.analysis/
+.generated/
+**/bin/
+**/obj/
+TestResults/
+*.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+
 # Hugo build output
 public/
 resources/_gen/

@@ -9,15 +9,16 @@ other admitted external HTTP traffic. It owns no Tenant, route, App, or endpoint
 ## Activities
 
 - Accept external HTTP, streaming HTTP, WebSocket, and required HTTP/2 traffic.
-- Resolve Tenant and optional Workspace address through `tenantd`.
-- Validate browser sessions, product credentials, or admitted external authentication through
-  `identityd`.
+- Reject authentication protocol routes owned by public `authd`.
+- Resolve the Tenant root and then any Workspace address segment through `tenantd`.
+- Exchange browser Sessions or validate admitted external credentials through `identityd`.
 - Ask `policyd` for the required coarse management or application operation.
 - Resolve the exact current App exposure through `pkgd`.
-- Resolve the exact ready endpoint and audience through `execd`.
+- Resolve the exact ready endpoint through `execd`.
 - Ask `execd` to realize an admitted start-on-demand App.
-- Create a trusted external request context.
+- Create a trusted external request context and obtain the invocation JWT when an Actor exists.
 - Remove caller-supplied protected identity and routing headers.
+- Create or continue validated W3C trace context and propagate it independently of identity.
 - Proxy request and response with finite body, stream, timeout, and concurrency bounds.
 - Serve immutable UI artifacts resolved by digest through `pkgd`, validating bytes obtained through
   its purpose-bound artifact transfer before caching them.
@@ -30,25 +31,29 @@ other admitted external HTTP traffic. It owns no Tenant, route, App, or endpoint
  external request
       |
       v
- tenantd ----> Tenant and optional Workspace
- identityd --> authenticated Actor
+ tenantd ----> Tenant, then optional Workspace
+ identityd --> authenticated Actor and invocation JWT
  policyd ----> coarse authorization
  pkgd -------> exact App exposure
- execd ------> exact ready endpoint, Placement, and audience
+ execd ------> exact ready endpoint and Placement
       |
       v
  target runtime proxy -> application
 ```
 
 Routes are inferred from current owner state. There is no create, update, or delete route API.
-Product URL design must identify Tenant, optional Workspace, and exposure with structurally
-separate fixed and user-controlled segments. `tenantd` resolves the admitted address and `edged`
-uses the resulting structured route identity and canonical remaining path.
+`edged` first resolves the exact Tenant root through `tenantd`. If the remaining path contains the
+fixed `/workspaces/<workspace-address>` boundary, it then resolves that exact Workspace inside the
+resolved Tenant. Product URL design below the address root must identify the exposure with
+structurally separate fixed and user-controlled segments. `edged` uses the resulting structured
+route identity and canonical remaining path.
 
 ## Authentication and context
 
-For a browser request, `edged` validates the opaque session through `identityd`. The session cookie
-is never forwarded. `identityd` issues an exact-audience credential and `edged` supplies it to the
+For a browser request, `edged` resolves the opaque Session through its bounded invocation cache or
+private `identityd` on a miss. The Session cookie is never forwarded or stored in plaintext.
+`identityd` derives current identity facts and issues one invocation JWT for the installation's
+internal audience. `edged` supplies that token and its own Kubernetes workload identity to the
 target runtime proxy.
 
 For an external webhook or API endpoint, the Package exposure declares its external authentication
@@ -59,8 +64,9 @@ For explicitly admitted unauthenticated traffic, `edged` is the immediate caller
 source Placement are absent. That context cannot be exchanged as a human invocation; any outbound
 call is autonomous as the target App's virtual principal.
 
-Every protected caller header is removed before trusted Actor, caller, Tenant, Workspace, Placement,
-request, and trace context is attached.
+Every protected caller header is removed before trusted Actor, caller, Tenant, Workspace, and
+Placement context is attached. W3C trace context is validated and propagated separately; it never
+becomes an identity fact.
 
 ## Start on demand
 
@@ -70,21 +76,30 @@ It never selects another App or stale endpoint as fallback.
 
 ## Caching
 
-`edged` keeps a bounded in-memory cache of the narrow `tenantd` external-address projection. Its key
-is the normalized external authority and admitted path prefix. Its value contains only the
-canonical Tenant ID, optional Workspace ID, address-binding generation, and expiry. It does not
-cache the Tenant or Workspace administrative record.
+`edged` keeps separate bounded in-memory caches for the two narrow `tenantd` address projections.
+The Tenant cache key is the normalized external authority and canonical Tenant path prefix; its
+value contains only Tenant ID, binding generation, and expiry. The Workspace cache key is Tenant ID
+and Workspace address segment; its value contains only Workspace ID, binding generation, and
+expiry. Neither cache contains a Tenant or Workspace administrative record.
 
-An address-cache miss or expiry calls `tenantd`. Entry expiry is the earlier of the owner-supplied
-expiry and 60 seconds. There is no invalidation stream, durable route cache, or second route
-database.
+A miss or expiry in either address cache calls `tenantd` for that exact hierarchy step. Entry
+expiry is the earlier of the owner-supplied expiry and 60 seconds. There is no invalidation stream,
+durable route cache, or second route database.
 
 The resolved App exposure and endpoint projection is cached separately. Its expiry is no later than
 the address expiry, the endpoint lifetime supplied by `execd`, or 60 seconds. A cache miss calls the
 owning services and never selects another target as fallback.
 
-Session validation and authorization decisions are request-specific and are not reused as cached
-allows. A cached target must still accept the request's current exact-audience credential.
+`edged` may cache a Session-to-invocation projection under a keyed digest of the Session credential.
+The entry expires no later than the invocation JWT and never exceeds 60 seconds. It contains no
+cookie value or authorization decision. Revocation therefore has the same bounded consequence as an
+already issued JWT and does not require a separate invalidation stream.
+
+The digest key is generated into process-private memory at startup and is never persisted, shared,
+or exposed. Restarting `edged` therefore starts with a cold Session cache.
+
+Authorization decisions are request-specific and are never reused as cached allows. A cached target
+must still validate the current invocation JWT, immediate workload identity, and operation.
 
 Drain blocks new proxied work while allowing bounded active streams to finish. Cache refresh and
 inspection are operational controls and never mutate domain state.
@@ -107,5 +122,6 @@ inspection are operational controls and never mutate domain state.
 - `edged` never creates a Tenant, App, route, Placement, or endpoint.
 - A warm address-cache hit does not call `tenantd`; a miss or expired entry always does.
 - Cached state can delay recovery but cannot widen authorization or change target identity.
+- Authentication protocols are served by `authd`, not routed as an `edged` application exposure.
 - Internal App-to-App calls do not traverse `edged`.
 - Request and response bodies are never audit payloads.

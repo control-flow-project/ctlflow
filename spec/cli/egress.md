@@ -31,5 +31,8 @@ A Destination declares one approved HTTP origin and deterministic generic rewrit
 the admitted callers, dependency, Placement fence, methods, and paths. Upstream credentials are
 write-only [Secrets](../config/) referenced by the Destination.
 
+External W3C Trace Context propagation is a Destination opt-in and is disabled by default. It never
+forwards baggage or CtlFlow identity and authorization metadata.
+
 `check` and `explain` perform the same decision without forwarding or revealing secret material.
 Non-HTTP traffic and provider-specific protocol behavior are outside `egressd`.

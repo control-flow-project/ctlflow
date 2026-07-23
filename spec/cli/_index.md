@@ -17,7 +17,7 @@ ctlflow init [--context CONTEXT]
 
 `init` loads kubeconfig, applies the signed CtlFlow release manifests, waits for readiness, binds the
 authenticated Kubernetes subject as the first operator, creates global configuration and Placement,
-and permanently closes initialization.
+verifies the installation OpenTelemetry Collector path, and permanently closes initialization.
 
 After initialization, the CLI calls aggregated CtlFlow APIs through the Kubernetes API server:
 

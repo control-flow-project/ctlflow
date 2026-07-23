@@ -13,7 +13,8 @@ remain unchanged.
  ctlflow init
    -> load selected kubeconfig context
    -> Kubernetes API authenticates operator
-   -> apply CtlFlow namespace, RBAC, API aggregation, storage, and kernel workloads
+   -> apply CtlFlow namespace, RBAC, API aggregation, storage, Collector, and kernel workloads
+   -> verify bounded OTLP intake and configured export
    -> wait for all kernel readiness endpoints
    -> bind authenticated Kubernetes subject as first infrastructure operator
    -> create global Placement and initial configuration
@@ -83,19 +84,26 @@ owners without provider selection.
 ## Login and Workspace access
 
 ```text
- browser -> edged -> identityd resolves Tenant login methods
-                    -> admitted external identity provider through egressd
-                    -> identityd resolves an existing identity link and User
-                    -> identityd mints opaque session
+ browser -> authd
+   -> tenantd resolves the exact Tenant root
+   -> tenantd separately resolves a Workspace return segment when present
+   -> identityd resolves admitted Tenant login methods
+   -> identityd uses admitted external identity provider through egressd
+   -> identityd resolves an existing identity link, User, and Membership
+   -> identityd creates opaque Session
+   -> authd sets secure Session cookie and returns to validated destination
 
  browser -> Workspace URL -> edged
-                           -> identityd validates session
-                           -> edged uses a bounded Workspace address-cache entry
+                           -> resolve cached invocation JWT or ask identityd to validate Session
+                              and issue one
+                           -> edged uses a bounded Tenant address-cache entry
                               or tenantd resolves it on miss/expiry
+                           -> edged uses a separate bounded Workspace address-cache entry
+                              or tenantd resolves it inside that Tenant on miss/expiry
                            -> policyd verifies current standing and operation
                            -> pkgd resolves App exposure
                            -> execd resolves ready endpoint
-                           -> App runtime proxy
+                           -> App runtime proxy validates edged workload + invocation JWT
 ```
 
 Login is Tenant-scoped. A Workspace return URL does not grant Workspace Membership.
@@ -104,10 +112,12 @@ Login is Tenant-scoped. A Workspace return URL does not grant Workspace Membersh
 
 ```text
  browser -> edged
-   -> validate session and external route
+   -> resolve Session to invocation JWT and validate external route
    -> authorize coarse App access
-   -> attach trusted actor context
+   -> start or continue W3C trace
    -> proxy to target App runtime proxy
+   -> runtime proxy validates edged workload and invocation JWT
+   -> inject trusted Actor and trace context
    -> App enforces its current object-level rules
 ```
 
@@ -120,23 +130,26 @@ the owning kernel service, which independently enforces the management operation
 ```text
  App A receives trusted Actor context
    -> App A selects declared dependency "tasks"
-   -> local runtime proxy exchanges invocation handle through identityd
-   -> identityd issues credential for exact Tasks endpoint
+   -> local runtime proxy resolves the existing Tasks binding
+   -> proxy presents App A workload token and propagates the invocation JWT
+   -> proxy injects current W3C trace context
    -> Kubernetes Service routes directly to Tasks runtime proxy
+   -> Tasks validates workload and invocation independently
    -> Tasks receives Actor, App A, runtime, Placement, and trace facts
    -> Tasks applies its own operation and object rules
 ```
 
 This supports managed Tasks, object-bound discussions, notifications, directory lookups, and
-cross-application aggregation without forwarding an inbound bearer or trusting identity headers.
+cross-application aggregation without forwarding a browser credential or trusting identity
+headers.
 
 ## Product management call
 
 ```text
  browser -> edged -> product backend App
    -> backend selects declared dependency "kernel:packages"
-   -> runtime proxy exchanges the trusted invocation handle through identityd
-   -> pkgd receives Actor, backend principal, runtime, Placement, and exact audience
+   -> runtime proxy presents its workload token and propagates the invocation JWT
+   -> pkgd validates both identities and receives Actor, backend principal, runtime, and Placement
    -> pkgd authorizes and applies the same App operation used by the aggregated API
 ```
 
@@ -182,8 +195,10 @@ A retry with the same idempotency identity returns the same Run.
    -> invoke configured Job through declared kernel:execution binding
    -> Run receives the agent virtual principal and attached account
    -> persistent state is mounted from the Job Placement
+   -> runtime proxy obtains a fresh invocation JWT for the admitted Run
    -> harness calls external model through egressd when admitted
-   -> harness calls application services using audience-bound credentials
+   -> harness calls application services through its runtime proxy
+   -> proxy presents the Run workload token and invocation JWT
 ```
 
 Agent templates, conversations, trigger configuration, and product logs remain product records.
@@ -232,4 +247,18 @@ prefix.
 ```
 
 Audit evidence and program logs remain separate. Automated activity records virtual principal,
-attached account, runtime principal, Placement, Run, request, and trace.
+attached account, runtime principal, Placement, Run, invocation-token ID, trace, and span.
+
+## Telemetry
+
+```text
+ authd or edged starts or continues W3C trace context
+   -> every internal HTTP/gRPC hop extracts and injects traceparent/tracestate
+   -> delayed Run starts a linked trace
+   -> each process exports bounded OTLP asynchronously
+   -> installation OpenTelemetry Collector processes and exports
+```
+
+Collector failure cannot fail the operation or satisfy required audit evidence. External baggage,
+credentials, payloads, and prohibited high-cardinality metric dimensions are never propagated or
+exported.

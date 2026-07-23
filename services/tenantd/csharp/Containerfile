@@ -1,0 +1,16 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet restore services/tenantd/csharp/CtlFlow.Tenancy.Tenantd.slnx --locked-mode
+RUN dotnet publish \
+    services/tenantd/csharp/src/CtlFlow.Tenancy.Tenantd.Service/CtlFlow.Tenancy.Tenantd.Service.csproj \
+    --configuration Release \
+    --runtime linux-x64 \
+    --no-restore \
+    --output /out
+
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0
+WORKDIR /app
+COPY --from=build /out/ ./
+USER 65532:65532
+ENTRYPOINT ["/app/CtlFlow.Tenancy.Tenantd.Service"]

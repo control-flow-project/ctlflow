@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package ctlflow.tenancy.v1;
+
+option csharp_namespace = "CtlFlow.Tenancy.V1";
+
+import "google/protobuf/timestamp.proto";
+
+service TenantService {
+  rpc ResolveTenant(ResolveTenantRequest) returns (ResolveTenantResponse);
+}
+
+message ResolveTenantRequest {
+  optional string tenant_id = 1;
+  ExternalTenantAddress external_address = 2;
+}
+
+message ExternalTenantAddress {
+  string authority = 1;
+  string path_prefix = 2;
+}
+
+message ResolveTenantResponse {
+  string tenant_id = 1;
+  TenantLifecycle lifecycle = 2;
+  uint64 tenant_revision = 3;
+  ResolvedTenantAddress address = 4;
+  google.protobuf.Timestamp cache_expires_at = 5;
+}
+
+message ResolvedTenantAddress {
+  uint64 binding_generation = 1;
+}
+
+enum TenantLifecycle {
+  TENANT_LIFECYCLE_UNSPECIFIED = 0;
+  TENANT_LIFECYCLE_PROVISIONING = 1;
+  TENANT_LIFECYCLE_ACTIVE = 2;
+  TENANT_LIFECYCLE_SUSPENDED = 3;
+  TENANT_LIFECYCLE_DELETING = 4;
+  TENANT_LIFECYCLE_FAILED = 5;
+  TENANT_LIFECYCLE_DELETED = 6;
+}

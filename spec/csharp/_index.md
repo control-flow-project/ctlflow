@@ -10,8 +10,9 @@ meeting the shared contract in [Implementation](../implementation/).
 
 The C# design is deliberately small and functional. A service has three production projects:
 
-- **Domain** owns service concepts, invariants, decisions, and database queries.
-- **Db** owns the concrete Entity Framework context, mappings, and provider configuration.
+- **Domain** owns service concepts, invariants, decisions, and purpose-named results.
+- **Db** owns the concrete Entity Framework context, mappings, provider configuration, and fixed
+  persistence operations.
 - **Service** owns process startup, gRPC translation, authentication integration, and lifecycle.
 
 There is no Application project, generic repository layer, persistence port layer, dependency bag,
@@ -26,9 +27,9 @@ does not copy or replace them. The following generic Customer service uses propo
 ```text
 services/examples/customerd/
   api/proto/v1/customerd.proto
-  knexfile.js
-  migrations/0001_create_customers.js
-  migrations/0002_create_orders.js
+  knexfile.ts
+  migrations/0001_create_customers.ts
+  migrations/0002_create_orders.ts
   tests/integration/get-customer-summary.test.ts
   csharp/
     Example.Customers.slnx
@@ -44,7 +45,6 @@ services/examples/customerd/
           CustomerStanding.cs
           CustomerSummary.cs
           GetCustomerSummaryResult.cs
-          QueryCustomerSummary.cs
           CalculateCustomerStanding.cs
         Amounts/
           Money.cs
@@ -57,6 +57,7 @@ services/examples/customerd/
         SalesDbContext.cs
         Customers/
           ConfigureCustomer.cs
+          QueryCustomerSummary.cs
         Orders/
           ConfigureOrder.cs
         Providers/
@@ -88,19 +89,19 @@ directories are not checked in.
 
 | Project | May reference | Must not own |
 | --- | --- | --- |
-| Domain | BCL and Entity Framework query abstractions | Wire types, hosting, provider selection, schema migrations |
-| Db | Domain, Entity Framework, selected database providers | Business rules, gRPC translation, schema migrations |
+| Domain | BCL | Wire types, hosting, Entity Framework, provider selection, schema migrations |
+| Db | Domain, Entity Framework, selected database providers | Business decisions, gRPC translation, schema migrations |
 | Service | Domain, Db, generated gRPC bindings, hosting libraries | Domain rules, provider-specific queries, schema migrations |
 
-Domain's use of Entity Framework query abstractions is intentional. This is a
-persistence-aware functional domain, not a textbook persistence-ignorant Clean Architecture. It
-keeps each query with the service logic that gives it meaning and avoids generic repositories that
-hide useful database semantics.
+Db persistence operations are semantic functions rather than repositories. Each operation creates
+and disposes a concrete context locally, executes one fixed Entity Framework query or mutation, and
+returns a typed Domain result. This placement is required so Entity Framework's NativeAOT
+precompiler can see the complete query root and expression; passing `DbSet<T>` or `IQueryable<T>`
+into another project creates a runtime-composed query and is forbidden.
 
 ```text
 Service -> Domain
 Service -> Db -> Domain
-Domain  -> Entity Framework query abstractions
 ```
 
 ## Functional source rules
@@ -111,11 +112,10 @@ function. The complete Domain example below defines `public static partial class
 sites import that module with `using static` and call the function directly:
 
 ```csharp
-using static Example.Customers.Domain.Customers.Customers;
+using static Example.Customers.Db.Customers.Customers;
 
 var result = await QueryCustomerSummary(
-    db.Customers,
-    db.Orders,
+    dbContexts,
     customerId,
     cancellation);
 ```
@@ -174,7 +174,6 @@ Domain owns:
 - validated identifiers, names, amounts, states, and other service concepts;
 - entities and relationships;
 - invariant checks and state transitions;
-- common Entity Framework query expressions;
 - purpose-named query results; and
 - closed success and failure results used by Service translation.
 
@@ -187,7 +186,7 @@ The entity used by business logic is also mapped by Entity Framework:
 
 ```csharp
 // Domain/Customers/Customer.cs
-public sealed class Customer
+public class Customer
 {
     private Customer() { }
     public Customer(CustomerId id, CustomerName name) => (Id, Name) = (id, name);
@@ -199,7 +198,7 @@ public sealed class Customer
 
 ```csharp
 // Domain/Orders/Order.cs
-public sealed class Order
+public class Order
 {
     private Order() { }
     public Order(OrderId id, CustomerId customerId, Money total)
@@ -210,33 +209,41 @@ public sealed class Order
 }
 ```
 
-Identifiers and bounded scalar concepts are typed values. Raw wire strings are parsed before they
-enter Domain operations.
+Mapped entity classes are non-sealed because generated Entity Framework NativeAOT materializers
+must perform framework service checks against them. Identifiers and bounded scalar concepts remain
+sealed typed values. Raw wire strings are parsed before they enter Domain operations.
 
-### Complete query
+### Complete persistence operation
 
-The query belongs in Domain because its selection and result express service meaning:
+The fixed query belongs in Db because Entity Framework's NativeAOT precompiler must see the
+concrete context and complete expression in one operation. Its projection and return values remain
+typed Domain concepts:
 
 ```csharp
-// Domain/Customers/QueryCustomerSummary.cs
-namespace Example.Customers.Domain.Customers;
+// Db/Customers/QueryCustomerSummary.cs
+namespace Example.Customers.Db.Customers;
 
 using Example.Customers.Domain.Amounts;
+using Example.Customers.Domain.Customers;
 using Example.Customers.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
+using static Example.Customers.Domain.Customers.Customers;
 
 public static partial class Customers
 {
     public static async Task<GetCustomerSummaryResult> QueryCustomerSummary(
-        IQueryable<Customer> customers,
-        IQueryable<Order> orders,
+        IDbContextFactory<SalesDbContext> dbContexts,
         CustomerId customerId,
         CancellationToken cancellation)
     {
+        cancellation.ThrowIfCancellationRequested();
+        await using var database = await dbContexts.CreateDbContextAsync(cancellation);
+        var queryCancellation = cancellation;
+
         var row = await (
-            from customer in customers.AsNoTracking()
+            from customer in database.Customers.AsNoTracking()
             where customer.Id == customerId
-            join order in orders.AsNoTracking()
+            join order in database.Orders.AsNoTracking()
                 on customer.Id equals order.CustomerId into customerOrders
             select new
             {
@@ -245,7 +252,7 @@ public static partial class Customers
                 OrderCount = customerOrders.Count(),
                 TotalOrdered = customerOrders.Sum(order => (decimal?)order.Total.Amount) ?? 0m
             })
-            .SingleOrDefaultAsync(cancellation);
+            .SingleOrDefaultAsync(queryCancellation);
 
         if (row is null)
         {
@@ -268,9 +275,11 @@ public static partial class Customers
 }
 ```
 
-The anonymous `row` exists only inside this function. It allows joins, aggregates, and partial
-column selection without inventing a universal row type. `CustomerSummary` is retained because it
-has domain meaning outside the query expression.
+The local cancellation alias is deliberate: it preserves the caller token while keeping the
+invocation statically materializable by the pinned Entity Framework precompiler. The anonymous
+`row` exists only inside this function. It allows joins, aggregates, and partial column selection
+without inventing a universal row type. `CustomerSummary` is retained because it has domain meaning
+outside the query expression.
 
 ## Db
 
@@ -290,8 +299,8 @@ using static Example.Customers.Db.Orders.OrderSchema;
 public sealed class SalesDbContext(DbContextOptions<SalesDbContext> options)
     : DbContext(options)
 {
-    public DbSet<Customer> Customers => Set<Customer>();
-    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<Customer> Customers { get; private set; } = null!;
+    public DbSet<Order> Orders { get; private set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -341,8 +350,9 @@ The process selects one supported provider at startup from typed configuration. 
 provider creates `DbContextOptions<SalesDbContext>` and a pooled context factory. Domain and Service
 code do not branch on provider names.
 
-Common queries stay in Domain and execute against either provider. A query moves behind a
-provider-specific function only when the providers require materially different SQL or semantics:
+Common queries stay in Db and execute against either provider. A query moves behind a
+provider-specific Db function only when the providers require materially different SQL or
+semantics:
 
 ```text
 Db/Sqlite/Customers/QueryCustomerSearch.cs
@@ -351,7 +361,7 @@ Db/Postgres/Customers/QueryCustomerSearch.cs
 
 That escape hatch is selected once during startup through one purpose-typed function delegate. It
 does not create a generic repository, broad storage interface, or provider conditional in every
-Domain function. Both variants return the same Domain result and pass the same canonical tests.
+operation. Both variants return the same Domain result and pass the same canonical tests.
 
 ## Service
 
@@ -361,10 +371,11 @@ Service is a thin process and translation boundary. It owns:
 - dependency construction and process lifecycle;
 - authentication facts supplied to the operation;
 - request validation and conversion into Domain values;
-- concrete context creation and disposal;
-- calls to Domain functions;
+- calls to Domain decisions and Db persistence operations;
 - mapping Domain results into generated wire responses and statuses; and
-- cancellation and deadline propagation.
+- cancellation and deadline propagation;
+- Kubernetes workload and invocation-JWT validation; and
+- OpenTelemetry span, metric, and structured-log integration.
 
 It does not contain service rules or database query expressions.
 
@@ -473,12 +484,8 @@ public sealed partial class CustomerGrpcService
     {
         var customerId = await ParseCustomerId(request, context.CancellationToken);
 
-        await using var db = await _dbContexts.CreateDbContextAsync(
-            context.CancellationToken);
-
         var result = await QueryCustomerSummary(
-            db.Customers,
-            db.Orders,
+            _dbContexts,
             customerId,
             context.CancellationToken);
 
@@ -515,18 +522,18 @@ generated request -> ParseCustomerId
 
 ## Mutations and transactions
 
-A mutation follows the same shape. Service creates the context and starts a transaction when the
-specified operation needs one. Domain functions query tracked entities, apply invariants, and
-produce typed results. Service commits through the context only after the Domain function succeeds.
+A mutation follows the same shape. Its Db operation creates the context and starts a transaction
+when needed. It loads tracked Domain entities, calls Domain decision functions, and commits only
+after the decision succeeds.
 
 For a mutation that must atomically write an audit outbox entry, both entities are added to the same
 context and saved in the same transaction. No network call occurs inside that transaction. A
 downstream call needed before the decision completes before the transaction begins; a call needed
 after commit is driven by the committed outbox.
 
-Functions accept only the concrete inputs they use: relevant `DbSet<T>` or `IQueryable<T>` values,
-typed Domain values, and cancellation. Do not pass a broad repository, service locator, or
-`Dependencies` record.
+Functions accept only the concrete inputs they use: the purpose-specific context factory, typed
+Domain values, and cancellation. Do not pass `DbSet<T>` or `IQueryable<T>` across project
+boundaries, or introduce a broad repository, service locator, or `Dependencies` record.
 
 ## Errors and cancellation
 
@@ -536,19 +543,25 @@ outcome. Service maps expected Domain outcomes to the exact gRPC status and erro
 by the shared API.
 
 Every I/O function receives and propagates `CancellationToken`. Service uses the gRPC call token;
-Domain passes it to Entity Framework; outbound adapters pass it to generated clients. Code does not
-replace a caller deadline with an unbounded token or convert asynchronous work into blocking calls.
+Db passes a local alias of it to each precompiled Entity Framework operation; outbound adapters pass
+it to generated clients. Code does not replace a caller deadline with an unbounded token or convert
+asynchronous work into blocking calls.
 
 ## Schema and migrations
 
 C# projects never own schema migrations. They contain no Entity Framework migration history and do
 not call `EnsureCreated`, `Migrate`, or equivalent startup schema mutation.
 
-Deployment runs the Knex migration job and verifies the schema revision before starting the C#
-Service process. Readiness succeeds only against that verified revision.
+Deployment runs the Knex migration job before starting the C# Service process. The build
+deterministically embeds the exact ordered compiled migration filenames in the native artifact.
+Readiness queries `knex_migrations` and succeeds only when its ordered names equal that embedded
+manifest. C# owns no second schema-version table or manually maintained version number.
 
 Entity Framework mappings must match the common Knex schema exactly. A mismatch fails build-time
 schema verification or process readiness; the service must not silently repair it.
+
+Mapped closed enums use explicit exhaustive Domain-to-storage and storage-to-Domain conversions.
+Generic enum converters that require runtime enum discovery are forbidden in the NativeAOT path.
 
 ## Testing
 
@@ -566,34 +579,5 @@ public wire API, and verifies the same behavior without C#-specific branches.
 It does not repeat RPC success, validation, authorization, pagination, or failure scenarios owned
 by the canonical suite.
 
-## NativeAOT profile
-
-Every shipping C# Service project publishes as NativeAOT. Native publication is a release gate, not
-an optional optimization. A package may be used only when its required paths are compatible with
-trimming and NativeAOT. Runtime code generation, reflection-based serializers, managed fallback
-artifacts, and separate non-native behavior paths are forbidden.
-
-Use generated protobuf bindings, source-generated closed-world metadata where needed, bounded
-asynchronous I/O, pooled long-lived clients and context factories, and finite concurrency. Native
-tests exercise the actual published binary and real database provider rather than a managed test
-host.
-
-SQLite is the required database provider. Its connection and file lifecycle live under
-`Db/Sqlite/`. Every additional supported provider belongs in its own `Db/<Provider>/` directory,
-uses the same Domain operations, and reaches the same Knex-owned logical schema and canonical
-behavior. A provider does not change the gRPC contract or create another service implementation.
-
-## Review checklist
-
-A C# service implementation is structurally complete when:
-
-1. it has exactly the Domain, Db, and Service production projects;
-2. its generated wire code comes only from the service-root protobuf contract;
-3. wire types remain in Service and concrete provider concerns remain in Db;
-4. Domain entities are mapped directly unless a named persistence escape hatch is justified;
-5. queries and decisions are semantic functions in verb-named files;
-6. call sites use direct functions rather than use-case, command-handler, or repository ceremony;
-7. all CtlFlow-owned operation APIs are awaitable and omit the `Async` suffix;
-8. Knex remains the only migration authority;
-9. the unchanged canonical suite passes against the NativeAOT process; and
-10. implementation-local tests contain only C#-specific release evidence.
+Authentication, telemetry, NativeAOT publication, and the implementation release gates are defined
+in [C# Runtime and Release](runtime/).

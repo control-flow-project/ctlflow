@@ -19,14 +19,16 @@ It serves `egressdestinations`, `egresspolicies`, and create-only `egressreviews
 ## Activities
 
 - Authenticate the calling runtime or kernel service.
-- Resolve its current principal, Placement, App or Job, and dependency through `identityd` and
-  `execd`.
+- Validate its Kubernetes workload identity, optional invocation JWT, or process-bound proxy
+  credential and resolve Placement, App or Job, and dependency through `execd`.
 - Require one matching enabled destination and policy.
 - Canonicalize method, origin, path, query, and headers before matching.
 - Remove caller-supplied cookies and upstream authentication.
 - Apply deterministic path, query, and header rewrites.
 - Obtain exact-purpose secret material from `configd`.
 - Apply the configured upstream HTTP authentication.
+- Create an internal client span and propagate W3C trace context externally only when the exact
+  destination policy admits it.
 - Enforce finite request, response, connection, stream, redirect, and concurrency bounds.
 - Proxy ordinary and streaming HTTP.
 - Record every allow, deny, rewrite identity, target, status class, and timing outcome.
@@ -45,6 +47,7 @@ It serves `egressdestinations`, `egresspolicies`, and create-only `egressreviews
           +-- apply generic HTTP rewrites
           +-- obtain purpose-bound material from configd
           +-- apply approved upstream authentication
+          +-- apply destination trace-propagation policy
           |
           v
     exact approved HTTP origin
@@ -66,8 +69,22 @@ short-lived credential for one runtime, dependency, and `egressd` audience. It i
 caller to `egressd`; it is not accepted by the external origin and cannot be replayed from another
 runtime.
 
+`egressd` validates signed identity credentials locally from the bounded `identityd` verification
+key set. It does not call `identityd` on the request path. A kernel service may instead call with
+its bound Kubernetes token when its exact egress policy admits that service.
+
 Real upstream secret material remains in `configd` custody. It is released only for one admitted
 destination operation and never returned to the caller.
+
+## Telemetry boundary
+
+`egressd` always records a bounded internal client span. External propagation is disabled by
+default. When the exact destination enables W3C Trace Context, `egressd` injects only
+`traceparent` and admitted `tracestate`; it never forwards baggage, invocation JWTs, Kubernetes
+tokens, cookies, protected identity fields, or internal authorization metadata.
+
+Destination and rewrite identity may be telemetry attributes. Full URLs, arbitrary query values,
+headers, bodies, and upstream diagnostics are not.
 
 ## Network safety
 
@@ -98,4 +115,6 @@ destination operation and never returned to the caller.
 - Secret material never appears in records, responses, reviews, errors, or logs.
 - Rewrites derive protected namespace facts only from authenticated owner records.
 - Egress admission is independent of application-object authorization.
+- External trace propagation requires explicit destination policy and never carries identity
+  context.
 - A referenced destination cannot be deleted until its policies and bindings are removed.

@@ -3,8 +3,8 @@ title: execd
 weight: 65
 ---
 
-`execd` owns Placements, execution intent, dependency realization, ready endpoints, and Tenant
-workload Kubernetes resources.
+`execd` owns Placements, execution intent, dependency realization, ready endpoints, and general
+CtlFlow workload Kubernetes resources.
 
 ## Owns
 
@@ -18,7 +18,7 @@ workload Kubernetes resources.
 | Run | One admitted Job invocation |
 | Dependency claim | Desired dependency for one consumer |
 | Dependency binding | Typed ready outputs from the resolved dependency |
-| Endpoint | Ready address and audience for one component |
+| Endpoint | Ready address for one component |
 
 It serves the execution resources listed in [APIs](../apis/).
 
@@ -50,6 +50,9 @@ ceiling. Lower scopes may narrow and never widen them.
 - Attach only declared configuration, secret, endpoint, and mount bindings.
 - Create Kubernetes Services, runtime proxies, workload-scoped ServiceAccounts, and admitted
   NetworkPolicies.
+- Project a rotating, workload-bound Kubernetes token within the installation's maximum lifetime
+  only into its trusted runtime proxy.
+- Inject standard OpenTelemetry endpoint and protected resource configuration.
 - Publish bounded readiness and endpoint status to `pkgd` and `edged`.
 - Suspend, resume, scale, replace, drain, and retire component realization.
 - Support admitted scale-to-zero and start-on-demand.
@@ -80,9 +83,9 @@ requester is recorded for evidence and does not replace the Job virtual principa
 - Create one stable claim per consumer and dependency.
 - For an external provider, create and observe the selected controller's provider-owned custom
   resource in the selected provider Placement namespace.
-- For `service:<contract>`, resolve one exact provider App, component, endpoint, and audience.
-- For `kernel:<contract>`, resolve the fixed owning kernel endpoint, audience, and admitted
-  operations without provider selection.
+- For `service:<contract>`, resolve one exact provider App, component, and endpoint.
+- For `kernel:<contract>`, resolve the fixed owning kernel endpoint and admitted operations without
+  provider selection.
 - Accept only outputs declared by the installed provider contract and bind a distinct logical
   namespace to each consumer.
 - Project ordinary values, secret references, endpoints, and mounts only to components that use the
@@ -111,13 +114,16 @@ containers receive no Kubernetes token.
 
 The proxy:
 
-- authenticates source runtime and exact-audience call credential;
+- presents its bound Kubernetes ServiceAccount token on outbound internal calls;
+- authenticates the source workload token and optional invocation JWT on inbound calls;
 - removes every caller-supplied protected context field;
-- injects trusted Actor, caller, Placement, request, and trace context;
-- exposes process-private credential acquisition for declared dependencies;
+- injects trusted Actor, subject account, caller, Placement, and W3C trace context;
+- propagates the current invocation JWT for actor-preserving HTTP and gRPC dependencies;
+- obtains a fresh invocation JWT for an admitted Run-originated Actor context when required;
+- exposes process-private proxy credential acquisition for declared mediated dependencies;
 - supports HTTP, WebSocket, and all gRPC streaming modes;
 - enforces finite request, stream, and backpressure limits; and
-- produces bounded runtime-call evidence.
+- produces bounded runtime-call evidence and OpenTelemetry spans.
 
 TCP dependencies receive workload-level authentication and network admission only.
 
@@ -128,8 +134,8 @@ realization and selected provider resources:
 
 ```text
 Placement  -> namespace, policy, service accounts
-Workload   -> continuous workload, Service, runtime proxy
-Run        -> Kubernetes Job
+Workload   -> continuous workload, Service, runtime proxy, telemetry configuration
+Run        -> Kubernetes Job, runtime proxy, telemetry configuration
 Schedule   -> Kubernetes scheduling that enters the same Run admission path
 Storage    -> PVC and mount
 Secret     -> reference to configd-owned Secret projection

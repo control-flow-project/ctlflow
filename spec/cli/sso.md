@@ -23,6 +23,8 @@ ctlflow delete admission-policy --tenant TENANT --workspace WORKSPACE [--force]
 
 Provider secret fields reference write-only [Secrets](../config/). Provider discovery and exchange
 use an admitted `egressd` destination; `identityd` has no independent external network path.
+Public browser redirects and callbacks enter through `authd`; SSO configuration remains an
+`identityd` administrative resource and is never stored by `authd`.
 
 The Tenant policy always exists and may be empty. No Workspace policy means Tenant inheritance. An
 explicit empty Workspace policy denies SSO entry; deleting it restores inheritance. Login never
