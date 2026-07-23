@@ -10,10 +10,10 @@ are ownership boundaries, not deployment marketing terms.
  DOMAIN CONTROL                   DATA PLANE                   KUBERNETES
 
  tenants and workspaces           external ingress            namespaces
- identities and grants            internal service calls      workloads and scheduling
+ identities and grants            public authentication       workloads and scheduling
  Packages and installations       external HTTP egress        Services and networking
  configuration and secrets        trusted runtime context     volumes and Secrets
- Placements, Jobs, and Runs        audit ingestion             provider-owned resources
+ Placements, Jobs, and Runs        telemetry and audit         provider-owned resources
           |                              |                           ^
           | domain intent                | authenticated traffic     |
           +------------------------------+---------------------------+
@@ -22,7 +22,7 @@ are ownership boundaries, not deployment marketing terms.
 
 ## Domain control
 
-The nine kernel services own CtlFlow records and their invariants. Operator clients use aggregated
+The ten kernel services own CtlFlow records and their invariants. Operator clients use aggregated
 Kubernetes APIs. Product backends use authenticated management operations over `edged`. Both
 surfaces invoke the same service semantics and never create a second record owner.
 
@@ -34,13 +34,19 @@ derived realization details and never become CtlFlow identity or authority.
 The data plane carries authenticated traffic:
 
 - `edged` terminates the CtlFlow application boundary for browser and external API requests;
-- runtime proxies validate audience-bound internal calls and deliver trusted actor context;
+- `authd` terminates public authentication protocols and calls private `identityd`;
+- runtime proxies validate Kubernetes workload identity and optional invocation JWTs before
+  delivering trusted actor context;
 - applications call resolved peer dependencies directly through Kubernetes networking;
 - `egressd` mediates admitted external HTTP; and
 - all kernel services deliver attributable evidence to `auditd`.
 
 An internal application call does not traverse `edged`. A browser session does not enter an
-application. Each hop receives a new credential addressed to its exact target.
+application. The current invocation JWT may cross admitted internal hops, while every hop
+authenticates its own immediate workload independently.
+
+Every process emits bounded OpenTelemetry data through OTLP to an installation-supplied Collector.
+The Collector is infrastructure rather than a kernel service or record authority.
 
 ## Kubernetes realization
 
@@ -51,7 +57,7 @@ realizes:
 - long-running components as suitable continuous workload resources;
 - finite executions as Jobs and periodic execution through Kubernetes scheduling;
 - Services and explicitly admitted network paths;
-- workload-scoped ServiceAccounts, runtime proxies, and process-specific credentials;
+- workload-scoped ServiceAccounts, bound tokens, runtime proxies, and process-specific identities;
 - PVCs and mounts for persistent files;
 - references to Kubernetes Secret projections written only by `configd`; and
 - provider-owned custom resources for configured external dependencies.
@@ -71,5 +77,6 @@ opaque binding that `execd` can reference.
 | Dependency implementation state | Installed provider controller or service Package | Generic claim, binding, generation, and readiness |
 | Artifact or export bytes | Configured object dependency | Bounded metadata and transfer capability |
 | Program logs | Configured log system | Query identity, cursor, and retention metadata |
+| Operational telemetry | Installation OpenTelemetry Collector and configured backends | No domain authority; bounded correlation references only |
 
 Administrative APIs never transport image, secret, artifact, export, or unbounded log bytes.

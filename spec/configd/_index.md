@@ -3,8 +3,8 @@ title: configd
 weight: 60
 ---
 
-`configd` owns validated configuration values, secret custody, and selected dependency-provider
-configuration.
+`configd` owns validated product and workload configuration values, product and provider secret
+custody, and selected dependency-provider configuration.
 
 ## Owns
 
@@ -108,6 +108,16 @@ configuration may select or narrow only providers admitted by inherited `execd` 
 `kernel:*` dependencies have no provider configuration; their owner and endpoint are fixed by the
 kernel contract.
 
+Kernel OpenTelemetry Collector endpoints, exporter configuration, and exporter credentials are
+installation inputs rather than `configd` records. This avoids making `configd` depend on itself to
+start, diagnose, or export telemetry. `execd` projects the admitted installation telemetry settings
+into managed workloads.
+
+Kernel bootstrap trust and credential material is also an installation input projected only into
+the daemon that owns its use. This includes `identityd` invocation-signing material, Kubernetes
+workload-token verification roots, ingress termination material, and Collector exporter custody.
+It is never a product `Secret`, general configuration value, or application-readable projection.
+
 ## Direct operations
 
 | Operation family | Purpose |
@@ -126,4 +136,5 @@ kernel contract.
 - Secret release is exact-purpose, exact-version, authenticated, and audited.
 - Provider configuration selects one provider explicitly and never records provider outputs.
 - Configuration cannot widen Placement constraints or authorization.
+- Kernel bootstrap trust, signing, ingress, and telemetry custody do not depend on `configd`.
 - `configd` owns no Package schema, workload, dependency binding, route, or application data.

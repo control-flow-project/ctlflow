@@ -1,9 +1,20 @@
 {
   "name": "ctlflow",
   "private": true,
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  },
+  "workspaces": [
+    "services/*",
+    "testing/*"
+  ],
   "scripts": {
     "build": "hugo --gc --minify --cleanDestinationDir",
-    "dev": "hugo server --bind 0.0.0.0 --port 7780 --disableFastRender"
+    "dev": "hugo server --bind 0.0.0.0 --port 7780 --disableFastRender",
+    "build:tenantd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/tenantd",
+    "test:tenantd": "npm run test --workspace @ctlflow/tenantd"
   },
   "devDependencies": {
     "hugo-bin": "0.149.2"

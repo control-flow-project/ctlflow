@@ -52,5 +52,6 @@ are read-only projections of admitted App, Job, and execution identity.
 Membership scope and User are immutable; `apply` may change only admitted management standing.
 Groups are non-nested and membership grants no authority without a matching policy rule.
 
-Disabling a User revokes sessions and new delegated credentials and suspends attached execution.
+Disabling a User revokes Sessions, blocks new invocation and proxy credentials, and suspends
+attached execution.
 Deletion is rejected while an App or Job remains attached; CtlFlow never silently reassigns it.

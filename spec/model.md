@@ -12,6 +12,8 @@ that cannot be delegated to Kubernetes.
 | --- | --- | --- |
 | Tenant | `tenantd` | Customer and top-level isolation boundary |
 | Workspace | `tenantd` | Collaboration boundary inside one Tenant |
+| Tenant address binding | `tenantd` | Permanent external address owned by one Tenant |
+| Workspace address binding | `tenantd` | Permanent external address owned by one Workspace |
 | User | `identityd` | Human or service account at global or Tenant scope |
 | Membership | `identityd` | A User's standing in a Tenant or Workspace |
 | Group and Group member | `identityd` | Reusable Tenant- or Workspace-scoped audience |
@@ -177,9 +179,9 @@ Dependencies resolve in three ways:
 contract. Provider and peer-service claims name their selected provider Placement. A binding
 contains typed ordinary values, secret references, endpoint references, mounts, generation, and
 readiness. A shared provider must return consumer-specific outputs and namespaces. A kernel
-binding contains only its fixed endpoint, audience, and admitted operations. The binding contains
-no provider-specific interpretation. Only components listing the dependency in `uses` receive
-those outputs.
+binding contains only its fixed endpoint and admitted operations. The binding contains no
+provider-specific interpretation. Only components listing the dependency in `uses` receive those
+outputs.
 
 There is no nearest-provider search, fallback provider, or allow-unless-denied behavior. Admission
 requires the dependency contract to be installed and requested by the Package. A selectable
@@ -206,7 +208,7 @@ lifecycle remain owned by the selected provider Placement.
 
 An App component may provide a named HTTP, gRPC, or TCP endpoint for one versioned service
 contract. A consumer names one declared `service:*` dependency. Before the consumer starts, `execd`
-resolves that dependency to one exact provider App, component, endpoint, and audience.
+resolves that dependency to one exact provider App, component, and endpoint.
 
 Reachability remains separate from the receiving application's object authorization.
 
@@ -216,10 +218,11 @@ Endpoint rotation changes derived realization without changing the Package depen
 ## Kernel bindings
 
 A `kernel:*` dependency names one versioned public kernel contract owned by its daemon. It resolves
-to the installation endpoint and exact audience, not to a Package or Placement provider. Any
+to the installation endpoint and admitted operations, not to a Package or Placement provider. Any
 Placement may use an explicitly admitted kernel binding, but that binding grants no Tenant,
-Workspace, or application-data authority. The receiving kernel service authenticates the workload
-and Actor and authorizes each requested operation independently.
+Workspace, or application-data authority. The receiving kernel service authenticates the immediate
+Kubernetes workload and optional invocation identity and authorizes each requested operation
+independently.
 
 ## Call identity
 
@@ -228,27 +231,28 @@ Every authenticated application call establishes:
 | Fact | Meaning |
 | --- | --- |
 | Actor | Principal whose authority initiated the operation |
-| Actor account | Attached account when the Actor is virtual |
-| Immediate caller | App component or Run making this hop |
+| Subject account | User whose authority bounds the invocation |
+| Immediate caller | Kernel service, App component, or Run making this hop |
 | Caller account | Account bounding that workload |
 | Source Placement | Placement of the caller |
 | Runtime principal | Concrete caller process |
-| Audience | Exact target endpoint |
-| Request, parent-call, and trace IDs | Correlation and bounded audit reconstruction |
+| Invocation token ID | Short-lived delegated identity assertion, when present |
+| Trace and span IDs | Standard operational and audit correlation |
 
 A request through an exposure explicitly admitting unauthenticated external traffic has no Actor,
-Actor account, or source Placement. `edged` remains its authenticated immediate caller. That
-request cannot be exchanged into a human delegation.
+subject account, or source Placement. `edged` remains its authenticated immediate caller. That
+request cannot be converted into a human invocation.
 
-A trusted runtime proxy fronts each workload endpoint. It authenticates the source, validates the
-audience-bound call credential, removes caller-supplied protected headers, and supplies trusted
-context to the application. For an outbound call, the application selects only a declared
-dependency name. `identityd` issues a new short-lived credential for the resolved target.
+A trusted runtime proxy fronts each workload endpoint. It authenticates the bound Kubernetes
+ServiceAccount token, validates the optional `identityd` invocation JWT, removes caller-supplied
+protected headers, and supplies trusted context to the application. For an outbound call, the
+application selects only a declared dependency name. The proxy presents its own workload identity
+and propagates the current invocation JWT unchanged.
 
-With a valid invocation handle, the original human Actor is preserved. Without one, the calling
-virtual principal becomes the Actor. An inbound credential is never forwarded to another audience.
-Raw TCP bindings carry workload identity only because they have no portable per-request delegation
-boundary.
+The invocation JWT has one installation-scoped internal audience, a maximum 60-second lifetime, and
+no permission or endpoint claims. `identityd` is not called at each hop. An autonomous call omits
+the token and acts as the calling virtual principal. Raw TCP bindings carry workload identity only
+because they have no portable per-request invocation boundary.
 
 ## Persistent state and bulk data
 
@@ -302,7 +306,7 @@ use Groups rather than overloading CtlFlow administration roles.
 
 | Record | Lifecycle |
 | --- | --- |
-| Tenant, Workspace | `provisioning`, `active`, `suspended`, `deleting`, or `failed` |
+| Tenant, Workspace | `provisioning`, `active`, `suspended`, `deleting`, `failed`, or terminal `deleted` |
 | Placement | `provisioning`, `active`, `suspended`, `retiring`, `retired`, or `failed` |
 | Package | `available` or terminal `revoked` |
 | App | `pending`, `active`, `suspended`, `removing`, or `failed` |
@@ -312,5 +316,7 @@ use Groups rather than overloading CtlFlow administration roles.
 
 Suspension is reversible and blocks new activity without discarding records. Deletion is
 irreversible. Owned children follow their owner; independent references block deletion until
-removed. Cross-service cleanup uses explicit lifecycle state and idempotent acknowledgements. No
-service reads or writes another service's database.
+removed. A deleted Tenant or Workspace remains as a minimal terminal tombstone, and its retired
+external address bindings remain permanently reserved. Cross-service cleanup uses explicit
+lifecycle state and idempotent acknowledgements. No service reads or writes another service's
+database.

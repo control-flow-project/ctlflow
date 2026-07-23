@@ -3,7 +3,7 @@ title: Contracts
 weight: 22
 ---
 
-These contracts close the boundaries between the nine kernel services. Protobuf and Kubernetes API
+These contracts close the boundaries between the ten kernel services. Protobuf and Kubernetes API
 definitions implement these semantics; implementations may not invent parallel envelopes or
 alternate ownership.
 
@@ -14,29 +14,28 @@ Every admitted application hop resolves one context:
 ```text
 tenant                 optional only for admitted global work
 workspace              present for workspace-scoped work
-actor                  initiating account or virtual principal; absent only for an
+actor                  initiating principal; absent only for an
                        exposure explicitly admitting unauthenticated external traffic
-actorAccount           attached account when actor is virtual
+subjectAccount         account whose authority bounds actor
 requester              reason the current Run exists when call is Run-derived; evidence only
-immediateCaller         edged, product backend, App component, or Run
+immediateCaller         kernel service, App component, or Run
 callerAccount          attached account when caller is virtual
-sourcePlacement         caller Placement; absent when immediate caller is edged
+sourcePlacement         caller Placement; absent for kernel service callers
 sourceRuntime           concrete runtime principal; absent for kernel service callers
-audience                exact target endpoint or kernel operation
-requestId               unique request identity
-parentCallId            previous independently issued hop, when present
-traceId                 end-to-end correlation
-issuedAt, expiresAt     short finite validity
+invocationTokenId       identityd assertion used for this chain, when present
+traceId, spanId         W3C operational and audit correlation
 ```
 
-The target runtime proxy derives this context from verified credentials and current owner facts.
-Every caller-supplied protected header or metadata field is removed. A target application receives
-the trusted result through one documented protocol projection.
+The target runtime proxy derives this context from the immediate Kubernetes workload token, the
+optional `identityd` invocation JWT, and current owner facts. Every caller-supplied protected header
+or metadata field is removed. A target application receives the trusted result through one
+documented protocol projection.
 
-To call a peer, a workload supplies one Package-declared dependency name and optionally its current
-invocation handle. `identityd` resolves the exact binding and issues a new credential for the target
-audience. A valid invocation handle preserves the original Actor; without one, the workload's
-virtual principal becomes the Actor. The requester never becomes ambient authority.
+To call a peer, a workload supplies one Package-declared dependency name to its trusted runtime
+proxy. The proxy resolves the existing binding, authenticates with its own bound Kubernetes token,
+and propagates the current invocation JWT when the operation preserves Actor context. An
+autonomous call omits the JWT and acts as the workload's virtual principal. The requester never
+becomes ambient authority.
 
 ## Dependency claim and binding
 
@@ -69,16 +68,16 @@ conditions.
 For a Placement service, `execd` resolves the selected provider App, component, service contract,
 and endpoint without creating an external provider resource.
 
-For a kernel contract, `execd` resolves the fixed owning service endpoint and audience without a
-provider selection or provider resource. The binding names only the Package-declared and admitted
-kernel operations.
+For a kernel contract, `execd` resolves the fixed owning service endpoint without a provider
+selection or provider resource. The binding names only the Package-declared and admitted kernel
+operations.
 
 A ready binding contains only outputs declared by the provider contract:
 
 ```text
 typed ordinary values
 configd secret references
-endpoint references and target audience
+endpoint references
 mount references
 observed provider generation
 ready condition
@@ -119,7 +118,6 @@ consumer App or Job and component
 declared dependency name
 exact provider App, component, and endpoint
 source and target Placements
-target audience
 Kubernetes Service realization reference
 binding generation and readiness
 ```
@@ -137,18 +135,29 @@ workload but cannot claim per-request human delegation.
 `pkgd` owns immutable endpoint and exposure declarations. `execd` owns realized endpoint readiness.
 `edged` owns neither; it resolves and caches their current projection.
 
-`tenantd` first resolves the external address to:
+`tenantd` resolves an external hierarchy in two explicit steps. `ResolveTenant` receives the exact
+canonical Tenant root and returns:
 
 ```text
 canonical Tenant ID
-optional canonical Workspace ID
-matched address-binding generation
+matched Tenant address-binding generation
 finite cache expiry
 ```
 
-`edged` caches only that narrow projection under the normalized external authority and admitted
-path prefix. It re-resolves through `tenantd` on a miss or after the earlier of the supplied expiry
-and 60 seconds.
+When the remaining path starts with the fixed `/workspaces/<workspace-address>` boundary,
+`ResolveWorkspace` receives the resolved Tenant ID and exact Workspace address segment and returns:
+
+```text
+canonical Workspace ID
+matched Workspace address-binding generation
+finite cache expiry
+```
+
+`edged` caches each narrow projection separately. The Tenant key is the normalized authority and
+canonical Tenant path prefix. The Workspace key is the canonical Tenant ID and Workspace address
+segment. It re-resolves an entry on a miss or after the earlier of the owner-supplied expiry and 60
+seconds. Neither cache contains an administrative record or permits a caller to choose a different
+parent.
 
 An exposure resolution uses:
 
@@ -163,16 +172,17 @@ It returns:
 
 ```text
 exact App, component, and endpoint
-target Placement and audience
+target Placement
 ready Kubernetes Service endpoint
 trusted request context
 bounded cache expiry
 ```
 
-Product URL design is outside the kernel, but every route handed to `edged` must identify its
-Tenant, optional Workspace, and exposure with structurally separate fixed and user-controlled
-segments. Routes are inferred from current Tenant, App, exposure, and endpoint state; there is no
-manually managed route record.
+Product URL design below the resolved address root is outside the kernel. Tenant roots are `/` or
+`/tenants/<tenant-address>`; Workspace roots append `/workspaces/<workspace-address>`. Every
+subsequent route handed to `edged` identifies its exposure with structurally separate fixed and
+user-controlled segments. Routes are inferred from current Tenant, Workspace, App, exposure, and
+endpoint state; there is no manually managed route record.
 
 If the exact App is admitted for start-on-demand but has no ready endpoint, `edged` asks `execd` to
 realize it and waits only within the request's bounded startup policy. Cache expiry never exceeds
@@ -239,7 +249,7 @@ Kubernetes subject for operator actions
 actor and attached account for product actions when established
 immediate caller and runtime principal when applicable
 Tenant, Workspace, Placement, Package, App, Job, and Run references when applicable
-request and trace IDs
+invocation-token ID and trace/span IDs when applicable
 outcome and stable reason
 bounded typed detail
 occurred time and source idempotency identity

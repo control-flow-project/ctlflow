@@ -21,7 +21,8 @@ It serves read-only `auditevents` and mutable `auditexports` in
 - Ingest idempotent evidence batches from authenticated kernel services.
 - Preserve the Kubernetes subject for operator actions or Actor and attached account for product
   actions, plus immediate caller, runtime principal, and delegation identity when applicable.
-- Preserve Tenant, Workspace, Placement, Package, App, Job, Run, request, and trace references.
+- Preserve Tenant, Workspace, Placement, Package, App, Job, Run, invocation-token, trace, and span
+  references when applicable.
 - Store bounded action, target, outcome, reason, timing, and typed detail.
 - Query global or exact Tenant partitions with bounded time and pagination.
 - Stream finite authorized tails from an explicit cursor.
@@ -47,8 +48,8 @@ Every durable service commits its domain mutation and audit-outbox envelope in o
 An accepted source identity and idempotency key map to one event. Retrying the outbox cannot
 duplicate evidence. A source service never holds its transaction while calling `auditd`.
 
-Runtime proxies and mediation services emit decision evidence with request IDs. Application
-workloads cannot submit authoritative kernel events directly.
+Runtime proxies and mediation services emit decision evidence correlated by invocation-token,
+trace, and span identity. Application workloads cannot submit authoritative kernel events directly.
 
 ## Identity
 
@@ -80,6 +81,10 @@ and status classes. It may not contain:
 Program logs remain in the configured log system and are exposed through `execd`. Kubernetes audit
 remains Kubernetes evidence.
 
+OpenTelemetry traces, metrics, and logs are operational and may be sampled or dropped. They can
+correlate with an Audit Event by trace and span identity but can never create, replace, acknowledge,
+or satisfy authoritative evidence.
+
 ## Retention, deletion, and integrity
 
 Audit Events are immutable. Retention may remove expired events according to partition policy.
@@ -110,3 +115,4 @@ An ordinary domain deletion can never erase audit evidence silently.
 - Export APIs return metadata and purpose-bound transfer access, not export bytes.
 - Audit unavailability cannot silently discard committed source evidence.
 - Payload removal always leaves immutable deletion evidence and the original commitment.
+- Telemetry loss or export success has no effect on audit acceptance or retention.

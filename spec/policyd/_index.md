@@ -76,8 +76,9 @@ identities. The owner calls `policyd` under its own identity and names one opera
 `policyd` verifies:
 
 1. the enforcing kernel service or Package component owns the operation declaration;
-2. the Actor credential audience identifies that endpoint;
-3. the immediate caller and runtime are current;
+2. the invocation JWT, when present, names the current installation, subject account, and Actor;
+3. the immediate Kubernetes workload and runtime are current and admitted to enforce that
+   operation;
 4. Tenant, Workspace, Placement, Package, account, and principal facts are current; and
 5. the canonical path is inside the admitted fence.
 
