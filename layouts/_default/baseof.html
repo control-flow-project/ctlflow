@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="{{ .Site.Language.LanguageCode }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CtlFlow specification">
+    <title>{{ if not .IsHome }}{{ .Title }} | {{ end }}{{ .Site.Title }}</title>
+    <link rel="stylesheet" href="{{ "css/site.css" | relURL }}">
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="brand" href="{{ .Site.Home.RelPermalink }}">CtlFlow</a>
+      <span class="site-label">Specification</span>
+    </header>
+    <div class="shell">
+      <nav class="navigation" aria-label="Specification">
+        <a class="nav-link{{ if .IsHome }} is-active{{ end }}" href="{{ .Site.Home.RelPermalink }}">Overview</a>
+        {{ range .Site.Home.Pages.ByWeight }}
+          <a class="nav-link{{ if eq $.RelPermalink .RelPermalink }} is-active{{ end }}" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
+        {{ end }}
+      </nav>
+      <main class="content" id="content">
+        {{ block "main" . }}{{ end }}
+      </main>
+    </div>
+  </body>
+</html>

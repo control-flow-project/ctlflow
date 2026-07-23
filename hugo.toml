@@ -1,0 +1,13 @@
+baseURL = "http://localhost:7780/"
+contentDir = "spec"
+languageCode = "en-us"
+title = "CtlFlow"
+
+disableKinds = ["taxonomy", "term"]
+
+[markup]
+  [markup.highlight]
+    noClasses = false
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = false

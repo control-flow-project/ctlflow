@@ -1,0 +1,11 @@
+{
+  "name": "ctlflow",
+  "private": true,
+  "scripts": {
+    "build": "hugo --gc --minify --cleanDestinationDir",
+    "dev": "hugo server --bind 0.0.0.0 --port 7780 --disableFastRender"
+  },
+  "devDependencies": {
+    "hugo-bin": "0.149.2"
+  }
+}
