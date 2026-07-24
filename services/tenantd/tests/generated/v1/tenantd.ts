@@ -85,6 +85,69 @@ export function tenantLifecycleToJSON(object: TenantLifecycle): string {
   }
 }
 
+export enum WorkspaceLifecycle {
+  WORKSPACE_LIFECYCLE_UNSPECIFIED = 0,
+  WORKSPACE_LIFECYCLE_PROVISIONING = 1,
+  WORKSPACE_LIFECYCLE_ACTIVE = 2,
+  WORKSPACE_LIFECYCLE_SUSPENDED = 3,
+  WORKSPACE_LIFECYCLE_DELETING = 4,
+  WORKSPACE_LIFECYCLE_FAILED = 5,
+  WORKSPACE_LIFECYCLE_DELETED = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function workspaceLifecycleFromJSON(object: any): WorkspaceLifecycle {
+  switch (object) {
+    case 0:
+    case "WORKSPACE_LIFECYCLE_UNSPECIFIED":
+      return WorkspaceLifecycle.WORKSPACE_LIFECYCLE_UNSPECIFIED;
+    case 1:
+    case "WORKSPACE_LIFECYCLE_PROVISIONING":
+      return WorkspaceLifecycle.WORKSPACE_LIFECYCLE_PROVISIONING;
+    case 2:
+    case "WORKSPACE_LIFECYCLE_ACTIVE":
+      return WorkspaceLifecycle.WORKSPACE_LIFECYCLE_ACTIVE;
+    case 3:
+    case "WORKSPACE_LIFECYCLE_SUSPENDED":
+      return WorkspaceLifecycle.WORKSPACE_LIFECYCLE_SUSPENDED;
+    case 4:
+    case "WORKSPACE_LIFECYCLE_DELETING":
+      return WorkspaceLifecycle.WORKSPACE_LIFECYCLE_DELETING;
+    case 5:
+    case "WORKSPACE_LIFECYCLE_FAILED":
+      return WorkspaceLifecycle.WORKSPACE_LIFECYCLE_FAILED;
+    case 6:
+    case "WORKSPACE_LIFECYCLE_DELETED":
+      return WorkspaceLifecycle.WORKSPACE_LIFECYCLE_DELETED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return WorkspaceLifecycle.UNRECOGNIZED;
+  }
+}
+
+export function workspaceLifecycleToJSON(object: WorkspaceLifecycle): string {
+  switch (object) {
+    case WorkspaceLifecycle.WORKSPACE_LIFECYCLE_UNSPECIFIED:
+      return "WORKSPACE_LIFECYCLE_UNSPECIFIED";
+    case WorkspaceLifecycle.WORKSPACE_LIFECYCLE_PROVISIONING:
+      return "WORKSPACE_LIFECYCLE_PROVISIONING";
+    case WorkspaceLifecycle.WORKSPACE_LIFECYCLE_ACTIVE:
+      return "WORKSPACE_LIFECYCLE_ACTIVE";
+    case WorkspaceLifecycle.WORKSPACE_LIFECYCLE_SUSPENDED:
+      return "WORKSPACE_LIFECYCLE_SUSPENDED";
+    case WorkspaceLifecycle.WORKSPACE_LIFECYCLE_DELETING:
+      return "WORKSPACE_LIFECYCLE_DELETING";
+    case WorkspaceLifecycle.WORKSPACE_LIFECYCLE_FAILED:
+      return "WORKSPACE_LIFECYCLE_FAILED";
+    case WorkspaceLifecycle.WORKSPACE_LIFECYCLE_DELETED:
+      return "WORKSPACE_LIFECYCLE_DELETED";
+    case WorkspaceLifecycle.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface ResolveTenantRequest {
   tenantId?: string | undefined;
   externalAddress: ExternalTenantAddress | undefined;
@@ -104,6 +167,23 @@ export interface ResolveTenantResponse {
 }
 
 export interface ResolvedTenantAddress {
+  bindingGeneration: bigint;
+}
+
+export interface ResolveWorkspaceRequest {
+  tenantId: string;
+  workspaceAddress: string;
+}
+
+export interface ResolveWorkspaceResponse {
+  workspaceId: string;
+  lifecycle: WorkspaceLifecycle;
+  workspaceRevision: bigint;
+  address: ResolvedWorkspaceAddress | undefined;
+  cacheExpiresAt: Date | undefined;
+}
+
+export interface ResolvedWorkspaceAddress {
   bindingGeneration: bigint;
 }
 
@@ -453,6 +533,272 @@ export const ResolvedTenantAddress: MessageFns<ResolvedTenantAddress> = {
   },
 };
 
+function createBaseResolveWorkspaceRequest(): ResolveWorkspaceRequest {
+  return { tenantId: "", workspaceAddress: "" };
+}
+
+export const ResolveWorkspaceRequest: MessageFns<ResolveWorkspaceRequest> = {
+  encode(message: ResolveWorkspaceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceAddress !== "") {
+      writer.uint32(18).string(message.workspaceAddress);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveWorkspaceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolveWorkspaceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceAddress = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ResolveWorkspaceRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceAddress: isSet(object.workspaceAddress) ? globalThis.String(object.workspaceAddress) : "",
+    };
+  },
+
+  toJSON(message: ResolveWorkspaceRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceAddress !== "") {
+      obj.workspaceAddress = message.workspaceAddress;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ResolveWorkspaceRequest>): ResolveWorkspaceRequest {
+    return ResolveWorkspaceRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ResolveWorkspaceRequest>): ResolveWorkspaceRequest {
+    const message = createBaseResolveWorkspaceRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceAddress = object.workspaceAddress ?? "";
+    return message;
+  },
+};
+
+function createBaseResolveWorkspaceResponse(): ResolveWorkspaceResponse {
+  return { workspaceId: "", lifecycle: 0, workspaceRevision: 0n, address: undefined, cacheExpiresAt: undefined };
+}
+
+export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
+  encode(message: ResolveWorkspaceResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workspaceId !== "") {
+      writer.uint32(10).string(message.workspaceId);
+    }
+    if (message.lifecycle !== 0) {
+      writer.uint32(16).int32(message.lifecycle);
+    }
+    if (message.workspaceRevision !== 0n) {
+      if (BigInt.asUintN(64, message.workspaceRevision) !== message.workspaceRevision) {
+        throw new globalThis.Error("value provided for field message.workspaceRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.workspaceRevision);
+    }
+    if (message.address !== undefined) {
+      ResolvedWorkspaceAddress.encode(message.address, writer.uint32(34).fork()).join();
+    }
+    if (message.cacheExpiresAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.cacheExpiresAt), writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveWorkspaceResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolveWorkspaceResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.lifecycle = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.workspaceRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.address = ResolvedWorkspaceAddress.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.cacheExpiresAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ResolveWorkspaceResponse {
+    return {
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      lifecycle: isSet(object.lifecycle) ? workspaceLifecycleFromJSON(object.lifecycle) : 0,
+      workspaceRevision: isSet(object.workspaceRevision) ? BigInt(object.workspaceRevision) : 0n,
+      address: isSet(object.address) ? ResolvedWorkspaceAddress.fromJSON(object.address) : undefined,
+      cacheExpiresAt: isSet(object.cacheExpiresAt) ? fromJsonTimestamp(object.cacheExpiresAt) : undefined,
+    };
+  },
+
+  toJSON(message: ResolveWorkspaceResponse): unknown {
+    const obj: any = {};
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.lifecycle !== 0) {
+      obj.lifecycle = workspaceLifecycleToJSON(message.lifecycle);
+    }
+    if (message.workspaceRevision !== 0n) {
+      obj.workspaceRevision = message.workspaceRevision.toString();
+    }
+    if (message.address !== undefined) {
+      obj.address = ResolvedWorkspaceAddress.toJSON(message.address);
+    }
+    if (message.cacheExpiresAt !== undefined) {
+      obj.cacheExpiresAt = message.cacheExpiresAt.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ResolveWorkspaceResponse>): ResolveWorkspaceResponse {
+    return ResolveWorkspaceResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ResolveWorkspaceResponse>): ResolveWorkspaceResponse {
+    const message = createBaseResolveWorkspaceResponse();
+    message.workspaceId = object.workspaceId ?? "";
+    message.lifecycle = object.lifecycle ?? 0;
+    message.workspaceRevision = object.workspaceRevision ?? 0n;
+    message.address = (object.address !== undefined && object.address !== null)
+      ? ResolvedWorkspaceAddress.fromPartial(object.address)
+      : undefined;
+    message.cacheExpiresAt = object.cacheExpiresAt ?? undefined;
+    return message;
+  },
+};
+
+function createBaseResolvedWorkspaceAddress(): ResolvedWorkspaceAddress {
+  return { bindingGeneration: 0n };
+}
+
+export const ResolvedWorkspaceAddress: MessageFns<ResolvedWorkspaceAddress> = {
+  encode(message: ResolvedWorkspaceAddress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.bindingGeneration !== 0n) {
+      if (BigInt.asUintN(64, message.bindingGeneration) !== message.bindingGeneration) {
+        throw new globalThis.Error("value provided for field message.bindingGeneration of type uint64 too large");
+      }
+      writer.uint32(8).uint64(message.bindingGeneration);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolvedWorkspaceAddress {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolvedWorkspaceAddress();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.bindingGeneration = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ResolvedWorkspaceAddress {
+    return { bindingGeneration: isSet(object.bindingGeneration) ? BigInt(object.bindingGeneration) : 0n };
+  },
+
+  toJSON(message: ResolvedWorkspaceAddress): unknown {
+    const obj: any = {};
+    if (message.bindingGeneration !== 0n) {
+      obj.bindingGeneration = message.bindingGeneration.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ResolvedWorkspaceAddress>): ResolvedWorkspaceAddress {
+    return ResolvedWorkspaceAddress.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ResolvedWorkspaceAddress>): ResolvedWorkspaceAddress {
+    const message = createBaseResolvedWorkspaceAddress();
+    message.bindingGeneration = object.bindingGeneration ?? 0n;
+    return message;
+  },
+};
+
 export type TenantServiceService = typeof TenantServiceService;
 export const TenantServiceService = {
   resolveTenant: {
@@ -465,10 +811,22 @@ export const TenantServiceService = {
       Buffer.from(ResolveTenantResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ResolveTenantResponse => ResolveTenantResponse.decode(value),
   },
+  resolveWorkspace: {
+    path: "/ctlflow.tenancy.v1.TenantService/ResolveWorkspace",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ResolveWorkspaceRequest): Buffer =>
+      Buffer.from(ResolveWorkspaceRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolveWorkspaceRequest => ResolveWorkspaceRequest.decode(value),
+    responseSerialize: (value: ResolveWorkspaceResponse): Buffer =>
+      Buffer.from(ResolveWorkspaceResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolveWorkspaceResponse => ResolveWorkspaceResponse.decode(value),
+  },
 } as const;
 
 export interface TenantServiceServer extends UntypedServiceImplementation {
   resolveTenant: handleUnaryCall<ResolveTenantRequest, ResolveTenantResponse>;
+  resolveWorkspace: handleUnaryCall<ResolveWorkspaceRequest, ResolveWorkspaceResponse>;
 }
 
 export interface TenantServiceClient extends Client {
@@ -486,6 +844,21 @@ export interface TenantServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: ResolveTenantResponse) => void,
+  ): ClientUnaryCall;
+  resolveWorkspace(
+    request: ResolveWorkspaceRequest,
+    callback: (error: ServiceError | null, response: ResolveWorkspaceResponse) => void,
+  ): ClientUnaryCall;
+  resolveWorkspace(
+    request: ResolveWorkspaceRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolveWorkspaceResponse) => void,
+  ): ClientUnaryCall;
+  resolveWorkspace(
+    request: ResolveWorkspaceRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolveWorkspaceResponse) => void,
   ): ClientUnaryCall;
 }
 

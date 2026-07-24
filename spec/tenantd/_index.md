@@ -13,6 +13,7 @@ weight: 40
 | Workspace | Exactly one Tenant |
 | Tenant address binding | Exactly one Tenant |
 | Workspace address binding | Exactly one Workspace |
+| Lifecycle operation and step acknowledgement | Exactly one Tenant or Workspace generation |
 
 It serves `tenants` and `workspaces` in `tenancy.ctlflow.com/v1alpha1`.
 
@@ -190,10 +191,96 @@ matched Workspace address-binding generation
 cache expiry
 ```
 
-Resolution returns only an active Workspace binding whose Workspace and parent Tenant are active.
+Resolution returns only an active Workspace binding whose bound Workspace is active and whose
+parent Tenant is both the request Tenant and active. A binding never resolves a Workspace owned by
+another Tenant even if a stored row names a mismatched pair.
+
 Malformed input is `INVALID_ARGUMENT`; no visible active binding is `NOT_FOUND`; authentication,
-admission, persistence, tracing, and the one-to-60-second expiry bound follow `ResolveTenant`.
-There is no alias, fallback, or nearest-Workspace match.
+admission, persistence, tracing, and the one-to-60-second expiry bound follow `ResolveTenant`. In
+addition to the Tenant fence, a valid invocation whose Workspace scope excludes the resolved
+Workspace makes the result not found, so a Workspace-scoped credential cannot resolve a sibling
+Workspace in the same Tenant. There is no alias, fallback, or nearest-Workspace match.
+
+## Administrative resources
+
+A Tenant create request contains bounded display metadata, one permanent external-address
+publication request, one initial-administrator declaration, and an explicit finite set of baseline
+App installation requests. A Workspace create request contains its immutable parent Tenant,
+bounded display metadata, one permanent Workspace address, an explicit finite initial Membership
+set, and an explicit finite baseline App set. Initial administrator, Membership, and App inputs are
+persisted provisioning intent; they never become `tenantd`-owned identity or Package records.
+
+Tenant and Workspace resources expose:
+
+```text
+spec:
+  immutable parent, when Workspace
+  display name
+  immutable external address publication
+  explicit provisioning inputs
+
+status:
+  lifecycle
+  positive revision
+  positive provisioning generation
+  current lifecycle operation
+  one bounded condition per incomplete owner step
+```
+
+Create allocates the opaque ID and permanent address binding in the same transaction. Update may
+change only admitted display metadata and requires the current resource version. Address, parent,
+initial provisioning inputs, and canonical Placement identity are immutable. Baseline Apps after
+creation are managed as `pkgd` Apps rather than by editing the Tenant or Workspace.
+
+`suspend`, `resume`, and `delete` are explicit subresources. Repeating one with the same
+idempotency identity returns the same lifecycle operation. Delete is irreversible; it reaches
+terminal `deleted` only after every required owner acknowledges retired child state. List and watch
+use the common bounded collection contract and preserve exact global or Tenant visibility.
+
+## Lifecycle fact contract
+
+`GetLifecycle` receives exactly one canonical target:
+
+```text
+Tenant ID
+
+or
+
+Tenant ID + Workspace ID
+```
+
+It returns the canonical target, parent Tenant when applicable, lifecycle, record revision,
+provisioning generation, and an expiry no later than 60 seconds. It returns any retained lifecycle
+state, including terminal tombstones. A mismatched Workspace parent or an invocation fence outside
+the target is `NOT_FOUND`. This is the only narrow lifecycle projection consumed by other kernel
+services; they do not cache or copy Tenant or Workspace administrative records.
+
+## Lifecycle acknowledgement contract
+
+`AcknowledgeLifecycleStep` records one downstream owner's result for one current provisioning,
+suspension, resumption, or deletion generation. Its request contains:
+
+```text
+target Tenant or Workspace
+lifecycle-operation ID and provisioning generation
+step key assigned by tenantd
+downstream owner revision
+outcome: complete or blocked
+bounded stable reason when blocked
+idempotency key
+```
+
+The authenticated immediate service determines the downstream owner; a body cannot name another
+owner. `tenantd` accepts only a step assigned to that service and generation. The same
+idempotency key and canonical result returns the existing acknowledgement. A stale generation or
+operation is `FAILED_PRECONDITION`; a conflicting retry is `ALREADY_EXISTS`; a revision race is
+`ABORTED`.
+
+The response returns the accepted step state, Tenant or Workspace lifecycle, provisioning
+generation, and current record revision. Completing the final required step advances lifecycle in
+the same transaction. A blocked step records one bounded condition and leaves the operation
+retryable. No acknowledgement can skip another required owner, resurrect deletion, or mutate the
+downstream record.
 
 ## Direct operations
 
@@ -202,7 +289,7 @@ There is no alias, fallback, or nearest-Workspace match.
 | ResolveTenant | Resolve one immutable ID or admitted external address with a revision and finite cache expiry |
 | ResolveWorkspace | Resolve one Workspace address inside an exact Tenant with a revision and finite cache expiry |
 | GetLifecycle | Return current lifecycle and generation for authorization or reconciliation |
-| AcknowledgeChildState | Record one idempotent provisioning or deletion step |
+| AcknowledgeLifecycleStep | Record one authenticated owner result for the current lifecycle generation |
 
 External address resolution is always two explicit operations: first the Tenant root, then the
 Workspace segment when the route contains the fixed Workspace boundary. Neither operation exposes
@@ -212,10 +299,31 @@ Administrative CRUD and lifecycle changes use the aggregated resources.
 
 ## Callers and dependencies
 
-- `authd` and `edged` resolve external Tenant and Workspace addresses.
-- `identityd`, `policyd`, `pkgd`, `configd`, `execd`, `egressd`, and `auditd` validate scope and
-  lifecycle through `tenantd`.
-- `tenantd` calls `identityd`, `configd`, `execd`, and `pkgd` only as committed lifecycle steps.
+| Caller | Operation | Purpose |
+| --- | --- | --- |
+| `authd`, `edged` | ResolveTenant, ResolveWorkspace | Resolve the external address hierarchy |
+| `identityd`, `policyd`, `pkgd`, `configd`, `execd`, `egressd`, `auditd` | GetLifecycle | Fence an exact owner reference by current lifecycle |
+| `identityd`, `configd`, `execd`, `pkgd` | AcknowledgeLifecycleStep | Report one assigned lifecycle step after committing local state |
+
+`tenantd` calls intent-specific `identityd`, `configd`, `execd`, and `pkgd` operations only after
+committing its local lifecycle generation and outbox. It never holds a transaction across a call.
+Each downstream request carries the Tenant or Workspace target, lifecycle-operation ID,
+provisioning generation, assigned step key, and idempotency identity. A response cannot directly
+advance `tenantd`; the committed acknowledgement operation does.
+
+## Verification
+
+Canonical evidence covers:
+
+- create, update, bounded list/watch, suspend, resume, retry, and irreversible deletion for Tenant
+  and Workspace resources;
+- permanent address allocation, collision, retirement, tombstones, and immutable Workspace parent;
+- every provisioning step, restart between steps, duplicate acknowledgement, blocked step, stale
+  generation, revision conflict, and downstream outage;
+- direct lookup and lifecycle operations across every lifecycle and visibility fence;
+- authentication, authorization, invocation fencing, schema incompatibility, cancellation,
+  deadline, telemetry, and transactional audit-outbox behavior; and
+- zero cross-Tenant visibility through reads, lists, watches, errors, caches, or acknowledgements.
 
 ## Invariants
 
@@ -224,6 +332,8 @@ Administrative CRUD and lifecycle changes use the aggregated resources.
   including after retirement or Tenant deletion.
 - An admitted Workspace address permanently belongs to exactly one Workspace in its Tenant and is
   never reassigned, including after retirement or Workspace deletion.
+- A Workspace address binding's Tenant is always the bound Workspace's parent Tenant; a binding that
+  names a Workspace in a different Tenant is rejected at write time and never resolves.
 - A binding's owner is immutable; no operation repoints or reactivates a retired binding.
 - Active sibling address roots are non-overlapping under the routing grammar. Tenant-to-Workspace
   nesting occurs only through an explicit fixed structural boundary, so one request has one exact

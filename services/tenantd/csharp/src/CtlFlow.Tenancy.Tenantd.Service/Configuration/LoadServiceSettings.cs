@@ -49,8 +49,10 @@ internal static partial class TenantdConfiguration
         var invocationTokens = CreateTokenSettings(
             "CTLFLOW_INVOCATION",
             DefaultInvocationTokenLifetimeSeconds);
-        var callers = ParseCallers(
-            RequireEnvironment("CTLFLOW_RESOLVE_TENANT_CALLERS"));
+        var tenantCallers = ParseCallers(
+            "CTLFLOW_RESOLVE_TENANT_CALLERS");
+        var workspaceCallers = ParseCallers(
+            "CTLFLOW_RESOLVE_WORKSPACE_CALLERS");
         var telemetry = TelemetrySettings.Parse(
             RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT"));
 
@@ -64,7 +66,8 @@ internal static partial class TenantdConfiguration
             cacheLifetime,
             workloadTokens,
             invocationTokens,
-            callers,
+            tenantCallers,
+            workspaceCallers,
             telemetry);
     }
 
@@ -111,8 +114,9 @@ internal static partial class TenantdConfiguration
     }
 
     private static IReadOnlySet<KubernetesServiceAccountSubject> ParseCallers(
-        string value)
+        string name)
     {
+        var value = RequireEnvironment(name);
         var callers = new HashSet<KubernetesServiceAccountSubject>();
 
         foreach (var item in value.Split(',', StringSplitOptions.TrimEntries))
@@ -123,7 +127,7 @@ internal static partial class TenantdConfiguration
         if (callers.Count == 0)
         {
             throw new InvalidOperationException(
-                "CTLFLOW_RESOLVE_TENANT_CALLERS must contain at least one caller");
+                $"{name} must contain at least one caller");
         }
 
         return callers;

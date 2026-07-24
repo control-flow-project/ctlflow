@@ -101,12 +101,110 @@ headers, bodies, and upstream diagnostics are not.
 
 ## Direct operations
 
-| Operation | Purpose |
+| Operation | Surface | Purpose |
+| --- | --- | --- |
+| ForwardHttp | private HTTP data plane | Proxy one ordinary or streaming exchange through an exact binding |
+| PreviewEgress | private gRPC and aggregated EgressReview | Return the effective decision and rewrite identity without forwarding |
+| Health | private Kubernetes probe | Report whether the process is live |
+| Ready | private Kubernetes probe | Report whether required dependencies permit forwarding |
+
+### Forwarding contract
+
+`execd` projects a consumer-specific egress binding containing an internal base endpoint and the
+name of the process-bound credential slot. The endpoint fixes destination, policy, dependency,
+consumer, Placement, and binding generation before a request begins:
+
+```text
+<egressd internal origin>/v1/bindings/<opaque-binding-id>/<relative-upstream-path>
+```
+
+The fixed prefix is removed before configured rewriting. A caller may choose only method, relative
+path, admitted query values, admitted ordinary headers, and body/stream inside that binding. It
+cannot supply another destination, origin, policy, consumer namespace, Secret, or binding through
+headers, query, body, redirects, DNS, or an absolute-form request target.
+
+`ForwardHttp` authenticates the immediate runtime or kernel service and, for a runtime, validates
+the short-lived process-and-dependency credential locally. It then resolves the current binding
+through `execd`, evaluates destination policy, canonicalizes the outbound request, strips all
+caller authentication and protected headers, applies deterministic rewrites, obtains only required
+material from `configd`, and opens TLS to the exact admitted origin.
+
+Ordinary and streaming requests use the same operation. Request/response byte limits, header
+limits, connection and first-byte deadlines, total lifetime, concurrent streams, redirect count,
+and backpressure are finite destination-policy fields. Bodies stream with bounded buffers; they are
+never placed in audit or telemetry. A downstream disconnect cancels upstream work.
+
+The response preserves admitted upstream status and ordinary headers while removing credentials,
+cookies, hop-by-hop fields, internal routing, and prohibited diagnostics. `egressd` does not retry
+non-idempotent methods. An explicitly configured idempotent retry remains within the same origin,
+credential purpose, request deadline, and finite retry budget.
+
+### Rewrite and review contract
+
+A destination has one immutable owner scope and approved HTTPS origin. Its versioned rule set may:
+
+- replace one exact path prefix;
+- add, replace, or remove named query fields;
+- add, replace, or remove named headers;
+- derive bounded namespace values from authenticated Tenant, Workspace, Placement, App/Job,
+  dependency, and binding IDs; and
+- place one exact `configd` Secret version into a declared upstream authentication slot.
+
+Rules are ordered, typed, finite, and validated at commit. They cannot execute code, interpolate
+caller-controlled templates into protected values, parse bodies, change origin after admission, or
+name a provider-specific concept.
+
+`PreviewEgress` receives the same binding, method, relative path, admitted query/header names, and
+body-length metadata but no body or Secret material. It returns allow/deny, destination and policy
+revisions, canonical upstream origin class, rewrite-rule IDs, redacted resulting path/header names,
+trace-propagation decision, finite limits, and first stable denying layer. It never returns a URL
+with query values, upstream authentication, physical namespace, or reusable allow capability.
+
+### Failure contract
+
+Malformed input is `400`; missing or invalid proxy identity is `401`; valid identity without policy
+is `403`; unknown or invisible binding/destination is `404`; body or concurrency bounds use `413`
+or `429`; required owner/configuration unavailability is `503`; connection/response deadline is
+`504`. An upstream status is returned only after an admitted connection succeeds. Internal
+resolution, DNS, policy, Secret, and provider detail remains a stable redacted class.
+
+## Administrative resources
+
+An Egress destination has immutable global or Tenant owner and origin, plus enabled state,
+address-admission policy, finite transport limits, deterministic rewrite rules, optional exact
+Secret references, and external trace-propagation policy. An Egress policy has immutable owner
+scope and finite allow-only matches over exact principal/dependency, Placement fence, destination,
+methods, and canonical path classes. Neither record can move scope.
+
+An EgressReview is create-only, side-effect-free, and enters the same evaluator as
+`PreviewEgress`. Destination disable blocks new connections immediately; deletion requires every
+policy, `configd` reference, and `execd` binding to be removed. Lists and watches use exact owner
+selectors and bounded pagination.
+
+## Callers and dependencies
+
+| Callee | Purpose |
 | --- | --- |
-| Fetch | Proxy one bounded admitted HTTP exchange |
-| OpenHttpStream | Proxy one bounded streaming HTTP exchange |
-| Preview | Return the effective decision and rewrite identity without forwarding |
-| Health / Ready | Report local and required dependency readiness |
+| `tenantd` | Validate destination Tenant and optional Workspace lifecycle |
+| `identityd` | Refresh the bounded proxy-credential verification-key set |
+| `execd` | Resolve exact runtime, Placement, dependency, and binding generation |
+| `configd` | Release one exact-purpose upstream Secret version |
+| `auditd` | Record every forwarding decision and policy mutation |
+
+`identityd` also uses an explicitly bound destination for SSO provider HTTP. Kernel services may
+use a binding under their own workload identity without a runtime proxy credential only when the
+exact policy admits that service.
+
+## Verification
+
+Canonical evidence covers destination/policy CRUD and revision conflicts, process credential
+binding and replay from another runtime, every rewrite type and ordering edge, namespace
+derivation, Secret substitution/redaction, absolute-target and origin escape, DNS rebinding,
+redirect re-admission, prohibited address classes, all methods and streaming modes, finite
+buffering/backpressure, disconnect/cancellation, timeout and retry budgets, trace opt-in and
+identity-header stripping, preview equivalence, destination disable/delete references,
+cross-Tenant isolation, dependency outage, public error redaction, and required audit/telemetry
+evidence.
 
 ## Invariants
 

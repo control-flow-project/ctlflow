@@ -34,8 +34,10 @@ after(async () => {
   await context?.stop();
 });
 
-test("the generated API inventory contains only ResolveTenant", () => {
-  assert.deepEqual(Object.keys(TenantServiceService), ["resolveTenant"]);
+test("the generated API inventory contains only the advertised operations", () => {
+  assert.deepEqual(
+    Object.keys(TenantServiceService),
+    ["resolveTenant", "resolveWorkspace"]);
 });
 
 test("resolves every retained Tenant lifecycle by ID", async () => {

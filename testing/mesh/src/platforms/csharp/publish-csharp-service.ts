@@ -2,16 +2,6 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { runCommand } from "../../processes/run-command.js";
-import {
-  extractNativeAotDiagnostics
-} from "./diagnostics/extract-native-aot-diagnostics.js";
-import {
-  readNativeAotDiagnosticManifest
-} from "./diagnostics/read-native-aot-diagnostic-manifest.js";
-import {
-  verifyNativeAotDiagnostics
-} from "./diagnostics/verify-native-aot-diagnostics.js";
-import { cleanCSharpService } from "./clean-csharp-service.js";
 
 export async function publishCSharpService(
   repositoryRoot: string,
@@ -22,36 +12,17 @@ export async function publishCSharpService(
     path.join(os.tmpdir(), "ctlflow-csharp-publish-"));
 
   try {
-    await cleanCSharpService(repositoryRoot, projectPath);
-    const result = await runCommand(
-      "dotnet",
+    // The repository owns one gated NativeAOT publisher; the canonical suite,
+    // local verification, and container release all run the same command.
+    await runCommand(
+      "node",
       [
-        "publish",
+        path.join(repositoryRoot, "tooling/native/gated-publish.mjs"),
         projectPath,
-        "--disable-build-servers",
-        "--configuration",
-        "Release",
-        "--runtime",
-        "linux-x64",
-        "--output",
-        outputDirectory,
-        "-m:1",
-        "-p:UseSharedCompilation=false",
-        "-p:TreatWarningsAsErrors=false",
-        "-p:ILLinkTreatWarningsAsErrors=false",
-        "-p:TrimmerTreatWarningsAsErrors=false",
-        "-p:IlcTreatWarningsAsErrors=false"
+        diagnosticsManifestPath,
+        outputDirectory
       ],
       { cwd: repositoryRoot });
-    const manifest = await readNativeAotDiagnosticManifest(
-      diagnosticsManifestPath);
-    const diagnostics = extractNativeAotDiagnostics(
-      `${result.stdout}\n${result.stderr}`,
-      {
-        repository: repositoryRoot,
-        publication: outputDirectory
-      });
-    verifyNativeAotDiagnostics(manifest.diagnostics, diagnostics);
 
     return outputDirectory;
   } catch (error) {

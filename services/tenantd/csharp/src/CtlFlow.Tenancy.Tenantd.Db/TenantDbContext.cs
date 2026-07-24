@@ -1,10 +1,13 @@
 using CtlFlow.Tenancy.Tenantd.Domain.Addresses;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
+using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 using CtlFlow.Tenancy.Tenantd.Db.Schema;
 using Microsoft.EntityFrameworkCore;
 using static CtlFlow.Tenancy.Tenantd.Db.Addresses.AddressBindingSchema;
 using static CtlFlow.Tenancy.Tenantd.Db.Schema.AppliedMigrationSchema;
 using static CtlFlow.Tenancy.Tenantd.Db.Tenants.TenantSchema;
+using static CtlFlow.Tenancy.Tenantd.Db.Workspaces.WorkspaceSchema;
+using static CtlFlow.Tenancy.Tenantd.Db.Workspaces.WorkspaceAddressBindingSchema;
 
 namespace CtlFlow.Tenancy.Tenantd.Db;
 
@@ -15,6 +18,10 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options)
 
     public DbSet<TenantAddressBinding> TenantAddressBindings { get; private set; } = null!;
 
+    public DbSet<Workspace> Workspaces { get; private set; } = null!;
+
+    public DbSet<WorkspaceAddressBinding> WorkspaceAddressBindings { get; private set; } = null!;
+
     public DbSet<AppliedMigration> AppliedMigrations { get; private set; } = null!;
 
     public DbSet<MigrationLock> MigrationLocks { get; private set; } = null!;
@@ -23,6 +30,8 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options)
     {
         ConfigureTenant(modelBuilder);
         ConfigureAddressBinding(modelBuilder);
+        ConfigureWorkspace(modelBuilder);
+        ConfigureWorkspaceAddressBinding(modelBuilder);
         ConfigureAppliedMigration(modelBuilder);
         ConfigureMigrationLock(modelBuilder);
     }

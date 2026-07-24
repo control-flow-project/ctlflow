@@ -31,10 +31,10 @@ replace an initialized operator or reset an existing installation.
  ctlflow create tenant -f tenant.yaml
    -> Kubernetes API authenticates and authorizes operator
    -> tenantd creates Tenant in provisioning state
-   -> identityd establishes initial administrator
-   -> configd establishes Tenant configuration scope
-   -> execd realizes canonical Tenant Placement
-   -> pkgd reconciles explicitly requested baseline Apps
+   -> identityd establishes initial administrator and acknowledges its assigned step
+   -> configd establishes Tenant configuration scope and acknowledges its step
+   -> execd realizes canonical Tenant Placement and acknowledges its step
+   -> pkgd reconciles explicitly requested baseline Apps and acknowledges its step
    -> tenantd marks Tenant active
    -> every owner delivers audit evidence
 ```
@@ -48,10 +48,10 @@ provisioning invokes the same `tenantd` use case through an admitted product bac
 ```text
  ctlflow create workspace --tenant TENANT -f workspace.yaml
    -> tenantd creates Workspace in provisioning state
-   -> identityd establishes requested Memberships
-   -> configd establishes Workspace configuration scope
-   -> execd realizes canonical Workspace Placement
-   -> pkgd reconciles requested Workspace Apps
+   -> identityd establishes requested Memberships and acknowledges its assigned step
+   -> configd establishes Workspace configuration scope and acknowledges its step
+   -> execd realizes canonical Workspace Placement and acknowledges its step
+   -> pkgd reconciles requested Workspace Apps and acknowledges its step
    -> tenantd marks Workspace active
 ```
 
@@ -222,7 +222,8 @@ into a Tenant context.
 ## External HTTP
 
 ```text
- App or Run -> egressd with process-bound proxy credential
+ App or Run -> binding-specific egressd HTTP endpoint
+             -> validate process-and-dependency-bound proxy credential
              -> establish runtime and dependency
              -> match destination, method, path, and policy
              -> obtain purpose-bound secret material from configd
@@ -240,6 +241,10 @@ prefix.
    -> owner commits domain state + outbox envelope
    -> auditd ingests idempotently
    -> authorized caller queries bounded Tenant or global partition
+
+ stateless ingress or egress allow
+   -> auditd accepts required decision evidence
+   -> mediator reports success or forwards the admitted result
 
  Run output
    -> configured log system

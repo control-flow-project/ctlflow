@@ -52,7 +52,8 @@ internal static partial class TenantdProcess
         builder.Services.AddSingleton(
             new TenantOperationSettings(
                 settings.CacheLifetime,
-                settings.ResolveTenantCallers));
+                settings.ResolveTenantCallers,
+                settings.ResolveWorkspaceCallers));
         builder.Services.AddSingleton<IDbContextFactory<TenantDbContext>>(
             databaseContexts);
         builder.Services.AddSingleton(tokenAuthorities);

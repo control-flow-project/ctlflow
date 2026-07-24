@@ -48,6 +48,12 @@ owning-service use case as the aggregated API.
 The product surface may offer a purpose-built form and JSON review for one operation. It cannot
 change semantics, bypass a field, or create a second record shape.
 
+The aggregated adapter trusts only the Kubernetes-authenticated operator subject and its RBAC
+decision. The product adapter validates its backend workload and invocation JWT, then the owning
+service calls `policyd.CheckAccess` for the exact management operation and resource path before
+entering the same use case. A product backend never calls an aggregated listener or presents a
+Kubernetes operator identity.
+
 ## Public authentication
 
 Browser authentication uses the public HTTP contract owned by `authd`. It covers login options,
@@ -67,7 +73,7 @@ operations are private gRPC and aggregated administrative resources only.
 | `policy.ctlflow.com/v1alpha1` | `roles`, `rolebindings`, `accessgrants`, create-only `accessreviews` | `policyd` |
 | `packages.ctlflow.com/v1alpha1` | `packages`, `apps`, and read-only `artifacts`, `servicecontracts`, and `exposures` | `pkgd` |
 | `config.ctlflow.com/v1alpha1` | `configurations`, `secrets`, `providerconfigurations` | `configd` |
-| `execution.ctlflow.com/v1alpha1` | `placements`, `placementconstraints`, `jobs`, `jobschedules`, `runs`, and read-only `workloads`, `dependencyclaims`, `dependencybindings`, and `endpoints` | `execd` |
+| `execution.ctlflow.com/v1alpha1` | `placements`, `placementconstraints`, `jobs`, `jobschedules`, `runs`, and read-only `workloads`, `persistentslots`, `dependencyclaims`, `dependencybindings`, `endpoints`, `runattempts`, and `runartifacts` | `execd` |
 | `egress.ctlflow.com/v1alpha1` | `egressdestinations`, `egresspolicies`, create-only `egressreviews` | `egressd` |
 | `audit.ctlflow.com/v1alpha1` | read-only `auditevents` and mutable `auditexports` | `auditd` |
 
@@ -117,16 +123,16 @@ service-to-service contracts use gRPC. Public HTTP mediation remains HTTP.
 
 | Service | Direct operations |
 | --- | --- |
-| `tenantd` | Resolve Tenant/Workspace address and coordinate lifecycle facts |
-| `authd` | Public HTTP login options, begin, callback, logout, and private operational health |
-| `identityd` | Authentication decisions for authd, Session validation, invocation JWTs, proxy credentials, and principal resolution |
-| `policyd` | Check or explain one operation on one canonical path |
-| `pkgd` | Resolve Package declaration, App installation, service contract, exposure, and provider schema |
-| `configd` | Resolve configuration and materialize an authorized secret binding |
-| `execd` | Reconcile Placement, resolve endpoint, create/cancel Run, obtain logs, and report realization |
-| `edged` | Proxy external request, preview resolution, drain, readiness, and bounded cache inspection |
-| `egressd` | Proxy admitted HTTP, open HTTP stream, and preview a decision |
-| `auditd` | Ingest idempotent evidence batches and manage exports |
+| `tenantd` | ResolveTenant, ResolveWorkspace, GetLifecycle, AcknowledgeLifecycleStep |
+| `authd` | Public HTTP Options, Begin, Callback, Logout, and private operational probes |
+| `identityd` | Login transaction, Session exchange/revocation, invocation/key, principal, runtime, proxy-credential, and identity-scope operations |
+| `policyd` | CheckAccess, ExplainAccess, BuildResourcePath |
+| `pkgd` | Package publication/resolution, App lifecycle/realization, immutable contract/exposure, baseline, and artifact-transfer operations |
+| `configd` | Validation/resolution, provider selection, write-only material, workload/egress materialization, and scope operations |
+| `execd` | Placement, App realization, endpoint, Job/Run, dependency, runtime-context, log, and artifact operations |
+| `edged` | Public ProxyRequest plus private preview, cache, drain, and probe operations |
+| `egressd` | Private HTTP ForwardHttp plus PreviewEgress and probes |
+| `auditd` | RecordAuditBatch, bounded query/follow, export/transfer, payload removal, and probes |
 
 Every internal direct request carries:
 
@@ -150,6 +156,52 @@ caller's visibility remains not found.
 Trace propagation follows [Telemetry](../telemetry/), whose W3C trace and span identity is the sole
 transport correlation model. Public cookies, public bearer tokens, protected identity headers, and
 W3C baggage are never forwarded into an internal operation.
+
+### Direct-operation rules
+
+Each direct operation has one intent-specific method. A protobuf service cannot expose a generic
+command, arbitrary resource envelope, untyped selector, property bag, or operation-family method.
+The callee owns the request, response, and error contract. Callers use the callee's contract rather
+than defining a caller-shaped copy.
+
+Requests contain only operation input. Authenticated workload, Actor, attached account, Tenant,
+Workspace, Placement, runtime, request deadline, and trace facts come from validated transport
+context unless the operation must name one of them as a target. Responses contain bounded domain
+results and owner-supplied revisions or expiries; they never contain credentials, native
+Kubernetes names, provider payloads, or another service's administrative record.
+
+The common gRPC status contract is:
+
+| Status | Meaning |
+| --- | --- |
+| `INVALID_ARGUMENT` | A required field is absent, malformed, non-canonical, conflicting, or outside a declared finite bound |
+| `NOT_FOUND` | The exact visible target does not exist; invisible and cross-fence targets use the same result |
+| `ALREADY_EXISTS` | An immutable publication key or relationship is already bound to a different canonical body |
+| `FAILED_PRECONDITION` | Current lifecycle or a required owner fact forbids the otherwise valid operation |
+| `ABORTED` | An expected revision or concurrency precondition no longer matches |
+| `RESOURCE_EXHAUSTED` | A declared finite request, stream, queue, or admission limit is reached |
+| `UNAUTHENTICATED` | Required immediate or invocation identity cannot be established |
+| `PERMISSION_DENIED` | Identity is valid but is not admitted to this operation |
+| `UNAVAILABLE` | Required owner state, persistence, or dependency cannot currently establish a safe result |
+| `CANCELLED` / `DEADLINE_EXCEEDED` | Caller cancellation or the effective deadline ends unfinished work |
+
+An operation may narrow this table but cannot reinterpret a status. Dependency and provider errors
+map to a bounded stable owner reason; raw diagnostics do not cross the boundary.
+
+Every retryable mutation requires an idempotency identity. The same caller, target, operation, and
+canonical input returns the same accepted result. Reuse with different input is
+`ALREADY_EXISTS`. Mutable records additionally require an expected positive revision; mismatch is
+`ABORTED`. A mutation commits its audit-outbox intent atomically before returning success.
+
+Direct lists use a finite `page_size` and opaque `page_token`; the response returns an opaque
+`next_page_token` and owner revision. Direct follow or wait operations require an explicit starting
+cursor or target revision, send finite messages, enforce backpressure, and end on deadline,
+cancellation, terminal state, or owner-defined maximum lifetime.
+
+Generated descriptors are release inventory. Canonical tests must prove every advertised method,
+success result, admitted validation and status outcome, pagination or streaming boundary,
+authentication and authorization path, cancellation, dependency failure, telemetry, and audit
+obligation. An operation absent from the callee-owned API definition does not exist.
 
 ## Application endpoints
 

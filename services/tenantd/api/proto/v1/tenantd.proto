@@ -8,6 +8,7 @@ import "google/protobuf/timestamp.proto";
 
 service TenantService {
   rpc ResolveTenant(ResolveTenantRequest) returns (ResolveTenantResponse);
+  rpc ResolveWorkspace(ResolveWorkspaceRequest) returns (ResolveWorkspaceResponse);
 }
 
 message ResolveTenantRequest {
@@ -32,6 +33,23 @@ message ResolvedTenantAddress {
   uint64 binding_generation = 1;
 }
 
+message ResolveWorkspaceRequest {
+  string tenant_id = 1;
+  string workspace_address = 2;
+}
+
+message ResolveWorkspaceResponse {
+  string workspace_id = 1;
+  WorkspaceLifecycle lifecycle = 2;
+  uint64 workspace_revision = 3;
+  ResolvedWorkspaceAddress address = 4;
+  google.protobuf.Timestamp cache_expires_at = 5;
+}
+
+message ResolvedWorkspaceAddress {
+  uint64 binding_generation = 1;
+}
+
 enum TenantLifecycle {
   TENANT_LIFECYCLE_UNSPECIFIED = 0;
   TENANT_LIFECYCLE_PROVISIONING = 1;
@@ -40,4 +58,14 @@ enum TenantLifecycle {
   TENANT_LIFECYCLE_DELETING = 4;
   TENANT_LIFECYCLE_FAILED = 5;
   TENANT_LIFECYCLE_DELETED = 6;
+}
+
+enum WorkspaceLifecycle {
+  WORKSPACE_LIFECYCLE_UNSPECIFIED = 0;
+  WORKSPACE_LIFECYCLE_PROVISIONING = 1;
+  WORKSPACE_LIFECYCLE_ACTIVE = 2;
+  WORKSPACE_LIFECYCLE_SUSPENDED = 3;
+  WORKSPACE_LIFECYCLE_DELETING = 4;
+  WORKSPACE_LIFECYCLE_FAILED = 5;
+  WORKSPACE_LIFECYCLE_DELETED = 6;
 }

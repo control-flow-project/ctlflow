@@ -112,7 +112,8 @@ reaches the same declared logical constraints, indexes, and revision.
 Migration TypeScript is compiled before execution under the repository's strict TypeScript policy.
 Deployment executes the compiled JavaScript artifact; production does not transpile source at
 runtime. Migration source uses explicit ESM imports ending in `.js`, just like other TypeScript
-source. The repository pins one Node LTS toolchain for migration and canonical-test artifacts.
+source. The repository pins one exact maintained Node Current or LTS release for migration and
+canonical-test artifacts.
 
 An implementation does not create, infer, repair, or migrate schema at startup. Deployment applies
 the common migrations first. A service fails readiness when its database is absent, behind, ahead,
@@ -181,6 +182,18 @@ Canonical tests use:
 - a real OpenTelemetry Collector for propagation and export evidence;
 - restart, cancellation, deadline, and controlled external-boundary failure; and
 - bounded collections, pagination, watches, and streams.
+
+One service test command owns one suite-scoped mesh. Before test files run, the mesh starts one
+test Kubernetes cluster, one real OpenTelemetry Collector, and one gated production artifact for
+each selected implementation. Those shared fixtures remain active until the entire service suite
+finishes. Test files never create another cluster, Collector, or publication.
+
+Each test file receives its own migrated database, ports, invocation authority, and shipping
+service process from that mesh, so schema mutation, restart, and process failure remain isolated.
+The shared cluster issues fresh finite workload credentials for each isolated context rather than
+assuming one startup token outlives the suite. Collector-outage evidence uses mesh-owned
+suspend/resume controls and restores the shared Collector before the test releases its context.
+One global teardown stops shared fixtures and removes their artifacts even after failure.
 
 Mocks, in-memory repositories, substitute kernel services, and handwritten protocol servers do not
 establish product behavior. Controlled processes are permitted only for external systems outside
@@ -274,4 +287,4 @@ An implementation is releasable only when it:
 The shared service-root assets define the service. An implementation supplies one interchangeable
 realization.
 
-Language-specific implementation rules are defined in [C#](csharp/).
+Language-specific implementation rules are defined in [C#](../csharp/).

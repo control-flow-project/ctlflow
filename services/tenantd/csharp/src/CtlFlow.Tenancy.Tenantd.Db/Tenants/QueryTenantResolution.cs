@@ -22,6 +22,9 @@ public static partial class Tenants
         var queryCancellation = cancellation;
         var cacheExpiry = CacheExpiry.Calculate(currentTime, cacheLifetime);
 
+        using var dbActivity = TenantDbTelemetry.StartQuery(
+            "tenantd.db.resolve_tenant");
+
         if (selector is TenantSelector.ById byId)
         {
             var tenantId = byId.TenantId.Value;

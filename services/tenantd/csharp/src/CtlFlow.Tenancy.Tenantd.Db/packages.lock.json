@@ -62,7 +62,7 @@
         "type": "Direct",
         "requested": "[10.0.10, )",
         "resolved": "10.0.10",
-        "contentHash": "HK7mO16Mk5t6c91PeG3YUpbdV65QbxOkcBRk9cGM5SIjWVSGsGlHwfINlficSs/4e/iImztp+Fcshgagiwu9Jg=="
+        "contentHash": "f5VCIE7AJpd5YvzNTeMGVzQIgyE9tX+AreTYwQF+REbu+DZo/2Ae+jNSwhPEYrVz6RRkd7y8ubXjk6Nn6Ka+Cg=="
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {
         "type": "Direct",

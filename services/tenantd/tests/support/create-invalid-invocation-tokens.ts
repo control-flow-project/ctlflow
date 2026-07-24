@@ -24,6 +24,7 @@ export function createInvalidInvocationTokens(
     }),
     authority.sign({
       tenantId: "tenant_active",
+      issuedAt: now,
       expiresAt: now + 61
     }),
     authority.sign({

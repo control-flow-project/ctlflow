@@ -35,7 +35,7 @@
         "type": "Direct",
         "requested": "[10.0.10, )",
         "resolved": "10.0.10",
-        "contentHash": "kLb5BxNZA8kKS38YW562JlA1kTfppNg2U6fAtl4B2vRC8PALzk/TjO1KEjh2DMlzBPJHWQjJxarSDu8AoN3QQQ=="
+        "contentHash": "tnG8ntt/Bk6odvHREnGLMo3PEiihy5iSlIFVp0JbIo00GKtNRt2k73eKZbPqR5yaJNIa3z8R86YLwbxfqpb17g=="
       },
       "Microsoft.EntityFrameworkCore.Tasks": {
         "type": "Direct",
@@ -50,7 +50,7 @@
         "type": "Direct",
         "requested": "[10.0.10, )",
         "resolved": "10.0.10",
-        "contentHash": "HK7mO16Mk5t6c91PeG3YUpbdV65QbxOkcBRk9cGM5SIjWVSGsGlHwfINlficSs/4e/iImztp+Fcshgagiwu9Jg=="
+        "contentHash": "f5VCIE7AJpd5YvzNTeMGVzQIgyE9tX+AreTYwQF+REbu+DZo/2Ae+jNSwhPEYrVz6RRkd7y8ubXjk6Nn6Ka+Cg=="
       },
       "OpenTelemetry": {
         "type": "Direct",
@@ -353,10 +353,7 @@
         }
       },
       "ctlflow.tenancy.tenantd.domain": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.EntityFrameworkCore": "[10.0.9, )"
-        }
+        "type": "Project"
       },
       "Microsoft.EntityFrameworkCore": {
         "type": "CentralTransitive",
@@ -399,6 +396,20 @@
       }
     },
     "net10.0/linux-x64": {
+      "Microsoft.DotNet.ILCompiler": {
+        "type": "Direct",
+        "requested": "[10.0.10, )",
+        "resolved": "10.0.10",
+        "contentHash": "tnG8ntt/Bk6odvHREnGLMo3PEiihy5iSlIFVp0JbIo00GKtNRt2k73eKZbPqR5yaJNIa3z8R86YLwbxfqpb17g==",
+        "dependencies": {
+          "runtime.linux-x64.Microsoft.DotNet.ILCompiler": "10.0.10"
+        }
+      },
+      "runtime.linux-x64.Microsoft.DotNet.ILCompiler": {
+        "type": "Transitive",
+        "resolved": "10.0.10",
+        "contentHash": "WRjSRBfv6A6UjgjO8EQuLe9xqdICpkQx1hACUziCw4B2uGL+2jVhkFLq/G7rxRr3MGvqLo9B+nNdfIJ/5CYN7A=="
+      },
       "SourceGear.sqlite3": {
         "type": "Transitive",
         "resolved": "3.50.4.5",

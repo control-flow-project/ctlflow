@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
+using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Principals;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
 using static CtlFlow.Tenancy.Tenantd.Service.Security.Tokens.JsonWebTokens;
@@ -50,14 +51,17 @@ internal static partial class InvocationTokens
 
         RejectAuthorityClaims(payload);
         var tenantId = await ReadTenantId(payload, cancellation);
-        var workspaceId = ReadOptionalString(payload, "workspace_id");
-        if (workspaceId is not null)
+        var workspaceValue = ReadOptionalString(payload, "workspace_id");
+        WorkspaceId? workspaceId = null;
+        if (workspaceValue is not null)
         {
-            ValidateScopeId(workspaceId);
+            ValidateScopeId(workspaceValue);
             if (tenantId is null)
             {
                 throw new TokenValidationException();
             }
+
+            workspaceId = WorkspaceId.FromStorage(workspaceValue);
         }
 
         if (sessionId is not null
@@ -66,7 +70,7 @@ internal static partial class InvocationTokens
             throw new TokenValidationException();
         }
 
-        return new InvocationIdentity(subject, actor, tenantId, tokenId);
+        return new InvocationIdentity(subject, actor, tenantId, workspaceId, tokenId);
     }
 
     private static PrincipalId ReadActor(

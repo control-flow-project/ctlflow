@@ -18,4 +18,5 @@ internal sealed record ServiceSettings(
     TokenValidationSettings WorkloadTokens,
     TokenValidationSettings InvocationTokens,
     IReadOnlySet<KubernetesServiceAccountSubject> ResolveTenantCallers,
+    IReadOnlySet<KubernetesServiceAccountSubject> ResolveWorkspaceCallers,
     TelemetrySettings Telemetry);

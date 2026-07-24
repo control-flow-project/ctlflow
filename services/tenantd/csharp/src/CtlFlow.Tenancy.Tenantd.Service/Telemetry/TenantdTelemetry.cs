@@ -17,6 +17,11 @@ internal sealed class TenantdTelemetry : IDisposable
             LogLevel.Information,
             new EventId(1, "ResolveTenantCompleted"),
             "ResolveTenant completed with {Outcome} in {DurationMilliseconds} ms");
+    private static readonly Action<ILogger, string, double, Exception?>
+        LogResolveWorkspaceCompletion = LoggerMessage.Define<string, double>(
+            LogLevel.Information,
+            new EventId(2, "ResolveWorkspaceCompleted"),
+            "ResolveWorkspace completed with {Outcome} in {DurationMilliseconds} ms");
     private readonly ActivitySource _activitySource = new(SourceName);
     private readonly Meter _meter = new(SourceName);
     private readonly ILogger<TenantdTelemetry> _logger;
@@ -42,6 +47,7 @@ internal sealed class TenantdTelemetry : IDisposable
             .SetResourceBuilder(CreateResource())
             .SetSampler(new AlwaysOnSampler())
             .AddSource(SourceName)
+            .AddSource(CtlFlow.Tenancy.Tenantd.Db.TenantDbTelemetry.SourceName)
             .AddOtlpExporter(options =>
             {
                 options.Endpoint = settings.TracesEndpoint;
@@ -77,29 +83,62 @@ internal sealed class TenantdTelemetry : IDisposable
             .Build();
     }
 
-    internal Activity? StartResolveTenant(Metadata headers)
-    {
-        var parent = ReadParentContext(headers);
-        var activity = _activitySource.StartActivity(
-            "tenantd.ResolveTenant",
-            ActivityKind.Server,
-            parent);
-        activity?.SetTag("rpc.system", "grpc");
-        activity?.SetTag("rpc.service", "ctlflow.tenancy.v1.TenantService");
-        activity?.SetTag("rpc.method", "ResolveTenant");
-        return activity;
-    }
+    internal Activity? StartResolveTenant(Metadata headers) =>
+        StartOperation("tenantd.ResolveTenant", "ResolveTenant", headers);
 
     internal void RecordResolveTenant(
         Activity? activity,
         string outcome,
-        long startedTimestamp)
+        long startedTimestamp) =>
+        RecordOperation(
+            activity,
+            "ResolveTenant",
+            outcome,
+            startedTimestamp,
+            LogResolveTenantCompletion);
+
+    internal Activity? StartResolveWorkspace(Metadata headers) =>
+        StartOperation("tenantd.ResolveWorkspace", "ResolveWorkspace", headers);
+
+    internal void RecordResolveWorkspace(
+        Activity? activity,
+        string outcome,
+        long startedTimestamp) =>
+        RecordOperation(
+            activity,
+            "ResolveWorkspace",
+            outcome,
+            startedTimestamp,
+            LogResolveWorkspaceCompletion);
+
+    private Activity? StartOperation(
+        string activityName,
+        string method,
+        Metadata headers)
+    {
+        var parent = ReadParentContext(headers);
+        var activity = _activitySource.StartActivity(
+            activityName,
+            ActivityKind.Server,
+            parent);
+        activity?.SetTag("rpc.system", "grpc");
+        activity?.SetTag("rpc.service", "ctlflow.tenancy.v1.TenantService");
+        activity?.SetTag("rpc.method", method);
+        return activity;
+    }
+
+    private void RecordOperation(
+        Activity? activity,
+        string operation,
+        string outcome,
+        long startedTimestamp,
+        Action<ILogger, string, double, Exception?> log)
     {
         var durationMilliseconds =
             Stopwatch.GetElapsedTime(startedTimestamp).TotalMilliseconds;
         var tags = new TagList
         {
-            { "ctlflow.operation", "ResolveTenant" },
+            { "ctlflow.operation", operation },
             { "ctlflow.outcome", outcome }
         };
         _requests.Add(1, tags);
@@ -109,7 +148,7 @@ internal sealed class TenantdTelemetry : IDisposable
             outcome == "ok"
                 ? ActivityStatusCode.Ok
                 : ActivityStatusCode.Error);
-        LogResolveTenantCompletion(
+        log(
             _logger,
             outcome,
             durationMilliseconds,
