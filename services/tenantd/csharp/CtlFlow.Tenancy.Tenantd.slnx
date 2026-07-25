@@ -2,4 +2,5 @@
   <Project Path="src/CtlFlow.Tenancy.Tenantd.Domain/CtlFlow.Tenancy.Tenantd.Domain.csproj" />
   <Project Path="src/CtlFlow.Tenancy.Tenantd.Db/CtlFlow.Tenancy.Tenantd.Db.csproj" />
   <Project Path="src/CtlFlow.Tenancy.Tenantd.Service/CtlFlow.Tenancy.Tenantd.Service.csproj" />
+  <Project Path="tests/CtlFlow.Tenancy.Tenantd.IntegrationTests/CtlFlow.Tenancy.Tenantd.IntegrationTests.csproj" />
 </Solution>

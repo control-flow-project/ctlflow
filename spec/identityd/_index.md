@@ -17,6 +17,7 @@ listener or browser protocol surface.
 | Identity link | External provider subject bound to one human User |
 | SSO provider | Tenant identity-provider configuration |
 | Admission policy | Tenant provider set or Workspace narrowing |
+| Login transaction | Short-lived one-use provider and return binding |
 | Session | Opaque browser session |
 | Virtual principal | Stable delegated App-component or Job identity |
 | Runtime principal | One concrete workload execution identity |
@@ -90,16 +91,128 @@ caller identity comes from the independently validated Kubernetes workload token
 
 ## Direct operations
 
-| Operation family | Purpose |
+| Operation | Admitted caller | Purpose |
+| --- | --- | --- |
+| ResolveLoginOptions | `authd` | Return the bounded enabled provider set for one Tenant and optional Workspace |
+| BeginLogin | `authd` | Create one short-lived provider-bound login transaction |
+| CompleteLogin | `authd` | Consume one transaction, validate the provider result, and create one Session |
+| ExchangeSession | `edged` | Validate one opaque Session and issue its short-lived invocation JWT |
+| RevokeSession | `authd`, admitted administrator | Revoke one exact Session |
+| IssueRunInvocation | admitted runtime proxy | Issue a Run-derived invocation JWT from current runtime facts |
+| GetInvocationVerificationKeys | admitted internal receiver | Return the active and retiring public verification keys with finite expiry |
+| ResolvePrincipal | admitted kernel owner | Return bounded current facts for one exact User, Group, virtual, or runtime principal |
+| ListPrincipalGroups | `policyd`, admitted administrator | Return one bounded page of Groups containing one exact principal |
+| ListDirectGroupMembers | admitted administrator | Return one bounded page of current direct members |
+| ValidateAttachedAccount | `pkgd`, `execd` | Prove that one enabled User may bound work at one exact Placement |
+| CreateVirtualPrincipal | `pkgd`, `execd` | Create the stable principal for one exact App component or Job |
+| DisableVirtualPrincipal | `pkgd`, `execd` | Block new use of an owned virtual principal |
+| EnableVirtualPrincipal | `pkgd`, `execd` | Re-enable a non-retired owned virtual principal after revalidation |
+| RetireVirtualPrincipal | `pkgd`, `execd` | Irreversibly retire an owned virtual principal |
+| MintRuntimePrincipal | admitted runtime proxy | Create one process identity for an exact admitted execution generation |
+| RetireRuntimePrincipal | `execd`, admitted runtime proxy | Retire one exact process identity |
+| IssueProxyCredential | admitted runtime proxy | Issue one short-lived process-and-dependency-bound proxy credential |
+
+### Authentication results
+
+`ResolveLoginOptions` receives canonical Tenant ID and optional Workspace ID already resolved by
+`authd`. It returns provider ID, bounded display metadata, protocol class, options revision, and a
+cache expiry no later than 60 seconds. It never returns provider secrets, issuer discovery
+documents, account matches, or admission reasons.
+
+`BeginLogin` additionally receives the selected provider, exact public origin, and canonical
+Tenant-local return target. It returns an opaque transaction credential, exact provider
+authorization URL, required callback method, and expiry. The transaction stores all authoritative
+Tenant, Workspace, provider, origin, return, nonce, verifier, and replay facts; callback input
+cannot replace them.
+
+`CompleteLogin` receives that transaction credential and the provider's bounded callback fields. It
+consumes the transaction before external exchange, performs any admitted provider HTTP through
+`egressd`, resolves an existing identity link, User, and current Membership, and returns an opaque
+Session credential, Session expiry, and stored return target. It never creates a User, Membership,
+or identity link implicitly.
+
+`ExchangeSession` receives the opaque Session credential plus the resolved request Tenant and
+optional Workspace. It returns the canonical subject account, Actor, Tenant, optional Workspace,
+Session ID, invocation JWT, and token expiry. The target must be inside current account standing
+and admission; a cross-Tenant or invisible target is `NOT_FOUND`. Session credentials and returned
+invocation JWTs are sensitive and use the redaction rules in [Access](../access/).
+
+### Principal and execution results
+
+Principal resolution returns only the requested principal's kind, canonical ID, enabled or retired
+state, immutable owner and attached account where applicable, exact Tenant/Workspace standing,
+revision, and finite expiry. Group membership is a separate paginated operation in either indexed
+principal-to-Group or Group-to-direct-member direction; nested expansion does not exist.
+
+Virtual-principal creation receives one immutable App-component or Job owner, exact Placement, and
+attached User. `identityd` validates the owner through `pkgd` or `execd`, validates the Placement
+through `execd`, and accepts only the caller that owns that kind. The generated principal ID does
+not contain Package, component, trigger, schedule, event, display name, or attached-account text.
+
+Runtime-principal minting derives App component or Run, virtual principal, attached account,
+Placement, workload generation, and Kubernetes workload from the authenticated runtime proxy and
+current owner facts. A request cannot supply substitute identity. A proxy credential additionally
+names one existing dependency binding and audience; it expires no later than the workload token or
+the configured 60-second maximum.
+
+### Scope lifecycle reconciliation
+
+`identityd` lists and watches the lifecycle steps assigned to its authenticated service identity.
+Tenant establishment creates the declared initial human administrator, Tenant Membership, and
+optional identity link as one identity-owned transaction. Workspace establishment creates only the
+explicitly requested Memberships for existing Tenant Users. Suspension blocks new Sessions and
+credentials, resumption revalidates current standing before restoring them, and retirement
+irreversibly retires remaining identity state after referential checks.
+
+Each local transition is idempotent for the supplied `tenantd` lifecycle-operation ID, generation,
+and step. After committing local state and audit intent, `identityd` calls
+`tenantd.AcknowledgeLifecycleStep` with its identity revision. It never mutates Tenant or Workspace
+lifecycle.
+
+## Administrative resources
+
+- A User has immutable kind (`human` or `service`) and immutable global or Tenant owner. Mutable
+  fields are bounded display metadata and enabled state. Global admits only non-login service Users.
+- A Membership has immutable User and Tenant or Workspace scope. Its mutable management standing is
+  exactly `admin` or `member`.
+- A Group has immutable Tenant or Workspace scope. Group-member records bind one direct User or
+  valid virtual principal; duplicate and nested membership are rejected.
+- An identity link permanently binds one provider subject to one human User in one Tenant. Provider
+  subject and User are immutable and cannot be reassigned.
+- An SSO provider has immutable Tenant and protocol class, bounded non-secret protocol
+  configuration, `configd` Secret references, one `egressd` destination, and enabled state.
+- The Tenant admission policy always exists. A Workspace policy is optional and stores only a
+  subset of enabled Tenant provider IDs; explicit empty denies login and deletion restores
+  inheritance.
+- Sessions expose metadata, origin provider, bounded times, and revocation state but never the
+  opaque credential. Virtual and runtime principals are read-only administrative projections.
+
+All collections use exact owner selectors, bounded pagination, and the caller's visibility fence.
+User disable, Session revoke, provider disable, and principal lifecycle changes are explicit
+subresources with idempotency and revision preconditions.
+
+## Callers and dependencies
+
+| Callee | Purpose |
 | --- | --- |
-| Authentication | Resolve options and begin or complete one login transaction for `authd` |
-| Session | Create, validate, revoke, and inspect a browser Session |
-| Invocation | Issue one short-lived internal invocation JWT |
-| Verification keys | Return the current bounded internal verification-key set |
-| Principal | Resolve account, Group, Membership, virtual, and runtime facts |
-| Virtual principal | Create, disable, and retire exact App-component or Job identity |
-| Runtime principal | Mint and retire one process execution identity |
-| Proxy credential | Issue one process-bound credential for an exact trusted proxy dependency |
+| `tenantd` | Validate exact parent/lifecycle and consume assigned identity lifecycle work |
+| `pkgd` | Validate App, component, Package, and virtual-principal owner references |
+| `execd` | Validate Placement, Job, Run, dependency, workload generation, and runtime references |
+| `egressd` | Perform only the provider discovery, authorization, token, and user-info HTTP admitted by the SSO binding |
+| `auditd` | Deliver identity mutation and authentication evidence through the transactional outbox |
+
+`policyd`, `configd`, `pkgd`, `execd`, `egressd`, `auditd`, runtime proxies, `authd`, and `edged`
+call only the exact operations admitted to them above. No caller receives a generic identity query,
+token-minting, provider, or secret interface.
+
+## Verification
+
+Canonical evidence covers every resource and direct operation, all User kinds and Placement
+attachment combinations, paginated Group membership, provider and Workspace narrowing, login
+transaction replay and callback failure, Session exchange and revocation, key rotation and cache
+expiry, invocation claim shapes, virtual/runtime identity lifecycle, process-bound credential
+replay from another runtime, cross-Tenant invisibility, disabled-account propagation, downstream
+outage, cancellation, concurrency, telemetry redaction, and transactional audit delivery.
 
 ## User scopes, groups, and management roles
 

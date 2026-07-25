@@ -10,7 +10,9 @@
   },
   "include": [
     "generated/**/*.ts",
+    "dependencies/**/*.ts",
     "integration/**/*.ts",
+    "suite/**/*.ts",
     "support/**/*.ts"
   ],
   "exclude": [

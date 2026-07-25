@@ -7,6 +7,9 @@ export async function stopProcess(process_: ManagedProcess): Promise<void> {
     return;
   }
 
+  process_.child.ref();
+  setStreamReference(process_.child.stdout, true);
+  setStreamReference(process_.child.stderr, true);
   process_.child.kill("SIGTERM");
 
   const stopped = await Promise.race([
@@ -23,5 +26,20 @@ export async function stopProcess(process_: ManagedProcess): Promise<void> {
     await new Promise<void>((resolve) => {
       process_.child.once("exit", () => resolve());
     });
+  }
+}
+
+function setStreamReference(
+  stream: NodeJS.ReadableStream | null,
+  referenced: boolean
+): void {
+  const referenceable = stream as (NodeJS.ReadableStream & {
+    ref?: () => void;
+    unref?: () => void;
+  }) | null;
+  if (referenced) {
+    referenceable?.ref?.();
+  } else {
+    referenceable?.unref?.();
   }
 }

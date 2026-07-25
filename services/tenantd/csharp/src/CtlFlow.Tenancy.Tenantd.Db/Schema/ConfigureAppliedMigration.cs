@@ -18,6 +18,6 @@ internal static partial class AppliedMigrationSchema
         migration.Property(value => value.Name)
             .HasColumnName("name")
             .HasMaxLength(255)
-            .IsRequired();
+            .IsRequired(false);
     }
 }

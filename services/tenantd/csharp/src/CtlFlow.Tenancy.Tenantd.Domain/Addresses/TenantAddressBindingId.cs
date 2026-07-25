@@ -1,9 +1,9 @@
+using CtlFlow.Tenancy.Tenantd.Domain.Identifiers;
+
 namespace CtlFlow.Tenancy.Tenantd.Domain.Addresses;
 
 public sealed record TenantAddressBindingId
 {
-    private const int MaximumLength = 64;
-
     private TenantAddressBindingId(string value)
     {
         Value = value;
@@ -11,38 +11,13 @@ public sealed record TenantAddressBindingId
 
     public string Value { get; }
 
-    public static TenantAddressBindingId FromStorage(string value)
-    {
-        if (!IsCanonical(value))
-        {
-            throw new InvalidOperationException("Stored address-binding ID is invalid");
-        }
+    public static TenantAddressBindingId FromStorage(string value) =>
+        new(OpaqueIdentifiers.ValidateStored(
+            value,
+            "Tenant address-binding ID"));
 
-        return new TenantAddressBindingId(value);
-    }
+    public static TenantAddressBindingId Generate() =>
+        new(OpaqueIdentifiers.Generate("tab"));
 
     public override string ToString() => Value;
-
-    private static bool IsCanonical(string value)
-    {
-        if (string.IsNullOrEmpty(value)
-            || value.Length > MaximumLength
-            || !IsLowerAlphaNumeric(value[0]))
-        {
-            return false;
-        }
-
-        foreach (var character in value.AsSpan(1))
-        {
-            if (!IsLowerAlphaNumeric(character) && character is not '_' and not '-')
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsLowerAlphaNumeric(char value) =>
-        value is >= 'a' and <= 'z' or >= '0' and <= '9';
 }

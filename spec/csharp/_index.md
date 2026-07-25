@@ -148,8 +148,13 @@ Do not create parallel `Customer`, `CustomerEntity`, and `CustomerRow` types for
 record. The Domain entity is the Entity Framework entity unless a reviewed persistence requirement
 makes that impossible.
 
-A query that returns only selected columns uses a local projection or a purpose-named Domain result.
-That projection is not a third persistence model:
+Every Entity Framework query uses an explicit closed scalar projection. A query never asks Entity
+Framework to materialize a mapped Domain entity directly. The projection names every stored value
+needed by that operation, including identifiers, relationships, state, and the original concurrency
+revision. A projection used only by one operation is an anonymous local value. A result with meaning
+outside that expression is a purpose-named Domain result.
+
+Neither form is a third persistence model:
 
 ```csharp
 // Domain/Customers/CustomerSummary.cs
@@ -279,7 +284,8 @@ The local cancellation alias is deliberate: it preserves the caller token while 
 invocation statically materializable by the pinned Entity Framework precompiler. The anonymous
 `row` exists only inside this function. It allows joins, aggregates, and partial column selection
 without inventing a universal row type. `CustomerSummary` is retained because it has domain meaning
-outside the query expression.
+outside the query expression. Whole-entity materialization through `DbSet<T>` is forbidden,
+including for queries that need every mapped property.
 
 ## Db
 
@@ -522,9 +528,20 @@ generated request -> ParseCustomerId
 
 ## Mutations and transactions
 
-A mutation follows the same shape. Its Db operation creates the context and starts a transaction
-when needed. It loads tracked Domain entities, calls Domain decision functions, and commits only
-after the decision succeeds.
+A mutation follows the same projection rule. Its Db operation creates the context and starts a
+transaction when needed. It explicitly projects the complete stored state required by the
+transition, asks a verb-named Domain function to rehydrate the mapped Domain entity, attaches that
+entity to the context, records the projected concurrency revision as the original value, calls the
+Domain decision function, and commits only after the decision succeeds.
+
+Rehydration validates storage invariants and reconstructs the same Domain entity used for creation
+and business logic. It does not introduce an `Entity`, `Row`, `Record`, or other parallel
+persistence model. Create operations add a newly created Domain entity directly and do not
+rehydrate it. Delete and update operations still use explicit projections rather than direct
+entity-returning Entity Framework materialization.
+
+Every projected mutation member, rehydration path, attach/update path, optimistic-concurrency path,
+and generated query interceptor executes in the real NativeAOT integration suite.
 
 For a mutation that must atomically write an audit outbox entry, both entities are added to the same
 context and saved in the same transaction. No network call occurs inside that transaction. A

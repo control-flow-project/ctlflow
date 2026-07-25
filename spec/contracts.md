@@ -159,30 +159,37 @@ segment. It re-resolves an entry on a miss or after the earlier of the owner-sup
 seconds. Neither cache contains an administrative record or permits a caller to choose a different
 parent.
 
-An exposure resolution uses:
+`pkgd.ResolveExposure` uses:
 
 ```text
 authenticated external request
 resolved Tenant and optional Workspace
-opaque App exposure identity
 method and canonical remaining path
 ```
 
-It returns:
+It matches one unambiguous installed route root and returns:
 
 ```text
-exact App, component, and endpoint
+exposure identity
+exact App generation and component
+endpoint declaration
 target Placement
-ready Kubernetes Service endpoint
-trusted request context
+authentication class and operation token
+unmatched application path
 bounded cache expiry
 ```
+
+After authentication and coarse authorization, `execd.ResolveEndpoint` returns the exact ready
+Kubernetes Service endpoint and endpoint generation. `edged` combines those owner projections with
+the trusted request context; neither owner stores the combined route.
 
 Product URL design below the resolved address root is outside the kernel. Tenant roots are `/` or
 `/tenants/<tenant-address>`; Workspace roots append `/workspaces/<workspace-address>`. Every
 subsequent route handed to `edged` identifies its exposure with structurally separate fixed and
-user-controlled segments. Routes are inferred from current Tenant, Workspace, App, exposure, and
-endpoint state; there is no manually managed route record.
+user-controlled segments. Each exposure declares one fixed route root and whether a trailing path
+is application data. Active route roots for the same Tenant/Workspace and method set cannot
+overlap. Routes are inferred from current Tenant, Workspace, App, exposure, and endpoint state;
+there is no manually managed route record.
 
 If the exact App is admitted for start-on-demand but has no ready endpoint, `edged` asks `execd` to
 realize it and waits only within the request's bounded startup policy. Cache expiry never exceeds
@@ -239,12 +246,74 @@ returns only its opaque binding and readiness. For `egressd`, `configd` releases
 the authenticated, purpose-bound operation for one admitted request. Neither path exposes a general
 secret read.
 
+## Owner lifecycle coordination
+
+Tenant and Workspace lifecycle is owned by `tenantd`; child owners never infer or mutate it. One
+cross-service lifecycle operation contains:
+
+```text
+lifecycle-operation ID
+Tenant or Workspace target
+provisioning generation
+desired lifecycle
+finite assigned owner steps
+idempotency identity
+```
+
+`tenantd` commits that operation, its assigned owner steps, and its audit intent atomically. Each
+child owner lists or watches only the steps assigned to its authenticated service identity. The
+step contains the target, operation ID, generation, stable step key, desired lifecycle, and the
+typed creation intent that owner needs. The child commits its own idempotent state and outbox, then
+calls `tenantd.AcknowledgeLifecycleStep` with its owner revision and complete or blocked result.
+
+```text
+ tenantd commit intent
+      |
+      +----> owner List/WatchLifecycleSteps
+                    |
+                    v
+             owner commits local result
+      |
+      v
+ tenantd commits authenticated acknowledgement
+      |
+      +-- all required complete -> advance lifecycle
+      +-- any blocked ----------> retain retryable condition
+```
+
+No database transaction crosses a call. Work delivery is at least once; the child operation and
+acknowledgement are independently idempotent. A stale operation or generation cannot acknowledge
+current work. Suspension and deletion become visible before owner work is published, so child
+admission stops before drain or cleanup. Deletion never reverses and cannot finish until every
+required owner confirms retirement.
+
+## External HTTP binding
+
+`execd` owns the dependency binding, `egressd` owns destination/policy and forwarding, and
+`configd` owns upstream Secret material. A ready binding supplies the workload one internal base
+endpoint and process-bound credential slot:
+
+```text
+<egressd>/v1/bindings/<binding-id>/<relative-upstream-path>
+```
+
+The binding fixes consumer, runtime class, dependency, destination, policy, Placement, and
+generation. A request can choose only admitted HTTP method, relative path, ordinary query/headers,
+and body. `egressd` strips the fixed prefix and caller authentication, revalidates the binding
+through `execd`, applies generic typed rewrites, obtains exact-purpose material through
+`configd.ReleaseEgressSecret`, and connects to the one admitted HTTPS origin.
+
+Destination rules may derive namespace values only from authenticated owner facts. They cannot run
+code, parse bodies, change origin, or contain provider-specific behavior. External trace
+propagation is separately opt-in and never carries CtlFlow identity or baggage.
+
 ## Audit envelope
 
 Every kernel mutation and security decision emits:
 
 ```text
 source service and operation
+positive source sequence and source schema generation
 Kubernetes subject for operator actions
 actor and attached account for product actions when established
 immediate caller and runtime principal when applicable
@@ -256,4 +325,20 @@ occurred time and source idempotency identity
 ```
 
 Credentials, secret values, application bodies, object bytes, model prompts, and program logs are
-forbidden. Durable services commit this envelope to a transactional outbox with the mutation.
+forbidden. Durable source services other than `auditd` commit this envelope to a transactional
+outbox with the mutation. `auditd` commits evidence for its own mutation directly in that mutation's
+transaction. `auditd.RecordAuditBatch` permanently binds source service and source event ID to one
+canonical envelope. Exact replay is accepted and conflicting replay is rejected. A durable source
+removes its outbox row only after that acceptance; a crash between acceptance and removal therefore
+replays the same canonical event rather than inventing another one.
+
+Stateless authentication, ingress, and egress mediators have no local domain transaction. Before
+they return an authentication success, open a target or upstream connection, or otherwise make an
+allow externally effective, they require `auditd` to accept a correlated admission event. Audit
+unavailability before admission therefore fails closed rather than creating an unaudited allow.
+
+A later completion or failure is a separate immutable event correlated to that admission. The
+mediator submits it before cleanly completing an ordinary finite exchange. A process failure or
+forced stream termination may leave an admitted exchange without a completion event; that absence
+remains visible and is never replaced with an invented outcome. Operational telemetry never
+substitutes for either accepted event.

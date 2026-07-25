@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package ctlflow.audit.v1;
+
+option csharp_namespace = "CtlFlow.Audit.V1";
+
+import "google/protobuf/timestamp.proto";
+
+service AuditService {
+  rpc RecordAuditBatch(RecordAuditBatchRequest)
+      returns (RecordAuditBatchResponse);
+}
+
+message RecordAuditBatchRequest {
+  uint64 source_schema_generation = 1;
+  repeated AuditEvent events = 2;
+}
+
+message RecordAuditBatchResponse {
+  repeated AuditAcceptance acceptances = 1;
+}
+
+message AuditAcceptance {
+  string source_event_id = 1;
+  uint64 partition_cursor = 2;
+}
+
+message AuditEvent {
+  string source_event_id = 1;
+  uint64 source_sequence = 2;
+  string idempotency_key = 3;
+  string operation = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+  AuditAttribution attribution = 6;
+  AuditPartition partition = 7;
+  string trace_id = 8;
+  string span_id = 9;
+
+  oneof detail {
+    TenancyMutationAuditDetail tenancy_mutation = 20;
+  }
+}
+
+message AuditAttribution {
+  oneof subject {
+    string kubernetes_subject = 1;
+    AttachedActor attached_actor = 2;
+  }
+
+  optional string immediate_caller = 3;
+  optional string runtime_principal = 4;
+}
+
+message AttachedActor {
+  string actor_principal_id = 1;
+  string attached_account_principal_id = 2;
+}
+
+message AuditPartition {
+  oneof partition {
+    GlobalAuditPartition global = 1;
+    TenantAuditPartition tenant = 2;
+  }
+}
+
+message GlobalAuditPartition {}
+
+message TenantAuditPartition {
+  string tenant_id = 1;
+}
+
+message TenancyMutationAuditDetail {
+  oneof target {
+    TenantAuditTarget tenant = 1;
+    WorkspaceAuditTarget workspace = 2;
+  }
+
+  uint64 resource_revision = 3;
+  AuditOutcome outcome = 4;
+}
+
+message TenantAuditTarget {
+  string tenant_id = 1;
+}
+
+message WorkspaceAuditTarget {
+  string tenant_id = 1;
+  string workspace_id = 2;
+}
+
+enum AuditOutcome {
+  AUDIT_OUTCOME_UNSPECIFIED = 0;
+  AUDIT_OUTCOME_SUCCEEDED = 1;
+  AUDIT_OUTCOME_DENIED = 2;
+  AUDIT_OUTCOME_FAILED = 3;
+}

@@ -25,6 +25,7 @@ services/<service>/
     kubernetes/
       v1alpha1/
         openapi.yaml
+        paths.yaml
 
   knexfile.ts
   migrations/
@@ -76,6 +77,10 @@ Administrative Kubernetes resources use the service-root OpenAPI contract. Direc
 service-to-service operations use the service-root gRPC contract. `edged` and `egressd` additionally
 preserve the standard HTTP semantics they mediate.
 
+An OpenAPI contract may use relative standard `$ref` links to cohesive files in the same version
+directory. The root document remains `openapi.yaml`; every referenced file is part of the same
+callee-owned contract and is reviewed and versioned with the root.
+
 ## Implementation independence
 
 An implementation may use its language's idiomatic layering, functional organization, dependency
@@ -112,7 +117,8 @@ reaches the same declared logical constraints, indexes, and revision.
 Migration TypeScript is compiled before execution under the repository's strict TypeScript policy.
 Deployment executes the compiled JavaScript artifact; production does not transpile source at
 runtime. Migration source uses explicit ESM imports ending in `.js`, just like other TypeScript
-source. The repository pins one Node LTS toolchain for migration and canonical-test artifacts.
+source. The repository pins one exact maintained Node Current or LTS release for migration and
+canonical-test artifacts.
 
 An implementation does not create, infer, repair, or migrate schema at startup. Deployment applies
 the common migrations first. A service fails readiness when its database is absent, behind, ahead,
@@ -181,6 +187,39 @@ Canonical tests use:
 - a real OpenTelemetry Collector for propagation and export evidence;
 - restart, cancellation, deadline, and controlled external-boundary failure; and
 - bounded collections, pagination, watches, and streams.
+
+One service test command owns one suite-scoped mesh. Before test files run, the mesh acquires one
+validated repository-local test Kubernetes cluster, starts one real OpenTelemetry Collector, and
+resolves one gated production artifact for each selected implementation. The cluster is reusable
+across serial test commands and lives under ignored `.temp`; every acquisition verifies that the
+named control plane is reachable and reapplies the complete idempotent test-workload declaration.
+It is never silently replaced or accepted when unhealthy. Suite-owned processes remain active
+until the entire service suite finishes. Test files never create another cluster, Collector, or
+publication.
+
+A gated production artifact is content-addressed by every source, contract, generated-input,
+toolchain, lock, diagnostic manifest, and publisher input that can affect it. The first request for
+that exact fingerprint publishes and verifies the artifact into the repository-local ignored
+`.temp` cache. Later service test commands validate the immutable cache inventory and file digests
+and reuse that artifact without republishing. A missing, partial, corrupt, differently tooled, or
+differently fingerprinted entry is a cache miss and is rebuilt through the same release gate; it
+is never accepted as a fallback. Tests therefore publish once per effective source revision, not
+once per file, shard, or command invocation.
+
+Each test file receives its own migrated database, ports, invocation authority, and shipping
+service process from that mesh, so schema mutation, restart, and process failure remain isolated.
+The shared cluster issues fresh finite workload credentials for each isolated context rather than
+assuming one startup token outlives the suite. Collector-outage evidence uses mesh-owned
+suspend/resume controls and restores the shared Collector before the test releases its context.
+A selectorless aggregated-API registration points to exactly one live
+context-owned process. Before rebinding the same group and version, the mesh
+removes the previous `APIService`, endpoint slice, and Service and waits for
+their deletion; it never relies on eventual endpoint-cache replacement while
+the retired host port remains routable state.
+One global teardown stops shared processes and releases suite-owned resources even after failure.
+It does not destroy the reusable test cluster or retained `.temp` diagnostics; destructive cleanup
+is an explicit operator action. Validated content-addressed publication artifacts likewise remain
+in the ignored cache for later commands.
 
 Mocks, in-memory repositories, substitute kernel services, and handwritten protocol servers do not
 establish product behavior. Controlled processes are permitted only for external systems outside
@@ -274,4 +313,4 @@ An implementation is releasable only when it:
 The shared service-root assets define the service. An implementation supplies one interchangeable
 realization.
 
-Language-specific implementation rules are defined in [C#](csharp/).
+Language-specific implementation rules are defined in [C#](../csharp/).

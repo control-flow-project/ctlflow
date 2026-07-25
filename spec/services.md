@@ -37,14 +37,14 @@ realtime, event delivery, agent management, and its vertical applications as Pac
                 +-> pkgd
                 +-> execd
 
- tenantd -> identityd / configd / execd / pkgd
- pkgd ----> identityd / configd / execd
+ identityd / configd / execd / pkgd -> tenantd lifecycle work
+ pkgd -----------------------------> identityd / configd / execd
  execd ---> tenantd / identityd / pkgd / configd / policyd -> Kubernetes
 
  App or Run -> runtime proxy -> bound App
  App or Run -----------------> egressd -> approved external HTTP
 
- every kernel service -------> auditd
+ every other kernel service -> auditd
  every process --------------> OpenTelemetry Collector
 ```
 
@@ -53,36 +53,32 @@ revisioned fact, but the cache is rebuildable and bounded by its owner's lifecyc
 
 ## Service interactions
 
-| Caller | Callee | Purpose |
+| Caller | Callee operations | Purpose |
 | --- | --- | --- |
-| `authd` | `tenantd` | Resolve the Tenant root, then an optional Workspace return segment |
-| `authd` | `identityd` | Resolve login methods and begin, complete, or revoke one browser Session |
-| `edged` | `identityd` | Exchange one established Session on an invocation-cache miss |
-| Runtime proxy | `identityd` | Obtain a fresh invocation JWT for an admitted Run-originated Actor context |
-| Internal invocation receiver | `identityd` | Refresh the bounded invocation verification-key cache |
-| Owning service for product management | `policyd` | Authorize the exact operation after local workload and invocation validation |
-| `tenantd` | `identityd` | Establish initial administrators and validate lifecycle references |
-| `tenantd` | `configd` | Establish and retire Tenant and Workspace configuration scopes |
-| `tenantd` | `execd` | Materialize, suspend, resume, and retire canonical Placements |
-| `tenantd` | `pkgd` | Reconcile explicitly requested bootstrap Package installations |
-| `identityd` | `tenantd` | Validate Tenant and Workspace scope and lifecycle |
-| `identityd` | `pkgd`, `execd` | Validate App, Job, Placement, Run, and virtual-principal references |
-| `identityd` | `egressd` | Perform admitted OIDC discovery and token exchange |
-| `policyd` | `tenantd`, `identityd`, `pkgd`, `execd` | Resolve current scope, subject, Package ceiling, and Placement fence |
-| `pkgd` | `tenantd`, `identityd` | Validate ownership scope, attached account, and target standing |
-| `pkgd` | `configd` | Validate installation configuration readiness |
-| `pkgd` | `execd` | Build Package artifacts and realize or retire App components |
-| `configd` | `tenantd`, `identityd` | Validate configuration scope and user boundary |
-| `configd` | `pkgd` | Resolve immutable Package and provider schemas |
-| `configd` | `execd` | Validate target Placement and materialize its authorized Secret projection |
-| `execd` | `tenantd`, `identityd`, `pkgd`, `configd`, `policyd` | Admit and realize Placement execution |
-| `edged` | `tenantd`, `policyd`, `pkgd`, `execd` | Resolve Tenant then optional Workspace address, and authorize one external target after Session exchange |
-| `egressd` | `configd`, `execd` | Resolve Placement binding and apply exact-purpose secret substitution |
-| `auditd` | `tenantd`, `identityd`, `policyd` | Fence evidence queries and payload-removal authority |
-| `auditd` | `configd` | Resolve retention and configured export-storage binding |
-| `auditd` | `egressd` | Reach configured export storage when that binding requires external HTTP |
-| Provider controller or App | `configd`, `egressd` | Submit claim-bound secret outputs and use admitted external HTTP |
-| Every kernel service | `auditd` | Deliver idempotent evidence; durable mutations use a transactional outbox |
+| `authd` | `tenantd.ResolveTenant`, `ResolveWorkspace` | Resolve Tenant login root and optional Workspace return |
+| `authd` | `identityd.ResolveLoginOptions`, `BeginLogin`, `CompleteLogin`, `RevokeSession` | Mediate one public browser authentication transaction |
+| `edged` | `tenantd.ResolveTenant`, `ResolveWorkspace` | Resolve the external hierarchy |
+| `edged` | `pkgd.ResolveExposure`, `AuthorizeArtifactTransfer` | Resolve one route declaration or immutable UI artifact |
+| `edged` | `identityd.ExchangeSession` | Exchange one Session on an invocation-cache miss |
+| `edged` | `policyd.CheckAccess` | Authorize the declared coarse exposure operation |
+| `edged` | `execd.ResolveEndpoint`, `StartAppOnDemand` | Resolve only the exact App target |
+| Runtime proxy | `identityd.IssueRunInvocation`, `MintRuntimePrincipal`, `RetireRuntimePrincipal`, `IssueProxyCredential` | Establish process and delegated execution identity |
+| Internal invocation receiver | `identityd.GetInvocationVerificationKeys` | Refresh one bounded verification-key cache |
+| Owning kernel/App service | `policyd.CheckAccess`, `ExplainAccess` | Authorize an exact owned operation and path |
+| `identityd`, `configd`, `execd`, `pkgd` | `tenantd.ListLifecycleSteps`, `WatchLifecycleSteps`, `AcknowledgeLifecycleStep` | Reconcile only lifecycle work assigned to the authenticated owner |
+| `identityd` | `tenantd.GetLifecycle` | Validate Tenant/Workspace standing |
+| `identityd` | `pkgd.ResolveAppGeneration`; `execd.ResolvePlacement`, `ResolveRuntimeContext` | Validate owner, Placement, Run, runtime, and dependency references |
+| `identityd` | `egressd.ForwardHttp` | Perform admitted SSO provider HTTP |
+| `policyd` | `tenantd.GetLifecycle`; `identityd.ResolvePrincipal`, `ListPrincipalGroups`; `pkgd.ResolveOperationCeiling`; `execd.ResolveRuntimeContext` | Establish every current decision layer |
+| `pkgd` | `tenantd.GetLifecycle`; `identityd.ValidateAttachedAccount`, `CreateVirtualPrincipal`, `DisableVirtualPrincipal`, `EnableVirtualPrincipal`, `RetireVirtualPrincipal` | Validate ownership and delegated App identity |
+| `pkgd` | `configd.ValidateConfiguration`, `ResolveConfiguration`, `ResolveProviderSelection` | Validate App generation input |
+| `pkgd` | `execd.ReconcileAppGeneration`, `DrainAppGeneration`, `CreateRun` | Build and realize or retire App components |
+| `configd` | `tenantd.GetLifecycle`; `identityd.ResolvePrincipal`; `pkgd.ResolveConfigurationSchema`, `ResolveProviderContract`; `execd.ResolvePlacement`, `ResolveRuntimeContext` | Validate scope, declaration, consumer, and target |
+| `execd` | `tenantd.GetLifecycle`; `identityd.ValidateAttachedAccount`, `CreateVirtualPrincipal`, `DisableVirtualPrincipal`, `EnableVirtualPrincipal`, `RetireVirtualPrincipal`, `RetireRuntimePrincipal`; `pkgd.ResolvePackage`, `ResolveAppGeneration`, `ResolveProviderContract`, `ResolveServiceContract`; `configd.ResolveConfiguration`, `ResolveProviderSelection`, `MaterializeWorkloadSecret`; `policyd.CheckAccess` | Admit and realize Placement execution |
+| `egressd` | `tenantd.GetLifecycle`; `identityd.GetInvocationVerificationKeys`; `execd.ResolveRuntimeContext`; `configd.ReleaseEgressSecret` | Establish exact outbound binding and authentication |
+| `auditd` | `tenantd.GetLifecycle`; `identityd.ResolvePrincipal`; `policyd.CheckAccess`; `configd.ResolveConfiguration`; `egressd.ForwardHttp` | Fence evidence access, retention, and export storage |
+| Provider controller or App | `configd.SubmitDependencySecret`; `egressd.ForwardHttp` | Submit claim-bound output and use admitted external HTTP |
+| Every kernel service except `auditd` | `auditd.RecordAuditBatch` | Deliver idempotent evidence; durable mutations use a transactional outbox |
 
 No service holds a database transaction while making one of these calls. A multi-service lifecycle
 operation persists its local step, commits its audit outbox, and advances idempotently.

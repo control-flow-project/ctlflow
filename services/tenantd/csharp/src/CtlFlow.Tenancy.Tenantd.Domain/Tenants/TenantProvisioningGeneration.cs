@@ -9,6 +9,11 @@ public sealed record TenantProvisioningGeneration
 
     public long Value { get; }
 
+    public static TenantProvisioningGeneration Initial() => new(1);
+
+    public TenantProvisioningGeneration Next() =>
+        new(checked(Value + 1));
+
     public static TenantProvisioningGeneration FromStorage(long value)
     {
         if (value <= 0)

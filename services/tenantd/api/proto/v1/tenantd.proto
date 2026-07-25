@@ -8,6 +8,14 @@ import "google/protobuf/timestamp.proto";
 
 service TenantService {
   rpc ResolveTenant(ResolveTenantRequest) returns (ResolveTenantResponse);
+  rpc ResolveWorkspace(ResolveWorkspaceRequest) returns (ResolveWorkspaceResponse);
+  rpc GetLifecycle(GetLifecycleRequest) returns (GetLifecycleResponse);
+  rpc ListLifecycleSteps(ListLifecycleStepsRequest)
+      returns (ListLifecycleStepsResponse);
+  rpc WatchLifecycleSteps(WatchLifecycleStepsRequest)
+      returns (stream LifecycleStepEvent);
+  rpc AcknowledgeLifecycleStep(AcknowledgeLifecycleStepRequest)
+      returns (AcknowledgeLifecycleStepResponse);
 }
 
 message ResolveTenantRequest {
@@ -22,7 +30,7 @@ message ExternalTenantAddress {
 
 message ResolveTenantResponse {
   string tenant_id = 1;
-  TenantLifecycle lifecycle = 2;
+  LifecycleState lifecycle = 2;
   uint64 tenant_revision = 3;
   ResolvedTenantAddress address = 4;
   google.protobuf.Timestamp cache_expires_at = 5;
@@ -32,12 +40,181 @@ message ResolvedTenantAddress {
   uint64 binding_generation = 1;
 }
 
-enum TenantLifecycle {
-  TENANT_LIFECYCLE_UNSPECIFIED = 0;
-  TENANT_LIFECYCLE_PROVISIONING = 1;
-  TENANT_LIFECYCLE_ACTIVE = 2;
-  TENANT_LIFECYCLE_SUSPENDED = 3;
-  TENANT_LIFECYCLE_DELETING = 4;
-  TENANT_LIFECYCLE_FAILED = 5;
-  TENANT_LIFECYCLE_DELETED = 6;
+message ResolveWorkspaceRequest {
+  string tenant_id = 1;
+  string workspace_address = 2;
+}
+
+message ResolveWorkspaceResponse {
+  string workspace_id = 1;
+  LifecycleState lifecycle = 2;
+  uint64 workspace_revision = 3;
+  ResolvedWorkspaceAddress address = 4;
+  google.protobuf.Timestamp cache_expires_at = 5;
+}
+
+message ResolvedWorkspaceAddress {
+  uint64 binding_generation = 1;
+}
+
+message GetLifecycleRequest {
+  LifecycleTarget target = 1;
+}
+
+message GetLifecycleResponse {
+  LifecycleTarget target = 1;
+  LifecycleState lifecycle = 2;
+  optional LifecycleState parent_tenant_lifecycle = 3;
+  uint64 resource_revision = 4;
+  uint64 provisioning_generation = 5;
+  optional string current_operation_id = 6;
+  google.protobuf.Timestamp cache_expires_at = 7;
+}
+
+message ListLifecycleStepsRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListLifecycleStepsResponse {
+  repeated LifecycleStep steps = 1;
+  string next_page_token = 2;
+  uint64 delivery_revision = 3;
+}
+
+message WatchLifecycleStepsRequest {
+  uint64 after_delivery_sequence = 1;
+}
+
+message LifecycleStepEvent {
+  uint64 delivery_sequence = 1;
+  LifecycleStep step = 2;
+}
+
+message LifecycleStep {
+  LifecycleTarget target = 1;
+  string lifecycle_operation_id = 2;
+  uint64 provisioning_generation = 3;
+  LifecycleOperationKind operation = 4;
+  LifecycleStepKey step_key = 5;
+  LifecycleStepState state = 6;
+  uint64 step_revision = 7;
+  optional string blocked_reason = 8;
+  oneof provisioning_intent {
+    IdentityLifecycleIntent identity = 9;
+    PackageLifecycleIntent packages = 10;
+  }
+}
+
+message LifecycleTarget {
+  oneof target {
+    TenantTarget tenant = 1;
+    WorkspaceTarget workspace = 2;
+  }
+}
+
+message TenantTarget {
+  string tenant_id = 1;
+}
+
+message WorkspaceTarget {
+  string tenant_id = 1;
+  string workspace_id = 2;
+}
+
+message IdentityLifecycleIntent {
+  InitialAdministrator initial_administrator = 1;
+  repeated InitialWorkspaceMembership workspace_memberships = 2;
+}
+
+message InitialAdministrator {
+  string display_name = 1;
+  string login_identifier = 2;
+  IdentityLinkDeclaration identity_link = 3;
+}
+
+message IdentityLinkDeclaration {
+  string provider_id = 1;
+  string provider_subject = 2;
+}
+
+message InitialWorkspaceMembership {
+  string user_id = 1;
+  MembershipStanding standing = 2;
+}
+
+message PackageLifecycleIntent {
+  repeated BaselinePackage baseline_packages = 1;
+}
+
+message BaselinePackage {
+  string package_id = 1;
+  string package_version = 2;
+}
+
+message AcknowledgeLifecycleStepRequest {
+  LifecycleTarget target = 1;
+  string lifecycle_operation_id = 2;
+  uint64 provisioning_generation = 3;
+  LifecycleStepKey step_key = 4;
+  uint64 expected_step_revision = 5;
+  uint64 owner_revision = 6;
+  LifecycleStepOutcome outcome = 7;
+  optional string blocked_reason = 8;
+  string idempotency_key = 9;
+}
+
+message AcknowledgeLifecycleStepResponse {
+  LifecycleStepState step_state = 1;
+  uint64 step_revision = 2;
+  LifecycleState lifecycle = 3;
+  uint64 resource_revision = 4;
+  uint64 provisioning_generation = 5;
+}
+
+enum LifecycleState {
+  LIFECYCLE_STATE_UNSPECIFIED = 0;
+  LIFECYCLE_STATE_PROVISIONING = 1;
+  LIFECYCLE_STATE_ACTIVE = 2;
+  LIFECYCLE_STATE_SUSPENDING = 3;
+  LIFECYCLE_STATE_SUSPENDED = 4;
+  LIFECYCLE_STATE_RESUMING = 5;
+  LIFECYCLE_STATE_DELETING = 6;
+  LIFECYCLE_STATE_FAILED = 7;
+  LIFECYCLE_STATE_DELETED = 8;
+}
+
+enum LifecycleOperationKind {
+  LIFECYCLE_OPERATION_KIND_UNSPECIFIED = 0;
+  LIFECYCLE_OPERATION_KIND_PROVISION = 1;
+  LIFECYCLE_OPERATION_KIND_SUSPEND = 2;
+  LIFECYCLE_OPERATION_KIND_RESUME = 3;
+  LIFECYCLE_OPERATION_KIND_DELETE = 4;
+}
+
+enum LifecycleStepKey {
+  LIFECYCLE_STEP_KEY_UNSPECIFIED = 0;
+  LIFECYCLE_STEP_KEY_IDENTITY = 1;
+  LIFECYCLE_STEP_KEY_CONFIGURATION = 2;
+  LIFECYCLE_STEP_KEY_EXECUTION = 3;
+  LIFECYCLE_STEP_KEY_PACKAGES = 4;
+}
+
+enum LifecycleStepState {
+  LIFECYCLE_STEP_STATE_UNSPECIFIED = 0;
+  LIFECYCLE_STEP_STATE_PENDING = 1;
+  LIFECYCLE_STEP_STATE_BLOCKED = 2;
+  LIFECYCLE_STEP_STATE_COMPLETE = 3;
+}
+
+enum LifecycleStepOutcome {
+  LIFECYCLE_STEP_OUTCOME_UNSPECIFIED = 0;
+  LIFECYCLE_STEP_OUTCOME_COMPLETE = 1;
+  LIFECYCLE_STEP_OUTCOME_BLOCKED = 2;
+}
+
+enum MembershipStanding {
+  MEMBERSHIP_STANDING_UNSPECIFIED = 0;
+  MEMBERSHIP_STANDING_ADMIN = 1;
+  MEMBERSHIP_STANDING_MEMBER = 2;
 }

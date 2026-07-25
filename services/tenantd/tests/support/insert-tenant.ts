@@ -4,6 +4,7 @@ export interface InsertTenantOptions {
   readonly id: string;
   readonly lifecycle: number;
   readonly revision?: number;
+  readonly lastEventSequence?: number;
 }
 
 export async function insertTenant(
@@ -18,6 +19,7 @@ export async function insertTenant(
     lifecycle_state: options.lifecycle,
     revision: options.revision ?? 1,
     provisioning_generation: 1,
+    last_event_sequence: options.lastEventSequence ?? 1,
     created_at_unix_ms: now,
     updated_at_unix_ms: now
   });

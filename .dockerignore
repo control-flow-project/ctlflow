@@ -1,0 +1,15 @@
+.git
+.temp
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/.generated
+**/*.log
+public
+resources
+spec
+layouts
+static
+.analysis
+services/tenantd/tests

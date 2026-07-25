@@ -1,10 +1,12 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import path from "node:path";
 import createKnex from "knex";
 import { runCommand } from "@ctlflow/test-mesh";
 import type { TestDatabase } from "./test-database.js";
-import { repositoryRoot } from "./test-paths.js";
+import {
+  repositoryRoot,
+  serviceRoot
+} from "./test-paths.js";
 
 interface SqliteConnection {
   pragma(statement: string): unknown;
@@ -16,13 +18,24 @@ type CompleteConnection = (
 ) => void;
 
 export async function createTestDatabase(): Promise<TestDatabase> {
+  const root = path.join(
+    repositoryRoot,
+    ".temp",
+    "tests",
+    "tenantd",
+    "databases");
+  await mkdir(root, { recursive: true });
   const directory = await mkdtemp(
-    path.join(os.tmpdir(), "ctlflow-tenantd-database-"));
+    path.join(root, "database-"));
   const databasePath = path.join(directory, "tenantd.sqlite");
 
   await runCommand(
-    "npm",
-    ["run", "migrate", "--workspace", "@ctlflow/tenantd"],
+    "node",
+    [
+      path.join(
+        serviceRoot,
+        ".generated/migrations/tooling/migrations/run.js")
+    ],
     {
       cwd: repositoryRoot,
       environment: {
@@ -52,9 +65,6 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   return {
     path: databasePath,
     connection,
-    stop: async () => {
-      await connection.destroy();
-      await rm(directory, { recursive: true, force: true });
-    }
+    stop: () => connection.destroy()
   };
 }

@@ -13,9 +13,11 @@ CtlFlow workload Kubernetes resources.
 | Placement | Exact execution and persistent-state boundary |
 | Placement constraints | Typed limits on admitted execution and dependencies |
 | Workload | Desired long-running App-component realization |
+| Persistent slot | Stable Placement-owned filesystem identity for one declared consumer slot |
 | Job | Reusable finite-work definition |
 | Schedule | Periodic activation belonging to one Job |
 | Run | One admitted Job invocation |
+| Run attempt and artifact metadata | One concrete execution attempt and its bounded outputs |
 | Dependency claim | Desired dependency for one consumer |
 | Dependency binding | Typed ready outputs from the resolved dependency |
 | Endpoint | Ready address for one component |
@@ -149,15 +151,190 @@ projection operation.
 
 ## Direct operations
 
-| Operation family | Purpose |
+| Operation | Admitted caller | Purpose |
+| --- | --- | --- |
+| EnsurePlacement | admitted private-work owner | Materialize the one canonical Placement for an exact source |
+| ResolvePlacement | kernel owner | Return current Placement identity, constraints, lifecycle, and revision |
+| SuspendPlacement | operator-owned reconciliation | Block new work and apply bounded drain policy |
+| ResumePlacement | operator-owned reconciliation | Revalidate and restore one suspended Placement |
+| RetirePlacement | operator-owned reconciliation | Irreversibly retire one Placement generation |
+| ReconcileAppGeneration | `pkgd` | Realize one exact desired App generation |
+| DrainAppGeneration | `pkgd` | Stop admission and drain or retire one App generation |
+| StartAppOnDemand | `edged` | Realize one admitted scale-to-zero App generation within a finite wait |
+| ResolveEndpoint | `edged`, bound consumer, kernel owner | Return one exact ready endpoint projection |
+| CreateJob | operator or admitted product manager | Create one reusable finite Job |
+| UpdateJob | operator or admitted Job manager | Create one revised configuration for an existing Job |
+| EnableJob | operator or admitted Job manager | Revalidate and admit new Runs for one Job |
+| DisableJob | operator or admitted Job manager | Block new Runs without deleting Job state |
+| RetireJob | operator or admitted Job manager | Irreversibly retire one Job |
+| CreateRun | admitted user, App, schedule, or kernel owner | Admit one idempotent Job invocation |
+| GetRun | admitted owner or observer | Return one bounded Run and attempt projection |
+| ListRuns | admitted owner or observer | Return one bounded page under exact selectors |
+| CancelRun | admitted owner or requester | Record cancellation and stop further execution |
+| WaitRun | admitted owner or observer | Stream revisioned state until terminal, deadline, or cancellation |
+| ResolveDependency | `pkgd`, runtime reconciliation | Create or refresh one exact claim and binding |
+| ReleaseDependency | `pkgd`, Job/App retirement | Retire one exact consumer binding |
+| ResolveRuntimeContext | `identityd`, `policyd`, `egressd`, runtime proxy | Return bounded current execution and dependency facts |
+| QueryProgramLogs | admitted App, Job, or Run observer | Return one time-bounded page from the configured log dependency |
+| FollowProgramLogs | admitted App, Job, or Run observer | Stream from an explicit cursor for a finite lifetime |
+| AuthorizeRunArtifactTransfer | admitted Run owner or observer | Return one short-lived transfer for exact artifact metadata |
+
+### Placement contract
+
+`EnsurePlacement` receives one valid source tuple, source lifecycle-operation ID and generation,
+effective inherited constraint revisions, and idempotency key. It creates at most one Placement and
+namespace for that source. User Placement creation additionally requires one already-admitted App,
+Job, or persistent-resource intent; an empty speculative request is rejected. The result contains
+Placement ID, kind, source, lifecycle, constraint revision, realization generation, and readiness,
+never the native namespace name.
+
+`ResolvePlacement` returns that same bounded projection plus effective typed constraints and an
+expiry no later than 60 seconds. Every lifecycle operation is generation-bound:
+`SuspendPlacement` blocks new work and drains policy-selected realization, `ResumePlacement`
+revalidates every owner fact, and `RetirePlacement` is irreversible and completes only after owned
+realization and retention obligations are settled.
+
+Placement-constraint resources are the only mutation path for execution ceilings. Reconciliation
+computes the intersection from global through exact source scope and rejects a desired lower-scope
+record that widens an ancestor. A changed constraint does not silently rewrite admitted App or Job
+intent; it marks incompatible realization blocked and invokes the documented owner lifecycle.
+
+### Tenant lifecycle reconciliation
+
+`execd` lists and watches lifecycle work assigned to its authenticated service identity.
+Provisioning realizes the one canonical Placement for the target source. Suspension blocks new
+work before applying bounded drain policy, resumption revalidates current constraints and owner
+facts, and retirement irreversibly settles workloads, Runs, bindings, and retention obligations.
+
+Each local transition is keyed by the supplied lifecycle-operation ID, generation, and step.
+`execd` commits Placement state and audit intent before acknowledging its owner revision to
+`tenantd`.
+
+### App-realization and endpoint contract
+
+`ReconcileAppGeneration` receives App/generation identity, expected `pkgd` revision, Placement,
+components, virtual principals, attached account, immutable Package digest, one complete `configd`
+generation, desired scale/lifecycle, slots, and dependency declarations. It re-resolves every owner
+fact, commits desired Workload/dependency state, and only then applies Kubernetes realization.
+Repeating the same generation is idempotent; different canonical intent under that generation is
+`ALREADY_EXISTS`.
+
+The result and subsequent observed reports contain only generation, component readiness, dependency
+readiness, endpoint IDs, stable reasons, and execd revision. `execd` reports those facts to `pkgd`;
+it never changes App intent. `DrainAppGeneration` prevents new endpoints before bounded draining,
+then retains or removes persistent slots exactly as declared by the App owner.
+
+`StartAppOnDemand` requires exact App, generation, component/exposure, and target Placement already
+resolved by `pkgd`. It may only raise desired realization from zero under current constraints. It
+waits within the smaller of request deadline and configured startup limit and returns the same
+endpoint projection as `ResolveEndpoint`; it cannot select another generation or App.
+
+`ResolveEndpoint` receives exact provider App/component/generation or kernel endpoint identity and,
+for a consumer call, its existing dependency binding. It returns protocol, ready internal authority,
+port, streaming/upgrade capability, delegation mode, endpoint generation, and finite expiry. A
+not-ready exact endpoint is `FAILED_PRECONDITION`; an unknown or invisible endpoint is `NOT_FOUND`.
+The result is connectivity, not application authorization.
+
+### Job and Run contract
+
+A Job configuration contains immutable Package version, Placement, attached account, virtual
+principal, configuration generation, dependencies, persistent slots, execution class, resource
+bounds, input/output declarations, and enabled state. An update may select a new compatible Package
+or configuration generation only with expected revision and cannot replace Placement, account,
+principal, or persistent-slot identity. Schedules have immutable Job ownership and bounded
+calendar/time-zone activation plus enabled state; each activation calls `CreateRun`.
+
+`CreateJob` receives the initial complete configuration and idempotency key. `UpdateJob` receives
+the Job, expected revision, complete replacement configuration, and idempotency key. Neither is an
+upsert: create conflicts with an existing immutable identity, and update requires a visible current
+Job.
+
+`CreateRun` receives Job ID, idempotency key, optional bounded input metadata or admitted artifact
+reference, optional schedule ID, and effective deadline. Requester comes from authenticated context.
+The Job supplies every authority and execution fact. The result is the existing or new Run ID,
+admitted revision, state, and creation time.
+
+A Run progresses:
+
+```text
+admitted -> running -> succeeded | failed | cancelled
+```
+
+Each attempt records attempt number, Kubernetes realization generation, runtime principal, start
+and finish time, bounded stable reason, log handle, and output/artifact metadata. A retry is an
+attempt of the same Run and cannot change input or immutable Job facts. Terminal state is immutable.
+Cancellation is idempotent, prevents later attempts, and records whether an active attempt was
+stopped; it cannot claim to undo an external side effect.
+
+`ListRuns` requires exact global/Tenant fence and supports indexed Job, Placement, state, and bounded
+time selectors. `WaitRun` starts from a supplied Run revision, emits only newer bounded projections,
+and ends at terminal state or finite stream limit.
+
+### Dependency and runtime-context contract
+
+`ResolveDependency` receives exact consumer/generation/component, Placement, Package declaration
+digest, and `configd` provider selection when selectable. It creates one stable claim. For an
+external provider it applies the installed provider contract resource at the exact provider
+Placement; for `service:*` it resolves one configured provider App endpoint; for `kernel:*` it
+binds the fixed owner. Outputs not declared by the immutable contract are rejected, not retained.
+
+A ready binding returns claim/binding IDs, consumer and provider Placements, provider generation,
+typed ordinary outputs, `configd` Secret references, endpoint or mount references, readiness,
+revision, and expiry. Each consumer receives a distinct binding and logical namespace. Release is
+idempotent and preserves retention/evidence until the provider acknowledges cleanup.
+
+`ResolveRuntimeContext` receives one authenticated workload/runtime or exact current owner
+reference. It returns only current App component or Run, virtual principal, attached account,
+Placement, workload generation, declared dependencies and bindings, lifecycle, revision, and finite
+expiry. It is the bounded execution-fact projection; callers cannot enumerate another runtime or
+obtain configuration values, Secret material, or native Kubernetes identity.
+
+### Logs and artifacts
+
+Program-log queries name one App component, Job, or Run, a bounded time interval, page size, and
+opaque cursor. Results contain timestamp, stream class, bounded line/event content, and next cursor
+under the configured log dependency's limits. Follow starts at an explicit cursor and is finite.
+Kernel operational logs are excluded.
+
+Run artifacts contain immutable ID, Run, attempt, declared output slot, media type, length, digest,
+state, and transfer reference. `AuthorizeRunArtifactTransfer` returns one method-, artifact-,
+caller-, byte-, and expiry-bound capability from the configured artifact dependency; bytes never
+cross an `execd` administrative body.
+
+## Administrative resources
+
+Placement and source are immutable. Placement constraints are typed, scope-owned, revisioned
+ceilings. Jobs and schedules are mutable only through their documented fields and lifecycle
+subresources. Runs are create-only except cancellation and observed execution transitions.
+Workloads, dependency claims/bindings, endpoints, attempts, logs, and artifact metadata are
+read-only projections. All lists/watches use exact owner selectors and bounded pagination; no
+resource exposes native object names, credentials, Secret material, or raw provider status.
+
+## Callers and dependencies
+
+| Callee | Purpose |
 | --- | --- |
-| Placement | Materialize, constrain, suspend, resume, retire, and inspect |
-| App realization | Reconcile, drain, start on demand, and report component status |
-| Job | Configure finite work and schedules |
-| Run | Create, get, list, cancel, wait, and inspect attempts |
-| Dependency | Resolve claim, binding, provider readiness, and release |
-| Endpoint | Resolve exact ready internal or exposed endpoint |
-| Output | Query bounded logs and artifact metadata |
+| `tenantd` | Validate source lifecycle/parent and consume assigned Placement lifecycle work |
+| `identityd` | Validate attached account and virtual principal; coordinate runtime-principal lifecycle |
+| `pkgd` | Resolve immutable App/Job Package, component, contract, and desired App generation |
+| `configd` | Resolve complete configuration/provider generations and materialize declared Secret slots |
+| `policyd` | Authorize management, Run, log, artifact, and cross-Placement operations |
+| Kubernetes API | Apply and observe only admitted realization owned by `execd` |
+| `auditd` | Deliver execution mutations and security decisions through the transactional outbox |
+
+Provider controllers are observed through their installed Kubernetes contracts, not private
+provider-specific calls. Program log, artifact, OCI, and other bulk systems are declared dependency
+bindings rather than embedded `execd` implementations.
+
+## Verification
+
+Canonical evidence covers every Placement source and inheritance edge, lazy user materialization,
+constraint narrowing/widening, suspend/resume/retire, App realization and restart, scale-to-zero and
+bounded startup, endpoint expiry, Job/schedule lifecycle, idempotent Run admission, attempts,
+cancellation races, terminal immutability, pages and streams, every dependency resolution class and
+Placement direction, provider output validation and cleanup, runtime-context fencing, log/artifact
+confinement, server-side-apply ownership and drift, restart/reconciliation, dependency outage,
+cross-Tenant isolation, cancellation, concurrency, telemetry, and transactional audit delivery.
 
 ## Invariants
 

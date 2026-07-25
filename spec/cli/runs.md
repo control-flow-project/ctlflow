@@ -12,6 +12,8 @@ ctlflow get run RUN (--global | --tenant TENANT)
 ctlflow wait run RUN (--global | --tenant TENANT)
 ctlflow cancel run RUN (--global | --tenant TENANT) [--force] [--wait]
 ctlflow logs run RUN (--global | --tenant TENANT) [--follow]
+ctlflow get run-attempts (--global | --tenant TENANT) --run RUN
+ctlflow get run-attempt ATTEMPT (--global | --tenant TENANT) --run RUN
 ctlflow get run-artifacts (--global | --tenant TENANT) --run RUN
 ctlflow get run-artifact ARTIFACT (--global | --tenant TENANT) --run RUN
 ctlflow download run-artifact ARTIFACT (--global | --tenant TENANT) \

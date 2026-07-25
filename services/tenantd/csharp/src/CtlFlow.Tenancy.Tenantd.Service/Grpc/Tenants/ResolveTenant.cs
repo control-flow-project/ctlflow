@@ -38,7 +38,7 @@ internal sealed partial class TenantGrpcService
                 request,
                 context.CancellationToken);
 
-            if (await VerifySchema(
+            if (await VerifyMigrationLedger(
                     _databaseContexts,
                     context.CancellationToken)
                 != SchemaCompatibility.Compatible)
@@ -76,6 +76,19 @@ internal sealed partial class TenantGrpcService
         {
             outcome = "unavailable";
             throw Unavailable();
+        }
+        catch (Exception) when (context.CancellationToken.IsCancellationRequested)
+        {
+            // Any exception raised while the call is cancelled — a cancellation
+            // token thrown by EF, or a provider exception from an interrupted
+            // query — is reported as cancellation, not as an internal error.
+            var deadlineExceeded = context.Deadline <= DateTimeOffset.UtcNow;
+            outcome = deadlineExceeded ? "deadline_exceeded" : "cancelled";
+            throw new RpcException(new Status(
+                deadlineExceeded
+                    ? StatusCode.DeadlineExceeded
+                    : StatusCode.Cancelled,
+                "Request was cancelled"));
         }
         catch (DbException)
         {
@@ -124,6 +137,9 @@ internal sealed partial class TenantGrpcService
             StatusCode.NotFound => "not_found",
             StatusCode.Unauthenticated => "unauthenticated",
             StatusCode.PermissionDenied => "permission_denied",
+            StatusCode.FailedPrecondition => "failed_precondition",
+            StatusCode.AlreadyExists => "already_exists",
+            StatusCode.Aborted => "aborted",
             StatusCode.Cancelled => "cancelled",
             StatusCode.DeadlineExceeded => "deadline_exceeded",
             StatusCode.Unavailable => "unavailable",

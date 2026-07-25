@@ -11,6 +11,21 @@ public sealed record TenantDisplayName
 
     public string Value { get; }
 
+    public static ValueTask<TenantDisplayName> Parse(
+        string value,
+        CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(value) || value.Length > MaximumLength)
+        {
+            throw new ArgumentException(
+                "Tenant display name is invalid",
+                nameof(value));
+        }
+
+        return ValueTask.FromResult(new TenantDisplayName(value));
+    }
+
     public static TenantDisplayName FromStorage(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > MaximumLength)

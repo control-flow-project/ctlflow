@@ -3,8 +3,7 @@ using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.V1;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-using DomainTenantLifecycle = CtlFlow.Tenancy.Tenantd.Domain.Tenants.TenantLifecycle;
-using WireTenantLifecycle = CtlFlow.Tenancy.V1.TenantLifecycle;
+using static CtlFlow.Tenancy.Tenantd.Service.Grpc.Responses.LifecycleResponses;
 
 namespace CtlFlow.Tenancy.Tenantd.Service.Grpc.Responses;
 
@@ -30,7 +29,7 @@ internal static partial class TenantResponses
         var response = new ResolveTenantResponse
         {
             TenantId = found.Resolution.TenantId.Value,
-            Lifecycle = MapLifecycle(found.Resolution.Lifecycle),
+            Lifecycle = MapLifecycleState(found.Resolution.Lifecycle),
             TenantRevision = checked((ulong)found.Resolution.Revision.Value),
             CacheExpiresAt = Timestamp.FromDateTimeOffset(
                 found.Resolution.CacheExpiry.Value)
@@ -46,23 +45,4 @@ internal static partial class TenantResponses
 
         return ValueTask.FromResult(response);
     }
-
-    private static WireTenantLifecycle MapLifecycle(
-        DomainTenantLifecycle lifecycle) =>
-        lifecycle switch
-        {
-            DomainTenantLifecycle.Provisioning =>
-                WireTenantLifecycle.Provisioning,
-            DomainTenantLifecycle.Active =>
-                WireTenantLifecycle.Active,
-            DomainTenantLifecycle.Suspended =>
-                WireTenantLifecycle.Suspended,
-            DomainTenantLifecycle.Deleting =>
-                WireTenantLifecycle.Deleting,
-            DomainTenantLifecycle.Failed =>
-                WireTenantLifecycle.Failed,
-            DomainTenantLifecycle.Deleted =>
-                WireTenantLifecycle.Deleted,
-            _ => throw new UnreachableException()
-        };
 }

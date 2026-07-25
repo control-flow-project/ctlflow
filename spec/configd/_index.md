@@ -12,6 +12,7 @@ custody, and selected dependency-provider configuration.
 | --- | --- |
 | Configuration | Versioned non-secret values at one supported scope |
 | Secret | Write-only material identity, policy, version, and custody binding |
+| Secret version and projection | Append-only custody version and authorized runtime binding |
 | Provider configuration | Selected provider and admitted options for one dependency use |
 | Resolved generation | Complete immutable configuration projection for one consumer |
 
@@ -120,13 +121,108 @@ It is never a product `Secret`, general configuration value, or application-read
 
 ## Direct operations
 
-| Operation family | Purpose |
+| Operation | Admitted caller | Purpose |
+| --- | --- | --- |
+| ValidateConfiguration | owning manager, `pkgd` | Validate one complete candidate against immutable declarations |
+| ResolveConfiguration | `pkgd`, `execd`, admitted owner | Produce one complete immutable consumer generation |
+| ResolveProviderSelection | `pkgd`, `execd` | Return one exact selected provider and validated options |
+| PutSecretMaterial | owning manager | Commit the first version through a bounded write-only stream |
+| RotateSecretMaterial | owning manager or admitted provider | Commit a new version without exposing either version |
+| RevokeSecretVersion | owning manager | Irreversibly forbid one version from new materialization |
+| SubmitDependencySecret | authenticated provider controller or App | Commit one generated secret output for an exact dependency claim |
+| MaterializeWorkloadSecret | `execd` | Write one authorized Placement-local Kubernetes Secret projection |
+| ReleaseEgressSecret | `egressd` | Release exact-purpose material for one admitted outbound exchange |
+
+### Configuration contract
+
+`ValidateConfiguration` receives one consumer, immutable Package/schema digest, exact applicable
+scope revisions, ordinary candidate values, Secret references, and provider selections. It returns
+only typed field errors or a validated digest. Validation has no side effect and never materializes
+a Secret.
+
+`ResolveConfiguration` receives the exact consumer and target Placement plus the Package/schema
+digest expected by the caller. It resolves only applicable scopes and commits one immutable
+generation containing complete ordinary values, exact Secret versions, provider selections,
+ordered source revisions, digest, and readiness. Repeating unchanged inputs returns the same
+generation. Any changed source creates a new generation; an existing generation never mutates.
+
+`ResolveProviderSelection` returns dependency declaration, provider contract/digest, selected
+provider identity and Placement, admitted options, required Secret references, selection revision,
+and readiness. It returns no provider outputs or credentials.
+
+### Secret-material contract
+
+Put, rotate, and provider submission begin with bounded metadata identifying Secret, expected
+revision, declared content type and length, purpose, and idempotency key. Material then crosses one
+authenticated finite stream directly into custody. The service computes a commitment while writing,
+rejects length or digest mismatch, clears partial custody on failure, and returns only Secret ID,
+version, commitment, and readiness. Material is never buffered into an administrative document or
+echoed.
+
+`SubmitDependencySecret` additionally requires claim ID, provider identity/generation, consumer,
+declared output slot, and provider Placement. Those facts must match current `execd` and `pkgd`
+contracts. The provider cannot select another Secret, consumer, slot, or version.
+
+`MaterializeWorkloadSecret` receives exact Secret version, consumer, Placement, runtime generation,
+and declared destination slot. After revalidating current owner and policy, `configd` writes one
+opaque Placement-local projection and returns only binding ID, version, generation, and readiness.
+The operation is idempotent and never returns native Secret name or material.
+
+`ReleaseEgressSecret` receives destination, egress policy, dependency binding, runtime, Secret
+version, declared authentication slot, and one request nonce supplied by `egressd`. It releases
+material only over the authenticated response to that `egressd` request, marks it non-cacheable,
+and records the exact purpose. It is not a general Secret read and cannot be called by a workload,
+administrator, or provider.
+
+### Scope lifecycle reconciliation
+
+`configd` lists and watches lifecycle work assigned to its authenticated service identity.
+Establishment creates an empty scope plus explicit initial configuration; suspension prevents new
+generations or materializations; resumption revalidates sources; retirement rejects new use and
+removes projections only after consumers are retired.
+
+Each local transition is keyed by the supplied `tenantd` lifecycle-operation ID, generation, and
+step. Its configuration-scope revision and audit intent commit before `configd` calls
+`tenantd.AcknowledgeLifecycleStep`.
+
+## Administrative resources
+
+A Configuration has immutable scope, schema identity, and field identity; update replaces its
+validated ordinary value at a new positive revision. A Secret has immutable owner scope, declared
+purpose/schema, and custody policy; versions are append-only and expose metadata, commitment,
+creation time, revocation, and readiness only. A Provider configuration has immutable consumer
+dependency and stores one exact provider, provider Placement, validated options, and Secret
+references. None may move to another owner or consumer.
+
+Configuration and provider records support bounded exact-scope lists and watches. Secret lists
+return metadata only. `material`, rotation, version revocation, and deletion are explicit
+subresources. Deletion is rejected while a resolved generation, dependency claim, destination, or
+retained projection references the record.
+
+## Callers and dependencies
+
+| Callee | Purpose |
 | --- | --- |
-| Validate | Validate values against one immutable schema |
-| Resolve | Produce one complete configuration generation |
-| Secret material | Put, rotate, revoke, and purpose-materialize write-only material |
-| Provider | Resolve exact selected provider and admitted options |
-| Scope lifecycle | Establish, suspend, resume, and retire configuration scope |
+| `tenantd` | Validate scope lifecycle and consume assigned configuration lifecycle work |
+| `identityd` | Validate User scope and attached account standing |
+| `pkgd` | Resolve immutable Package, configuration, Secret-slot, and provider declarations |
+| `execd` | Validate Placement, consumer generation, dependency claim, runtime, and projection target |
+| `auditd` | Deliver configuration and secret-custody evidence through the transactional outbox |
+
+Only `configd` talks to the Kubernetes API for Secret custody/projection objects, using its narrow
+resource authority. `egressd` receives exact-purpose material but no generic configuration
+projection.
+
+## Verification
+
+Canonical evidence covers precedence at every applicable scope, forbidden widening, schema and
+source revision drift, immutable generation reuse, provider selection and replacement, every
+write-only stream boundary, length/digest failure and cleanup, rotation/revocation, concurrent
+version writes, provider claim/slot spoofing, runtime projection confinement, exact-purpose egress
+release, scope lifecycle/restart, cross-Tenant and cross-user invisibility, Kubernetes Secret
+write-authority limits, dependency outage, cancellation, telemetry redaction, and transactional
+audit delivery. Evidence scans every response, error, log, trace, metric, and audit envelope for
+submitted material.
 
 ## Invariants
 

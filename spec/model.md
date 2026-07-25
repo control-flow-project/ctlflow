@@ -14,29 +14,35 @@ that cannot be delegated to Kubernetes.
 | Workspace | `tenantd` | Collaboration boundary inside one Tenant |
 | Tenant address binding | `tenantd` | Permanent external address owned by one Tenant |
 | Workspace address binding | `tenantd` | Permanent external address owned by one Workspace |
+| Lifecycle operation and step acknowledgement | `tenantd` | Revisioned cross-owner progress for one Tenant or Workspace generation |
 | User | `identityd` | Human or service account at global or Tenant scope |
 | Membership | `identityd` | A User's standing in a Tenant or Workspace |
 | Group and Group member | `identityd` | Reusable Tenant- or Workspace-scoped audience |
 | Identity link | `identityd` | External provider subject bound to a human User |
 | SSO provider and admission rule | `identityd` | Tenant login configuration and Workspace narrowing |
+| Login transaction | `identityd` | Short-lived one-use provider, origin, and return binding |
 | Session | `identityd` | Opaque human browser session |
 | Virtual principal | `identityd` | Stable delegated identity for one App component or Job |
 | Runtime principal | `identityd` | Identity of one concrete workload execution |
 | Role, Role binding, Access grant, and Access review | `policyd` | Path-and-operation authorization state and decision |
 | Package and artifact | `pkgd` | Immutable versioned application or finite-work contract |
 | App | `pkgd` | One App Package installed in one Placement |
+| App generation | `pkgd` | Immutable desired App state pinned to one Package version |
 | Service contract and exposure | `pkgd` | Declared peer-service compatibility and external surface |
 | Application operation and provider contract | `pkgd` | Application operation ownership and dependency schema |
 | Configuration | `configd` | Versioned non-secret value at one supported scope |
 | Secret | `configd` | Write-only secret identity, policy, version, and custody binding |
+| Secret version and projection | `configd` | Append-only custody version and authorized runtime binding |
 | Provider configuration | `configd` | Selected dependency provider and its admitted options |
 | Resolved generation | `configd` | Complete immutable configuration for one consumer |
 | Placement | `execd` | Concrete execution and persistent-state boundary |
 | Placement constraints | `execd` | Inherited typed execution and dependency ceiling |
 | Workload | `execd` | Desired long-running realization of one App component |
+| Persistent slot | `execd` | Stable Placement-owned filesystem identity for one consumer slot |
 | Job | `execd` | Reusable finite-work definition |
 | Schedule | `execd` | Periodic activation belonging to one Job |
 | Run | `execd` | One admitted Job invocation |
+| Run attempt and artifact metadata | `execd` | Concrete execution attempt and bounded output identity |
 | Dependency claim and binding | `execd` | Desired dependency and its resolved runtime outputs |
 | Endpoint | `execd` | Ready internal address for one realized component |
 | Egress destination, policy, and review | `egressd` | Approved external HTTP target, admitted callers, and decision |

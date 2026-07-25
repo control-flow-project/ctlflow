@@ -73,11 +73,15 @@ A C# service implementation is structurally complete when:
 2. its generated wire code comes only from the service-root protobuf contract;
 3. wire types remain in Service and concrete provider concerns remain in Db;
 4. Domain entities are mapped directly unless a named persistence escape hatch is justified;
-5. Db query/mutation operations and Domain decisions are semantic functions in verb-named files;
-6. call sites use direct functions rather than use-case, command-handler, or repository ceremony;
-7. all CtlFlow-owned operation APIs are awaitable and omit the `Async` suffix;
-8. Knex remains the only migration authority;
-9. workload and invocation authentication have one production path without certificates or
+5. every Entity Framework query uses a closed scalar projection, and mutations rehydrate and attach
+   the same mapped Domain entity with its explicit original concurrency revision;
+6. Db query/mutation operations and Domain decisions are semantic functions in verb-named files;
+7. call sites use direct functions rather than use-case, command-handler, or repository ceremony;
+8. all CtlFlow-owned operation APIs are awaitable and omit the `Async` suffix;
+9. Knex remains the only migration authority;
+10. workload and invocation authentication have one production path without certificates or
    development bypasses;
-10. the unchanged canonical suite passes against the NativeAOT process and real Collector; and
-11. implementation-local tests contain only C#-specific release evidence.
+11. generated model and query-interceptor output compiles as part of the gated NativeAOT
+    publication;
+12. the unchanged canonical suite passes against the NativeAOT process and real Collector; and
+13. implementation-local tests contain only C#-specific release evidence.

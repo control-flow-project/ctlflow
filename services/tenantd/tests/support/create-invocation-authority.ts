@@ -4,8 +4,7 @@ import {
   type JsonWebKey,
   type KeyObject
 } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   InvocationAuthority,
@@ -16,10 +15,18 @@ const issuer = "https://identity.test";
 const audience = "ctlflow-internal";
 const keyId = "invocation-test-key";
 
-export async function createInvocationAuthority():
+export async function createInvocationAuthority(
+  repositoryRoot: string
+):
 Promise<InvocationAuthority> {
+  const root = path.join(
+    repositoryRoot,
+    ".temp",
+    "tests",
+    "invocation");
+  await mkdir(root, { recursive: true });
   const directory = await mkdtemp(
-    path.join(os.tmpdir(), "ctlflow-invocation-"));
+    path.join(root, "authority-"));
   const jwksPath = path.join(directory, "invocation-jwks.json");
   const keys = generateKeyPairSync("rsa", {
     modulusLength: 2_048
@@ -43,9 +50,7 @@ Promise<InvocationAuthority> {
     jwksPath,
     sign: (options = {}) => signInvocationToken(keys.privateKey, options),
     signPayload: (payloadJson) => signPayload(keys.privateKey, payloadJson),
-    stop: async () => {
-      await rm(directory, { recursive: true, force: true });
-    }
+    stop: () => Promise.resolve()
   };
 }
 

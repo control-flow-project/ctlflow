@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using CtlFlow.Tenancy.Tenantd.Db.Sqlite;
 using CtlFlow.Tenancy.Tenantd.Domain.Caching;
+using CtlFlow.Tenancy.Tenantd.Domain.Collections;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Workloads;
 using CtlFlow.Tenancy.Tenantd.Service.Telemetry;
@@ -14,6 +15,8 @@ internal static partial class TenantdConfiguration
     private const int DefaultCacheLifetimeSeconds = 30;
     private const int DefaultWorkloadTokenLifetimeSeconds = 3_600;
     private const int DefaultInvocationTokenLifetimeSeconds = 60;
+    private const int DefaultPageCursorLifetimeSeconds = 300;
+    private const int DefaultWatchLifetimeSeconds = 30;
     private static readonly TimeSpan KeyCacheLifetime = TimeSpan.FromSeconds(30);
 
     internal static async Task<ServiceSettings> LoadServiceSettings(
@@ -25,10 +28,14 @@ internal static partial class TenantdConfiguration
         var probeUri = ParseListenUri(
             "CTLFLOW_PROBE_URL",
             RequireEnvironment("CTLFLOW_PROBE_URL"));
-        if (grpcUri.Port == probeUri.Port)
+        var aggregation = LoadAggregationSettings();
+        var audit = await LoadAuditSettings(cancellation);
+        if (grpcUri.Port == probeUri.Port
+            || grpcUri.Port == aggregation.Port
+            || probeUri.Port == aggregation.Port)
         {
             throw new InvalidOperationException(
-                "CTLFLOW_GRPC_URL and CTLFLOW_PROBE_URL must use distinct ports");
+                "gRPC, probe, and aggregation listeners must use distinct ports");
         }
         var databasePath = await DatabaseFilePath.Parse(
             RequireEnvironment("CTLFLOW_DATABASE_PATH"),
@@ -49,8 +56,23 @@ internal static partial class TenantdConfiguration
         var invocationTokens = CreateTokenSettings(
             "CTLFLOW_INVOCATION",
             DefaultInvocationTokenLifetimeSeconds);
-        var callers = ParseCallers(
-            RequireEnvironment("CTLFLOW_RESOLVE_TENANT_CALLERS"));
+        var tenantCallers = ParseCallers(
+            "CTLFLOW_RESOLVE_TENANT_CALLERS");
+        var workspaceCallers = ParseCallers(
+            "CTLFLOW_RESOLVE_WORKSPACE_CALLERS");
+        var lifecycleCallers = ParseCallers(
+            "CTLFLOW_GET_LIFECYCLE_CALLERS");
+        var lifecycleOwners = ParseLifecycleOwners();
+        var pageCursorLifetime = await PageCursorLifetime.Parse(
+            ReadPositiveInteger(
+                "CTLFLOW_PAGE_CURSOR_TTL_SECONDS",
+                DefaultPageCursorLifetimeSeconds),
+            cancellation);
+        var watchLifetime = await WatchLifetime.Parse(
+            ReadPositiveInteger(
+                "CTLFLOW_WATCH_MAX_LIFETIME_SECONDS",
+                DefaultWatchLifetimeSeconds),
+            cancellation);
         var telemetry = TelemetrySettings.Parse(
             RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT"));
 
@@ -59,12 +81,19 @@ internal static partial class TenantdConfiguration
             grpcUri.Port,
             IPAddress.Parse(probeUri.Host),
             probeUri.Port,
+            aggregation,
+            audit,
             databasePath,
             databasePoolSize,
             cacheLifetime,
             workloadTokens,
             invocationTokens,
-            callers,
+            tenantCallers,
+            workspaceCallers,
+            lifecycleCallers,
+            lifecycleOwners,
+            pageCursorLifetime,
+            watchLifetime,
             telemetry);
     }
 
@@ -111,8 +140,9 @@ internal static partial class TenantdConfiguration
     }
 
     private static IReadOnlySet<KubernetesServiceAccountSubject> ParseCallers(
-        string value)
+        string name)
     {
+        var value = RequireEnvironment(name);
         var callers = new HashSet<KubernetesServiceAccountSubject>();
 
         foreach (var item in value.Split(',', StringSplitOptions.TrimEntries))
@@ -123,10 +153,30 @@ internal static partial class TenantdConfiguration
         if (callers.Count == 0)
         {
             throw new InvalidOperationException(
-                "CTLFLOW_RESOLVE_TENANT_CALLERS must contain at least one caller");
+                $"{name} must contain at least one caller");
         }
 
         return callers;
+    }
+
+    private static LifecycleOwnerCallers ParseLifecycleOwners()
+    {
+        var owners = new LifecycleOwnerCallers(
+            KubernetesServiceAccountSubject.Parse(
+                RequireEnvironment("CTLFLOW_LIFECYCLE_IDENTITY_CALLER")),
+            KubernetesServiceAccountSubject.Parse(
+                RequireEnvironment("CTLFLOW_LIFECYCLE_CONFIG_CALLER")),
+            KubernetesServiceAccountSubject.Parse(
+                RequireEnvironment("CTLFLOW_LIFECYCLE_EXEC_CALLER")),
+            KubernetesServiceAccountSubject.Parse(
+                RequireEnvironment("CTLFLOW_LIFECYCLE_PACKAGE_CALLER")));
+        if (owners.All.Count != 4)
+        {
+            throw new InvalidOperationException(
+                "Lifecycle owner callers must be distinct");
+        }
+
+        return owners;
     }
 
     private static string RequireEnvironment(string name)

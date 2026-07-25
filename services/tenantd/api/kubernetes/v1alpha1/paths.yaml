@@ -1,0 +1,277 @@
+/:
+  get:
+    operationId: discoverTenancy
+    responses:
+      "200":
+        description: API resource discovery
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/APIResourceList"
+/tenants:
+  get:
+    operationId: listOrWatchTenants
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/Limit"
+      - $ref: "./openapi.yaml#/components/parameters/Continue"
+      - $ref: "./openapi.yaml#/components/parameters/Watch"
+      - $ref: "./openapi.yaml#/components/parameters/ResourceVersion"
+    responses:
+      "200":
+        description: Bounded Tenant list or watch stream
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/TenantList"
+          "application/json;stream=watch":
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/TenantWatchEvent"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+  post:
+    operationId: createTenant
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/Tenant"
+    responses:
+      "201":
+        description: Tenant accepted in provisioning state
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Tenant"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/tenants/{tenantId}:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/TenantId"
+  get:
+    operationId: getTenant
+    responses:
+      "200":
+        description: Exact retained Tenant
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Tenant"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+  put:
+    operationId: updateTenant
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/Tenant"
+    responses:
+      "200":
+        description: Updated Tenant
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Tenant"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+  delete:
+    operationId: deleteTenant
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/LifecycleAction"
+    responses:
+      "202":
+        description: Irreversible deletion accepted
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Tenant"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/tenants/{tenantId}/suspend:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/TenantId"
+  put:
+    operationId: suspendTenant
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      $ref: "./openapi.yaml#/components/requestBodies/LifecycleAction"
+    responses:
+      "202":
+        $ref: "./openapi.yaml#/components/responses/TenantLifecycleAccepted"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/tenants/{tenantId}/resume:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/TenantId"
+  put:
+    operationId: resumeTenant
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      $ref: "./openapi.yaml#/components/requestBodies/LifecycleAction"
+    responses:
+      "202":
+        $ref: "./openapi.yaml#/components/responses/TenantLifecycleAccepted"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/tenants/{tenantId}/retry:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/TenantId"
+  put:
+    operationId: retryTenant
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      $ref: "./openapi.yaml#/components/requestBodies/LifecycleAction"
+    responses:
+      "202":
+        $ref: "./openapi.yaml#/components/responses/TenantLifecycleAccepted"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/workspaces:
+  get:
+    operationId: listOrWatchWorkspaces
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/TenantSelector"
+      - $ref: "./openapi.yaml#/components/parameters/Limit"
+      - $ref: "./openapi.yaml#/components/parameters/Continue"
+      - $ref: "./openapi.yaml#/components/parameters/Watch"
+      - $ref: "./openapi.yaml#/components/parameters/ResourceVersion"
+    responses:
+      "200":
+        description: Bounded Workspace list or watch stream
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/WorkspaceList"
+          "application/json;stream=watch":
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/WorkspaceWatchEvent"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+  post:
+    operationId: createWorkspace
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/Workspace"
+    responses:
+      "201":
+        description: Workspace accepted in provisioning state
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Workspace"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/workspaces/{workspaceId}:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/WorkspaceId"
+  get:
+    operationId: getWorkspace
+    responses:
+      "200":
+        description: Exact retained Workspace
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Workspace"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+  put:
+    operationId: updateWorkspace
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/Workspace"
+    responses:
+      "200":
+        description: Updated Workspace
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Workspace"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+  delete:
+    operationId: deleteWorkspace
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/LifecycleAction"
+    responses:
+      "202":
+        description: Irreversible deletion accepted
+        content:
+          application/json:
+            schema:
+              $ref: "./openapi.yaml#/components/schemas/Workspace"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/workspaces/{workspaceId}/suspend:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/WorkspaceId"
+  put:
+    operationId: suspendWorkspace
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      $ref: "./openapi.yaml#/components/requestBodies/LifecycleAction"
+    responses:
+      "202":
+        $ref: "./openapi.yaml#/components/responses/WorkspaceLifecycleAccepted"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/workspaces/{workspaceId}/resume:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/WorkspaceId"
+  put:
+    operationId: resumeWorkspace
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      $ref: "./openapi.yaml#/components/requestBodies/LifecycleAction"
+    responses:
+      "202":
+        $ref: "./openapi.yaml#/components/responses/WorkspaceLifecycleAccepted"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
+/workspaces/{workspaceId}/retry:
+  parameters:
+    - $ref: "./openapi.yaml#/components/parameters/WorkspaceId"
+  put:
+    operationId: retryWorkspace
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/IdempotencyKey"
+    requestBody:
+      $ref: "./openapi.yaml#/components/requestBodies/LifecycleAction"
+    responses:
+      "202":
+        $ref: "./openapi.yaml#/components/responses/WorkspaceLifecycleAccepted"
+      default:
+        $ref: "./openapi.yaml#/components/responses/KubernetesFailure"
