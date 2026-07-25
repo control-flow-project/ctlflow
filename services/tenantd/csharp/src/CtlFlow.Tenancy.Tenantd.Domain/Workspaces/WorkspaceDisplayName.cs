@@ -11,6 +11,21 @@ public sealed record WorkspaceDisplayName
 
     public string Value { get; }
 
+    public static ValueTask<WorkspaceDisplayName> Parse(
+        string value,
+        CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(value) || value.Length > MaximumLength)
+        {
+            throw new ArgumentException(
+                "Workspace display name is invalid",
+                nameof(value));
+        }
+
+        return ValueTask.FromResult(new WorkspaceDisplayName(value));
+    }
+
     public static WorkspaceDisplayName FromStorage(string value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > MaximumLength)

@@ -40,9 +40,27 @@ export function startProcess(
 
   child.stdout.on("data", capture);
   child.stderr.on("data", capture);
+  child.unref();
+  setStreamReference(child.stdout, false);
+  setStreamReference(child.stderr, false);
 
   return {
     child,
     diagnostics: () => Buffer.concat(chunks).toString("utf8")
   };
+}
+
+function setStreamReference(
+  stream: NodeJS.ReadableStream,
+  referenced: boolean
+): void {
+  const referenceable = stream as NodeJS.ReadableStream & {
+    ref?: () => void;
+    unref?: () => void;
+  };
+  if (referenced) {
+    referenceable.ref?.();
+  } else {
+    referenceable.unref?.();
+  }
 }

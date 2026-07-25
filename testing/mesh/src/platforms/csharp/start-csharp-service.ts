@@ -1,5 +1,3 @@
-import { rm } from "node:fs/promises";
-import path from "node:path";
 import { startProcess } from "../../processes/start-process.js";
 import { stopProcess } from "../../processes/stop-process.js";
 import { waitForReadiness } from "../../processes/wait-for-readiness.js";
@@ -7,18 +5,10 @@ import type {
   CSharpService,
   CSharpServiceOptions
 } from "./csharp-service.js";
-import { publishCSharpService } from "./publish-csharp-service.js";
 
 export async function startCSharpService(
   options: CSharpServiceOptions
 ): Promise<CSharpService> {
-  const outputDirectory = await publishCSharpService(
-    options.repositoryRoot,
-    options.projectPath,
-    options.diagnosticsManifestPath);
-  const executablePath = path.join(
-    outputDirectory,
-    options.executableName);
   let process_ = start(options.environment);
   let disposed = false;
 
@@ -26,12 +16,11 @@ export async function startCSharpService(
     await waitUntilReady();
   } catch (error) {
     await stopProcess(process_);
-    await rm(outputDirectory, { recursive: true, force: true });
     throw error;
   }
 
   return {
-    executablePath,
+    executablePath: options.publication.executablePath,
     diagnostics: () => process_.diagnostics(),
     restart: async (environment = {}) => {
       if (disposed) {
@@ -57,15 +46,14 @@ export async function startCSharpService(
 
       disposed = true;
       await stopProcess(process_);
-      await rm(outputDirectory, { recursive: true, force: true });
     }
   };
 
   function start(
     environment: Readonly<Record<string, string>>
   ) {
-    return startProcess(executablePath, [], {
-      cwd: outputDirectory,
+    return startProcess(options.publication.executablePath, [], {
+      cwd: options.publication.directoryPath,
       environment
     });
   }

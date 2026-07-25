@@ -12,16 +12,11 @@ internal sealed class TenantdTelemetry : IDisposable
 {
     internal const string SourceName = "ctlflow.tenantd";
     private const int ExportTimeoutMilliseconds = 1_000;
-    private static readonly Action<ILogger, string, double, Exception?>
-        LogResolveTenantCompletion = LoggerMessage.Define<string, double>(
+    private static readonly Action<ILogger, string, string, double, Exception?>
+        LogOperationCompletion = LoggerMessage.Define<string, string, double>(
             LogLevel.Information,
-            new EventId(1, "ResolveTenantCompleted"),
-            "ResolveTenant completed with {Outcome} in {DurationMilliseconds} ms");
-    private static readonly Action<ILogger, string, double, Exception?>
-        LogResolveWorkspaceCompletion = LoggerMessage.Define<string, double>(
-            LogLevel.Information,
-            new EventId(2, "ResolveWorkspaceCompleted"),
-            "ResolveWorkspace completed with {Outcome} in {DurationMilliseconds} ms");
+            new EventId(1, "TenantdOperationCompleted"),
+            "{Operation} completed with {Outcome} in {DurationMilliseconds} ms");
     private readonly ActivitySource _activitySource = new(SourceName);
     private readonly Meter _meter = new(SourceName);
     private readonly ILogger<TenantdTelemetry> _logger;
@@ -84,41 +79,38 @@ internal sealed class TenantdTelemetry : IDisposable
     }
 
     internal Activity? StartResolveTenant(Metadata headers) =>
-        StartOperation("tenantd.ResolveTenant", "ResolveTenant", headers);
+        StartGrpcOperation("ResolveTenant", headers);
 
     internal void RecordResolveTenant(
         Activity? activity,
         string outcome,
         long startedTimestamp) =>
-        RecordOperation(
+        RecordGrpcOperation(
             activity,
             "ResolveTenant",
             outcome,
-            startedTimestamp,
-            LogResolveTenantCompletion);
+            startedTimestamp);
 
     internal Activity? StartResolveWorkspace(Metadata headers) =>
-        StartOperation("tenantd.ResolveWorkspace", "ResolveWorkspace", headers);
+        StartGrpcOperation("ResolveWorkspace", headers);
 
     internal void RecordResolveWorkspace(
         Activity? activity,
         string outcome,
         long startedTimestamp) =>
-        RecordOperation(
+        RecordGrpcOperation(
             activity,
             "ResolveWorkspace",
             outcome,
-            startedTimestamp,
-            LogResolveWorkspaceCompletion);
+            startedTimestamp);
 
-    private Activity? StartOperation(
-        string activityName,
+    internal Activity? StartGrpcOperation(
         string method,
         Metadata headers)
     {
         var parent = ReadParentContext(headers);
         var activity = _activitySource.StartActivity(
-            activityName,
+            $"tenantd.{method}",
             ActivityKind.Server,
             parent);
         activity?.SetTag("rpc.system", "grpc");
@@ -127,12 +119,11 @@ internal sealed class TenantdTelemetry : IDisposable
         return activity;
     }
 
-    private void RecordOperation(
+    internal void RecordGrpcOperation(
         Activity? activity,
         string operation,
         string outcome,
-        long startedTimestamp,
-        Action<ILogger, string, double, Exception?> log)
+        long startedTimestamp)
     {
         var durationMilliseconds =
             Stopwatch.GetElapsedTime(startedTimestamp).TotalMilliseconds;
@@ -148,12 +139,60 @@ internal sealed class TenantdTelemetry : IDisposable
             outcome == "ok"
                 ? ActivityStatusCode.Ok
                 : ActivityStatusCode.Error);
-        log(
+        LogOperationCompletion(
             _logger,
+            operation,
             outcome,
             durationMilliseconds,
             null);
     }
+
+    internal Activity? StartHttpOperation(
+        string operation,
+        string method,
+        IHeaderDictionary headers)
+    {
+        var parent = ReadParentContext(headers);
+        var activity = _activitySource.StartActivity(
+            $"tenantd.{operation}",
+            ActivityKind.Server,
+            parent);
+        activity?.SetTag("http.request.method", method);
+        activity?.SetTag("ctlflow.operation", operation);
+        return activity;
+    }
+
+    internal void RecordHttpOperation(
+        Activity? activity,
+        string operation,
+        string outcome,
+        long startedTimestamp) =>
+        RecordGrpcOperation(
+            activity,
+            operation,
+            outcome,
+            startedTimestamp);
+
+    internal Activity? StartAuditDelivery()
+    {
+        var activity = _activitySource.StartActivity(
+            "tenantd.RecordAuditBatch",
+            ActivityKind.Client);
+        activity?.SetTag("rpc.system", "grpc");
+        activity?.SetTag("rpc.service", "ctlflow.audit.v1.AuditService");
+        activity?.SetTag("rpc.method", "RecordAuditBatch");
+        return activity;
+    }
+
+    internal void RecordAuditDelivery(
+        Activity? activity,
+        string outcome,
+        long startedTimestamp) =>
+        RecordGrpcOperation(
+            activity,
+            "RecordAuditBatch",
+            outcome,
+            startedTimestamp);
 
     public void Dispose()
     {
@@ -178,6 +217,27 @@ internal sealed class TenantdTelemetry : IDisposable
         var traceParent = ReadSingleHeader(headers, "traceparent", 128);
         var traceState = ReadSingleHeader(headers, "tracestate", 512);
 
+        return traceParent is not null
+            && ActivityContext.TryParse(
+                traceParent,
+                traceState,
+                isRemote: true,
+                out var parent)
+            ? parent
+            : default;
+    }
+
+    private static ActivityContext ReadParentContext(
+        IHeaderDictionary headers)
+    {
+        var traceParent = ReadSingleHeader(
+            headers,
+            "traceparent",
+            128);
+        var traceState = ReadSingleHeader(
+            headers,
+            "tracestate",
+            512);
         return traceParent is not null
             && ActivityContext.TryParse(
                 traceParent,
@@ -216,5 +276,18 @@ internal sealed class TenantdTelemetry : IDisposable
         }
 
         return value;
+    }
+
+    private static string? ReadSingleHeader(
+        IHeaderDictionary headers,
+        string name,
+        int maximumLength)
+    {
+        var values = headers[name];
+        return values.Count == 1
+            && values[0] is { } value
+            && value.Length <= maximumLength
+            ? value
+            : null;
     }
 }

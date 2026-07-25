@@ -114,11 +114,12 @@ An ordinary domain deletion can never erase audit evidence silently.
 
 ### Ingestion contract
 
-`RecordAuditBatch` receives a finite ordered batch under one authenticated source service and source
-generation. Every envelope contains:
+`RecordAuditBatch` receives one to 100 events in strict source-sequence order
+under one authenticated source service and positive source schema generation.
+Every envelope contains:
 
 ```text
-source event ID and idempotency key
+source event ID, positive source sequence, and idempotency key
 source operation and occurred time
 operator Kubernetes subject, or Actor and attached account
 immediate caller and runtime principal when applicable
@@ -133,8 +134,16 @@ The authenticated workload determines source service; the body cannot name anoth
 `auditd` validates event kind and typed-detail schema registered for that source operation. One
 source and event ID maps permanently to one canonical envelope. Exact replay returns the existing
 acceptance; different content is `ALREADY_EXISTS`. A batch commits atomically in source order or
-rejects without a partial prefix. The result lists accepted event IDs and the resulting partition
-cursor.
+rejects without a partial prefix. Repeated source-event IDs inside one request,
+non-increasing source sequences, malformed attribution, and a detail type not
+registered for the authenticated source operation are `INVALID_ARGUMENT`.
+The result lists one acceptance per input event, in input order, with the
+source-event ID and resulting partition cursor.
+
+The common authentication, cancellation, and dependency statuses apply.
+Finite ingestion capacity is `RESOURCE_EXHAUSTED`; an authenticated source
+that is not admitted to ingestion is `PERMISSION_DENIED`; persistence that
+cannot establish an atomic result is `UNAVAILABLE`.
 
 Durable services write an outbox row with their domain mutation, then retry until accepted.
 Stateless `authd`, `edged`, and `egressd` submit an admission event before returning authentication

@@ -9,6 +9,8 @@ public sealed record AddressBindingGeneration
 
     public long Value { get; }
 
+    public static AddressBindingGeneration Initial() => new(1);
+
     public static AddressBindingGeneration FromStorage(long value)
     {
         if (value <= 0)

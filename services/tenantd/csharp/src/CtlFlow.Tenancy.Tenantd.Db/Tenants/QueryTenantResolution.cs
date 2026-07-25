@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using CtlFlow.Tenancy.Tenantd.Domain.Addresses;
 using CtlFlow.Tenancy.Tenantd.Domain.Caching;
+using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.Tenantd.Domain.Time;
 using Microsoft.EntityFrameworkCore;
@@ -17,13 +18,12 @@ public static partial class Tenants
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
+        using var dbActivity = TenantDbTelemetry.StartOperation(
+            "resolve_tenant");
         await using var database = await databaseContexts.CreateDbContextAsync(
             cancellation);
         var queryCancellation = cancellation;
         var cacheExpiry = CacheExpiry.Calculate(currentTime, cacheLifetime);
-
-        using var dbActivity = TenantDbTelemetry.StartQuery(
-            "tenantd.db.resolve_tenant");
 
         if (selector is TenantSelector.ById byId)
         {
@@ -65,7 +65,7 @@ public static partial class Tenants
                     database.Tenants
                         .AsNoTracking()
                         .Where(tenant =>
-                            tenant.Lifecycle == TenantLifecycle.Active),
+                            tenant.Lifecycle == LifecycleState.Active),
                     address => EF.Property<string>(address, "_tenantId"),
                     tenant => EF.Property<string>(tenant, "_id"),
                     (address, tenant) => new

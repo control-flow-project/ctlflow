@@ -1,6 +1,7 @@
 using System.Net;
 using CtlFlow.Tenancy.Tenantd.Db.Sqlite;
 using CtlFlow.Tenancy.Tenantd.Domain.Caching;
+using CtlFlow.Tenancy.Tenantd.Domain.Collections;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Workloads;
 using CtlFlow.Tenancy.Tenantd.Service.Telemetry;
@@ -12,6 +13,8 @@ internal sealed record ServiceSettings(
     int GrpcPort,
     IPAddress ProbeAddress,
     int ProbePort,
+    AggregationSettings Aggregation,
+    AuditSettings Audit,
     DatabaseFilePath DatabasePath,
     DatabasePoolSize DatabasePoolSize,
     CacheLifetime CacheLifetime,
@@ -19,4 +22,8 @@ internal sealed record ServiceSettings(
     TokenValidationSettings InvocationTokens,
     IReadOnlySet<KubernetesServiceAccountSubject> ResolveTenantCallers,
     IReadOnlySet<KubernetesServiceAccountSubject> ResolveWorkspaceCallers,
+    IReadOnlySet<KubernetesServiceAccountSubject> GetLifecycleCallers,
+    LifecycleOwnerCallers LifecycleOwners,
+    PageCursorLifetime PageCursorLifetime,
+    WatchLifetime WatchLifetime,
     TelemetrySettings Telemetry);

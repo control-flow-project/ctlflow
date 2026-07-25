@@ -260,17 +260,19 @@ finite assigned owner steps
 idempotency identity
 ```
 
-`tenantd` commits that operation and its audit intent before calling a child owner. Every request
-to `identityd`, `configd`, `execd`, or `pkgd` includes target, operation ID, generation, assigned
-step, and idempotency identity. The child commits its own state and outbox, then calls
-`tenantd.AcknowledgeLifecycleStep` with its authenticated service identity, owner revision, and
-complete or blocked result.
+`tenantd` commits that operation, its assigned owner steps, and its audit intent atomically. Each
+child owner lists or watches only the steps assigned to its authenticated service identity. The
+step contains the target, operation ID, generation, stable step key, desired lifecycle, and the
+typed creation intent that owner needs. The child commits its own idempotent state and outbox, then
+calls `tenantd.AcknowledgeLifecycleStep` with its owner revision and complete or blocked result.
 
 ```text
  tenantd commit intent
       |
-      v
- child owner commits local result
+      +----> owner List/WatchLifecycleSteps
+                    |
+                    v
+             owner commits local result
       |
       v
  tenantd commits authenticated acknowledgement
@@ -279,9 +281,10 @@ complete or blocked result.
       +-- any blocked ----------> retain retryable condition
 ```
 
-No database transaction crosses a call. A retry at any edge returns the same accepted state. A
-stale operation or generation cannot acknowledge current work. Suspension and deletion block new
-child admission before drain or cleanup; deletion never reverses and cannot finish until every
+No database transaction crosses a call. Work delivery is at least once; the child operation and
+acknowledgement are independently idempotent. A stale operation or generation cannot acknowledge
+current work. Suspension and deletion become visible before owner work is published, so child
+admission stops before drain or cleanup. Deletion never reverses and cannot finish until every
 required owner confirms retirement.
 
 ## External HTTP binding
@@ -310,6 +313,7 @@ Every kernel mutation and security decision emits:
 
 ```text
 source service and operation
+positive source sequence and source schema generation
 Kubernetes subject for operator actions
 actor and attached account for product actions when established
 immediate caller and runtime principal when applicable
@@ -324,7 +328,9 @@ Credentials, secret values, application bodies, object bytes, model prompts, and
 forbidden. Durable source services other than `auditd` commit this envelope to a transactional
 outbox with the mutation. `auditd` commits evidence for its own mutation directly in that mutation's
 transaction. `auditd.RecordAuditBatch` permanently binds source service and source event ID to one
-canonical envelope. Exact replay is accepted and conflicting replay is rejected.
+canonical envelope. Exact replay is accepted and conflicting replay is rejected. A durable source
+removes its outbox row only after that acceptance; a crash between acceptance and removal therefore
+replays the same canonical event rather than inventing another one.
 
 Stateless authentication, ingress, and egress mediators have no local domain transaction. Before
 they return an authentication success, open a target or upstream connection, or otherwise make an

@@ -8,5 +8,5 @@ public class AppliedMigration
 
     internal int Id { get; private set; }
 
-    internal string Name { get; private set; } = string.Empty;
+    internal string? Name { get; private set; }
 }

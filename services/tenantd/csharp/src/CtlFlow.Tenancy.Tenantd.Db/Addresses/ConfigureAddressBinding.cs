@@ -65,7 +65,8 @@ internal static partial class AddressBindingSchema
 
         address.HasIndex("_authority", "_pathPrefix")
             .IsUnique();
-        address.HasIndex("_tenantId");
+        address.HasIndex("_tenantId")
+            .IsUnique();
 
         address.HasOne<Tenant>()
             .WithMany()

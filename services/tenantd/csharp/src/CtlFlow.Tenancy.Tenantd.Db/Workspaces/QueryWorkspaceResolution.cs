@@ -1,4 +1,5 @@
 using CtlFlow.Tenancy.Tenantd.Domain.Caching;
+using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.Tenantd.Domain.Time;
 using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
@@ -16,6 +17,8 @@ public static partial class Workspaces
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
+        using var dbActivity = TenantDbTelemetry.StartOperation(
+            "resolve_workspace");
         await using var database = await databaseContexts.CreateDbContextAsync(
             cancellation);
         var queryCancellation = cancellation;
@@ -23,9 +26,6 @@ public static partial class Workspaces
 
         var tenantId = lookup.TenantId.Value;
         var workspaceAddress = lookup.Address.Value;
-
-        using var dbActivity = TenantDbTelemetry.StartQuery(
-            "tenantd.db.resolve_workspace");
 
         var row = await database.WorkspaceAddressBindings
             .AsNoTracking()
@@ -37,7 +37,7 @@ public static partial class Workspaces
                 database.Workspaces
                     .AsNoTracking()
                     .Where(workspace =>
-                        workspace.Lifecycle == WorkspaceLifecycle.Active
+                        workspace.Lifecycle == LifecycleState.Active
                         && EF.Property<string>(workspace, "_tenantId") == tenantId),
                 binding => EF.Property<string>(binding, "_workspaceId"),
                 workspace => EF.Property<string>(workspace, "_id"),
@@ -52,7 +52,7 @@ public static partial class Workspaces
             .Join(
                 database.Tenants
                     .AsNoTracking()
-                    .Where(tenant => tenant.Lifecycle == TenantLifecycle.Active),
+                    .Where(tenant => tenant.Lifecycle == LifecycleState.Active),
                 joined => joined.ParentTenantId,
                 tenant => EF.Property<string>(tenant, "_id"),
                 (joined, tenant) => new

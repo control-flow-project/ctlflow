@@ -153,11 +153,11 @@ projection operation.
 
 | Operation | Admitted caller | Purpose |
 | --- | --- | --- |
-| EnsurePlacement | `tenantd`, admitted private-work owner | Materialize the one canonical Placement for an exact source |
+| EnsurePlacement | admitted private-work owner | Materialize the one canonical Placement for an exact source |
 | ResolvePlacement | kernel owner | Return current Placement identity, constraints, lifecycle, and revision |
-| SuspendPlacement | `tenantd`, operator-owned reconciliation | Block new work and apply bounded drain policy |
-| ResumePlacement | `tenantd`, operator-owned reconciliation | Revalidate and restore one suspended Placement |
-| RetirePlacement | `tenantd`, operator-owned reconciliation | Irreversibly retire one Placement generation |
+| SuspendPlacement | operator-owned reconciliation | Block new work and apply bounded drain policy |
+| ResumePlacement | operator-owned reconciliation | Revalidate and restore one suspended Placement |
+| RetirePlacement | operator-owned reconciliation | Irreversibly retire one Placement generation |
 | ReconcileAppGeneration | `pkgd` | Realize one exact desired App generation |
 | DrainAppGeneration | `pkgd` | Stop admission and drain or retire one App generation |
 | StartAppOnDemand | `edged` | Realize one admitted scale-to-zero App generation within a finite wait |
@@ -198,6 +198,17 @@ Placement-constraint resources are the only mutation path for execution ceilings
 computes the intersection from global through exact source scope and rejects a desired lower-scope
 record that widens an ancestor. A changed constraint does not silently rewrite admitted App or Job
 intent; it marks incompatible realization blocked and invokes the documented owner lifecycle.
+
+### Tenant lifecycle reconciliation
+
+`execd` lists and watches lifecycle work assigned to its authenticated service identity.
+Provisioning realizes the one canonical Placement for the target source. Suspension blocks new
+work before applying bounded drain policy, resumption revalidates current constraints and owner
+facts, and retirement irreversibly settles workloads, Runs, bindings, and retention obligations.
+
+Each local transition is keyed by the supplied lifecycle-operation ID, generation, and step.
+`execd` commits Placement state and audit intent before acknowledging its owner revision to
+`tenantd`.
 
 ### App-realization and endpoint contract
 
@@ -303,7 +314,7 @@ resource exposes native object names, credentials, Secret material, or raw provi
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate source Tenant/Workspace lifecycle and parent |
+| `tenantd` | Validate source lifecycle/parent and consume assigned Placement lifecycle work |
 | `identityd` | Validate attached account and virtual principal; coordinate runtime-principal lifecycle |
 | `pkgd` | Resolve immutable App/Job Package, component, contract, and desired App generation |
 | `configd` | Resolve complete configuration/provider generations and materialize declared Secret slots |

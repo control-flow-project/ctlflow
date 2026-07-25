@@ -26,7 +26,13 @@ await new Promise((resolve, reject) => {
       `--ts_proto_out=${generatedDirectory}`,
       "--ts_proto_opt=outputServices=grpc-js,env=node,forceLong=bigint,useExactTypes=false,importSuffix=.js",
       `--proto_path=${path.join(serviceRoot, "api/proto")}`,
-      path.join(serviceRoot, "api/proto/v1/tenantd.proto")
+      `--proto_path=${path.join(
+        repositoryRoot,
+        "services/auditd/api/proto")}`,
+      path.join(serviceRoot, "api/proto/v1/tenantd.proto"),
+      path.join(
+        repositoryRoot,
+        "services/auditd/api/proto/v1/auditd.proto")
     ],
     {
       cwd: repositoryRoot,

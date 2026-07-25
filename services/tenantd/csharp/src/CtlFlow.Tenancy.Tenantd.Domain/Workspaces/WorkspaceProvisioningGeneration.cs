@@ -9,6 +9,11 @@ public sealed record WorkspaceProvisioningGeneration
 
     public long Value { get; }
 
+    public static WorkspaceProvisioningGeneration Initial() => new(1);
+
+    public WorkspaceProvisioningGeneration Next() =>
+        new(checked(Value + 1));
+
     public static WorkspaceProvisioningGeneration FromStorage(long value)
     {
         if (value <= 0)

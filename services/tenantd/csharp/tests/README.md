@@ -1,9 +1,14 @@
 # C#-specific integration evidence
 
-Canonical wire behavior belongs in `services/tenantd/tests/` and already
-publishes and executes the real NativeAOT process.
+Canonical wire behavior belongs in `services/tenantd/tests/` and runs against
+the shipping NativeAOT process.
 
-Add a C# test project here only for evidence that cannot apply to another
-implementation, such as direct compiled-model inspection or native packaging
-diagnostics. It must still use the migrated file-backed database and shipping
-artifact, and it must not duplicate a canonical RPC assertion.
+`CtlFlow.Tenancy.Tenantd.IntegrationTests` is the implementation-specific
+NativeAOT model audit. It opens a real Knex-migrated, file-backed SQLite
+database through the generated EF compiled model and verifies the exact table,
+column, key, relationship, index, nullability, type-affinity, and optimistic
+concurrency inventory.
+
+`run-model-audit.mjs` publishes that test executable through the same gated,
+content-addressed NativeAOT publisher used by the service. It contains no
+canonical RPC assertions.

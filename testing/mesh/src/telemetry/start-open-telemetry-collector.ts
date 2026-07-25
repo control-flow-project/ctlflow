@@ -2,10 +2,8 @@ import {
   chmod,
   mkdtemp,
   mkdir,
-  rm,
   writeFile
 } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import type {
   OpenTelemetryCollector
@@ -19,8 +17,14 @@ const image =
 export async function startOpenTelemetryCollector(
   repositoryRoot: string
 ): Promise<OpenTelemetryCollector> {
+  const root = path.join(
+    repositoryRoot,
+    ".temp",
+    "test-mesh",
+    "otel");
+  await mkdir(root, { recursive: true });
   const directory = await mkdtemp(
-    path.join(os.tmpdir(), "ctlflow-otel-"));
+    path.join(root, "session-"));
   const outputDirectory = path.join(directory, "output");
   const configPath = path.join(directory, "collector.yaml");
   const tracesPath = path.join(outputDirectory, "traces.json");
@@ -31,6 +35,12 @@ export async function startOpenTelemetryCollector(
 
   await mkdir(outputDirectory);
   await chmod(outputDirectory, 0o777);
+  await writeFile(tracesPath, "", "utf8");
+  await writeFile(metricsPath, "", "utf8");
+  await writeFile(logsPath, "", "utf8");
+  await chmod(tracesPath, 0o666);
+  await chmod(metricsPath, 0o666);
+  await chmod(logsPath, 0o666);
   await writeFile(configPath, createConfiguration(), "utf8");
 
   try {
@@ -54,25 +64,60 @@ export async function startOpenTelemetryCollector(
     await waitForOtlpEndpoint(port);
 
     let stopped = false;
+    let suspended = false;
     return {
       endpoint: `http://127.0.0.1:${String(port)}`,
       tracesPath,
       metricsPath,
       logsPath,
+      clearExports: async () => {
+        requireRunning(stopped);
+        await writeFile(tracesPath, "", "utf8");
+        await writeFile(metricsPath, "", "utf8");
+        await writeFile(logsPath, "", "utf8");
+      },
+      suspend: async () => {
+        requireRunning(stopped);
+        if (suspended) {
+          return;
+        }
+
+        await runCommand(
+          "docker",
+          ["pause", name],
+          { cwd: repositoryRoot });
+        suspended = true;
+      },
+      resume: async () => {
+        requireRunning(stopped);
+        if (!suspended) {
+          return;
+        }
+
+        await runCommand(
+          "docker",
+          ["unpause", name],
+          { cwd: repositoryRoot });
+        suspended = false;
+        await waitForOtlpEndpoint(port);
+      },
       stop: async () => {
         if (stopped) {
           return;
         }
 
         stopped = true;
-        try {
+        if (suspended) {
           await runCommand(
             "docker",
-            ["stop", "--timeout", "5", name],
+            ["unpause", name],
             { cwd: repositoryRoot });
-        } finally {
-          await rm(directory, { recursive: true, force: true });
+          suspended = false;
         }
+        await runCommand(
+          "docker",
+          ["stop", "--timeout", "5", name],
+          { cwd: repositoryRoot });
       }
     };
   } catch (error) {
@@ -80,8 +125,13 @@ export async function startOpenTelemetryCollector(
       "docker",
       ["rm", "--force", name],
       { cwd: repositoryRoot }).catch(() => undefined);
-    await rm(directory, { recursive: true, force: true });
     throw error;
+  }
+}
+
+function requireRunning(stopped: boolean): void {
+  if (stopped) {
+    throw new Error("OpenTelemetry Collector is stopped");
   }
 }
 

@@ -111,10 +111,6 @@ caller identity comes from the independently validated Kubernetes workload token
 | MintRuntimePrincipal | admitted runtime proxy | Create one process identity for an exact admitted execution generation |
 | RetireRuntimePrincipal | `execd`, admitted runtime proxy | Retire one exact process identity |
 | IssueProxyCredential | admitted runtime proxy | Issue one short-lived process-and-dependency-bound proxy credential |
-| EstablishIdentityScope | `tenantd` | Establish initial Tenant administrator or requested Workspace Memberships |
-| SuspendIdentityScope | `tenantd` | Block new identity activity for one lifecycle generation |
-| ResumeIdentityScope | `tenantd` | Revalidate and restore one suspended identity scope |
-| RetireIdentityScope | `tenantd` | Irreversibly retire one identity scope generation |
 
 ### Authentication results
 
@@ -159,16 +155,19 @@ current owner facts. A request cannot supply substitute identity. A proxy creden
 names one existing dependency binding and audience; it expires no later than the workload token or
 the configured 60-second maximum.
 
-### Scope lifecycle results
+### Scope lifecycle reconciliation
 
-`EstablishIdentityScope` is idempotent for one `tenantd` lifecycle-operation ID, generation, and
-step. Tenant establishment creates the declared initial human administrator, Tenant Membership,
-and optional identity link as one identity-owned transaction. Workspace establishment creates only
-the explicitly requested Memberships for existing Tenant Users. `SuspendIdentityScope` blocks new
-Sessions and credentials, `ResumeIdentityScope` revalidates current standing before restoring them,
-and `RetireIdentityScope` irreversibly retires remaining identity state after referential checks.
-Each returns an identity revision for
-`tenantd.AcknowledgeLifecycleStep`; neither mutates Tenant or Workspace lifecycle.
+`identityd` lists and watches the lifecycle steps assigned to its authenticated service identity.
+Tenant establishment creates the declared initial human administrator, Tenant Membership, and
+optional identity link as one identity-owned transaction. Workspace establishment creates only the
+explicitly requested Memberships for existing Tenant Users. Suspension blocks new Sessions and
+credentials, resumption revalidates current standing before restoring them, and retirement
+irreversibly retires remaining identity state after referential checks.
+
+Each local transition is idempotent for the supplied `tenantd` lifecycle-operation ID, generation,
+and step. After committing local state and audit intent, `identityd` calls
+`tenantd.AcknowledgeLifecycleStep` with its identity revision. It never mutates Tenant or Workspace
+lifecycle.
 
 ## Administrative resources
 
@@ -196,7 +195,7 @@ subresources with idempotency and revision preconditions.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate exact Tenant and Workspace parent and lifecycle |
+| `tenantd` | Validate exact parent/lifecycle and consume assigned identity lifecycle work |
 | `pkgd` | Validate App, component, Package, and virtual-principal owner references |
 | `execd` | Validate Placement, Job, Run, dependency, workload generation, and runtime references |
 | `egressd` | Perform only the provider discovery, authorization, token, and user-info HTTP admitted by the SSO binding |

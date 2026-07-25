@@ -14,7 +14,44 @@ public class WorkspaceAddressBinding
     {
     }
 
-    public WorkspaceAddressBindingId Id { get; private set; } = null!;
+    internal WorkspaceAddressBinding(
+        WorkspaceAddressBindingId id,
+        TenantId tenantId,
+        WorkspaceId workspaceId,
+        WorkspaceAddress workspaceAddress,
+        UtcInstant now)
+    {
+        Id = id;
+        _tenantId = tenantId.Value;
+        _workspaceId = workspaceId.Value;
+        _workspaceAddress = workspaceAddress.Value;
+        BindingGeneration = AddressBindingGeneration.Initial();
+        IsActive = true;
+        CreatedAt = now;
+        UpdatedAt = now;
+    }
+
+    internal WorkspaceAddressBinding(
+        WorkspaceAddressBindingId id,
+        TenantId tenantId,
+        WorkspaceId workspaceId,
+        WorkspaceAddress workspaceAddress,
+        AddressBindingGeneration bindingGeneration,
+        bool isActive,
+        UtcInstant createdAt,
+        UtcInstant updatedAt)
+    {
+        Id = id;
+        _tenantId = tenantId.Value;
+        _workspaceId = workspaceId.Value;
+        _workspaceAddress = workspaceAddress.Value;
+        BindingGeneration = bindingGeneration;
+        IsActive = isActive;
+        CreatedAt = createdAt;
+        UpdatedAt = updatedAt;
+    }
+
+    public WorkspaceAddressBindingId Id { get; internal set; } = null!;
 
     public TenantId TenantId => TenantId.FromStorage(_tenantId);
 
@@ -22,11 +59,11 @@ public class WorkspaceAddressBinding
 
     public WorkspaceAddress WorkspaceAddress => WorkspaceAddress.FromStorage(_workspaceAddress);
 
-    public AddressBindingGeneration BindingGeneration { get; private set; } = null!;
+    public AddressBindingGeneration BindingGeneration { get; internal set; } = null!;
 
-    public bool IsActive { get; private set; }
+    public bool IsActive { get; internal set; }
 
-    public UtcInstant CreatedAt { get; private set; } = null!;
+    public UtcInstant CreatedAt { get; internal set; } = null!;
 
-    public UtcInstant UpdatedAt { get; private set; } = null!;
+    public UtcInstant UpdatedAt { get; internal set; } = null!;
 }

@@ -29,6 +29,7 @@
     <PackageReference Include="Google.Protobuf" />
     <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="Grpc.Core.Api" />
+    <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tasks" PrivateAssets="all" />
     <PackageReference Include="OpenTelemetry" />
@@ -39,5 +40,8 @@
     <Protobuf Include="../../../api/proto/v1/tenantd.proto"
               GrpcServices="Server"
               ProtoRoot="../../../api/proto" />
+    <Protobuf Include="../../../../auditd/api/proto/v1/auditd.proto"
+              GrpcServices="Client"
+              ProtoRoot="../../../../auditd/api/proto" />
   </ItemGroup>
 </Project>

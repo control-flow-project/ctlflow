@@ -3,8 +3,7 @@ using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 using CtlFlow.Tenancy.V1;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
-using DomainWorkspaceLifecycle = CtlFlow.Tenancy.Tenantd.Domain.Workspaces.WorkspaceLifecycle;
-using WireWorkspaceLifecycle = CtlFlow.Tenancy.V1.WorkspaceLifecycle;
+using static CtlFlow.Tenancy.Tenantd.Service.Grpc.Responses.LifecycleResponses;
 
 namespace CtlFlow.Tenancy.Tenantd.Service.Grpc.Responses;
 
@@ -30,7 +29,7 @@ internal static partial class WorkspaceResponses
         var response = new ResolveWorkspaceResponse
         {
             WorkspaceId = found.Resolution.WorkspaceId.Value,
-            Lifecycle = MapLifecycle(found.Resolution.Lifecycle),
+            Lifecycle = MapLifecycleState(found.Resolution.Lifecycle),
             WorkspaceRevision = checked((ulong)found.Resolution.Revision.Value),
             Address = new ResolvedWorkspaceAddress
             {
@@ -43,23 +42,4 @@ internal static partial class WorkspaceResponses
 
         return ValueTask.FromResult(response);
     }
-
-    private static WireWorkspaceLifecycle MapLifecycle(
-        DomainWorkspaceLifecycle lifecycle) =>
-        lifecycle switch
-        {
-            DomainWorkspaceLifecycle.Provisioning =>
-                WireWorkspaceLifecycle.Provisioning,
-            DomainWorkspaceLifecycle.Active =>
-                WireWorkspaceLifecycle.Active,
-            DomainWorkspaceLifecycle.Suspended =>
-                WireWorkspaceLifecycle.Suspended,
-            DomainWorkspaceLifecycle.Deleting =>
-                WireWorkspaceLifecycle.Deleting,
-            DomainWorkspaceLifecycle.Failed =>
-                WireWorkspaceLifecycle.Failed,
-            DomainWorkspaceLifecycle.Deleted =>
-                WireWorkspaceLifecycle.Deleted,
-            _ => throw new UnreachableException()
-        };
 }

@@ -6,6 +6,7 @@ const maximumOutputBytes = 1024 * 1024;
 export interface RunCommandOptions {
   readonly cwd: string;
   readonly environment?: Readonly<Record<string, string>>;
+  readonly input?: string;
 }
 
 export async function runCommand(
@@ -20,7 +21,7 @@ export async function runCommand(
         ...process.env,
         ...options.environment
       },
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"]
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
@@ -55,5 +56,7 @@ export async function runCommand(
           `${command} exited with code ${String(code)} and signal ${String(signal)}\n`
           + `${result.stdout}${result.stderr}`));
     });
+
+    child.stdin.end(options.input);
   });
 }

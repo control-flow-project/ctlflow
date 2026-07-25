@@ -132,10 +132,6 @@ It is never a product `Secret`, general configuration value, or application-read
 | SubmitDependencySecret | authenticated provider controller or App | Commit one generated secret output for an exact dependency claim |
 | MaterializeWorkloadSecret | `execd` | Write one authorized Placement-local Kubernetes Secret projection |
 | ReleaseEgressSecret | `egressd` | Release exact-purpose material for one admitted outbound exchange |
-| EstablishConfigurationScope | `tenantd` | Establish one Tenant or Workspace configuration scope idempotently |
-| SuspendConfigurationScope | `tenantd` | Block new generations and materializations in one scope |
-| ResumeConfigurationScope | `tenantd` | Revalidate and restore one suspended scope |
-| RetireConfigurationScope | `tenantd` | Irreversibly retire one scope generation and its projections |
 
 ### Configuration contract
 
@@ -178,13 +174,15 @@ material only over the authenticated response to that `egressd` request, marks i
 and records the exact purpose. It is not a general Secret read and cannot be called by a workload,
 administrator, or provider.
 
-### Scope lifecycle contract
+### Scope lifecycle reconciliation
 
-Scope establishment, suspension, resumption, and retirement are keyed by `tenantd`
-lifecycle-operation ID, generation, step, and idempotency identity. Establishment creates an empty
-scope plus explicit initial configuration; suspension prevents new generations or materializations;
-resumption revalidates sources; retirement rejects new use and removes projections only after
-consumers are retired. Each response supplies the configuration-scope revision used by
+`configd` lists and watches lifecycle work assigned to its authenticated service identity.
+Establishment creates an empty scope plus explicit initial configuration; suspension prevents new
+generations or materializations; resumption revalidates sources; retirement rejects new use and
+removes projections only after consumers are retired.
+
+Each local transition is keyed by the supplied `tenantd` lifecycle-operation ID, generation, and
+step. Its configuration-scope revision and audit intent commit before `configd` calls
 `tenantd.AcknowledgeLifecycleStep`.
 
 ## Administrative resources
@@ -205,7 +203,7 @@ retained projection references the record.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate global/Tenant/Workspace/user configuration scope and lifecycle |
+| `tenantd` | Validate scope lifecycle and consume assigned configuration lifecycle work |
 | `identityd` | Validate User scope and attached account standing |
 | `pkgd` | Resolve immutable Package, configuration, Secret-slot, and provider declarations |
 | `execd` | Validate Placement, consumer generation, dependency claim, runtime, and projection target |

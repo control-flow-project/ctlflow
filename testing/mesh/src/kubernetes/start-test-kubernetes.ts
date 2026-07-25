@@ -1,200 +1,90 @@
 import { createSign } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { TestKubernetes } from "./test-kubernetes.js";
+import type {
+  TestCallerCredentials,
+  TestKubernetes,
+  TestLifecycleOwnerCredentials,
+  TestWorkloadCredentials
+} from "./test-kubernetes.js";
+import {
+  createAggregationCredentials
+} from "./create-aggregation-credentials.js";
+import {
+  createKubernetesApiCredentials
+} from "./create-kubernetes-api-credentials.js";
+import {
+  createTestWorkloads,
+  type TestWorkloadDefinition
+} from "./create-test-workloads.js";
+import {
+  registerTestAggregatedApi
+} from "./register-test-aggregated-api.js";
 import { runKubectl } from "./run-kubectl.js";
 import { runCommand } from "../processes/run-command.js";
 
 const audience = "ctlflow-internal";
-const namespaceName = "tenantd-tests";
-const serviceAccountName = "tenantd-caller";
-const podName = "tenantd-caller";
+const clusterName = "ctlflow-test-mesh";
+const namespaceName = "ctlflow-tests";
+const serviceAccountName = "kernel-caller";
+const podName = "kernel-caller";
 const unadmittedServiceAccountName = "unadmitted-caller";
 const unadmittedPodName = "unadmitted-caller";
+const lifecycleWorkloads = {
+  identity: {
+    serviceAccountName: "identity-owner",
+    podName: "identity-owner"
+  },
+  configuration: {
+    serviceAccountName: "configuration-owner",
+    podName: "configuration-owner"
+  },
+  execution: {
+    serviceAccountName: "execution-owner",
+    podName: "execution-owner"
+  },
+  packages: {
+    serviceAccountName: "packages-owner",
+    podName: "packages-owner"
+  }
+} as const satisfies Record<string, TestWorkloadDefinition>;
 
 export async function startTestKubernetes(
   repositoryRoot: string
 ): Promise<TestKubernetes> {
+  const root = path.join(
+    repositoryRoot,
+    ".temp",
+    "test-mesh",
+    "kubernetes");
+  const sessions = path.join(root, "sessions");
+  await mkdir(sessions, { recursive: true });
   const directory = await mkdtemp(
-    path.join(os.tmpdir(), "ctlflow-kubernetes-"));
-  const clusterName = `ctlflow-${process.pid.toString(36)}-${Date.now().toString(36)}`;
-  const kubeconfigPath = path.join(directory, "kubeconfig");
+    path.join(sessions, "session-"));
+  const kubeconfigPath = path.join(root, "kubeconfig");
   const kind = process.env.CTLFLOW_KIND_PATH ?? "kind";
   const controlPlane = `${clusterName}-control-plane`;
-  let created = false;
 
   try {
-    await runCommand(
+    await acquireTestCluster(
       kind,
-      [
-        "create",
-        "cluster",
-        "--name",
-        clusterName,
-        "--kubeconfig",
-        kubeconfigPath,
-        "--wait",
-        "120s"
-      ],
-      { cwd: repositoryRoot });
-    created = true;
+      repositoryRoot,
+      controlPlane,
+      kubeconfigPath);
 
-    await runKubectl(
+    await createTestWorkloads(
       repositoryRoot,
       controlPlane,
-      ["create", "namespace", namespaceName]);
-    await runKubectl(
-      repositoryRoot,
-      controlPlane,
+      namespaceName,
       [
-        "create",
-        "serviceaccount",
-        serviceAccountName,
-        "--namespace",
-        namespaceName
-      ]);
-    await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "create",
-        "serviceaccount",
-        unadmittedServiceAccountName,
-        "--namespace",
-        namespaceName
-      ]);
-    await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "run",
-        podName,
-        "--namespace",
-        namespaceName,
-        "--image",
-        "registry.k8s.io/pause:3.10",
-        "--restart",
-        "Never",
-        "--overrides",
-        JSON.stringify({
-          spec: {
-            serviceAccountName,
-            automountServiceAccountToken: true
-          }
-        })
-      ]);
-    await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "run",
-        unadmittedPodName,
-        "--namespace",
-        namespaceName,
-        "--image",
-        "registry.k8s.io/pause:3.10",
-        "--restart",
-        "Never",
-        "--overrides",
-        JSON.stringify({
-          spec: {
-            serviceAccountName: unadmittedServiceAccountName,
-            automountServiceAccountToken: true
-          }
-        })
-      ]);
-    await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "wait",
-        `pod/${podName}`,
-        "--namespace",
-        namespaceName,
-        "--for=condition=Ready",
-        "--timeout=90s"
-      ]);
-    await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "wait",
-        `pod/${unadmittedPodName}`,
-        "--namespace",
-        namespaceName,
-        "--for=condition=Ready",
-        "--timeout=90s"
+        { serviceAccountName, podName },
+        {
+          serviceAccountName: unadmittedServiceAccountName,
+          podName: unadmittedPodName
+        },
+        ...Object.values(lifecycleWorkloads)
       ]);
 
-    const token = (await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "create",
-        "token",
-        serviceAccountName,
-        "--namespace",
-        namespaceName,
-        `--audience=${audience}`,
-        "--duration=10m",
-        "--bound-object-kind=Pod",
-        `--bound-object-name=${podName}`
-      ])).stdout.trim();
-    const unadmittedToken = (await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "create",
-        "token",
-        unadmittedServiceAccountName,
-        "--namespace",
-        namespaceName,
-        `--audience=${audience}`,
-        "--duration=10m",
-        "--bound-object-kind=Pod",
-        `--bound-object-name=${unadmittedPodName}`
-      ])).stdout.trim();
-    const wrongAudienceToken = (await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "create",
-        "token",
-        serviceAccountName,
-        "--namespace",
-        namespaceName,
-        "--audience=wrong-audience",
-        "--duration=10m",
-        "--bound-object-kind=Pod",
-        `--bound-object-name=${podName}`
-      ])).stdout.trim();
-    const overlongToken = (await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "create",
-        "token",
-        serviceAccountName,
-        "--namespace",
-        namespaceName,
-        `--audience=${audience}`,
-        "--duration=20m",
-        "--bound-object-kind=Pod",
-        `--bound-object-name=${podName}`
-      ])).stdout.trim();
-    const unboundToken = (await runKubectl(
-      repositoryRoot,
-      controlPlane,
-      [
-        "create",
-        "token",
-        serviceAccountName,
-        "--namespace",
-        namespaceName,
-        `--audience=${audience}`,
-        "--duration=10m"
-      ])).stdout.trim();
     const jwks = (await runKubectl(
       repositoryRoot,
       controlPlane,
@@ -208,7 +98,6 @@ export async function startTestKubernetes(
         "/etc/kubernetes/pki/sa.key"
       ],
       { cwd: repositoryRoot })).stdout;
-    const expiredToken = createExpiredToken(token, signingKey);
     const discovery = JSON.parse((await runKubectl(
       repositoryRoot,
       controlPlane,
@@ -216,49 +105,259 @@ export async function startTestKubernetes(
         readonly issuer?: unknown;
       };
 
-    if (token.length === 0
-        || unadmittedToken.length === 0
-        || wrongAudienceToken.length === 0
-        || overlongToken.length === 0
-        || unboundToken.length === 0
-        || typeof discovery.issuer !== "string")
-    {
-      throw new Error("Kubernetes did not return a usable bound token");
+    const issuer = discovery.issuer;
+    if (typeof issuer !== "string") {
+      throw new Error("Kubernetes did not return a usable issuer");
     }
 
     const jwksPath = path.join(directory, "workload-jwks.json");
     await writeFile(jwksPath, jwks, "utf8");
+    const api = await createKubernetesApiCredentials(
+      kubeconfigPath,
+      directory);
+    const aggregation = await createAggregationCredentials(
+      repositoryRoot,
+      controlPlane,
+      directory);
 
+    let stopped = false;
     return {
-      issuer: discovery.issuer,
-      audience,
-      callerSubject:
-        `system:serviceaccount:${namespaceName}:${serviceAccountName}`,
-      callerToken: token,
-      expiredToken,
-      overlongToken,
-      unadmittedToken,
-      wrongAudienceToken,
-      unboundToken,
-      jwksPath,
+      aggregation,
+      api,
+      createWorkloadCredentials: async () => {
+        if (stopped) {
+          throw new Error("Test Kubernetes cluster is stopped");
+        }
+
+        return createWorkloadCredentials(
+          repositoryRoot,
+          controlPlane,
+          issuer,
+          jwksPath,
+          signingKey);
+      },
+      createLifecycleOwnerCredentials: async () => {
+        if (stopped) {
+          throw new Error("Test Kubernetes cluster is stopped");
+        }
+
+        return await createLifecycleOwnerCredentials(
+          repositoryRoot,
+          controlPlane);
+      },
+      registerAggregatedApi: async (options) => {
+        if (stopped) {
+          throw new Error("Test Kubernetes cluster is stopped");
+        }
+
+        await registerTestAggregatedApi(
+          repositoryRoot,
+          controlPlane,
+          options);
+      },
       stop: async () => {
-        await runCommand(
-          kind,
-          ["delete", "cluster", "--name", clusterName],
-          { cwd: repositoryRoot });
-        await rm(directory, { recursive: true, force: true });
+        if (stopped) {
+          return;
+        }
+
+        stopped = true;
       }
     };
   } catch (error) {
-    if (created) {
-      await runCommand(
-        kind,
-        ["delete", "cluster", "--name", clusterName],
-        { cwd: repositoryRoot }).catch(() => undefined);
-    }
-    await rm(directory, { recursive: true, force: true });
     throw error;
   }
+}
+
+async function acquireTestCluster(
+  kind: string,
+  repositoryRoot: string,
+  controlPlane: string,
+  kubeconfigPath: string
+): Promise<void> {
+  const clusters = (await runCommand(
+    kind,
+    ["get", "clusters"],
+    { cwd: repositoryRoot })).stdout
+    .split(/\r?\n/u)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (!clusters.includes(clusterName)) {
+    await runCommand(
+      kind,
+      [
+        "create",
+        "cluster",
+        "--name",
+        clusterName,
+        "--kubeconfig",
+        kubeconfigPath,
+        "--wait",
+        "120s"
+      ],
+      { cwd: repositoryRoot });
+    return;
+  }
+
+  const running = (await runCommand(
+    "docker",
+    [
+      "inspect",
+      "--format",
+      "{{.State.Running}}",
+      controlPlane
+    ],
+    { cwd: repositoryRoot })).stdout.trim();
+  if (running !== "true") {
+    throw new Error(
+      `Reusable Kind control plane ${controlPlane} is not running`);
+  }
+
+  const kubeconfig = (await runCommand(
+    kind,
+    ["get", "kubeconfig", "--name", clusterName],
+    { cwd: repositoryRoot })).stdout;
+  if (kubeconfig.trim().length === 0) {
+    throw new Error("Reusable Kind cluster returned an empty kubeconfig");
+  }
+
+  await writeFile(kubeconfigPath, kubeconfig, {
+    encoding: "utf8",
+    mode: 0o600
+  });
+}
+
+async function createLifecycleOwnerCredentials(
+  repositoryRoot: string,
+  controlPlane: string
+): Promise<TestLifecycleOwnerCredentials> {
+  return {
+    identity: await createCallerCredentials(
+      repositoryRoot,
+      controlPlane,
+      lifecycleWorkloads.identity),
+    configuration: await createCallerCredentials(
+      repositoryRoot,
+      controlPlane,
+      lifecycleWorkloads.configuration),
+    execution: await createCallerCredentials(
+      repositoryRoot,
+      controlPlane,
+      lifecycleWorkloads.execution),
+    packages: await createCallerCredentials(
+      repositoryRoot,
+      controlPlane,
+      lifecycleWorkloads.packages)
+  };
+}
+
+async function createCallerCredentials(
+  repositoryRoot: string,
+  controlPlane: string,
+  workload: TestWorkloadDefinition
+): Promise<TestCallerCredentials> {
+  return {
+    callerSubject:
+      `system:serviceaccount:${namespaceName}:${workload.serviceAccountName}`,
+    callerToken: await createToken(
+      repositoryRoot,
+      controlPlane,
+      workload.serviceAccountName,
+      audience,
+      "10m",
+      workload.podName)
+  };
+}
+
+async function createWorkloadCredentials(
+  repositoryRoot: string,
+  controlPlane: string,
+  issuer: string,
+  jwksPath: string,
+  signingKey: string
+): Promise<TestWorkloadCredentials> {
+  const token = await createToken(
+    repositoryRoot,
+    controlPlane,
+    serviceAccountName,
+    audience,
+    "10m",
+    podName);
+  const unadmittedToken = await createToken(
+    repositoryRoot,
+    controlPlane,
+    unadmittedServiceAccountName,
+    audience,
+    "10m",
+    unadmittedPodName);
+  const wrongAudienceToken = await createToken(
+    repositoryRoot,
+    controlPlane,
+    serviceAccountName,
+    "wrong-audience",
+    "10m",
+    podName);
+  const overlongToken = await createToken(
+    repositoryRoot,
+    controlPlane,
+    serviceAccountName,
+    audience,
+    "20m",
+    podName);
+  const unboundToken = await createToken(
+    repositoryRoot,
+    controlPlane,
+    serviceAccountName,
+    audience,
+    "10m");
+
+  return {
+    issuer,
+    audience,
+    callerSubject:
+      `system:serviceaccount:${namespaceName}:${serviceAccountName}`,
+    callerToken: token,
+    expiredToken: createExpiredToken(token, signingKey),
+    overlongToken,
+    unadmittedToken,
+    wrongAudienceToken,
+    unboundToken,
+    jwksPath
+  };
+}
+
+async function createToken(
+  repositoryRoot: string,
+  controlPlane: string,
+  serviceAccount: string,
+  tokenAudience: string,
+  duration: string,
+  boundPod?: string
+): Promise<string> {
+  const binding = boundPod === undefined
+    ? []
+    : [
+        "--bound-object-kind=Pod",
+        `--bound-object-name=${boundPod}`
+      ];
+  const token = (await runKubectl(
+    repositoryRoot,
+    controlPlane,
+    [
+      "create",
+      "token",
+      serviceAccount,
+      "--namespace",
+      namespaceName,
+      `--audience=${tokenAudience}`,
+      `--duration=${duration}`,
+      ...binding
+    ])).stdout.trim();
+
+  if (token.length === 0) {
+    throw new Error("Kubernetes did not return a usable workload token");
+  }
+
+  return token;
 }
 
 function createExpiredToken(token: string, privateKey: string): string {

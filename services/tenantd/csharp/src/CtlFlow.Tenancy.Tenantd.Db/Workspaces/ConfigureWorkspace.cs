@@ -1,3 +1,5 @@
+using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
+using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.Tenantd.Domain.Time;
 using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
@@ -35,8 +37,8 @@ internal static partial class WorkspaceSchema
 
         workspace.Property(value => value.Lifecycle)
             .HasConversion(
-                value => WorkspaceLifecycleStorage.ToStorage(value),
-                value => WorkspaceLifecycleStorage.FromStorage(value))
+                value => LifecycleStates.ToStorage(value),
+                value => LifecycleStates.FromStorage(value))
             .HasColumnName("lifecycle_state")
             .IsRequired();
 
@@ -53,6 +55,18 @@ internal static partial class WorkspaceSchema
                 value => value.Value,
                 value => WorkspaceProvisioningGeneration.FromStorage(value))
             .HasColumnName("provisioning_generation")
+            .IsRequired();
+
+        workspace.Ignore(value => value.CurrentOperationId);
+        workspace.Property<string?>("_currentOperationId")
+            .HasColumnName("current_operation_id")
+            .HasMaxLength(64);
+
+        workspace.Property(value => value.LastEventSequence)
+            .HasConversion(
+                value => value.Value,
+                value => ResourceEventSequence.FromStorage(value))
+            .HasColumnName("last_event_sequence")
             .IsRequired();
 
         workspace.Property(value => value.CreatedAt)

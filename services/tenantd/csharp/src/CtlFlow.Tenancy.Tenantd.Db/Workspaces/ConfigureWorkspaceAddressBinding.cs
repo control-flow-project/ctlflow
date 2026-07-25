@@ -66,7 +66,8 @@ internal static partial class WorkspaceAddressBindingSchema
 
         binding.HasIndex("_tenantId", "_workspaceAddress")
             .IsUnique();
-        binding.HasIndex("_workspaceId");
+        binding.HasIndex("_workspaceId")
+            .IsUnique();
 
         binding.HasOne<Tenant>()
             .WithMany()

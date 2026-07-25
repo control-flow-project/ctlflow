@@ -6,8 +6,13 @@ public static partial class Schemas
 {
     private const string ManifestResourceName =
         "CtlFlow.Tenancy.Tenantd.SchemaManifest";
+    private static readonly IReadOnlyList<string> ExpectedMigrationNames =
+        LoadExpectedMigrationNames();
 
-    public static IReadOnlyList<string> ReadExpectedMigrationNames()
+    public static IReadOnlyList<string> ReadExpectedMigrationNames() =>
+        ExpectedMigrationNames;
+
+    private static IReadOnlyList<string> LoadExpectedMigrationNames()
     {
         using var stream = typeof(TenantDbContext).Assembly
             .GetManifestResourceStream(ManifestResourceName)
@@ -34,6 +39,6 @@ public static partial class Schemas
                 "The embedded schema manifest is empty");
         }
 
-        return names;
+        return names.AsReadOnly();
     }
 }

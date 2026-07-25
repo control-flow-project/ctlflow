@@ -123,7 +123,7 @@ service-to-service contracts use gRPC. Public HTTP mediation remains HTTP.
 
 | Service | Direct operations |
 | --- | --- |
-| `tenantd` | ResolveTenant, ResolveWorkspace, GetLifecycle, AcknowledgeLifecycleStep |
+| `tenantd` | ResolveTenant, ResolveWorkspace, GetLifecycle, ListLifecycleSteps, WatchLifecycleSteps, AcknowledgeLifecycleStep |
 | `authd` | Public HTTP Options, Begin, Callback, Logout, and private operational probes |
 | `identityd` | Login transaction, Session exchange/revocation, invocation/key, principal, runtime, proxy-credential, and identity-scope operations |
 | `policyd` | CheckAccess, ExplainAccess, BuildResourcePath |

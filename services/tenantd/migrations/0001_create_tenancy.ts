@@ -7,11 +7,14 @@ export async function up(knex: Knex): Promise<void> {
     table.integer("lifecycle_state").notNullable();
     table.bigInteger("revision").notNullable();
     table.bigInteger("provisioning_generation").notNullable();
+    table.string("current_operation_id", 64).nullable();
+    table.bigInteger("last_event_sequence").notNullable();
     table.bigInteger("created_at_unix_ms").notNullable();
     table.bigInteger("updated_at_unix_ms").notNullable();
-    table.check("lifecycle_state BETWEEN 1 AND 6");
+    table.check("lifecycle_state BETWEEN 1 AND 8");
     table.check("revision > 0");
     table.check("provisioning_generation > 0");
+    table.check("last_event_sequence > 0");
     table.check("created_at_unix_ms > 0");
     table.check("updated_at_unix_ms >= created_at_unix_ms");
   });
@@ -27,7 +30,9 @@ export async function up(knex: Knex): Promise<void> {
     table.bigInteger("created_at_unix_ms").notNullable();
     table.bigInteger("updated_at_unix_ms").notNullable();
     table.unique(["authority", "path_prefix"]);
-    table.index(["tenant_id"], "tenant_address_bindings_tenant_idx");
+    table.unique(
+      ["tenant_id"],
+      { indexName: "tenant_address_bindings_tenant_uq" });
     table.check("binding_generation > 0");
     table.check("is_active IN (0, 1)");
     table.check(
@@ -48,12 +53,15 @@ export async function up(knex: Knex): Promise<void> {
     table.integer("lifecycle_state").notNullable();
     table.bigInteger("revision").notNullable();
     table.bigInteger("provisioning_generation").notNullable();
+    table.string("current_operation_id", 64).nullable();
+    table.bigInteger("last_event_sequence").notNullable();
     table.bigInteger("created_at_unix_ms").notNullable();
     table.bigInteger("updated_at_unix_ms").notNullable();
     table.index(["tenant_id"], "workspaces_tenant_idx");
-    table.check("lifecycle_state BETWEEN 1 AND 6");
+    table.check("lifecycle_state BETWEEN 1 AND 8");
     table.check("revision > 0");
     table.check("provisioning_generation > 0");
+    table.check("last_event_sequence > 0");
     table.check("created_at_unix_ms > 0");
     table.check("updated_at_unix_ms >= created_at_unix_ms");
   });
@@ -70,13 +78,54 @@ export async function up(knex: Knex): Promise<void> {
     table.bigInteger("created_at_unix_ms").notNullable();
     table.bigInteger("updated_at_unix_ms").notNullable();
     table.unique(["tenant_id", "workspace_address"]);
-    table.index(["workspace_id"], "workspace_address_bindings_workspace_idx");
+    table.unique(
+      ["workspace_id"],
+      { indexName: "workspace_address_bindings_workspace_uq" });
     table.check("binding_generation > 0");
     table.check("is_active IN (0, 1)");
     table.check("length(workspace_address) BETWEEN 1 AND 63");
     table.check("instr(workspace_address, '/') = 0");
     table.check("created_at_unix_ms > 0");
     table.check("updated_at_unix_ms >= created_at_unix_ms");
+  });
+
+  await knex.schema.createTable("tenant_initial_administrators", (table) => {
+    table.string("tenant_id", 64).primary()
+      .references("tenant_id").inTable("tenants").onDelete("RESTRICT");
+    table.string("display_name", 200).notNullable();
+    table.string("login_identifier", 320).notNullable();
+    table.string("provider_id", 64).nullable();
+    table.string("provider_subject", 512).nullable();
+    table.check("length(trim(display_name)) BETWEEN 1 AND 200");
+    table.check("length(trim(login_identifier)) BETWEEN 1 AND 320");
+    table.check(
+      "(provider_id IS NULL AND provider_subject IS NULL)"
+      + " OR (provider_id IS NOT NULL AND provider_subject IS NOT NULL)");
+  });
+
+  await knex.schema.createTable("tenant_baseline_packages", (table) => {
+    table.string("tenant_id", 64).notNullable()
+      .references("tenant_id").inTable("tenants").onDelete("RESTRICT");
+    table.string("package_id", 64).notNullable();
+    table.string("package_version", 128).notNullable();
+    table.primary(["tenant_id", "package_id", "package_version"]);
+  });
+
+  await knex.schema.createTable("workspace_initial_memberships", (table) => {
+    table.string("workspace_id", 64).notNullable()
+      .references("workspace_id").inTable("workspaces").onDelete("RESTRICT");
+    table.string("user_id", 64).notNullable();
+    table.integer("standing").notNullable();
+    table.primary(["workspace_id", "user_id"]);
+    table.check("standing IN (1, 2)");
+  });
+
+  await knex.schema.createTable("workspace_baseline_packages", (table) => {
+    table.string("workspace_id", 64).notNullable()
+      .references("workspace_id").inTable("workspaces").onDelete("RESTRICT");
+    table.string("package_id", 64).notNullable();
+    table.string("package_version", 128).notNullable();
+    table.primary(["workspace_id", "package_id", "package_version"]);
   });
 
   await knex.raw(`
@@ -182,9 +231,43 @@ export async function up(knex: Knex): Promise<void> {
       SELECT RAISE(ABORT, 'Workspace address binding Tenant must own the Workspace');
     END
   `);
+
+  for (const [trigger, table] of [
+    ["tenant_initial_administrator_is_immutable", "tenant_initial_administrators"],
+    ["tenant_baseline_packages_are_immutable", "tenant_baseline_packages"],
+    ["workspace_initial_memberships_are_immutable", "workspace_initial_memberships"],
+    ["workspace_baseline_packages_are_immutable", "workspace_baseline_packages"]
+  ] as const) {
+    await knex.raw(`
+      CREATE TRIGGER ${trigger}_update
+      BEFORE UPDATE ON ${table}
+      BEGIN
+        SELECT RAISE(ABORT, 'Provisioning intent is immutable');
+      END
+    `);
+    await knex.raw(`
+      CREATE TRIGGER ${trigger}_delete
+      BEFORE DELETE ON ${table}
+      BEGIN
+        SELECT RAISE(ABORT, 'Provisioning intent is permanent');
+      END
+    `);
+  }
 }
 
 export async function down(knex: Knex): Promise<void> {
+  for (const trigger of [
+    "workspace_baseline_packages_are_immutable_delete",
+    "workspace_baseline_packages_are_immutable_update",
+    "workspace_initial_memberships_are_immutable_delete",
+    "workspace_initial_memberships_are_immutable_update",
+    "tenant_baseline_packages_are_immutable_delete",
+    "tenant_baseline_packages_are_immutable_update",
+    "tenant_initial_administrator_is_immutable_delete",
+    "tenant_initial_administrator_is_immutable_update"
+  ]) {
+    await knex.raw(`DROP TRIGGER IF EXISTS ${trigger}`);
+  }
   await knex.raw(
     "DROP TRIGGER IF EXISTS workspace_address_binding_tenant_matches");
   await knex.raw("DROP TRIGGER IF EXISTS workspace_parent_is_immutable");
@@ -200,6 +283,10 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw("DROP TRIGGER IF EXISTS tenant_address_binding_owner_is_immutable");
   await knex.raw("DROP TRIGGER IF EXISTS tenant_address_bindings_are_permanent");
   await knex.raw("DROP TRIGGER IF EXISTS tenants_are_permanent");
+  await knex.schema.dropTableIfExists("workspace_baseline_packages");
+  await knex.schema.dropTableIfExists("workspace_initial_memberships");
+  await knex.schema.dropTableIfExists("tenant_baseline_packages");
+  await knex.schema.dropTableIfExists("tenant_initial_administrators");
   await knex.schema.dropTableIfExists("workspace_address_bindings");
   await knex.schema.dropTableIfExists("workspaces");
   await knex.schema.dropTableIfExists("tenant_address_bindings");

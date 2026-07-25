@@ -1,3 +1,5 @@
+using CtlFlow.Tenancy.Tenantd.Domain.Identifiers;
+
 namespace CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 
 public sealed record WorkspaceId
@@ -34,6 +36,9 @@ public sealed record WorkspaceId
 
         return new WorkspaceId(value);
     }
+
+    public static WorkspaceId Generate() =>
+        new(OpaqueIdentifiers.Generate("wsp"));
 
     public override string ToString() => Value;
 

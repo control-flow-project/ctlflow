@@ -11,10 +11,13 @@ public static class TenantDbTelemetry
 
     public static readonly ActivitySource Source = new(SourceName);
 
-    public static Activity? StartQuery(string operation)
+    public static Activity? StartOperation(string operation)
     {
-        var activity = Source.StartActivity(operation, ActivityKind.Client);
-        activity?.SetTag("db.system", "sqlite");
+        var activity = Source.StartActivity(
+            $"tenantd.db.{operation}",
+            ActivityKind.Client);
+        activity?.SetTag("db.system.name", "sqlite");
+        activity?.SetTag("db.operation.name", operation);
         return activity;
     }
 }

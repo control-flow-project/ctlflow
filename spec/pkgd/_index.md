@@ -115,6 +115,17 @@ Package revocation is terminal. After committing revocation, `pkgd` asks `execd`
 generation, Job, and Run attempt pinned to that version. Their records and evidence remain; no
 replacement Package is selected automatically.
 
+## Tenant lifecycle reconciliation
+
+`pkgd` lists and watches lifecycle work assigned to its authenticated service identity. Provisioning
+work carries the exact finite baseline Package versions persisted by `tenantd`; `pkgd` installs
+them idempotently at the canonical target Placement. Suspension blocks App mutation and exposure,
+resumption revalidates current Package standing, and retirement drains or retires target-owned Apps
+under their declared persistence policy.
+
+Each local transition is keyed by the supplied lifecycle-operation ID, generation, and step.
+`pkgd` commits App state and audit intent before acknowledging the step to `tenantd`.
+
 ## Direct operations
 
 | Operation | Admitted caller | Purpose |
@@ -131,7 +142,6 @@ replacement Package is selected automatically.
 | RemoveApp | operator or admitted App manager | Irreversibly retire one App and apply persistent-slot policy |
 | ResolveAppGeneration | `execd`, `edged`, kernel owner | Return immutable current App-component intent |
 | ReportAppRealization | `execd` | Commit bounded observed component and binding status |
-| ReconcileBaselineApps | `tenantd` | Idempotently install the explicitly requested baseline set |
 | ResolveConfigurationSchema | `configd` | Return the immutable schema for one Package consumer |
 | ResolveProviderContract | `configd`, `execd` | Return one immutable dependency provider contract |
 | ResolveServiceContract | `execd` | Return one provided or required service compatibility declaration |
@@ -207,7 +217,7 @@ selectors only and follow the common bounded contract.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate Package/App owner Tenant or Workspace lifecycle |
+| `tenantd` | Validate owner lifecycle and consume assigned baseline-App lifecycle work |
 | `identityd` | Validate attached account and create or retire component virtual principals |
 | `configd` | Validate complete configuration and exact provider selections |
 | `execd` | Run isolated builds and realize, drain, or retire App generations |

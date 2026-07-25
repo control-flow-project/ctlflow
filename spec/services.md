@@ -37,8 +37,8 @@ realtime, event delivery, agent management, and its vertical applications as Pac
                 +-> pkgd
                 +-> execd
 
- tenantd -> identityd / configd / execd / pkgd
- pkgd ----> identityd / configd / execd
+ identityd / configd / execd / pkgd -> tenantd lifecycle work
+ pkgd -----------------------------> identityd / configd / execd
  execd ---> tenantd / identityd / pkgd / configd / policyd -> Kubernetes
 
  App or Run -> runtime proxy -> bound App
@@ -65,10 +65,7 @@ revisioned fact, but the cache is rebuildable and bounded by its owner's lifecyc
 | Runtime proxy | `identityd.IssueRunInvocation`, `MintRuntimePrincipal`, `RetireRuntimePrincipal`, `IssueProxyCredential` | Establish process and delegated execution identity |
 | Internal invocation receiver | `identityd.GetInvocationVerificationKeys` | Refresh one bounded verification-key cache |
 | Owning kernel/App service | `policyd.CheckAccess`, `ExplainAccess` | Authorize an exact owned operation and path |
-| `tenantd` | `identityd.EstablishIdentityScope`, `SuspendIdentityScope`, `ResumeIdentityScope`, `RetireIdentityScope` | Establish or change Tenant/Workspace identity lifecycle |
-| `tenantd` | `configd.EstablishConfigurationScope`, `SuspendConfigurationScope`, `ResumeConfigurationScope`, `RetireConfigurationScope` | Establish or change configuration-scope lifecycle |
-| `tenantd` | `execd.EnsurePlacement`, `SuspendPlacement`, `ResumePlacement`, `RetirePlacement` | Materialize or change canonical Placement lifecycle |
-| `tenantd` | `pkgd.ReconcileBaselineApps` | Reconcile only explicitly requested baseline Apps |
+| `identityd`, `configd`, `execd`, `pkgd` | `tenantd.ListLifecycleSteps`, `WatchLifecycleSteps`, `AcknowledgeLifecycleStep` | Reconcile only lifecycle work assigned to the authenticated owner |
 | `identityd` | `tenantd.GetLifecycle` | Validate Tenant/Workspace standing |
 | `identityd` | `pkgd.ResolveAppGeneration`; `execd.ResolvePlacement`, `ResolveRuntimeContext` | Validate owner, Placement, Run, runtime, and dependency references |
 | `identityd` | `egressd.ForwardHttp` | Perform admitted SSO provider HTTP |
