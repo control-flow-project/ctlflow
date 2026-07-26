@@ -33,7 +33,7 @@ Trace context remains separate from:
 ```text
 Kubernetes workload token   immediate process identity
 invocation JWT              User or Job Actor context
-idempotency key             retry identity for one domain mutation
+source event ID             retry identity for direct audit delivery
 ```
 
 W3C trace and span identity is the sole transport correlation model.
@@ -134,7 +134,7 @@ context rather than retaining an indefinitely open parent span.
 operational observations that may be sampled, delayed, or dropped.
 
 ```text
-auditd          authority, attribution, retention, legal deletion
+auditd          authority, attribution, immutable durable retention
 OpenTelemetry   diagnosis, performance, saturation, correlation
 ```
 

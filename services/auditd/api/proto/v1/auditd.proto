@@ -12,8 +12,7 @@ service AuditService {
 }
 
 message RecordAuditBatchRequest {
-  uint64 source_schema_generation = 1;
-  repeated AuditEvent events = 2;
+  repeated AuditEvent events = 1;
 }
 
 message RecordAuditBatchResponse {
@@ -27,80 +26,65 @@ message AuditAcceptance {
 
 message AuditEvent {
   string source_event_id = 1;
-  string idempotency_key = 2;
-  string operation = 3;
-  google.protobuf.Timestamp occurred_at = 4;
-  AuditAttribution attribution = 5;
-  AuditPartition partition = 6;
-  string trace_id = 7;
-  string span_id = 8;
+  google.protobuf.Timestamp occurred_at = 2;
+  AuditAttribution attribution = 3;
+  string tenant_id = 4;
+  string trace_id = 5;
+  string span_id = 6;
 
   oneof detail {
-    TenancyMutationAuditDetail tenancy_mutation = 20;
-    IdentitySessionAuditDetail identity_session = 21;
+    TenantMutationAuditDetail tenant_mutation = 7;
+    WorkspaceMutationAuditDetail workspace_mutation = 8;
+    IdentitySessionAuditDetail identity_session = 9;
   }
 }
 
 message AuditAttribution {
-  oneof subject {
-    string kubernetes_subject = 1;
-    AttachedActor attached_actor = 2;
+  oneof attribution {
+    string operator_common_name = 1;
+    string workload_subject = 2;
+    InvocationAuditAttribution invocation = 3;
   }
-
-  optional string immediate_caller = 3;
-  optional string runtime_principal = 4;
 }
 
-message AttachedActor {
+message InvocationAuditAttribution {
   string actor_principal_id = 1;
-  string attached_account_principal_id = 2;
+  string subject_account_principal_id = 2;
+  string workload_subject = 3;
 }
 
-message AuditPartition {
-  oneof partition {
-    GlobalAuditPartition global = 1;
-    TenantAuditPartition tenant = 2;
-  }
+message TenantMutationAuditDetail {
+  TenantMutationOperation operation = 1;
+  uint64 resource_revision = 2;
+  TenancyResourceState resulting_state = 3;
 }
 
-message GlobalAuditPartition {}
-
-message TenantAuditPartition {
-  string tenant_id = 1;
-}
-
-message TenancyMutationAuditDetail {
-  oneof target {
-    TenantAuditTarget tenant = 1;
-    WorkspaceAuditTarget workspace = 2;
-  }
-
+message WorkspaceMutationAuditDetail {
+  string workspace_id = 1;
+  WorkspaceMutationOperation operation = 2;
   uint64 resource_revision = 3;
-  AuditOutcome outcome = 4;
-  TenancyResourceState resulting_state = 5;
-}
-
-message TenantAuditTarget {
-  string tenant_id = 1;
-}
-
-message WorkspaceAuditTarget {
-  string tenant_id = 1;
-  string workspace_id = 2;
+  TenancyResourceState resulting_state = 4;
 }
 
 message IdentitySessionAuditDetail {
   string session_id = 1;
-  string account_principal_id = 2;
+  string human_account_principal_id = 2;
   uint64 session_revision = 3;
   IdentitySessionAction action = 4;
 }
 
-enum AuditOutcome {
-  AUDIT_OUTCOME_UNSPECIFIED = 0;
-  AUDIT_OUTCOME_SUCCEEDED = 1;
-  AUDIT_OUTCOME_DENIED = 2;
-  AUDIT_OUTCOME_FAILED = 3;
+enum TenantMutationOperation {
+  TENANT_MUTATION_OPERATION_UNSPECIFIED = 0;
+  TENANT_MUTATION_OPERATION_CREATE_TENANT = 1;
+  TENANT_MUTATION_OPERATION_UPDATE_TENANT = 2;
+  TENANT_MUTATION_OPERATION_SET_TENANT_STATE = 3;
+}
+
+enum WorkspaceMutationOperation {
+  WORKSPACE_MUTATION_OPERATION_UNSPECIFIED = 0;
+  WORKSPACE_MUTATION_OPERATION_CREATE_WORKSPACE = 1;
+  WORKSPACE_MUTATION_OPERATION_UPDATE_WORKSPACE = 2;
+  WORKSPACE_MUTATION_OPERATION_SET_WORKSPACE_STATE = 3;
 }
 
 enum TenancyResourceState {

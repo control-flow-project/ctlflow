@@ -164,9 +164,10 @@ After an audited mutation commits and no transaction is held, the source calls
 Domain outcome -> source service -> auditd
 ```
 
-The source event identity makes an identical replay idempotent and a
-conflicting replay invalid. The source stores no audit outbox, queue, journal,
-cursor, delivery worker, or fallback copy.
+The authenticated source and source event ID make an identical replay
+idempotent. A replay with different canonical event content is
+`ALREADY_EXISTS`. The source stores no audit outbox, queue, journal, cursor,
+delivery worker, or fallback copy.
 
 Reads, rejected calls, create retries, and no-op mutations emit no successful
 mutation event. Identityd audits only successful Session creation and an

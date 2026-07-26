@@ -217,7 +217,7 @@ gRPC services use only the statuses needed by an operation:
 | --- | --- |
 | `INVALID_ARGUMENT` | A required value is absent, malformed, conflicting, or outside its bound |
 | `NOT_FOUND` | The exact visible target does not exist |
-| `ALREADY_EXISTS` | An immutable identity or publication key is already owned |
+| `ALREADY_EXISTS` | An immutable identity, publication key, or audit event identity already owns conflicting content |
 | `FAILED_PRECONDITION` | Current domain state forbids the request |
 | `ABORTED` | An expected revision no longer matches |
 | `RESOURCE_EXHAUSTED` | A documented finite input or capacity bound is reached |

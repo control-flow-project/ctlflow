@@ -178,10 +178,12 @@ identity cannot be supplied or replaced by a request field or
 caller-asserted metadata.
 
 The operator certificate must chain to the installation's Kubernetes client
-CA and contain exactly one non-empty common name. A missing or untrusted
-certificate is `UNAUTHENTICATED`; a trusted subject absent from tenantd's
-finite operator allowlist is `PERMISSION_DENIED`. Workload calls never obtain
-operator authority from a bearer token.
+CA and contain exactly one common name. That common name has one to 253 Unicode
+scalar values, has no control scalar, and is not whitespace-only so it is
+admissible as typed Auditd attribution. A missing or untrusted certificate is
+`UNAUTHENTICATED`; a trusted subject absent from tenantd's finite operator
+allowlist is `PERMISSION_DENIED`. Workload calls never obtain operator
+authority from a bearer token.
 
 When a workload call carries an invocation JWT, tenantd obtains the active and
 retiring public keys through
@@ -230,12 +232,12 @@ is `PERMISSION_DENIED`; missing current target standing is `NOT_FOUND`; a
 policy or identity dependency failure is `UNAVAILABLE`. tenantd never accepts
 a Role, capability, operation token, Actor, or resource path from its caller.
 
-Every actual mutation produces one typed audit intent in Domain containing the
-operation, infrastructure operator or invocation Actor, immediate workload
-when present, Tenant partition, target ID, successful outcome, resulting state
-and revision, time, request identity, and trace identity. Db persists only
-Tenant or Workspace state. After Db completes and no transaction is held,
-Service calls
+Every actual mutation produces one typed audit intent in Domain containing a
+canonical source event ID, typed operation, infrastructure operator or
+invocation Actor, immediate workload when present, Tenant partition, target
+ID, resulting state and revision, occurrence time, and trace identity. Db
+persists only Tenant or Workspace state. After Db completes and no transaction
+is held, Service calls
 `auditd.RecordAuditBatch` directly before returning the result. Reads,
 rejected requests, retries, and no-op mutations produce no tenantd audit
 event. This tenantd-specific obligation is the complete audit set for the

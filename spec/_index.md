@@ -57,7 +57,7 @@ to `execd`.
 | [`execd`](execd/) | Placements, constraints, dependencies, workloads, Jobs, Runs, storage, endpoints, and Kubernetes realization |
 | [`edged`](edged/) | External ingress and reverse proxying |
 | [`egressd`](egressd/) | Controlled external HTTP |
-| [`auditd`](auditd/) | Authoritative kernel evidence and exports |
+| [`auditd`](auditd/) | Immutable authoritative kernel evidence |
 
 Chat, Files, Tasks, Notifications, realtime delivery, application events, agent management, and
 vertical business domains are Packages, not kernel services. An agent is a product composition of a

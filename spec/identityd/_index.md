@@ -442,11 +442,12 @@ before returning success. It holds no database transaction during the call and
 has no audit table, outbox, queue, retry journal, or fallback. Audit failure is
 `UNAVAILABLE` and does not roll back the committed Session state.
 
-The exact audit operation names are `create_session` and `revoke_session`.
-The event is Tenant-partitioned and contains Session ID, account principal ID,
-resulting positive Session revision, action, authenticated Authd workload,
-time, and trace correlation. It contains no credential, digest, provider
-identity, invocation token, or signing material.
+The exact typed Session actions are `CREATED` and `REVOKED`. The event is
+Tenant-partitioned and contains a canonical source event ID, Session ID, human
+account principal ID, resulting positive Session revision, action,
+authenticated Authd workload, occurrence time, and trace correlation. It
+contains no credential, digest, provider identity, invocation token, signing
+material, or generic operation string.
 
 Session exchange, invocation issuance, fact reads, no-op revocation,
 rejections, and dependency failures create no audit event.
