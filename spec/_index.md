@@ -15,39 +15,29 @@ CtlFlow records with one owning service each.
 ## Architecture
 
 ```text
- INFRASTRUCTURE OPERATOR                    TENANT USER OR ADMINISTRATOR
+ infrastructure operator
+   -> ctlflow
+   -> kubeconfig-authorized Kubernetes port-forward
+   -> owning versioned gRPC contract
 
- ctlflow                                         browser
-    |                                             |   |
-    | kubeconfig-authorized port-forward          |   +----> authd ----> identityd
-    | + kubeconfig client certificate             |          login       Session
-    v                                             |
- Kubernetes API server                           |
-    |                                             +--------> edged
-    | byte transport                                           |
-    v                                                         | invocation JWT
- CtlFlow owning services <------------------------ product backend App
-    |
-    | desired Placement and execution state
-    v
- execd
-    |
-    | Kubernetes API
-    v
- namespaces, workloads, Services, policy, volumes, Secrets
+ product backend
+   -> tenantd
+      -> policyd
+         -> identityd
+      -> auditd
 
- App and Job runtimes ---- workload identity + invocation JWT ----> peer / kernel / egressd
+ CtlFlow realization ownership
+   -> execd
+   -> Kubernetes workloads, Services, volumes, and policy
 
- Every service ---- bounded OTLP ----> OpenTelemetry Collector ----> configured backends
+ every process -> bounded OTLP -> OpenTelemetry Collector
 ```
 
 The operator CLI asks the Kubernetes API server for an authorized port-forward, then calls the
 owning service's private gRPC contract directly with the selected kubeconfig client certificate.
-Tenant-facing requests enter through `edged`; an authenticated product backend App calls the same
-owning-service operations. Changing the client surface never changes record ownership or semantics.
-
-Public authentication enters through `authd`. All identity records, Sessions, and internal
-invocation-token issuance remain behind private `identityd`.
+`authd` and `edged` are reserved public boundaries. Their ownership does not
+imply a route; public routes exist only in checked versioned HTTP contracts.
+Changing the client surface never changes record ownership or semantics.
 
 `execd` is the sole CtlFlow owner of general Placement realization and workload execution. Other
 services own domain intent and call `execd`. The only narrow Kubernetes write exception is
@@ -78,10 +68,10 @@ virtual principal, a Job, persistent state, and product-owned activation rules.
 | Caller | Surface |
 | --- | --- |
 | Infrastructure operator | `ctlflow`, authenticated by a certificate-backed kubeconfig |
-| Human signing in or out | `authd`, backed by private `identityd` |
-| Tenant administrator or user | Product-provided UI or API through `edged` |
-| Browser, webhook, or external API client | `edged` |
-| Application component or Run | Direct authenticated service bindings and `egressd` |
+| Human signing in or out | Routes explicitly declared by `authd` |
+| Tenant administrator or user | Product surface backed by approved owner operations |
+| Browser, webhook, or external API client | Routes explicitly declared by `edged` |
+| Application component or Run | Explicitly declared private bindings |
 | Cluster operator | `kubectl` for Kubernetes implementation and diagnostics |
 
 ## Core laws
@@ -100,12 +90,11 @@ virtual principal, a Job, persistent state, and product-owned activation rules.
 8. Configuration and secrets are separate data classes even though `configd` owns both. Secret
    material has no general read operation.
 9. Provider-specific dependency behavior belongs to installed Kubernetes controllers or service
-   Packages. The kernel understands only a generic claim and binding contract.
+   Packages, not a kernel service.
 10. CtlFlow-managed external HTTP crosses `egressd`. Provider-specific protocols remain outside
     the kernel.
 11. Application data and object authorization remain with the application that owns the object.
-12. Collections, logs, and evidence are bounded and paginated; bulk bytes use purpose-bound
-    transfer paths.
+12. Every approved collection is bounded and paginated.
 13. OpenTelemetry is the sole operational telemetry model. It is bounded and non-authoritative;
     required security and mutation evidence remains in `auditd`.
 

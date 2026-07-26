@@ -1,0 +1,17 @@
+{
+  "extends": "../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../../.generated/testing/stub/node",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "generated/**/*.ts",
+    "src/**/*.ts"
+  ]
+}

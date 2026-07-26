@@ -3,238 +3,130 @@ title: Access
 weight: 15
 ---
 
-CtlFlow distinguishes infrastructure operators, Tenant accounts, virtual principals, concrete
-runtime principals, and external callers. None can be substituted for another.
+CtlFlow distinguishes infrastructure operators, Kubernetes workloads,
+invocation Actors, attached accounts, and external callers. One identity class
+never substitutes for another.
 
-## Infrastructure operators
+## Infrastructure operator
 
-`ctlflow` loads a certificate-backed kubeconfig and asks the selected Kubernetes API server for an
-authorized port-forward to the owning private service. It then speaks end-to-end TLS and gRPC
-through that tunnel, presenting the selected kubeconfig client certificate to the service.
-Kubernetes carries bytes after authorizing the tunnel; it does not translate or own the domain API.
-
-```text
- ctlflow --context CLUSTER
-          |
-          | kubeconfig authentication
-          v
- Kubernetes API server
-          |
-          | authorized byte tunnel
-          v
- owning CtlFlow service
-          ^
-          | kubeconfig client certificate
-          +---------------- ctlflow
-```
-
-`ctlflow init` is the sole pre-kernel path. It applies signed CtlFlow manifests and waits for the
-kernel. Initialization is idempotent. Infrastructure-operator admission remains installation
-configuration enforced by Kubernetes RBAC and each owning service; it is not a CtlFlow domain
-record.
-
-Routine operator access requires both authorization to create the Kubernetes port-forward and an
-exact admitted Kubernetes certificate subject at the owning service. The service validates the
-certificate chain against the installation-provisioned Kubernetes client CA. The certificate's
-single common name is the authenticated Kubernetes subject and the Actor preserved in audit
-evidence. A missing, untrusted, expired, multiply named, or unadmitted certificate fails closed.
-
-The operator contract admits certificate-backed kubeconfig identities only. A context that cannot
-provide a client certificate and private key cannot make an operator domain call. CtlFlow has no
-operator password database, active-Tenant login, reusable bootstrap token, alternate bearer-token
-operator path, or caller-asserted subject header. The operator subject is not converted into an
-`identityd` User or virtual principal.
-
-## Accounts
-
-`identityd` owns human and service Users. Human and ordinary service Users belong to one Tenant. A
-global service User belongs to the installation, cannot sign in, and can bound only global
-workloads. A Membership gives a Tenant User standing in one Tenant or Workspace and may carry the
-built-in CtlFlow management role `admin` or `member`. Product roles, teams, committees, and
-audiences are Groups rather than management roles.
-
-Tenant login is Tenant-scoped. Public login, callback, logout, cookie, origin, and browser-protocol
-handling belongs only to `authd`. Private identity, provider, admission, Session, and token
-operations belong only to `identityd`. A login started from a Workspace returns there, but current
-Workspace Membership and admission policy still determine access. A Workspace may narrow its
-Tenant's enabled identity providers and cannot add another provider.
-
-Human browser Sessions are opaque secure cookies. Service Users cannot use SSO or hold browser
-Sessions. The cookie is accepted only by `authd` and `edged`; it never enters an application or
-another kernel service.
+`ctlflow` uses a certificate-backed kubeconfig to request an authorized
+port-forward from the Kubernetes API, then presents that same client
+certificate end to end to the owning gRPC service.
 
 ```text
- browser ---- authentication HTTP ----> authd ---- private login operations ----> identityd
-    |
-    | opaque Session cookie
-    v
-  edged ---- private Session exchange ----> identityd
-    |
-    | short-lived invocation JWT
-    v
- product or domain App runtime proxy
+ctlflow -> Kubernetes API authorized tunnel -> owning service
+   \______________________________________________/
+               client certificate
 ```
 
-`identityd` derives the User, Actor, Tenant, optional Workspace, and optional Run from current
-records. It never signs caller-supplied identity fields. The browser never receives the internal
-invocation JWT.
+The service validates the chain against the installation Kubernetes client CA
+and admits an exact finite certificate subject. A request field or metadata
+header cannot name or replace that subject.
+
+There is no operator password database, reusable bootstrap bearer, active
+Tenant login, or automatic conversion into an Identityd User.
+
+## Workload identity
+
+Each kernel or application workload has one Kubernetes ServiceAccount.
+Kubernetes projects a bound, rotating token to the trusted process boundary.
+The receiver validates issuer, signature, installation audience, expiry,
+binding, namespace, and exact ServiceAccount subject.
+
+```text
+authorization: Bearer <bound workload token>
+```
+
+Reachability or a valid token does not admit an operation. Every operation has
+an exact finite caller set.
 
 ## Invocation identity
 
-An invocation JWT is an asymmetrically signed, short-lived internal identity assertion. It contains:
+An invocation JWT is a short-lived internal identity assertion used when a
+call acts on behalf of a User or virtual principal. Its maximum lifetime is 60
+seconds.
 
 ```text
-iss             identityd issuer for this installation
-aud             installation-scoped internal audience
-sub             canonical subject-account principal
-act.sub         canonical actual Actor principal when it differs from sub
-tenant_id       absent only for admitted global work
-workspace_id    present only for Workspace context
-session_id      present for browser-derived invocation
-run_id          present for Run-derived invocation
-iat, nbf, exp   issued, not-before, and expiry times
-jti             unique invocation-token ID
+iss             installation Identityd issuer
+aud             installation internal audience
+sub             attached or direct subject account
+act.sub         distinct virtual Actor when present
+tenant_id       target Tenant fence
+workspace_id    optional narrower Workspace fence
+session_id      browser-derived origin, mutually exclusive with run_id
+run_id          finite-execution origin, mutually exclusive with session_id
+iat, nbf, exp   bounded times
+jti             unique token ID
 ```
 
-Tenant and Workspace IDs in an invocation use
-`[a-z0-9][a-z0-9_-]{0,63}`. Session, Run, and invocation-token IDs use
-`[a-z0-9][a-z0-9._~-]{0,127}`. These are opaque identifiers despite their canonical transport
-grammar. A Workspace context always includes its parent Tenant. Exactly one of `session_id` and
-`run_id` is present. A Session invocation has no separate Actor; a Run invocation has exactly one
-`act.sub` virtual principal distinct from the attached account in `sub`.
-
-For a direct human action, `act` is absent and Actor is `sub`. For a Job, including one presented by
-a product as an agent, `sub` names the attached User and `act` is an object containing only the
-virtual principal's `sub`. Nested actor chains are rejected. Session and Run are mutually exclusive
-origins. The token contains no role, grant, resolved endpoint, permission snapshot, trace context,
-or Kubernetes identity.
-
-Invocation tokens expire no later than 60 seconds after issuance. They have no refresh-token form,
-are never persisted as Job credentials, and are never returned in logs, evidence, errors, or
-telemetry. A delayed Run obtains a fresh token from its admitted runtime context when execution
-starts.
-
-`identityd` publishes a bounded private verification-key set. Receivers cache it for the supplied
-finite lifetime and validate token signature, key ID, issuer, installation audience, not-before,
-expiry, subject, Actor, and scope locally. Signing material never leaves `identityd`.
-
-Revoking a Session, disabling an account, or removing standing blocks new tokens immediately.
-Already issued tokens remain bounded by the 60-second maximum; there is no second distributed
-revocation check on every domain call.
-
-## Management boundaries
-
-| Caller | Maximum management boundary |
-| --- | --- |
-| Infrastructure operator | Every CtlFlow record in the selected installation |
-| Tenant administrator | Tenant-owned records in one Tenant |
-| Workspace administrator | Workspace-owned records within Tenant limits |
-| Ordinary User | That User's permitted private Apps, Jobs, Runs, configuration, and evidence |
-| Tenant service User | Explicit delegated runtime operations; no browser administration |
-| Global service User | Explicit global workload delegation; no Tenant or browser standing |
-
-Every owner enforces its own boundary after authentication. Lists, watches, logs, errors, and
-evidence use the same visibility fence as direct reads. An invisible record is reported as not
-found.
-
-## Delegated workload identity
-
-Every App component and Job has a stable virtual principal attached to one existing User valid for
-the target Placement. Global work requires a global service User. Tenant and Workspace work
-requires current standing in that boundary. A private user Placement requires its exact owning
-User. An administrator creating shared automation selects an existing admitted human or service
-User explicitly.
-
-Every App component or Job attempt receives a workload-scoped Kubernetes ServiceAccount. Kubernetes
-projects a bound, rotating token only into its trusted runtime proxy. Application containers never
-receive a Kubernetes token. Each concrete Pod/process also has a distinct runtime principal.
-Replacing a Pod changes the bound token and runtime facts without changing the virtual principal,
-attached account, or declared workload identity.
-
-The effective authority is always the intersection documented in [Model](../model/). Placement,
-network reachability, Package installation, or administrator authorship never grants application
-authority by itself.
-
-## Internal calls
-
-Every internal HTTP or gRPC call carries:
+The token contains no Role, capability, grant, endpoint, Kubernetes identity,
+trace context, or permission snapshot. Nested Actor chains are rejected.
+Signing material never leaves Identityd.
 
 ```text
-authorization: Bearer <bound Kubernetes ServiceAccount token>
-ctlflow-invocation: Bearer <identityd invocation JWT>   optional
-traceparent: <W3C trace context>
-tracestate: <W3C vendor state>                         optional
+ctlflow-invocation: Bearer <invocation JWT>
 ```
 
-The workload token establishes the immediate service, App component, or Run. The invocation JWT
-establishes the subject account and Actor on whose behalf the call proceeds. The receiver validates
-both independently, checks that the workload may call the operation, and evaluates current domain
-authorization. Reachability and a valid user token never grant an operation by themselves.
+Every receiving service validates the token independently. A known public key
+in a current bounded cache may remain usable during an Identityd outage;
+unknown keys or expired caches fail closed.
 
-One invocation JWT propagates unchanged through its short lifetime. It uses the installation's
-internal audience rather than an endpoint audience. Immediate-caller identity changes at every hop
-through the workload token, so forwarding the invocation JWT does not hide which service made the
-call and does not require an `identityd` exchange on every dependency.
+## Capability path
 
-After a Session or Run establishes an invocation, every downstream call made on its behalf must
-carry that JWT. A service cannot silently drop it and continue under broader service authority,
-replace its Actor, or convert an autonomous call into a human action.
+A protected product operation requires:
 
 ```text
- edged
-   | workload: service:edged
-   | invocation: subject=user:maya, actor=user:maya
-   v
- App A runtime proxy
-   | workload: app:app-a/component:api
-   | same invocation JWT
-   v
- App B runtime proxy
+admitted immediate workload
+AND valid invocation identity
+AND target inside the invocation fence
+AND policyd allow for the exact operation and path
+AND owning-service Domain invariants
 ```
 
-Each runtime proxy removes caller-supplied protected context before injecting its verified
-projection into the private application listener. Application code selects only a declared
-dependency. It cannot select another Tenant, Placement, workload identity, or attached account.
+The owner constructs operation and path from validated domain values and
+forwards the unchanged invocation JWT to Policyd. Policyd independently
+validates it and loads current Identityd standing and Group facts.
 
-An autonomous call has no invocation JWT and acts only as its authenticated workload and virtual
-principal. Raw TCP bindings carry workload identity only because they have no standard portable
-per-request invocation envelope.
+Membership proves standing only. It contains no Role or administrator flag.
+A virtual Actor is allowed only when both the virtual principal and its one
+immutable attached account have matching authority.
 
-## Runtime and proxy credentials
+## Autonomous path
 
-Tenant application code has no Kubernetes API authority. It cannot create Pods, read Secrets, mount
-volumes, or inspect another namespace.
+An explicitly admitted kernel lookup may omit the invocation JWT. It acts only
+as its authenticated workload and receives only that operation's fixed
+authority. It cannot be converted into an operator or capability call.
 
-Some standard clients require credential-shaped configuration. `identityd` may mint a short-lived,
-process-bound proxy credential that identifies one runtime and one dependency to a trusted proxy.
-It is not an upstream credential, cannot be used from another runtime, and grants no ambient access.
+Autonomous, capability, and operator caller sets are disjoint.
 
-`egressd` ignores caller-supplied upstream authentication and applies only the credential selected by
-the admitted destination policy. Secret material comes from `configd` and never enters domain
-records, evidence, or error text.
+## Internal call metadata
 
-## Kernel service identity
+Every private call carries:
 
-Each kernel service has its own Kubernetes ServiceAccount and bound token. A receiver validates the
-Kubernetes issuer, signature, installation audience, expiry, bound workload, namespace, and exact
-ServiceAccount subject, then admits only named callers for each operation. The installation
-declares a finite maximum token lifetime; runtimes request no more than that lifetime and receivers
-reject tokens whose issued-to-expiry interval exceeds it.
+```text
+authorization
+ctlflow-invocation   when acting on behalf of an Actor
+traceparent
+tracestate           optional
+```
 
-Validation uses the installation's bounded local verification-key cache rather than a TokenReview
-call on every request. Workload suspension, replacement, or deletion blocks new tokens; the maximum
-accepted lifetime bounds the consequence of an already issued token.
+Calls have finite deadlines and propagate cancellation. Protected identity
+headers from an untrusted caller are stripped before a trusted boundary adds
+validated context.
 
-There is no shared daemon credential, caller-asserted service header, or unauthenticated internal
-domain listener. Public TLS belongs to Kubernetes ingress. Private gRPC server TLS identity is
-installation-provisioned. It authenticates the server; an admitted kubeconfig client certificate
-authenticates an operator, while a bound workload token authenticates an internal caller.
+## Public boundary
 
-## Exposure boundary
+`authd` is reserved for public authentication protocol traffic. `edged` is
+reserved for general public application traffic. Every other kernel daemon is
+private.
 
-`edged` and `authd` are the only public kernel daemons. `edged` accepts general external application
-traffic; `authd` accepts authentication protocol traffic. Every other kernel daemon has only a
-private Kubernetes Service and no Ingress, external load balancer, NodePort, or public domain API.
+This boundary assignment does not imply any route. Public routes exist only in
+their owner's checked versioned HTTP contract.
 
-A public daemon may expose private liveness and readiness endpoints for Kubernetes operation, but
-it cannot combine its public protocol with another service's private domain API.
+## Failure and evidence
+
+Authentication, admission, target fencing, authorization, and dependency
+failure are fail-closed. Invisible targets are not found.
+
+Required security or mutation evidence uses the approved Auditd contract.
+OpenTelemetry is bounded operational evidence and cannot replace audit.

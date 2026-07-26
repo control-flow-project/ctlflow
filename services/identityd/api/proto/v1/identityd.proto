@@ -10,6 +10,10 @@ service IdentityService {
   rpc GetInvocationVerificationKeys(
       GetInvocationVerificationKeysRequest)
       returns (GetInvocationVerificationKeysResponse);
+  rpc ResolvePrincipal(ResolvePrincipalRequest)
+      returns (ResolvePrincipalResponse);
+  rpc ListPrincipalGroups(ListPrincipalGroupsRequest)
+      returns (ListPrincipalGroupsResponse);
 }
 
 message GetInvocationVerificationKeysRequest {}
@@ -24,4 +28,41 @@ message InvocationVerificationKey {
   string algorithm = 2;
   string modulus_base64url = 3;
   string exponent_base64url = 4;
+}
+
+message ResolvePrincipalRequest {
+  string principal_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+}
+
+message ResolvePrincipalResponse {
+  string principal_id = 1;
+  PrincipalKind principal_kind = 2;
+  bool principal_enabled = 3;
+  uint64 principal_revision = 4;
+  string subject_account_id = 5;
+  bool subject_account_enabled = 6;
+  uint64 subject_account_revision = 7;
+  uint64 membership_revision = 8;
+}
+
+message ListPrincipalGroupsRequest {
+  string principal_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+  uint32 page_size = 4;
+  optional string after_group_id = 5;
+}
+
+message ListPrincipalGroupsResponse {
+  repeated string group_ids = 1;
+  optional string next_after_group_id = 2;
+}
+
+enum PrincipalKind {
+  PRINCIPAL_KIND_UNSPECIFIED = 0;
+  PRINCIPAL_KIND_HUMAN = 1;
+  PRINCIPAL_KIND_SERVICE = 2;
+  PRINCIPAL_KIND_VIRTUAL = 3;
 }

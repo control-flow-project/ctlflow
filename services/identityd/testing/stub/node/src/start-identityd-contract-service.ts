@@ -23,11 +23,11 @@ import type {
   IdentitydRequestEvidence
 } from "./identityd-request-evidence.js";
 import type {
+  IdentitydSourceConfiguration
+} from "./identityd-source-configuration.js";
+import type {
   IdentitydTestSource
 } from "./identityd-test-source.js";
-import type {
-  InvocationVerificationKeyResponse
-} from "./invocation-verification-key.js";
 import {
   requestIdentitydControl
 } from "./request-identityd-control.js";
@@ -106,11 +106,10 @@ export async function startIdentitydContractService(
     endpoint: service.endpoint,
     certificateAuthorityPath: tls.certificateAuthorityPath,
     serverName: tls.serverName,
-    createSource: async (callerSubject, response) =>
+    createSource: async (configuration) =>
       await createSource(
         service.controlEndpoint,
-        callerSubject,
-        response),
+        configuration),
     stop: async () => {
       if (stopped) {
         return;
@@ -123,8 +122,7 @@ export async function startIdentitydContractService(
 
 async function createSource(
   controlEndpoint: string,
-  callerSubject: string,
-  response: InvocationVerificationKeyResponse
+  configuration: IdentitydSourceConfiguration
 ): Promise<IdentitydTestSource> {
   const sourceId =
     `source_${randomUUID().replaceAll("-", "")}`;
@@ -135,8 +133,7 @@ async function createSource(
       method: "POST",
       body: {
         sourceId,
-        callerSubject,
-        response
+        ...configuration
       }
     });
 
@@ -152,13 +149,22 @@ async function createSource(
           body: { mode }
         });
     },
-    setResponse: async (nextResponse) => {
+    setVerificationKeys: async (nextResponse) => {
       await requestIdentitydControl<void>(
         controlEndpoint,
-        `/sources/${sourceId}/response`,
+        `/sources/${sourceId}/verification-keys`,
         {
           method: "PUT",
           body: nextResponse
+        });
+    },
+    setPrincipalFacts: async (facts) => {
+      await requestIdentitydControl<void>(
+        controlEndpoint,
+        `/sources/${sourceId}/principal-facts`,
+        {
+          method: "PUT",
+          body: facts
         });
     },
     readRequests: async () =>

@@ -48,7 +48,7 @@ test("an unknown invocation key refreshes through identityd", async () => {
     "rotated-key");
   const baseline =
     (await context.identityd.readRequests()).length;
-  await context.identityd.setResponse(
+  await context.identityd.setVerificationKeys(
     keyResponse(rotated.verificationKey));
   try {
     const resolved = await resolveWithInvocation(
@@ -61,7 +61,7 @@ test("an unknown invocation key refreshes through identityd", async () => {
       (await context.identityd.readRequests()).length,
       baseline + 1);
   } finally {
-    await context.identityd.setResponse(
+    await context.identityd.setVerificationKeys(
       keyResponse(
         context.invocation.verificationKey));
   }
@@ -151,13 +151,13 @@ test("malformed identityd key responses fail unavailable", async () => {
 
   try {
     for (const response of responses) {
-      await context.identityd.setResponse(response);
+      await context.identityd.setVerificationKeys(response);
       await assert.rejects(
         resolveWithInvocation(token),
         matchGrpcStatus(status.UNAVAILABLE));
     }
   } finally {
-    await context.identityd.setResponse(
+    await context.identityd.setVerificationKeys(
       keyResponse(
         context.invocation.verificationKey));
   }

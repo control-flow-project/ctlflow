@@ -35,15 +35,16 @@ installation's Kubernetes client CA and admits the exact certificate subject.
 That subject authenticates the operator call and is retained for audit
 evidence. A request body or metadata header cannot name or replace it.
 
-This is the only operator transport currently specified. There is no implied
+This is the operator transport. There is no implied
 Kubernetes aggregated API, CRD, HTTP mirror, gateway, or second administrative
 contract.
 
 ## Public HTTP
 
-Browser authentication uses the public HTTP contract owned by `authd`.
-Application and product traffic enters through `edged`. Neither surface
-creates an alternate kernel record shape.
+`authd` is the owner reserved for browser authentication HTTP. `edged` is the
+owner reserved for application and product HTTP. A route exists only when it
+appears in that owner's checked versioned HTTP contract; neither ownership
+boundary implies a route or alternate kernel record shape.
 
 ```text
  browser -> authd
@@ -98,6 +99,53 @@ ResolveWorkspace
 The complete messages and behavior are defined by
 [tenantd](../tenantd/) and its owned protobuf contract. It has no HTTP,
 Kubernetes-resource, watch, or streaming surface.
+
+## Approved tenant authorization dependencies
+
+The capability path used by `tenantd` requires exactly these `identityd`
+operations:
+
+```text
+GetInvocationVerificationKeys
+ResolvePrincipal
+ListPrincipalGroups
+```
+
+`GetInvocationVerificationKeys` returns the bounded active and retiring public
+verification keys. `ResolvePrincipal` returns current principal, attached
+account, and exact target-standing facts. `ListPrincipalGroups` returns a
+bounded page of current direct Group IDs at that same target. Neither fact
+operation returns Roles, grants, or an access decision.
+
+`policyd` exposes exactly this decision operation:
+
+```text
+CheckAccess
+```
+
+It receives one declared operation token, canonical resource path, target
+Tenant ID, and optional target Workspace ID. It returns the closed decision
+`allow` or `deny`. Actor and subject account come only from the independently
+validated invocation JWT; immediate caller comes only from authenticated
+workload transport.
+
+The complete behavior and status mapping are defined by
+[identityd](../identityd/) and [policyd](../policyd/). These are private unary
+gRPC operations. There is no HTTP mirror, watch, stream, explain operation,
+path-builder operation, or reusable decision credential.
+
+## Approved audit dependency
+
+`auditd` exposes exactly:
+
+```text
+RecordAuditBatch
+```
+
+It accepts a bounded batch of typed source events and returns one acceptance
+per event. The admitted detail is Tenant or Workspace mutation
+evidence. There is no query, export, watch, stream, redaction, deletion, or
+Kubernetes-resource API.
 
 ## Collections
 

@@ -1,4 +1,5 @@
 using CtlFlow.Audit.V1;
+using CtlFlow.Policy.V1;
 using CtlFlow.Tenancy.Tenantd.Db.Providers;
 using CtlFlow.Tenancy.Tenantd.Service.Configuration;
 using CtlFlow.Tenancy.Tenantd.Service.Security;
@@ -16,10 +17,13 @@ internal sealed partial class TenantGrpcService(
     ServiceSettings settings,
     TokenAuthorities tokenAuthorities,
     AuditService.AuditServiceClient auditClient,
+    PolicyService.PolicyServiceClient policyClient,
     TenantdTelemetry telemetry)
     : TenantService.TenantServiceBase
 {
     private readonly AuditService.AuditServiceClient _auditClient = auditClient;
+    private readonly PolicyService.PolicyServiceClient _policyClient =
+        policyClient;
     private readonly TenantDatabase _tenantDatabase = tenantDatabase;
     private readonly ServiceSettings _settings = settings;
     private readonly TenantdTelemetry _telemetry = telemetry;
@@ -45,6 +49,37 @@ internal sealed partial class TenantGrpcService(
             context,
             _settings.GetWorkspaceCallers);
 
+    private ValueTask<TenantRequestIdentity> AuthenticateTenantUpdate(
+        ServerCallContext context) =>
+        AuthenticateOperatorOrWorkload(
+            context,
+            _settings.UpdateTenantCallers);
+
+    private ValueTask<TenantRequestIdentity> AuthenticateWorkspaceCreation(
+        ServerCallContext context) =>
+        AuthenticateOperatorOrWorkload(
+            context,
+            _settings.CreateWorkspaceCallers);
+
+    private ValueTask<TenantRequestIdentity> AuthenticateWorkspaceList(
+        ServerCallContext context) =>
+        AuthenticateOperatorOrWorkload(
+            context,
+            _settings.ListWorkspaceCallers);
+
+    private ValueTask<TenantRequestIdentity> AuthenticateWorkspaceUpdate(
+        ServerCallContext context) =>
+        AuthenticateOperatorOrWorkload(
+            context,
+            _settings.UpdateWorkspaceCallers);
+
+    private ValueTask<TenantRequestIdentity>
+        AuthenticateWorkspaceStateChange(
+            ServerCallContext context) =>
+        AuthenticateOperatorOrWorkload(
+            context,
+            _settings.SetWorkspaceStateCallers);
+
     private ValueTask<TenantRequestIdentity> AuthenticateTenantResolution(
         ServerCallContext context) =>
         AuthenticateOperatorOrWorkload(
@@ -59,14 +94,15 @@ internal sealed partial class TenantGrpcService(
 
     private ValueTask<TenantRequestIdentity> AuthenticateOperatorOrWorkload(
         ServerCallContext context,
-        IReadOnlySet<KubernetesServiceAccountSubject> allowedWorkloads)
+        OperationCallerSettings callers)
     {
         return context.GetHttpContext().Connection.ClientCertificate is not null
             ? AuthenticateOperatorRequest(context, _settings.OperatorSubjects)
             : AuthenticateWorkloadRequest(
                 context.RequestHeaders,
                 _tokenAuthorities,
-                allowedWorkloads,
+                callers.AutonomousCallers,
+                callers.CapabilityCallers,
                 DateTimeOffset.UtcNow,
                 context.CancellationToken);
     }

@@ -37,6 +37,7 @@ internal static partial class OperatorAuthentication
 
         return new TenantRequestIdentity(
             new AuthenticatedTenantCaller.Operator(subject),
-            null);
+            null,
+            TenantAdmission.Operator);
     }
 }

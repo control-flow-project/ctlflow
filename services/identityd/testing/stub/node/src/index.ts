@@ -14,6 +14,13 @@ export type {
   InvocationVerificationKey,
   InvocationVerificationKeyResponse
 } from "./invocation-verification-key.js";
+export type {
+  IdentitydSourceConfiguration
+} from "./identityd-source-configuration.js";
+export type {
+  PrincipalAuthorizationFacts,
+  PrincipalAuthorizationKind
+} from "./principal-authorization-facts.js";
 export {
   startIdentitydContractService
 } from "./start-identityd-contract-service.js";

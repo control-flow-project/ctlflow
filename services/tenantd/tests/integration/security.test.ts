@@ -7,7 +7,6 @@ import {
 import {
   ResourceState,
   type ListTenantsResponse,
-  type ListWorkspacesResponse,
   type ResolveTenantResponse,
   type ResolveWorkspaceResponse,
   type Tenant,
@@ -391,60 +390,11 @@ function createOperatorOnlyRpcCalls(
         client.listTenants({ pageSize: 0 }, metadata, done))
     },
     {
-      name: "UpdateTenant",
-      request: () => callUnary<Tenant>((done) =>
-        client.updateTenant(
-          { tenantId: "", expectedRevision: 0n, displayName: "" },
-          metadata,
-          done))
-    },
-    {
       name: "SetTenantState",
       request: () => callUnary<Tenant>((done) =>
         client.setTenantState(
           {
             tenantId: "",
-            expectedRevision: 0n,
-            state: ResourceState.RESOURCE_STATE_UNSPECIFIED
-          },
-          metadata,
-          done))
-    },
-    {
-      name: "CreateWorkspace",
-      request: () => callUnary<Workspace>((done) =>
-        client.createWorkspace(
-          {
-            workspaceId: "",
-            tenantId: "",
-            address: "",
-            displayName: ""
-          },
-          metadata,
-          done))
-    },
-    {
-      name: "ListWorkspaces",
-      request: () => callUnary<ListWorkspacesResponse>((done) =>
-        client.listWorkspaces(
-          { tenantId: "", pageSize: 0 },
-          metadata,
-          done))
-    },
-    {
-      name: "UpdateWorkspace",
-      request: () => callUnary<Workspace>((done) =>
-        client.updateWorkspace(
-          { workspaceId: "", expectedRevision: 0n, displayName: "" },
-          metadata,
-          done))
-    },
-    {
-      name: "SetWorkspaceState",
-      request: () => callUnary<Workspace>((done) =>
-        client.setWorkspaceState(
-          {
-            workspaceId: "",
             expectedRevision: 0n,
             state: ResourceState.RESOURCE_STATE_UNSPECIFIED
           },

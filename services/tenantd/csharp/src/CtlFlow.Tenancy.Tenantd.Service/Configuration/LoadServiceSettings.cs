@@ -13,6 +13,7 @@ internal static partial class TenantdConfiguration
     private const int DefaultDatabasePoolSize = 16;
     private const int DefaultAuditCallTimeoutMilliseconds = 2_000;
     private const int DefaultIdentityCallTimeoutMilliseconds = 2_000;
+    private const int DefaultPolicyCallTimeoutMilliseconds = 2_000;
     private const int DefaultWorkloadTokenLifetimeSeconds = 3_600;
     private const int DefaultInvocationTokenLifetimeSeconds = 60;
     private static readonly TimeSpan KeyCacheLifetime = TimeSpan.FromSeconds(30);
@@ -47,8 +48,61 @@ internal static partial class TenantdConfiguration
         var identityEndpoint = ParsePrivateOrigin(
             "CTLFLOW_IDENTITY_URL",
             RequireEnvironment("CTLFLOW_IDENTITY_URL"));
+        var policyEndpoint = ParsePrivateOrigin(
+            "CTLFLOW_POLICY_URL",
+            RequireEnvironment("CTLFLOW_POLICY_URL"));
         var workloadTokenFile =
             RequireAbsoluteFile("CTLFLOW_WORKLOAD_TOKEN_FILE");
+        var getTenantCallers = CreateOperationCallerSettings(
+            ParseRequiredCallers(
+                "CTLFLOW_GET_TENANT_AUTONOMOUS_CALLERS"),
+            ParseOptionalCallers(
+                "CTLFLOW_GET_TENANT_CAPABILITY_CALLERS"));
+        var updateTenantCallers = CreateOperationCallerSettings(
+            EmptyCallers(),
+            ParseOptionalCallers(
+                "CTLFLOW_UPDATE_TENANT_CAPABILITY_CALLERS"));
+        var createWorkspaceCallers = CreateOperationCallerSettings(
+            EmptyCallers(),
+            ParseOptionalCallers(
+                "CTLFLOW_CREATE_WORKSPACE_CAPABILITY_CALLERS"));
+        var getWorkspaceCallers = CreateOperationCallerSettings(
+            ParseRequiredCallers(
+                "CTLFLOW_GET_WORKSPACE_AUTONOMOUS_CALLERS"),
+            ParseOptionalCallers(
+                "CTLFLOW_GET_WORKSPACE_CAPABILITY_CALLERS"));
+        var listWorkspaceCallers = CreateOperationCallerSettings(
+            EmptyCallers(),
+            ParseOptionalCallers(
+                "CTLFLOW_LIST_WORKSPACES_CAPABILITY_CALLERS"));
+        var updateWorkspaceCallers = CreateOperationCallerSettings(
+            EmptyCallers(),
+            ParseOptionalCallers(
+                "CTLFLOW_UPDATE_WORKSPACE_CAPABILITY_CALLERS"));
+        var setWorkspaceStateCallers = CreateOperationCallerSettings(
+            EmptyCallers(),
+            ParseOptionalCallers(
+                "CTLFLOW_SET_WORKSPACE_STATE_CAPABILITY_CALLERS"));
+        var resolveTenantCallers = CreateOperationCallerSettings(
+            ParseRequiredCallers(
+                "CTLFLOW_RESOLVE_TENANT_AUTONOMOUS_CALLERS"),
+            EmptyCallers());
+        var resolveWorkspaceCallers = CreateOperationCallerSettings(
+            ParseRequiredCallers(
+                "CTLFLOW_RESOLVE_WORKSPACE_AUTONOMOUS_CALLERS"),
+            EmptyCallers());
+        EnsureAdmissionPathsAreDisjoint(
+            [
+                getTenantCallers,
+                updateTenantCallers,
+                createWorkspaceCallers,
+                getWorkspaceCallers,
+                listWorkspaceCallers,
+                updateWorkspaceCallers,
+                setWorkspaceStateCallers,
+                resolveTenantCallers,
+                resolveWorkspaceCallers
+            ]);
 
         return new ServiceSettings(
             IPAddress.Parse(grpcUri.Host),
@@ -79,6 +133,15 @@ internal static partial class TenantdConfiguration
                 TimeSpan.FromMilliseconds(ReadPositiveInteger(
                     "CTLFLOW_IDENTITY_CALL_TIMEOUT_MILLISECONDS",
                     DefaultIdentityCallTimeoutMilliseconds))),
+            new PolicySettings(
+                new PrivateGrpcSettings(
+                    policyEndpoint,
+                    RequireDnsName("CTLFLOW_POLICY_TLS_SERVER_NAME"),
+                    RequireAbsoluteFile("CTLFLOW_POLICY_TLS_CA_PATH")),
+                workloadTokenFile,
+                TimeSpan.FromMilliseconds(ReadPositiveInteger(
+                    "CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS",
+                    DefaultPolicyCallTimeoutMilliseconds))),
             new WorkloadTokenSettings(
                 CreateTokenSettings(
                     "CTLFLOW_WORKLOAD",
@@ -89,10 +152,15 @@ internal static partial class TenantdConfiguration
                 "CTLFLOW_INVOCATION",
                 DefaultInvocationTokenLifetimeSeconds),
             ParseOperatorSubjects("CTLFLOW_OPERATOR_SUBJECTS"),
-            ParseCallers("CTLFLOW_GET_TENANT_CALLERS"),
-            ParseCallers("CTLFLOW_GET_WORKSPACE_CALLERS"),
-            ParseCallers("CTLFLOW_RESOLVE_TENANT_CALLERS"),
-            ParseCallers("CTLFLOW_RESOLVE_WORKSPACE_CALLERS"),
+            getTenantCallers,
+            updateTenantCallers,
+            createWorkspaceCallers,
+            getWorkspaceCallers,
+            listWorkspaceCallers,
+            updateWorkspaceCallers,
+            setWorkspaceStateCallers,
+            resolveTenantCallers,
+            resolveWorkspaceCallers,
             TelemetrySettings.Parse(
                 RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT")));
     }
@@ -157,18 +225,10 @@ internal static partial class TenantdConfiguration
             maximumLifetime);
     }
 
-    private static IReadOnlySet<KubernetesServiceAccountSubject> ParseCallers(
-        string name)
+    private static IReadOnlySet<KubernetesServiceAccountSubject>
+        ParseRequiredCallers(string name)
     {
-        var callers = new HashSet<KubernetesServiceAccountSubject>();
-        foreach (var item in RequireEnvironment(name).Split(
-                     ',',
-                     StringSplitOptions.TrimEntries
-                         | StringSplitOptions.RemoveEmptyEntries))
-        {
-            callers.Add(KubernetesServiceAccountSubject.Parse(item));
-        }
-
+        var callers = ParseCallers(name, RequireEnvironment(name));
         if (callers.Count == 0)
         {
             throw new InvalidOperationException(
@@ -176,6 +236,72 @@ internal static partial class TenantdConfiguration
         }
 
         return callers;
+    }
+
+    private static IReadOnlySet<KubernetesServiceAccountSubject>
+        ParseOptionalCallers(string name)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        return string.IsNullOrWhiteSpace(value)
+            ? EmptyCallers()
+            : ParseCallers(name, value);
+    }
+
+    private static IReadOnlySet<KubernetesServiceAccountSubject> ParseCallers(
+        string name,
+        string value)
+    {
+        var callers = new HashSet<KubernetesServiceAccountSubject>();
+        foreach (var item in value.Split(
+                     ',',
+                     StringSplitOptions.TrimEntries
+                         | StringSplitOptions.RemoveEmptyEntries))
+        {
+            callers.Add(KubernetesServiceAccountSubject.Parse(item));
+        }
+
+        return callers;
+    }
+
+    private static OperationCallerSettings CreateOperationCallerSettings(
+        IReadOnlySet<KubernetesServiceAccountSubject> autonomousCallers,
+        IReadOnlySet<KubernetesServiceAccountSubject> capabilityCallers)
+    {
+        if (autonomousCallers.Overlaps(capabilityCallers))
+        {
+            throw new InvalidOperationException(
+                "An operation caller cannot use two admission paths");
+        }
+
+        return new OperationCallerSettings(
+            autonomousCallers,
+            capabilityCallers);
+    }
+
+    private static void EnsureAdmissionPathsAreDisjoint(
+        IReadOnlyList<OperationCallerSettings> operations)
+    {
+        var autonomous =
+            new HashSet<KubernetesServiceAccountSubject>();
+        var capability =
+            new HashSet<KubernetesServiceAccountSubject>();
+        foreach (var operation in operations)
+        {
+            autonomous.UnionWith(operation.AutonomousCallers);
+            capability.UnionWith(operation.CapabilityCallers);
+        }
+
+        if (autonomous.Overlaps(capability))
+        {
+            throw new InvalidOperationException(
+                "Autonomous and capability callers must be disjoint");
+        }
+    }
+
+    private static IReadOnlySet<KubernetesServiceAccountSubject>
+        EmptyCallers()
+    {
+        return new HashSet<KubernetesServiceAccountSubject>();
     }
 
     private static IReadOnlySet<KubernetesOperatorSubject>

@@ -29,7 +29,8 @@ export interface TestKubernetes {
   readonly api: TestKubernetesApiCredentials;
   readonly storage: TestKubernetesStorage;
   readonly createWorkloadCredentials:
-    () => Promise<TestWorkloadCredentials>;
+    (serviceAccountName?: string) =>
+      Promise<TestWorkloadCredentials>;
   readonly createOperatorCredentials:
     (subject: string) => Promise<TestOperatorCredentials>;
   readonly loadImage: (image: string) => Promise<void>;

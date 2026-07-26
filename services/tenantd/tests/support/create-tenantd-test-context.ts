@@ -15,6 +15,9 @@ import type {
 import type {
   IdentitydTestSource
 } from "@ctlflow/identityd/testing/stub";
+import type {
+  PolicyTestSource
+} from "@ctlflow/policyd/testing/stub";
 import {
   TenantServiceClient
 } from "../generated/v1/tenantd.js";
@@ -45,10 +48,15 @@ const serviceName = "tenantd";
 
 export interface TenantdTestContext {
   readonly workload: TestWorkloadCredentials;
+  readonly capabilityWorkload: TestWorkloadCredentials;
+  readonly readOnlyCapabilityWorkload:
+    TestWorkloadCredentials;
   readonly collector: OpenTelemetryCollector;
   readonly invocation: InvocationAuthority;
   readonly auditd: AuditdTestSource;
   readonly identityd: IdentitydTestSource;
+  readonly policyIdentityd: IdentitydTestSource;
+  readonly policyd: PolicyTestSource;
   readonly database: TestDatabase;
   readonly service: TenantdRunningService;
   readonly client: TenantServiceClient;
@@ -67,6 +75,8 @@ Promise<TenantdTestContext> {
   let database: TestDatabase | undefined;
   let auditd: AuditdTestSource | undefined;
   let identityd: IdentitydTestSource | undefined;
+  let policyIdentityd: IdentitydTestSource | undefined;
+  let policyd: PolicyTestSource | undefined;
   let service: TenantdRunningService | undefined;
   const clients: TenantServiceClient[] = [];
 
@@ -75,6 +85,12 @@ Promise<TenantdTestContext> {
     await suite.collector.clearExports();
     const workload =
       await suite.kubernetes.createWorkloadCredentials();
+    const capabilityWorkload =
+      await suite.kubernetes.createWorkloadCredentials(
+        "product-backend");
+    const readOnlyCapabilityWorkload =
+      await suite.kubernetes.createWorkloadCredentials(
+        "tenant-reader-backend");
     const invocation = await createInvocationAuthority();
     database = await createTestDatabase(
       suite.kubernetes.storage);
@@ -83,13 +99,25 @@ Promise<TenantdTestContext> {
       + serviceName;
     auditd = await suite.auditd.createSource(
       serviceAccountSubject);
-    identityd = await suite.identityd.createSource(
-      serviceAccountSubject,
-      {
-        keys: [invocation.verificationKey],
-        expiresAt: new Date(
-          Date.now() + 4 * 60_000).toISOString()
-      });
+    const verificationKeys = {
+      keys: [invocation.verificationKey],
+      expiresAt: new Date(
+        Date.now() + 4 * 60_000).toISOString()
+    };
+    identityd = await suite.identityd.createSource({
+      callerSubject: serviceAccountSubject,
+      verificationKeys,
+      principalFacts: []
+    });
+    policyIdentityd = await suite.identityd.createSource({
+      callerSubject: suite.policyd.identityCallerSubject,
+      verificationKeys,
+      principalFacts: []
+    });
+    policyd = await suite.policyd.createSource({
+      callerSubject: serviceAccountSubject,
+      grants: []
+    });
     const files = await prepareTenantdContextFiles({
       repositoryRoot: suite.repositoryRoot,
       directory: database.directory,
@@ -97,18 +125,23 @@ Promise<TenantdTestContext> {
       workload,
       kubernetes: suite.kubernetes,
       auditd: suite.auditd,
-      identityd: suite.identityd
+      identityd: suite.identityd,
+      policyd: suite.policyd
     });
     const environment = createEnvironment(
       suite.collector,
       suite.auditd.endpoint,
       suite.identityd.endpoint,
+      suite.policyd.endpoint,
       database,
       workload,
+      capabilityWorkload,
+      readOnlyCapabilityWorkload,
       invocation,
       files,
       suite.auditd.serverName,
       suite.identityd.serverName,
+      suite.policyd.serverName,
       suite.kubernetes.api.clientSubject);
 
     service = await suite.runtime.start({
@@ -155,10 +188,14 @@ Promise<TenantdTestContext> {
     let stopped = false;
     return {
       workload,
+      capabilityWorkload,
+      readOnlyCapabilityWorkload,
       collector: suite.collector,
       invocation,
       auditd,
       identityd,
+      policyIdentityd,
+      policyd,
       database,
       service,
       client,
@@ -181,7 +218,9 @@ Promise<TenantdTestContext> {
           service,
           database,
           auditd,
-          identityd);
+          identityd,
+          policyIdentityd,
+          policyd);
       }
     };
   } catch (error) {
@@ -192,7 +231,9 @@ Promise<TenantdTestContext> {
       service,
       database,
       auditd,
-      identityd).catch(() => undefined);
+      identityd,
+      policyIdentityd,
+      policyd).catch(() => undefined);
     throw error;
   }
 }
@@ -201,12 +242,17 @@ function createEnvironment(
   collector: OpenTelemetryCollector,
   auditEndpoint: string,
   identityEndpoint: string,
+  policyEndpoint: string,
   database: TestDatabase,
   workload: TestWorkloadCredentials,
+  capabilityWorkload: TestWorkloadCredentials,
+  readOnlyCapabilityWorkload:
+    TestWorkloadCredentials,
   invocation: InvocationAuthority,
   files: TenantdContextFiles,
   auditServerName: string,
   identityServerName: string,
+  policyServerName: string,
   operatorSubject: string
 ): Readonly<Record<string, string>> {
   return {
@@ -234,6 +280,12 @@ function createEnvironment(
     CTLFLOW_IDENTITY_TLS_CA_PATH:
       files.identityCertificateAuthority,
     CTLFLOW_IDENTITY_CALL_TIMEOUT_MILLISECONDS: "500",
+    CTLFLOW_POLICY_URL: policyEndpoint,
+    CTLFLOW_POLICY_TLS_SERVER_NAME:
+      policyServerName,
+    CTLFLOW_POLICY_TLS_CA_PATH:
+      files.policyCertificateAuthority,
+    CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS: "500",
     CTLFLOW_WORKLOAD_TOKEN_ISSUER: workload.issuer,
     CTLFLOW_WORKLOAD_TOKEN_AUDIENCE: workload.audience,
     CTLFLOW_WORKLOAD_JWKS_PATH: files.workloadJwks,
@@ -242,13 +294,30 @@ function createEnvironment(
     CTLFLOW_INVOCATION_TOKEN_AUDIENCE: invocation.audience,
     CTLFLOW_INVOCATION_TOKEN_MAX_LIFETIME_SECONDS: "60",
     CTLFLOW_OPERATOR_SUBJECTS: operatorSubject,
-    CTLFLOW_GET_TENANT_CALLERS:
+    CTLFLOW_GET_TENANT_AUTONOMOUS_CALLERS:
       workload.callerSubject,
-    CTLFLOW_GET_WORKSPACE_CALLERS:
+    CTLFLOW_GET_TENANT_CAPABILITY_CALLERS:
+      [
+        capabilityWorkload.callerSubject,
+        readOnlyCapabilityWorkload.callerSubject
+      ].join(","),
+    CTLFLOW_UPDATE_TENANT_CAPABILITY_CALLERS:
+      capabilityWorkload.callerSubject,
+    CTLFLOW_CREATE_WORKSPACE_CAPABILITY_CALLERS:
+      capabilityWorkload.callerSubject,
+    CTLFLOW_GET_WORKSPACE_AUTONOMOUS_CALLERS:
       workload.callerSubject,
-    CTLFLOW_RESOLVE_TENANT_CALLERS:
+    CTLFLOW_GET_WORKSPACE_CAPABILITY_CALLERS:
+      capabilityWorkload.callerSubject,
+    CTLFLOW_LIST_WORKSPACES_CAPABILITY_CALLERS:
+      capabilityWorkload.callerSubject,
+    CTLFLOW_UPDATE_WORKSPACE_CAPABILITY_CALLERS:
+      capabilityWorkload.callerSubject,
+    CTLFLOW_SET_WORKSPACE_STATE_CAPABILITY_CALLERS:
+      capabilityWorkload.callerSubject,
+    CTLFLOW_RESOLVE_TENANT_AUTONOMOUS_CALLERS:
       workload.callerSubject,
-    CTLFLOW_RESOLVE_WORKSPACE_CALLERS:
+    CTLFLOW_RESOLVE_WORKSPACE_AUTONOMOUS_CALLERS:
       workload.callerSubject,
     OTEL_EXPORTER_OTLP_ENDPOINT: collector.endpoint
   };
@@ -265,12 +334,16 @@ async function stopResources(
   service: TenantdRunningService | undefined,
   database: TestDatabase | undefined,
   auditd: AuditdTestSource | undefined,
-  identityd: IdentitydTestSource | undefined
+  identityd: IdentitydTestSource | undefined,
+  policyIdentityd: IdentitydTestSource | undefined,
+  policyd: PolicyTestSource | undefined
 ): Promise<void> {
   let failure: unknown;
 
   for (const stop of [
     service?.stop,
+    policyd?.stop,
+    policyIdentityd?.stop,
     identityd?.stop,
     auditd?.stop,
     database?.stop

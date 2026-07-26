@@ -14,7 +14,7 @@
     "build": "hugo --gc --minify --cleanDestinationDir",
     "dev": "hugo server --bind 0.0.0.0 --port 7780 --disableFastRender",
     "setup:minikube": "node tooling/minikube/install-minikube.mjs",
-    "build:tenantd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/auditd && npm run build --workspace @ctlflow/identityd && npm run build --workspace @ctlflow/tenantd",
+    "build:tenantd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/auditd && npm run build --workspace @ctlflow/identityd && npm run build --workspace @ctlflow/policyd && npm run build --workspace @ctlflow/tenantd",
     "test:tenantd": "npm run build:tenantd && npm run test:compiled --workspace @ctlflow/tenantd && npm run test:csharp --workspace @ctlflow/tenantd",
     "test:tooling": "node --test tooling/native/*.test.mjs",
     "verify:container:tenantd": "docker build --network=host -f services/tenantd/csharp/Containerfile -t ctlflow-tenantd:verify .",

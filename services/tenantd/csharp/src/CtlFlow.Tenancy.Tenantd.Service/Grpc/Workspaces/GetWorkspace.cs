@@ -1,6 +1,8 @@
 using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 using CtlFlow.Tenancy.V1;
 using Grpc.Core;
+using static CtlFlow.Tenancy.Tenantd.Service.Authorization.TenantAuthorization;
+using CtlFlow.Tenancy.Tenantd.Service.Authorization;
 using static CtlFlow.Tenancy.Tenantd.Service.Grpc.Responses.TenancyResponses;
 using static CtlFlow.Tenancy.Tenantd.Service.Grpc.TenantGrpcErrors;
 using WorkspaceDatabase =
@@ -22,24 +24,23 @@ internal sealed partial class TenantGrpcService
             _tenantDatabase,
             workspaceId,
             context.CancellationToken);
-        if (result is WorkspaceLookupResult.Found located
-            && identity.Invocation is { } invocation
-            && (invocation.TenantId is { } fencedTenant
-                    && located.Workspace.TenantId != fencedTenant
-                || invocation.WorkspaceId is { } fencedWorkspace
-                    && workspaceId != fencedWorkspace))
+        if (result is not WorkspaceLookupResult.Found found)
         {
-            result = new WorkspaceLookupResult.NotFound();
+            throw result is WorkspaceLookupResult.NotFound
+                ? CreateExpectedRpcException(StatusCode.NotFound)
+                : new InvalidOperationException(
+                    "Workspace lookup result is invalid");
         }
 
-        return result switch
-        {
-            WorkspaceLookupResult.Found found =>
-                CreateWorkspaceResponse(found.Workspace),
-            WorkspaceLookupResult.NotFound =>
-                throw CreateExpectedRpcException(StatusCode.NotFound),
-            _ => throw new InvalidOperationException(
-                "Workspace lookup result is invalid")
-        };
+        await AuthorizeTenantCapability(
+            _policyClient,
+            _settings.Policy,
+            _telemetry,
+            identity,
+            TenantCapability.ReadWorkspace,
+            found.Workspace.TenantId,
+            workspaceId,
+            context.CancellationToken);
+        return CreateWorkspaceResponse(found.Workspace);
     }
 }

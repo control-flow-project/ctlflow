@@ -27,6 +27,8 @@ export async function startNodeTestService(
 ): Promise<NodeTestService> {
   validateName(options.name);
   validateStorageDirectory(options.storageDirectory);
+  validateWorkloadTokenAudience(
+    options.workloadTokenAudience);
   const hostControlPort = await findAvailablePort();
   let forwarding: ManagedProcess | undefined;
   let logs: ManagedProcess | undefined;
@@ -96,6 +98,17 @@ function createManifest(
     apiVersion: "v1",
     kind: "List",
     items: [
+      ...(options.workloadTokenAudience === undefined
+        ? []
+        : [{
+            apiVersion: "v1",
+            kind: "ServiceAccount",
+            metadata: {
+              name: options.name,
+              namespace
+            },
+            automountServiceAccountToken: false
+          }]),
       {
         apiVersion: "apps/v1",
         kind: "Deployment",
@@ -111,6 +124,11 @@ function createManifest(
             metadata: { labels: selector },
             spec: {
               automountServiceAccountToken: false,
+              ...(options.workloadTokenAudience === undefined
+                ? {}
+                : {
+                    serviceAccountName: options.name
+                  }),
               containers: [
                 {
                   name: options.name,
@@ -141,7 +159,15 @@ function createManifest(
                       mountPath: "/ctlflow-context",
                       name: "context",
                       readOnly: true
-                    }
+                    },
+                    ...(options.workloadTokenAudience === undefined
+                      ? []
+                      : [{
+                          mountPath:
+                            "/var/run/secrets/ctlflow",
+                          name: "workload-token",
+                          readOnly: true
+                        }])
                   ]
                 }
               ],
@@ -154,7 +180,23 @@ function createManifest(
                       options.storageDirectory),
                     type: "Directory"
                   }
-                }
+                },
+                ...(options.workloadTokenAudience === undefined
+                  ? []
+                  : [{
+                      name: "workload-token",
+                      projected: {
+                        defaultMode: 0o440,
+                        sources: [{
+                          serviceAccountToken: {
+                            audience:
+                              options.workloadTokenAudience,
+                            expirationSeconds: 600,
+                            path: "token"
+                          }
+                        }]
+                      }
+                    }])
               ]
             }
           }
@@ -225,5 +267,17 @@ function validateStorageDirectory(value: string): void {
       (segment) => segment.length === 0 || segment === "." || segment === "..")
   ) {
     throw new Error("Node test service storage directory is invalid");
+  }
+}
+
+function validateWorkloadTokenAudience(
+  value: string | undefined
+): void {
+  if (
+    value !== undefined
+    && (value.length === 0 || value.length > 256)
+  ) {
+    throw new Error(
+      "Node test service workload token audience is invalid");
   }
 }
