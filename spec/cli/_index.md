@@ -3,122 +3,73 @@ title: CLI
 weight: 30
 ---
 
-`ctlflow` is the infrastructure-operator CLI. It operates against one Kubernetes installation at a
-time and may manage every Tenant there. Tenant administrators and users use product-provided
-surfaces over the same owning-service operations.
+`ctlflow` is the infrastructure-operator CLI. It operates against one
+Kubernetes installation at a time and does not log in to a Tenant.
 
-## Initialization and connection
+## Connection
 
-Before CtlFlow exists:
+The CLI resolves kubeconfig using:
+
+```text
+--kubeconfig
+KUBECONFIG
+standard kubeconfig path
+```
+
+`--context` selects a Kubernetes context. For a private service, the CLI asks
+the Kubernetes API for an authorized port-forward, then presents the selected
+kubeconfig client certificate end to end to the gRPC service.
+
+CtlFlow stores no second login, credential database, active Tenant, or fleet
+context.
+
+## Installation
 
 ```text
 ctlflow init [--context CONTEXT]
 ```
 
-`init` loads kubeconfig, applies the signed CtlFlow release manifests, waits for readiness, creates
-global configuration and Placement, and verifies the installation OpenTelemetry Collector path.
-Kubernetes RBAC and installation configuration admit operator certificate subjects; CtlFlow does
-not create an operator account record.
+`init` is an idempotent local infrastructure operation. It applies the signed
+CtlFlow Kubernetes manifests through the selected kubeconfig and waits for
+their declared probes. It creates no Tenant, User, Placement, Package, or
+other CtlFlow domain record.
 
-After initialization, the CLI asks the Kubernetes API server for an authorized port-forward to the
-owning private service, then calls that service's gRPC contract:
+## Command law
 
-```text
- ctlflow
-    |
-    | kubeconfig authentication
-    v
- Kubernetes API server
-    |
-    | authorized port-forward
-    v
- owning CtlFlow service
-```
-
-Kubeconfig resolution follows `--kubeconfig`, then `KUBECONFIG`, then the standard default. The
-`--context` flag selects a Kubernetes context. The selected user must provide client-certificate
-and client-key data or paths; the CLI presents them end to end to the owning service. CtlFlow
-maintains no login, credential store, active Tenant, or fleet database.
-
-## Command form
-
-Commands follow Kubernetes verb-first conventions:
+Commands use:
 
 ```text
-ctlflow <verb> <resource> [NAME] [flags]
+ctlflow <verb> <resource> [name] [flags]
 ```
 
-Examples:
+Every command maps to one or more explicitly approved owner operations. A CLI
+name, flag, or help page cannot create an API. The approved command areas are:
 
-```text
-ctlflow get tenants
-ctlflow create tenant -f tenant.yaml
-ctlflow get workspaces --tenant ten-123
-ctlflow install app pkg-456 --tenant ten-123 --placement plc-789 -f app.yaml
-ctlflow run job job-123 --tenant ten-123 --wait
-```
+- [Tenants](tenants/)
+- [Workspaces](workspaces/)
 
-Common verbs have one meaning:
-
-- `get`, `create`, `apply`, and `delete` operate on records;
-- `suspend`, `resume`, `enable`, and `disable` change explicit lifecycle;
-- `publish` and `revoke` manage immutable Packages;
-- `install`, `upgrade`, `scale`, and `remove` manage Apps;
-- `run`, `cancel`, `wait`, `logs`, and `download` manage execution and bounded data;
-- `set`, `rotate`, and `revoke` manage configuration or secret lifecycle;
-- `add` and `remove` manage explicit relationships;
-- `resolve`, `check`, and `explain` evaluate without mutation; and
-- `redact` and `delete` are distinct audit-payload operations.
-
-The CLI does not clone native Pod, node, namespace, Secret, manifest, or container commands. Those
-remain `kubectl` operations.
+No other operator command is specified.
 
 ## Common flags
 
 ```text
---kubeconfig PATH       kubeconfig file
---context NAME          Kubernetes context
---global                explicit global scope
---tenant TENANT         explicit Tenant target
---workspace WORKSPACE   explicit Workspace target
---user USER             explicit User target
---all-tenants           cross-Tenant list target
---placement PLACEMENT   CtlFlow Placement target
--f, --filename FILE     YAML or JSON input; - reads stdin
--o, --output FORMAT     table, json, or yaml
---limit COUNT           requested page size
---after ID              last emitted ID for a keyset-paginated operation
---cursor TOKEN          continuation value for an operation that explicitly defines one
---field-selector EXPR   selector declared by the resource
---revision REVISION     optimistic-concurrency precondition
---idempotency-key KEY   mutation identity preserved across retries
---wait                   wait only when the owning contract defines a wait operation
---follow                 follow a finite live stream
---force                  suppress destructive confirmation
+--kubeconfig PATH
+--context NAME
+--tenant TENANT
+-f, --filename FILE
+-o, --output table|json|yaml
+--limit COUNT
+--after ID
+--revision REVISION
+--force
 ```
 
-Every scoped mutation names exactly one `--global` or `--tenant` guard, and the server requires it
-to match the resource body and current owner. A child-resource read spanning several Tenants
-requires `--all-tenants`; `get tenants` is itself the installation-scoped Tenant inventory.
-Destructive commands confirm installation, Tenant, and record unless `--force` is supplied.
-`--force` never bypasses server authorization, lifecycle, or referential checks.
+`--force` suppresses a local destructive confirmation only. It never changes
+the RPC, bypasses authorization, or weakens Domain invariants.
 
-## Documents and output
+Lists return one bounded page. `--after` is the last emitted immutable ID and
+is validated as untrusted input; the CLI does not fetch every page
+automatically.
 
-Structured records use YAML or JSON with `-f`. Secret material is accepted only by explicitly
-write-only commands and is never printed, echoed, or returned by a read.
-
-List commands return one bounded page and never fetch every continuation implicitly. JSON and YAML
-preserve the owning service's stable CLI document shape. Table output is for humans and is not a
-machine contract.
-
-`ctlflow version`, `ctlflow status`, and `ctlflow completion SHELL` are the only utility commands.
-
-## Areas
-
-- [Tenants](tenants/) and [Workspaces](workspaces/)
-- [Users and Groups](users/) and [SSO](sso/)
-- [Placements](placements/), [Configuration](config/), and [Execution State](execution/)
-- [Packages](packages/) and [Apps](apps/)
-- [Jobs](jobs/), [Runs](runs/), and [Logs](logs/)
-- [Policy](policy/), [Egress](egress/), and [Audit](audit/)
+Structured input is YAML or JSON. Output preserves the owning contract's
+fields. Raw diagnostics and credentials are never printed.

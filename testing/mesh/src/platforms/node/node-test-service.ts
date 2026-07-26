@@ -8,6 +8,7 @@ export interface NodeTestServiceOptions {
   readonly image: string;
   readonly storageDirectory: string;
   readonly environment: Readonly<Record<string, string>>;
+  readonly workloadTokenAudience?: string;
 }
 
 export interface NodeTestService {

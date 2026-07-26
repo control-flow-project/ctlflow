@@ -9,7 +9,8 @@ export protocol.
 
 ## Propagation
 
-Every public HTTP and internal HTTP or gRPC hop extracts and injects:
+Every declared public HTTP route and internal HTTP or gRPC operation extracts
+and injects:
 
 ```text
 traceparent
@@ -20,8 +21,9 @@ An absent valid parent starts a new trace. A valid external parent is accepted o
 it grants no identity, authority, routing, tenancy, or sampling privilege. Malformed or oversized
 trace context is discarded and replaced with a new trace rather than forwarded.
 
-`authd` and `edged` apply installation sampling policy to an external parent rather than trusting
-its sampled flag. Internal hops propagate the resulting decision through standard trace flags.
+An `authd` or `edged` route applies installation sampling policy to an
+external parent rather than trusting its sampled flag. Internal hops propagate
+the resulting decision through standard trace flags.
 
 CtlFlow does not propagate W3C baggage. Identity, Placement, routing, and authorization facts come
 from authenticated workload and invocation context, never caller-controlled telemetry fields.
@@ -44,7 +46,8 @@ Every kernel service instruments:
 - outbound kernel, application, Kubernetes, and admitted external calls;
 - database operations and direct audit delivery;
 - bounded queueing, retries, cancellation, and dependency waits;
-- long-lived streams with finite lifecycle and backpressure measurements; and
+- any contract-declared stream with finite lifecycle and backpressure
+  measurements; and
 - process health, readiness, saturation, and telemetry-export failure.
 
 Every implementation uses its language's OpenTelemetry SDK and produces the same service and
@@ -136,10 +139,10 @@ audit evidence, and a telemetry export cannot satisfy a direct audit obligation.
 
 Canonical integration evidence runs a real OpenTelemetry Collector and proves:
 
-- trace continuity across public ingress, identity, policy, application, and kernel calls;
-- correct parent-child relationships and asynchronous links;
+- trace continuity across Tenantd, Policyd, Identityd, Auditd, and database
+  calls;
+- correct parent-child relationships;
 - malformed external context replacement and baggage rejection;
 - correlation of structured logs without credential or payload disclosure;
 - bounded metrics without prohibited high-cardinality dimensions;
-- controlled external trace propagation through `egressd`; and
 - continued domain operation during Collector outage and backpressure.

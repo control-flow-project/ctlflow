@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package ctlflow.policy.v1;
+
+option csharp_namespace = "CtlFlow.Policy.V1";
+
+service PolicyService {
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
+}
+
+message CheckAccessRequest {
+  string operation = 1;
+  string resource_path = 2;
+  string tenant_id = 3;
+  optional string workspace_id = 4;
+}
+
+message CheckAccessResponse {
+  AccessDecision decision = 1;
+}
+
+enum AccessDecision {
+  ACCESS_DECISION_UNSPECIFIED = 0;
+  ACCESS_DECISION_ALLOW = 1;
+  ACCESS_DECISION_DENY = 2;
+}

@@ -1,6 +1,7 @@
 using System.Data.Common;
 using CtlFlow.Audit.V1;
 using CtlFlow.Identity.V1;
+using CtlFlow.Policy.V1;
 using CtlFlow.Tenancy.Tenantd.Db.Providers;
 using CtlFlow.Tenancy.Tenantd.Db.Schema;
 using CtlFlow.Tenancy.Tenantd.Service.Grpc;
@@ -33,6 +34,8 @@ internal static partial class TenantdProcess
             settings.Audit.Grpc);
         using var identityChannel = CreatePrivateGrpcChannel(
             settings.Identity.Grpc);
+        using var policyChannel = CreatePrivateGrpcChannel(
+            settings.Policy.Grpc);
         var identityClient = new IdentityService.IdentityServiceClient(
             identityChannel);
         var tokenAuthorities = new TokenAuthorities(
@@ -81,6 +84,8 @@ internal static partial class TenantdProcess
         builder.Services.AddSingleton(tokenAuthorities);
         builder.Services.AddSingleton(
             new AuditService.AuditServiceClient(auditChannel));
+        builder.Services.AddSingleton(
+            new PolicyService.PolicyServiceClient(policyChannel));
 
         await using var application = builder.Build();
         application.Use(async (context, next) =>

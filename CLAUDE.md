@@ -81,11 +81,22 @@ deployment assets, fixtures, generated artifacts, tests, and evidence manifests
 for both names and structural remnants. Do not declare the simplification done
 until those searches and a fresh spec-to-code review are clean.
 
-Dependency services may be minimal stubs only when the user has explicitly
-allowed that boundary to remain unimplemented. Such stubs must still be real,
-callable processes using the production transport, identity, and authentication
-contract. Never substitute an in-process fake or weaker test-only path for the
-service currently under test.
+When the service being implemented calls a dependency whose full implementation
+does not yet exist, create a deterministic static stub inside that dependency's
+own service project. The stub is a real, separately running process that
+implements exactly the needed production contract and is reached through the
+same network transport, generated client, identity, authentication, and
+authorization channel that the completed dependency will use. It may return
+hard-coded valid data, but the caller must receive and process that response
+through the real wire call without knowing that the callee is a stub.
+
+Keep a dependency stub limited to the operations required by the current
+implemented service. Never put the substitute in the caller, canonical test
+suite, or mesh; bypass the RPC; share in-process state; weaken transport or
+identity; or add a caller-side stub branch. When the dependency is implemented,
+replace its stub outright. The caller and its integration tests continue over
+the same contract and channel; no fallback, compatibility path, or dual
+implementation remains.
 
 Keep integration tests ordinary and fast. Share expensive immutable setup such
 as cluster creation and NativeAOT publication across the suite, cache build

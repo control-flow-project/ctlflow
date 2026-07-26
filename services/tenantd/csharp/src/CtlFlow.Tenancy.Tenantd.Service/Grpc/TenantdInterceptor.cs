@@ -1,4 +1,5 @@
 using System.Data.Common;
+using CtlFlow.Tenancy.Tenantd.Service.Authorization;
 using CtlFlow.Tenancy.Tenantd.Service.Auditing;
 using CtlFlow.Tenancy.Tenantd.Service.Security;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
@@ -49,6 +50,16 @@ internal sealed class TenantdInterceptor(TenantdTelemetry telemetry)
             outcome = "permission_denied";
             throw CreateRpcException(StatusCode.PermissionDenied);
         }
+        catch (CapabilityDeniedException)
+        {
+            outcome = "permission_denied";
+            throw CreateRpcException(StatusCode.PermissionDenied);
+        }
+        catch (AuthorizationTargetNotFoundException)
+        {
+            outcome = "not_found";
+            throw CreateRpcException(StatusCode.NotFound);
+        }
         catch (ArgumentException)
         {
             outcome = "invalid_argument";
@@ -69,6 +80,7 @@ internal sealed class TenantdInterceptor(TenantdTelemetry telemetry)
         }
         catch (Exception exception) when (
             exception is AuditUnavailableException
+                or PolicyUnavailableException
                 or DbException
                 or DbUpdateException
                 or IOException

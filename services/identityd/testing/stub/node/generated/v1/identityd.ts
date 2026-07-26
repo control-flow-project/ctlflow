@@ -22,6 +22,51 @@ import { Timestamp } from "../google/protobuf/timestamp.js";
 
 export const protobufPackage = "ctlflow.identity.v1";
 
+export enum PrincipalKind {
+  PRINCIPAL_KIND_UNSPECIFIED = 0,
+  PRINCIPAL_KIND_HUMAN = 1,
+  PRINCIPAL_KIND_SERVICE = 2,
+  PRINCIPAL_KIND_VIRTUAL = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function principalKindFromJSON(object: any): PrincipalKind {
+  switch (object) {
+    case 0:
+    case "PRINCIPAL_KIND_UNSPECIFIED":
+      return PrincipalKind.PRINCIPAL_KIND_UNSPECIFIED;
+    case 1:
+    case "PRINCIPAL_KIND_HUMAN":
+      return PrincipalKind.PRINCIPAL_KIND_HUMAN;
+    case 2:
+    case "PRINCIPAL_KIND_SERVICE":
+      return PrincipalKind.PRINCIPAL_KIND_SERVICE;
+    case 3:
+    case "PRINCIPAL_KIND_VIRTUAL":
+      return PrincipalKind.PRINCIPAL_KIND_VIRTUAL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PrincipalKind.UNRECOGNIZED;
+  }
+}
+
+export function principalKindToJSON(object: PrincipalKind): string {
+  switch (object) {
+    case PrincipalKind.PRINCIPAL_KIND_UNSPECIFIED:
+      return "PRINCIPAL_KIND_UNSPECIFIED";
+    case PrincipalKind.PRINCIPAL_KIND_HUMAN:
+      return "PRINCIPAL_KIND_HUMAN";
+    case PrincipalKind.PRINCIPAL_KIND_SERVICE:
+      return "PRINCIPAL_KIND_SERVICE";
+    case PrincipalKind.PRINCIPAL_KIND_VIRTUAL:
+      return "PRINCIPAL_KIND_VIRTUAL";
+    case PrincipalKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface GetInvocationVerificationKeysRequest {
 }
 
@@ -35,6 +80,36 @@ export interface InvocationVerificationKey {
   algorithm: string;
   modulusBase64url: string;
   exponentBase64url: string;
+}
+
+export interface ResolvePrincipalRequest {
+  principalId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface ResolvePrincipalResponse {
+  principalId: string;
+  principalKind: PrincipalKind;
+  principalEnabled: boolean;
+  principalRevision: bigint;
+  subjectAccountId: string;
+  subjectAccountEnabled: boolean;
+  subjectAccountRevision: bigint;
+  membershipRevision: bigint;
+}
+
+export interface ListPrincipalGroupsRequest {
+  principalId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+  pageSize: number;
+  afterGroupId?: string | undefined;
+}
+
+export interface ListPrincipalGroupsResponse {
+  groupIds: string[];
+  nextAfterGroupId?: string | undefined;
 }
 
 function createBaseGetInvocationVerificationKeysRequest(): GetInvocationVerificationKeysRequest {
@@ -266,6 +341,490 @@ export const InvocationVerificationKey: MessageFns<InvocationVerificationKey> = 
   },
 };
 
+function createBaseResolvePrincipalRequest(): ResolvePrincipalRequest {
+  return { principalId: "", tenantId: "", workspaceId: undefined };
+}
+
+export const ResolvePrincipalRequest: MessageFns<ResolvePrincipalRequest> = {
+  encode(message: ResolvePrincipalRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolvePrincipalRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolvePrincipalRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ResolvePrincipalRequest {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: ResolvePrincipalRequest): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ResolvePrincipalRequest>): ResolvePrincipalRequest {
+    return ResolvePrincipalRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ResolvePrincipalRequest>): ResolvePrincipalRequest {
+    const message = createBaseResolvePrincipalRequest();
+    message.principalId = object.principalId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseResolvePrincipalResponse(): ResolvePrincipalResponse {
+  return {
+    principalId: "",
+    principalKind: 0,
+    principalEnabled: false,
+    principalRevision: 0n,
+    subjectAccountId: "",
+    subjectAccountEnabled: false,
+    subjectAccountRevision: 0n,
+    membershipRevision: 0n,
+  };
+}
+
+export const ResolvePrincipalResponse: MessageFns<ResolvePrincipalResponse> = {
+  encode(message: ResolvePrincipalResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.principalKind !== 0) {
+      writer.uint32(16).int32(message.principalKind);
+    }
+    if (message.principalEnabled !== false) {
+      writer.uint32(24).bool(message.principalEnabled);
+    }
+    if (message.principalRevision !== 0n) {
+      if (BigInt.asUintN(64, message.principalRevision) !== message.principalRevision) {
+        throw new globalThis.Error("value provided for field message.principalRevision of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.principalRevision);
+    }
+    if (message.subjectAccountId !== "") {
+      writer.uint32(42).string(message.subjectAccountId);
+    }
+    if (message.subjectAccountEnabled !== false) {
+      writer.uint32(48).bool(message.subjectAccountEnabled);
+    }
+    if (message.subjectAccountRevision !== 0n) {
+      if (BigInt.asUintN(64, message.subjectAccountRevision) !== message.subjectAccountRevision) {
+        throw new globalThis.Error("value provided for field message.subjectAccountRevision of type uint64 too large");
+      }
+      writer.uint32(56).uint64(message.subjectAccountRevision);
+    }
+    if (message.membershipRevision !== 0n) {
+      if (BigInt.asUintN(64, message.membershipRevision) !== message.membershipRevision) {
+        throw new globalThis.Error("value provided for field message.membershipRevision of type uint64 too large");
+      }
+      writer.uint32(64).uint64(message.membershipRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolvePrincipalResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolvePrincipalResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.principalKind = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.principalEnabled = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.principalRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.subjectAccountId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.subjectAccountEnabled = reader.bool();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.subjectAccountRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.membershipRevision = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ResolvePrincipalResponse {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      principalKind: isSet(object.principalKind) ? principalKindFromJSON(object.principalKind) : 0,
+      principalEnabled: isSet(object.principalEnabled) ? globalThis.Boolean(object.principalEnabled) : false,
+      principalRevision: isSet(object.principalRevision) ? BigInt(object.principalRevision) : 0n,
+      subjectAccountId: isSet(object.subjectAccountId) ? globalThis.String(object.subjectAccountId) : "",
+      subjectAccountEnabled: isSet(object.subjectAccountEnabled)
+        ? globalThis.Boolean(object.subjectAccountEnabled)
+        : false,
+      subjectAccountRevision: isSet(object.subjectAccountRevision) ? BigInt(object.subjectAccountRevision) : 0n,
+      membershipRevision: isSet(object.membershipRevision) ? BigInt(object.membershipRevision) : 0n,
+    };
+  },
+
+  toJSON(message: ResolvePrincipalResponse): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.principalKind !== 0) {
+      obj.principalKind = principalKindToJSON(message.principalKind);
+    }
+    if (message.principalEnabled !== false) {
+      obj.principalEnabled = message.principalEnabled;
+    }
+    if (message.principalRevision !== 0n) {
+      obj.principalRevision = message.principalRevision.toString();
+    }
+    if (message.subjectAccountId !== "") {
+      obj.subjectAccountId = message.subjectAccountId;
+    }
+    if (message.subjectAccountEnabled !== false) {
+      obj.subjectAccountEnabled = message.subjectAccountEnabled;
+    }
+    if (message.subjectAccountRevision !== 0n) {
+      obj.subjectAccountRevision = message.subjectAccountRevision.toString();
+    }
+    if (message.membershipRevision !== 0n) {
+      obj.membershipRevision = message.membershipRevision.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ResolvePrincipalResponse>): ResolvePrincipalResponse {
+    return ResolvePrincipalResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ResolvePrincipalResponse>): ResolvePrincipalResponse {
+    const message = createBaseResolvePrincipalResponse();
+    message.principalId = object.principalId ?? "";
+    message.principalKind = object.principalKind ?? 0;
+    message.principalEnabled = object.principalEnabled ?? false;
+    message.principalRevision = object.principalRevision ?? 0n;
+    message.subjectAccountId = object.subjectAccountId ?? "";
+    message.subjectAccountEnabled = object.subjectAccountEnabled ?? false;
+    message.subjectAccountRevision = object.subjectAccountRevision ?? 0n;
+    message.membershipRevision = object.membershipRevision ?? 0n;
+    return message;
+  },
+};
+
+function createBaseListPrincipalGroupsRequest(): ListPrincipalGroupsRequest {
+  return { principalId: "", tenantId: "", workspaceId: undefined, pageSize: 0, afterGroupId: undefined };
+}
+
+export const ListPrincipalGroupsRequest: MessageFns<ListPrincipalGroupsRequest> = {
+  encode(message: ListPrincipalGroupsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(32).uint32(message.pageSize);
+    }
+    if (message.afterGroupId !== undefined) {
+      writer.uint32(42).string(message.afterGroupId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPrincipalGroupsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPrincipalGroupsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.afterGroupId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListPrincipalGroupsRequest {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterGroupId: isSet(object.afterGroupId) ? globalThis.String(object.afterGroupId) : undefined,
+    };
+  },
+
+  toJSON(message: ListPrincipalGroupsRequest): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterGroupId !== undefined) {
+      obj.afterGroupId = message.afterGroupId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListPrincipalGroupsRequest>): ListPrincipalGroupsRequest {
+    return ListPrincipalGroupsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListPrincipalGroupsRequest>): ListPrincipalGroupsRequest {
+    const message = createBaseListPrincipalGroupsRequest();
+    message.principalId = object.principalId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.pageSize = object.pageSize ?? 0;
+    message.afterGroupId = object.afterGroupId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListPrincipalGroupsResponse(): ListPrincipalGroupsResponse {
+  return { groupIds: [], nextAfterGroupId: undefined };
+}
+
+export const ListPrincipalGroupsResponse: MessageFns<ListPrincipalGroupsResponse> = {
+  encode(message: ListPrincipalGroupsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.groupIds) {
+      writer.uint32(10).string(v!);
+    }
+    if (message.nextAfterGroupId !== undefined) {
+      writer.uint32(18).string(message.nextAfterGroupId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPrincipalGroupsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPrincipalGroupsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupIds.push(reader.string());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterGroupId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListPrincipalGroupsResponse {
+    return {
+      groupIds: globalThis.Array.isArray(object?.groupIds) ? object.groupIds.map((e: any) => globalThis.String(e)) : [],
+      nextAfterGroupId: isSet(object.nextAfterGroupId) ? globalThis.String(object.nextAfterGroupId) : undefined,
+    };
+  },
+
+  toJSON(message: ListPrincipalGroupsResponse): unknown {
+    const obj: any = {};
+    if (message.groupIds?.length) {
+      obj.groupIds = message.groupIds;
+    }
+    if (message.nextAfterGroupId !== undefined) {
+      obj.nextAfterGroupId = message.nextAfterGroupId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListPrincipalGroupsResponse>): ListPrincipalGroupsResponse {
+    return ListPrincipalGroupsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListPrincipalGroupsResponse>): ListPrincipalGroupsResponse {
+    const message = createBaseListPrincipalGroupsResponse();
+    message.groupIds = object.groupIds?.map((e) => e) || [];
+    message.nextAfterGroupId = object.nextAfterGroupId ?? undefined;
+    return message;
+  },
+};
+
 export type IdentityServiceService = typeof IdentityServiceService;
 export const IdentityServiceService = {
   getInvocationVerificationKeys: {
@@ -281,6 +840,28 @@ export const IdentityServiceService = {
     responseDeserialize: (value: Buffer): GetInvocationVerificationKeysResponse =>
       GetInvocationVerificationKeysResponse.decode(value),
   },
+  resolvePrincipal: {
+    path: "/ctlflow.identity.v1.IdentityService/ResolvePrincipal",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ResolvePrincipalRequest): Buffer =>
+      Buffer.from(ResolvePrincipalRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolvePrincipalRequest => ResolvePrincipalRequest.decode(value),
+    responseSerialize: (value: ResolvePrincipalResponse): Buffer =>
+      Buffer.from(ResolvePrincipalResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolvePrincipalResponse => ResolvePrincipalResponse.decode(value),
+  },
+  listPrincipalGroups: {
+    path: "/ctlflow.identity.v1.IdentityService/ListPrincipalGroups",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListPrincipalGroupsRequest): Buffer =>
+      Buffer.from(ListPrincipalGroupsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListPrincipalGroupsRequest => ListPrincipalGroupsRequest.decode(value),
+    responseSerialize: (value: ListPrincipalGroupsResponse): Buffer =>
+      Buffer.from(ListPrincipalGroupsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListPrincipalGroupsResponse => ListPrincipalGroupsResponse.decode(value),
+  },
 } as const;
 
 export interface IdentityServiceServer extends UntypedServiceImplementation {
@@ -288,6 +869,8 @@ export interface IdentityServiceServer extends UntypedServiceImplementation {
     GetInvocationVerificationKeysRequest,
     GetInvocationVerificationKeysResponse
   >;
+  resolvePrincipal: handleUnaryCall<ResolvePrincipalRequest, ResolvePrincipalResponse>;
+  listPrincipalGroups: handleUnaryCall<ListPrincipalGroupsRequest, ListPrincipalGroupsResponse>;
 }
 
 export interface IdentityServiceClient extends Client {
@@ -305,6 +888,36 @@ export interface IdentityServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: GetInvocationVerificationKeysResponse) => void,
+  ): ClientUnaryCall;
+  resolvePrincipal(
+    request: ResolvePrincipalRequest,
+    callback: (error: ServiceError | null, response: ResolvePrincipalResponse) => void,
+  ): ClientUnaryCall;
+  resolvePrincipal(
+    request: ResolvePrincipalRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolvePrincipalResponse) => void,
+  ): ClientUnaryCall;
+  resolvePrincipal(
+    request: ResolvePrincipalRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolvePrincipalResponse) => void,
+  ): ClientUnaryCall;
+  listPrincipalGroups(
+    request: ListPrincipalGroupsRequest,
+    callback: (error: ServiceError | null, response: ListPrincipalGroupsResponse) => void,
+  ): ClientUnaryCall;
+  listPrincipalGroups(
+    request: ListPrincipalGroupsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListPrincipalGroupsResponse) => void,
+  ): ClientUnaryCall;
+  listPrincipalGroups(
+    request: ListPrincipalGroupsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListPrincipalGroupsResponse) => void,
   ): ClientUnaryCall;
 }
 

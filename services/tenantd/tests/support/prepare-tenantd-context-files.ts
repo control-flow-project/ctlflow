@@ -17,6 +17,9 @@ import type {
 import type {
   IdentitydContractService
 } from "@ctlflow/identityd/testing/stub";
+import type {
+  PolicyContractService
+} from "@ctlflow/policyd/testing/stub";
 
 export interface TenantdContextFiles {
   readonly workloadJwks: string;
@@ -27,6 +30,7 @@ export interface TenantdContextFiles {
   readonly kubernetesClientCertificateAuthority: string;
   readonly auditCertificateAuthority: string;
   readonly identityCertificateAuthority: string;
+  readonly policyCertificateAuthority: string;
   readonly deployment: KustomizeServiceFiles;
 }
 
@@ -38,6 +42,7 @@ export interface PrepareTenantdContextFilesOptions {
   readonly kubernetes: TestKubernetes;
   readonly auditd: AuditdContractService;
   readonly identityd: IdentitydContractService;
+  readonly policyd: PolicyContractService;
 }
 
 export async function prepareTenantdContextFiles(
@@ -69,6 +74,10 @@ export async function prepareTenantdContextFiles(
     {
       source: options.identityd.certificateAuthorityPath,
       name: "identityd-ca.crt"
+    },
+    {
+      source: options.policyd.certificateAuthorityPath,
+      name: "policyd-ca.crt"
     }
   ] as const;
   for (const file of copies) {
@@ -95,6 +104,8 @@ export async function prepareTenantdContextFiles(
       "/var/run/ctlflow/trust/auditd-ca.crt",
     identityCertificateAuthority:
       "/var/run/ctlflow/trust/identityd-ca.crt",
+    policyCertificateAuthority:
+      "/var/run/ctlflow/trust/policyd-ca.crt",
     deployment: {
       secret: {
         "tls.crt": tls.certificatePath,
@@ -112,7 +123,10 @@ export async function prepareTenantdContextFiles(
           "auditd-ca.crt"),
         "identityd-ca.crt": path.join(
           options.directory,
-          "identityd-ca.crt")
+          "identityd-ca.crt"),
+        "policyd-ca.crt": path.join(
+          options.directory,
+          "policyd-ca.crt")
       }
     }
   };

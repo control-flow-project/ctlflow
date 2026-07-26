@@ -9,4 +9,5 @@ internal sealed record InvocationIdentity(
     PrincipalId Actor,
     TenantId? TenantId,
     WorkspaceId? WorkspaceId,
-    string TokenId);
+    string TokenId,
+    InvocationToken Token);

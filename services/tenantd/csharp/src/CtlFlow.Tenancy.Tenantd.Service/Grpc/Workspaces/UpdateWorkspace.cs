@@ -5,6 +5,8 @@ using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 using CtlFlow.Tenancy.V1;
 using Grpc.Core;
 using static CtlFlow.Tenancy.Tenantd.Service.Auditing.AuditDelivery;
+using CtlFlow.Tenancy.Tenantd.Service.Authorization;
+using static CtlFlow.Tenancy.Tenantd.Service.Authorization.TenantAuthorization;
 using WorkspaceDatabase =
     CtlFlow.Tenancy.Tenantd.Db.Workspaces.Workspaces;
 
@@ -16,7 +18,29 @@ internal sealed partial class TenantGrpcService
         UpdateWorkspaceRequest request,
         ServerCallContext context)
     {
-        var identity = await AuthenticateAdministration(context);
+        var identity = await AuthenticateWorkspaceUpdate(context);
+        var workspaceId = await WorkspaceId.Parse(
+            request.WorkspaceId,
+            context.CancellationToken);
+        var expectedRevision = await Revision.Parse(
+            request.ExpectedRevision,
+            context.CancellationToken);
+        var displayName = await DisplayName.Parse(
+            request.DisplayName,
+            context.CancellationToken);
+        var tenantId = await ResolveWorkspaceAuthorizationTenant(
+            _tenantDatabase,
+            workspaceId,
+            context.CancellationToken);
+        await AuthorizeTenantCapability(
+            _policyClient,
+            _settings.Policy,
+            _telemetry,
+            identity,
+            TenantCapability.UpdateWorkspaceDisplayName,
+            tenantId,
+            workspaceId,
+            context.CancellationToken);
         var audit = await CreateAuditContext(
             identity,
             Activity.Current,
@@ -24,15 +48,9 @@ internal sealed partial class TenantGrpcService
             context.CancellationToken);
         var result = await WorkspaceDatabase.UpdateWorkspace(
             _tenantDatabase,
-            await WorkspaceId.Parse(
-                request.WorkspaceId,
-                context.CancellationToken),
-            await Revision.Parse(
-                request.ExpectedRevision,
-                context.CancellationToken),
-            await DisplayName.Parse(
-                request.DisplayName,
-                context.CancellationToken),
+            workspaceId,
+            expectedRevision,
+            displayName,
             audit,
             context.CancellationToken);
         return await CompleteWorkspaceMutation(

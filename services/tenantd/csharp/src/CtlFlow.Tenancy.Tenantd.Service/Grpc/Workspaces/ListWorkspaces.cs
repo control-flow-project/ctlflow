@@ -3,6 +3,8 @@ using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 using CtlFlow.Tenancy.V1;
 using Grpc.Core;
+using CtlFlow.Tenancy.Tenantd.Service.Authorization;
+using static CtlFlow.Tenancy.Tenantd.Service.Authorization.TenantAuthorization;
 using static CtlFlow.Tenancy.Tenantd.Service.Grpc.Responses.TenancyResponses;
 using static CtlFlow.Tenancy.Tenantd.Service.Grpc.TenantGrpcErrors;
 using WorkspaceDatabase =
@@ -16,20 +18,31 @@ internal sealed partial class TenantGrpcService
         ListWorkspacesRequest request,
         ServerCallContext context)
     {
-        await AuthenticateAdministration(context);
+        var identity = await AuthenticateWorkspaceList(context);
         var after = request.HasAfterWorkspaceId
             ? await WorkspaceId.Parse(
                 request.AfterWorkspaceId,
                 context.CancellationToken)
             : null;
+        var tenantId = await TenantId.Parse(
+            request.TenantId,
+            context.CancellationToken);
+        var pageSize = await PageSize.Parse(
+            request.PageSize,
+            context.CancellationToken);
+        await AuthorizeTenantCapability(
+            _policyClient,
+            _settings.Policy,
+            _telemetry,
+            identity,
+            TenantCapability.ReadWorkspace,
+            tenantId,
+            null,
+            context.CancellationToken);
         var result = await WorkspaceDatabase.ListWorkspaces(
             _tenantDatabase,
-            await TenantId.Parse(
-                request.TenantId,
-                context.CancellationToken),
-            await PageSize.Parse(
-                request.PageSize,
-                context.CancellationToken),
+            tenantId,
+            pageSize,
             after,
             context.CancellationToken);
         if (result is WorkspaceListResult.TenantNotFound)

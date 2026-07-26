@@ -3,81 +3,57 @@ title: Planes
 weight: 5
 ---
 
-CtlFlow separates domain control, trusted data-plane mediation, and Kubernetes realization. These
-are ownership boundaries, not deployment marketing terms.
+CtlFlow separates domain ownership, trusted protocol mediation, and Kubernetes
+realization.
 
 ```text
- DOMAIN CONTROL                   DATA PLANE                   KUBERNETES
+DOMAIN OWNERS                 PUBLIC BOUNDARIES           KUBERNETES
 
- tenants and workspaces           external ingress            namespaces
- identities and grants            public authentication       workloads and scheduling
- Packages and installations       external HTTP egress        Services and networking
- configuration and secrets        trusted runtime context     volumes and Secrets
- Placements, Jobs, and Runs        telemetry and audit         provider-owned resources
-          |                              |                           ^
-          | domain intent                | authenticated traffic     |
-          +------------------------------+---------------------------+
-                                         execd realization
+tenant and identity           authd                      namespaces
+policy and packages           edged                      workloads
+configuration                 egressd                    Services
+placement intent                                          volumes
+audit evidence                                            native policy
 ```
 
-## Domain control
+These are ownership boundaries, not additional APIs.
 
-The ten kernel services own CtlFlow records and their invariants. Operator clients use
-kubeconfig-authorized port-forwards and the selected kubeconfig client certificate to reach the
-owning private gRPC service. Product backends use authenticated management operations over `edged`.
-Both surfaces invoke the same service semantics and never create a second record owner.
+## Domain ownership
 
-Domain records are not reconstructed from Kubernetes objects. Native names, labels, and status are
-derived realization details and never become CtlFlow identity or authority.
+Each durable CtlFlow record has one owning kernel service. A private operation
+exists only in that owner's versioned gRPC contract. Operators reach it through
+a kubeconfig-authorized port-forward and end-to-end client certificate.
 
-## Data plane
+Domain identity is not reconstructed from Kubernetes names, labels, or
+objects. Kubernetes objects are derived realization state.
 
-The data plane carries authenticated traffic:
+## Public mediation
 
-- `edged` terminates the CtlFlow application boundary for browser and external API requests;
-- `authd` terminates public authentication protocols and calls private `identityd`;
-- runtime proxies validate Kubernetes workload identity and optional invocation JWTs before
-  delivering trusted actor context;
-- applications call resolved peer dependencies directly through Kubernetes networking;
-- `egressd` mediates admitted external HTTP; and
-- all kernel services deliver attributable evidence to `auditd`.
+`authd`, `edged`, and `egressd` reserve distinct public protocol boundaries:
 
-An internal application call does not traverse `edged`. A browser session does not enter an
-application. The current invocation JWT may cross admitted internal hops, while every hop
-authenticates its own immediate workload independently.
+- authentication HTTP;
+- general application HTTP; and
+- controlled outbound HTTP.
 
-Every process emits bounded OpenTelemetry data through OTLP to an installation-supplied Collector.
-The Collector is infrastructure rather than a kernel service or record authority.
+A route exists only in a checked versioned HTTP contract. Public boundaries
+cannot expose another service's private gRPC API or become another domain
+record owner.
 
 ## Kubernetes realization
 
-`execd` translates admitted CtlFlow intent into Kubernetes resources and observes their status. It
-realizes:
+Kubernetes owns containment, scheduling, native workload state, networking,
+and storage primitives. `execd` is the sole general CtlFlow owner that
+translates admitted workload intent into those primitives.
 
-- one namespace for each materialized Placement;
-- long-running components as suitable continuous workload resources;
-- finite executions as Jobs and periodic execution through Kubernetes scheduling;
-- Services and explicitly admitted network paths;
-- workload-scoped ServiceAccounts, bound tokens, runtime proxies, and process-specific identities;
-- PVCs and mounts for persistent files;
-- references to Kubernetes Secret projections written only by `configd`; and
-- provider-owned custom resources for configured external dependencies.
+`configd` has one narrow disjoint write boundary for secret custody and
+authorized projections. Provider controllers may own their own custom
+resources and external systems; those objects are not CtlFlow domain APIs.
 
-Kubernetes decides node placement, Pod scheduling, restart mechanics, and native object state.
-`execd` remains responsible for CtlFlow admission, desired state, Run identity, and interpretation
-of observed status. `configd` is the sole exception to its general realization ownership: it may
-write only Secret custody and an authorized Secret projection in a Placement, then returns an
-opaque binding that `execd` can reference.
+CtlFlow never gives application code Kubernetes credentials or authority to
+create or inspect workloads.
 
-## Adjacent custody
+## Telemetry
 
-| Material | Custody | CtlFlow stores |
-| --- | --- | --- |
-| Container image | OCI registry | Digest-pinned image reference and provenance |
-| Secret material | Kubernetes Secret under `configd` custody | Secret identity, policy, version, and readiness |
-| Dependency implementation state | Installed provider controller or service Package | Generic claim, binding, generation, and readiness |
-| Artifact or export bytes | Configured object dependency | Bounded metadata and transfer capability |
-| Program logs | Configured log system | Query identity, cursor, and retention metadata |
-| Operational telemetry | Installation OpenTelemetry Collector and configured backends | No domain authority; bounded correlation references only |
-
-Administrative APIs never transport image, secret, artifact, export, or unbounded log bytes.
+Every process exports bounded OpenTelemetry data to an installation Collector.
+The Collector is infrastructure, not a kernel service or record authority.
+Authoritative security and mutation evidence remains in Auditd.

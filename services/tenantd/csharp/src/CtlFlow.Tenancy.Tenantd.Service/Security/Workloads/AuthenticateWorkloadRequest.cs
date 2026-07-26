@@ -13,7 +13,8 @@ internal static partial class WorkloadAuthentication
     internal static async ValueTask<TenantRequestIdentity> AuthenticateWorkloadRequest(
         Metadata headers,
         TokenAuthorities authorities,
-        IReadOnlySet<KubernetesServiceAccountSubject> allowedCallers,
+        IReadOnlySet<KubernetesServiceAccountSubject> autonomousCallers,
+        IReadOnlySet<KubernetesServiceAccountSubject> capabilityCallers,
         DateTimeOffset currentTime,
         CancellationToken cancellation)
     {
@@ -29,15 +30,22 @@ internal static partial class WorkloadAuthentication
             currentTime,
             cancellation);
 
-        if (!allowedCallers.Contains(caller))
+        var admission = autonomousCallers.Contains(caller)
+            ? TenantAdmission.AutonomousKernel
+            : capabilityCallers.Contains(caller)
+                ? TenantAdmission.Capability
+                : throw new CallerNotAdmittedException();
+        if (autonomousCallers.Contains(caller)
+            && capabilityCallers.Contains(caller))
         {
-            throw new CallerNotAdmittedException();
+            throw new InvalidOperationException(
+                "A workload caller has conflicting admission paths");
         }
 
         var invocationToken = ReadBearerToken(
             headers,
             "ctlflow-invocation",
-            required: false);
+            required: admission == TenantAdmission.Capability);
         var invocation = invocationToken is null
             ? null
             : await ValidateInvocationToken(
@@ -49,6 +57,7 @@ internal static partial class WorkloadAuthentication
 
         return new TenantRequestIdentity(
             new AuthenticatedTenantCaller.Workload(caller),
-            invocation);
+            invocation,
+            admission);
     }
 }

@@ -70,7 +70,13 @@ internal static partial class InvocationTokens
             throw new TokenValidationException();
         }
 
-        return new InvocationIdentity(subject, actor, tenantId, workspaceId, tokenId);
+        return new InvocationIdentity(
+            subject,
+            actor,
+            tenantId,
+            workspaceId,
+            tokenId,
+            new InvocationToken(token));
     }
 
     private static PrincipalId ReadActor(

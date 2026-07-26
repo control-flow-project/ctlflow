@@ -1,6 +1,8 @@
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.V1;
 using Grpc.Core;
+using static CtlFlow.Tenancy.Tenantd.Service.Authorization.TenantAuthorization;
+using CtlFlow.Tenancy.Tenantd.Service.Authorization;
 using static CtlFlow.Tenancy.Tenantd.Service.Grpc.Responses.TenancyResponses;
 using static CtlFlow.Tenancy.Tenantd.Service.Grpc.TenantGrpcErrors;
 using TenantDatabase = CtlFlow.Tenancy.Tenantd.Db.Tenants.Tenants;
@@ -17,17 +19,19 @@ internal sealed partial class TenantGrpcService
         var tenantId = await TenantId.Parse(
             request.TenantId,
             context.CancellationToken);
+        await AuthorizeTenantCapability(
+            _policyClient,
+            _settings.Policy,
+            _telemetry,
+            identity,
+            TenantCapability.ReadTenant,
+            tenantId,
+            null,
+            context.CancellationToken);
         var result = await TenantDatabase.GetTenant(
             _tenantDatabase,
             tenantId,
             context.CancellationToken);
-        if (result is TenantLookupResult.Found
-            && identity.Invocation?.TenantId is { } fencedTenant
-            && tenantId != fencedTenant)
-        {
-            result = new TenantLookupResult.NotFound();
-        }
-
         return result switch
         {
             TenantLookupResult.Found found =>

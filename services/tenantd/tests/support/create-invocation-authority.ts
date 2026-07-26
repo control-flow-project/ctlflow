@@ -9,9 +9,11 @@ import type {
   InvocationAuthority,
   InvocationTokenOptions
 } from "./invocation-authority.js";
+import {
+  invocationAudience,
+  invocationIssuer
+} from "./invocation-settings.js";
 
-const issuer = "https://identity.test";
-const audience = "ctlflow-internal";
 export async function createInvocationAuthority(
   keyId = `key_${randomUUID().replaceAll("-", "")}`
 ):
@@ -24,8 +26,8 @@ Promise<InvocationAuthority> {
   });
 
   return {
-    issuer,
-    audience,
+    issuer: invocationIssuer,
+    audience: invocationAudience,
     verificationKey: createVerificationKey(
       keyId,
       publicJwk),
@@ -66,8 +68,8 @@ function signInvocationToken(
   const now = Math.floor(Date.now() / 1_000);
   const issuedAt = options.issuedAt ?? now;
   const payload: Record<string, unknown> = {
-    iss: options.issuer ?? issuer,
-    aud: options.audience ?? audience,
+    iss: options.issuer ?? invocationIssuer,
+    aud: options.audience ?? invocationAudience,
     sub: options.subject ?? "user:alice",
     iat: issuedAt,
     nbf: options.notBefore ?? issuedAt,

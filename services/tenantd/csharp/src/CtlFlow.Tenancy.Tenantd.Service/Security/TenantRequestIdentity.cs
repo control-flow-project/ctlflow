@@ -5,4 +5,5 @@ namespace CtlFlow.Tenancy.Tenantd.Service.Security;
 
 internal sealed record TenantRequestIdentity(
     AuthenticatedTenantCaller ImmediateCaller,
-    InvocationIdentity? Invocation);
+    InvocationIdentity? Invocation,
+    TenantAdmission Admission);

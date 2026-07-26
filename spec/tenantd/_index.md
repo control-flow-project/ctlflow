@@ -149,8 +149,8 @@ expiry, or mutation invalidation.
 | `ALREADY_EXISTS` | An immutable ID or address belongs to another declaration |
 | `FAILED_PRECONDITION` | The current or parent state forbids the requested transition |
 | `ABORTED` | The expected revision does not match |
-| `UNAUTHENTICATED` | Caller identity cannot be established |
-| `PERMISSION_DENIED` | The caller is not admitted to the operation |
+| `UNAUTHENTICATED` | Required operator, workload, or invocation identity cannot be established |
+| `PERMISSION_DENIED` | The caller is not admitted or the required capability is denied |
 | `UNAVAILABLE` | Required persistence or an obligatory integration is unavailable |
 | `CANCELLED` / `DEADLINE_EXCEEDED` | The call ended before completion |
 
@@ -159,14 +159,23 @@ audit evidence.
 
 ## Integrations
 
-Operator operations authenticate the exact admitted subject of the
-certificate-backed current kubeconfig context. Kernel callers authenticate
-their immediate pod-bound workload token. An operator certificate is admitted
-for every operation. A workload caller is admitted only when its exact
-ServiceAccount subject appears in the configured allowlist for the requested
-`GetTenant`, `GetWorkspace`, `ResolveTenant`, or `ResolveWorkspace` operation.
-Tenant and Workspace mutations and lists remain operator-only. Caller identity
-cannot be supplied or replaced by a request field or caller-asserted metadata.
+tenantd has three disjoint admission paths:
+
+1. An infrastructure operator presents the exact admitted certificate-backed
+   subject from the current kubeconfig context. An admitted operator may call
+   every operation and does not require a Tenant capability.
+2. An autonomous kernel caller presents its pod-bound workload token. Its exact
+   ServiceAccount subject must appear in the per-operation allowlist for
+   `GetTenant`, `GetWorkspace`, `ResolveTenant`, or `ResolveWorkspace`.
+3. An admitted product backend presents its pod-bound workload token and a
+   required invocation JWT. Its exact ServiceAccount subject must appear in
+   tenantd's capability-caller allowlist for that operation, and
+   `policyd.CheckAccess` must return allow.
+
+Autonomous-kernel and capability-caller allowlists are finite, operation
+specific, and disjoint. Startup fails when a subject overlaps them. Caller
+identity cannot be supplied or replaced by a request field or
+caller-asserted metadata.
 
 The operator certificate must chain to the installation's Kubernetes client
 CA and contain exactly one non-empty common name. A missing or untrusted
@@ -183,17 +192,50 @@ expired, or malformed key response is `UNAVAILABLE`; a successful refresh
 without the requested key and invalid token claims or signatures are
 `UNAUTHENTICATED`.
 
-An invocation Tenant or Workspace fence applies to both exact lookup and
-address resolution. A `GetTenant`, `GetWorkspace`, `ResolveTenant`, or
-`ResolveWorkspace` target outside that fence is `NOT_FOUND`. An autonomous
-admitted workload call without an invocation JWT is bounded by its exact
-per-operation allowlist.
+An invocation Tenant or Workspace fence applies before any capability
+decision. A target outside that fence is `NOT_FOUND`. For an operation that
+names only a Workspace ID, tenantd reads the retained Workspace to derive its
+immutable parent before applying the fence; it holds no transaction while
+calling a dependency. `CreateWorkspace` and `ListWorkspaces` target the
+Tenant's Workspace collection and therefore require a Tenant-scoped invocation
+rather than a narrower Workspace invocation. An autonomous admitted workload
+without an invocation JWT remains bounded by its exact per-operation
+allowlist.
 
-Every actual mutation produces one typed audit intent in Domain containing
-the operation, operator or workload identity, Tenant partition, target ID,
-successful outcome, resulting state and revision, time, request identity, and
-trace identity. Db persists only Tenant or Workspace state. After Db
-completes and no transaction is held, Service calls
+The tenant capability catalog is:
+
+| tenantd operation | Required capability | Canonical resource path |
+| --- | --- | --- |
+| `GetTenant` | `tenants.read` | `/tenants/<tenant_id>` |
+| `UpdateTenant` | `tenants.update_display_name` | `/tenants/<tenant_id>` |
+| `CreateWorkspace` | `workspaces.create` | `/tenants/<tenant_id>/workspaces` |
+| `GetWorkspace` | `workspaces.read` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
+| `ListWorkspaces` | `workspaces.read` | `/tenants/<tenant_id>/workspaces` |
+| `UpdateWorkspace` | `workspaces.update_display_name` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
+| `SetWorkspaceState` to `suspended` | `workspaces.suspend` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
+| `SetWorkspaceState` to `active` | `workspaces.resume` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
+| `SetWorkspaceState` to `deleted` | `workspaces.delete` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
+
+`CreateTenant`, `ListTenants`, and `SetTenantState` remain operator-only.
+`ResolveTenant` and `ResolveWorkspace` have no capability path. `UpdateTenant`
+changes only the display name; Tenant ID, address, and state are not mutable
+through it.
+
+For a capability path, tenantd constructs the operation and resource path from
+validated domain values, calls `policyd.CheckAccess` as
+`SERVICE/svc_tenantd`, and forwards the unchanged invocation JWT. `policyd`
+independently validates that token and obtains current principal, attached
+account, Membership, and direct-Group facts from `identityd`. A deny response
+is `PERMISSION_DENIED`; missing current target standing is `NOT_FOUND`; a
+policy or identity dependency failure is `UNAVAILABLE`. tenantd never accepts
+a Role, capability, operation token, Actor, or resource path from its caller.
+
+Every actual mutation produces one typed audit intent in Domain containing the
+operation, infrastructure operator or invocation Actor, immediate workload
+when present, Tenant partition, target ID, successful outcome, resulting state
+and revision, time, request identity, and trace identity. Db persists only
+Tenant or Workspace state. After Db completes and no transaction is held,
+Service calls
 `auditd.RecordAuditBatch` directly before returning the result. Reads,
 rejected requests, retries, and no-op mutations produce no tenantd audit
 event. This tenantd-specific obligation is the complete audit set for the
@@ -230,8 +272,12 @@ Canonical integration evidence covers:
 - retained deleted records and permanent address reservation;
 - bounded last-ID pagination under concurrent changes;
 - active-only Tenant and Workspace resolution;
-- operator and per-operation workload authentication, authorization,
-  cancellation, deadline, restart, and schema failure;
+- operator, autonomous-kernel, and product-backend admission;
+- every capability token and canonical resource path;
+- independent tenantd and policyd invocation validation;
+- current identity and direct-Group facts, allow, deny, missing standing,
+  disabled identity, and dependency outage;
+- cancellation, deadline, restart, and schema failure;
 - one audit event per actual mutation and none for reads or no-op retries; and
 - bounded, correlated, redacted telemetry.
 

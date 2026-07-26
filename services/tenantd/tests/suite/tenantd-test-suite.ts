@@ -9,6 +9,9 @@ import type {
   IdentitydContractService
 } from "@ctlflow/identityd/testing/stub";
 import type {
+  PolicyContractService
+} from "@ctlflow/policyd/testing/stub";
+import type {
   TenantdTestRuntime
 } from "../runtime/tenantd-test-runtime.js";
 
@@ -18,6 +21,7 @@ export interface TenantdTestSuite {
   readonly collector: OpenTelemetryCollector;
   readonly auditd: AuditdContractService;
   readonly identityd: IdentitydContractService;
+  readonly policyd: PolicyContractService;
   readonly runtime: TenantdTestRuntime;
   readonly stop: () => Promise<void>;
 }

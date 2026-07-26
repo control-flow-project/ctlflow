@@ -112,17 +112,30 @@ export async function startTestKubernetes(
       namespace: namespaceName,
       api,
       storage,
-      createWorkloadCredentials: async () => {
+      createWorkloadCredentials: async (
+        requestedServiceAccountName = serviceAccountName
+      ) => {
         if (stopped) {
           throw new Error("Test Kubernetes cluster is stopped");
         }
+        validateWorkloadName(requestedServiceAccountName);
+        await createTestWorkloads(
+          repositoryRoot,
+          minikube,
+          namespaceName,
+          [{
+            serviceAccountName: requestedServiceAccountName,
+            podName: requestedServiceAccountName
+          }]);
 
         return createWorkloadCredentials(
           repositoryRoot,
           minikube,
           issuer,
           jwksPath,
-          signingKey);
+          signingKey,
+          requestedServiceAccountName,
+          requestedServiceAccountName);
       },
       createOperatorCredentials: async (subject) => {
         if (stopped) {
@@ -372,15 +385,17 @@ async function createWorkloadCredentials(
   minikube: TestMinikube,
   issuer: string,
   jwksPath: string,
-  signingKey: string
+  signingKey: string,
+  admittedServiceAccountName: string,
+  admittedPodName: string
 ): Promise<TestWorkloadCredentials> {
   const token = await createToken(
     repositoryRoot,
     minikube,
-    serviceAccountName,
+    admittedServiceAccountName,
     audience,
     "10m",
-    podName);
+    admittedPodName);
   const unadmittedToken = await createToken(
     repositoryRoot,
     minikube,
@@ -391,21 +406,21 @@ async function createWorkloadCredentials(
   const wrongAudienceToken = await createToken(
     repositoryRoot,
     minikube,
-    serviceAccountName,
+    admittedServiceAccountName,
     "wrong-audience",
     "10m",
-    podName);
+    admittedPodName);
   const overlongToken = await createToken(
     repositoryRoot,
     minikube,
-    serviceAccountName,
+    admittedServiceAccountName,
     audience,
     "20m",
-    podName);
+    admittedPodName);
   const unboundToken = await createToken(
     repositoryRoot,
     minikube,
-    serviceAccountName,
+    admittedServiceAccountName,
     audience,
     "10m");
 
@@ -413,7 +428,8 @@ async function createWorkloadCredentials(
     issuer,
     audience,
     callerSubject:
-      `system:serviceaccount:${namespaceName}:${serviceAccountName}`,
+      `system:serviceaccount:${namespaceName}:`
+      + admittedServiceAccountName,
     callerToken: token,
     expiredToken: createExpiredToken(token, signingKey),
     overlongToken,
@@ -422,6 +438,16 @@ async function createWorkloadCredentials(
     unboundToken,
     jwksPath
   };
+}
+
+function validateWorkloadName(value: string): void {
+  if (
+    value.length < 1
+    || value.length > 63
+    || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u.test(value)
+  ) {
+    throw new Error("Test workload name is invalid");
+  }
 }
 
 async function createToken(
