@@ -376,11 +376,8 @@ key-state failure is `UNAVAILABLE`.
 
 ## Admission and invocation identity
 
-Every operation authenticates its exact approved Kubernetes workload and
-admits an exact per-operation caller set. Ordinary operations use a bound
-ServiceAccount token. `CreateSession` and `RevokeSession` instead require
-Authd's process-private mutual-TLS client certificate and carry no workload
-bearer.
+Every operation authenticates a bound Kubernetes ServiceAccount token and
+admits an exact per-operation caller set.
 
 The approved callers are:
 
@@ -395,9 +392,7 @@ The approved callers are:
 | `IssueRunInvocation` | `SERVICE/svc_execd` |
 
 Installation configuration maps those canonical principals to exact
-Kubernetes ServiceAccount subjects for bearer-authenticated operations and to
-the exact admitted Authd client-certificate subject for the two
-certificate-authenticated operations. Startup fails when an operation has an
+Kubernetes ServiceAccount subjects. Startup fails when an operation has an
 empty caller set or a configured subject is malformed.
 
 `GetInvocationVerificationKeys`, `CreateSession`, `ExchangeSession`,
@@ -412,12 +407,7 @@ seconds. A Session origin and Run origin are mutually exclusive.
 
 A request field cannot replace the authenticated workload, invocation Actor,
 attached account, or target fence. Every call uses private TLS, finite
-deadline, cancellation, and W3C trace context. For `CreateSession` and
-`RevokeSession`, Identityd additionally validates the client certificate's
-validity, client-auth usage, installation workload trust chain, and exact
-configured subject before mapping it to `SERVICE/svc_authd`. The other
-operations do not accept that certificate as a substitute for their workload
-bearer.
+deadline, cancellation, and W3C trace context.
 
 ## Errors
 
@@ -470,9 +460,8 @@ The shipping process exposes standard health and readiness endpoints on a
 separate probe-only listener. Readiness verifies the exact current migration
 ledger and mapped schema. The private gRPC listener uses
 installation-provisioned server TLS. Process-private files supply the server
-identity, workload-token validation material, Authd workload-client trust
-material and admitted subject, active signing key, and Auditd client identity.
-Operational endpoints are not Identityd domain operations.
+identity, workload-validation material, active signing key, and Auditd client
+identity. Operational endpoints are not Identityd domain operations.
 
 ## Verification
 
@@ -480,9 +469,6 @@ Canonical integration evidence covers:
 
 - the exact seven-method descriptor and every documented status;
 - exact per-operation workload admission;
-- exact Authd workload-mTLS admission for `CreateSession` and
-  `RevokeSession`, including absent, untrusted, expired, wrong-usage, and
-  unadmitted certificates and rejection of bearer substitution;
 - exactly one active and up to seven retiring keys, deterministic order,
   bounded expiry, private/public mismatch, malformed key state, and source
   outage;

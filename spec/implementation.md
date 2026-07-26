@@ -55,14 +55,12 @@ placeholders are forbidden.
 Shared repository packages may provide generation, migration, test-mesh, and build mechanics. They
 cannot own service behavior or create a second API.
 
-Each shipping service owns one `kubernetes/base/` Kustomize base containing
-its ServiceAccount, workload, whichever public or private Services its
-contract requires, a probe Service, process-private projections, and required
-storage plus a pre-start Knex migration Job where the service is durable.
-Installation overlays supply concrete OCI images, storage classes, trust and
-credential bindings, dependency endpoints, and environment-specific
-configuration. A test-only generated workload cannot replace these checked
-shipping assets as installation evidence.
+Each shipping service owns one `kubernetes/base/` Kustomize base containing its ServiceAccount,
+workload, private and probe Services, required storage, process-private projections, and pre-start
+Knex migration Job where the service is durable. Installation overlays supply concrete OCI images,
+storage classes, trust and credential bindings, dependency endpoints, and environment-specific
+configuration. A test-only generated workload cannot replace these checked shipping assets as
+installation evidence.
 
 Every hand-authored source and test file is at most 600 lines. Larger concepts split into cohesive
 noun directories and operation files. Deterministic generated output is exempt but remains
@@ -207,10 +205,9 @@ Canonical tests use:
 
 - generated clients from service-root contracts;
 - shipping service processes;
-- real Knex-migrated file-backed databases for durable services;
+- real Knex-migrated file-backed databases;
 - real dependency services through public contracts;
-- production operation-specific Kubernetes workload authentication, including
-  the Authd workload-mTLS edge, invocation JWT validation, authorization, and
+- production Kubernetes workload authentication, invocation JWT validation, authorization, and
   runtime proxies;
 - real Kubernetes realization where the behavior requires it;
 - a real OpenTelemetry Collector for propagation and export evidence;
@@ -231,12 +228,10 @@ Ordinary teardown never deletes the profile.
 Shipping service artifacts and admitted service-owned contract stubs run as Kubernetes workloads
 inside that profile. A canonical suite never routes a Kubernetes Service back to a daemon running
 on the host. Host test code reaches private test endpoints only through an explicit suite-owned
-Kubernetes port-forward. Deployment, ServiceAccount identity, the operation's
-projected workload token or workload certificate, Service, probe, volume,
-migration Job where applicable, restart, and dependency routing behavior
-therefore remain in the tested path. Suite-owned workloads and port-forwards
-remain active until the owning context or suite finishes. Test files never
-create another cluster, Collector, or publication.
+Kubernetes port-forward. Deployment, ServiceAccount identity, projected workload token, Service,
+probe, volume, migration Job, restart, and dependency routing behavior therefore remain in the
+tested path. Suite-owned workloads and port-forwards remain active until the owning context or
+suite finishes. Test files never create another cluster, Collector, or publication.
 
 A gated production artifact is content-addressed by every source, contract, generated-input,
 toolchain, lock, diagnostic manifest, and publisher input that can affect it. The first request for
@@ -298,16 +293,11 @@ gates. They cannot duplicate or weaken wire-visible behavior.
 
 ## Process and transport
 
-Every service is independently buildable, deployable, restartable, and
-observable. Ordinary kernel gRPC authenticates the immediate bound Kubernetes
-ServiceAccount token. Exactly Authd's calls to `identityd.CreateSession` and
-`identityd.RevokeSession` instead authenticate the immediate
-`SERVICE/svc_authd` workload through a process-private mutual-TLS client
-certificate and carry no workload bearer. An optional `identityd` invocation
-JWT carries subject-account and Actor context under the installation's
-internal audience where an operation admits one. Long-lived clients and
-connection pools are reused. Concurrency, queues, bodies, streams, retries,
-and shutdown periods are finite and cancellation-aware.
+Every service is independently buildable, deployable, restartable, and observable. Kernel gRPC
+authenticates the immediate bound Kubernetes ServiceAccount token. An optional `identityd`
+invocation JWT carries subject-account and Actor context under the installation's internal
+audience. Long-lived clients and connection pools are reused. Concurrency, queues, bodies, streams,
+retries, and shutdown periods are finite and cancellation-aware.
 
 Installation configuration supplies the expected Kubernetes token issuer, internal audience,
 maximum token lifetime, and verification-key source. Services validate bound tokens locally, cache
@@ -318,24 +308,14 @@ caller-asserted ServiceAccount name. It does not add a TokenReview call to each 
 Kernel bootstrap trust and credential material arrives only through process-private file
 projections. It is never an environment value or `configd` record. In particular, only `identityd`
 receives the active invocation-signing key set; other services receive public verification
-material through its private operation. Authd's Identityd client certificate
-and private key and Identityd's corresponding workload-client trust material
-are also installation bootstrap projections, separate from Configd-owned
-provider settings and credentials.
+material through its private operation.
 
 Only `authd` and `edged` have public listeners. Every other kernel service is reachable only through
 a private Kubernetes Service. Public TLS is terminated by the installation ingress. The private
 gRPC listener uses installation-provisioned server TLS so operator port-forwards and internal
 clients validate the intended service endpoint. That server identity never authenticates the
 caller. An admitted kubeconfig client certificate authenticates an operator; a bound Kubernetes
-workload token authenticates an ordinary internal caller; and Authd's exact
-approved mutual-TLS certificate authenticates only its two Identityd Session
-calls.
-
-Authd communicates directly with only the exact external provider HTTPS
-endpoints in its Configd-owned deployed projection. This is the bounded
-authentication protocol defined by Authd, not general managed egress or a
-generic proxy. It cannot select a destination from a public request.
+workload token authenticates an internal caller.
 
 A private service exposes direct gRPC over TLS on an HTTP/2-only listener and health probes on a
 separate HTTP/1.1-only listener. The probe listener serves only `/healthz` and `/readyz`; it never

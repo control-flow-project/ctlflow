@@ -167,12 +167,6 @@ audience, key, permission, or claim bag. There is no HTTP mirror, generic
 token-minting method, introspection method, Session list, or Session
 administration API.
 
-Authd invokes only `CreateSession` and `RevokeSession`. Those two operations
-authenticate the exact `SERVICE/svc_authd` workload through the
-operation-specific mutual-TLS channel and carry no workload bearer or
-invocation JWT. Other Identityd operations retain their declared
-ServiceAccount-token authentication.
-
 ## Approved audit dependency
 
 `auditd` exposes exactly:

@@ -31,7 +31,7 @@ from authenticated workload and invocation context, never caller-controlled tele
 Trace context remains separate from:
 
 ```text
-workload token or approved client certificate   immediate process identity
+Kubernetes workload token   immediate process identity
 invocation JWT              User or Job Actor context
 idempotency key             retry identity for one domain mutation
 ```
@@ -117,10 +117,6 @@ External trace propagation through `egressd` is disabled unless the exact destin
 admits it. Even when admitted, baggage, identity context, and internal authorization metadata are
 never forwarded.
 
-Authd never propagates CtlFlow trace headers or baggage to its external
-authentication provider. It creates a local outbound child span and propagates
-the resulting trace context only to its Identityd calls.
-
 ## Failure and sampling
 
 Telemetry is never a synchronous dependency of domain work. Export uses finite queues, batches,
@@ -149,9 +145,8 @@ audit evidence, and a telemetry export cannot satisfy a direct audit obligation.
 
 Canonical integration evidence runs a real OpenTelemetry Collector and proves:
 
-- trace continuity across Authd and Identityd Session calls and across
-  Tenantd, Policyd, Identityd, Auditd, and database calls;
-- no Authd trace or baggage propagation to the controlled external provider;
+- trace continuity across Tenantd, Policyd, Identityd, Auditd, and database
+  calls;
 - correct parent-child relationships;
 - malformed external context replacement and baggage rejection;
 - correlation of structured logs without credential or payload disclosure;

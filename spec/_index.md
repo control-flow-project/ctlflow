@@ -85,17 +85,14 @@ virtual principal, a Job, persistent state, and product-owned activation rules.
    can only be narrowed.
 6. Every concrete runtime has a process-specific identity and cannot reuse another runtime's
    credentials or resource namespace.
-7. Every internal hop authenticates its immediate Kubernetes workload through
-   the operation's approved bound token or workload client certificate. A
-   short-lived invocation JWT carries User or Job context when the call acts
-   on behalf of one.
+7. Every internal hop authenticates its immediate Kubernetes workload. A short-lived invocation
+   JWT carries User or Job context when the call acts on behalf of one.
 8. Configuration and secrets are separate data classes even though `configd` owns both. Secret
    material has no general read operation.
 9. Provider-specific dependency behavior belongs to installed Kubernetes controllers or service
    Packages, not a kernel service.
-10. General CtlFlow-managed external HTTP crosses `egressd`. Authd mediates
-    only its declared bounded authentication-provider protocol; other
-    provider-specific protocols remain outside the kernel.
+10. CtlFlow-managed external HTTP crosses `egressd`. Provider-specific protocols remain outside
+    the kernel.
 11. Application data and object authorization remain with the application that owns the object.
 12. Every approved collection is bounded and paginated.
 13. OpenTelemetry is the sole operational telemetry model. It is bounded and non-authoritative;

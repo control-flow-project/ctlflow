@@ -78,8 +78,7 @@ made over its production transport without holding a persistence transaction.
 
 ## Identity and failure
 
-Every private call authenticates its immediate Kubernetes workload through
-the operation's approved bound token or workload client certificate. Calls
+Every private call authenticates its immediate Kubernetes workload. Calls
 acting on behalf of a User or virtual principal additionally carry one
 short-lived invocation JWT. Each receiver validates its own admission and
 target fence.
