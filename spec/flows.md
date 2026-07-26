@@ -73,6 +73,48 @@ admitted autonomous caller
 
 Resolution returns only active records and never creates route or cache state.
 
+## Browser authentication and invocation
+
+```text
+validated provider callback
+  -> authd
+  -> identityd.CreateSession(tenant, provider, provider_subject)
+       -> resolve current external identity link and Tenant standing
+       -> commit Session
+       -> auditd.RecordAuditBatch
+  <- one-time opaque credential
+  -> Authd sets an HttpOnly cookie
+
+authenticated application request
+  -> edged
+  -> identityd.ExchangeSession(cookie credential, exact target)
+       -> validate Session, account, standing, and target
+       -> sign short-lived Session-origin invocation JWT
+  -> private product target with invocation JWT
+
+logout
+  -> authd
+  -> identityd.RevokeSession(cookie credential)
+       -> commit actual revocation
+       -> auditd.RecordAuditBatch
+```
+
+Authd and Edged never receive invocation-signing material. Edged never
+forwards the browser credential to a product target.
+
+## Run invocation
+
+```text
+admitted Execd Run
+  -> identityd.IssueRunInvocation(actor, target, run_id)
+       -> resolve current Actor, attached account, standing, and fence
+       -> sign short-lived Run-origin invocation JWT
+  -> product or kernel target with invocation JWT
+```
+
+Execd cannot name an attached account. Identityd derives it from a virtual
+principal or uses the direct account Actor.
+
 ## Product management
 
 ```text

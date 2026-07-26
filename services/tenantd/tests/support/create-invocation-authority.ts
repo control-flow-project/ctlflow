@@ -5,6 +5,9 @@ import {
   type JsonWebKey,
   type KeyObject
 } from "node:crypto";
+import {
+  writeFile
+} from "node:fs/promises";
 import type {
   InvocationAuthority,
   InvocationTokenOptions
@@ -40,7 +43,16 @@ Promise<InvocationAuthority> {
       signPayload(
         keyId,
         keys.privateKey,
-        payloadJson)
+        payloadJson),
+    writePrivateKey: async (filePath) => {
+      await writeFile(
+        filePath,
+        keys.privateKey.export({
+          format: "pem",
+          type: "pkcs8"
+        }),
+        { mode: 0o600 });
+    }
   };
 }
 

@@ -20,7 +20,8 @@ export interface PolicyStubState {
     WorkloadVerificationSettings;
   readonly workloadKeys:
     ReadonlyMap<string, KeyObject>;
-  readonly identityClient: IdentityServiceClient;
+  identityClient: IdentityServiceClient;
+  readonly createIdentityClient: () => IdentityServiceClient;
   readonly identityCallTimeoutMilliseconds: number;
   readonly outboundWorkloadTokenPath: string;
   readonly invocationSettings:

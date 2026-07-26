@@ -1,17 +1,17 @@
 import { createHash } from "node:crypto";
-import {
-  readdir,
-  readFile,
-  stat
-} from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type {
   CSharpServicePublicationOptions
 } from "../csharp-service-publication.js";
 import { runCommand } from "../../../processes/run-command.js";
-
-const ignoredDirectories = new Set(["bin", "obj"]);
+import { collectPublicationFiles } from
+  "./collect-publication-files.js";
+import { relativeRepositoryPath } from
+  "./relative-repository-path.js";
+import { resolveServiceRoot } from
+  "./resolve-service-root.js";
 
 export async function calculatePublicationFingerprint(
   options: CSharpServicePublicationOptions
@@ -31,7 +31,7 @@ export async function calculatePublicationFingerprint(
     path.dirname(options.projectPath),
     options.projectPath
   ];
-  const files = await collectExistingFiles(roots);
+  const files = await collectPublicationFiles(roots);
   const dotnetVersion = (await runCommand(
     "dotnet",
     ["--version"],
@@ -43,82 +43,18 @@ export async function calculatePublicationFingerprint(
   hash.update(`platform=${process.platform}\0`);
   hash.update(`arch=${process.arch}\0`);
   hash.update(`release=${os.release()}\0`);
-  hash.update(`project=${relativePath(options.repositoryRoot, options.projectPath)}\0`);
+  hash.update(`project=${relativeRepositoryPath(
+    options.repositoryRoot,
+    options.projectPath)}\0`);
   hash.update(`executable=${options.executableName}\0`);
 
   for (const file of files) {
-    hash.update(`file=${relativePath(options.repositoryRoot, file)}\0`);
+    hash.update(`file=${relativeRepositoryPath(
+      options.repositoryRoot,
+      file)}\0`);
     hash.update(await readFile(file));
     hash.update("\0");
   }
 
   return hash.digest("hex");
-}
-
-async function collectExistingFiles(
-  roots: readonly string[]
-): Promise<readonly string[]> {
-  const files = new Set<string>();
-
-  for (const root of roots) {
-    const rootStat = await stat(root).catch(() => undefined);
-    if (rootStat === undefined) {
-      continue;
-    }
-
-    if (rootStat.isFile()) {
-      files.add(path.resolve(root));
-      continue;
-    }
-
-    if (rootStat.isDirectory()) {
-      for (const file of await collectDirectoryFiles(root)) {
-        files.add(file);
-      }
-    }
-  }
-
-  return [...files].sort((left, right) =>
-    left < right ? -1 : left > right ? 1 : 0);
-}
-
-async function collectDirectoryFiles(
-  directory: string
-): Promise<readonly string[]> {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files: string[] = [];
-
-  for (const entry of entries) {
-    if (entry.isDirectory() && ignoredDirectories.has(entry.name)) {
-      continue;
-    }
-
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...await collectDirectoryFiles(entryPath));
-    } else if (entry.isFile()) {
-      files.push(path.resolve(entryPath));
-    }
-  }
-
-  return files;
-}
-
-function resolveServiceRoot(projectPath: string): string {
-  const marker = `${path.sep}csharp${path.sep}`;
-  const markerIndex = projectPath.lastIndexOf(marker);
-  if (markerIndex <= 0) {
-    throw new Error("C# project path must belong to a service csharp directory");
-  }
-
-  return projectPath.slice(0, markerIndex);
-}
-
-function relativePath(repositoryRoot: string, filePath: string): string {
-  const relative = path.relative(repositoryRoot, filePath);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error("Publication input must be inside the repository");
-  }
-
-  return relative.split(path.sep).join("/");
 }

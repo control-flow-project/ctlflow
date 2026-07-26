@@ -1,9 +1,9 @@
 import type {
   ResolvePrincipalResponse
 } from "../generated/v1/identityd.js";
-import type {
-  ClientUnaryCall
-} from "@grpc/grpc-js";
+import {
+  callIdentity
+} from "./call-identity.js";
 import {
   createIdentityMetadata
 } from "./create-identity-metadata.js";
@@ -28,41 +28,19 @@ export async function resolveAuthorizationPrincipal(
   const metadata = await createIdentityMetadata(
     state.outboundWorkloadTokenPath,
     context);
-  return await new Promise((resolve, reject) => {
-    let call: ClientUnaryCall | undefined;
-    const cancel = () => {
-      call?.cancel();
-    };
-    context.cancellation.addEventListener(
-      "abort",
-      cancel,
-      { once: true });
-    call = state.identityClient.resolvePrincipal(
-      {
-        principalId: options.principalId,
-        tenantId: options.tenantId,
-        ...(options.workspaceId === undefined
-          ? {}
-          : { workspaceId: options.workspaceId })
-      },
-      metadata,
-      {
-        deadline: new Date(
-          Date.now()
-          + state.identityCallTimeoutMilliseconds)
-      },
-      (error, response) => {
-        context.cancellation.removeEventListener(
-          "abort",
-          cancel);
-        if (error === null) {
-          resolve(response);
-        } else {
-          reject(error);
-        }
-      });
-    if (context.cancellation.aborted) {
-      cancel();
-    }
-  });
+  return await callIdentity(
+    state,
+    context,
+    (deadline, done) =>
+      state.identityClient.resolvePrincipal(
+        {
+          principalId: options.principalId,
+          tenantId: options.tenantId,
+          ...(options.workspaceId === undefined
+            ? {}
+            : { workspaceId: options.workspaceId })
+        },
+        metadata,
+        { deadline },
+        done));
 }

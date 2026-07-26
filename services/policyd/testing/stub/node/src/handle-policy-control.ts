@@ -14,6 +14,9 @@ import type {
 import type {
   PolicyStubState
 } from "./policy-stub-state.js";
+import {
+  reconnectIdentityClient
+} from "./reconnect-identity-client.js";
 
 export async function handlePolicyControl(
   state: PolicyStubState,
@@ -21,6 +24,15 @@ export async function handlePolicyControl(
   response: ServerResponse
 ): Promise<void> {
   if (request.url === "/readyz") {
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  if (
+    request.method === "POST"
+    && request.url === "/identity/reconnect"
+  ) {
+    reconnectIdentityClient(state);
     response.writeHead(204);
     response.end();
     return;

@@ -15,8 +15,8 @@ import type {
   AuditdContractService
 } from "@ctlflow/auditd/testing/stub";
 import type {
-  IdentitydContractService
-} from "@ctlflow/identityd/testing/stub";
+  IdentitydProductionService
+} from "@ctlflow/identityd/testing/production";
 import type {
   PolicyContractService
 } from "@ctlflow/policyd/testing/stub";
@@ -41,7 +41,7 @@ export interface PrepareTenantdContextFilesOptions {
   readonly workload: TestWorkloadCredentials;
   readonly kubernetes: TestKubernetes;
   readonly auditd: AuditdContractService;
-  readonly identityd: IdentitydContractService;
+  readonly identityd: IdentitydProductionService;
   readonly policyd: PolicyContractService;
 }
 

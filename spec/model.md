@@ -12,7 +12,7 @@ checked versioned contracts.
 | Concept | Owner |
 | --- | --- |
 | Tenant and Workspace | `tenantd` |
-| User, Membership standing, Group, Session, virtual principal, runtime principal | `identityd` |
+| Account, Membership standing, Group, external identity link, Session, virtual principal, invocation identity | `identityd` |
 | Role, grant, operation ownership, access decision | `policyd` |
 | Package and installed App intent | `pkgd` |
 | Configuration and secret custody | `configd` |
@@ -45,9 +45,19 @@ service.
 
 ## Identity and standing
 
-A User is human or service. Membership proves current standing in one Tenant
-or Workspace and carries no Role, grant, capability, or administrator flag.
-Groups are non-nested direct audiences and grant no authority by themselves.
+A User is represented by a `user:` human account principal or `service:`
+service account principal. An `agent:` virtual principal has one immutable
+attached human or service account and one immutable Tenant fence with an
+optional narrower Workspace fence.
+
+A Tenant Membership proves current account standing in one Tenant. A
+Workspace Membership requires that Tenant Membership and proves current
+standing in one Workspace. Membership carries no Role, grant, capability, or
+administrator flag.
+
+Groups are globally identified, non-nested direct audiences at one exact
+Tenant or Workspace target. Direct Group membership grants no authority by
+itself.
 
 A virtual principal has one immutable attached account. For a virtual Actor,
 effective policy authority requires matching authority for both:
@@ -59,6 +69,13 @@ AND attached account
 
 Invocation tokens carry identity and target-fence facts, never permission
 snapshots.
+
+An external identity link maps one exact Tenant, provider ID, and provider
+subject to one human account. It is identity state, not provider protocol
+configuration. A browser Session contains an opaque generated ID, one human
+account, one Tenant fence, a digest of a one-time credential, finite lifetime,
+revocation state, and positive revision. Raw Session credentials and
+invocation-signing private keys are never persisted as domain records.
 
 ## Policy
 

@@ -1,7 +1,7 @@
 import type {
   PrincipalAuthorizationFacts,
   PrincipalAuthorizationKind
-} from "@ctlflow/identityd/testing/stub";
+} from "@ctlflow/identityd/testing/production";
 import type {
   PolicyGrant
 } from "@ctlflow/policyd/testing/stub";

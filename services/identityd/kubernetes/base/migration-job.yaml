@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: identityd-migrate
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+      containers:
+        - name: migrate
+          image: identityd-migrations
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CTLFLOW_DATABASE_PATH
+              value: /var/lib/ctlflow/identityd.sqlite
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 65532
+            runAsUser: 65532
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ctlflow
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: identityd-data
+        - name: tmp
+          emptyDir: {}

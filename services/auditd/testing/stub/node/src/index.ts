@@ -2,7 +2,9 @@ export type {
   AuditdContractService
 } from "./auditd-contract-service.js";
 export type {
-  AuditEventEvidence
+  AuditEventEvidence,
+  IdentitySessionAuditEventEvidence,
+  TenancyAuditEventEvidence
 } from "./audit-event-evidence.js";
 export type { AuditdMode } from "./auditd-mode.js";
 export type { AuditdTestSource } from "./auditd-test-source.js";

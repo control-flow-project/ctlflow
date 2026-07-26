@@ -43,7 +43,8 @@ import {
 
 test("records one complete audit event for each mutation operation", async () => {
   const context = getTenantdTestContext();
-  const baseline = (await context.auditd.readEvents()).length;
+  const baseline =
+    (await context.auditd.readTenancyEvents()).length;
   const tenant = await createTenant(context, {
     tenantId: "audit_tenant",
     address: "audit-tenant",
@@ -88,7 +89,8 @@ test("records one complete audit event for each mutation operation", async () =>
       },
       done));
 
-  const events = (await context.auditd.readEvents()).slice(baseline);
+  const events =
+    (await context.auditd.readTenancyEvents()).slice(baseline);
   assert.deepEqual(
     events.map((event) => event.operation),
     [
@@ -147,7 +149,8 @@ test("does not audit reads, rejections, retries, or no-op mutations", async () =
     address: "audit-noop-tenant",
     displayName: "Audit No-op Tenant"
   });
-  const baseline = (await context.auditd.readEvents()).length;
+  const baseline =
+    (await context.auditd.readTenancyEvents()).length;
 
   await createTenant(context, {
     tenantId: tenant.tenantId,
@@ -191,12 +194,15 @@ test("does not audit reads, rejections, retries, or no-op mutations", async () =
     }),
     matchGrpcStatus(status.INVALID_ARGUMENT));
 
-  assert.equal((await context.auditd.readEvents()).length, baseline);
+  assert.equal(
+    (await context.auditd.readTenancyEvents()).length,
+    baseline);
 });
 
 test("returns unavailable after a committed mutation when auditd fails", async () => {
   const context = getTenantdTestContext();
-  const baseline = (await context.auditd.readEvents()).length;
+  const baseline =
+    (await context.auditd.readTenancyEvents()).length;
 
   await context.auditd.setMode("unavailable");
   try {
@@ -212,7 +218,9 @@ test("returns unavailable after a committed mutation when auditd fails", async (
   }
   const committed = await getTenant("audit_unavailable_tenant");
   assert.equal(committed.revision, 1n);
-  assert.equal((await context.auditd.readEvents()).length, baseline);
+  assert.equal(
+    (await context.auditd.readTenancyEvents()).length,
+    baseline);
 
   await context.auditd.setMode("denied");
   try {
@@ -228,7 +236,9 @@ test("returns unavailable after a committed mutation when auditd fails", async (
   const updated = await getTenant(committed.tenantId);
   assert.equal(updated.displayName, "Committed Without Audit");
   assert.equal(updated.revision, 2n);
-  assert.equal((await context.auditd.readEvents()).length, baseline);
+  assert.equal(
+    (await context.auditd.readTenancyEvents()).length,
+    baseline);
 
 });
 

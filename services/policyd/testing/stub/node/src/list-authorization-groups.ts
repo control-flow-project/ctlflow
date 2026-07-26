@@ -1,9 +1,9 @@
 import {
   createIdentityMetadata
 } from "./create-identity-metadata.js";
-import type {
-  ClientUnaryCall
-} from "@grpc/grpc-js";
+import {
+  callIdentity
+} from "./call-identity.js";
 import type {
   IdentityCallContext
 } from "./identity-call-context.js";
@@ -49,48 +49,26 @@ async function listPage(
   const metadata = await createIdentityMetadata(
     state.outboundWorkloadTokenPath,
     context);
-  return await new Promise<{
+  return await callIdentity<{
     readonly groupIds: string[];
     readonly nextAfterGroupId?: string | undefined;
-  }>((resolve, reject) => {
-    let call: ClientUnaryCall | undefined;
-    const cancel = () => {
-      call?.cancel();
-    };
-    context.cancellation.addEventListener(
-      "abort",
-      cancel,
-      { once: true });
-    call = state.identityClient.listPrincipalGroups(
-      {
-        principalId: options.principalId,
-        tenantId: options.tenantId,
-        pageSize: 100,
-        ...(options.workspaceId === undefined
-          ? {}
-          : { workspaceId: options.workspaceId }),
-        ...(afterGroupId === undefined
-          ? {}
-          : { afterGroupId })
-      },
-      metadata,
-      {
-        deadline: new Date(
-          Date.now()
-          + state.identityCallTimeoutMilliseconds)
-      },
-      (error, response) => {
-        context.cancellation.removeEventListener(
-          "abort",
-          cancel);
-        if (error === null) {
-          resolve(response);
-        } else {
-          reject(error);
-        }
-      });
-    if (context.cancellation.aborted) {
-      cancel();
-    }
-  });
+  }>(
+    state,
+    context,
+    (deadline, done) =>
+      state.identityClient.listPrincipalGroups(
+        {
+          principalId: options.principalId,
+          tenantId: options.tenantId,
+          pageSize: 100,
+          ...(options.workspaceId === undefined
+            ? {}
+            : { workspaceId: options.workspaceId }),
+          ...(afterGroupId === undefined
+            ? {}
+            : { afterGroupId })
+        },
+        metadata,
+        { deadline },
+        done));
 }

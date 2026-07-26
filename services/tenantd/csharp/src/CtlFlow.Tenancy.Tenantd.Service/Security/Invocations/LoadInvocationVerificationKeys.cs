@@ -29,10 +29,12 @@ internal static partial class InvocationVerificationKeys
             {
                 { "authorization", $"Bearer {token}" }
             };
-            var response = await client.GetInvocationVerificationKeysAsync(
-                new GetInvocationVerificationKeysRequest(),
+            var deadline = DateTime.UtcNow.Add(settings.CallTimeout);
+            var response = await FetchInvocationVerificationKeys(
+                client,
                 headers,
-                DateTime.UtcNow.Add(settings.CallTimeout),
+                deadline,
+                settings.CallTimeout,
                 cancellation);
             return CreateSnapshot(response, DateTimeOffset.UtcNow);
         }
@@ -48,6 +50,58 @@ internal static partial class InvocationVerificationKeys
         {
             throw new TokenKeySourceException(exception);
         }
+    }
+
+    private static async Task<GetInvocationVerificationKeysResponse>
+        FetchInvocationVerificationKeys(
+            IdentityService.IdentityServiceClient client,
+            Metadata headers,
+            DateTime deadline,
+            TimeSpan timeout,
+            CancellationToken cancellation)
+    {
+        var firstDeadline = new DateTime(
+            Math.Min(
+                deadline.Ticks,
+                DateTime.UtcNow.AddTicks(
+                    Math.Max(1, timeout.Ticks / 4)).Ticks),
+            DateTimeKind.Utc);
+        try
+        {
+            return await FetchInvocationVerificationKeysOnce(
+                client,
+                headers,
+                firstDeadline,
+                cancellation);
+        }
+        catch (RpcException exception) when (
+            !cancellation.IsCancellationRequested
+            && exception.StatusCode is StatusCode.Unavailable
+                or StatusCode.DeadlineExceeded)
+        {
+            return await FetchInvocationVerificationKeysOnce(
+                client,
+                headers,
+                deadline,
+                cancellation);
+        }
+    }
+
+    private static async Task<GetInvocationVerificationKeysResponse>
+        FetchInvocationVerificationKeysOnce(
+            IdentityService.IdentityServiceClient client,
+            Metadata headers,
+            DateTime deadline,
+            CancellationToken cancellation)
+    {
+        var callOptions = new CallOptions(
+            headers,
+            deadline,
+            cancellationToken: cancellation)
+            .WithWaitForReady();
+        return await client.GetInvocationVerificationKeysAsync(
+            new GetInvocationVerificationKeysRequest(),
+            callOptions);
     }
 
     private static VerificationKeySnapshot CreateSnapshot(
@@ -73,7 +127,7 @@ internal static partial class InvocationVerificationKeys
             StringComparer.Ordinal);
         foreach (var key in response.Keys)
         {
-            if (key.Algorithm != "RS256"
+            if (key.Algorithm != VerificationKeyAlgorithm.Rs256
                 || !IsKeyId(key.KeyId)
                 || !keys.TryAdd(
                     key.KeyId,

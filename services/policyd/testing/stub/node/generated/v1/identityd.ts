@@ -22,6 +22,39 @@ import { Timestamp } from "../google/protobuf/timestamp.js";
 
 export const protobufPackage = "ctlflow.identity.v1";
 
+export enum VerificationKeyAlgorithm {
+  VERIFICATION_KEY_ALGORITHM_UNSPECIFIED = 0,
+  VERIFICATION_KEY_ALGORITHM_RS256 = 1,
+  UNRECOGNIZED = -1,
+}
+
+export function verificationKeyAlgorithmFromJSON(object: any): VerificationKeyAlgorithm {
+  switch (object) {
+    case 0:
+    case "VERIFICATION_KEY_ALGORITHM_UNSPECIFIED":
+      return VerificationKeyAlgorithm.VERIFICATION_KEY_ALGORITHM_UNSPECIFIED;
+    case 1:
+    case "VERIFICATION_KEY_ALGORITHM_RS256":
+      return VerificationKeyAlgorithm.VERIFICATION_KEY_ALGORITHM_RS256;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return VerificationKeyAlgorithm.UNRECOGNIZED;
+  }
+}
+
+export function verificationKeyAlgorithmToJSON(object: VerificationKeyAlgorithm): string {
+  switch (object) {
+    case VerificationKeyAlgorithm.VERIFICATION_KEY_ALGORITHM_UNSPECIFIED:
+      return "VERIFICATION_KEY_ALGORITHM_UNSPECIFIED";
+    case VerificationKeyAlgorithm.VERIFICATION_KEY_ALGORITHM_RS256:
+      return "VERIFICATION_KEY_ALGORITHM_RS256";
+    case VerificationKeyAlgorithm.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum PrincipalKind {
   PRINCIPAL_KIND_UNSPECIFIED = 0,
   PRINCIPAL_KIND_HUMAN = 1,
@@ -77,7 +110,7 @@ export interface GetInvocationVerificationKeysResponse {
 
 export interface InvocationVerificationKey {
   keyId: string;
-  algorithm: string;
+  algorithm: VerificationKeyAlgorithm;
   modulusBase64url: string;
   exponentBase64url: string;
 }
@@ -110,6 +143,43 @@ export interface ListPrincipalGroupsRequest {
 export interface ListPrincipalGroupsResponse {
   groupIds: string[];
   nextAfterGroupId?: string | undefined;
+}
+
+export interface CreateSessionRequest {
+  tenantId: string;
+  providerId: string;
+  providerSubject: string;
+}
+
+export interface CreateSessionResponse {
+  sessionId: string;
+  sessionCredential: Buffer;
+  expiresAt: Date | undefined;
+}
+
+export interface ExchangeSessionRequest {
+  sessionCredential: Buffer;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface RevokeSessionRequest {
+  sessionCredential: Buffer;
+}
+
+export interface RevokeSessionResponse {
+}
+
+export interface IssueRunInvocationRequest {
+  principalId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+  runId: string;
+}
+
+export interface IssueInvocationResponse {
+  invocationJwt: string;
+  expiresAt: Date | undefined;
 }
 
 function createBaseGetInvocationVerificationKeysRequest(): GetInvocationVerificationKeysRequest {
@@ -234,7 +304,7 @@ export const GetInvocationVerificationKeysResponse: MessageFns<GetInvocationVeri
 };
 
 function createBaseInvocationVerificationKey(): InvocationVerificationKey {
-  return { keyId: "", algorithm: "", modulusBase64url: "", exponentBase64url: "" };
+  return { keyId: "", algorithm: 0, modulusBase64url: "", exponentBase64url: "" };
 }
 
 export const InvocationVerificationKey: MessageFns<InvocationVerificationKey> = {
@@ -242,8 +312,8 @@ export const InvocationVerificationKey: MessageFns<InvocationVerificationKey> = 
     if (message.keyId !== "") {
       writer.uint32(10).string(message.keyId);
     }
-    if (message.algorithm !== "") {
-      writer.uint32(18).string(message.algorithm);
+    if (message.algorithm !== 0) {
+      writer.uint32(16).int32(message.algorithm);
     }
     if (message.modulusBase64url !== "") {
       writer.uint32(26).string(message.modulusBase64url);
@@ -270,11 +340,11 @@ export const InvocationVerificationKey: MessageFns<InvocationVerificationKey> = 
           continue;
         }
         case 2: {
-          if (tag !== 18) {
+          if (tag !== 16) {
             break;
           }
 
-          message.algorithm = reader.string();
+          message.algorithm = reader.int32() as any;
           continue;
         }
         case 3: {
@@ -305,7 +375,7 @@ export const InvocationVerificationKey: MessageFns<InvocationVerificationKey> = 
   fromJSON(object: any): InvocationVerificationKey {
     return {
       keyId: isSet(object.keyId) ? globalThis.String(object.keyId) : "",
-      algorithm: isSet(object.algorithm) ? globalThis.String(object.algorithm) : "",
+      algorithm: isSet(object.algorithm) ? verificationKeyAlgorithmFromJSON(object.algorithm) : 0,
       modulusBase64url: isSet(object.modulusBase64url) ? globalThis.String(object.modulusBase64url) : "",
       exponentBase64url: isSet(object.exponentBase64url) ? globalThis.String(object.exponentBase64url) : "",
     };
@@ -316,8 +386,8 @@ export const InvocationVerificationKey: MessageFns<InvocationVerificationKey> = 
     if (message.keyId !== "") {
       obj.keyId = message.keyId;
     }
-    if (message.algorithm !== "") {
-      obj.algorithm = message.algorithm;
+    if (message.algorithm !== 0) {
+      obj.algorithm = verificationKeyAlgorithmToJSON(message.algorithm);
     }
     if (message.modulusBase64url !== "") {
       obj.modulusBase64url = message.modulusBase64url;
@@ -334,7 +404,7 @@ export const InvocationVerificationKey: MessageFns<InvocationVerificationKey> = 
   fromPartial(object: DeepPartial<InvocationVerificationKey>): InvocationVerificationKey {
     const message = createBaseInvocationVerificationKey();
     message.keyId = object.keyId ?? "";
-    message.algorithm = object.algorithm ?? "";
+    message.algorithm = object.algorithm ?? 0;
     message.modulusBase64url = object.modulusBase64url ?? "";
     message.exponentBase64url = object.exponentBase64url ?? "";
     return message;
@@ -825,6 +895,575 @@ export const ListPrincipalGroupsResponse: MessageFns<ListPrincipalGroupsResponse
   },
 };
 
+function createBaseCreateSessionRequest(): CreateSessionRequest {
+  return { tenantId: "", providerId: "", providerSubject: "" };
+}
+
+export const CreateSessionRequest: MessageFns<CreateSessionRequest> = {
+  encode(message: CreateSessionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.providerSubject !== "") {
+      writer.uint32(26).string(message.providerSubject);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateSessionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateSessionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.providerSubject = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateSessionRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      providerSubject: isSet(object.providerSubject) ? globalThis.String(object.providerSubject) : "",
+    };
+  },
+
+  toJSON(message: CreateSessionRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.providerSubject !== "") {
+      obj.providerSubject = message.providerSubject;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateSessionRequest>): CreateSessionRequest {
+    return CreateSessionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateSessionRequest>): CreateSessionRequest {
+    const message = createBaseCreateSessionRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.providerSubject = object.providerSubject ?? "";
+    return message;
+  },
+};
+
+function createBaseCreateSessionResponse(): CreateSessionResponse {
+  return { sessionId: "", sessionCredential: Buffer.alloc(0), expiresAt: undefined };
+}
+
+export const CreateSessionResponse: MessageFns<CreateSessionResponse> = {
+  encode(message: CreateSessionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionId !== "") {
+      writer.uint32(10).string(message.sessionId);
+    }
+    if (message.sessionCredential.length !== 0) {
+      writer.uint32(18).bytes(message.sessionCredential);
+    }
+    if (message.expiresAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.expiresAt), writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateSessionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateSessionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sessionCredential = Buffer.from(reader.bytes());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.expiresAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateSessionResponse {
+    return {
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      sessionCredential: isSet(object.sessionCredential)
+        ? Buffer.from(bytesFromBase64(object.sessionCredential))
+        : Buffer.alloc(0),
+      expiresAt: isSet(object.expiresAt) ? fromJsonTimestamp(object.expiresAt) : undefined,
+    };
+  },
+
+  toJSON(message: CreateSessionResponse): unknown {
+    const obj: any = {};
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.sessionCredential.length !== 0) {
+      obj.sessionCredential = base64FromBytes(message.sessionCredential);
+    }
+    if (message.expiresAt !== undefined) {
+      obj.expiresAt = message.expiresAt.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateSessionResponse>): CreateSessionResponse {
+    return CreateSessionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateSessionResponse>): CreateSessionResponse {
+    const message = createBaseCreateSessionResponse();
+    message.sessionId = object.sessionId ?? "";
+    message.sessionCredential = object.sessionCredential ?? Buffer.alloc(0);
+    message.expiresAt = object.expiresAt ?? undefined;
+    return message;
+  },
+};
+
+function createBaseExchangeSessionRequest(): ExchangeSessionRequest {
+  return { sessionCredential: Buffer.alloc(0), tenantId: "", workspaceId: undefined };
+}
+
+export const ExchangeSessionRequest: MessageFns<ExchangeSessionRequest> = {
+  encode(message: ExchangeSessionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionCredential.length !== 0) {
+      writer.uint32(10).bytes(message.sessionCredential);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExchangeSessionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExchangeSessionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionCredential = Buffer.from(reader.bytes());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExchangeSessionRequest {
+    return {
+      sessionCredential: isSet(object.sessionCredential)
+        ? Buffer.from(bytesFromBase64(object.sessionCredential))
+        : Buffer.alloc(0),
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: ExchangeSessionRequest): unknown {
+    const obj: any = {};
+    if (message.sessionCredential.length !== 0) {
+      obj.sessionCredential = base64FromBytes(message.sessionCredential);
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExchangeSessionRequest>): ExchangeSessionRequest {
+    return ExchangeSessionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExchangeSessionRequest>): ExchangeSessionRequest {
+    const message = createBaseExchangeSessionRequest();
+    message.sessionCredential = object.sessionCredential ?? Buffer.alloc(0);
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseRevokeSessionRequest(): RevokeSessionRequest {
+  return { sessionCredential: Buffer.alloc(0) };
+}
+
+export const RevokeSessionRequest: MessageFns<RevokeSessionRequest> = {
+  encode(message: RevokeSessionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionCredential.length !== 0) {
+      writer.uint32(10).bytes(message.sessionCredential);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeSessionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeSessionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionCredential = Buffer.from(reader.bytes());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevokeSessionRequest {
+    return {
+      sessionCredential: isSet(object.sessionCredential)
+        ? Buffer.from(bytesFromBase64(object.sessionCredential))
+        : Buffer.alloc(0),
+    };
+  },
+
+  toJSON(message: RevokeSessionRequest): unknown {
+    const obj: any = {};
+    if (message.sessionCredential.length !== 0) {
+      obj.sessionCredential = base64FromBytes(message.sessionCredential);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeSessionRequest>): RevokeSessionRequest {
+    return RevokeSessionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevokeSessionRequest>): RevokeSessionRequest {
+    const message = createBaseRevokeSessionRequest();
+    message.sessionCredential = object.sessionCredential ?? Buffer.alloc(0);
+    return message;
+  },
+};
+
+function createBaseRevokeSessionResponse(): RevokeSessionResponse {
+  return {};
+}
+
+export const RevokeSessionResponse: MessageFns<RevokeSessionResponse> = {
+  encode(_: RevokeSessionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeSessionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevokeSessionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): RevokeSessionResponse {
+    return {};
+  },
+
+  toJSON(_: RevokeSessionResponse): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevokeSessionResponse>): RevokeSessionResponse {
+    return RevokeSessionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<RevokeSessionResponse>): RevokeSessionResponse {
+    const message = createBaseRevokeSessionResponse();
+    return message;
+  },
+};
+
+function createBaseIssueRunInvocationRequest(): IssueRunInvocationRequest {
+  return { principalId: "", tenantId: "", workspaceId: undefined, runId: "" };
+}
+
+export const IssueRunInvocationRequest: MessageFns<IssueRunInvocationRequest> = {
+  encode(message: IssueRunInvocationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    if (message.runId !== "") {
+      writer.uint32(34).string(message.runId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): IssueRunInvocationRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseIssueRunInvocationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.runId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): IssueRunInvocationRequest {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      runId: isSet(object.runId) ? globalThis.String(object.runId) : "",
+    };
+  },
+
+  toJSON(message: IssueRunInvocationRequest): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.runId !== "") {
+      obj.runId = message.runId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<IssueRunInvocationRequest>): IssueRunInvocationRequest {
+    return IssueRunInvocationRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<IssueRunInvocationRequest>): IssueRunInvocationRequest {
+    const message = createBaseIssueRunInvocationRequest();
+    message.principalId = object.principalId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.runId = object.runId ?? "";
+    return message;
+  },
+};
+
+function createBaseIssueInvocationResponse(): IssueInvocationResponse {
+  return { invocationJwt: "", expiresAt: undefined };
+}
+
+export const IssueInvocationResponse: MessageFns<IssueInvocationResponse> = {
+  encode(message: IssueInvocationResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.invocationJwt !== "") {
+      writer.uint32(10).string(message.invocationJwt);
+    }
+    if (message.expiresAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.expiresAt), writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): IssueInvocationResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseIssueInvocationResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.invocationJwt = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.expiresAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): IssueInvocationResponse {
+    return {
+      invocationJwt: isSet(object.invocationJwt) ? globalThis.String(object.invocationJwt) : "",
+      expiresAt: isSet(object.expiresAt) ? fromJsonTimestamp(object.expiresAt) : undefined,
+    };
+  },
+
+  toJSON(message: IssueInvocationResponse): unknown {
+    const obj: any = {};
+    if (message.invocationJwt !== "") {
+      obj.invocationJwt = message.invocationJwt;
+    }
+    if (message.expiresAt !== undefined) {
+      obj.expiresAt = message.expiresAt.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<IssueInvocationResponse>): IssueInvocationResponse {
+    return IssueInvocationResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<IssueInvocationResponse>): IssueInvocationResponse {
+    const message = createBaseIssueInvocationResponse();
+    message.invocationJwt = object.invocationJwt ?? "";
+    message.expiresAt = object.expiresAt ?? undefined;
+    return message;
+  },
+};
+
 export type IdentityServiceService = typeof IdentityServiceService;
 export const IdentityServiceService = {
   getInvocationVerificationKeys: {
@@ -862,6 +1501,48 @@ export const IdentityServiceService = {
       Buffer.from(ListPrincipalGroupsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ListPrincipalGroupsResponse => ListPrincipalGroupsResponse.decode(value),
   },
+  createSession: {
+    path: "/ctlflow.identity.v1.IdentityService/CreateSession",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: CreateSessionRequest): Buffer => Buffer.from(CreateSessionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateSessionRequest => CreateSessionRequest.decode(value),
+    responseSerialize: (value: CreateSessionResponse): Buffer =>
+      Buffer.from(CreateSessionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): CreateSessionResponse => CreateSessionResponse.decode(value),
+  },
+  exchangeSession: {
+    path: "/ctlflow.identity.v1.IdentityService/ExchangeSession",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ExchangeSessionRequest): Buffer =>
+      Buffer.from(ExchangeSessionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ExchangeSessionRequest => ExchangeSessionRequest.decode(value),
+    responseSerialize: (value: IssueInvocationResponse): Buffer =>
+      Buffer.from(IssueInvocationResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): IssueInvocationResponse => IssueInvocationResponse.decode(value),
+  },
+  revokeSession: {
+    path: "/ctlflow.identity.v1.IdentityService/RevokeSession",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: RevokeSessionRequest): Buffer => Buffer.from(RevokeSessionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RevokeSessionRequest => RevokeSessionRequest.decode(value),
+    responseSerialize: (value: RevokeSessionResponse): Buffer =>
+      Buffer.from(RevokeSessionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RevokeSessionResponse => RevokeSessionResponse.decode(value),
+  },
+  issueRunInvocation: {
+    path: "/ctlflow.identity.v1.IdentityService/IssueRunInvocation",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: IssueRunInvocationRequest): Buffer =>
+      Buffer.from(IssueRunInvocationRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): IssueRunInvocationRequest => IssueRunInvocationRequest.decode(value),
+    responseSerialize: (value: IssueInvocationResponse): Buffer =>
+      Buffer.from(IssueInvocationResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): IssueInvocationResponse => IssueInvocationResponse.decode(value),
+  },
 } as const;
 
 export interface IdentityServiceServer extends UntypedServiceImplementation {
@@ -871,6 +1552,10 @@ export interface IdentityServiceServer extends UntypedServiceImplementation {
   >;
   resolvePrincipal: handleUnaryCall<ResolvePrincipalRequest, ResolvePrincipalResponse>;
   listPrincipalGroups: handleUnaryCall<ListPrincipalGroupsRequest, ListPrincipalGroupsResponse>;
+  createSession: handleUnaryCall<CreateSessionRequest, CreateSessionResponse>;
+  exchangeSession: handleUnaryCall<ExchangeSessionRequest, IssueInvocationResponse>;
+  revokeSession: handleUnaryCall<RevokeSessionRequest, RevokeSessionResponse>;
+  issueRunInvocation: handleUnaryCall<IssueRunInvocationRequest, IssueInvocationResponse>;
 }
 
 export interface IdentityServiceClient extends Client {
@@ -919,6 +1604,66 @@ export interface IdentityServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: ListPrincipalGroupsResponse) => void,
   ): ClientUnaryCall;
+  createSession(
+    request: CreateSessionRequest,
+    callback: (error: ServiceError | null, response: CreateSessionResponse) => void,
+  ): ClientUnaryCall;
+  createSession(
+    request: CreateSessionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CreateSessionResponse) => void,
+  ): ClientUnaryCall;
+  createSession(
+    request: CreateSessionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CreateSessionResponse) => void,
+  ): ClientUnaryCall;
+  exchangeSession(
+    request: ExchangeSessionRequest,
+    callback: (error: ServiceError | null, response: IssueInvocationResponse) => void,
+  ): ClientUnaryCall;
+  exchangeSession(
+    request: ExchangeSessionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: IssueInvocationResponse) => void,
+  ): ClientUnaryCall;
+  exchangeSession(
+    request: ExchangeSessionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: IssueInvocationResponse) => void,
+  ): ClientUnaryCall;
+  revokeSession(
+    request: RevokeSessionRequest,
+    callback: (error: ServiceError | null, response: RevokeSessionResponse) => void,
+  ): ClientUnaryCall;
+  revokeSession(
+    request: RevokeSessionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RevokeSessionResponse) => void,
+  ): ClientUnaryCall;
+  revokeSession(
+    request: RevokeSessionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RevokeSessionResponse) => void,
+  ): ClientUnaryCall;
+  issueRunInvocation(
+    request: IssueRunInvocationRequest,
+    callback: (error: ServiceError | null, response: IssueInvocationResponse) => void,
+  ): ClientUnaryCall;
+  issueRunInvocation(
+    request: IssueRunInvocationRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: IssueInvocationResponse) => void,
+  ): ClientUnaryCall;
+  issueRunInvocation(
+    request: IssueRunInvocationRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: IssueInvocationResponse) => void,
+  ): ClientUnaryCall;
 }
 
 export const IdentityServiceClient = makeGenericClientConstructor(
@@ -929,6 +1674,14 @@ export const IdentityServiceClient = makeGenericClientConstructor(
   service: typeof IdentityServiceService;
   serviceName: string;
 };
+
+function bytesFromBase64(b64: string): Uint8Array {
+  return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  return globalThis.Buffer.from(arr).toString("base64");
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | bigint | undefined;
 

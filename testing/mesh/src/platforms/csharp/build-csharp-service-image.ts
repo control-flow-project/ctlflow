@@ -23,30 +23,46 @@ export async function buildCSharpServiceImage(
   if (!/^[a-z0-9][a-z0-9._-]*$/u.test(imageName)) {
     throw new Error("C# service image name is invalid");
   }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(
+      publication.executableName)) {
+    throw new Error("C# publication executable name is invalid");
+  }
 
+  const runtimeImage = readFinalRuntimeImage(
+    await readFile(containerfilePath, "utf8"));
   const fingerprint = createHash("sha256")
-    .update("ctlflow-csharp-image-v1\0")
+    .update("ctlflow-csharp-image-v2\0")
     .update(publicationFingerprint)
     .update("\0")
-    .update(await readFile(containerfilePath))
+    .update(runtimeImage)
     .update("\0")
-    .update(await readFile(
-      path.join(repositoryRoot, ".dockerignore")))
+    .update(publication.executableName)
     .digest("hex");
   const image = `ctlflow-test-${imageName}:${fingerprint}`;
   if (!await imageExists(repositoryRoot, image)) {
+    const containerfile = [
+      `FROM ${runtimeImage}`,
+      "WORKDIR /app",
+      "COPY . ./",
+      "USER 65532:65532",
+      `ENTRYPOINT ["/app/${publication.executableName}"]`,
+      ""
+    ].join("\n");
     await runCommand(
       "docker",
       [
         "build",
         "--network=host",
         "--file",
-        containerfilePath,
+        "-",
         "--tag",
         image,
-        repositoryRoot
+        publication.directoryPath
       ],
-      { cwd: repositoryRoot });
+      {
+        cwd: repositoryRoot,
+        input: containerfile
+      });
   }
 
   await kubernetes.loadImage(image);
@@ -63,4 +79,21 @@ async function imageExists(
     { cwd: repositoryRoot })
     .then(() => true)
     .catch(() => false);
+}
+
+function readFinalRuntimeImage(containerfile: string): string {
+  const images = containerfile
+    .split(/\r?\n/u)
+    .map((line) => /^FROM\s+(\S+)(?:\s+AS\s+\S+)?\s*$/iu.exec(
+      line.trim())?.[1])
+    .filter((image): image is string => image !== undefined);
+  const image = images.at(-1);
+  if (image === undefined
+      || image.startsWith("$")
+      || image.includes("${")) {
+    throw new Error(
+      "C# Containerfile must end with a concrete runtime image");
+  }
+
+  return image;
 }

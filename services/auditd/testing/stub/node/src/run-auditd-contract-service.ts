@@ -16,6 +16,7 @@ import http from "node:http";
 import {
   AuditServiceService,
   type AuditEvent,
+  IdentitySessionAction,
   type RecordAuditBatchRequest,
   type RecordAuditBatchResponse
 } from "../generated/v1/auditd.js";
@@ -164,12 +165,10 @@ function createEvidence(
       || event.occurredAt === undefined
       || event.attribution === undefined
       || event.partition?.tenant === undefined
-      || event.tenancyMutation === undefined
       || event.traceId.length !== 32
       || event.spanId.length !== 16) {
     throw new Error("invalid audit event");
   }
-  const detail = event.tenancyMutation;
   const attribution = createAttributionEvidence(event.attribution);
   const common = {
     sourceEventId: event.sourceEventId,
@@ -178,30 +177,65 @@ function createEvidence(
     occurredAt: event.occurredAt.toISOString(),
     ...attribution,
     tenantId: event.partition.tenant.tenantId,
-    outcome: detail.outcome,
-    resultingState: detail.resultingState,
-    resourceRevision: detail.resourceRevision,
     traceId: event.traceId,
     spanId: event.spanId,
     ...(receivedTraceparent === undefined
       ? {}
       : { receivedTraceparent })
   } as const;
-  if (detail.tenant !== undefined) {
-    return {
-      ...common,
-      targetKind: "tenant",
-      targetId: detail.tenant.tenantId
-    };
+  const tenancy = event.tenancyMutation;
+  if (tenancy !== undefined) {
+    if (tenancy.tenant !== undefined) {
+      return {
+        ...common,
+        targetKind: "tenant",
+        targetId: tenancy.tenant.tenantId,
+        outcome: tenancy.outcome,
+        resultingState: tenancy.resultingState,
+        resourceRevision: tenancy.resourceRevision
+      };
+    }
+    if (tenancy.workspace !== undefined) {
+      return {
+        ...common,
+        targetKind: "workspace",
+        targetId: tenancy.workspace.workspaceId,
+        outcome: tenancy.outcome,
+        resultingState: tenancy.resultingState,
+        resourceRevision: tenancy.resourceRevision
+      };
+    }
   }
-  if (detail.workspace !== undefined) {
+  const session = event.identitySession;
+  if (
+    session !== undefined
+    && session.sessionId.length > 0
+    && session.accountPrincipalId.length > 0
+    && session.sessionRevision > 0n
+  ) {
     return {
       ...common,
-      targetKind: "workspace",
-      targetId: detail.workspace.workspaceId
+      targetKind: "session",
+      sessionId: session.sessionId,
+      accountPrincipalId: session.accountPrincipalId,
+      sessionRevision: session.sessionRevision,
+      action: mapSessionAction(session.action)
     };
   }
   throw new Error("audit target is required");
+}
+
+function mapSessionAction(
+  action: IdentitySessionAction
+): "created" | "revoked" {
+  switch (action) {
+    case IdentitySessionAction.IDENTITY_SESSION_ACTION_CREATED:
+      return "created";
+    case IdentitySessionAction.IDENTITY_SESSION_ACTION_REVOKED:
+      return "revoked";
+    default:
+      throw new Error("identity Session action is invalid");
+  }
 }
 
 function createAttributionEvidence(

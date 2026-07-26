@@ -10,7 +10,12 @@
 // so the release path is never a warning-tolerant command that skips the gate.
 
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import {
   diagnosticsMatch,
   extractDiagnostics,
@@ -28,6 +33,8 @@ if (!project || !manifestPath || !outputDir) {
 }
 
 const repositoryRoot = process.cwd();
+rmSync(outputDir, { recursive: true, force: true });
+mkdirSync(outputDir, { recursive: true });
 
 function dotnet(args) {
   const result = spawnSync("dotnet", args, {
@@ -50,7 +57,12 @@ function require(step, result) {
   return result;
 }
 
-require("dotnet clean", dotnet([
+require("dotnet Debug clean", dotnet([
+  "clean", project, "--configuration", "Debug", "--runtime", "linux-x64",
+  "--disable-build-servers", "-m:1", "-p:UseSharedCompilation=false"
+]));
+
+require("dotnet Release clean", dotnet([
   "clean", project, "--configuration", "Release", "--runtime", "linux-x64",
   "--disable-build-servers", "-m:1", "-p:UseSharedCompilation=false"
 ]));

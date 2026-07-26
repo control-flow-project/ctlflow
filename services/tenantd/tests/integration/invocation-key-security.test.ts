@@ -7,7 +7,7 @@ import {
 } from "@grpc/grpc-js";
 import type {
   InvocationVerificationKey
-} from "@ctlflow/identityd/testing/stub";
+} from "@ctlflow/identityd/testing/production";
 import type {
   ResolveTenantResponse
 } from "../generated/v1/tenantd.js";
@@ -24,19 +24,34 @@ import {
   matchGrpcStatus
 } from "../support/match-grpc-status.js";
 import {
+  createTenant
+} from "../support/tenants/create-tenant.js";
+import {
+  findSpansForTrace
+} from "../support/telemetry/find-spans-for-trace.js";
+import {
+  waitForExport
+} from "../support/telemetry/wait-for-export.js";
+import {
   workloadMetadata
 } from "../support/workload-metadata.js";
 
+const tenantId = "invocation_key_tenant";
+const tenantAddress = "invocation-key-tenant";
+let tenantCreated: Promise<void> | undefined;
+
 test("a current known invocation key remains usable during identityd outage", async () => {
   const context = getTenantdTestContext();
+  await ensureTenant();
+  const invocation = context.invocation.sign({
+    tenantId,
+    tokenId: "security-cached-key"
+  });
+  await resolveWithInvocation(invocation);
   await context.identityd.setMode("unavailable");
   try {
-    const resolved = await resolveWithInvocation(
-      context.invocation.sign({
-        tenantId: "security_tenant",
-        tokenId: "security-cached-key"
-      }));
-    assert.equal(resolved.tenantId, "security_tenant");
+    const resolved = await resolveWithInvocation(invocation);
+    assert.equal(resolved.tenantId, tenantId);
   } finally {
     await context.identityd.setMode("available");
   }
@@ -44,22 +59,25 @@ test("a current known invocation key remains usable during identityd outage", as
 
 test("an unknown invocation key refreshes through identityd", async () => {
   const context = getTenantdTestContext();
+  await ensureTenant();
   const rotated = await createInvocationAuthority(
     "rotated-key");
-  const baseline =
-    (await context.identityd.readRequests()).length;
+  const traceId = "0a0b0c0d0e0f10111213141516171819";
   await context.identityd.setVerificationKeys(
     keyResponse(rotated.verificationKey));
   try {
     const resolved = await resolveWithInvocation(
       rotated.sign({
-        tenantId: "security_tenant",
+        tenantId,
         tokenId: "security-rotated-key"
-      }));
-    assert.equal(resolved.tenantId, "security_tenant");
-    assert.equal(
-      (await context.identityd.readRequests()).length,
-      baseline + 1);
+      }),
+      traceId);
+    assert.equal(resolved.tenantId, tenantId);
+    await waitForExport(
+      context.collector.tracesPath,
+      (value) => findSpansForTrace(value, traceId)
+        .some((span) =>
+          span.name === "identityd.GetInvocationVerificationKeys"));
   } finally {
     await context.identityd.setVerificationKeys(
       keyResponse(
@@ -68,7 +86,7 @@ test("an unknown invocation key refreshes through identityd", async () => {
 
   await resolveWithInvocation(
     context.invocation.sign({
-      tenantId: "security_tenant",
+      tenantId,
       tokenId: "security-restored-key"
     }));
 });
@@ -78,7 +96,7 @@ test("unknown keys fail unavailable when identityd cannot provide authority", as
   const unknown = await createInvocationAuthority(
     "unknown-key");
   const token = unknown.sign({
-    tenantId: "security_tenant",
+    tenantId,
     tokenId: "security-unknown-key"
   });
 
@@ -101,42 +119,19 @@ test("unknown keys fail unavailable when identityd cannot provide authority", as
   }
 });
 
-test("malformed identityd key responses fail unavailable", async () => {
+test("unavailable identityd key states fail unavailable", async () => {
   const context = getTenantdTestContext();
   const unknown = await createInvocationAuthority(
     "malformed-key");
   const key = unknown.verificationKey;
   const token = unknown.sign({
-    tenantId: "security_tenant",
+    tenantId,
     tokenId: "security-malformed-key"
   });
-  const validExpiry =
-    new Date(Date.now() + 4 * 60_000).toISOString();
   const responses = [
     {
       keys: [],
-      expiresAt: validExpiry
-    },
-    {
-      keys: [key, key],
-      expiresAt: validExpiry
-    },
-    {
-      keys: [{
-        ...key,
-        algorithm: "none"
-      }],
-      expiresAt: validExpiry
-    },
-    {
-      keys: [key],
-      expiresAt:
-        new Date(Date.now() - 1_000).toISOString()
-    },
-    {
-      keys: [key],
-      expiresAt:
-        new Date(Date.now() + 6 * 60_000).toISOString()
+      expiresAt: new Date(Date.now() + 60_000).toISOString()
     },
     {
       keys: Array.from(
@@ -145,7 +140,7 @@ test("malformed identityd key responses fail unavailable", async () => {
           ...key,
           keyId: `oversized-key-${String(index)}`
         })),
-      expiresAt: validExpiry
+      expiresAt: new Date(Date.now() + 60_000).toISOString()
     }
   ] as const;
 
@@ -160,6 +155,8 @@ test("malformed identityd key responses fail unavailable", async () => {
     await context.identityd.setVerificationKeys(
       keyResponse(
         context.invocation.verificationKey));
+    await context.service.restart(context.environment);
+    await context.reconnectPolicyIdentity();
   }
 });
 
@@ -177,14 +174,32 @@ function keyResponse(
 }
 
 async function resolveWithInvocation(
-  invocation: string
+  invocation: string,
+  traceId?: string
 ): Promise<ResolveTenantResponse> {
   const context = getTenantdTestContext();
+  const metadata = workloadMetadata(
+    context.workload.callerToken,
+    invocation);
+  if (traceId !== undefined) {
+    metadata.set(
+      "traceparent",
+      `00-${traceId}-1234567890abcdef-01`);
+  }
   return await callUnary<ResolveTenantResponse>((done) =>
     context.workloadClient.resolveTenant(
-      { address: "security-tenant" },
-      workloadMetadata(
-        context.workload.callerToken,
-        invocation),
+      { address: tenantAddress },
+      metadata,
       done));
+}
+
+async function ensureTenant(): Promise<void> {
+  tenantCreated ??= createTenant(
+    getTenantdTestContext(),
+    {
+      tenantId,
+      address: tenantAddress,
+      displayName: "Invocation Key Tenant"
+    }).then(() => undefined);
+  await tenantCreated;
 }

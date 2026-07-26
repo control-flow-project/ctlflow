@@ -1,4 +1,5 @@
 export type {
+  CSharpContainerServicePublicationOptions,
   CSharpServicePublication,
   CSharpServicePublicationOptions
 } from "./platforms/csharp/csharp-service-publication.js";
@@ -6,6 +7,9 @@ export type {
   CSharpService,
   CSharpServiceOptions
 } from "./platforms/csharp/csharp-service.js";
+export {
+  publishContainerizedCSharpService
+} from "./platforms/csharp/publish-containerized-csharp-service.js";
 export {
   publishCSharpService
 } from "./platforms/csharp/publish-csharp-service.js";

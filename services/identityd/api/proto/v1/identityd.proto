@@ -14,6 +14,14 @@ service IdentityService {
       returns (ResolvePrincipalResponse);
   rpc ListPrincipalGroups(ListPrincipalGroupsRequest)
       returns (ListPrincipalGroupsResponse);
+  rpc CreateSession(CreateSessionRequest)
+      returns (CreateSessionResponse);
+  rpc ExchangeSession(ExchangeSessionRequest)
+      returns (IssueInvocationResponse);
+  rpc RevokeSession(RevokeSessionRequest)
+      returns (RevokeSessionResponse);
+  rpc IssueRunInvocation(IssueRunInvocationRequest)
+      returns (IssueInvocationResponse);
 }
 
 message GetInvocationVerificationKeysRequest {}
@@ -25,9 +33,14 @@ message GetInvocationVerificationKeysResponse {
 
 message InvocationVerificationKey {
   string key_id = 1;
-  string algorithm = 2;
+  VerificationKeyAlgorithm algorithm = 2;
   string modulus_base64url = 3;
   string exponent_base64url = 4;
+}
+
+enum VerificationKeyAlgorithm {
+  VERIFICATION_KEY_ALGORITHM_UNSPECIFIED = 0;
+  VERIFICATION_KEY_ALGORITHM_RS256 = 1;
 }
 
 message ResolvePrincipalRequest {
@@ -58,6 +71,42 @@ message ListPrincipalGroupsRequest {
 message ListPrincipalGroupsResponse {
   repeated string group_ids = 1;
   optional string next_after_group_id = 2;
+}
+
+message CreateSessionRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+  string provider_subject = 3;
+}
+
+message CreateSessionResponse {
+  string session_id = 1;
+  bytes session_credential = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ExchangeSessionRequest {
+  bytes session_credential = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+}
+
+message RevokeSessionRequest {
+  bytes session_credential = 1;
+}
+
+message RevokeSessionResponse {}
+
+message IssueRunInvocationRequest {
+  string principal_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+  string run_id = 4;
+}
+
+message IssueInvocationResponse {
+  string invocation_jwt = 1;
+  google.protobuf.Timestamp expires_at = 2;
 }
 
 enum PrincipalKind {

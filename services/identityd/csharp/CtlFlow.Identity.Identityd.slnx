@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/CtlFlow.Identity.Identityd.Domain/CtlFlow.Identity.Identityd.Domain.csproj" />
+  <Project Path="src/CtlFlow.Identity.Identityd.Db/CtlFlow.Identity.Identityd.Db.csproj" />
+  <Project Path="src/CtlFlow.Identity.Identityd.Service/CtlFlow.Identity.Identityd.Service.csproj" />
+  <Project Path="tests/CtlFlow.Identity.Identityd.IntegrationTests/CtlFlow.Identity.Identityd.IntegrationTests.csproj" />
+</Solution>

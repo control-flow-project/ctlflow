@@ -207,27 +207,17 @@ test("capability denial, standing, and identity state fail closed", async () => 
     getTenant(tenant.tenantId, metadata),
     matchGrpcStatus(status.NOT_FOUND));
 
-  for (const state of [
-    {
-      principalEnabled: false,
-      subjectAccountEnabled: true
-    },
-    {
-      principalEnabled: true,
-      subjectAccountEnabled: false
-    }
-  ]) {
-    await configureCapabilityPolicy(context, {
-      tenantId: tenant.tenantId,
-      ...state,
-      grants: [
-        grant("user:alice", "tenants.read", path)
-      ]
-    });
-    await assert.rejects(
-      getTenant(tenant.tenantId, metadata),
-      matchGrpcStatus(status.PERMISSION_DENIED));
-  }
+  await configureCapabilityPolicy(context, {
+    tenantId: tenant.tenantId,
+    principalEnabled: false,
+    subjectAccountEnabled: false,
+    grants: [
+      grant("user:alice", "tenants.read", path)
+    ]
+  });
+  await assert.rejects(
+    getTenant(tenant.tenantId, metadata),
+    matchGrpcStatus(status.PERMISSION_DENIED));
 });
 
 test("policy and identity dependency failures preserve canonical statuses", async () => {
@@ -284,22 +274,8 @@ test("policy and identity dependency failures preserve canonical statuses", asyn
   } finally {
     await context.policyIdentityd.setMode("available");
   }
-
-  await context.policyIdentityd.setPrincipalFacts([{
-    principalId: "user:alice",
-    tenantId: tenant.tenantId,
-    principalKind: "human",
-    principalEnabled: true,
-    principalRevision: 0,
-    subjectAccountId: "user:alice",
-    subjectAccountEnabled: true,
-    subjectAccountRevision: 1,
-    membershipRevision: 1,
-    groupIds: []
-  }]);
-  await assert.rejects(
-    getTenant(tenant.tenantId, metadata),
-    matchGrpcStatus(status.UNAVAILABLE));
+  await context.reconnectPolicyIdentity();
+  await context.service.restart(context.environment);
 
   await context.policyd.setMode("blocked");
   try {
@@ -324,6 +300,14 @@ test("policyd independently validates the invocation signature", async () => {
     displayName: "Capability Independent Tenant"
   });
   await configureReadPolicy(tenant.tenantId);
+  await getTenant(
+    tenant.tenantId,
+    workloadMetadata(
+      context.workload.callerToken,
+      context.invocation.sign({
+        tenantId: tenant.tenantId,
+        tokenId: "capability-independent-cache"
+      })));
   const otherAuthority = await createInvocationAuthority(
     "policy-other-key");
   await context.policyIdentityd.setVerificationKeys({

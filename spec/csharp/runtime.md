@@ -23,6 +23,13 @@ gRPC operation.
 C# instrumentation uses the OpenTelemetry .NET APIs with explicit `ActivitySource`, `Meter`, gRPC,
 HTTP, and Entity Framework integration selected for NativeAOT compatibility. Runtime profiler
 injection, reflection-discovered instrumentation, and a managed-only telemetry path are forbidden.
+
+When C# renders a `Grpc.Core.StatusCode`, it deterministically converts the
+runtime enum spelling to the canonical uppercase underscore status name
+defined by the shared API. For example, `StatusCode.OK` is `OK` and
+`StatusCode.DeadlineExceeded` is `DEADLINE_EXCEEDED`. Locale-sensitive casing,
+`ToLowerInvariant`, concatenated Pascal case, and service-specific status
+tables are forbidden.
 The shipping native process exports bounded OTLP and preserves W3C `traceparent` and `tracestate`.
 
 OpenTelemetry package versions are pinned centrally. Native publication and integration tests
@@ -44,6 +51,16 @@ cannot be removed under the pinned SDK and package set. A fingerprint contains t
 owning project, normalized source identity, and complete message. Normalization may replace only
 machine-specific repository, package-cache, generated-output, and publication roots; it cannot
 discard a diagnostic code, source identity, message, or multiplicity.
+
+Before restore or publication, the publisher cleans both the design-time `Debug` configuration and
+the shipping `Release` configuration with build-server reuse disabled, then empties and recreates
+its requested publication directory. Files from an earlier build or publication never participate
+in compilation, Entity Framework generation, diagnostic collection, or the emitted artifact.
+
+Canonical tests run that publisher in the digest-pinned shipping SDK environment and cache its
+verified native output by the complete effective source fingerprint. Test images add only those
+cached bytes to the digest-pinned shipping runtime base; they never republish on the host or compile
+a second time while packaging the image.
 
 Publication fails for a missing, additional, or changed fingerprint. Broad `NoWarn`, source or
 MSBuild suppression attributes, wildcard entries, accept-any matching, and a warning-tolerant

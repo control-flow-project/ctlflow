@@ -43,6 +43,12 @@ realization boundaries and cannot replace Placement identity or policy.
 Provider-owned custom resources may be used by installed provider
 controllers; they are not `execd` domain records.
 
+When one admitted Run must act through product or kernel APIs, Execd calls
+`identityd.IssueRunInvocation` with the Run ID, configured Actor, and exact
+target. Execd never supplies an attached account or signing material.
+Identityd resolves attachment and standing and returns one short-lived
+Run-origin invocation JWT.
+
 ## Invariants
 
 - One valid Placement source tuple maps to one canonical Placement.

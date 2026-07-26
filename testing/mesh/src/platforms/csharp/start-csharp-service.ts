@@ -153,6 +153,7 @@ export async function startCSharpService(
     if (initial) {
       await waitForKustomizeServiceMigration(current);
       await grantKustomizeServiceStorageAccess(current);
+      await options.provision?.();
       await options.kubernetes.runKubectl([
         "scale",
         `statefulset/${options.name}`,

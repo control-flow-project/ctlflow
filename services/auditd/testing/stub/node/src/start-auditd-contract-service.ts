@@ -15,7 +15,9 @@ import type {
   AuditdContractService
 } from "./auditd-contract-service.js";
 import type {
-  AuditEventEvidence
+  AuditEventEvidence,
+  IdentitySessionAuditEventEvidence,
+  TenancyAuditEventEvidence
 } from "./audit-event-evidence.js";
 import type {
   AuditdMode
@@ -139,19 +141,12 @@ async function createSource(
           body: { mode }
         });
     },
-    readEvents: async () => {
-      const events = await requestAuditdControl<Array<
-        Omit<AuditEventEvidence, "resourceRevision"> & {
-          readonly resourceRevision: string;
-        }
-      >>(
-        controlEndpoint,
-        `/sources/${sourceId}/events`);
-      return events.map((event) => ({
-        ...event,
-        resourceRevision: BigInt(event.resourceRevision)
-      }));
-    },
+    readTenancyEvents: async () =>
+      readTenancyEvents(
+        await readEvents(controlEndpoint, sourceId)),
+    readIdentitySessionEvents: async () =>
+      readIdentitySessionEvents(
+        await readEvents(controlEndpoint, sourceId)),
     stop: async () => {
       if (stopped) {
         return;
@@ -163,4 +158,56 @@ async function createSource(
         { method: "DELETE" });
     }
   };
+}
+
+type SerializedAuditEventEvidence =
+  | (
+      Omit<TenancyAuditEventEvidence, "resourceRevision">
+      & { readonly resourceRevision: string }
+    )
+  | (
+      Omit<IdentitySessionAuditEventEvidence, "sessionRevision">
+      & { readonly sessionRevision: string }
+    );
+
+async function readEvents(
+  controlEndpoint: string,
+  sourceId: string
+): Promise<readonly AuditEventEvidence[]> {
+  const events = await requestAuditdControl<
+    readonly SerializedAuditEventEvidence[]
+  >(
+    controlEndpoint,
+    `/sources/${sourceId}/events`);
+  return events.map((event) =>
+    event.targetKind === "session"
+      ? {
+          ...event,
+          sessionRevision: BigInt(event.sessionRevision)
+        }
+      : {
+          ...event,
+          resourceRevision: BigInt(event.resourceRevision)
+        });
+}
+
+function readTenancyEvents(
+  events: readonly AuditEventEvidence[]
+): readonly TenancyAuditEventEvidence[] {
+  if (events.some((event) => event.targetKind === "session")) {
+    throw new Error("Audit source contains non-tenancy evidence");
+  }
+
+  return events as readonly TenancyAuditEventEvidence[];
+}
+
+function readIdentitySessionEvents(
+  events: readonly AuditEventEvidence[]
+): readonly IdentitySessionAuditEventEvidence[] {
+  if (events.some((event) => event.targetKind !== "session")) {
+    throw new Error(
+      "Audit source contains non-identity-Session evidence");
+  }
+
+  return events as readonly IdentitySessionAuditEventEvidence[];
 }

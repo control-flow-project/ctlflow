@@ -2,8 +2,9 @@ import {
   createPublicKey,
   verify
 } from "node:crypto";
-import type {
-  GetInvocationVerificationKeysResponse
+import {
+  VerificationKeyAlgorithm,
+  type GetInvocationVerificationKeysResponse
 } from "../generated/v1/identityd.js";
 import type {
   InvocationIdentity
@@ -146,7 +147,8 @@ function loadVerificationKey(
     if (
       candidate.keyId.length < 1
       || candidate.keyId.length > 128
-      || candidate.algorithm !== "RS256"
+      || candidate.algorithm
+        !== VerificationKeyAlgorithm.VERIFICATION_KEY_ALGORITHM_RS256
       || candidate.modulusBase64url.length < 1
       || candidate.exponentBase64url.length < 1
       || seen.has(candidate.keyId)

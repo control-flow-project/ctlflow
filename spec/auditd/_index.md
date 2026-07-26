@@ -27,9 +27,18 @@ trace and span IDs
 one typed detail
 ```
 
-The approved detail set contains Tenant and Workspace mutation evidence. The
-response returns one acceptance per event with source event ID and partition
-cursor.
+The approved detail set contains:
+
+- Tenant and Workspace mutation evidence; and
+- Identityd Session creation and actual revocation evidence.
+
+Session evidence contains only the opaque Session ID, account principal ID,
+positive Session revision, and creation or revocation action. It never contains
+the Session credential or digest, provider identity, invocation token,
+signing material, or browser protocol data.
+
+The response returns one acceptance per event with source event ID and
+partition cursor.
 
 No query, export, watch, stream, redaction, payload-deletion,
 cursor-management, or Kubernetes-resource operation exists in the contract.
