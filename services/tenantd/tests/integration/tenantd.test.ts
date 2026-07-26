@@ -1,14 +1,18 @@
-import "./resolve-tenant.js";
-import "./resolve-workspace.js";
-import "./tenant-administration.js";
-import "./workspace-administration.js";
-import "./lifecycle-coordination.js";
-import "./lifecycle-contract.js";
-import "./tenant-lifecycle.js";
-import "./workspace-lifecycle.js";
-import "./tenant-watch.js";
-import "./workspace-watch.js";
-import "./audit-delivery.js";
-import "./audit-admission.js";
-import "./audit-operations.js";
-import "./aggregation-boundary.js";
+import { after } from "node:test";
+import {
+  stopTenantdTestSuite
+} from "../suite/stop-tenantd-test-suite.js";
+
+after(async () => {
+  await stopTenantdTestSuite();
+});
+
+await import("./api.test.js");
+await import("./audit-and-telemetry.test.js");
+await import("./parent-child-concurrency.test.js");
+await import("./security.test.js");
+await import("./invocation-key-security.test.js");
+await import("./tenants.test.js");
+await import("./workspace-pagination.test.js");
+await import("./workspaces.test.js");
+await import("./zz-persistence.test.js");

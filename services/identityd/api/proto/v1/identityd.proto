@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package ctlflow.identity.v1;
+
+option csharp_namespace = "CtlFlow.Identity.V1";
+
+import "google/protobuf/timestamp.proto";
+
+service IdentityService {
+  rpc GetInvocationVerificationKeys(
+      GetInvocationVerificationKeysRequest)
+      returns (GetInvocationVerificationKeysResponse);
+}
+
+message GetInvocationVerificationKeysRequest {}
+
+message GetInvocationVerificationKeysResponse {
+  repeated InvocationVerificationKey keys = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message InvocationVerificationKey {
+  string key_id = 1;
+  string algorithm = 2;
+  string modulus_base64url = 3;
+  string exponent_base64url = 4;
+}

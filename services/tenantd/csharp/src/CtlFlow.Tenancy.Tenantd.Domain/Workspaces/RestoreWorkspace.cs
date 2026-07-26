@@ -1,5 +1,6 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
-using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
+using CtlFlow.Tenancy.Tenantd.Domain.Addresses;
+using CtlFlow.Tenancy.Tenantd.Domain.Names;
+using CtlFlow.Tenancy.Tenantd.Domain.Resources;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.Tenantd.Domain.Time;
 
@@ -8,28 +9,29 @@ namespace CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 public static partial class Workspaces
 {
     public static ValueTask<Workspace> RestoreWorkspace(
-        WorkspaceId id,
+        WorkspaceId workspaceId,
         TenantId tenantId,
-        WorkspaceDisplayName displayName,
-        LifecycleState lifecycle,
-        WorkspaceRevision revision,
-        WorkspaceProvisioningGeneration provisioningGeneration,
-        LifecycleOperationId? currentOperationId,
-        ResourceEventSequence lastEventSequence,
+        ResourceAddress address,
+        DisplayName displayName,
+        ResourceState state,
+        Revision revision,
         UtcInstant createdAt,
         UtcInstant updatedAt,
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
+        if (!Enum.IsDefined(state) || updatedAt.Value < createdAt.Value)
+        {
+            throw new InvalidOperationException("Stored Workspace state is invalid");
+        }
+
         return ValueTask.FromResult(new Workspace(
-            id,
+            workspaceId,
             tenantId,
+            address,
             displayName,
-            lifecycle,
+            state,
             revision,
-            provisioningGeneration,
-            currentOperationId,
-            lastEventSequence,
             createdAt,
             updatedAt));
     }

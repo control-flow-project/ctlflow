@@ -1,8 +1,9 @@
 using CtlFlow.Tenancy.Tenantd.Db;
+using CtlFlow.Tenancy.Tenantd.Db.Providers;
 using CtlFlow.Tenancy.Tenantd.Db.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
-using static CtlFlow.Tenancy.Tenantd.Db.Sqlite.TenantDatabases;
+using static CtlFlow.Tenancy.Tenantd.Db.Providers.TenantDatabaseProviders;
 
 namespace CtlFlow.Tenancy.Tenantd.IntegrationTests.Model;
 
@@ -10,11 +11,6 @@ internal static partial class ModelAudits
 {
     private static readonly string[] ExpectedConcurrencyTokens =
     [
-        "AuditOutboxEntry.Revision",
-        "AuditOutboxState.Revision",
-        "LifecycleDeliverySequenceState.CurrentSequence",
-        "LifecycleStep.Revision",
-        "ResourceEventSequenceState.CurrentSequence",
         "Tenant.Revision",
         "Workspace.Revision"
     ];
@@ -32,11 +28,10 @@ internal static partial class ModelAudits
     {
         var path = await DatabaseFilePath.Parse(databasePath, cancellation);
         var poolSize = await DatabasePoolSize.Parse(1, cancellation);
-        var factory = await CreateTenantDbContextFactory(
-            path,
-            poolSize,
+        var database = await CreateTenantDatabase(
+            new DatabaseConfiguration.Sqlite(path, poolSize),
             cancellation);
-        await using var context = await factory.CreateDbContextAsync(
+        await using var context = await database.Contexts.CreateDbContextAsync(
             cancellation);
         Require(
             context.Database.ProviderName

@@ -8,10 +8,12 @@ layering and data-access design remains in [C# Implementation](../).
 
 ## Authentication and telemetry
 
-Service validates the bound Kubernetes ServiceAccount token before invoking a Domain function. It
-then validates the optional `identityd` invocation JWT and constructs one typed request context.
-Certificate parsing, private daemon certificate configuration, caller-asserted identity headers,
-and an alternate development authentication path are forbidden.
+Service authenticates either an admitted kubeconfig client certificate for an operator operation
+or a bound Kubernetes ServiceAccount token for an internal operation before invoking a Domain
+function. It then validates any permitted `identityd` invocation JWT and constructs one typed
+request context. Server and operator-certificate handling remains in the Service transport and
+authentication boundary; Domain and Db never receive certificate types. Caller-asserted identity
+headers and alternate development authentication paths are forbidden.
 
 Kestrel binds one explicit HTTP/2-only address for direct gRPC and one distinct HTTP/1.1-only
 address for health and readiness. Routing constrains `/healthz` and `/readyz` to the probe listener;
@@ -79,8 +81,8 @@ A C# service implementation is structurally complete when:
 7. call sites use direct functions rather than use-case, command-handler, or repository ceremony;
 8. all CtlFlow-owned operation APIs are awaitable and omit the `Async` suffix;
 9. Knex remains the only migration authority;
-10. workload and invocation authentication have one production path without certificates or
-   development bypasses;
+10. operator-certificate, workload-token, and invocation-token authentication each have one
+    production path without development bypasses;
 11. generated model and query-interceptor output compiles as part of the gated NativeAOT
     publication;
 12. the unchanged canonical suite passes against the NativeAOT process and real Collector; and

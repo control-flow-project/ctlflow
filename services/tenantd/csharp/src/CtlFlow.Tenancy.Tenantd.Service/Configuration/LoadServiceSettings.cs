@@ -1,22 +1,20 @@
 using System.Globalization;
 using System.Net;
-using CtlFlow.Tenancy.Tenantd.Db.Sqlite;
-using CtlFlow.Tenancy.Tenantd.Domain.Caching;
-using CtlFlow.Tenancy.Tenantd.Domain.Collections;
+using CtlFlow.Tenancy.Tenantd.Service.Security.Operators;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Workloads;
 using CtlFlow.Tenancy.Tenantd.Service.Telemetry;
+using static CtlFlow.Tenancy.Tenantd.Db.Providers.TenantDatabaseProviders;
 
 namespace CtlFlow.Tenancy.Tenantd.Service.Configuration;
 
 internal static partial class TenantdConfiguration
 {
     private const int DefaultDatabasePoolSize = 16;
-    private const int DefaultCacheLifetimeSeconds = 30;
+    private const int DefaultAuditCallTimeoutMilliseconds = 2_000;
+    private const int DefaultIdentityCallTimeoutMilliseconds = 2_000;
     private const int DefaultWorkloadTokenLifetimeSeconds = 3_600;
     private const int DefaultInvocationTokenLifetimeSeconds = 60;
-    private const int DefaultPageCursorLifetimeSeconds = 300;
-    private const int DefaultWatchLifetimeSeconds = 30;
     private static readonly TimeSpan KeyCacheLifetime = TimeSpan.FromSeconds(30);
 
     internal static async Task<ServiceSettings> LoadServiceSettings(
@@ -24,83 +22,88 @@ internal static partial class TenantdConfiguration
     {
         var grpcUri = ParseListenUri(
             "CTLFLOW_GRPC_URL",
-            RequireEnvironment("CTLFLOW_GRPC_URL"));
+            RequireEnvironment("CTLFLOW_GRPC_URL"),
+            Uri.UriSchemeHttps);
         var probeUri = ParseListenUri(
             "CTLFLOW_PROBE_URL",
-            RequireEnvironment("CTLFLOW_PROBE_URL"));
-        var aggregation = LoadAggregationSettings();
-        var audit = await LoadAuditSettings(cancellation);
-        if (grpcUri.Port == probeUri.Port
-            || grpcUri.Port == aggregation.Port
-            || probeUri.Port == aggregation.Port)
+            RequireEnvironment("CTLFLOW_PROBE_URL"),
+            Uri.UriSchemeHttp);
+        if (grpcUri.Port == probeUri.Port)
         {
             throw new InvalidOperationException(
-                "gRPC, probe, and aggregation listeners must use distinct ports");
+                "gRPC and probe listeners must use distinct ports");
         }
-        var databasePath = await DatabaseFilePath.Parse(
+
+        var database = await ParseDatabaseConfiguration(
+            RequireEnvironment("CTLFLOW_DATABASE_PROVIDER"),
             RequireEnvironment("CTLFLOW_DATABASE_PATH"),
-            cancellation);
-        var databasePoolSize = await DatabasePoolSize.Parse(
             ReadPositiveInteger(
                 "CTLFLOW_DATABASE_POOL_SIZE",
-                DefaultDatabasePoolSize),
+                DefaultDatabasePoolSize).ToString(CultureInfo.InvariantCulture),
             cancellation);
-        var cacheLifetime = await CacheLifetime.Parse(
-            ReadPositiveInteger(
-                "CTLFLOW_CACHE_TTL_SECONDS",
-                DefaultCacheLifetimeSeconds),
-            cancellation);
-        var workloadTokens = CreateTokenSettings(
-            "CTLFLOW_WORKLOAD",
-            DefaultWorkloadTokenLifetimeSeconds);
-        var invocationTokens = CreateTokenSettings(
-            "CTLFLOW_INVOCATION",
-            DefaultInvocationTokenLifetimeSeconds);
-        var tenantCallers = ParseCallers(
-            "CTLFLOW_RESOLVE_TENANT_CALLERS");
-        var workspaceCallers = ParseCallers(
-            "CTLFLOW_RESOLVE_WORKSPACE_CALLERS");
-        var lifecycleCallers = ParseCallers(
-            "CTLFLOW_GET_LIFECYCLE_CALLERS");
-        var lifecycleOwners = ParseLifecycleOwners();
-        var pageCursorLifetime = await PageCursorLifetime.Parse(
-            ReadPositiveInteger(
-                "CTLFLOW_PAGE_CURSOR_TTL_SECONDS",
-                DefaultPageCursorLifetimeSeconds),
-            cancellation);
-        var watchLifetime = await WatchLifetime.Parse(
-            ReadPositiveInteger(
-                "CTLFLOW_WATCH_MAX_LIFETIME_SECONDS",
-                DefaultWatchLifetimeSeconds),
-            cancellation);
-        var telemetry = TelemetrySettings.Parse(
-            RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT"));
+        var auditEndpoint = ParsePrivateOrigin(
+            "CTLFLOW_AUDIT_URL",
+            RequireEnvironment("CTLFLOW_AUDIT_URL"));
+        var identityEndpoint = ParsePrivateOrigin(
+            "CTLFLOW_IDENTITY_URL",
+            RequireEnvironment("CTLFLOW_IDENTITY_URL"));
+        var workloadTokenFile =
+            RequireAbsoluteFile("CTLFLOW_WORKLOAD_TOKEN_FILE");
 
         return new ServiceSettings(
             IPAddress.Parse(grpcUri.Host),
             grpcUri.Port,
             IPAddress.Parse(probeUri.Host),
             probeUri.Port,
-            aggregation,
-            audit,
-            databasePath,
-            databasePoolSize,
-            cacheLifetime,
-            workloadTokens,
-            invocationTokens,
-            tenantCallers,
-            workspaceCallers,
-            lifecycleCallers,
-            lifecycleOwners,
-            pageCursorLifetime,
-            watchLifetime,
-            telemetry);
+            new TlsSettings(
+                RequireAbsoluteFile("CTLFLOW_TLS_CERTIFICATE_PATH"),
+                RequireAbsoluteFile("CTLFLOW_TLS_PRIVATE_KEY_PATH"),
+                RequireAbsoluteFile(
+                    "CTLFLOW_KUBERNETES_CLIENT_CA_PATH")),
+            database,
+            new AuditSettings(
+                new PrivateGrpcSettings(
+                    auditEndpoint,
+                    RequireDnsName("CTLFLOW_AUDIT_TLS_SERVER_NAME"),
+                    RequireAbsoluteFile("CTLFLOW_AUDIT_TLS_CA_PATH")),
+                workloadTokenFile,
+                TimeSpan.FromMilliseconds(ReadPositiveInteger(
+                    "CTLFLOW_AUDIT_CALL_TIMEOUT_MILLISECONDS",
+                    DefaultAuditCallTimeoutMilliseconds))),
+            new IdentitySettings(
+                new PrivateGrpcSettings(
+                    identityEndpoint,
+                    RequireDnsName("CTLFLOW_IDENTITY_TLS_SERVER_NAME"),
+                    RequireAbsoluteFile("CTLFLOW_IDENTITY_TLS_CA_PATH")),
+                workloadTokenFile,
+                TimeSpan.FromMilliseconds(ReadPositiveInteger(
+                    "CTLFLOW_IDENTITY_CALL_TIMEOUT_MILLISECONDS",
+                    DefaultIdentityCallTimeoutMilliseconds))),
+            new WorkloadTokenSettings(
+                CreateTokenSettings(
+                    "CTLFLOW_WORKLOAD",
+                    DefaultWorkloadTokenLifetimeSeconds),
+                RequireAbsoluteFile("CTLFLOW_WORKLOAD_JWKS_PATH"),
+                KeyCacheLifetime),
+            CreateTokenSettings(
+                "CTLFLOW_INVOCATION",
+                DefaultInvocationTokenLifetimeSeconds),
+            ParseOperatorSubjects("CTLFLOW_OPERATOR_SUBJECTS"),
+            ParseCallers("CTLFLOW_GET_TENANT_CALLERS"),
+            ParseCallers("CTLFLOW_GET_WORKSPACE_CALLERS"),
+            ParseCallers("CTLFLOW_RESOLVE_TENANT_CALLERS"),
+            ParseCallers("CTLFLOW_RESOLVE_WORKSPACE_CALLERS"),
+            TelemetrySettings.Parse(
+                RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT")));
     }
 
-    private static Uri ParseListenUri(string name, string value)
+    private static Uri ParseListenUri(
+        string name,
+        string value,
+        string expectedScheme)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttp
+            || uri.Scheme != expectedScheme
             || !IPAddress.TryParse(uri.Host, out _)
             || uri.Port is < 1 or > 65_535
             || uri.AbsolutePath != "/"
@@ -109,7 +112,25 @@ internal static partial class TenantdConfiguration
             || !string.IsNullOrEmpty(uri.UserInfo))
         {
             throw new InvalidOperationException(
-                $"{name} must be an HTTP URL with an IP host and no path");
+                $"{name} must use {expectedScheme} with an IP host and no path");
+        }
+
+        return uri;
+    }
+
+    private static Uri ParsePrivateOrigin(string name, string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || string.IsNullOrEmpty(uri.Host)
+            || uri.Port is < 1 or > 65_535
+            || uri.AbsolutePath != "/"
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment)
+            || !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            throw new InvalidOperationException(
+                $"{name} must be a private HTTPS origin");
         }
 
         return uri;
@@ -123,7 +144,6 @@ internal static partial class TenantdConfiguration
             ReadPositiveInteger(
                 $"{prefix}_TOKEN_MAX_LIFETIME_SECONDS",
                 defaultMaximumLifetimeSeconds));
-
         if (prefix == "CTLFLOW_INVOCATION"
             && maximumLifetime > TimeSpan.FromSeconds(60))
         {
@@ -134,18 +154,17 @@ internal static partial class TenantdConfiguration
         return new TokenValidationSettings(
             RequireEnvironment($"{prefix}_TOKEN_ISSUER"),
             RequireEnvironment($"{prefix}_TOKEN_AUDIENCE"),
-            RequireAbsoluteFile($"{prefix}_JWKS_PATH"),
-            maximumLifetime,
-            KeyCacheLifetime);
+            maximumLifetime);
     }
 
     private static IReadOnlySet<KubernetesServiceAccountSubject> ParseCallers(
         string name)
     {
-        var value = RequireEnvironment(name);
         var callers = new HashSet<KubernetesServiceAccountSubject>();
-
-        foreach (var item in value.Split(',', StringSplitOptions.TrimEntries))
+        foreach (var item in RequireEnvironment(name).Split(
+                     ',',
+                     StringSplitOptions.TrimEntries
+                         | StringSplitOptions.RemoveEmptyEntries))
         {
             callers.Add(KubernetesServiceAccountSubject.Parse(item));
         }
@@ -159,24 +178,25 @@ internal static partial class TenantdConfiguration
         return callers;
     }
 
-    private static LifecycleOwnerCallers ParseLifecycleOwners()
+    private static IReadOnlySet<KubernetesOperatorSubject>
+        ParseOperatorSubjects(string name)
     {
-        var owners = new LifecycleOwnerCallers(
-            KubernetesServiceAccountSubject.Parse(
-                RequireEnvironment("CTLFLOW_LIFECYCLE_IDENTITY_CALLER")),
-            KubernetesServiceAccountSubject.Parse(
-                RequireEnvironment("CTLFLOW_LIFECYCLE_CONFIG_CALLER")),
-            KubernetesServiceAccountSubject.Parse(
-                RequireEnvironment("CTLFLOW_LIFECYCLE_EXEC_CALLER")),
-            KubernetesServiceAccountSubject.Parse(
-                RequireEnvironment("CTLFLOW_LIFECYCLE_PACKAGE_CALLER")));
-        if (owners.All.Count != 4)
+        var subjects = new HashSet<KubernetesOperatorSubject>();
+        foreach (var item in RequireEnvironment(name).Split(
+                     ',',
+                     StringSplitOptions.TrimEntries
+                         | StringSplitOptions.RemoveEmptyEntries))
         {
-            throw new InvalidOperationException(
-                "Lifecycle owner callers must be distinct");
+            subjects.Add(KubernetesOperatorSubject.Parse(item));
         }
 
-        return owners;
+        if (subjects.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"{name} must contain at least one subject");
+        }
+
+        return subjects;
     }
 
     private static string RequireEnvironment(string name)
@@ -200,6 +220,19 @@ internal static partial class TenantdConfiguration
         }
 
         return Path.GetFullPath(value);
+    }
+
+    private static string RequireDnsName(string name)
+    {
+        var value = RequireEnvironment(name);
+        if (value.Length is > 253
+            || Uri.CheckHostName(value) != UriHostNameType.Dns)
+        {
+            throw new InvalidOperationException(
+                $"{name} must be a DNS name");
+        }
+
+        return value;
     }
 
     private static int ReadPositiveInteger(string name, int defaultValue)

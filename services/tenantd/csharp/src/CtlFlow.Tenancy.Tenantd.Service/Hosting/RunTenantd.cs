@@ -1,26 +1,23 @@
 using System.Data.Common;
 using CtlFlow.Audit.V1;
-using CtlFlow.Tenancy.Tenantd.Db;
-using CtlFlow.Tenancy.Tenantd.Domain.Auditing;
-using CtlFlow.Tenancy.Tenantd.Service.Auditing;
+using CtlFlow.Identity.V1;
+using CtlFlow.Tenancy.Tenantd.Db.Providers;
 using CtlFlow.Tenancy.Tenantd.Db.Schema;
-using CtlFlow.Tenancy.Tenantd.Service.Aggregation.Documents;
-using CtlFlow.Tenancy.Tenantd.Service.Configuration;
 using CtlFlow.Tenancy.Tenantd.Service.Grpc;
+using CtlFlow.Tenancy.Tenantd.Service.Hosting.Tls;
 using CtlFlow.Tenancy.Tenantd.Service.Security;
+using CtlFlow.Tenancy.Tenantd.Service.Security.Invocations;
+using CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
 using CtlFlow.Tenancy.Tenantd.Service.Telemetry;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
-using Microsoft.EntityFrameworkCore;
-using Grpc.Net.Client;
-using static CtlFlow.Tenancy.Tenantd.Db.AuditOutbox.AuditOutboxEntries;
+using static CtlFlow.Tenancy.Tenantd.Db.Providers.TenantDatabaseProviders;
 using static CtlFlow.Tenancy.Tenantd.Db.Schema.Schemas;
-using static CtlFlow.Tenancy.Tenantd.Db.Sqlite.TenantDatabases;
-using static CtlFlow.Tenancy.Tenantd.Service.Aggregation.AggregationHosting;
-using static CtlFlow.Tenancy.Tenantd.Service.Aggregation.Security.AggregationAuthentication;
-using static CtlFlow.Tenancy.Tenantd.Service.Aggregation.Serialization.AggregationJson;
 using static CtlFlow.Tenancy.Tenantd.Service.Configuration.TenantdConfiguration;
+using static CtlFlow.Tenancy.Tenantd.Service.Hosting.Tls.GrpcTls;
+using static CtlFlow.Tenancy.Tenantd.Service.Security.Invocations.InvocationVerificationKeys;
+using static CtlFlow.Tenancy.Tenantd.Service.Security.Tokens.JsonWebKeys;
 using static CtlFlow.Tenancy.Tenantd.Service.Telemetry.TelemetryConfiguration;
+using static CtlFlow.Tenancy.Tenantd.Service.Transport.PrivateGrpcChannels;
 
 namespace CtlFlow.Tenancy.Tenantd.Service.Hosting;
 
@@ -29,26 +26,28 @@ internal static partial class TenantdProcess
     internal static async Task<int> RunTenantd(string[] args)
     {
         var settings = await LoadServiceSettings(CancellationToken.None);
-        using var aggregationCertificates =
-            await LoadAggregationCertificates(
-                settings.Aggregation,
-                CancellationToken.None);
-        SQLitePCL.Batteries_V2.Init();
-
-        var databaseContexts = await CreateTenantDbContextFactory(
-            settings.DatabasePath,
-            settings.DatabasePoolSize,
+        var tenantDatabase = await CreateTenantDatabase(
+            settings.Database,
             CancellationToken.None);
+        using var auditChannel = CreatePrivateGrpcChannel(
+            settings.Audit.Grpc);
+        using var identityChannel = CreatePrivateGrpcChannel(
+            settings.Identity.Grpc);
+        var identityClient = new IdentityService.IdentityServiceClient(
+            identityChannel);
         var tokenAuthorities = new TokenAuthorities(
-            settings.WorkloadTokens,
-            settings.InvocationTokens);
-        var auditChannel = GrpcChannel.ForAddress(
-            settings.Audit.Endpoint,
-            new GrpcChannelOptions
-            {
-                MaxReceiveMessageSize = 64 * 1024,
-                MaxSendMessageSize = 64 * 1024
-            });
+            settings.WorkloadTokens.Validation,
+            new VerificationKeys(cancellation =>
+                LoadFileVerificationKeys(
+                    settings.WorkloadTokens.VerificationKeySetPath,
+                    settings.WorkloadTokens.KeyCacheLifetime,
+                    cancellation)),
+            settings.InvocationTokens,
+            new VerificationKeys(cancellation =>
+                LoadInvocationVerificationKeys(
+                    identityClient,
+                    settings.Identity,
+                    cancellation)));
 
         var builder = WebApplication.CreateSlimBuilder(args);
         builder.WebHost.ConfigureKestrel(options =>
@@ -56,35 +55,16 @@ internal static partial class TenantdProcess
             options.Listen(
                 settings.GrpcAddress,
                 settings.GrpcPort,
-                listen => listen.Protocols = HttpProtocols.Http2);
+                listen =>
+                {
+                    listen.Protocols = HttpProtocols.Http2;
+                    listen.UseHttps(
+                        tls => ConfigureGrpcTls(tls, settings.Tls));
+                });
             options.Listen(
                 settings.ProbeAddress,
                 settings.ProbePort,
                 listen => listen.Protocols = HttpProtocols.Http1);
-            options.Listen(
-                settings.Aggregation.Address,
-                settings.Aggregation.Port,
-                listen =>
-                {
-                    listen.Protocols = HttpProtocols.Http1AndHttp2;
-                    listen.UseHttps(https =>
-                    {
-                        https.ServerCertificate =
-                            aggregationCertificates.ServerCertificate;
-                        https.ClientCertificateMode =
-                            ClientCertificateMode.RequireCertificate;
-                        https.ClientCertificateValidation =
-                            (certificate, chain, errors) =>
-                                ValidateAggregationClientCertificate(
-                                    certificate,
-                                    chain,
-                                    errors,
-                                    aggregationCertificates
-                                        .RequestHeaderRoot,
-                                    settings.Aggregation
-                                        .AllowedClientNames);
-                    });
-                });
         });
 
         ConfigureTelemetry(builder, settings.Telemetry);
@@ -93,50 +73,45 @@ internal static partial class TenantdProcess
             options.EnableDetailedErrors = false;
             options.MaxReceiveMessageSize = 64 * 1024;
             options.MaxSendMessageSize = 64 * 1024;
+            options.Interceptors.Add<TenantdInterceptor>();
         });
-        builder.Services.AddSingleton(
-            new TenantOperationSettings(
-                settings.CacheLifetime,
-                settings.ResolveTenantCallers,
-                settings.ResolveWorkspaceCallers,
-                settings.GetLifecycleCallers,
-                settings.LifecycleOwners,
-                settings.PageCursorLifetime,
-                settings.WatchLifetime));
-        builder.Services.AddSingleton(CreateTenancyJsonContext());
-        builder.Services.AddSingleton<IDbContextFactory<TenantDbContext>>(
-            databaseContexts);
+        builder.Services.AddSingleton<TenantdInterceptor>();
+        builder.Services.AddSingleton(settings);
+        builder.Services.AddSingleton(tenantDatabase);
         builder.Services.AddSingleton(tokenAuthorities);
-        builder.Services.AddSingleton(settings.Audit);
-        builder.Services.AddSingleton(auditChannel);
         builder.Services.AddSingleton(
             new AuditService.AuditServiceClient(auditChannel));
-        builder.Services.AddHostedService<AuditDispatcher>();
 
         await using var application = builder.Build();
-        UseAggregationBoundary(application, settings);
+        application.Use(async (context, next) =>
+        {
+            var isProbeListener =
+                context.Connection.LocalPort == settings.ProbePort;
+            var isProbePath = context.Request.Path == "/healthz"
+                || context.Request.Path == "/readyz";
+            if (isProbeListener != isProbePath)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            await next(context);
+        });
         application.MapGrpcService<TenantGrpcService>();
-        application.MapGet(
-            "/healthz",
-            static () => Results.NoContent());
+        application.MapGet("/healthz", static () => Results.NoContent());
         application.MapGet(
             "/readyz",
             async (
-                IDbContextFactory<TenantDbContext> contexts,
+                TenantDatabase database,
                 CancellationToken cancellation) =>
             {
                 try
                 {
-                    var schema = await VerifySchema(contexts, cancellation);
-                    var audit = schema == SchemaCompatibility.Compatible
-                        ? await QueryAuditOutboxReadiness(
-                            contexts,
-                            cancellation)
-                        : AuditOutboxReadiness.Inconsistent;
-                    return schema == SchemaCompatibility.Compatible
-                        && audit == AuditOutboxReadiness.Ready
+                    return await VerifySchema(database, cancellation)
+                        == SchemaCompatibility.Compatible
                         ? Results.NoContent()
-                        : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+                        : Results.StatusCode(
+                            StatusCodes.Status503ServiceUnavailable);
                 }
                 catch (Exception exception) when (
                     exception is DbException
@@ -146,7 +121,6 @@ internal static partial class TenantdProcess
                         StatusCodes.Status503ServiceUnavailable);
                 }
             });
-        MapTenancyApi(application);
 
         await application.RunAsync();
         return 0;

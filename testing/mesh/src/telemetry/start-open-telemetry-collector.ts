@@ -6,21 +6,25 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import type {
+  TestKubernetes
+} from "../kubernetes/test-kubernetes.js";
+import { runCommand } from "../processes/run-command.js";
+import type {
   OpenTelemetryCollector
 } from "./open-telemetry-collector.js";
-import { findAvailablePort } from "../ports/find-available-port.js";
-import { runCommand } from "../processes/run-command.js";
 
-const image =
+const serviceName = "otel-collector-test";
+const imageTag =
   "otel/opentelemetry-collector-contrib:0.135.0";
+const imageDigest =
+  "sha256:89107a3a8f4636a396927edf7025bb9614b8da2d92f4cc3f43109e8d115736e2";
 
 export async function startOpenTelemetryCollector(
-  repositoryRoot: string
+  repositoryRoot: string,
+  kubernetes: TestKubernetes
 ): Promise<OpenTelemetryCollector> {
   const root = path.join(
-    repositoryRoot,
-    ".temp",
-    "test-mesh",
+    kubernetes.storage.hostRoot,
     "otel");
   await mkdir(root, { recursive: true });
   const directory = await mkdtemp(
@@ -30,103 +34,123 @@ export async function startOpenTelemetryCollector(
   const tracesPath = path.join(outputDirectory, "traces.json");
   const metricsPath = path.join(outputDirectory, "metrics.json");
   const logsPath = path.join(outputDirectory, "logs.json");
-  const port = await findAvailablePort();
-  const name = `ctlflow-otel-${process.pid.toString(36)}-${Date.now().toString(36)}`;
 
   await mkdir(outputDirectory);
+  await chmod(directory, 0o777);
   await chmod(outputDirectory, 0o777);
-  await writeFile(tracesPath, "", "utf8");
-  await writeFile(metricsPath, "", "utf8");
-  await writeFile(logsPath, "", "utf8");
-  await chmod(tracesPath, 0o666);
-  await chmod(metricsPath, 0o666);
-  await chmod(logsPath, 0o666);
+  await initializeOutputs(tracesPath, metricsPath, logsPath);
   await writeFile(configPath, createConfiguration(), "utf8");
+  await chmod(configPath, 0o644);
+  await loadCollectorImage(repositoryRoot, kubernetes);
+  await kubernetes.runKubectl(
+    ["apply", "-f", "-"],
+    JSON.stringify(createManifest(
+      kubernetes,
+      path.relative(kubernetes.storage.hostRoot, directory))));
+  await waitForCollector(kubernetes);
 
-  try {
-    await runCommand(
-      "docker",
-      [
-        "run",
-        "--detach",
-        "--rm",
-        "--name",
-        name,
-        "--publish",
-        `127.0.0.1:${String(port)}:4318`,
-        "--volume",
-        `${configPath}:/etc/otelcol-contrib/config.yaml:ro`,
-        "--volume",
-        `${outputDirectory}:/output`,
-        process.env.CTLFLOW_OTEL_COLLECTOR_IMAGE ?? image
-      ],
-      { cwd: repositoryRoot });
-    await waitForOtlpEndpoint(port);
-
-    let stopped = false;
-    let suspended = false;
-    return {
-      endpoint: `http://127.0.0.1:${String(port)}`,
-      tracesPath,
-      metricsPath,
-      logsPath,
-      clearExports: async () => {
-        requireRunning(stopped);
-        await writeFile(tracesPath, "", "utf8");
-        await writeFile(metricsPath, "", "utf8");
-        await writeFile(logsPath, "", "utf8");
-      },
-      suspend: async () => {
-        requireRunning(stopped);
-        if (suspended) {
-          return;
-        }
-
-        await runCommand(
-          "docker",
-          ["pause", name],
-          { cwd: repositoryRoot });
-        suspended = true;
-      },
-      resume: async () => {
-        requireRunning(stopped);
-        if (!suspended) {
-          return;
-        }
-
-        await runCommand(
-          "docker",
-          ["unpause", name],
-          { cwd: repositoryRoot });
-        suspended = false;
-        await waitForOtlpEndpoint(port);
-      },
-      stop: async () => {
-        if (stopped) {
-          return;
-        }
-
-        stopped = true;
-        if (suspended) {
-          await runCommand(
-            "docker",
-            ["unpause", name],
-            { cwd: repositoryRoot });
-          suspended = false;
-        }
-        await runCommand(
-          "docker",
-          ["stop", "--timeout", "5", name],
-          { cwd: repositoryRoot });
+  let stopped = false;
+  let suspended = false;
+  return {
+    endpoint:
+      `http://${serviceName}.${kubernetes.namespace}.svc:4318`,
+    tracesPath,
+    metricsPath,
+    logsPath,
+    clearExports: async () => {
+      requireRunning(stopped);
+      await initializeOutputs(tracesPath, metricsPath, logsPath);
+    },
+    suspend: async () => {
+      requireRunning(stopped);
+      if (suspended) {
+        return;
       }
-    };
-  } catch (error) {
-    await runCommand(
-      "docker",
-      ["rm", "--force", name],
-      { cwd: repositoryRoot }).catch(() => undefined);
-    throw error;
+
+      await scale(kubernetes, 0);
+      suspended = true;
+    },
+    resume: async () => {
+      requireRunning(stopped);
+      if (!suspended) {
+        return;
+      }
+
+      await scale(kubernetes, 1);
+      await waitForCollector(kubernetes);
+      suspended = false;
+    },
+    stop: async () => {
+      if (stopped) {
+        return;
+      }
+
+      stopped = true;
+      await scale(kubernetes, 0);
+    }
+  };
+}
+
+async function loadCollectorImage(
+  repositoryRoot: string,
+  kubernetes: TestKubernetes
+): Promise<void> {
+  await runCommand(
+    "docker",
+    ["pull", `${imageTag}@${imageDigest}`],
+    { cwd: repositoryRoot });
+  const digests = JSON.parse((await runCommand(
+    "docker",
+    [
+      "image",
+      "inspect",
+      imageTag,
+      "--format",
+      "{{json .RepoDigests}}"
+    ],
+    { cwd: repositoryRoot })).stdout) as readonly string[];
+  if (!digests.some((value) => value.endsWith(`@${imageDigest}`))) {
+    throw new Error("OpenTelemetry Collector image digest is not pinned");
   }
+
+  await kubernetes.loadImage(imageTag);
+}
+
+async function initializeOutputs(
+  tracesPath: string,
+  metricsPath: string,
+  logsPath: string
+): Promise<void> {
+  for (const output of [tracesPath, metricsPath, logsPath]) {
+    await writeFile(output, "", "utf8");
+    await chmod(output, 0o666);
+  }
+}
+
+async function scale(
+  kubernetes: TestKubernetes,
+  replicas: 0 | 1
+): Promise<void> {
+  await kubernetes.runKubectl([
+    "scale",
+    `deployment/${serviceName}`,
+    "--namespace",
+    kubernetes.namespace,
+    `--replicas=${String(replicas)}`
+  ]);
+}
+
+async function waitForCollector(
+  kubernetes: TestKubernetes
+): Promise<void> {
+  await kubernetes.runKubectl([
+    "rollout",
+    "status",
+    `deployment/${serviceName}`,
+    "--namespace",
+    kubernetes.namespace,
+    "--timeout=90s"
+  ]);
 }
 
 function requireRunning(stopped: boolean): void {
@@ -135,33 +159,100 @@ function requireRunning(stopped: boolean): void {
   }
 }
 
-async function waitForOtlpEndpoint(port: number): Promise<void> {
-  const endpoint = `http://127.0.0.1:${String(port)}/v1/traces`;
-  const deadline = Date.now() + 60_000;
-
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
+function createManifest(
+  kubernetes: TestKubernetes,
+  storageDirectory: string
+): object {
+  const selector = { "app.kubernetes.io/name": serviceName };
+  return {
+    apiVersion: "v1",
+    kind: "List",
+    items: [
+      {
+        apiVersion: "apps/v1",
+        kind: "Deployment",
+        metadata: {
+          name: serviceName,
+          namespace: kubernetes.namespace
         },
-        body: "{\"resourceSpans\":[]}",
-        signal: AbortSignal.timeout(1_000)
-      });
-      if (response.ok) {
-        return;
+        spec: {
+          replicas: 1,
+          strategy: { type: "Recreate" },
+          selector: { matchLabels: selector },
+          template: {
+            metadata: {
+              annotations: {
+                "ctlflow.test/revision": Date.now().toString(36)
+              },
+              labels: selector
+            },
+            spec: {
+              automountServiceAccountToken: false,
+              containers: [
+                {
+                  name: "collector",
+                  image: imageTag,
+                  imagePullPolicy: "Never",
+                  args: ["--config=/state/collector.yaml"],
+                  ports: [
+                    {
+                      containerPort: 4318,
+                      name: "otlp-http"
+                    }
+                  ],
+                  readinessProbe: {
+                    tcpSocket: { port: "otlp-http" },
+                    periodSeconds: 1,
+                    timeoutSeconds: 1,
+                    failureThreshold: 60
+                  },
+                  securityContext: {
+                    allowPrivilegeEscalation: false,
+                    runAsNonRoot: true
+                  },
+                  volumeMounts: [
+                    {
+                      mountPath: "/state",
+                      name: "state"
+                    }
+                  ]
+                }
+              ],
+              volumes: [
+                {
+                  name: "state",
+                  hostPath: {
+                    path: path.posix.join(
+                      kubernetes.storage.nodeRoot,
+                      storageDirectory),
+                    type: "Directory"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        apiVersion: "v1",
+        kind: "Service",
+        metadata: {
+          name: serviceName,
+          namespace: kubernetes.namespace
+        },
+        spec: {
+          selector,
+          ports: [
+            {
+              name: "otlp-http",
+              port: 4318,
+              targetPort: "otlp-http"
+            }
+          ]
+        }
       }
-    } catch {
-      // The container can accept TCP before the OTLP receiver is ready.
-    }
-
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 100);
-    });
-  }
-
-  throw new Error(`OpenTelemetry Collector did not become ready at ${endpoint}`);
+    ]
+  };
 }
 
 function createConfiguration(): string {
@@ -172,11 +263,11 @@ function createConfiguration(): string {
         endpoint: 0.0.0.0:4318
 exporters:
   file/traces:
-    path: /output/traces.json
+    path: /state/output/traces.json
   file/metrics:
-    path: /output/metrics.json
+    path: /state/output/metrics.json
   file/logs:
-    path: /output/logs.json
+    path: /state/output/logs.json
 service:
   telemetry:
     logs:

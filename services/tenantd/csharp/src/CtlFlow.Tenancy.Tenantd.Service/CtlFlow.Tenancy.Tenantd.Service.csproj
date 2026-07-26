@@ -34,7 +34,6 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tasks" PrivateAssets="all" />
     <PackageReference Include="OpenTelemetry" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
   <ItemGroup>
     <Protobuf Include="../../../api/proto/v1/tenantd.proto"
@@ -43,5 +42,8 @@
     <Protobuf Include="../../../../auditd/api/proto/v1/auditd.proto"
               GrpcServices="Client"
               ProtoRoot="../../../../auditd/api/proto" />
+    <Protobuf Include="../../../../identityd/api/proto/v1/identityd.proto"
+              GrpcServices="Client"
+              ProtoRoot="../../../../identityd/api/proto" />
   </ItemGroup>
 </Project>

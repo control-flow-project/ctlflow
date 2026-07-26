@@ -104,7 +104,7 @@ headers, bodies, and upstream diagnostics are not.
 | Operation | Surface | Purpose |
 | --- | --- | --- |
 | ForwardHttp | private HTTP data plane | Proxy one ordinary or streaming exchange through an exact binding |
-| PreviewEgress | private gRPC and aggregated EgressReview | Return the effective decision and rewrite identity without forwarding |
+| PreviewEgress | private gRPC | Return the effective decision and rewrite identity without forwarding |
 | Health | private Kubernetes probe | Report whether the process is live |
 | Ready | private Kubernetes probe | Report whether required dependencies permit forwarding |
 
@@ -185,7 +185,7 @@ selectors and bounded pagination.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate destination Tenant and optional Workspace lifecycle |
+| `tenantd` | Validate destination Tenant and optional Workspace state |
 | `identityd` | Refresh the bounded proxy-credential verification-key set |
 | `execd` | Resolve exact runtime, Placement, dependency, and binding generation |
 | `configd` | Release one exact-purpose upstream Secret version |

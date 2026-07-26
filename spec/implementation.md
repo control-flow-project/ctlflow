@@ -22,10 +22,6 @@ services/<service>/
     proto/
       v1/
         <service>.proto
-    kubernetes/
-      v1alpha1/
-        openapi.yaml
-        paths.yaml
 
   knexfile.ts
   migrations/
@@ -35,6 +31,9 @@ services/<service>/
   tests/
     integration/
     support/
+
+  kubernetes/
+    base/
 
   <implementation>/
     src/
@@ -50,10 +49,18 @@ placeholders are forbidden.
 | `api/` | Callee-owned language-neutral wire contracts |
 | `knexfile.ts`, `migrations/` | Sole ordered logical schema history |
 | `tests/` | Canonical language-neutral behavior and interoperability suite |
+| `kubernetes/` | Versioned plain service deployment and migration assets |
 | `<implementation>/` | One independently shippable implementation and private internals |
 
 Shared repository packages may provide generation, migration, test-mesh, and build mechanics. They
 cannot own service behavior or create a second API.
+
+Each shipping service owns one `kubernetes/base/` Kustomize base containing its ServiceAccount,
+workload, private and probe Services, required storage, process-private projections, and pre-start
+Knex migration Job where the service is durable. Installation overlays supply concrete OCI images,
+storage classes, trust and credential bindings, dependency endpoints, and environment-specific
+configuration. A test-only generated workload cannot replace these checked shipping assets as
+installation evidence.
 
 Every hand-authored source and test file is at most 600 lines. Larger concepts split into cohesive
 noun directories and operation files. Deterministic generated output is exempt but remains
@@ -73,13 +80,9 @@ service/api/proto/v1/service.proto
 A caller imports generated bindings from the callee's contract. It never copies or narrows the
 callee contract into a caller-owned proto.
 
-Administrative Kubernetes resources use the service-root OpenAPI contract. Direct runtime and
-service-to-service operations use the service-root gRPC contract. `edged` and `egressd` additionally
-preserve the standard HTTP semantics they mediate.
-
-An OpenAPI contract may use relative standard `$ref` links to cohesive files in the same version
-directory. The root document remains `openapi.yaml`; every referenced file is part of the same
-callee-owned contract and is reviewed and versioned with the root.
+Kernel domain operations use the service-root gRPC contract. `authd`, `edged`, and `egressd`
+additionally preserve the standard HTTP semantics they mediate. Kubernetes resources are
+realization details unless an explicit service contract says otherwise.
 
 ## Implementation independence
 
@@ -89,9 +92,9 @@ model, and libraries. It must preserve:
 - the complete administrative and direct API contracts;
 - validation, authentication, authorization, and Tenant fencing;
 - logical state, transitions, ordering, idempotency, and concurrency;
-- pagination, watch, streaming, cancellation, and failure behavior;
+- every declared pagination, streaming, cancellation, and failure behavior;
 - the common migrated schema and revision;
-- transactional audit-outbox behavior;
+- direct typed audit delivery behavior;
 - health, readiness, startup, and shutdown behavior; and
 - interoperability with every other supported service implementation.
 
@@ -111,8 +114,9 @@ services/<service>/migrations/*.ts
 ```
 
 Migrations are ordered, deterministic, asynchronous, and checked in. A migration defines one
-logical schema transition. Provider-specific syntax is allowed only when each supported provider
-reaches the same declared logical constraints, indexes, and revision.
+logical schema transition. SQLite is the only currently admitted provider. The Db boundary remains
+replaceable so another explicitly implemented provider can later reach the same declared logical
+constraints, indexes, and revision without changing Domain, API, or canonical behavior.
 
 Migration TypeScript is compiled before execution under the repository's strict TypeScript policy.
 Deployment executes the compiled JavaScript artifact; production does not transpile source at
@@ -139,13 +143,35 @@ latest-version rule, or startup repair path. Repository verification separately 
 migration sources and compiled artifacts so an existing filename cannot change unnoticed. The
 Knex ledger remains the sole database record of applied schema history.
 
-The required durable provider uses validated file-backed SQLite paths. Data access sits behind
-narrow operation-specific persistence boundaries so every supported provider implements the same
-logical contract without changing Domain, API, or migration ownership.
+The current durable provider uses validated file-backed SQLite paths. Data access sits behind
+narrow operation-specific persistence boundaries so a future provider can implement the same
+logical contract without changing Domain, API, or migration ownership. No unimplemented provider,
+fallback provider, dual write, or dormant provider branch exists.
 
-A domain mutation and its audit outbox entry commit atomically. Network calls never occur while a
-database transaction is held. Transactions are bounded; mutable records use optimistic concurrency;
-retryable operations use idempotency identities.
+Each provider supplies the coordination needed for its cross-record invariants. The current SQLite
+deployment runs one service process per database and uses finite process-local coordination before
+related Entity Framework operations. A provider admitted for multiple service processes must
+provide equivalent cross-process atomicity without changing Domain or API behavior.
+
+Database schemas contain structural storage rules only: types, bounds, requiredness, keys, foreign
+keys, uniqueness, indexes, and representation checks. Database triggers, stored procedures,
+user-defined database functions, generated side effects, and provider-resident business logic are
+forbidden. They do not implement domain transitions, immutability, revision changes, authorization,
+audit admission, lifecycle, or cross-record decisions.
+
+Every domain decision executes in the service implementation language through the service's Domain
+layer. A request returns a closed typed outcome from which Domain code creates the complete typed
+audit event for each outcome required by that service's contract. The persistence operation only
+projects stored state, invokes the Domain decision, and persists the returned domain state. A database
+constraint is defense against corrupt storage; it is never an alternate domain path or a substitute
+for the Domain decision.
+
+Services call `auditd.RecordAuditBatch` directly after a contract-required outcome is established
+and before returning that outcome to the caller. They do not persist an audit outbox, delivery
+queue, retry journal, source sequence, or audit fallback in their own database. A storage or
+dependency failure is audited only when the owning service contract requires that failure event.
+Network calls never occur while a database transaction is held. Transactions are bounded; mutable
+records use optimistic concurrency; retryable operations use their contract-defined identity.
 
 ## Kubernetes ownership
 
@@ -186,16 +212,26 @@ Canonical tests use:
 - real Kubernetes realization where the behavior requires it;
 - a real OpenTelemetry Collector for propagation and export evidence;
 - restart, cancellation, deadline, and controlled external-boundary failure; and
-- bounded collections, pagination, watches, and streams.
+- every declared bounded collection, pagination, and stream.
 
-One service test command owns one suite-scoped mesh. Before test files run, the mesh acquires one
-validated repository-local test Kubernetes cluster, starts one real OpenTelemetry Collector, and
-resolves one gated production artifact for each selected implementation. The cluster is reusable
-across serial test commands and lives under ignored `.temp`; every acquisition verifies that the
-named control plane is reachable and reapplies the complete idempotent test-workload declaration.
-It is never silently replaced or accepted when unhealthy. Suite-owned processes remain active
-until the entire service suite finishes. Test files never create another cluster, Collector, or
-publication.
+One service test command owns one suite-scoped mesh. Before test files run, the mesh acquires the
+single reusable Minikube profile named by the checked test-toolchain manifest, deploys one real
+OpenTelemetry Collector workload inside that profile, and resolves one gated production artifact for each selected
+implementation. Minikube uses its Docker driver and containerd runtime at the exact versions in
+that manifest. The profile is reusable across serial test commands; ignored `.temp` contains the
+resolved Minikube binary, flattened kubeconfig, session material, and generated workload state.
+Every acquisition verifies the driver, runtime, Kubernetes version, control-plane health, and
+declared profile identity before idempotently applying the complete test constellation. An
+unhealthy or differently configured profile fails closed rather than being silently replaced.
+Ordinary teardown never deletes the profile.
+
+Shipping service artifacts and admitted service-owned contract stubs run as Kubernetes workloads
+inside that profile. A canonical suite never routes a Kubernetes Service back to a daemon running
+on the host. Host test code reaches private test endpoints only through an explicit suite-owned
+Kubernetes port-forward. Deployment, ServiceAccount identity, projected workload token, Service,
+probe, volume, migration Job, restart, and dependency routing behavior therefore remain in the
+tested path. Suite-owned workloads and port-forwards remain active until the owning context or
+suite finishes. Test files never create another cluster, Collector, or publication.
 
 A gated production artifact is content-addressed by every source, contract, generated-input,
 toolchain, lock, diagnostic manifest, and publisher input that can affect it. The first request for
@@ -206,24 +242,36 @@ differently fingerprinted entry is a cache miss and is rebuilt through the same 
 is never accepted as a fallback. Tests therefore publish once per effective source revision, not
 once per file, shard, or command invocation.
 
-Each test file receives its own migrated database, ports, invocation authority, and shipping
-service process from that mesh, so schema mutation, restart, and process failure remain isolated.
-The shared cluster issues fresh finite workload credentials for each isolated context rather than
-assuming one startup token outlives the suite. Collector-outage evidence uses mesh-owned
-suspend/resume controls and restores the shared Collector before the test releases its context.
-A selectorless aggregated-API registration points to exactly one live
-context-owned process. Before rebinding the same group and version, the mesh
-removes the previous `APIService`, endpoint slice, and Service and waits for
-their deletion; it never relies on eventual endpoint-cache replacement while
-the retired host port remains routable state.
-One global teardown stops shared processes and releases suite-owned resources even after failure.
+One canonical suite uses one migrated database and shipping service workload for ordinary serial
+tests. Tests use unique opaque record IDs and explicitly restore mutable dependency modes. A test
+that corrupts schema, replaces the process, or otherwise cannot restore isolation owns a separate
+service context or runs as the final destructive test. The shared cluster issues fresh finite
+workload credentials and never assumes one startup token outlives its bound Pod.
+Collector-outage evidence uses mesh-owned suspend/resume controls and restores the shared Collector
+before the test completes. One global teardown stops shared processes and releases suite-owned
+resources even after failure.
 It does not destroy the reusable test cluster or retained `.temp` diagnostics; destructive cleanup
 is an explicit operator action. Validated content-addressed publication artifacts likewise remain
 in the ignored cache for later commands.
 
-Mocks, in-memory repositories, substitute kernel services, and handwritten protocol servers do not
-establish product behavior. Controlled processes are permitted only for external systems outside
-the kernel constellation.
+Mocks, in-memory repositories, caller-owned substitute kernel services, and caller-local
+handwritten protocol servers do not establish product behavior. Controlled processes are
+permitted for external systems outside the kernel constellation.
+
+A kernel dependency without a production implementation may provide one service-owned contract
+stub under its own service root. The stub uses the callee-owned generated contract, runs as a real
+Kubernetes workload under the callee's ServiceAccount and Service, and implements only explicit
+finite behavior required to exercise callers. It may provide a separately bound test-control
+surface for deterministic dependency outcomes. That surface is never part of the service
+contract, is unreachable outside the test namespace, and cannot weaken caller authentication or
+request validation.
+
+A service-owned contract stub can establish the calling service's request mapping, authentication,
+retry, timeout, ordering, idempotency, and failure handling. It is never release evidence for the
+stubbed service and never satisfies that service's canonical suite. Once any production
+implementation of the dependency exists, canonical constellation tests use that implementation;
+the stub cannot become a fallback. Stub source, image, manifests, and tests remain owned by the
+callee service rather than copied into each caller.
 
 Every public operation has direct success evidence and every specified validation, authentication,
 authorization, dependency, concurrency, cancellation, lifecycle, and failure result has an owning
@@ -254,20 +302,16 @@ receives the active invocation-signing key set; other services receive public ve
 material through its private operation.
 
 Only `authd` and `edged` have public listeners. Every other kernel service is reachable only through
-a private Kubernetes Service. Public TLS is terminated by the installation ingress. Internal
-transport encryption may be supplied by the Kubernetes network substrate, but no implementation
-may require a private application certificate or treat network reachability as caller identity.
+a private Kubernetes Service. Public TLS is terminated by the installation ingress. The private
+gRPC listener uses installation-provisioned server TLS so operator port-forwards and internal
+clients validate the intended service endpoint. That server identity never authenticates the
+caller. An admitted kubeconfig client certificate authenticates an operator; a bound Kubernetes
+workload token authenticates an internal caller.
 
-A private service exposes direct gRPC on an HTTP/2-only listener and health probes on a separate
-HTTP/1.1-only listener. The probe listener serves only `/healthz` and `/readyz`; it never dispatches
-a domain RPC or accepts identity metadata. Both listeners use separately configured, explicit
-addresses and ports. A protocol-negotiating plaintext listener is forbidden because it cannot
-reliably select HTTP/2 without TLS.
-
-An aggregated administrative API listener is the exact Kubernetes-native exception: it uses the
-serving certificate and request-header client authentication provisioned for API aggregation.
-Those credentials and forwarded operator headers are scoped to that listener and are never accepted
-by the service's direct gRPC listener.
+A private service exposes direct gRPC over TLS on an HTTP/2-only listener and health probes on a
+separate HTTP/1.1-only listener. The probe listener serves only `/healthz` and `/readyz`; it never
+dispatches a domain RPC or accepts identity metadata. Both listeners use separately configured,
+explicit addresses and ports.
 
 Health proves process liveness. Readiness proves compatible schema, required local custody, and
 ability to serve the declared generation. A dependency outage changes readiness or operation status

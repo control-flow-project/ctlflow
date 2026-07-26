@@ -1,54 +1,40 @@
 import { createSign } from "node:crypto";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  writeFile
+} from "node:fs/promises";
 import path from "node:path";
 import type {
-  TestCallerCredentials,
   TestKubernetes,
-  TestLifecycleOwnerCredentials,
   TestWorkloadCredentials
 } from "./test-kubernetes.js";
-import {
-  createAggregationCredentials
-} from "./create-aggregation-credentials.js";
 import {
   createKubernetesApiCredentials
 } from "./create-kubernetes-api-credentials.js";
 import {
-  createTestWorkloads,
-  type TestWorkloadDefinition
-} from "./create-test-workloads.js";
+  createKubernetesOperatorCredentials
+} from "./create-kubernetes-operator-credentials.js";
 import {
-  registerTestAggregatedApi
-} from "./register-test-aggregated-api.js";
+  createTestWorkloads
+} from "./create-test-workloads.js";
+import { loadTestToolchain } from "./load-test-toolchain.js";
+import { readMinikubeFile } from "./read-minikube-file.js";
+import { resolveKubectl } from "./resolve-kubectl.js";
+import { resolveMinikube } from "./resolve-minikube.js";
+import { runMinikube } from "./run-minikube.js";
 import { runKubectl } from "./run-kubectl.js";
+import { startKubectl } from "./start-kubectl.js";
 import { runCommand } from "../processes/run-command.js";
+import type { TestMinikube } from "./test-minikube.js";
 
 const audience = "ctlflow-internal";
-const clusterName = "ctlflow-test-mesh";
 const namespaceName = "ctlflow-tests";
 const serviceAccountName = "kernel-caller";
 const podName = "kernel-caller";
 const unadmittedServiceAccountName = "unadmitted-caller";
 const unadmittedPodName = "unadmitted-caller";
-const lifecycleWorkloads = {
-  identity: {
-    serviceAccountName: "identity-owner",
-    podName: "identity-owner"
-  },
-  configuration: {
-    serviceAccountName: "configuration-owner",
-    podName: "configuration-owner"
-  },
-  execution: {
-    serviceAccountName: "execution-owner",
-    podName: "execution-owner"
-  },
-  packages: {
-    serviceAccountName: "packages-owner",
-    podName: "packages-owner"
-  }
-} as const satisfies Record<string, TestWorkloadDefinition>;
-
 export async function startTestKubernetes(
   repositoryRoot: string
 ): Promise<TestKubernetes> {
@@ -62,45 +48,41 @@ export async function startTestKubernetes(
   const directory = await mkdtemp(
     path.join(sessions, "session-"));
   const kubeconfigPath = path.join(root, "kubeconfig");
-  const kind = process.env.CTLFLOW_KIND_PATH ?? "kind";
-  const controlPlane = `${clusterName}-control-plane`;
+  const toolchain = await loadTestToolchain(repositoryRoot);
+  const minikube: TestMinikube = {
+    executable: await resolveMinikube(repositoryRoot, toolchain),
+    toolchain
+  };
 
   try {
     await acquireTestCluster(
-      kind,
       repositoryRoot,
-      controlPlane,
+      minikube,
       kubeconfigPath);
 
     await createTestWorkloads(
       repositoryRoot,
-      controlPlane,
+      minikube,
       namespaceName,
       [
         { serviceAccountName, podName },
         {
           serviceAccountName: unadmittedServiceAccountName,
           podName: unadmittedPodName
-        },
-        ...Object.values(lifecycleWorkloads)
+        }
       ]);
 
     const jwks = (await runKubectl(
       repositoryRoot,
-      controlPlane,
+      minikube,
       ["get", "--raw", "/openid/v1/jwks"])).stdout;
-    const signingKey = (await runCommand(
-      "docker",
-      [
-        "exec",
-        controlPlane,
-        "cat",
-        "/etc/kubernetes/pki/sa.key"
-      ],
-      { cwd: repositoryRoot })).stdout;
+    const signingKey = await readMinikubeFile(
+      repositoryRoot,
+      minikube,
+      "/var/lib/minikube/certs/sa.key");
     const discovery = JSON.parse((await runKubectl(
       repositoryRoot,
-      controlPlane,
+      minikube,
       ["get", "--raw", "/.well-known/openid-configuration"])).stdout) as {
         readonly issuer?: unknown;
       };
@@ -115,15 +97,21 @@ export async function startTestKubernetes(
     const api = await createKubernetesApiCredentials(
       kubeconfigPath,
       directory);
-    const aggregation = await createAggregationCredentials(
+    const storage = await createTestStorage(
       repositoryRoot,
-      controlPlane,
-      directory);
+      minikube);
+    const kubectl = await resolveKubectl(
+      repositoryRoot,
+      minikube);
+    const loadedImages = await readLoadedImages(
+      repositoryRoot,
+      minikube);
 
     let stopped = false;
     return {
-      aggregation,
+      namespace: namespaceName,
       api,
+      storage,
       createWorkloadCredentials: async () => {
         if (stopped) {
           throw new Error("Test Kubernetes cluster is stopped");
@@ -131,29 +119,63 @@ export async function startTestKubernetes(
 
         return createWorkloadCredentials(
           repositoryRoot,
-          controlPlane,
+          minikube,
           issuer,
           jwksPath,
           signingKey);
       },
-      createLifecycleOwnerCredentials: async () => {
+      createOperatorCredentials: async (subject) => {
         if (stopped) {
           throw new Error("Test Kubernetes cluster is stopped");
         }
-
-        return await createLifecycleOwnerCredentials(
+        return await createKubernetesOperatorCredentials(
           repositoryRoot,
-          controlPlane);
+          directory,
+          api.certificateAuthorityPath,
+          await readMinikubeFile(
+            repositoryRoot,
+            minikube,
+            "/var/lib/minikube/certs/ca.key"),
+          subject);
       },
-      registerAggregatedApi: async (options) => {
+      loadImage: async (image) => {
+        if (stopped) {
+          throw new Error("Test Kubernetes cluster is stopped");
+        }
+        const canonical = image.includes("/")
+          ? image
+          : `docker.io/library/${image}`;
+        if (loadedImages.has(canonical)) {
+          return;
+        }
+
+        await runMinikube(
+          repositoryRoot,
+          minikube,
+          ["image", "load", image]);
+        loadedImages.add(canonical);
+      },
+      runKubectl: async (arguments_, input) => {
         if (stopped) {
           throw new Error("Test Kubernetes cluster is stopped");
         }
 
-        await registerTestAggregatedApi(
+        return await runKubectl(
           repositoryRoot,
-          controlPlane,
-          options);
+          minikube,
+          arguments_,
+          input === undefined ? undefined : { input });
+      },
+      startKubectl: (arguments_) => {
+        if (stopped) {
+          throw new Error("Test Kubernetes cluster is stopped");
+        }
+
+        return startKubectl(
+          repositoryRoot,
+          kubectl,
+          kubeconfigPath,
+          arguments_);
       },
       stop: async () => {
         if (stopped) {
@@ -168,56 +190,73 @@ export async function startTestKubernetes(
   }
 }
 
-async function acquireTestCluster(
-  kind: string,
+async function readLoadedImages(
   repositoryRoot: string,
-  controlPlane: string,
-  kubeconfigPath: string
-): Promise<void> {
-  const clusters = (await runCommand(
-    kind,
-    ["get", "clusters"],
-    { cwd: repositoryRoot })).stdout
-    .split(/\r?\n/u)
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
-  if (!clusters.includes(clusterName)) {
-    await runCommand(
-      kind,
-      [
-        "create",
-        "cluster",
-        "--name",
-        clusterName,
-        "--kubeconfig",
-        kubeconfigPath,
-        "--wait",
-        "120s"
-      ],
-      { cwd: repositoryRoot });
-    return;
-  }
+  minikube: TestMinikube
+): Promise<Set<string>> {
+  const result = await runMinikube(
+    repositoryRoot,
+    minikube,
+    [
+      "image",
+      "ls",
+      "--format",
+      "{{.Repository}}:{{.Tag}}"
+    ]);
+  return new Set(
+    result.stdout
+      .split(/\r?\n/u)
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0));
+}
 
-  const running = (await runCommand(
+async function createTestStorage(
+  repositoryRoot: string,
+  minikube: TestMinikube
+): Promise<{
+  readonly hostRoot: string;
+  readonly nodeRoot: string;
+}> {
+  const volume = (await runCommand(
     "docker",
     [
+      "volume",
       "inspect",
+      minikube.toolchain.profile,
       "--format",
-      "{{.State.Running}}",
-      controlPlane
+      "{{.Mountpoint}}"
     ],
     { cwd: repositoryRoot })).stdout.trim();
-  if (running !== "true") {
-    throw new Error(
-      `Reusable Kind control plane ${controlPlane} is not running`);
+  if (!path.isAbsolute(volume)) {
+    throw new Error("Minikube Docker volume mountpoint is invalid");
   }
 
-  const kubeconfig = (await runCommand(
-    kind,
-    ["get", "kubeconfig", "--name", clusterName],
-    { cwd: repositoryRoot })).stdout;
+  const hostRoot = path.join(volume, "ctlflow-tests");
+  await mkdir(hostRoot, { recursive: true });
+  await chmod(hostRoot, 0o777);
+  return {
+    hostRoot,
+    nodeRoot: "/var/ctlflow-tests"
+  };
+}
+
+async function acquireTestCluster(
+  repositoryRoot: string,
+  minikube: TestMinikube,
+  kubeconfigPath: string
+): Promise<void> {
+  const profile = await readProfile(repositoryRoot, minikube);
+  if (profile === undefined || profile.status !== "OK") {
+    await startMinikube(repositoryRoot, minikube);
+  }
+
+  await validateProfile(repositoryRoot, minikube);
+  const kubeconfig = (await runKubectl(
+    repositoryRoot,
+    minikube,
+    ["config", "view", "--raw", "--minify", "--flatten"])).stdout;
   if (kubeconfig.trim().length === 0) {
-    throw new Error("Reusable Kind cluster returned an empty kubeconfig");
+    throw new Error("Reusable Minikube profile returned an empty kubeconfig");
   }
 
   await writeFile(kubeconfigPath, kubeconfig, {
@@ -226,86 +265,146 @@ async function acquireTestCluster(
   });
 }
 
-async function createLifecycleOwnerCredentials(
+interface MinikubeProfile {
+  readonly status: string;
+  readonly driver: string;
+  readonly runtime: string;
+  readonly kubernetesVersion: string;
+}
+
+async function readProfile(
   repositoryRoot: string,
-  controlPlane: string
-): Promise<TestLifecycleOwnerCredentials> {
+  minikube: TestMinikube
+): Promise<MinikubeProfile | undefined> {
+  const output = await runCommand(
+    minikube.executable,
+    ["profile", "list", "--output=json"],
+    { cwd: repositoryRoot });
+  const document = JSON.parse(output.stdout) as {
+    readonly valid?: readonly {
+      readonly Name?: unknown;
+      readonly Status?: unknown;
+      readonly Config?: {
+        readonly Driver?: unknown;
+        readonly KubernetesConfig?: {
+          readonly ContainerRuntime?: unknown;
+          readonly KubernetesVersion?: unknown;
+        };
+      };
+    }[];
+  };
+  const profile = document.valid?.find(
+    (value) => value.Name === minikube.toolchain.profile);
+  if (profile === undefined) {
+    return undefined;
+  }
+
   return {
-    identity: await createCallerCredentials(
-      repositoryRoot,
-      controlPlane,
-      lifecycleWorkloads.identity),
-    configuration: await createCallerCredentials(
-      repositoryRoot,
-      controlPlane,
-      lifecycleWorkloads.configuration),
-    execution: await createCallerCredentials(
-      repositoryRoot,
-      controlPlane,
-      lifecycleWorkloads.execution),
-    packages: await createCallerCredentials(
-      repositoryRoot,
-      controlPlane,
-      lifecycleWorkloads.packages)
+    status: String(profile.Status),
+    driver: String(profile.Config?.Driver),
+    runtime: String(
+      profile.Config?.KubernetesConfig?.ContainerRuntime),
+    kubernetesVersion: String(
+      profile.Config?.KubernetesConfig?.KubernetesVersion)
   };
 }
 
-async function createCallerCredentials(
+async function startMinikube(
   repositoryRoot: string,
-  controlPlane: string,
-  workload: TestWorkloadDefinition
-): Promise<TestCallerCredentials> {
-  return {
-    callerSubject:
-      `system:serviceaccount:${namespaceName}:${workload.serviceAccountName}`,
-    callerToken: await createToken(
-      repositoryRoot,
-      controlPlane,
-      workload.serviceAccountName,
-      audience,
-      "10m",
-      workload.podName)
-  };
+  minikube: TestMinikube
+): Promise<void> {
+  const toolchain = minikube.toolchain;
+  await runMinikube(
+    repositoryRoot,
+    minikube,
+    [
+      "start",
+      "--driver",
+      toolchain.driver,
+      "--container-runtime",
+      toolchain.containerRuntime,
+      "--kubernetes-version",
+      toolchain.kubernetesVersion,
+      "--cpus",
+      String(toolchain.cpus),
+      "--memory",
+      `${String(toolchain.memoryMiB)}mb`
+    ]);
+}
+
+async function validateProfile(
+  repositoryRoot: string,
+  minikube: TestMinikube
+): Promise<void> {
+  const profile = await readProfile(repositoryRoot, minikube);
+  const expected = minikube.toolchain;
+  if (
+    profile?.status !== "OK"
+    || profile.driver !== expected.driver
+    || profile.runtime !== expected.containerRuntime
+    || profile.kubernetesVersion !== expected.kubernetesVersion
+  ) {
+    throw new Error(
+      "Reusable Minikube profile does not match the test toolchain");
+  }
+
+  const status = JSON.parse((await runMinikube(
+    repositoryRoot,
+    minikube,
+    ["status", "--output=json"])).stdout) as {
+      readonly Host?: unknown;
+      readonly Kubelet?: unknown;
+      readonly APIServer?: unknown;
+      readonly Kubeconfig?: unknown;
+    };
+  if (
+    status.Host !== "Running"
+    || status.Kubelet !== "Running"
+    || status.APIServer !== "Running"
+    || status.Kubeconfig !== "Configured"
+  ) {
+    throw new Error("Reusable Minikube profile is not healthy");
+  }
 }
 
 async function createWorkloadCredentials(
   repositoryRoot: string,
-  controlPlane: string,
+  minikube: TestMinikube,
   issuer: string,
   jwksPath: string,
   signingKey: string
 ): Promise<TestWorkloadCredentials> {
   const token = await createToken(
     repositoryRoot,
-    controlPlane,
+    minikube,
     serviceAccountName,
     audience,
     "10m",
     podName);
   const unadmittedToken = await createToken(
     repositoryRoot,
-    controlPlane,
+    minikube,
     unadmittedServiceAccountName,
     audience,
     "10m",
     unadmittedPodName);
   const wrongAudienceToken = await createToken(
     repositoryRoot,
-    controlPlane,
+    minikube,
     serviceAccountName,
     "wrong-audience",
     "10m",
     podName);
   const overlongToken = await createToken(
     repositoryRoot,
-    controlPlane,
+    minikube,
     serviceAccountName,
     audience,
     "20m",
     podName);
   const unboundToken = await createToken(
     repositoryRoot,
-    controlPlane,
+    minikube,
     serviceAccountName,
     audience,
     "10m");
@@ -327,7 +426,7 @@ async function createWorkloadCredentials(
 
 async function createToken(
   repositoryRoot: string,
-  controlPlane: string,
+  minikube: TestMinikube,
   serviceAccount: string,
   tokenAudience: string,
   duration: string,
@@ -341,7 +440,7 @@ async function createToken(
       ];
   const token = (await runKubectl(
     repositoryRoot,
-    controlPlane,
+    minikube,
     [
       "create",
       "token",

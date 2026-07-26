@@ -86,18 +86,18 @@ It never selects another App or stale endpoint as fallback.
 ## Caching
 
 `edged` keeps separate bounded in-memory caches for the two narrow `tenantd` address projections.
-The Tenant cache key is the normalized external authority and canonical Tenant path prefix; its
-value contains only Tenant ID, binding generation, and expiry. The Workspace cache key is Tenant ID
-and Workspace address segment; its value contains only Workspace ID, binding generation, and
-expiry. Neither cache contains a Tenant or Workspace administrative record.
+The Tenant cache key is the Tenant address segment; its value contains only Tenant ID, state,
+revision, and local expiry. The Workspace cache key is Tenant ID and Workspace address segment; its
+value contains only Workspace ID, state, revision, and local expiry. Neither cache contains a
+Tenant or Workspace administrative record.
 
 A miss or expiry in either address cache calls `tenantd` for that exact hierarchy step. Entry
-expiry is the earlier of the owner-supplied expiry and 60 seconds. There is no invalidation stream,
-durable route cache, or second route database.
+expiry follows one finite `edged` policy and never exceeds 60 seconds. `tenantd` does not supply
+cache policy. There is no invalidation stream, durable route cache, or second route database.
 
 The resolved App exposure and endpoint projection is cached separately. Its expiry is no later than
-the address expiry, the endpoint lifetime supplied by `execd`, or 60 seconds. A cache miss calls the
-owning services and never selects another target as fallback.
+the local address-cache expiry, the endpoint lifetime supplied by `execd`, or 60 seconds. A cache
+miss calls the owning services and never selects another target as fallback.
 
 `edged` may cache a Session-to-invocation projection under a keyed digest of the Session credential.
 The entry expires no later than the invocation JWT and never exceeds 60 seconds. It contains no

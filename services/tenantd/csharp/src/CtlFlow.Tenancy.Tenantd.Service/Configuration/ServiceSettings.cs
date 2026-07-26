@@ -1,7 +1,6 @@
 using System.Net;
-using CtlFlow.Tenancy.Tenantd.Db.Sqlite;
-using CtlFlow.Tenancy.Tenantd.Domain.Caching;
-using CtlFlow.Tenancy.Tenantd.Domain.Collections;
+using CtlFlow.Tenancy.Tenantd.Db.Providers;
+using CtlFlow.Tenancy.Tenantd.Service.Security.Operators;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
 using CtlFlow.Tenancy.Tenantd.Service.Security.Workloads;
 using CtlFlow.Tenancy.Tenantd.Service.Telemetry;
@@ -13,17 +12,15 @@ internal sealed record ServiceSettings(
     int GrpcPort,
     IPAddress ProbeAddress,
     int ProbePort,
-    AggregationSettings Aggregation,
+    TlsSettings Tls,
+    DatabaseConfiguration Database,
     AuditSettings Audit,
-    DatabaseFilePath DatabasePath,
-    DatabasePoolSize DatabasePoolSize,
-    CacheLifetime CacheLifetime,
-    TokenValidationSettings WorkloadTokens,
+    IdentitySettings Identity,
+    WorkloadTokenSettings WorkloadTokens,
     TokenValidationSettings InvocationTokens,
+    IReadOnlySet<KubernetesOperatorSubject> OperatorSubjects,
+    IReadOnlySet<KubernetesServiceAccountSubject> GetTenantCallers,
+    IReadOnlySet<KubernetesServiceAccountSubject> GetWorkspaceCallers,
     IReadOnlySet<KubernetesServiceAccountSubject> ResolveTenantCallers,
     IReadOnlySet<KubernetesServiceAccountSubject> ResolveWorkspaceCallers,
-    IReadOnlySet<KubernetesServiceAccountSubject> GetLifecycleCallers,
-    LifecycleOwnerCallers LifecycleOwners,
-    PageCursorLifetime PageCursorLifetime,
-    WatchLifetime WatchLifetime,
     TelemetrySettings Telemetry);

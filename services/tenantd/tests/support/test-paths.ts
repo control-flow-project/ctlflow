@@ -13,3 +13,15 @@ export const serviceProjectPath = path.join(
 export const diagnosticsManifestPath = path.join(
   serviceRoot,
   "csharp/nativeaot-diagnostics.json");
+
+export const serviceContainerfilePath = path.join(
+  serviceRoot,
+  "csharp/Containerfile");
+
+export const migrationContainerfilePath = path.join(
+  serviceRoot,
+  "migrations/Containerfile");
+
+export const kustomizeBasePath = path.join(
+  serviceRoot,
+  "kubernetes/base");

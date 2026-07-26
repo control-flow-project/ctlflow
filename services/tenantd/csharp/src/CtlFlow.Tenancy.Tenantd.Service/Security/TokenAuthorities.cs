@@ -6,16 +6,14 @@ internal sealed class TokenAuthorities : IAsyncDisposable
 {
     internal TokenAuthorities(
         TokenValidationSettings workloadSettings,
-        TokenValidationSettings invocationSettings)
+        VerificationKeys workloadKeys,
+        TokenValidationSettings invocationSettings,
+        VerificationKeys invocationKeys)
     {
         WorkloadSettings = workloadSettings;
         InvocationSettings = invocationSettings;
-        WorkloadKeys = new VerificationKeys(
-            workloadSettings.JwksPath,
-            workloadSettings.KeyCacheLifetime);
-        InvocationKeys = new VerificationKeys(
-            invocationSettings.JwksPath,
-            invocationSettings.KeyCacheLifetime);
+        WorkloadKeys = workloadKeys;
+        InvocationKeys = invocationKeys;
     }
 
     internal TokenValidationSettings WorkloadSettings { get; }

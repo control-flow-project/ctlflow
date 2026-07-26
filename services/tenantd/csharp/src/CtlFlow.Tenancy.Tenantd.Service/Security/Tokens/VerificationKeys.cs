@@ -1,13 +1,9 @@
 namespace CtlFlow.Tenancy.Tenantd.Service.Security.Tokens;
 
-using static JsonWebKeys;
-
 internal sealed class VerificationKeys(
-    string path,
-    TimeSpan cacheLifetime) : IAsyncDisposable
+    VerificationKeyLoader load) : IAsyncDisposable
 {
-    private readonly string _path = path;
-    private readonly TimeSpan _cacheLifetime = cacheLifetime;
+    private readonly VerificationKeyLoader _load = load;
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
     private VerificationKeySnapshot? _snapshot;
 
@@ -31,10 +27,7 @@ internal sealed class VerificationKeys(
                 || snapshot.ExpiresAt <= DateTimeOffset.UtcNow
                 || !snapshot.Keys.ContainsKey(keyId))
             {
-                snapshot = await ReloadVerificationKeys(
-                    _path,
-                    _cacheLifetime,
-                    cancellation);
+                snapshot = await _load(cancellation);
                 _snapshot = snapshot;
             }
 

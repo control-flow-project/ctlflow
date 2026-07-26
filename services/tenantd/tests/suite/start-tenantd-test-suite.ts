@@ -1,57 +1,60 @@
 import {
-  publishCSharpService,
   startOpenTelemetryCollector,
   startTestKubernetes,
-  type CSharpServicePublication,
   type OpenTelemetryCollector,
   type TestKubernetes
 } from "@ctlflow/test-mesh";
 import {
-  diagnosticsManifestPath,
-  repositoryRoot,
-  serviceProjectPath
-} from "../support/test-paths.js";
+  startAuditdContractService,
+  type AuditdContractService
+} from "@ctlflow/auditd/testing/stub";
 import {
-  serviceRoot
-} from "../support/test-paths.js";
+  startIdentitydContractService,
+  type IdentitydContractService
+} from "@ctlflow/identityd/testing/stub";
 import {
-  startAuditdContractService
-} from "../dependencies/auditd/start-auditd-contract-service.js";
+  loadTenantdTestRuntime
+} from "../runtime/load-tenantd-test-runtime.js";
 import type {
-  AuditdContractService
-} from "../dependencies/auditd/auditd-contract-service.js";
+  TenantdTestRuntime
+} from "../runtime/tenantd-test-runtime.js";
+import {
+  repositoryRoot
+} from "../support/test-paths.js";
 import type {
   TenantdTestSuite
 } from "./tenantd-test-suite.js";
 
-const executableName = "CtlFlow.Tenancy.Tenantd.Service";
-
 export async function startTenantdTestSuite():
 Promise<TenantdTestSuite> {
-  let publication: CSharpServicePublication | undefined;
+  let runtime: TenantdTestRuntime | undefined;
   let kubernetes: TestKubernetes | undefined;
   let collector: OpenTelemetryCollector | undefined;
   let auditd: AuditdContractService | undefined;
+  let identityd: IdentitydContractService | undefined;
 
   try {
-    publication = await publishCSharpService({
-      repositoryRoot,
-      projectPath: serviceProjectPath,
-      diagnosticsManifestPath,
-      executableName
-    });
+    runtime = await loadTenantdTestRuntime();
     kubernetes = await startTestKubernetes(repositoryRoot);
-    collector = await startOpenTelemetryCollector(repositoryRoot);
-    auditd = await startAuditdContractService(
+    collector = await startOpenTelemetryCollector(
       repositoryRoot,
-      serviceRoot);
+      kubernetes);
+    auditd = await startAuditdContractService({
+      repositoryRoot,
+      kubernetes
+    });
+    identityd = await startIdentitydContractService({
+      repositoryRoot,
+      kubernetes
+    });
     let stopped = false;
     return {
       repositoryRoot,
-      publication,
+      runtime,
       kubernetes,
       collector,
       auditd,
+      identityd,
       stop: async () => {
         if (stopped) {
           return;
@@ -59,32 +62,40 @@ Promise<TenantdTestSuite> {
 
         stopped = true;
         await stopResources(
-          publication,
+          runtime,
           kubernetes,
           collector,
-          auditd);
+          auditd,
+          identityd);
       }
     };
   } catch (error) {
-    await stopResources(publication, kubernetes, collector, auditd)
+    await stopResources(
+      runtime,
+      kubernetes,
+      collector,
+      auditd,
+      identityd)
       .catch(() => undefined);
     throw error;
   }
 }
 
 async function stopResources(
-  publication: CSharpServicePublication | undefined,
+  runtime: TenantdTestRuntime | undefined,
   kubernetes: TestKubernetes | undefined,
   collector: OpenTelemetryCollector | undefined,
-  auditd: AuditdContractService | undefined
+  auditd: AuditdContractService | undefined,
+  identityd: IdentitydContractService | undefined
 ): Promise<void> {
   let failure: unknown;
 
   for (const stop of [
+    identityd?.stop,
     auditd?.stop,
     collector?.stop,
     kubernetes?.stop,
-    publication?.stop
+    runtime?.stop
   ]) {
     if (stop === undefined) {
       continue;

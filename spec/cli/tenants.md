@@ -6,19 +6,23 @@ weight: 10
 A Tenant is the customer and top-level isolation boundary.
 
 ```text
-ctlflow get tenants
+ctlflow get tenants [--limit COUNT] [--after TENANT_ID]
 ctlflow get tenant TENANT
-ctlflow create tenant -f FILE [--wait]
-ctlflow apply tenant TENANT -f FILE
-ctlflow suspend tenant TENANT [--wait]
-ctlflow resume tenant TENANT [--wait]
-ctlflow delete tenant TENANT [--force] [--wait]
+ctlflow create tenant -f FILE
+ctlflow update tenant TENANT --revision REVISION --display-name NAME
+ctlflow suspend tenant TENANT --revision REVISION
+ctlflow resume tenant TENANT --revision REVISION
+ctlflow delete tenant TENANT --revision REVISION [--force]
+ctlflow resolve tenant ADDRESS
 ```
 
-Creation allocates an opaque ID, establishes the initial administrator and configuration scope,
-materializes the Tenant Placement, and installs only explicitly requested baseline Apps. The
-Tenant remains visible with a stable condition until every step succeeds.
+The create document contains exactly `tenant_id`, `address`, and `display_name`. The ID and address
+are immutable. Create returns an active Tenant and does not create Users, configuration,
+Placements, Packages, or Apps.
 
-Suspension blocks new Tenant activity without deleting state. Deletion is irreversible and
-completes only after each owner has retired its Tenant records and realization. A Tenant document
-contains domain policy and display metadata, never Kubernetes object identity.
+Update changes only the display name. Suspend, resume, and delete map to `SetTenantState`; all
+mutations after create require the current positive revision. Delete is terminal and retains the
+record and address. Resolve returns only an active Tenant.
+
+List returns one ID-ordered page. `--after` is the last emitted Tenant ID and is not a stored
+cursor.

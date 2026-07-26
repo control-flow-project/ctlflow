@@ -1,28 +1,70 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
-using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
+using CtlFlow.Tenancy.Tenantd.Domain.Addresses;
+using CtlFlow.Tenancy.Tenantd.Domain.Auditing;
+using CtlFlow.Tenancy.Tenantd.Domain.Names;
+using CtlFlow.Tenancy.Tenantd.Domain.Resources;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
-using CtlFlow.Tenancy.Tenantd.Domain.Time;
+using static CtlFlow.Tenancy.Tenantd.Domain.Workspaces.Workspaces;
 
 namespace CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 
 public static partial class Workspaces
 {
-    public static ValueTask<Workspace> CreateWorkspace(
-        WorkspaceId id,
+    public static async ValueTask<WorkspaceMutationResult> CreateWorkspace(
+        WorkspaceId workspaceId,
         TenantId tenantId,
-        WorkspaceDisplayName displayName,
-        LifecycleOperationId operationId,
-        ResourceEventSequence eventSequence,
-        UtcInstant now,
+        ResourceAddress address,
+        DisplayName displayName,
+        ResourceState? parentState,
+        WorkspaceDetails? existingById,
+        WorkspaceDetails? existingByAddress,
+        AuditContext audit,
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        return ValueTask.FromResult(new Workspace(
-            id,
+        if (existingById is not null)
+        {
+            return existingById.TenantId == tenantId
+                && existingById.Address == address
+                && existingById.DisplayName == displayName
+                ? new WorkspaceMutationResult.Current(existingById)
+                : new WorkspaceMutationResult.AlreadyExists();
+        }
+
+        if (existingByAddress is not null)
+        {
+            return new WorkspaceMutationResult.AlreadyExists();
+        }
+
+        if (parentState is null)
+        {
+            return new WorkspaceMutationResult.NotFound();
+        }
+
+        if (parentState != ResourceState.Active)
+        {
+            return new WorkspaceMutationResult.FailedPrecondition();
+        }
+
+        var workspace = new Workspace(
+            workspaceId,
             tenantId,
+            address,
             displayName,
-            operationId,
-            eventSequence,
-            now));
+            ResourceState.Active,
+            Revision.Initial(),
+            audit.OccurredAt,
+            audit.OccurredAt);
+        var details = await DescribeWorkspace(workspace, cancellation);
+        return new WorkspaceMutationResult.Changed(
+            workspace,
+            new AuditIntent(
+                AuditEventId.Generate(),
+                AuditOperation.CreateWorkspace,
+                audit.Attribution,
+                new AuditTarget.Workspace(tenantId, workspaceId),
+                details.State,
+                details.Revision,
+                audit.Correlation,
+                audit.OccurredAt));
     }
 }

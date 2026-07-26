@@ -11,54 +11,43 @@ export interface TestWorkloadCredentials {
   readonly jwksPath: string;
 }
 
-export interface TestCallerCredentials {
-  readonly callerSubject: string;
-  readonly callerToken: string;
-}
-
-export interface TestLifecycleOwnerCredentials {
-  readonly identity: TestCallerCredentials;
-  readonly configuration: TestCallerCredentials;
-  readonly execution: TestCallerCredentials;
-  readonly packages: TestCallerCredentials;
-}
-
 export interface TestKubernetesApiCredentials {
   readonly endpoint: string;
   readonly certificateAuthorityPath: string;
   readonly clientCertificatePath: string;
   readonly clientKeyPath: string;
+  readonly clientSubject: string;
 }
 
-export interface TestAggregationCredentials {
-  readonly serverCertificateAuthorityPath: string;
-  readonly serverCertificatePath: string;
-  readonly serverKeyPath: string;
-  readonly requestHeaderCertificateAuthorityPath: string;
-  readonly requestHeaderClientCertificatePath: string;
-  readonly requestHeaderClientKeyPath: string;
-  readonly unadmittedClientCertificatePath: string;
-  readonly unadmittedClientKeyPath: string;
-  readonly allowedClientName: string;
-}
-
-export interface RegisterTestAggregatedApiOptions {
-  readonly group: string;
-  readonly version: string;
-  readonly serviceName: string;
-  readonly serviceNamespace: string;
-  readonly hostPort: number;
-  readonly serverCertificateAuthorityPath: string;
+export interface TestKubernetesStorage {
+  readonly hostRoot: string;
+  readonly nodeRoot: string;
 }
 
 export interface TestKubernetes {
-  readonly aggregation: TestAggregationCredentials;
+  readonly namespace: string;
   readonly api: TestKubernetesApiCredentials;
+  readonly storage: TestKubernetesStorage;
   readonly createWorkloadCredentials:
     () => Promise<TestWorkloadCredentials>;
-  readonly createLifecycleOwnerCredentials:
-    () => Promise<TestLifecycleOwnerCredentials>;
-  readonly registerAggregatedApi:
-    (options: RegisterTestAggregatedApiOptions) => Promise<void>;
+  readonly createOperatorCredentials:
+    (subject: string) => Promise<TestOperatorCredentials>;
+  readonly loadImage: (image: string) => Promise<void>;
+  readonly runKubectl: (
+    arguments_: readonly string[],
+    input?: string
+  ) => Promise<CommandResult>;
+  readonly startKubectl: (
+    arguments_: readonly string[]
+  ) => ManagedProcess;
   readonly stop: () => Promise<void>;
 }
+import type {
+  CommandResult
+} from "../processes/command-result.js";
+import type {
+  ManagedProcess
+} from "../processes/managed-process.js";
+import type {
+  TestOperatorCredentials
+} from "./test-operator-credentials.js";

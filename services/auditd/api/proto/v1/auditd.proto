@@ -27,14 +27,13 @@ message AuditAcceptance {
 
 message AuditEvent {
   string source_event_id = 1;
-  uint64 source_sequence = 2;
-  string idempotency_key = 3;
-  string operation = 4;
-  google.protobuf.Timestamp occurred_at = 5;
-  AuditAttribution attribution = 6;
-  AuditPartition partition = 7;
-  string trace_id = 8;
-  string span_id = 9;
+  string idempotency_key = 2;
+  string operation = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+  AuditAttribution attribution = 5;
+  AuditPartition partition = 6;
+  string trace_id = 7;
+  string span_id = 8;
 
   oneof detail {
     TenancyMutationAuditDetail tenancy_mutation = 20;
@@ -77,6 +76,7 @@ message TenancyMutationAuditDetail {
 
   uint64 resource_revision = 3;
   AuditOutcome outcome = 4;
+  TenancyResourceState resulting_state = 5;
 }
 
 message TenantAuditTarget {
@@ -93,4 +93,11 @@ enum AuditOutcome {
   AUDIT_OUTCOME_SUCCEEDED = 1;
   AUDIT_OUTCOME_DENIED = 2;
   AUDIT_OUTCOME_FAILED = 3;
+}
+
+enum TenancyResourceState {
+  TENANCY_RESOURCE_STATE_UNSPECIFIED = 0;
+  TENANCY_RESOURCE_STATE_ACTIVE = 1;
+  TENANCY_RESOURCE_STATE_SUSPENDED = 2;
+  TENANCY_RESOURCE_STATE_DELETED = 3;
 }

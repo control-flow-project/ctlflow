@@ -1,13 +1,14 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
-using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
+using CtlFlow.Tenancy.Tenantd.Domain.Addresses;
+using CtlFlow.Tenancy.Tenantd.Domain.Names;
+using CtlFlow.Tenancy.Tenantd.Domain.Resources;
 using CtlFlow.Tenancy.Tenantd.Domain.Time;
 
 namespace CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 
 public class Tenant
 {
-    private string _id = string.Empty;
-    private string? _currentOperationId;
+    private string _address = null!;
+    private string _id = null!;
 
     private Tenant()
     {
@@ -15,68 +16,47 @@ public class Tenant
 
     internal Tenant(
         TenantId id,
-        TenantDisplayName displayName,
-        LifecycleOperationId operationId,
-        ResourceEventSequence eventSequence,
-        UtcInstant now)
-    {
-        _id = id.Value;
-        _currentOperationId = operationId.Value;
-        DisplayName = displayName;
-        Lifecycle = LifecycleState.Provisioning;
-        Revision = TenantRevision.Initial();
-        ProvisioningGeneration = TenantProvisioningGeneration.Initial();
-        LastEventSequence = eventSequence;
-        CreatedAt = now;
-        UpdatedAt = now;
-    }
-
-    internal Tenant(
-        TenantId id,
-        TenantDisplayName displayName,
-        LifecycleState lifecycle,
-        TenantRevision revision,
-        TenantProvisioningGeneration provisioningGeneration,
-        LifecycleOperationId? currentOperationId,
-        ResourceEventSequence lastEventSequence,
+        ResourceAddress address,
+        DisplayName displayName,
+        ResourceState state,
+        Revision revision,
         UtcInstant createdAt,
         UtcInstant updatedAt)
     {
         _id = id.Value;
-        _currentOperationId = currentOperationId?.Value;
+        _address = address.Value;
         DisplayName = displayName;
-        Lifecycle = lifecycle;
+        State = state;
         Revision = revision;
-        ProvisioningGeneration = provisioningGeneration;
-        LastEventSequence = lastEventSequence;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
     }
 
     public TenantId Id => TenantId.FromStorage(_id);
 
-    public TenantDisplayName DisplayName { get; internal set; } = null!;
+    public ResourceAddress Address => ResourceAddress.FromStorage(_address);
 
-    public LifecycleState Lifecycle { get; internal set; }
+    public DisplayName DisplayName { get; private set; } = null!;
 
-    public TenantRevision Revision { get; internal set; } = null!;
+    public ResourceState State { get; private set; }
 
-    public TenantProvisioningGeneration ProvisioningGeneration { get; internal set; } = null!;
+    public Revision Revision { get; private set; } = null!;
 
-    public LifecycleOperationId? CurrentOperationId =>
-        _currentOperationId is null
-            ? null
-            : LifecycleOperationId.FromStorage(_currentOperationId);
+    public UtcInstant CreatedAt { get; private set; } = null!;
 
-    internal string? CurrentOperationStorage
+    public UtcInstant UpdatedAt { get; private set; } = null!;
+
+    internal void ChangeDisplayName(DisplayName displayName, UtcInstant now)
     {
-        get => _currentOperationId;
-        set => _currentOperationId = value;
+        DisplayName = displayName;
+        Revision = Revision.Next();
+        UpdatedAt = now;
     }
 
-    public ResourceEventSequence LastEventSequence { get; internal set; } = null!;
-
-    public UtcInstant CreatedAt { get; internal set; } = null!;
-
-    public UtcInstant UpdatedAt { get; internal set; } = null!;
+    internal void ChangeState(ResourceState state, UtcInstant now)
+    {
+        State = state;
+        Revision = Revision.Next();
+        UpdatedAt = now;
+    }
 }

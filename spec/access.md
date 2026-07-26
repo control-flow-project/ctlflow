@@ -8,30 +8,42 @@ runtime principals, and external callers. None can be substituted for another.
 
 ## Infrastructure operators
 
-`ctlflow` loads standard kubeconfig and calls the selected Kubernetes API server. Kubernetes
-authenticates the request and routes CtlFlow resources to their aggregated API owners.
+`ctlflow` loads a certificate-backed kubeconfig and asks the selected Kubernetes API server for an
+authorized port-forward to the owning private service. It then speaks end-to-end TLS and gRPC
+through that tunnel, presenting the selected kubeconfig client certificate to the service.
+Kubernetes carries bytes after authorizing the tunnel; it does not translate or own the domain API.
 
 ```text
  ctlflow --context CLUSTER
           |
-          | kubeconfig credential
+          | kubeconfig authentication
           v
  Kubernetes API server
           |
-          | authentication, RBAC, aggregation identity
+          | authorized byte tunnel
           v
  owning CtlFlow service
+          ^
+          | kubeconfig client certificate
+          +---------------- ctlflow
 ```
 
-`ctlflow init` is the sole pre-kernel path. It applies signed CtlFlow manifests, waits for the kernel,
-and uses a one-time initialization operation to bind the authenticated Kubernetes subject as the
-first infrastructure operator. Initialization is idempotent and permanently closes after success.
+`ctlflow init` is the sole pre-kernel path. It applies signed CtlFlow manifests and waits for the
+kernel. Initialization is idempotent. Infrastructure-operator admission remains installation
+configuration enforced by Kubernetes RBAC and each owning service; it is not a CtlFlow domain
+record.
 
-Routine operator access uses an explicit least-privilege Kubernetes group. CtlFlow has no operator
-password database, active-Tenant login, or reusable bootstrap token.
+Routine operator access requires both authorization to create the Kubernetes port-forward and an
+exact admitted Kubernetes certificate subject at the owning service. The service validates the
+certificate chain against the installation-provisioned Kubernetes client CA. The certificate's
+single common name is the authenticated Kubernetes subject and the Actor preserved in audit
+evidence. A missing, untrusted, expired, multiply named, or unadmitted certificate fails closed.
 
-The authenticated Kubernetes subject is the Actor for operator mutations and is preserved in audit
-evidence. It is not converted into an `identityd` User or virtual principal.
+The operator contract admits certificate-backed kubeconfig identities only. A context that cannot
+provide a client certificate and private key cannot make an operator domain call. CtlFlow has no
+operator password database, active-Tenant login, reusable bootstrap token, alternate bearer-token
+operator path, or caller-asserted subject header. The operator subject is not converted into an
+`identityd` User or virtual principal.
 
 ## Accounts
 
@@ -213,15 +225,10 @@ Validation uses the installation's bounded local verification-key cache rather t
 call on every request. Workload suspension, replacement, or deletion blocks new tokens; the maximum
 accepted lifetime bounds the consequence of an already issued token.
 
-There is no service-owned certificate authority, per-daemon application certificate, shared daemon
-credential, caller-asserted service header, or unauthenticated internal domain listener. Public TLS
-belongs to Kubernetes ingress. Optional internal transport encryption belongs to the Kubernetes
-network substrate and does not change the application identity contract.
-
-An aggregated administrative API listener uses Kubernetes-native serving certificates and
-request-header client authentication supplied for API aggregation. That substrate path authenticates
-the Kubernetes API server only; its certificate and forwarded headers are never accepted on a
-direct gRPC or application listener.
+There is no shared daemon credential, caller-asserted service header, or unauthenticated internal
+domain listener. Public TLS belongs to Kubernetes ingress. Private gRPC server TLS identity is
+installation-provisioned. It authenticates the server; an admitted kubeconfig client certificate
+authenticates an operator, while a bound workload token authenticates an internal caller.
 
 ## Exposure boundary
 

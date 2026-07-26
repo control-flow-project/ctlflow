@@ -1,0 +1,30 @@
+FROM node:26.1.0-bookworm-slim AS build
+
+WORKDIR /workspace
+COPY package.json package-lock.json ./
+COPY tsconfig.base.json ./
+COPY tooling/clean-directories.mjs tooling/clean-directories.mjs
+COPY testing/mesh/package.json testing/mesh/package.json
+COPY services/auditd/package.json services/auditd/package.json
+RUN npm ci \
+    --workspace @ctlflow/test-mesh \
+    --workspace @ctlflow/auditd \
+    --include-workspace-root=false
+
+COPY testing/mesh/tsconfig.json testing/mesh/tsconfig.json
+COPY testing/mesh/src testing/mesh/src
+COPY services/auditd/api services/auditd/api
+COPY services/auditd/testing services/auditd/testing
+RUN npm run build --workspace @ctlflow/test-mesh \
+    && npm run build --workspace @ctlflow/auditd
+
+FROM node:26.1.0-bookworm-slim
+
+WORKDIR /workspace
+COPY --from=build /workspace/node_modules /workspace/node_modules
+COPY --from=build /workspace/testing/mesh/package.json /workspace/testing/mesh/package.json
+COPY --from=build /workspace/testing/mesh/dist /workspace/testing/mesh/dist
+COPY --from=build /workspace/services/auditd/.generated /workspace/services/auditd/.generated
+
+USER node
+ENTRYPOINT ["node", "/workspace/services/auditd/.generated/testing/stub/node/src/run-auditd-contract-service.js"]

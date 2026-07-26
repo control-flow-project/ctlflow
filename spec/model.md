@@ -12,9 +12,6 @@ that cannot be delegated to Kubernetes.
 | --- | --- | --- |
 | Tenant | `tenantd` | Customer and top-level isolation boundary |
 | Workspace | `tenantd` | Collaboration boundary inside one Tenant |
-| Tenant address binding | `tenantd` | Permanent external address owned by one Tenant |
-| Workspace address binding | `tenantd` | Permanent external address owned by one Workspace |
-| Lifecycle operation and step acknowledgement | `tenantd` | Revisioned cross-owner progress for one Tenant or Workspace generation |
 | User | `identityd` | Human or service account at global or Tenant scope |
 | Membership | `identityd` | A User's standing in a Tenant or Workspace |
 | Group and Group member | `identityd` | Reusable Tenant- or Workspace-scoped audience |
@@ -48,14 +45,22 @@ that cannot be delegated to Kubernetes.
 | Egress destination, policy, and review | `egressd` | Approved external HTTP target, admitted callers, and decision |
 | Audit event, payload deletion event, and export | `auditd` | Authoritative evidence and bounded extraction |
 
-Identifiers are opaque, server allocated, and prefixed by kind. Display names, slugs, Package names,
-logical bucket names, and Kubernetes names never determine ownership or authorization.
+Identifiers are opaque and follow their owning API. Tenant and Workspace IDs are caller generated
+so an exact create is naturally retryable. Display names, addresses, Package names, logical bucket
+names, and Kubernetes names never determine ownership or authorization.
 
 ## Tenancy and Placements
 
-A Tenant owns its Workspaces and accounts; the installation owns global service accounts. A
-Placement answers one question: **where do execution and persistent state belong?** It is a fence,
-not a grant.
+A Tenant has one immutable installation-wide address, display metadata, state, and revision. A
+Workspace has one immutable parent Tenant and one address unique inside that Tenant. Deleted rows
+remain as tombstones, so neither an ID nor an address is reassigned. Tenant and Workspace state is
+exactly active, suspended, or deleted.
+
+Identity, configuration, Package, and execution records are not part of Tenant or Workspace
+creation. Their owning services create and manage them separately.
+
+A Placement answers one question: **where do execution and persistent state belong?** It is a
+fence, not a grant.
 
 | Placement kind | Source | Meaning |
 | --- | --- | --- |
@@ -65,10 +70,11 @@ not a grant.
 | `tenant-user` | Tenant Membership | One User's private Tenant execution and state |
 | `workspace-user` | Workspace Membership | One User's private Workspace execution and state |
 
-There is one canonical Placement for each valid source tuple. Global, Tenant, and Workspace
-Placements materialize with their source. User Placements materialize on the first admitted private
-App, Job, or persistent resource. Each materialized Placement maps to one opaque Kubernetes
-namespace. Removing or suspending its source stops new work before retirement begins.
+There is one canonical Placement for each valid source tuple. A Placement is created through
+`execd`; `tenantd` does not create or reconcile it. User Placements may materialize on the first
+admitted private App, Job, or persistent resource. Each materialized Placement maps to one opaque
+Kubernetes namespace. An inactive source prevents new work under the owning service's admission
+rules.
 
 Every App and Job has one immutable Placement. Every Run inherits its Job's Placement. Installing
 the same Package at another Placement creates another App or Job with separate identity, state,
@@ -312,7 +318,7 @@ use Groups rather than overloading CtlFlow administration roles.
 
 | Record | Lifecycle |
 | --- | --- |
-| Tenant, Workspace | `provisioning`, `active`, `suspended`, `deleting`, `failed`, or terminal `deleted` |
+| Tenant, Workspace | `active`, `suspended`, or terminal `deleted` |
 | Placement | `provisioning`, `active`, `suspended`, `retiring`, `retired`, or `failed` |
 | Package | `available` or terminal `revoked` |
 | App | `pending`, `active`, `suspended`, `removing`, or `failed` |
@@ -321,8 +327,7 @@ use Groups rather than overloading CtlFlow administration roles.
 | Audit export | `pending`, `running`, `succeeded`, `failed`, or `expired` |
 
 Suspension is reversible and blocks new activity without discarding records. Deletion is
-irreversible. Owned children follow their owner; independent references block deletion until
-removed. A deleted Tenant or Workspace remains as a minimal terminal tombstone, and its retired
-external address bindings remain permanently reserved. Cross-service cleanup uses explicit
-lifecycle state and idempotent acknowledgements. No service reads or writes another service's
-database.
+irreversible. A deleted Tenant or Workspace record and its immutable address remain permanently
+reserved. Other services validate current parent state and manage their own records through their
+own explicit operations; `tenantd` does not coordinate cross-service cleanup. No service reads or
+writes another service's database.

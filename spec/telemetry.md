@@ -42,7 +42,7 @@ Every kernel service instruments:
 
 - public HTTP and direct gRPC operations;
 - outbound kernel, application, Kubernetes, and admitted external calls;
-- database operations and committed outbox delivery;
+- database operations and direct audit delivery;
 - bounded queueing, retries, cancellation, and dependency waits;
 - long-lived streams with finite lifecycle and backpressure measurements; and
 - process health, readiness, saturation, and telemetry-export failure.
@@ -130,7 +130,7 @@ OpenTelemetry   diagnosis, performance, saturation, correlation
 ```
 
 Audit envelopes may record trace and span IDs. Missing telemetry never permits missing required
-audit evidence, and a telemetry export cannot satisfy an audit outbox obligation.
+audit evidence, and a telemetry export cannot satisfy a direct audit obligation.
 
 ## Verification
 

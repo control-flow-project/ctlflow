@@ -1,5 +1,5 @@
 import { runKubectl } from "./run-kubectl.js";
-import { runCommand } from "../processes/run-command.js";
+import type { TestMinikube } from "./test-minikube.js";
 
 export interface TestWorkloadDefinition {
   readonly podName: string;
@@ -8,10 +8,13 @@ export interface TestWorkloadDefinition {
 
 export async function createTestWorkloads(
   repositoryRoot: string,
-  controlPlane: string,
+  minikube: TestMinikube,
   namespaceName: string,
   workloads: readonly TestWorkloadDefinition[]
 ): Promise<void> {
+  const bootstrapLabels = {
+    "ctlflow.test/component": "credential-bootstrap"
+  };
   const items: object[] = [
     {
       apiVersion: "v1",
@@ -34,7 +37,8 @@ export async function createTestWorkloads(
         kind: "Pod",
         metadata: {
           name: workload.podName,
-          namespace: namespaceName
+          namespace: namespaceName,
+          labels: bootstrapLabels
         },
         spec: {
           automountServiceAccountToken: true,
@@ -51,20 +55,11 @@ export async function createTestWorkloads(
     );
   }
 
-  await runCommand(
-    "docker",
-    [
-      "exec",
-      "-i",
-      controlPlane,
-      "kubectl",
-      "--kubeconfig=/etc/kubernetes/admin.conf",
-      "apply",
-      "-f",
-      "-"
-    ],
+  await runKubectl(
+    repositoryRoot,
+    minikube,
+    ["apply", "-f", "-"],
     {
-      cwd: repositoryRoot,
       input: JSON.stringify({
         apiVersion: "v1",
         kind: "List",
@@ -73,13 +68,14 @@ export async function createTestWorkloads(
     });
   await runKubectl(
     repositoryRoot,
-    controlPlane,
+    minikube,
     [
       "wait",
       "pod",
-      "--all",
       "--namespace",
       namespaceName,
+      "--selector",
+      "ctlflow.test/component=credential-bootstrap",
       "--for=condition=Ready",
       "--timeout=90s"
     ]);

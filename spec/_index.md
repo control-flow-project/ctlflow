@@ -19,11 +19,12 @@ CtlFlow records with one owning service each.
 
  ctlflow                                         browser
     |                                             |   |
-    | kubeconfig                                  |   +----> authd ----> identityd
-    v                                             |          login       Session
+    | kubeconfig-authorized port-forward          |   +----> authd ----> identityd
+    | + kubeconfig client certificate             |          login       Session
+    v                                             |
  Kubernetes API server                           |
     |                                             +--------> edged
-    | aggregated administrative APIs                           |
+    | byte transport                                           |
     v                                                         | invocation JWT
  CtlFlow owning services <------------------------ product backend App
     |
@@ -40,9 +41,10 @@ CtlFlow records with one owning service each.
  Every service ---- bounded OTLP ----> OpenTelemetry Collector ----> configured backends
 ```
 
-The operator CLI calls aggregated CtlFlow APIs through the Kubernetes API server. Tenant-facing
-requests enter through `edged`; an authenticated product backend App calls the same owning-service
-operations. Changing the client surface never changes record ownership or semantics.
+The operator CLI asks the Kubernetes API server for an authorized port-forward, then calls the
+owning service's private gRPC contract directly with the selected kubeconfig client certificate.
+Tenant-facing requests enter through `edged`; an authenticated product backend App calls the same
+owning-service operations. Changing the client surface never changes record ownership or semantics.
 
 Public authentication enters through `authd`. All identity records, Sessions, and internal
 invocation-token issuance remain behind private `identityd`.
@@ -75,7 +77,7 @@ virtual principal, a Job, persistent state, and product-owned activation rules.
 
 | Caller | Surface |
 | --- | --- |
-| Infrastructure operator | `ctlflow`, authenticated by kubeconfig |
+| Infrastructure operator | `ctlflow`, authenticated by a certificate-backed kubeconfig |
 | Human signing in or out | `authd`, backed by private `identityd` |
 | Tenant administrator or user | Product-provided UI or API through `edged` |
 | Browser, webhook, or external API client | `edged` |

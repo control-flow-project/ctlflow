@@ -1,3 +1,6 @@
+import {
+  X509Certificate
+} from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -38,8 +41,22 @@ export async function createKubernetesApiCredentials(
     endpoint,
     certificateAuthorityPath,
     clientCertificatePath,
-    clientKeyPath
+    clientKeyPath,
+    clientSubject: readCommonName(clientCertificate)
   };
+}
+
+function readCommonName(certificate: Buffer): string {
+  const names = new X509Certificate(certificate)
+    .subject
+    .split("\n")
+    .filter((value) => value.startsWith("CN="))
+    .map((value) => value.slice("CN=".length));
+  if (names.length !== 1 || names[0]!.length === 0) {
+    throw new Error(
+      "Kubeconfig client certificate must have one common name");
+  }
+  return names[0]!;
 }
 
 function readKubeconfigValue(

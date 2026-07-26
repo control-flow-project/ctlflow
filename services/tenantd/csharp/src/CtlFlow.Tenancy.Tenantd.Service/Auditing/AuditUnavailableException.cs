@@ -1,0 +1,9 @@
+namespace CtlFlow.Tenancy.Tenantd.Service.Auditing;
+
+internal sealed class AuditUnavailableException : Exception
+{
+    internal AuditUnavailableException(Exception innerException)
+        : base("Required audit delivery is unavailable", innerException)
+    {
+    }
+}

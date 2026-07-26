@@ -65,8 +65,6 @@ services/examples/customerd/
           CreateDbContextFactory.cs
         Sqlite/
           ConfigureSqlite.cs
-        Postgres/
-          ConfigurePostgres.cs
       Example.Customers.Service/
         Example.Customers.Service.csproj
         Program.cs
@@ -82,8 +80,11 @@ services/examples/customerd/
         PublishAndStart.cs
 ```
 
-Only supported providers and necessary implementation-local tests are present. Empty provider
-directories are not checked in.
+Only implemented providers and necessary implementation-local tests are present. The example
+therefore contains only SQLite. A future PostgreSQL implementation adds its provider package,
+configuration, and any genuinely provider-specific operations without changing Domain, Service,
+the wire contract, or common Db operations. Empty or dormant provider directories are not checked
+in.
 
 ## Dependencies
 
@@ -168,9 +169,9 @@ public sealed record CustomerSummary(
     CustomerStanding Standing);
 ```
 
-Separate persistence-only records are an escape hatch for concrete needs such as transactional
-outbox rows, idempotency records, encrypted storage envelopes, or provider-specific materialized
-views. Their file and name must state that storage purpose. They never leak into the wire contract.
+Separate persistence-only records are an escape hatch for concrete needs such as idempotency
+records, encrypted storage envelopes, or provider-specific materialized views. Their file and name
+must state that storage purpose. They never leak into the wire contract.
 
 ## Domain
 
@@ -352,22 +353,31 @@ contract. It is not a Domain operation.
 
 ### Provider selection
 
-The process selects one supported provider at startup from typed configuration. The selected
+The process selects one implemented provider at startup from typed configuration. The selected
 provider creates `DbContextOptions<SalesDbContext>` and a pooled context factory. Domain and Service
-code do not branch on provider names.
+code do not branch on provider names. SQLite is the sole implemented provider until another
+provider is explicitly added and proved.
 
-Common queries stay in Db and execute against either provider. A query moves behind a
-provider-specific Db function only when the providers require materially different SQL or
-semantics:
+Common queries stay in Db and execute through the configured context factory. When a future
+provider requires materially different SQL or semantics, only that operation moves behind
+purpose-specific provider functions:
 
 ```text
 Db/Sqlite/Customers/QueryCustomerSearch.cs
 Db/Postgres/Customers/QueryCustomerSearch.cs
 ```
 
-That escape hatch is selected once during startup through one purpose-typed function delegate. It
-does not create a generic repository, broad storage interface, or provider conditional in every
-operation. Both variants return the same Domain result and pass the same canonical tests.
+Those files exist only after both variants are implemented. The escape hatch is selected once
+during startup through one purpose-typed function delegate. It does not create a generic
+repository, broad storage interface, or provider conditional in every operation. Both variants
+return the same Domain result and pass the same canonical tests.
+
+The SQLite provider is deployed as one service process per database. A fixed, finite set of
+tenant-keyed asynchronous locks coordinates Tenant and child mutations before their Entity
+Framework operations. The lock is released before any downstream call. A future provider that
+admits multiple service processes replaces that purpose-specific coordination with
+provider-appropriate cross-process atomicity while preserving the same Domain decisions and
+canonical tests.
 
 ## Service
 
@@ -532,7 +542,9 @@ A mutation follows the same projection rule. Its Db operation creates the contex
 transaction when needed. It explicitly projects the complete stored state required by the
 transition, asks a verb-named Domain function to rehydrate the mapped Domain entity, attaches that
 entity to the context, records the projected concurrency revision as the original value, calls the
-Domain decision function, and commits only after the decision succeeds.
+Domain decision function, and commits only after the decision succeeds. Domain creates the complete
+typed audit intent for each contract-required outcome. Reads, retries, no-ops, denials, and failures
+create no audit intent unless their service contract explicitly requires one.
 
 Rehydration validates storage invariants and reconstructs the same Domain entity used for creation
 and business logic. It does not introduce an `Entity`, `Row`, `Record`, or other parallel
@@ -543,10 +555,17 @@ entity-returning Entity Framework materialization.
 Every projected mutation member, rehydration path, attach/update path, optimistic-concurrency path,
 and generated query interceptor executes in the real NativeAOT integration suite.
 
-For a mutation that must atomically write an audit outbox entry, both entities are added to the same
-context and saved in the same transaction. No network call occurs inside that transaction. A
-downstream call needed before the decision completes before the transaction begins; a call needed
-after commit is driven by the committed outbox.
+Db persists only service-owned domain state. After Db completes and no database transaction is
+held, Service maps the Domain-produced audit intent to the shared wire contract and calls
+`auditd.RecordAuditBatch` directly before returning the corresponding outcome. Infrastructure
+failures are mapped through a Domain function to the required typed failure evidence and submitted
+the same way. No local audit outbox, queue, retry journal, source sequence, or fallback path exists.
+
+Entity Framework mappings and common migrations contain structural schema only. C# behavior must
+not depend on a database trigger, stored procedure, user-defined database function, computed side
+effect, or provider-resident business rule. Immutability, state transitions, parent checks, revision
+advancement, no-op handling, and audit intent are explicit Domain code and are exercised through
+the shipping process.
 
 Functions accept only the concrete inputs they use: the purpose-specific context factory, typed
 Domain values, and cancellation. Do not pass `DbSet<T>` or `IQueryable<T>` across project

@@ -1,5 +1,6 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
-using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
+using CtlFlow.Tenancy.Tenantd.Domain.Addresses;
+using CtlFlow.Tenancy.Tenantd.Domain.Names;
+using CtlFlow.Tenancy.Tenantd.Domain.Resources;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.Tenantd.Domain.Time;
 
@@ -7,9 +8,9 @@ namespace CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 
 public class Workspace
 {
-    private string _id = string.Empty;
-    private string _tenantId = string.Empty;
-    private string? _currentOperationId;
+    private string _address = null!;
+    private string _id = null!;
+    private string _tenantId = null!;
 
     private Workspace()
     {
@@ -18,43 +19,19 @@ public class Workspace
     internal Workspace(
         WorkspaceId id,
         TenantId tenantId,
-        WorkspaceDisplayName displayName,
-        LifecycleOperationId operationId,
-        ResourceEventSequence eventSequence,
-        UtcInstant now)
-    {
-        _id = id.Value;
-        _tenantId = tenantId.Value;
-        _currentOperationId = operationId.Value;
-        DisplayName = displayName;
-        Lifecycle = LifecycleState.Provisioning;
-        Revision = WorkspaceRevision.Initial();
-        ProvisioningGeneration = WorkspaceProvisioningGeneration.Initial();
-        LastEventSequence = eventSequence;
-        CreatedAt = now;
-        UpdatedAt = now;
-    }
-
-    internal Workspace(
-        WorkspaceId id,
-        TenantId tenantId,
-        WorkspaceDisplayName displayName,
-        LifecycleState lifecycle,
-        WorkspaceRevision revision,
-        WorkspaceProvisioningGeneration provisioningGeneration,
-        LifecycleOperationId? currentOperationId,
-        ResourceEventSequence lastEventSequence,
+        ResourceAddress address,
+        DisplayName displayName,
+        ResourceState state,
+        Revision revision,
         UtcInstant createdAt,
         UtcInstant updatedAt)
     {
         _id = id.Value;
         _tenantId = tenantId.Value;
-        _currentOperationId = currentOperationId?.Value;
+        _address = address.Value;
         DisplayName = displayName;
-        Lifecycle = lifecycle;
+        State = state;
         Revision = revision;
-        ProvisioningGeneration = provisioningGeneration;
-        LastEventSequence = lastEventSequence;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
     }
@@ -63,28 +40,29 @@ public class Workspace
 
     public TenantId TenantId => TenantId.FromStorage(_tenantId);
 
-    public WorkspaceDisplayName DisplayName { get; internal set; } = null!;
+    public ResourceAddress Address => ResourceAddress.FromStorage(_address);
 
-    public LifecycleState Lifecycle { get; internal set; }
+    public DisplayName DisplayName { get; private set; } = null!;
 
-    public WorkspaceRevision Revision { get; internal set; } = null!;
+    public ResourceState State { get; private set; }
 
-    public WorkspaceProvisioningGeneration ProvisioningGeneration { get; internal set; } = null!;
+    public Revision Revision { get; private set; } = null!;
 
-    public LifecycleOperationId? CurrentOperationId =>
-        _currentOperationId is null
-            ? null
-            : LifecycleOperationId.FromStorage(_currentOperationId);
+    public UtcInstant CreatedAt { get; private set; } = null!;
 
-    internal string? CurrentOperationStorage
+    public UtcInstant UpdatedAt { get; private set; } = null!;
+
+    internal void ChangeDisplayName(DisplayName displayName, UtcInstant now)
     {
-        get => _currentOperationId;
-        set => _currentOperationId = value;
+        DisplayName = displayName;
+        Revision = Revision.Next();
+        UpdatedAt = now;
     }
 
-    public ResourceEventSequence LastEventSequence { get; internal set; } = null!;
-
-    public UtcInstant CreatedAt { get; internal set; } = null!;
-
-    public UtcInstant UpdatedAt { get; internal set; } = null!;
+    internal void ChangeState(ResourceState state, UtcInstant now)
+    {
+        State = state;
+        Revision = Revision.Next();
+        UpdatedAt = now;
+    }
 }

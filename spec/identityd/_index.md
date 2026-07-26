@@ -137,6 +137,13 @@ Session ID, invocation JWT, and token expiry. The target must be inside current 
 and admission; a cross-Tenant or invisible target is `NOT_FOUND`. Session credentials and returned
 invocation JWTs are sensitive and use the redaction rules in [Access](../access/).
 
+`GetInvocationVerificationKeys` has an empty request and returns one to eight active or retiring
+RS256 public keys plus an absolute cache expiry. Each key contains a unique key ID of one to 128
+ASCII characters and base64url modulus and exponent values. The expiry is after the response time
+and no more than five minutes later. Receivers refresh on expiry or an unknown key ID. An empty,
+duplicate, malformed, expired, or oversized response is unavailable rather than an empty authority.
+The operation never returns private or symmetric key material.
+
 ### Principal and execution results
 
 Principal resolution returns only the requested principal's kind, canonical ID, enabled or retired
@@ -154,20 +161,6 @@ Placement, workload generation, and Kubernetes workload from the authenticated r
 current owner facts. A request cannot supply substitute identity. A proxy credential additionally
 names one existing dependency binding and audience; it expires no later than the workload token or
 the configured 60-second maximum.
-
-### Scope lifecycle reconciliation
-
-`identityd` lists and watches the lifecycle steps assigned to its authenticated service identity.
-Tenant establishment creates the declared initial human administrator, Tenant Membership, and
-optional identity link as one identity-owned transaction. Workspace establishment creates only the
-explicitly requested Memberships for existing Tenant Users. Suspension blocks new Sessions and
-credentials, resumption revalidates current standing before restoring them, and retirement
-irreversibly retires remaining identity state after referential checks.
-
-Each local transition is idempotent for the supplied `tenantd` lifecycle-operation ID, generation,
-and step. After committing local state and audit intent, `identityd` calls
-`tenantd.AcknowledgeLifecycleStep` with its identity revision. It never mutates Tenant or Workspace
-lifecycle.
 
 ## Administrative resources
 
@@ -195,11 +188,11 @@ subresources with idempotency and revision preconditions.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate exact parent/lifecycle and consume assigned identity lifecycle work |
+| `tenantd` | Validate exact parent Tenant or Workspace and current state |
 | `pkgd` | Validate App, component, Package, and virtual-principal owner references |
 | `execd` | Validate Placement, Job, Run, dependency, workload generation, and runtime references |
 | `egressd` | Perform only the provider discovery, authorization, token, and user-info HTTP admitted by the SSO binding |
-| `auditd` | Deliver identity mutation and authentication evidence through the transactional outbox |
+| `auditd` | Deliver identity mutation and authentication evidence directly |
 
 `policyd`, `configd`, `pkgd`, `execd`, `egressd`, `auditd`, runtime proxies, `authd`, and `edged`
 call only the exact operations admitted to them above. No caller receives a generic identity query,
@@ -212,7 +205,7 @@ attachment combinations, paginated Group membership, provider and Workspace narr
 transaction replay and callback failure, Session exchange and revocation, key rotation and cache
 expiry, invocation claim shapes, virtual/runtime identity lifecycle, process-bound credential
 replay from another runtime, cross-Tenant invisibility, disabled-account propagation, downstream
-outage, cancellation, concurrency, telemetry redaction, and transactional audit delivery.
+outage, cancellation, concurrency, telemetry redaction, and direct audit delivery.
 
 ## User scopes, groups, and management roles
 

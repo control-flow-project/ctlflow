@@ -1,19 +1,27 @@
-import { runCommand } from "../processes/run-command.js";
+import {
+  runCommand,
+  type RunCommandOptions
+} from "../processes/run-command.js";
 import type { CommandResult } from "../processes/command-result.js";
+import type { TestMinikube } from "./test-minikube.js";
 
 export async function runKubectl(
   repositoryRoot: string,
-  controlPlaneContainer: string,
-  arguments_: readonly string[]
+  minikube: TestMinikube,
+  arguments_: readonly string[],
+  options: Omit<RunCommandOptions, "cwd"> = {}
 ): Promise<CommandResult> {
   return await runCommand(
-    "docker",
+    minikube.executable,
     [
-      "exec",
-      controlPlaneContainer,
+      "--profile",
+      minikube.toolchain.profile,
       "kubectl",
-      "--kubeconfig=/etc/kubernetes/admin.conf",
+      "--",
       ...arguments_
     ],
-    { cwd: repositoryRoot });
+    {
+      cwd: repositoryRoot,
+      ...options
+    });
 }

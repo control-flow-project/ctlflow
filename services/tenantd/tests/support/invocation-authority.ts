@@ -17,8 +17,10 @@ export interface InvocationTokenOptions {
 export interface InvocationAuthority {
   readonly issuer: string;
   readonly audience: string;
-  readonly jwksPath: string;
+  readonly verificationKey: InvocationVerificationKey;
   readonly sign: (options?: InvocationTokenOptions) => string;
   readonly signPayload: (payloadJson: string) => string;
-  readonly stop: () => Promise<void>;
 }
+import type {
+  InvocationVerificationKey
+} from "@ctlflow/identityd/testing/stub";

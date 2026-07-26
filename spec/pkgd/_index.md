@@ -115,17 +115,6 @@ Package revocation is terminal. After committing revocation, `pkgd` asks `execd`
 generation, Job, and Run attempt pinned to that version. Their records and evidence remain; no
 replacement Package is selected automatically.
 
-## Tenant lifecycle reconciliation
-
-`pkgd` lists and watches lifecycle work assigned to its authenticated service identity. Provisioning
-work carries the exact finite baseline Package versions persisted by `tenantd`; `pkgd` installs
-them idempotently at the canonical target Placement. Suspension blocks App mutation and exposure,
-resumption revalidates current Package standing, and retirement drains or retires target-owned Apps
-under their declared persistence policy.
-
-Each local transition is keyed by the supplied lifecycle-operation ID, generation, and step.
-`pkgd` commits App state and audit intent before acknowledging the step to `tenantd`.
-
 ## Direct operations
 
 | Operation | Admitted caller | Purpose |
@@ -217,11 +206,11 @@ selectors only and follow the common bounded contract.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate owner lifecycle and consume assigned baseline-App lifecycle work |
+| `tenantd` | Validate exact parent Tenant or Workspace and current state |
 | `identityd` | Validate attached account and create or retire component virtual principals |
 | `configd` | Validate complete configuration and exact provider selections |
 | `execd` | Run isolated builds and realize, drain, or retire App generations |
-| `auditd` | Deliver publication, App lifecycle, and exposure evidence through the transactional outbox |
+| `auditd` | Deliver publication, App lifecycle, and exposure evidence directly |
 
 `edged`, `policyd`, `configd`, and `execd` receive only their exact immutable projections. `pkgd`
 never asks them to infer Package content.
@@ -230,11 +219,11 @@ never asks them to infer Package content.
 
 Canonical evidence covers canonical publication and conflict, every declaration and artifact
 validation, revocation, ownership/visibility, bounded lists and watches, transfer confinement,
-App installation and restart between lifecycle steps, attached-account and Placement failure,
+App installation and restart, attached-account and Placement failure,
 compatible and incompatible upgrade, scaling bounds, suspension/resumption/removal, persistent-slot
-policy, baseline idempotency, stale realization reports, exact contract/exposure resolution,
+policy, stale realization reports, exact contract/exposure resolution,
 cross-Tenant invisibility, dependency outage, cancellation, concurrency, telemetry redaction, and
-transactional audit delivery.
+direct audit delivery.
 
 ## Invariants
 

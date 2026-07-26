@@ -33,20 +33,19 @@ It serves read-only `auditevents` and mutable `auditexports` in
 
 ## Evidence flow
 
-Every durable service commits its domain mutation and audit-outbox envelope in one transaction:
+Every kernel service submits required evidence directly after establishing the corresponding
+outcome and while holding no database transaction:
 
 ```text
- service database transaction
-   +-- domain mutation
-   +-- audit outbox row
+ source Domain outcome
           |
-          | idempotent authenticated batch
+          | direct idempotent authenticated batch
           v
-       auditd
+       auditd commit
 ```
 
-An accepted source identity and idempotency key map to one event. Retrying the outbox cannot
-duplicate evidence. A source service never holds its transaction while calling `auditd`.
+An accepted source identity and idempotency key map to one event. Exact retry cannot duplicate
+evidence. A source service keeps no local outbox, delivery queue, retry journal, or source sequence.
 
 Runtime proxies and mediation services emit decision evidence correlated by invocation-token,
 trace, and span identity. Application workloads cannot submit authoritative kernel events directly.
@@ -110,16 +109,16 @@ An ordinary domain deletion can never erase audit evidence silently.
 | RedactAuditPayload | specifically authorized legal operator | Replace admitted detail with an irreversible redacted marker |
 | DeleteAuditPayload | specifically authorized legal operator | Hard-delete admitted detail and append deletion evidence |
 | Health | private Kubernetes probe | Report whether the process is live |
-| Ready | private Kubernetes probe | Report whether persistence, ingestion, and finite-outbox capacity permit work |
+| Ready | private Kubernetes probe | Report whether persistence and ingestion permit work |
 
 ### Ingestion contract
 
-`RecordAuditBatch` receives one to 100 events in strict source-sequence order
-under one authenticated source service and positive source schema generation.
+`RecordAuditBatch` receives one to 100 events in request order under one
+authenticated source service and positive source schema generation.
 Every envelope contains:
 
 ```text
-source event ID, positive source sequence, and idempotency key
+source event ID and idempotency key
 source operation and occurred time
 operator Kubernetes subject, or Actor and attached account
 immediate caller and runtime principal when applicable
@@ -135,8 +134,8 @@ The authenticated workload determines source service; the body cannot name anoth
 source and event ID maps permanently to one canonical envelope. Exact replay returns the existing
 acceptance; different content is `ALREADY_EXISTS`. A batch commits atomically in source order or
 rejects without a partial prefix. Repeated source-event IDs inside one request,
-non-increasing source sequences, malformed attribution, and a detail type not
-registered for the authenticated source operation are `INVALID_ARGUMENT`.
+malformed attribution, and a detail type not registered for the authenticated
+source operation are `INVALID_ARGUMENT`.
 The result lists one acceptance per input event, in input order, with the
 source-event ID and resulting partition cursor.
 
@@ -145,12 +144,12 @@ Finite ingestion capacity is `RESOURCE_EXHAUSTED`; an authenticated source
 that is not admitted to ingestion is `PERMISSION_DENIED`; persistence that
 cannot establish an atomic result is `UNAVAILABLE`.
 
-Durable services write an outbox row with their domain mutation, then retry until accepted.
-Stateless `authd`, `edged`, and `egressd` submit an admission event before returning authentication
-success, opening a target or upstream connection, or otherwise making an allow externally
-effective. If acceptance cannot be established within the request deadline, admission fails
-unavailable. A denial remains fail-closed; its public response may be generalized to unavailable
-when required evidence cannot be accepted.
+All source services call `RecordAuditBatch` directly. A durable service submits mutation evidence
+after its database operation completes and before returning the outcome. `authd`, `edged`, and
+`egressd` submit an admission event before returning authentication success, opening a target or
+upstream connection, or otherwise making an allow externally effective. If acceptance cannot be
+established within the request deadline, the source reports unavailable. No local audit state or
+fallback is created.
 
 The mediator submits a separately correlated outcome event before cleanly completing an ordinary
 finite exchange. A process failure or forced stream termination may leave only the accepted
@@ -210,7 +209,7 @@ evidence. Legal payload deletion is independent of ordinary retention.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate exact Tenant partition and lifecycle |
+| `tenantd` | Validate exact Tenant partition and current state |
 | `identityd` | Resolve current query Actor, account, and principal facts |
 | `policyd` | Authorize query, export, and payload-removal operations |
 | `configd` | Resolve retention and exact export-storage configuration |
@@ -223,7 +222,7 @@ metadata and commitments.
 ## Verification
 
 Canonical evidence covers source authentication/spoofing, typed envelope validation, exact replay
-and conflicting replay, atomic batch order, durable outbox restart, stateless allow backpressure,
+and conflicting replay, atomic batch order, direct source delivery, stateless allow backpressure,
 global/Tenant separation, every indexed query and continuation fence, count bounds, follow
 backpressure and retention gaps, export idempotency/restart/failure/expiry/transfer confinement,
 redaction and hard deletion commitments, concurrent removal, retention, cross-Tenant invisibility,
@@ -236,6 +235,7 @@ application record, file, prompt, model response, or program log enters evidence
 - Tenant callers cannot query another Tenant partition.
 - Global evidence is distinct from Tenant partitions.
 - Export APIs return metadata and purpose-bound transfer access, not export bytes.
-- Audit unavailability cannot silently discard committed source evidence.
+- Audit unavailability is an explicit source dependency failure; sources do not persist a local
+  fallback.
 - Payload removal always leaves immutable deletion evidence and the original commitment.
 - Telemetry loss or export success has no effect on audit acceptance or retention.
