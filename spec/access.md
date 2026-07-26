@@ -28,10 +28,11 @@ Tenant login, or automatic conversion into an Identityd User.
 
 ## Workload identity
 
-Each kernel or application workload has one Kubernetes ServiceAccount.
-Kubernetes projects a bound, rotating token to the trusted process boundary.
-The receiver validates issuer, signature, installation audience, expiry,
-binding, namespace, and exact ServiceAccount subject.
+Each kernel or application workload has one Kubernetes ServiceAccount. Most
+private operations authenticate it with a bound rotating token projected to
+the trusted process boundary. The receiver validates issuer, signature,
+installation audience, expiry, binding, namespace, and exact ServiceAccount
+subject.
 
 ```text
 authorization: Bearer <bound workload token>
@@ -39,6 +40,15 @@ authorization: Bearer <bound workload token>
 
 Reachability or a valid token does not admit an operation. Every operation has
 an exact finite caller set.
+
+The exact exception is Authd's call to `identityd.CreateSession` or
+`identityd.RevokeSession`. Each Authd process instead presents a
+process-private client certificate. Identityd validates its client-auth usage,
+validity, installation workload trust chain, and exact configured certificate
+subject before mapping it to `SERVICE/svc_authd`. Those calls carry no
+workload bearer and no invocation JWT. A shared certificate, request field,
+header, Kubernetes name, or browser credential cannot replace the certificate
+identity.
 
 ## Invocation identity
 
@@ -129,7 +139,9 @@ Autonomous, capability, and operator caller sets are disjoint.
 Every private call carries:
 
 ```text
-authorization
+immediate caller authentication:
+  authorization bearer for a workload-token operation
+  OR mutual-TLS client identity for Authd CreateSession/RevokeSession
 ctlflow-invocation   when acting on behalf of an Actor
 traceparent
 tracestate           optional
@@ -147,6 +159,12 @@ private.
 
 This boundary assignment does not imply any route. Public routes exist only in
 their owner's checked versioned HTTP contract.
+
+Authd's complete browser surface is `POST /auth/v1/begin`,
+`GET /auth/v1/callback`, and `POST /auth/v1/logout`. Begin and Logout require
+the exact configured HTTPS Origin; Callback instead requires one unexpired,
+one-time state value bound to the browser's HttpOnly state cookie. No route
+accepts caller-asserted identity.
 
 ## Failure and evidence
 

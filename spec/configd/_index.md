@@ -29,6 +29,33 @@ leave only through a purpose-bound projection operation once those operations
 are explicitly present in the contract. A general read-secret operation is
 forbidden.
 
+## Authd provider projection
+
+Authd has no Configd RPC. Configd supplies Authd's provider configuration
+through one purpose-bound deployed projection for the exact Authd workload.
+The projection consists of two disjoint, read-only process-private files:
+
+```text
+resolved non-secret provider manifest
+provider secret material referenced by that manifest
+```
+
+The resolved manifest contains the canonical Authd public origin and a finite
+set of exact Tenant/provider entries. Each entry selects one installed adapter
+and its exact endpoints, trust, bounded settings, callback expectations, and
+secret references. It contains no account, external identity link, Session, or
+provider catalog exposed to a caller.
+
+Authd validates and resolves both files once at startup and treats that
+generation as immutable. A provider change or secret rotation creates a new
+projection and replacement Authd process. There is no Authd read call, watch,
+poll, fallback, runtime discovery, or last-known-good reload. The complete
+bounds and consumer behavior are owned by the
+[Authd HTTP contract](../authd/#configd-projection).
+
+This is Configd's existing narrow Kubernetes projection realization, not a
+callable Configd operation or a second provider-configuration read surface.
+
 ## Kubernetes boundary
 
 `configd` may be the narrow owner that writes Kubernetes Secret custody and
@@ -43,6 +70,9 @@ secret material directly.
   payloads.
 - A projection is bound to one admitted consumer and cannot be reused by
   another runtime.
+- Non-secret Authd provider settings and provider secrets remain separate
+  projection files even though Authd resolves them into one process-local
+  generation.
 - Provider-specific schemas and behavior remain owned by the provider.
 - Mutations are explicit and directly audited through the approved audit
   contract.

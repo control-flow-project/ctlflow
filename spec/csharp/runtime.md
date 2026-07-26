@@ -8,17 +8,31 @@ layering and data-access design remains in [C# Implementation](../).
 
 ## Authentication and telemetry
 
-Service authenticates either an admitted kubeconfig client certificate for an operator operation
-or a bound Kubernetes ServiceAccount token for an internal operation before invoking a Domain
-function. It then validates any permitted `identityd` invocation JWT and constructs one typed
-request context. Server and operator-certificate handling remains in the Service transport and
-authentication boundary; Domain and Db never receive certificate types. Caller-asserted identity
-headers and alternate development authentication paths are forbidden.
+Service authenticates the exact inbound identity declared by the owned
+operation: an admitted kubeconfig client certificate for an operator
+operation, a bound Kubernetes ServiceAccount token for an ordinary internal
+operation, or no caller identity for a declared public route. It then
+validates any permitted `identityd` invocation JWT and constructs one typed
+request context.
 
-Kestrel binds one explicit HTTP/2-only address for direct gRPC and one distinct HTTP/1.1-only
-address for health and readiness. Routing constrains `/healthz` and `/readyz` to the probe listener;
-the gRPC listener cannot silently downgrade to HTTP/1.1, and the probe listener cannot dispatch a
-gRPC operation.
+Where an owned dependency contract requires workload mTLS, Service also owns
+the process-private client certificate, exact server validation, pooled
+channel, deadline, and cancellation. Authd uses that path only for
+`identityd.CreateSession` and `identityd.RevokeSession`; it sends no workload
+bearer or invocation JWT on those calls. Server, operator-certificate, and
+outbound client-certificate handling remains in the Service transport and
+authentication boundary; Domain and Db never receive certificate types.
+Caller-asserted identity headers and alternate development authentication
+paths are forbidden.
+
+A service with private gRPC binds one explicit HTTP/2-only address for that
+contract. A service with a declared public HTTP contract instead binds one
+explicit public address and exposes no gRPC endpoint unless its owned contract
+also declares one. Every service binds one distinct HTTP/1.1-only address for
+health and readiness. Routing constrains `/healthz` and `/readyz` to the probe
+listener; a gRPC listener cannot silently downgrade to HTTP/1.1, a public
+listener cannot dispatch an undeclared route or RPC, and the probe listener
+cannot dispatch a domain operation.
 
 C# instrumentation uses the OpenTelemetry .NET APIs with explicit `ActivitySource`, `Meter`, gRPC,
 HTTP, and Entity Framework integration selected for NativeAOT compatibility. Runtime profiler
@@ -74,33 +88,45 @@ asynchronous I/O, pooled long-lived clients and context factories, and finite co
 tests exercise the actual published binary and real database provider rather than a managed test
 host.
 
-Db references the Entity Framework build tasks and owns compiled-model and query generation.
-Service also references the tasks so NativeAOT publication recurses into Db, but disables its own
-model and query generation stages because Service owns no `DbContext`. Generated C# remains build
-output and is never hand-edited or checked in.
+For a durable service, Db references the Entity Framework build tasks and owns
+compiled-model and query generation. Service also references the tasks so
+NativeAOT publication recurses into Db, but disables its own model and query
+generation stages because Service owns no `DbContext`. A stateless Service
+does not reference Entity Framework tasks. Generated C# remains build output
+and is never hand-edited or checked in.
 
-SQLite is the required database provider. Its connection and file lifecycle live under
-`Db/Sqlite/`. Every additional supported provider belongs in its own `Db/<Provider>/` directory,
-uses the same Domain operations, and reaches the same Knex-owned logical schema and canonical
-behavior. A provider does not change the gRPC contract or create another service implementation.
+For a durable service, SQLite is the required database provider. Its
+connection and file lifecycle live under `Db/Sqlite/`. Every additional
+supported provider belongs in its own `Db/<Provider>/` directory, uses the
+same Domain operations, and reaches the same Knex-owned logical schema and
+canonical behavior. A provider does not change the gRPC contract or create
+another service implementation. A stateless service has no provider
+directory.
 
 ## Review checklist
 
 A C# service implementation is structurally complete when:
 
-1. it has exactly the Domain, Db, and Service production projects;
-2. its generated wire code comes only from the service-root protobuf contract;
+1. it has exactly Domain and Service, plus Db only when its owned contract is
+   durable;
+2. any generated wire code comes only from the service-root protobuf contract,
+   while public HTTP routes come only from the owned checked HTTP contract;
 3. wire types remain in Service and concrete provider concerns remain in Db;
-4. Domain entities are mapped directly unless a named persistence escape hatch is justified;
-5. every Entity Framework query uses a closed scalar projection, and mutations rehydrate and attach
-   the same mapped Domain entity with its explicit original concurrency revision;
-6. Db query/mutation operations and Domain decisions are semantic functions in verb-named files;
+4. for a durable service, Domain entities are mapped directly unless a named
+   persistence escape hatch is justified;
+5. for a durable service, every Entity Framework query uses a closed scalar
+   projection, and mutations rehydrate and attach the same mapped Domain
+   entity with its explicit original concurrency revision;
+6. any Db query/mutation operations and all Domain decisions are semantic
+   functions in verb-named files;
 7. call sites use direct functions rather than use-case, command-handler, or repository ceremony;
 8. all CtlFlow-owned operation APIs are awaitable and omit the `Async` suffix;
-9. Knex remains the only migration authority;
-10. operator-certificate, workload-token, and invocation-token authentication each have one
-    production path without development bypasses;
-11. generated model and query-interceptor output compiles as part of the gated NativeAOT
-    publication;
+9. Knex remains the only migration authority for a durable service, and a
+   stateless service has no migration path;
+10. every declared operator certificate, workload token, workload-mTLS
+    certificate, and invocation-token path has one production realization
+    without development bypasses;
+11. for a durable service, generated model and query-interceptor output
+    compiles as part of the gated NativeAOT publication;
 12. the unchanged canonical suite passes against the NativeAOT process and real Collector; and
 13. implementation-local tests contain only C#-specific release evidence.

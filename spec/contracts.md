@@ -8,23 +8,29 @@ pages do not create additional calls.
 
 ## Private transport
 
-Every private gRPC call carries:
+Every private gRPC call carries one operation-approved immediate workload
+identity:
 
 ```text
-authorization: Bearer <bound Kubernetes workload token>
+authorization: Bearer <bound Kubernetes workload token>   ordinary kernel call
+OR mutual-TLS Authd client certificate                    Authd Session call only
 ctlflow-invocation: Bearer <invocation JWT>   when acting on behalf of an Actor
 traceparent: <W3C trace context>
 tracestate: <W3C vendor state>                optional
 ```
 
-The workload token establishes the immediate caller. The invocation JWT
-establishes subject account, Actor, Tenant, optional Workspace, and origin
-facts. Each receiver validates both independently and ignores caller-supplied
-fields that attempt to replace them.
+The bound workload token establishes the immediate caller for ordinary kernel
+calls. Exactly `identityd.CreateSession` and `identityd.RevokeSession` instead
+authenticate Authd through its process-private mutual-TLS client certificate,
+mapped to `SERVICE/svc_authd`; those calls carry no workload bearer. The
+invocation JWT establishes subject account, Actor, Tenant, optional Workspace,
+and origin facts where its operation permits one. Each receiver validates the
+applicable identities independently and ignores caller-supplied fields that
+attempt to replace them.
 
 Every call has a finite deadline, propagates cancellation, and uses private
-TLS. A caller never holds a database transaction while making a dependency
-call.
+TLS. Authd's two calls require mutual TLS and exact peer validation. A caller
+never holds a database transaction while making a dependency call.
 
 `identityd.GetInvocationVerificationKeys` is a bootstrap operation: it carries
 workload authentication and trace context but no invocation JWT.
@@ -35,7 +41,9 @@ validate the unchanged invocation.
 Identityd Session and issuance operations also omit an existing invocation.
 They establish identity from an exact admitted workload plus either a
 validated external identity, opaque Session credential, or Execd-owned Run
-request as defined by their individual contracts.
+request as defined by their individual contracts. Authd's two Session
+operations use the mutual-TLS workload identity; the other issuance operations
+use their declared workload bearer.
 
 ## Tenant capability authorization
 
@@ -116,7 +124,7 @@ on every page.
 ```text
 validated provider result
   -> authd
-       -> identityd.CreateSession
+       -> identityd.CreateSession   Authd workload mTLS
             -> auditd.RecordAuditBatch
        <- one-time opaque Session credential
 
@@ -132,7 +140,7 @@ admitted Run
 
 logout credential
   -> authd
-       -> identityd.RevokeSession
+       -> identityd.RevokeSession   Authd workload mTLS
             -> auditd.RecordAuditBatch   actual mutation only
 ```
 
@@ -144,6 +152,8 @@ origin, times, and key.
 
 Session credentials never leave Authd, the browser cookie, Edged, and
 Identityd. Invocation-signing private material never leaves Identityd.
+Authd receives provider settings and credentials only from the Configd-owned,
+purpose-bound deployed projection defined by Authd; it makes no Configd call.
 
 ## Audit delivery
 

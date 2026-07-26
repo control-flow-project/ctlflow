@@ -52,6 +52,18 @@ boundary implies a route or alternate kernel record shape.
  browser or external client -> edged -> admitted application or kernel call
 ```
 
+The complete approved Authd browser contract is:
+
+```text
+POST /auth/v1/begin
+GET  /auth/v1/callback
+POST /auth/v1/logout
+```
+
+The exact form fields, query bounds, cookies, redirects, origin checks, errors,
+and evidence are defined by [authd](../authd/). Authd has no other public
+method or route and no private inbound RPC.
+
 Public cookie headers and external bearer credentials never become authentication metadata for a
 private service call. A public boundary may extract an approved opaque credential and pass it only
 as typed request data to the service that owns that credential, such as `ExchangeSession`.
@@ -154,6 +166,12 @@ no attached account supplied by Execd, and no caller-supplied issuer,
 audience, key, permission, or claim bag. There is no HTTP mirror, generic
 token-minting method, introspection method, Session list, or Session
 administration API.
+
+Authd invokes only `CreateSession` and `RevokeSession`. Those two operations
+authenticate the exact `SERVICE/svc_authd` workload through the
+operation-specific mutual-TLS channel and carry no workload bearer or
+invocation JWT. Other Identityd operations retain their declared
+ServiceAccount-token authentication.
 
 ## Approved audit dependency
 

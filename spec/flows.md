@@ -76,14 +76,23 @@ Resolution returns only active records and never creates route or cache state.
 ## Browser authentication and invocation
 
 ```text
-validated provider callback
-  -> authd
+POST /auth/v1/begin(tenant_id, provider_id, return_to)
+  -> authd validates exact Origin, selection, and same-origin return target
+  -> authd uses its startup-loaded Configd-owned provider projection
+  -> authd stores one browser-bound, ten-minute in-flight attempt
+  <- 303 to the exact configured provider
+
+GET /auth/v1/callback(state, bounded provider fields)
+  -> authd consumes the browser-bound attempt
+  -> selected adapter validates the exact provider result
   -> identityd.CreateSession(tenant, provider, provider_subject)
+       Authd workload mTLS; no account ID
        -> resolve current external identity link and Tenant standing
        -> commit Session
        -> auditd.RecordAuditBatch
   <- one-time opaque credential
-  -> Authd sets an HttpOnly cookie
+  -> authd sets __Host-ctlflow-session
+  <- 303 to the stored same-origin return target
 
 authenticated application request
   -> edged
@@ -92,15 +101,22 @@ authenticated application request
        -> sign short-lived Session-origin invocation JWT
   -> private product target with invocation JWT
 
-logout
-  -> authd
+POST /auth/v1/logout(return_to)
+  -> authd validates exact Origin and opaque cookie
   -> identityd.RevokeSession(cookie credential)
+       Authd workload mTLS
        -> commit actual revocation
        -> auditd.RecordAuditBatch
+  -> authd clears its cookies
+  <- 303 to the validated same-origin return target
 ```
 
 Authd and Edged never receive invocation-signing material. Edged never
-forwards the browser credential to a product target.
+forwards the browser credential to a product target. Authd makes no Configd
+call: the purpose-bound projection is mounted before startup. Unknown,
+malformed, expired, mismatched, and replayed callback state fail without an
+Identityd call. Provider or dependency failures never select another Tenant,
+provider, return target, adapter, or identity.
 
 ## Run invocation
 
