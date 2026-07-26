@@ -20,7 +20,8 @@ export interface InvocationAuthority {
   readonly verificationKey: InvocationVerificationKey;
   readonly sign: (options?: InvocationTokenOptions) => string;
   readonly signPayload: (payloadJson: string) => string;
+  readonly writePrivateKey: (path: string) => Promise<void>;
 }
 import type {
   InvocationVerificationKey
-} from "@ctlflow/identityd/testing/stub";
+} from "@ctlflow/identityd/testing/production";

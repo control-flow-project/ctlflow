@@ -50,7 +50,7 @@ to `execd`.
 | --- | --- |
 | [`tenantd`](tenantd/) | Tenants and Workspaces |
 | [`authd`](authd/) | Public authentication protocol mediation; no durable domain records |
-| [`identityd`](identityd/) | Accounts, groups, memberships, SSO, Sessions, invocation tokens, virtual principals, and runtime identity |
+| [`identityd`](identityd/) | Accounts, groups, memberships, external identity links, Sessions, virtual principals, and invocation identity |
 | [`policyd`](policyd/) | Path-and-operation grants and authorization decisions |
 | [`pkgd`](pkgd/) | Packages, artifacts, service contracts, exposures, and installations |
 | [`configd`](configd/) | Configuration, secret custody, and provider configuration |

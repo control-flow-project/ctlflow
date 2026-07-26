@@ -26,6 +26,17 @@ Every call has a finite deadline, propagates cancellation, and uses private
 TLS. A caller never holds a database transaction while making a dependency
 call.
 
+`identityd.GetInvocationVerificationKeys` is a bootstrap operation: it carries
+workload authentication and trace context but no invocation JWT.
+Receivers use its result to validate an invocation whose key is not in their
+current cache. Identityd fact operations still receive and independently
+validate the unchanged invocation.
+
+Identityd Session and issuance operations also omit an existing invocation.
+They establish identity from an exact admitted workload plus either a
+validated external identity, opaque Session credential, or Execd-owned Run
+request as defined by their individual contracts.
+
 ## Tenant capability authorization
 
 A product backend calls an approved capability-enabled Tenantd operation with
@@ -93,6 +104,47 @@ Policyd uses `ResolvePrincipal` and all pages of `ListPrincipalGroups` at the
 exact target. These operations return identity facts only. They never return a
 Role, grant, operation, resource path, or decision.
 
+Identityd independently validates the unchanged invocation JWT on both fact
+operations. `ResolvePrincipal` admits only the invocation Actor.
+`ListPrincipalGroups` admits that Actor and, for a virtual invocation, its
+immutable attached subject account. Identityd re-establishes current
+attachment, target standing, and both invocation and virtual-principal fences
+on every page.
+
+## Session and invocation issuance
+
+```text
+validated provider result
+  -> authd
+       -> identityd.CreateSession
+            -> auditd.RecordAuditBatch
+       <- one-time opaque Session credential
+
+browser cookie
+  -> edged
+       -> identityd.ExchangeSession
+       <- short-lived Session-origin invocation JWT
+
+admitted Run
+  -> execd
+       -> identityd.IssueRunInvocation
+       <- short-lived Run-origin invocation JWT
+
+logout credential
+  -> authd
+       -> identityd.RevokeSession
+            -> auditd.RecordAuditBatch   actual mutation only
+```
+
+Authd never names an account. Identityd resolves the current external identity
+link and standing before creating a Session. Edged never names an account or
+Actor. Execd names the Actor attached to its Run but never names an attached
+account. Identityd alone derives `sub`, optional `act.sub`, issuer, audience,
+origin, times, and key.
+
+Session credentials never leave Authd, the browser cookie, Edged, and
+Identityd. Invocation-signing private material never leaves Identityd.
+
 ## Audit delivery
 
 After an audited mutation commits and no transaction is held, the source calls
@@ -107,7 +159,8 @@ conflicting replay invalid. The source stores no audit outbox, queue, journal,
 cursor, delivery worker, or fallback copy.
 
 Reads, rejected calls, create retries, and no-op mutations emit no successful
-Tenantd mutation event.
+mutation event. Identityd audits only successful Session creation and an
+actual Session revocation.
 
 ## Complete call inventory
 
@@ -119,5 +172,10 @@ Tenantd mutation event.
 | `policyd` | `identityd.GetInvocationVerificationKeys` | Independently validate the invocation |
 | `policyd` | `identityd.ResolvePrincipal` | Obtain current exact-target identity and standing facts |
 | `policyd` | `identityd.ListPrincipalGroups` | Obtain bounded pages of direct Group IDs |
+| `authd` | `identityd.CreateSession` | Resolve a validated external identity and create one Session |
+| `authd` | `identityd.RevokeSession` | Revoke one Session by opaque credential |
+| `edged` | `identityd.ExchangeSession` | Exchange one current Session for an exact-target invocation |
+| `execd` | `identityd.IssueRunInvocation` | Issue an exact-target invocation for one owned Run |
+| `identityd` | `auditd.RecordAuditBatch` | Record one committed Session creation or actual revocation |
 
 No other kernel-to-kernel call is approved by this specification.

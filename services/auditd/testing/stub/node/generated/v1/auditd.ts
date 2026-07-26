@@ -112,6 +112,45 @@ export function tenancyResourceStateToJSON(object: TenancyResourceState): string
   }
 }
 
+export enum IdentitySessionAction {
+  IDENTITY_SESSION_ACTION_UNSPECIFIED = 0,
+  IDENTITY_SESSION_ACTION_CREATED = 1,
+  IDENTITY_SESSION_ACTION_REVOKED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function identitySessionActionFromJSON(object: any): IdentitySessionAction {
+  switch (object) {
+    case 0:
+    case "IDENTITY_SESSION_ACTION_UNSPECIFIED":
+      return IdentitySessionAction.IDENTITY_SESSION_ACTION_UNSPECIFIED;
+    case 1:
+    case "IDENTITY_SESSION_ACTION_CREATED":
+      return IdentitySessionAction.IDENTITY_SESSION_ACTION_CREATED;
+    case 2:
+    case "IDENTITY_SESSION_ACTION_REVOKED":
+      return IdentitySessionAction.IDENTITY_SESSION_ACTION_REVOKED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return IdentitySessionAction.UNRECOGNIZED;
+  }
+}
+
+export function identitySessionActionToJSON(object: IdentitySessionAction): string {
+  switch (object) {
+    case IdentitySessionAction.IDENTITY_SESSION_ACTION_UNSPECIFIED:
+      return "IDENTITY_SESSION_ACTION_UNSPECIFIED";
+    case IdentitySessionAction.IDENTITY_SESSION_ACTION_CREATED:
+      return "IDENTITY_SESSION_ACTION_CREATED";
+    case IdentitySessionAction.IDENTITY_SESSION_ACTION_REVOKED:
+      return "IDENTITY_SESSION_ACTION_REVOKED";
+    case IdentitySessionAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface RecordAuditBatchRequest {
   sourceSchemaGeneration: bigint;
   events: AuditEvent[];
@@ -136,6 +175,7 @@ export interface AuditEvent {
   traceId: string;
   spanId: string;
   tenancyMutation?: TenancyMutationAuditDetail | undefined;
+  identitySession?: IdentitySessionAuditDetail | undefined;
 }
 
 export interface AuditAttribution {
@@ -177,6 +217,13 @@ export interface TenantAuditTarget {
 export interface WorkspaceAuditTarget {
   tenantId: string;
   workspaceId: string;
+}
+
+export interface IdentitySessionAuditDetail {
+  sessionId: string;
+  accountPrincipalId: string;
+  sessionRevision: bigint;
+  action: IdentitySessionAction;
 }
 
 function createBaseRecordAuditBatchRequest(): RecordAuditBatchRequest {
@@ -410,6 +457,7 @@ function createBaseAuditEvent(): AuditEvent {
     traceId: "",
     spanId: "",
     tenancyMutation: undefined,
+    identitySession: undefined,
   };
 }
 
@@ -441,6 +489,9 @@ export const AuditEvent: MessageFns<AuditEvent> = {
     }
     if (message.tenancyMutation !== undefined) {
       TenancyMutationAuditDetail.encode(message.tenancyMutation, writer.uint32(162).fork()).join();
+    }
+    if (message.identitySession !== undefined) {
+      IdentitySessionAuditDetail.encode(message.identitySession, writer.uint32(170).fork()).join();
     }
     return writer;
   },
@@ -524,6 +575,14 @@ export const AuditEvent: MessageFns<AuditEvent> = {
           message.tenancyMutation = TenancyMutationAuditDetail.decode(reader, reader.uint32());
           continue;
         }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.identitySession = IdentitySessionAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -545,6 +604,9 @@ export const AuditEvent: MessageFns<AuditEvent> = {
       spanId: isSet(object.spanId) ? globalThis.String(object.spanId) : "",
       tenancyMutation: isSet(object.tenancyMutation)
         ? TenancyMutationAuditDetail.fromJSON(object.tenancyMutation)
+        : undefined,
+      identitySession: isSet(object.identitySession)
+        ? IdentitySessionAuditDetail.fromJSON(object.identitySession)
         : undefined,
     };
   },
@@ -578,6 +640,9 @@ export const AuditEvent: MessageFns<AuditEvent> = {
     if (message.tenancyMutation !== undefined) {
       obj.tenancyMutation = TenancyMutationAuditDetail.toJSON(message.tenancyMutation);
     }
+    if (message.identitySession !== undefined) {
+      obj.identitySession = IdentitySessionAuditDetail.toJSON(message.identitySession);
+    }
     return obj;
   },
 
@@ -600,6 +665,9 @@ export const AuditEvent: MessageFns<AuditEvent> = {
     message.spanId = object.spanId ?? "";
     message.tenancyMutation = (object.tenancyMutation !== undefined && object.tenancyMutation !== null)
       ? TenancyMutationAuditDetail.fromPartial(object.tenancyMutation)
+      : undefined;
+    message.identitySession = (object.identitySession !== undefined && object.identitySession !== null)
+      ? IdentitySessionAuditDetail.fromPartial(object.identitySession)
       : undefined;
     return message;
   },
@@ -1240,6 +1308,117 @@ export const WorkspaceAuditTarget: MessageFns<WorkspaceAuditTarget> = {
     const message = createBaseWorkspaceAuditTarget();
     message.tenantId = object.tenantId ?? "";
     message.workspaceId = object.workspaceId ?? "";
+    return message;
+  },
+};
+
+function createBaseIdentitySessionAuditDetail(): IdentitySessionAuditDetail {
+  return { sessionId: "", accountPrincipalId: "", sessionRevision: 0n, action: 0 };
+}
+
+export const IdentitySessionAuditDetail: MessageFns<IdentitySessionAuditDetail> = {
+  encode(message: IdentitySessionAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionId !== "") {
+      writer.uint32(10).string(message.sessionId);
+    }
+    if (message.accountPrincipalId !== "") {
+      writer.uint32(18).string(message.accountPrincipalId);
+    }
+    if (message.sessionRevision !== 0n) {
+      if (BigInt.asUintN(64, message.sessionRevision) !== message.sessionRevision) {
+        throw new globalThis.Error("value provided for field message.sessionRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.sessionRevision);
+    }
+    if (message.action !== 0) {
+      writer.uint32(32).int32(message.action);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): IdentitySessionAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseIdentitySessionAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.accountPrincipalId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.sessionRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): IdentitySessionAuditDetail {
+    return {
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      accountPrincipalId: isSet(object.accountPrincipalId) ? globalThis.String(object.accountPrincipalId) : "",
+      sessionRevision: isSet(object.sessionRevision) ? BigInt(object.sessionRevision) : 0n,
+      action: isSet(object.action) ? identitySessionActionFromJSON(object.action) : 0,
+    };
+  },
+
+  toJSON(message: IdentitySessionAuditDetail): unknown {
+    const obj: any = {};
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.accountPrincipalId !== "") {
+      obj.accountPrincipalId = message.accountPrincipalId;
+    }
+    if (message.sessionRevision !== 0n) {
+      obj.sessionRevision = message.sessionRevision.toString();
+    }
+    if (message.action !== 0) {
+      obj.action = identitySessionActionToJSON(message.action);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<IdentitySessionAuditDetail>): IdentitySessionAuditDetail {
+    return IdentitySessionAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<IdentitySessionAuditDetail>): IdentitySessionAuditDetail {
+    const message = createBaseIdentitySessionAuditDetail();
+    message.sessionId = object.sessionId ?? "";
+    message.accountPrincipalId = object.accountPrincipalId ?? "";
+    message.sessionRevision = object.sessionRevision ?? 0n;
+    message.action = object.action ?? 0;
     return message;
   },
 };

@@ -278,6 +278,15 @@ authorization, dependency, concurrency, cancellation, lifecycle, and failure res
 test. Descriptor, migration, HTTP-surface, and evidence inventories fail when an operation lacks
 coverage.
 
+Each service checks in one service-root evidence manifest. It maps every
+generated RPC or public route and every documented result to an exact ordinary
+test file and test title, and lists the implementation-neutral release gates.
+A verifier rejects missing descriptor members, stale or duplicate test
+ownership, nonexistent tests, unowned documented results, and unknown manifest
+entries. The manifest is an inventory only; it does not introduce scenario
+identifiers, a custom test DSL, runtime dispatch, or implementation-dependent
+expectations.
+
 Implementation-local tests are allowed only for evidence that cannot apply to another
 implementation, such as compiler, packaging, native-publication, provider-library, or memory-safety
 gates. They cannot duplicate or weaken wire-visible behavior.

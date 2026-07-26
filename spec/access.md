@@ -71,6 +71,31 @@ Every receiving service validates the token independently. A known public key
 in a current bounded cache may remain usable during an Identityd outage;
 unknown keys or expired caches fail closed.
 
+Identityd creates invocations through exactly two paths:
+
+```text
+browser Session:
+  edged -> identityd.ExchangeSession
+  sub = Session human account
+  session_id = Session origin
+
+finite Run:
+  execd -> identityd.IssueRunInvocation
+  sub = direct or attached account
+  act.sub = distinct virtual Actor when present
+  run_id = Run origin
+```
+
+Both callers authenticate as exact admitted workloads. Neither can provide an
+attached account, key, issuer, audience, permission, Role, or grant.
+Identityd re-establishes current account standing and target fences before
+signing.
+
+Identityd validates the same token locally before returning principal or
+direct-Group facts. The requested principal is constrained to the invocation
+Actor or, only for virtual-principal Group expansion, that Actor's immutable
+attached account. Request fields cannot select an unrelated principal.
+
 ## Capability path
 
 A protected product operation requires:

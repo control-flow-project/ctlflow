@@ -4,22 +4,36 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./testing/stub": {
-      "types": "./.generated/testing/stub/node/src/index.d.ts",
-      "default": "./.generated/testing/stub/node/src/index.js"
+    "./testing/production": {
+      "types": "./.generated/testing/production/index.d.ts",
+      "default": "./.generated/testing/production/index.js"
     }
   },
   "scripts": {
-    "generate": "node testing/stub/node/generate-client.mjs",
-    "build": "npm run generate && node ../../tooling/clean-directories.mjs .generated/testing/stub/node && tsc --project testing/stub/node/tsconfig.json"
+    "generate:tests": "node tests/support/generate-client.mjs",
+    "update:api-manifest": "node tooling/api/update-api-manifest.mjs",
+    "verify:api-manifest": "node tooling/api/verify-api-manifest.mjs",
+    "build:migrations": "node ../../tooling/clean-directories.mjs .generated/migrations && tsc --project tsconfig.migrations.json",
+    "build:testing:production": "node ../../tooling/clean-directories.mjs .generated/testing/production && tsc --project testing/production/tsconfig.json",
+    "update:schema-manifest": "npm run build:migrations && node tooling/schema/update-schema-manifest.mjs",
+    "verify:schema-manifest": "node tooling/schema/verify-schema-manifest.mjs",
+    "verify:evidence": "node tooling/evidence/verify-evidence-manifest.mjs",
+    "build": "npm run build:migrations && npm run verify:schema-manifest && npm run verify:api-manifest && npm run build:testing:production && npm run generate:tests && node ../../tooling/clean-directories.mjs tests/dist && tsc --project tests/tsconfig.json && npm run verify:evidence",
+    "migrate": "npm run build:migrations && node .generated/migrations/tooling/migrations/run.js",
+    "test": "npm run build --workspace @ctlflow/test-mesh && npm run build && npm run test:compiled && npm run test:csharp",
+    "test:compiled": "node --test --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-identityd-test-suite.js tests/dist/integration/identityd.test.js",
+    "test:csharp": "node csharp/tests/run-model-audit.mjs"
   },
   "dependencies": {
     "@bufbuild/protobuf": "2.12.1",
     "@grpc/grpc-js": "1.14.4",
+    "better-sqlite3": "12.11.1",
+    "knex": "3.1.0",
     "long": "5.3.2",
     "protobufjs": "7.6.4"
   },
   "devDependencies": {
+    "@ctlflow/auditd": "0.0.0",
     "@ctlflow/test-mesh": "0.0.0",
     "@types/node": "24.10.1",
     "grpc-tools": "1.13.0",

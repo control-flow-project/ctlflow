@@ -9,7 +9,7 @@ CtlFlow has ten kernel ownership boundaries.
 | --- | --- |
 | [`tenantd`](../tenantd/) | Tenants and Workspaces |
 | [`authd`](../authd/) | Public authentication protocol; no durable records |
-| [`identityd`](../identityd/) | Accounts, standing, Groups, Sessions, and delegated identity |
+| [`identityd`](../identityd/) | Accounts, standing, Groups, identity links, Sessions, and invocation identity |
 | [`policyd`](../policyd/) | Roles, grants, operation ownership, and access decisions |
 | [`pkgd`](../pkgd/) | Packages and installed application intent |
 | [`configd`](../configd/) | Configuration and secret custody |
@@ -40,6 +40,19 @@ policyd
   +-> identityd.GetInvocationVerificationKeys
   +-> identityd.ResolvePrincipal
   +-> identityd.ListPrincipalGroups
+
+authd
+  +-> identityd.CreateSession
+  +-> identityd.RevokeSession
+
+edged
+  +-> identityd.ExchangeSession
+
+execd
+  +-> identityd.IssueRunInvocation
+
+identityd
+  +-> auditd.RecordAuditBatch
 ```
 
 No other cross-service method is implied by the architecture diagrams,
@@ -49,7 +62,7 @@ ownership table, CLI naming, or an implementation helper.
 
 - Only `tenantd` mutates Tenant or Workspace state.
 - Only `identityd` owns account, standing, Session, and delegated-principal
-  facts.
+  facts or signs invocation JWTs.
 - Only `policyd` owns Roles, grants, operation ownership, and authoritative
   access decisions.
 - Only `pkgd` owns Package and App installation intent.

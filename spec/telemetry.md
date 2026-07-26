@@ -68,6 +68,12 @@ Validated Tenant, Workspace, Placement, App, Job, Run, Actor kind, and outcome m
 structured-log attributes when required by policy. User, Actor, request, Run, object, trace, and
 other unbounded identifiers are forbidden as metric dimensions.
 
+For a gRPC operation or outbound gRPC dependency call, `ctlflow.outcome` is
+the final canonical gRPC status name in uppercase underscore form. A successful
+RPC is `OK`, including a successful response carrying a domain denial.
+Closed domain results such as `allow` and `deny` use a separate
+`ctlflow.decision` attribute and never overload the transport outcome.
+
 Telemetry never contains:
 
 - browser cookies, Kubernetes tokens, invocation JWTs, or authorization headers;

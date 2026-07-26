@@ -52,9 +52,11 @@ boundary implies a route or alternate kernel record shape.
  browser or external client -> edged -> admitted application or kernel call
 ```
 
-Public cookies and external bearer tokens do not enter private service calls.
-The receiving boundary establishes a short-lived internal invocation identity
-when a call acts on behalf of a User or Job.
+Public cookie headers and external bearer credentials never become authentication metadata for a
+private service call. A public boundary may extract an approved opaque credential and pass it only
+as typed request data to the service that owns that credential, such as `ExchangeSession`.
+The receiving boundary establishes a short-lived internal invocation identity when a call acts on
+behalf of a User or Job.
 
 ## Private gRPC
 
@@ -112,7 +114,8 @@ ListPrincipalGroups
 ```
 
 `GetInvocationVerificationKeys` returns the bounded active and retiring public
-verification keys. `ResolvePrincipal` returns current principal, attached
+verification keys to an admitted workload without requiring the invocation
+being bootstrapped. `ResolvePrincipal` returns current principal, attached
 account, and exact target-standing facts. `ListPrincipalGroups` returns a
 bounded page of current direct Group IDs at that same target. Neither fact
 operation returns Roles, grants, or an access decision.
@@ -134,6 +137,24 @@ The complete behavior and status mapping are defined by
 gRPC operations. There is no HTTP mirror, watch, stream, explain operation,
 path-builder operation, or reusable decision credential.
 
+## Approved identity issuance
+
+Identityd additionally exposes exactly:
+
+```text
+CreateSession
+ExchangeSession
+RevokeSession
+IssueRunInvocation
+```
+
+These private unary operations are owned completely by
+[identityd](../identityd/). They accept no account supplied by Authd or Edged,
+no attached account supplied by Execd, and no caller-supplied issuer,
+audience, key, permission, or claim bag. There is no HTTP mirror, generic
+token-minting method, introspection method, Session list, or Session
+administration API.
+
 ## Approved audit dependency
 
 `auditd` exposes exactly:
@@ -143,9 +164,9 @@ RecordAuditBatch
 ```
 
 It accepts a bounded batch of typed source events and returns one acceptance
-per event. The admitted detail is Tenant or Workspace mutation
-evidence. There is no query, export, watch, stream, redaction, deletion, or
-Kubernetes-resource API.
+per event. The admitted details are Tenant or Workspace mutation evidence and
+Identityd Session creation or actual revocation evidence. There is no query,
+export, watch, stream, redaction, deletion, or Kubernetes-resource API.
 
 ## Collections
 
@@ -162,6 +183,18 @@ after_tenant_id or after_workspace_id
 The response returns at most the admitted page size and the last emitted ID
 when another page exists. Continuation values are validated as untrusted
 input. They are not stored server-side and do not grant visibility.
+
+Identityd direct-Group lists use the same keyset shape over immutable Group
+IDs:
+
+```text
+page_size
+after_group_id
+```
+
+They return only direct Groups at the exact requested target and repeat
+workload admission, invocation validation, standing, and fence checks for
+every page.
 
 ## Statuses
 
@@ -182,6 +215,12 @@ gRPC services use only the statuses needed by an operation:
 
 Raw database, provider, Kubernetes, credential, and stack diagnostics never
 cross a service boundary.
+
+Any textual rendering of a gRPC status uses its canonical uppercase
+underscore name exactly, including `OK`, `ALREADY_EXISTS`,
+`PERMISSION_DENIED`, and `DEADLINE_EXCEEDED`. A language runtime's enum
+spelling, casing, or concatenation never becomes a wire, telemetry, log, or
+evidence value.
 
 ## Cross-cutting obligations
 

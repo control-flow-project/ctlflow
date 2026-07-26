@@ -21,6 +21,7 @@ export interface CSharpServiceOptions {
   readonly storageFilePath: string;
   readonly environment: Readonly<Record<string, string>>;
   readonly files: KustomizeServiceFiles;
+  readonly provision?: () => Promise<void>;
 }
 
 export interface CSharpService {

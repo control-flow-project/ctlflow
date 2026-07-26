@@ -51,7 +51,8 @@ test("tenant capabilities use exact operations and resource paths", async () => 
     tokenId: "capability-tenant-operations"
   });
   const baseline = (await context.policyd.readRequests()).length;
-  const auditBaseline = (await context.auditd.readEvents()).length;
+  const auditBaseline =
+    (await context.auditd.readTenancyEvents()).length;
 
   const loaded = await callUnary<Tenant>((done) =>
     context.workloadClient.getTenant(
@@ -93,7 +94,7 @@ test("tenant capabilities use exact operations and resource paths", async () => 
         subjectAccountId: "user:alice"
       }
     ]);
-  const audit = (await context.auditd.readEvents())
+  const audit = (await context.auditd.readTenancyEvents())
     .slice(auditBaseline);
   assert.equal(audit.length, 1);
   assert.equal(audit[0]?.actorPrincipalId, "user:alice");

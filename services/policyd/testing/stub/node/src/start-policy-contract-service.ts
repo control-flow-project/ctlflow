@@ -118,7 +118,7 @@ export async function startPolicyContractService(
       CTLFLOW_TEST_IDENTITY_TLS_CA_PATH:
         `/ctlflow-context/${path.basename(identityCaPath)}`,
       CTLFLOW_TEST_IDENTITY_CALL_TIMEOUT_MILLISECONDS:
-        "500",
+        "2000",
       CTLFLOW_TEST_INVOCATION_TOKEN_ISSUER:
         options.invocationIssuer,
       CTLFLOW_TEST_INVOCATION_TOKEN_AUDIENCE:
@@ -140,6 +140,12 @@ export async function startPolicyContractService(
       await createSource(
         service.controlEndpoint,
         configuration),
+    reconnectIdentity: async () => {
+      await requestPolicyControl<void>(
+        service.controlEndpoint,
+        "/identity/reconnect",
+        { method: "POST" });
+    },
     stop: async () => {
       if (stopped) {
         return;

@@ -32,6 +32,12 @@ import {
 import {
   createWorkspace
 } from "../support/workspaces/create-workspace.js";
+import {
+  findSpansForTrace
+} from "../support/telemetry/find-spans-for-trace.js";
+import {
+  waitForExport
+} from "../support/telemetry/wait-for-export.js";
 
 test("a current direct Group grant authorizes a human principal", async () => {
   const context = getTenantdTestContext();
@@ -45,8 +51,6 @@ test("a current direct Group grant authorizes a human principal", async () => {
     { length: 101 },
     (_value, index) =>
       `tenant_readers_${String(index).padStart(3, "0")}`);
-  const identityBaseline =
-    (await context.policyIdentityd.readRequests()).length;
   const policyBaseline =
     (await context.policyd.readRequests()).length;
   await configureCapabilityPolicy(context, {
@@ -57,27 +61,36 @@ test("a current direct Group grant authorizes a human principal", async () => {
     ]
   });
 
-  const loaded = await getTenant(
-    tenant.tenantId,
-    createCapabilityMetadata(context, {
-      tenantId: tenant.tenantId,
-      tokenId: "capability-group"
-    }));
+  const traceId = "1a1b1c1d1e1f20212223242526272829";
+  const metadata = createCapabilityMetadata(context, {
+    tenantId: tenant.tenantId,
+    tokenId: "capability-group"
+  });
+  metadata.set(
+    "traceparent",
+    `00-${traceId}-2234567890abcdef-01`);
+  const loaded = await getTenant(tenant.tenantId, metadata);
   assert.equal(loaded.tenantId, tenant.tenantId);
-  const identityRequests =
-    (await context.policyIdentityd.readRequests())
-      .slice(identityBaseline);
-  assert.equal(identityRequests.filter(
-    (request) =>
-      request.operation === "ListPrincipalGroups"
-      && request.principalId === "user:alice").length, 2);
+  await waitForExport(
+    context.collector.tracesPath,
+    (value) => findSpansForTrace(value, traceId)
+      .filter((span) =>
+        span.name === "identityd.ListPrincipalGroups")
+      .length === 2);
   const policyRequest =
     (await context.policyd.readRequests())[policyBaseline];
   assert.notEqual(policyRequest, undefined);
-  assert.ok(identityRequests.every(
-    (request) =>
-      request.receivedTraceparent
-      === policyRequest?.receivedTraceparent));
+  const receivedTraceparent =
+    policyRequest?.receivedTraceparent ?? "";
+  assert.match(
+    receivedTraceparent,
+    /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/u);
+  assert.equal(
+    receivedTraceparent.slice(3, 35),
+    traceId);
+  assert.notEqual(
+    receivedTraceparent,
+    `00-${traceId}-2234567890abcdef-01`);
 });
 
 test("subtree grants match only at canonical path boundaries", async () => {
@@ -188,6 +201,30 @@ test("a virtual principal and attached account must both be authorized", async (
       getTenant(tenant.tenantId, metadata),
       matchGrpcStatus(status.PERMISSION_DENIED));
   }
+
+  const completeGrants = [
+    grant("agent_readers", "tenants.read", path),
+    grant("automation_readers", "tenants.read", path)
+  ];
+  for (const state of [
+    {
+      principalEnabled: false,
+      subjectAccountEnabled: true
+    },
+    {
+      principalEnabled: true,
+      subjectAccountEnabled: false
+    }
+  ]) {
+    await configureCapabilityPolicy(context, {
+      ...common,
+      ...state,
+      grants: completeGrants
+    });
+    await assert.rejects(
+      getTenant(tenant.tenantId, metadata),
+      matchGrpcStatus(status.PERMISSION_DENIED));
+  }
 });
 
 test("virtual-principal mutations audit both identities", async () => {
@@ -214,7 +251,8 @@ test("virtual-principal mutations audit both identities", async () => {
         path)
     ]
   });
-  const auditBaseline = (await context.auditd.readEvents()).length;
+  const auditBaseline =
+    (await context.auditd.readTenancyEvents()).length;
   const updated = await callUnary<Tenant>((done) =>
     context.workloadClient.updateTenant(
       {
@@ -233,7 +271,7 @@ test("virtual-principal mutations audit both identities", async () => {
       done));
   assert.equal(updated.displayName, "Renamed By Agent");
 
-  const audit = (await context.auditd.readEvents())
+  const audit = (await context.auditd.readTenancyEvents())
     .slice(auditBaseline);
   assert.equal(audit.length, 1);
   assert.equal(

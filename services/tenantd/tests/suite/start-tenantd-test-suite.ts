@@ -9,9 +9,9 @@ import {
   type AuditdContractService
 } from "@ctlflow/auditd/testing/stub";
 import {
-  startIdentitydContractService,
-  type IdentitydContractService
-} from "@ctlflow/identityd/testing/stub";
+  startIdentitydProductionService,
+  type IdentitydProductionService
+} from "@ctlflow/identityd/testing/production";
 import {
   startPolicyContractService,
   type PolicyContractService
@@ -33,6 +33,9 @@ import {
 import type {
   TenantdTestSuite
 } from "./tenantd-test-suite.js";
+import {
+  createInvocationAuthority
+} from "../support/create-invocation-authority.js";
 
 export async function startTenantdTestSuite():
 Promise<TenantdTestSuite> {
@@ -40,10 +43,12 @@ Promise<TenantdTestSuite> {
   let kubernetes: TestKubernetes | undefined;
   let collector: OpenTelemetryCollector | undefined;
   let auditd: AuditdContractService | undefined;
-  let identityd: IdentitydContractService | undefined;
+  let identityd: IdentitydProductionService | undefined;
   let policyd: PolicyContractService | undefined;
 
   try {
+    const invocation = await createInvocationAuthority(
+      "identity-primary-key");
     runtime = await loadTenantdTestRuntime();
     kubernetes = await startTestKubernetes(repositoryRoot);
     collector = await startOpenTelemetryCollector(
@@ -53,11 +58,24 @@ Promise<TenantdTestSuite> {
       repositoryRoot,
       kubernetes
     });
-    identityd = await startIdentitydContractService({
+    identityd = await startIdentitydProductionService({
       repositoryRoot,
-      kubernetes
+      kubernetes,
+      auditd,
+      signing: invocation,
+      telemetryEndpoint: collector.endpoint,
+      invocationIssuer,
+      invocationAudience,
+      invocationMaximumLifetimeSeconds,
+      verificationKeyCallers: [
+        `system:serviceaccount:${kubernetes.namespace}:tenantd`,
+        `system:serviceaccount:${kubernetes.namespace}:policyd-test`
+      ],
+      principalFactCallers: [
+        `system:serviceaccount:${kubernetes.namespace}:policyd-test`
+      ]
     });
-    policyd = await startPolicyContractService({
+      policyd = await startPolicyContractService({
       repositoryRoot,
       kubernetes,
       identityEndpoint: identityd.endpoint,
@@ -77,6 +95,7 @@ Promise<TenantdTestSuite> {
       auditd,
       identityd,
       policyd,
+      invocation,
       stop: async () => {
         if (stopped) {
           return;
@@ -110,7 +129,7 @@ async function stopResources(
   kubernetes: TestKubernetes | undefined,
   collector: OpenTelemetryCollector | undefined,
   auditd: AuditdContractService | undefined,
-  identityd: IdentitydContractService | undefined,
+  identityd: IdentitydProductionService | undefined,
   policyd: PolicyContractService | undefined
 ): Promise<void> {
   let failure: unknown;

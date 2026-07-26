@@ -41,20 +41,26 @@ const controlPort = readPort(
 const workloadSettings = readWorkloadSettings();
 const identityServerName = requireEnvironment(
   "CTLFLOW_TEST_IDENTITY_TLS_SERVER_NAME");
-const identityClient = new IdentityServiceClient(
-  readGrpcEndpoint(
-    requireEnvironment("CTLFLOW_TEST_IDENTITY_URL")),
-  credentials.createSsl(
-    await readFile(
-      requireEnvironment(
-        "CTLFLOW_TEST_IDENTITY_TLS_CA_PATH"))),
-  createClientOptions(identityServerName));
+const identityEndpoint = readGrpcEndpoint(
+  requireEnvironment("CTLFLOW_TEST_IDENTITY_URL"));
+const identityCredentials = credentials.createSsl(
+  await readFile(
+    requireEnvironment(
+      "CTLFLOW_TEST_IDENTITY_TLS_CA_PATH")));
+const identityClientOptions =
+  createClientOptions(identityServerName);
+const createIdentityClient = () =>
+  new IdentityServiceClient(
+    identityEndpoint,
+    identityCredentials,
+    identityClientOptions);
 const state: PolicyStubState = {
   sources: new Map(),
   workloadSettings,
   workloadKeys: await loadWorkloadVerificationKeys(
     workloadSettings.keySetPath),
-  identityClient,
+  identityClient: createIdentityClient(),
+  createIdentityClient,
   identityCallTimeoutMilliseconds: readPositiveInteger(
     "CTLFLOW_TEST_IDENTITY_CALL_TIMEOUT_MILLISECONDS"),
   outboundWorkloadTokenPath: requireEnvironment(
@@ -186,7 +192,10 @@ function createClientOptions(
 ): ClientOptions {
   return {
     "grpc.ssl_target_name_override": serverName,
-    "grpc.default_authority": serverName
+    "grpc.default_authority": serverName,
+    "grpc.initial_reconnect_backoff_ms": 100,
+    "grpc.min_reconnect_backoff_ms": 100,
+    "grpc.max_reconnect_backoff_ms": 500
   };
 }
 
@@ -201,7 +210,7 @@ function requireEnvironment(name: string): string {
 function shutdown(): void {
   control.close();
   server.tryShutdown(() => {
-    identityClient.close();
+    state.identityClient.close();
     process.exit(0);
   });
 }

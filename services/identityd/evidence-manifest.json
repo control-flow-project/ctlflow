@@ -1,0 +1,473 @@
+{
+  "schemaVersion": 1,
+  "service": "ctlflow.identity.v1.IdentityService",
+  "operations": [
+    {
+      "name": "GetInvocationVerificationKeys",
+      "success": [
+        {
+          "file": "tests/integration/keys.test.ts",
+          "title": "returns the bounded current public key set and expiry"
+        },
+        {
+          "file": "tests/integration/keys.test.ts",
+          "title": "returns active and retiring keys in ordinal key-ID order"
+        }
+      ],
+      "results": {
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC requires an authenticated workload"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC rejects an unadmitted workload"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/keys.test.ts",
+            "title": "empty and oversized key state fails unavailable"
+          },
+          {
+            "file": "tests/integration/keys.test.ts",
+            "title": "malformed stored public key state fails unavailable"
+          },
+          {
+            "file": "tests/integration/keys.test.ts",
+            "title": "verification-key persistence outage fails unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolvePrincipal",
+      "success": [
+        {
+          "file": "tests/integration/principals.test.ts",
+          "title": "resolves current human and service account facts"
+        },
+        {
+          "file": "tests/integration/principals.test.ts",
+          "title": "resolves virtual principal and attached-account facts"
+        },
+        {
+          "file": "tests/integration/principals.test.ts",
+          "title": "returns disabled principal and attached-account facts"
+        },
+        {
+          "file": "tests/integration/principals.test.ts",
+          "title": "workspace resolution requires both exact memberships"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/principals.test.ts",
+            "title": "malformed principal and target selectors are invalid"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/principals.test.ts",
+            "title": "virtual and invocation fences conceal outside targets"
+          },
+          {
+            "file": "tests/integration/principals.test.ts",
+            "title": "request identity must match the invocation actor and attachment"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "fact RPCs require a valid invocation identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC rejects an unadmitted workload"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/principals.test.ts",
+            "title": "malformed stored principal facts fail unavailable"
+          },
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListPrincipalGroups",
+      "success": [
+        {
+          "file": "tests/integration/groups.test.ts",
+          "title": "returns only direct groups at the exact target"
+        },
+        {
+          "file": "tests/integration/groups.test.ts",
+          "title": "returns virtual principal groups independently"
+        },
+        {
+          "file": "tests/integration/groups.test.ts",
+          "title": "a virtual invocation may expand its attached account"
+        },
+        {
+          "file": "tests/integration/groups.test.ts",
+          "title": "group pages use bounded keyset pagination"
+        },
+        {
+          "file": "tests/integration/groups.test.ts",
+          "title": "continuations are stateless across concurrent inserts"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/groups.test.ts",
+            "title": "malformed pagination and selectors are invalid"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/groups.test.ts",
+            "title": "unrelated and mismatched attachment group requests are concealed"
+          },
+          {
+            "file": "tests/integration/groups.test.ts",
+            "title": "standing and fences are re-established for every page"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "fact RPCs require a valid invocation identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC rejects an unadmitted workload"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateSession",
+      "success": [
+        {
+          "file": "tests/integration/sessions.test.ts",
+          "title": "creates a digest-only Session and delivers typed audit"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/sessions.test.ts",
+            "title": "CreateSession rejects malformed non-credential fields"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/sessions.test.ts",
+            "title": "external login identity is exact and must resolve to standing human"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC rejects an unadmitted workload"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/sessions.test.ts",
+            "title": "CreateSession fails unavailable after a committed Auditd failure"
+          },
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExchangeSession",
+      "success": [
+        {
+          "file": "tests/integration/invocations.test.ts",
+          "title": "exchanges a Session for a signed, bounded invocation"
+        },
+        {
+          "file": "tests/integration/invocations.test.ts",
+          "title": "Session exchange re-establishes exact target standing"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/invocations.test.ts",
+            "title": "malformed Session targets are invalid after credential validation"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/invocations.test.ts",
+            "title": "Session exchange conceals disabled accounts and lost standing"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/invocations.test.ts",
+            "title": "Session exchange rejects invalid, expired, and revoked credentials"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC rejects an unadmitted workload"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/invocations.test.ts",
+            "title": "malformed stored Session identity fails unavailable"
+          },
+          {
+            "file": "tests/integration/invocations.test.ts",
+            "title": "Session persistence outage fails unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RevokeSession",
+      "success": [
+        {
+          "file": "tests/integration/sessions.test.ts",
+          "title": "revocation mutates and audits once, then remains idempotent"
+        },
+        {
+          "file": "tests/integration/sessions.test.ts",
+          "title": "concurrent revocation converges on one mutation and audit event"
+        },
+        {
+          "file": "tests/integration/sessions.test.ts",
+          "title": "expiry does not prevent Session revocation"
+        }
+      ],
+      "results": {
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/sessions.test.ts",
+            "title": "RevokeSession rejects malformed and unknown credentials"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC rejects an unadmitted workload"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/sessions.test.ts",
+            "title": "RevokeSession stays revoked after a committed Auditd failure"
+          },
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "IssueRunInvocation",
+      "success": [
+        {
+          "file": "tests/integration/invocations.test.ts",
+          "title": "issues direct and virtual Run invocations with derived identities"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/invocations.test.ts",
+            "title": "IssueRunInvocation rejects malformed selectors"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/invocations.test.ts",
+            "title": "Run invocation issuance conceals identity, standing, and fences"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC requires an authenticated workload"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "every RPC rejects an unadmitted workload"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "identityd exposes exactly the approved RPC inventory"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "identityd health and readiness probes are available"
+    },
+    {
+      "file": "tests/integration/security.test.ts",
+      "title": "operation caller sets are exact"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "every operation emits correlated telemetry and Session audit"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "telemetry outage is bounded and preserves the result"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "readiness and RPCs fail closed when a mapped table is missing"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "readiness rejects an ahead or locked migration ledger"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "startup rejects empty and malformed caller admission"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "startup rejects a private and public signing-key mismatch"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "SQLite contains only migration metadata and identity domain tables"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "persists identity state across a production-process restart"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:identityd",
+    "npm run test:compiled --workspace @ctlflow/identityd"
+  ]
+}

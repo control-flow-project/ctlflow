@@ -1,4 +1,4 @@
-export interface AuditEventEvidence {
+interface AuditEventEvidenceBase {
   readonly sourceEventId: string;
   readonly idempotencyKey: string;
   readonly operation: string;
@@ -8,12 +8,29 @@ export interface AuditEventEvidence {
   readonly attachedAccountPrincipalId?: string;
   readonly immediateCaller?: string;
   readonly tenantId: string;
+  readonly traceId: string;
+  readonly spanId: string;
+  readonly receivedTraceparent?: string;
+}
+
+export interface TenancyAuditEventEvidence
+extends AuditEventEvidenceBase {
   readonly targetKind: "tenant" | "workspace";
   readonly targetId: string;
   readonly outcome: number;
   readonly resultingState: number;
   readonly resourceRevision: bigint;
-  readonly traceId: string;
-  readonly spanId: string;
-  readonly receivedTraceparent?: string;
 }
+
+export interface IdentitySessionAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly targetKind: "session";
+  readonly sessionId: string;
+  readonly accountPrincipalId: string;
+  readonly sessionRevision: bigint;
+  readonly action: "created" | "revoked";
+}
+
+export type AuditEventEvidence =
+  | TenancyAuditEventEvidence
+  | IdentitySessionAuditEventEvidence;

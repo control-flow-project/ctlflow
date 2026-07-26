@@ -13,5 +13,6 @@ export interface PolicyContractService {
   readonly createSource: (
     configuration: PolicySourceConfiguration
   ) => Promise<PolicyTestSource>;
+  readonly reconnectIdentity: () => Promise<void>;
   readonly stop: () => Promise<void>;
 }

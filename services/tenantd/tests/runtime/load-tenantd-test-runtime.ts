@@ -1,6 +1,6 @@
 import {
   buildNodeTestImage,
-  publishCSharpService,
+  publishContainerizedCSharpService,
   startCSharpService
 } from "@ctlflow/test-mesh";
 import {
@@ -28,10 +28,11 @@ Promise<TenantdTestRuntime> {
       `Unsupported tenantd implementation: ${implementation}`);
   }
 
-  const publication = await publishCSharpService({
+  const publication = await publishContainerizedCSharpService({
     repositoryRoot,
     projectPath: serviceProjectPath,
     diagnosticsManifestPath,
+    containerfilePath: serviceContainerfilePath,
     executableName: csharpExecutableName
   });
   return {

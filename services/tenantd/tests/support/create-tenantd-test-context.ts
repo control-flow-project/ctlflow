@@ -13,8 +13,8 @@ import type {
   AuditdTestSource
 } from "@ctlflow/auditd/testing/stub";
 import type {
-  IdentitydTestSource
-} from "@ctlflow/identityd/testing/stub";
+  IdentitydProductionSource
+} from "@ctlflow/identityd/testing/production";
 import type {
   PolicyTestSource
 } from "@ctlflow/policyd/testing/stub";
@@ -24,9 +24,6 @@ import {
 import {
   getTenantdTestSuite
 } from "../suite/get-tenantd-test-suite.js";
-import {
-  createInvocationAuthority
-} from "./create-invocation-authority.js";
 import {
   createTestDatabase
 } from "./create-test-database.js";
@@ -54,9 +51,10 @@ export interface TenantdTestContext {
   readonly collector: OpenTelemetryCollector;
   readonly invocation: InvocationAuthority;
   readonly auditd: AuditdTestSource;
-  readonly identityd: IdentitydTestSource;
-  readonly policyIdentityd: IdentitydTestSource;
+  readonly identityd: IdentitydProductionSource;
+  readonly policyIdentityd: IdentitydProductionSource;
   readonly policyd: PolicyTestSource;
+  readonly reconnectPolicyIdentity: () => Promise<void>;
   readonly database: TestDatabase;
   readonly service: TenantdRunningService;
   readonly client: TenantServiceClient;
@@ -74,8 +72,8 @@ Promise<TenantdTestContext> {
   const suite = getTenantdTestSuite();
   let database: TestDatabase | undefined;
   let auditd: AuditdTestSource | undefined;
-  let identityd: IdentitydTestSource | undefined;
-  let policyIdentityd: IdentitydTestSource | undefined;
+  let identityd: IdentitydProductionSource | undefined;
+  let policyIdentityd: IdentitydProductionSource | undefined;
   let policyd: PolicyTestSource | undefined;
   let service: TenantdRunningService | undefined;
   const clients: TenantServiceClient[] = [];
@@ -91,7 +89,7 @@ Promise<TenantdTestContext> {
     const readOnlyCapabilityWorkload =
       await suite.kubernetes.createWorkloadCredentials(
         "tenant-reader-backend");
-    const invocation = await createInvocationAuthority();
+    const invocation = suite.invocation;
     database = await createTestDatabase(
       suite.kubernetes.storage);
     const serviceAccountSubject =
@@ -196,6 +194,8 @@ Promise<TenantdTestContext> {
       identityd,
       policyIdentityd,
       policyd,
+      reconnectPolicyIdentity:
+        suite.policyd.reconnectIdentity,
       database,
       service,
       client,
@@ -279,13 +279,13 @@ function createEnvironment(
       identityServerName,
     CTLFLOW_IDENTITY_TLS_CA_PATH:
       files.identityCertificateAuthority,
-    CTLFLOW_IDENTITY_CALL_TIMEOUT_MILLISECONDS: "500",
+    CTLFLOW_IDENTITY_CALL_TIMEOUT_MILLISECONDS: "2000",
     CTLFLOW_POLICY_URL: policyEndpoint,
     CTLFLOW_POLICY_TLS_SERVER_NAME:
       policyServerName,
     CTLFLOW_POLICY_TLS_CA_PATH:
       files.policyCertificateAuthority,
-    CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS: "500",
+    CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS: "2000",
     CTLFLOW_WORKLOAD_TOKEN_ISSUER: workload.issuer,
     CTLFLOW_WORKLOAD_TOKEN_AUDIENCE: workload.audience,
     CTLFLOW_WORKLOAD_JWKS_PATH: files.workloadJwks,
@@ -334,8 +334,8 @@ async function stopResources(
   service: TenantdRunningService | undefined,
   database: TestDatabase | undefined,
   auditd: AuditdTestSource | undefined,
-  identityd: IdentitydTestSource | undefined,
-  policyIdentityd: IdentitydTestSource | undefined,
+  identityd: IdentitydProductionSource | undefined,
+  policyIdentityd: IdentitydProductionSource | undefined,
   policyd: PolicyTestSource | undefined
 ): Promise<void> {
   let failure: unknown;
