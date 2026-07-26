@@ -1,0 +1,4 @@
+http/v1/openapi.yaml	0e165f9fb891296fcd0680111f24f040cec3c0a3a43bf4543daf579346deaf8b
+POST	/auth/v1/begin	beginAuthentication
+GET	/auth/v1/callback	completeProviderCallback
+POST	/auth/v1/logout	logout

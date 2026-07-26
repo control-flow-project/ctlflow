@@ -60,7 +60,8 @@ GET  /auth/v1/callback
 POST /auth/v1/logout
 ```
 
-The exact form fields, query bounds, cookies, redirects, origin checks, errors,
+The checked `services/authd/api/http/v1/openapi.yaml` is authoritative for this
+inventory and its wire contract. Bounds, dependencies, security, telemetry,
 and evidence are defined by [authd](../authd/). Authd has no other public
 method or route and no private inbound RPC.
 

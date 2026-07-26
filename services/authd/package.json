@@ -1,0 +1,14 @@
+{
+  "name": "@ctlflow/authd",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "update:api-manifest": "node tooling/api/verify-api-manifest.mjs --write",
+    "verify:api-manifest": "node tooling/api/verify-api-manifest.mjs",
+    "build": "npm run verify:api-manifest"
+  },
+  "devDependencies": {
+    "yaml": "2.9.0"
+  }
+}

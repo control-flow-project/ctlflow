@@ -17,6 +17,10 @@ The complete public browser contract is:
 | `GET` | `/auth/v1/callback` | Complete the selected provider callback |
 | `POST` | `/auth/v1/logout` | Revoke and clear the current Session |
 
+The checked `services/authd/api/http/v1/openapi.yaml` is the authoritative
+request, response, status, redirect, and cookie contract. Its manifest and
+verifier reject route, method, operation, media-type, status, or content drift.
+
 There is no discovery, provider catalog, administration, Session list or
 introspection, user-info, refresh, generic proxy, private RPC, or other public
 route. `HEAD` and `OPTIONS` are not aliases. Health and readiness exist only on
