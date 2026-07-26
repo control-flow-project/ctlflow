@@ -1,30 +1,51 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
-using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
-using CtlFlow.Tenancy.Tenantd.Domain.Time;
-using static CtlFlow.Tenancy.Tenantd.Domain.Lifecycles.LifecycleTransitions;
+using CtlFlow.Tenancy.Tenantd.Domain.Auditing;
+using CtlFlow.Tenancy.Tenantd.Domain.Names;
+using CtlFlow.Tenancy.Tenantd.Domain.Resources;
+using static CtlFlow.Tenancy.Tenantd.Domain.Workspaces.Workspaces;
 
 namespace CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 
 public static partial class Workspaces
 {
-    public static ValueTask UpdateWorkspaceDisplayName(
-        Workspace workspace,
-        WorkspaceDisplayName displayName,
-        ResourceEventSequence eventSequence,
-        UtcInstant now,
-        CancellationToken cancellation)
+    public static async ValueTask<WorkspaceMutationResult>
+        UpdateWorkspaceDisplayName(
+            Workspace workspace,
+            Revision expectedRevision,
+            DisplayName displayName,
+            AuditContext audit,
+            CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        if (!IsDisplayMetadataUpdateAdmitted(workspace.Lifecycle))
+        if (workspace.Revision != expectedRevision)
         {
-            throw new InvalidOperationException(
-                "Workspace lifecycle does not admit display-name updates");
+            return new WorkspaceMutationResult.RevisionMismatch();
         }
 
-        workspace.DisplayName = displayName;
-        workspace.Revision = workspace.Revision.Next();
-        workspace.LastEventSequence = eventSequence;
-        workspace.UpdatedAt = now;
-        return ValueTask.CompletedTask;
+        if (workspace.State == ResourceState.Deleted)
+        {
+            return new WorkspaceMutationResult.FailedPrecondition();
+        }
+
+        if (workspace.DisplayName == displayName)
+        {
+            return new WorkspaceMutationResult.Current(
+                await DescribeWorkspace(workspace, cancellation));
+        }
+
+        workspace.ChangeDisplayName(displayName, audit.OccurredAt);
+        var details = await DescribeWorkspace(workspace, cancellation);
+        return new WorkspaceMutationResult.Changed(
+            workspace,
+            new AuditIntent(
+                AuditEventId.Generate(),
+                AuditOperation.UpdateWorkspace,
+                audit.Attribution,
+                new AuditTarget.Workspace(
+                    workspace.TenantId,
+                    workspace.Id),
+                details.State,
+                details.Revision,
+                audit.Correlation,
+                audit.OccurredAt));
     }
 }

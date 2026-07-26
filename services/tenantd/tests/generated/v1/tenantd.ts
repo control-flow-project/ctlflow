@@ -11,9 +11,7 @@ import {
   type ChannelCredentials,
   Client,
   type ClientOptions,
-  type ClientReadableStream,
   type ClientUnaryCall,
-  type handleServerStreamingCall,
   type handleUnaryCall,
   makeGenericClientConstructor,
   type Metadata,
@@ -24,475 +22,181 @@ import { Timestamp } from "../google/protobuf/timestamp.js";
 
 export const protobufPackage = "ctlflow.tenancy.v1";
 
-export enum LifecycleState {
-  LIFECYCLE_STATE_UNSPECIFIED = 0,
-  LIFECYCLE_STATE_PROVISIONING = 1,
-  LIFECYCLE_STATE_ACTIVE = 2,
-  LIFECYCLE_STATE_SUSPENDING = 3,
-  LIFECYCLE_STATE_SUSPENDED = 4,
-  LIFECYCLE_STATE_RESUMING = 5,
-  LIFECYCLE_STATE_DELETING = 6,
-  LIFECYCLE_STATE_FAILED = 7,
-  LIFECYCLE_STATE_DELETED = 8,
+export enum ResourceState {
+  RESOURCE_STATE_UNSPECIFIED = 0,
+  RESOURCE_STATE_ACTIVE = 1,
+  RESOURCE_STATE_SUSPENDED = 2,
+  RESOURCE_STATE_DELETED = 3,
   UNRECOGNIZED = -1,
 }
 
-export function lifecycleStateFromJSON(object: any): LifecycleState {
+export function resourceStateFromJSON(object: any): ResourceState {
   switch (object) {
     case 0:
-    case "LIFECYCLE_STATE_UNSPECIFIED":
-      return LifecycleState.LIFECYCLE_STATE_UNSPECIFIED;
+    case "RESOURCE_STATE_UNSPECIFIED":
+      return ResourceState.RESOURCE_STATE_UNSPECIFIED;
     case 1:
-    case "LIFECYCLE_STATE_PROVISIONING":
-      return LifecycleState.LIFECYCLE_STATE_PROVISIONING;
+    case "RESOURCE_STATE_ACTIVE":
+      return ResourceState.RESOURCE_STATE_ACTIVE;
     case 2:
-    case "LIFECYCLE_STATE_ACTIVE":
-      return LifecycleState.LIFECYCLE_STATE_ACTIVE;
+    case "RESOURCE_STATE_SUSPENDED":
+      return ResourceState.RESOURCE_STATE_SUSPENDED;
     case 3:
-    case "LIFECYCLE_STATE_SUSPENDING":
-      return LifecycleState.LIFECYCLE_STATE_SUSPENDING;
-    case 4:
-    case "LIFECYCLE_STATE_SUSPENDED":
-      return LifecycleState.LIFECYCLE_STATE_SUSPENDED;
-    case 5:
-    case "LIFECYCLE_STATE_RESUMING":
-      return LifecycleState.LIFECYCLE_STATE_RESUMING;
-    case 6:
-    case "LIFECYCLE_STATE_DELETING":
-      return LifecycleState.LIFECYCLE_STATE_DELETING;
-    case 7:
-    case "LIFECYCLE_STATE_FAILED":
-      return LifecycleState.LIFECYCLE_STATE_FAILED;
-    case 8:
-    case "LIFECYCLE_STATE_DELETED":
-      return LifecycleState.LIFECYCLE_STATE_DELETED;
+    case "RESOURCE_STATE_DELETED":
+      return ResourceState.RESOURCE_STATE_DELETED;
     case -1:
     case "UNRECOGNIZED":
     default:
-      return LifecycleState.UNRECOGNIZED;
+      return ResourceState.UNRECOGNIZED;
   }
 }
 
-export function lifecycleStateToJSON(object: LifecycleState): string {
+export function resourceStateToJSON(object: ResourceState): string {
   switch (object) {
-    case LifecycleState.LIFECYCLE_STATE_UNSPECIFIED:
-      return "LIFECYCLE_STATE_UNSPECIFIED";
-    case LifecycleState.LIFECYCLE_STATE_PROVISIONING:
-      return "LIFECYCLE_STATE_PROVISIONING";
-    case LifecycleState.LIFECYCLE_STATE_ACTIVE:
-      return "LIFECYCLE_STATE_ACTIVE";
-    case LifecycleState.LIFECYCLE_STATE_SUSPENDING:
-      return "LIFECYCLE_STATE_SUSPENDING";
-    case LifecycleState.LIFECYCLE_STATE_SUSPENDED:
-      return "LIFECYCLE_STATE_SUSPENDED";
-    case LifecycleState.LIFECYCLE_STATE_RESUMING:
-      return "LIFECYCLE_STATE_RESUMING";
-    case LifecycleState.LIFECYCLE_STATE_DELETING:
-      return "LIFECYCLE_STATE_DELETING";
-    case LifecycleState.LIFECYCLE_STATE_FAILED:
-      return "LIFECYCLE_STATE_FAILED";
-    case LifecycleState.LIFECYCLE_STATE_DELETED:
-      return "LIFECYCLE_STATE_DELETED";
-    case LifecycleState.UNRECOGNIZED:
+    case ResourceState.RESOURCE_STATE_UNSPECIFIED:
+      return "RESOURCE_STATE_UNSPECIFIED";
+    case ResourceState.RESOURCE_STATE_ACTIVE:
+      return "RESOURCE_STATE_ACTIVE";
+    case ResourceState.RESOURCE_STATE_SUSPENDED:
+      return "RESOURCE_STATE_SUSPENDED";
+    case ResourceState.RESOURCE_STATE_DELETED:
+      return "RESOURCE_STATE_DELETED";
+    case ResourceState.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
 }
 
-export enum LifecycleOperationKind {
-  LIFECYCLE_OPERATION_KIND_UNSPECIFIED = 0,
-  LIFECYCLE_OPERATION_KIND_PROVISION = 1,
-  LIFECYCLE_OPERATION_KIND_SUSPEND = 2,
-  LIFECYCLE_OPERATION_KIND_RESUME = 3,
-  LIFECYCLE_OPERATION_KIND_DELETE = 4,
-  UNRECOGNIZED = -1,
+export interface CreateTenantRequest {
+  tenantId: string;
+  address: string;
+  displayName: string;
 }
 
-export function lifecycleOperationKindFromJSON(object: any): LifecycleOperationKind {
-  switch (object) {
-    case 0:
-    case "LIFECYCLE_OPERATION_KIND_UNSPECIFIED":
-      return LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_UNSPECIFIED;
-    case 1:
-    case "LIFECYCLE_OPERATION_KIND_PROVISION":
-      return LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_PROVISION;
-    case 2:
-    case "LIFECYCLE_OPERATION_KIND_SUSPEND":
-      return LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_SUSPEND;
-    case 3:
-    case "LIFECYCLE_OPERATION_KIND_RESUME":
-      return LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_RESUME;
-    case 4:
-    case "LIFECYCLE_OPERATION_KIND_DELETE":
-      return LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_DELETE;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return LifecycleOperationKind.UNRECOGNIZED;
-  }
+export interface GetTenantRequest {
+  tenantId: string;
 }
 
-export function lifecycleOperationKindToJSON(object: LifecycleOperationKind): string {
-  switch (object) {
-    case LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_UNSPECIFIED:
-      return "LIFECYCLE_OPERATION_KIND_UNSPECIFIED";
-    case LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_PROVISION:
-      return "LIFECYCLE_OPERATION_KIND_PROVISION";
-    case LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_SUSPEND:
-      return "LIFECYCLE_OPERATION_KIND_SUSPEND";
-    case LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_RESUME:
-      return "LIFECYCLE_OPERATION_KIND_RESUME";
-    case LifecycleOperationKind.LIFECYCLE_OPERATION_KIND_DELETE:
-      return "LIFECYCLE_OPERATION_KIND_DELETE";
-    case LifecycleOperationKind.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
+export interface ListTenantsRequest {
+  pageSize: number;
+  afterTenantId?: string | undefined;
 }
 
-export enum LifecycleStepKey {
-  LIFECYCLE_STEP_KEY_UNSPECIFIED = 0,
-  LIFECYCLE_STEP_KEY_IDENTITY = 1,
-  LIFECYCLE_STEP_KEY_CONFIGURATION = 2,
-  LIFECYCLE_STEP_KEY_EXECUTION = 3,
-  LIFECYCLE_STEP_KEY_PACKAGES = 4,
-  UNRECOGNIZED = -1,
+export interface ListTenantsResponse {
+  tenants: Tenant[];
+  nextAfterTenantId?: string | undefined;
 }
 
-export function lifecycleStepKeyFromJSON(object: any): LifecycleStepKey {
-  switch (object) {
-    case 0:
-    case "LIFECYCLE_STEP_KEY_UNSPECIFIED":
-      return LifecycleStepKey.LIFECYCLE_STEP_KEY_UNSPECIFIED;
-    case 1:
-    case "LIFECYCLE_STEP_KEY_IDENTITY":
-      return LifecycleStepKey.LIFECYCLE_STEP_KEY_IDENTITY;
-    case 2:
-    case "LIFECYCLE_STEP_KEY_CONFIGURATION":
-      return LifecycleStepKey.LIFECYCLE_STEP_KEY_CONFIGURATION;
-    case 3:
-    case "LIFECYCLE_STEP_KEY_EXECUTION":
-      return LifecycleStepKey.LIFECYCLE_STEP_KEY_EXECUTION;
-    case 4:
-    case "LIFECYCLE_STEP_KEY_PACKAGES":
-      return LifecycleStepKey.LIFECYCLE_STEP_KEY_PACKAGES;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return LifecycleStepKey.UNRECOGNIZED;
-  }
+export interface UpdateTenantRequest {
+  tenantId: string;
+  expectedRevision: bigint;
+  displayName: string;
 }
 
-export function lifecycleStepKeyToJSON(object: LifecycleStepKey): string {
-  switch (object) {
-    case LifecycleStepKey.LIFECYCLE_STEP_KEY_UNSPECIFIED:
-      return "LIFECYCLE_STEP_KEY_UNSPECIFIED";
-    case LifecycleStepKey.LIFECYCLE_STEP_KEY_IDENTITY:
-      return "LIFECYCLE_STEP_KEY_IDENTITY";
-    case LifecycleStepKey.LIFECYCLE_STEP_KEY_CONFIGURATION:
-      return "LIFECYCLE_STEP_KEY_CONFIGURATION";
-    case LifecycleStepKey.LIFECYCLE_STEP_KEY_EXECUTION:
-      return "LIFECYCLE_STEP_KEY_EXECUTION";
-    case LifecycleStepKey.LIFECYCLE_STEP_KEY_PACKAGES:
-      return "LIFECYCLE_STEP_KEY_PACKAGES";
-    case LifecycleStepKey.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
+export interface SetTenantStateRequest {
+  tenantId: string;
+  expectedRevision: bigint;
+  state: ResourceState;
 }
 
-export enum LifecycleStepState {
-  LIFECYCLE_STEP_STATE_UNSPECIFIED = 0,
-  LIFECYCLE_STEP_STATE_PENDING = 1,
-  LIFECYCLE_STEP_STATE_BLOCKED = 2,
-  LIFECYCLE_STEP_STATE_COMPLETE = 3,
-  UNRECOGNIZED = -1,
+export interface CreateWorkspaceRequest {
+  workspaceId: string;
+  tenantId: string;
+  address: string;
+  displayName: string;
 }
 
-export function lifecycleStepStateFromJSON(object: any): LifecycleStepState {
-  switch (object) {
-    case 0:
-    case "LIFECYCLE_STEP_STATE_UNSPECIFIED":
-      return LifecycleStepState.LIFECYCLE_STEP_STATE_UNSPECIFIED;
-    case 1:
-    case "LIFECYCLE_STEP_STATE_PENDING":
-      return LifecycleStepState.LIFECYCLE_STEP_STATE_PENDING;
-    case 2:
-    case "LIFECYCLE_STEP_STATE_BLOCKED":
-      return LifecycleStepState.LIFECYCLE_STEP_STATE_BLOCKED;
-    case 3:
-    case "LIFECYCLE_STEP_STATE_COMPLETE":
-      return LifecycleStepState.LIFECYCLE_STEP_STATE_COMPLETE;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return LifecycleStepState.UNRECOGNIZED;
-  }
+export interface GetWorkspaceRequest {
+  workspaceId: string;
 }
 
-export function lifecycleStepStateToJSON(object: LifecycleStepState): string {
-  switch (object) {
-    case LifecycleStepState.LIFECYCLE_STEP_STATE_UNSPECIFIED:
-      return "LIFECYCLE_STEP_STATE_UNSPECIFIED";
-    case LifecycleStepState.LIFECYCLE_STEP_STATE_PENDING:
-      return "LIFECYCLE_STEP_STATE_PENDING";
-    case LifecycleStepState.LIFECYCLE_STEP_STATE_BLOCKED:
-      return "LIFECYCLE_STEP_STATE_BLOCKED";
-    case LifecycleStepState.LIFECYCLE_STEP_STATE_COMPLETE:
-      return "LIFECYCLE_STEP_STATE_COMPLETE";
-    case LifecycleStepState.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
+export interface ListWorkspacesRequest {
+  tenantId: string;
+  pageSize: number;
+  afterWorkspaceId?: string | undefined;
 }
 
-export enum LifecycleStepOutcome {
-  LIFECYCLE_STEP_OUTCOME_UNSPECIFIED = 0,
-  LIFECYCLE_STEP_OUTCOME_COMPLETE = 1,
-  LIFECYCLE_STEP_OUTCOME_BLOCKED = 2,
-  UNRECOGNIZED = -1,
+export interface ListWorkspacesResponse {
+  workspaces: Workspace[];
+  nextAfterWorkspaceId?: string | undefined;
 }
 
-export function lifecycleStepOutcomeFromJSON(object: any): LifecycleStepOutcome {
-  switch (object) {
-    case 0:
-    case "LIFECYCLE_STEP_OUTCOME_UNSPECIFIED":
-      return LifecycleStepOutcome.LIFECYCLE_STEP_OUTCOME_UNSPECIFIED;
-    case 1:
-    case "LIFECYCLE_STEP_OUTCOME_COMPLETE":
-      return LifecycleStepOutcome.LIFECYCLE_STEP_OUTCOME_COMPLETE;
-    case 2:
-    case "LIFECYCLE_STEP_OUTCOME_BLOCKED":
-      return LifecycleStepOutcome.LIFECYCLE_STEP_OUTCOME_BLOCKED;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return LifecycleStepOutcome.UNRECOGNIZED;
-  }
+export interface UpdateWorkspaceRequest {
+  workspaceId: string;
+  expectedRevision: bigint;
+  displayName: string;
 }
 
-export function lifecycleStepOutcomeToJSON(object: LifecycleStepOutcome): string {
-  switch (object) {
-    case LifecycleStepOutcome.LIFECYCLE_STEP_OUTCOME_UNSPECIFIED:
-      return "LIFECYCLE_STEP_OUTCOME_UNSPECIFIED";
-    case LifecycleStepOutcome.LIFECYCLE_STEP_OUTCOME_COMPLETE:
-      return "LIFECYCLE_STEP_OUTCOME_COMPLETE";
-    case LifecycleStepOutcome.LIFECYCLE_STEP_OUTCOME_BLOCKED:
-      return "LIFECYCLE_STEP_OUTCOME_BLOCKED";
-    case LifecycleStepOutcome.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum MembershipStanding {
-  MEMBERSHIP_STANDING_UNSPECIFIED = 0,
-  MEMBERSHIP_STANDING_ADMIN = 1,
-  MEMBERSHIP_STANDING_MEMBER = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function membershipStandingFromJSON(object: any): MembershipStanding {
-  switch (object) {
-    case 0:
-    case "MEMBERSHIP_STANDING_UNSPECIFIED":
-      return MembershipStanding.MEMBERSHIP_STANDING_UNSPECIFIED;
-    case 1:
-    case "MEMBERSHIP_STANDING_ADMIN":
-      return MembershipStanding.MEMBERSHIP_STANDING_ADMIN;
-    case 2:
-    case "MEMBERSHIP_STANDING_MEMBER":
-      return MembershipStanding.MEMBERSHIP_STANDING_MEMBER;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return MembershipStanding.UNRECOGNIZED;
-  }
-}
-
-export function membershipStandingToJSON(object: MembershipStanding): string {
-  switch (object) {
-    case MembershipStanding.MEMBERSHIP_STANDING_UNSPECIFIED:
-      return "MEMBERSHIP_STANDING_UNSPECIFIED";
-    case MembershipStanding.MEMBERSHIP_STANDING_ADMIN:
-      return "MEMBERSHIP_STANDING_ADMIN";
-    case MembershipStanding.MEMBERSHIP_STANDING_MEMBER:
-      return "MEMBERSHIP_STANDING_MEMBER";
-    case MembershipStanding.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
+export interface SetWorkspaceStateRequest {
+  workspaceId: string;
+  expectedRevision: bigint;
+  state: ResourceState;
 }
 
 export interface ResolveTenantRequest {
-  tenantId?: string | undefined;
-  externalAddress: ExternalTenantAddress | undefined;
-}
-
-export interface ExternalTenantAddress {
-  authority: string;
-  pathPrefix: string;
+  address: string;
 }
 
 export interface ResolveTenantResponse {
   tenantId: string;
-  lifecycle: LifecycleState;
-  tenantRevision: bigint;
-  address: ResolvedTenantAddress | undefined;
-  cacheExpiresAt: Date | undefined;
-}
-
-export interface ResolvedTenantAddress {
-  bindingGeneration: bigint;
+  state: ResourceState;
+  revision: bigint;
 }
 
 export interface ResolveWorkspaceRequest {
   tenantId: string;
-  workspaceAddress: string;
+  address: string;
 }
 
 export interface ResolveWorkspaceResponse {
   workspaceId: string;
-  lifecycle: LifecycleState;
-  workspaceRevision: bigint;
-  address: ResolvedWorkspaceAddress | undefined;
-  cacheExpiresAt: Date | undefined;
+  state: ResourceState;
+  revision: bigint;
 }
 
-export interface ResolvedWorkspaceAddress {
-  bindingGeneration: bigint;
-}
-
-export interface GetLifecycleRequest {
-  target: LifecycleTarget | undefined;
-}
-
-export interface GetLifecycleResponse {
-  target: LifecycleTarget | undefined;
-  lifecycle: LifecycleState;
-  parentTenantLifecycle?: LifecycleState | undefined;
-  resourceRevision: bigint;
-  provisioningGeneration: bigint;
-  currentOperationId?: string | undefined;
-  cacheExpiresAt: Date | undefined;
-}
-
-export interface ListLifecycleStepsRequest {
-  pageSize: number;
-  pageToken: string;
-}
-
-export interface ListLifecycleStepsResponse {
-  steps: LifecycleStep[];
-  nextPageToken: string;
-  deliveryRevision: bigint;
-}
-
-export interface WatchLifecycleStepsRequest {
-  afterDeliverySequence: bigint;
-}
-
-export interface LifecycleStepEvent {
-  deliverySequence: bigint;
-  step: LifecycleStep | undefined;
-}
-
-export interface LifecycleStep {
-  target: LifecycleTarget | undefined;
-  lifecycleOperationId: string;
-  provisioningGeneration: bigint;
-  operation: LifecycleOperationKind;
-  stepKey: LifecycleStepKey;
-  state: LifecycleStepState;
-  stepRevision: bigint;
-  blockedReason?: string | undefined;
-  identity?: IdentityLifecycleIntent | undefined;
-  packages?: PackageLifecycleIntent | undefined;
-}
-
-export interface LifecycleTarget {
-  tenant?: TenantTarget | undefined;
-  workspace?: WorkspaceTarget | undefined;
-}
-
-export interface TenantTarget {
+export interface Tenant {
   tenantId: string;
-}
-
-export interface WorkspaceTarget {
-  tenantId: string;
-  workspaceId: string;
-}
-
-export interface IdentityLifecycleIntent {
-  initialAdministrator: InitialAdministrator | undefined;
-  workspaceMemberships: InitialWorkspaceMembership[];
-}
-
-export interface InitialAdministrator {
+  address: string;
   displayName: string;
-  loginIdentifier: string;
-  identityLink: IdentityLinkDeclaration | undefined;
+  state: ResourceState;
+  revision: bigint;
+  createdAt: Date | undefined;
+  updatedAt: Date | undefined;
 }
 
-export interface IdentityLinkDeclaration {
-  providerId: string;
-  providerSubject: string;
+export interface Workspace {
+  workspaceId: string;
+  tenantId: string;
+  address: string;
+  displayName: string;
+  state: ResourceState;
+  revision: bigint;
+  createdAt: Date | undefined;
+  updatedAt: Date | undefined;
 }
 
-export interface InitialWorkspaceMembership {
-  userId: string;
-  standing: MembershipStanding;
+function createBaseCreateTenantRequest(): CreateTenantRequest {
+  return { tenantId: "", address: "", displayName: "" };
 }
 
-export interface PackageLifecycleIntent {
-  baselinePackages: BaselinePackage[];
-}
-
-export interface BaselinePackage {
-  packageId: string;
-  packageVersion: string;
-}
-
-export interface AcknowledgeLifecycleStepRequest {
-  target: LifecycleTarget | undefined;
-  lifecycleOperationId: string;
-  provisioningGeneration: bigint;
-  stepKey: LifecycleStepKey;
-  expectedStepRevision: bigint;
-  ownerRevision: bigint;
-  outcome: LifecycleStepOutcome;
-  blockedReason?: string | undefined;
-  idempotencyKey: string;
-}
-
-export interface AcknowledgeLifecycleStepResponse {
-  stepState: LifecycleStepState;
-  stepRevision: bigint;
-  lifecycle: LifecycleState;
-  resourceRevision: bigint;
-  provisioningGeneration: bigint;
-}
-
-function createBaseResolveTenantRequest(): ResolveTenantRequest {
-  return { tenantId: undefined, externalAddress: undefined };
-}
-
-export const ResolveTenantRequest: MessageFns<ResolveTenantRequest> = {
-  encode(message: ResolveTenantRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.tenantId !== undefined) {
+export const CreateTenantRequest: MessageFns<CreateTenantRequest> = {
+  encode(message: CreateTenantRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
       writer.uint32(10).string(message.tenantId);
     }
-    if (message.externalAddress !== undefined) {
-      ExternalTenantAddress.encode(message.externalAddress, writer.uint32(18).fork()).join();
+    if (message.address !== "") {
+      writer.uint32(18).string(message.address);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(26).string(message.displayName);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): ResolveTenantRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateTenantRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseResolveTenantRequest();
+    const message = createBaseCreateTenantRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -509,7 +213,1013 @@ export const ResolveTenantRequest: MessageFns<ResolveTenantRequest> = {
             break;
           }
 
-          message.externalAddress = ExternalTenantAddress.decode(reader, reader.uint32());
+          message.address = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateTenantRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+    };
+  },
+
+  toJSON(message: CreateTenantRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.address !== "") {
+      obj.address = message.address;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateTenantRequest>): CreateTenantRequest {
+    return CreateTenantRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateTenantRequest>): CreateTenantRequest {
+    const message = createBaseCreateTenantRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.address = object.address ?? "";
+    message.displayName = object.displayName ?? "";
+    return message;
+  },
+};
+
+function createBaseGetTenantRequest(): GetTenantRequest {
+  return { tenantId: "" };
+}
+
+export const GetTenantRequest: MessageFns<GetTenantRequest> = {
+  encode(message: GetTenantRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetTenantRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetTenantRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetTenantRequest {
+    return { tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "" };
+  },
+
+  toJSON(message: GetTenantRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetTenantRequest>): GetTenantRequest {
+    return GetTenantRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetTenantRequest>): GetTenantRequest {
+    const message = createBaseGetTenantRequest();
+    message.tenantId = object.tenantId ?? "";
+    return message;
+  },
+};
+
+function createBaseListTenantsRequest(): ListTenantsRequest {
+  return { pageSize: 0, afterTenantId: undefined };
+}
+
+export const ListTenantsRequest: MessageFns<ListTenantsRequest> = {
+  encode(message: ListTenantsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.pageSize !== 0) {
+      writer.uint32(8).uint32(message.pageSize);
+    }
+    if (message.afterTenantId !== undefined) {
+      writer.uint32(18).string(message.afterTenantId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListTenantsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListTenantsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.afterTenantId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListTenantsRequest {
+    return {
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterTenantId: isSet(object.afterTenantId) ? globalThis.String(object.afterTenantId) : undefined,
+    };
+  },
+
+  toJSON(message: ListTenantsRequest): unknown {
+    const obj: any = {};
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterTenantId !== undefined) {
+      obj.afterTenantId = message.afterTenantId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListTenantsRequest>): ListTenantsRequest {
+    return ListTenantsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListTenantsRequest>): ListTenantsRequest {
+    const message = createBaseListTenantsRequest();
+    message.pageSize = object.pageSize ?? 0;
+    message.afterTenantId = object.afterTenantId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListTenantsResponse(): ListTenantsResponse {
+  return { tenants: [], nextAfterTenantId: undefined };
+}
+
+export const ListTenantsResponse: MessageFns<ListTenantsResponse> = {
+  encode(message: ListTenantsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.tenants) {
+      Tenant.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterTenantId !== undefined) {
+      writer.uint32(18).string(message.nextAfterTenantId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListTenantsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListTenantsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenants.push(Tenant.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterTenantId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListTenantsResponse {
+    return {
+      tenants: globalThis.Array.isArray(object?.tenants) ? object.tenants.map((e: any) => Tenant.fromJSON(e)) : [],
+      nextAfterTenantId: isSet(object.nextAfterTenantId) ? globalThis.String(object.nextAfterTenantId) : undefined,
+    };
+  },
+
+  toJSON(message: ListTenantsResponse): unknown {
+    const obj: any = {};
+    if (message.tenants?.length) {
+      obj.tenants = message.tenants.map((e) => Tenant.toJSON(e));
+    }
+    if (message.nextAfterTenantId !== undefined) {
+      obj.nextAfterTenantId = message.nextAfterTenantId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListTenantsResponse>): ListTenantsResponse {
+    return ListTenantsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListTenantsResponse>): ListTenantsResponse {
+    const message = createBaseListTenantsResponse();
+    message.tenants = object.tenants?.map((e) => Tenant.fromPartial(e)) || [];
+    message.nextAfterTenantId = object.nextAfterTenantId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateTenantRequest(): UpdateTenantRequest {
+  return { tenantId: "", expectedRevision: 0n, displayName: "" };
+}
+
+export const UpdateTenantRequest: MessageFns<UpdateTenantRequest> = {
+  encode(message: UpdateTenantRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.expectedRevision !== 0n) {
+      if (BigInt.asUintN(64, message.expectedRevision) !== message.expectedRevision) {
+        throw new globalThis.Error("value provided for field message.expectedRevision of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.expectedRevision);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(26).string(message.displayName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateTenantRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateTenantRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.expectedRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateTenantRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      expectedRevision: isSet(object.expectedRevision) ? BigInt(object.expectedRevision) : 0n,
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+    };
+  },
+
+  toJSON(message: UpdateTenantRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.expectedRevision !== 0n) {
+      obj.expectedRevision = message.expectedRevision.toString();
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateTenantRequest>): UpdateTenantRequest {
+    return UpdateTenantRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateTenantRequest>): UpdateTenantRequest {
+    const message = createBaseUpdateTenantRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.expectedRevision = object.expectedRevision ?? 0n;
+    message.displayName = object.displayName ?? "";
+    return message;
+  },
+};
+
+function createBaseSetTenantStateRequest(): SetTenantStateRequest {
+  return { tenantId: "", expectedRevision: 0n, state: 0 };
+}
+
+export const SetTenantStateRequest: MessageFns<SetTenantStateRequest> = {
+  encode(message: SetTenantStateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.expectedRevision !== 0n) {
+      if (BigInt.asUintN(64, message.expectedRevision) !== message.expectedRevision) {
+        throw new globalThis.Error("value provided for field message.expectedRevision of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.expectedRevision);
+    }
+    if (message.state !== 0) {
+      writer.uint32(24).int32(message.state);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetTenantStateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetTenantStateRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.expectedRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.state = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetTenantStateRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      expectedRevision: isSet(object.expectedRevision) ? BigInt(object.expectedRevision) : 0n,
+      state: isSet(object.state) ? resourceStateFromJSON(object.state) : 0,
+    };
+  },
+
+  toJSON(message: SetTenantStateRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.expectedRevision !== 0n) {
+      obj.expectedRevision = message.expectedRevision.toString();
+    }
+    if (message.state !== 0) {
+      obj.state = resourceStateToJSON(message.state);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetTenantStateRequest>): SetTenantStateRequest {
+    return SetTenantStateRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SetTenantStateRequest>): SetTenantStateRequest {
+    const message = createBaseSetTenantStateRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.expectedRevision = object.expectedRevision ?? 0n;
+    message.state = object.state ?? 0;
+    return message;
+  },
+};
+
+function createBaseCreateWorkspaceRequest(): CreateWorkspaceRequest {
+  return { workspaceId: "", tenantId: "", address: "", displayName: "" };
+}
+
+export const CreateWorkspaceRequest: MessageFns<CreateWorkspaceRequest> = {
+  encode(message: CreateWorkspaceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workspaceId !== "") {
+      writer.uint32(10).string(message.workspaceId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.address !== "") {
+      writer.uint32(26).string(message.address);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(34).string(message.displayName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateWorkspaceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateWorkspaceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.address = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateWorkspaceRequest {
+    return {
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+    };
+  },
+
+  toJSON(message: CreateWorkspaceRequest): unknown {
+    const obj: any = {};
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.address !== "") {
+      obj.address = message.address;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateWorkspaceRequest>): CreateWorkspaceRequest {
+    return CreateWorkspaceRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateWorkspaceRequest>): CreateWorkspaceRequest {
+    const message = createBaseCreateWorkspaceRequest();
+    message.workspaceId = object.workspaceId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.address = object.address ?? "";
+    message.displayName = object.displayName ?? "";
+    return message;
+  },
+};
+
+function createBaseGetWorkspaceRequest(): GetWorkspaceRequest {
+  return { workspaceId: "" };
+}
+
+export const GetWorkspaceRequest: MessageFns<GetWorkspaceRequest> = {
+  encode(message: GetWorkspaceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workspaceId !== "") {
+      writer.uint32(10).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetWorkspaceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetWorkspaceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetWorkspaceRequest {
+    return { workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "" };
+  },
+
+  toJSON(message: GetWorkspaceRequest): unknown {
+    const obj: any = {};
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetWorkspaceRequest>): GetWorkspaceRequest {
+    return GetWorkspaceRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetWorkspaceRequest>): GetWorkspaceRequest {
+    const message = createBaseGetWorkspaceRequest();
+    message.workspaceId = object.workspaceId ?? "";
+    return message;
+  },
+};
+
+function createBaseListWorkspacesRequest(): ListWorkspacesRequest {
+  return { tenantId: "", pageSize: 0, afterWorkspaceId: undefined };
+}
+
+export const ListWorkspacesRequest: MessageFns<ListWorkspacesRequest> = {
+  encode(message: ListWorkspacesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(16).uint32(message.pageSize);
+    }
+    if (message.afterWorkspaceId !== undefined) {
+      writer.uint32(26).string(message.afterWorkspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkspacesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkspacesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.afterWorkspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkspacesRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterWorkspaceId: isSet(object.afterWorkspaceId) ? globalThis.String(object.afterWorkspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: ListWorkspacesRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterWorkspaceId !== undefined) {
+      obj.afterWorkspaceId = message.afterWorkspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListWorkspacesRequest>): ListWorkspacesRequest {
+    return ListWorkspacesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListWorkspacesRequest>): ListWorkspacesRequest {
+    const message = createBaseListWorkspacesRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.pageSize = object.pageSize ?? 0;
+    message.afterWorkspaceId = object.afterWorkspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListWorkspacesResponse(): ListWorkspacesResponse {
+  return { workspaces: [], nextAfterWorkspaceId: undefined };
+}
+
+export const ListWorkspacesResponse: MessageFns<ListWorkspacesResponse> = {
+  encode(message: ListWorkspacesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.workspaces) {
+      Workspace.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterWorkspaceId !== undefined) {
+      writer.uint32(18).string(message.nextAfterWorkspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkspacesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkspacesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaces.push(Workspace.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterWorkspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkspacesResponse {
+    return {
+      workspaces: globalThis.Array.isArray(object?.workspaces)
+        ? object.workspaces.map((e: any) => Workspace.fromJSON(e))
+        : [],
+      nextAfterWorkspaceId: isSet(object.nextAfterWorkspaceId)
+        ? globalThis.String(object.nextAfterWorkspaceId)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ListWorkspacesResponse): unknown {
+    const obj: any = {};
+    if (message.workspaces?.length) {
+      obj.workspaces = message.workspaces.map((e) => Workspace.toJSON(e));
+    }
+    if (message.nextAfterWorkspaceId !== undefined) {
+      obj.nextAfterWorkspaceId = message.nextAfterWorkspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListWorkspacesResponse>): ListWorkspacesResponse {
+    return ListWorkspacesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListWorkspacesResponse>): ListWorkspacesResponse {
+    const message = createBaseListWorkspacesResponse();
+    message.workspaces = object.workspaces?.map((e) => Workspace.fromPartial(e)) || [];
+    message.nextAfterWorkspaceId = object.nextAfterWorkspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateWorkspaceRequest(): UpdateWorkspaceRequest {
+  return { workspaceId: "", expectedRevision: 0n, displayName: "" };
+}
+
+export const UpdateWorkspaceRequest: MessageFns<UpdateWorkspaceRequest> = {
+  encode(message: UpdateWorkspaceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workspaceId !== "") {
+      writer.uint32(10).string(message.workspaceId);
+    }
+    if (message.expectedRevision !== 0n) {
+      if (BigInt.asUintN(64, message.expectedRevision) !== message.expectedRevision) {
+        throw new globalThis.Error("value provided for field message.expectedRevision of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.expectedRevision);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(26).string(message.displayName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateWorkspaceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateWorkspaceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.expectedRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateWorkspaceRequest {
+    return {
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      expectedRevision: isSet(object.expectedRevision) ? BigInt(object.expectedRevision) : 0n,
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+    };
+  },
+
+  toJSON(message: UpdateWorkspaceRequest): unknown {
+    const obj: any = {};
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.expectedRevision !== 0n) {
+      obj.expectedRevision = message.expectedRevision.toString();
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateWorkspaceRequest>): UpdateWorkspaceRequest {
+    return UpdateWorkspaceRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateWorkspaceRequest>): UpdateWorkspaceRequest {
+    const message = createBaseUpdateWorkspaceRequest();
+    message.workspaceId = object.workspaceId ?? "";
+    message.expectedRevision = object.expectedRevision ?? 0n;
+    message.displayName = object.displayName ?? "";
+    return message;
+  },
+};
+
+function createBaseSetWorkspaceStateRequest(): SetWorkspaceStateRequest {
+  return { workspaceId: "", expectedRevision: 0n, state: 0 };
+}
+
+export const SetWorkspaceStateRequest: MessageFns<SetWorkspaceStateRequest> = {
+  encode(message: SetWorkspaceStateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workspaceId !== "") {
+      writer.uint32(10).string(message.workspaceId);
+    }
+    if (message.expectedRevision !== 0n) {
+      if (BigInt.asUintN(64, message.expectedRevision) !== message.expectedRevision) {
+        throw new globalThis.Error("value provided for field message.expectedRevision of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.expectedRevision);
+    }
+    if (message.state !== 0) {
+      writer.uint32(24).int32(message.state);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetWorkspaceStateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetWorkspaceStateRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.expectedRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.state = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetWorkspaceStateRequest {
+    return {
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      expectedRevision: isSet(object.expectedRevision) ? BigInt(object.expectedRevision) : 0n,
+      state: isSet(object.state) ? resourceStateFromJSON(object.state) : 0,
+    };
+  },
+
+  toJSON(message: SetWorkspaceStateRequest): unknown {
+    const obj: any = {};
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.expectedRevision !== 0n) {
+      obj.expectedRevision = message.expectedRevision.toString();
+    }
+    if (message.state !== 0) {
+      obj.state = resourceStateToJSON(message.state);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetWorkspaceStateRequest>): SetWorkspaceStateRequest {
+    return SetWorkspaceStateRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SetWorkspaceStateRequest>): SetWorkspaceStateRequest {
+    const message = createBaseSetWorkspaceStateRequest();
+    message.workspaceId = object.workspaceId ?? "";
+    message.expectedRevision = object.expectedRevision ?? 0n;
+    message.state = object.state ?? 0;
+    return message;
+  },
+};
+
+function createBaseResolveTenantRequest(): ResolveTenantRequest {
+  return { address: "" };
+}
+
+export const ResolveTenantRequest: MessageFns<ResolveTenantRequest> = {
+  encode(message: ResolveTenantRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.address !== "") {
+      writer.uint32(10).string(message.address);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveTenantRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolveTenantRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.address = reader.string();
           continue;
         }
       }
@@ -522,21 +1232,13 @@ export const ResolveTenantRequest: MessageFns<ResolveTenantRequest> = {
   },
 
   fromJSON(object: any): ResolveTenantRequest {
-    return {
-      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : undefined,
-      externalAddress: isSet(object.externalAddress)
-        ? ExternalTenantAddress.fromJSON(object.externalAddress)
-        : undefined,
-    };
+    return { address: isSet(object.address) ? globalThis.String(object.address) : "" };
   },
 
   toJSON(message: ResolveTenantRequest): unknown {
     const obj: any = {};
-    if (message.tenantId !== undefined) {
-      obj.tenantId = message.tenantId;
-    }
-    if (message.externalAddress !== undefined) {
-      obj.externalAddress = ExternalTenantAddress.toJSON(message.externalAddress);
+    if (message.address !== "") {
+      obj.address = message.address;
     }
     return obj;
   },
@@ -546,92 +1248,13 @@ export const ResolveTenantRequest: MessageFns<ResolveTenantRequest> = {
   },
   fromPartial(object: DeepPartial<ResolveTenantRequest>): ResolveTenantRequest {
     const message = createBaseResolveTenantRequest();
-    message.tenantId = object.tenantId ?? undefined;
-    message.externalAddress = (object.externalAddress !== undefined && object.externalAddress !== null)
-      ? ExternalTenantAddress.fromPartial(object.externalAddress)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseExternalTenantAddress(): ExternalTenantAddress {
-  return { authority: "", pathPrefix: "" };
-}
-
-export const ExternalTenantAddress: MessageFns<ExternalTenantAddress> = {
-  encode(message: ExternalTenantAddress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.authority !== "") {
-      writer.uint32(10).string(message.authority);
-    }
-    if (message.pathPrefix !== "") {
-      writer.uint32(18).string(message.pathPrefix);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ExternalTenantAddress {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseExternalTenantAddress();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.authority = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.pathPrefix = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ExternalTenantAddress {
-    return {
-      authority: isSet(object.authority) ? globalThis.String(object.authority) : "",
-      pathPrefix: isSet(object.pathPrefix) ? globalThis.String(object.pathPrefix) : "",
-    };
-  },
-
-  toJSON(message: ExternalTenantAddress): unknown {
-    const obj: any = {};
-    if (message.authority !== "") {
-      obj.authority = message.authority;
-    }
-    if (message.pathPrefix !== "") {
-      obj.pathPrefix = message.pathPrefix;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ExternalTenantAddress>): ExternalTenantAddress {
-    return ExternalTenantAddress.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ExternalTenantAddress>): ExternalTenantAddress {
-    const message = createBaseExternalTenantAddress();
-    message.authority = object.authority ?? "";
-    message.pathPrefix = object.pathPrefix ?? "";
+    message.address = object.address ?? "";
     return message;
   },
 };
 
 function createBaseResolveTenantResponse(): ResolveTenantResponse {
-  return { tenantId: "", lifecycle: 0, tenantRevision: 0n, address: undefined, cacheExpiresAt: undefined };
+  return { tenantId: "", state: 0, revision: 0n };
 }
 
 export const ResolveTenantResponse: MessageFns<ResolveTenantResponse> = {
@@ -639,20 +1262,14 @@ export const ResolveTenantResponse: MessageFns<ResolveTenantResponse> = {
     if (message.tenantId !== "") {
       writer.uint32(10).string(message.tenantId);
     }
-    if (message.lifecycle !== 0) {
-      writer.uint32(16).int32(message.lifecycle);
+    if (message.state !== 0) {
+      writer.uint32(16).int32(message.state);
     }
-    if (message.tenantRevision !== 0n) {
-      if (BigInt.asUintN(64, message.tenantRevision) !== message.tenantRevision) {
-        throw new globalThis.Error("value provided for field message.tenantRevision of type uint64 too large");
+    if (message.revision !== 0n) {
+      if (BigInt.asUintN(64, message.revision) !== message.revision) {
+        throw new globalThis.Error("value provided for field message.revision of type uint64 too large");
       }
-      writer.uint32(24).uint64(message.tenantRevision);
-    }
-    if (message.address !== undefined) {
-      ResolvedTenantAddress.encode(message.address, writer.uint32(34).fork()).join();
-    }
-    if (message.cacheExpiresAt !== undefined) {
-      Timestamp.encode(toTimestamp(message.cacheExpiresAt), writer.uint32(42).fork()).join();
+      writer.uint32(24).uint64(message.revision);
     }
     return writer;
   },
@@ -677,7 +1294,7 @@ export const ResolveTenantResponse: MessageFns<ResolveTenantResponse> = {
             break;
           }
 
-          message.lifecycle = reader.int32() as any;
+          message.state = reader.int32() as any;
           continue;
         }
         case 3: {
@@ -685,23 +1302,7 @@ export const ResolveTenantResponse: MessageFns<ResolveTenantResponse> = {
             break;
           }
 
-          message.tenantRevision = reader.uint64() as bigint;
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.address = ResolvedTenantAddress.decode(reader, reader.uint32());
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.cacheExpiresAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          message.revision = reader.uint64() as bigint;
           continue;
         }
       }
@@ -716,10 +1317,8 @@ export const ResolveTenantResponse: MessageFns<ResolveTenantResponse> = {
   fromJSON(object: any): ResolveTenantResponse {
     return {
       tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
-      lifecycle: isSet(object.lifecycle) ? lifecycleStateFromJSON(object.lifecycle) : 0,
-      tenantRevision: isSet(object.tenantRevision) ? BigInt(object.tenantRevision) : 0n,
-      address: isSet(object.address) ? ResolvedTenantAddress.fromJSON(object.address) : undefined,
-      cacheExpiresAt: isSet(object.cacheExpiresAt) ? fromJsonTimestamp(object.cacheExpiresAt) : undefined,
+      state: isSet(object.state) ? resourceStateFromJSON(object.state) : 0,
+      revision: isSet(object.revision) ? BigInt(object.revision) : 0n,
     };
   },
 
@@ -728,17 +1327,11 @@ export const ResolveTenantResponse: MessageFns<ResolveTenantResponse> = {
     if (message.tenantId !== "") {
       obj.tenantId = message.tenantId;
     }
-    if (message.lifecycle !== 0) {
-      obj.lifecycle = lifecycleStateToJSON(message.lifecycle);
+    if (message.state !== 0) {
+      obj.state = resourceStateToJSON(message.state);
     }
-    if (message.tenantRevision !== 0n) {
-      obj.tenantRevision = message.tenantRevision.toString();
-    }
-    if (message.address !== undefined) {
-      obj.address = ResolvedTenantAddress.toJSON(message.address);
-    }
-    if (message.cacheExpiresAt !== undefined) {
-      obj.cacheExpiresAt = message.cacheExpiresAt.toISOString();
+    if (message.revision !== 0n) {
+      obj.revision = message.revision.toString();
     }
     return obj;
   },
@@ -749,79 +1342,14 @@ export const ResolveTenantResponse: MessageFns<ResolveTenantResponse> = {
   fromPartial(object: DeepPartial<ResolveTenantResponse>): ResolveTenantResponse {
     const message = createBaseResolveTenantResponse();
     message.tenantId = object.tenantId ?? "";
-    message.lifecycle = object.lifecycle ?? 0;
-    message.tenantRevision = object.tenantRevision ?? 0n;
-    message.address = (object.address !== undefined && object.address !== null)
-      ? ResolvedTenantAddress.fromPartial(object.address)
-      : undefined;
-    message.cacheExpiresAt = object.cacheExpiresAt ?? undefined;
-    return message;
-  },
-};
-
-function createBaseResolvedTenantAddress(): ResolvedTenantAddress {
-  return { bindingGeneration: 0n };
-}
-
-export const ResolvedTenantAddress: MessageFns<ResolvedTenantAddress> = {
-  encode(message: ResolvedTenantAddress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.bindingGeneration !== 0n) {
-      if (BigInt.asUintN(64, message.bindingGeneration) !== message.bindingGeneration) {
-        throw new globalThis.Error("value provided for field message.bindingGeneration of type uint64 too large");
-      }
-      writer.uint32(8).uint64(message.bindingGeneration);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ResolvedTenantAddress {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseResolvedTenantAddress();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.bindingGeneration = reader.uint64() as bigint;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ResolvedTenantAddress {
-    return { bindingGeneration: isSet(object.bindingGeneration) ? BigInt(object.bindingGeneration) : 0n };
-  },
-
-  toJSON(message: ResolvedTenantAddress): unknown {
-    const obj: any = {};
-    if (message.bindingGeneration !== 0n) {
-      obj.bindingGeneration = message.bindingGeneration.toString();
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ResolvedTenantAddress>): ResolvedTenantAddress {
-    return ResolvedTenantAddress.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ResolvedTenantAddress>): ResolvedTenantAddress {
-    const message = createBaseResolvedTenantAddress();
-    message.bindingGeneration = object.bindingGeneration ?? 0n;
+    message.state = object.state ?? 0;
+    message.revision = object.revision ?? 0n;
     return message;
   },
 };
 
 function createBaseResolveWorkspaceRequest(): ResolveWorkspaceRequest {
-  return { tenantId: "", workspaceAddress: "" };
+  return { tenantId: "", address: "" };
 }
 
 export const ResolveWorkspaceRequest: MessageFns<ResolveWorkspaceRequest> = {
@@ -829,8 +1357,8 @@ export const ResolveWorkspaceRequest: MessageFns<ResolveWorkspaceRequest> = {
     if (message.tenantId !== "") {
       writer.uint32(10).string(message.tenantId);
     }
-    if (message.workspaceAddress !== "") {
-      writer.uint32(18).string(message.workspaceAddress);
+    if (message.address !== "") {
+      writer.uint32(18).string(message.address);
     }
     return writer;
   },
@@ -855,7 +1383,7 @@ export const ResolveWorkspaceRequest: MessageFns<ResolveWorkspaceRequest> = {
             break;
           }
 
-          message.workspaceAddress = reader.string();
+          message.address = reader.string();
           continue;
         }
       }
@@ -870,7 +1398,7 @@ export const ResolveWorkspaceRequest: MessageFns<ResolveWorkspaceRequest> = {
   fromJSON(object: any): ResolveWorkspaceRequest {
     return {
       tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
-      workspaceAddress: isSet(object.workspaceAddress) ? globalThis.String(object.workspaceAddress) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
     };
   },
 
@@ -879,8 +1407,8 @@ export const ResolveWorkspaceRequest: MessageFns<ResolveWorkspaceRequest> = {
     if (message.tenantId !== "") {
       obj.tenantId = message.tenantId;
     }
-    if (message.workspaceAddress !== "") {
-      obj.workspaceAddress = message.workspaceAddress;
+    if (message.address !== "") {
+      obj.address = message.address;
     }
     return obj;
   },
@@ -891,13 +1419,13 @@ export const ResolveWorkspaceRequest: MessageFns<ResolveWorkspaceRequest> = {
   fromPartial(object: DeepPartial<ResolveWorkspaceRequest>): ResolveWorkspaceRequest {
     const message = createBaseResolveWorkspaceRequest();
     message.tenantId = object.tenantId ?? "";
-    message.workspaceAddress = object.workspaceAddress ?? "";
+    message.address = object.address ?? "";
     return message;
   },
 };
 
 function createBaseResolveWorkspaceResponse(): ResolveWorkspaceResponse {
-  return { workspaceId: "", lifecycle: 0, workspaceRevision: 0n, address: undefined, cacheExpiresAt: undefined };
+  return { workspaceId: "", state: 0, revision: 0n };
 }
 
 export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
@@ -905,20 +1433,14 @@ export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
     if (message.workspaceId !== "") {
       writer.uint32(10).string(message.workspaceId);
     }
-    if (message.lifecycle !== 0) {
-      writer.uint32(16).int32(message.lifecycle);
+    if (message.state !== 0) {
+      writer.uint32(16).int32(message.state);
     }
-    if (message.workspaceRevision !== 0n) {
-      if (BigInt.asUintN(64, message.workspaceRevision) !== message.workspaceRevision) {
-        throw new globalThis.Error("value provided for field message.workspaceRevision of type uint64 too large");
+    if (message.revision !== 0n) {
+      if (BigInt.asUintN(64, message.revision) !== message.revision) {
+        throw new globalThis.Error("value provided for field message.revision of type uint64 too large");
       }
-      writer.uint32(24).uint64(message.workspaceRevision);
-    }
-    if (message.address !== undefined) {
-      ResolvedWorkspaceAddress.encode(message.address, writer.uint32(34).fork()).join();
-    }
-    if (message.cacheExpiresAt !== undefined) {
-      Timestamp.encode(toTimestamp(message.cacheExpiresAt), writer.uint32(42).fork()).join();
+      writer.uint32(24).uint64(message.revision);
     }
     return writer;
   },
@@ -943,7 +1465,7 @@ export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
             break;
           }
 
-          message.lifecycle = reader.int32() as any;
+          message.state = reader.int32() as any;
           continue;
         }
         case 3: {
@@ -951,23 +1473,7 @@ export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
             break;
           }
 
-          message.workspaceRevision = reader.uint64() as bigint;
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.address = ResolvedWorkspaceAddress.decode(reader, reader.uint32());
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.cacheExpiresAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          message.revision = reader.uint64() as bigint;
           continue;
         }
       }
@@ -982,10 +1488,8 @@ export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
   fromJSON(object: any): ResolveWorkspaceResponse {
     return {
       workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
-      lifecycle: isSet(object.lifecycle) ? lifecycleStateFromJSON(object.lifecycle) : 0,
-      workspaceRevision: isSet(object.workspaceRevision) ? BigInt(object.workspaceRevision) : 0n,
-      address: isSet(object.address) ? ResolvedWorkspaceAddress.fromJSON(object.address) : undefined,
-      cacheExpiresAt: isSet(object.cacheExpiresAt) ? fromJsonTimestamp(object.cacheExpiresAt) : undefined,
+      state: isSet(object.state) ? resourceStateFromJSON(object.state) : 0,
+      revision: isSet(object.revision) ? BigInt(object.revision) : 0n,
     };
   },
 
@@ -994,17 +1498,11 @@ export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
     if (message.workspaceId !== "") {
       obj.workspaceId = message.workspaceId;
     }
-    if (message.lifecycle !== 0) {
-      obj.lifecycle = lifecycleStateToJSON(message.lifecycle);
+    if (message.state !== 0) {
+      obj.state = resourceStateToJSON(message.state);
     }
-    if (message.workspaceRevision !== 0n) {
-      obj.workspaceRevision = message.workspaceRevision.toString();
-    }
-    if (message.address !== undefined) {
-      obj.address = ResolvedWorkspaceAddress.toJSON(message.address);
-    }
-    if (message.cacheExpiresAt !== undefined) {
-      obj.cacheExpiresAt = message.cacheExpiresAt.toISOString();
+    if (message.revision !== 0n) {
+      obj.revision = message.revision.toString();
     }
     return obj;
   },
@@ -1015,1170 +1513,57 @@ export const ResolveWorkspaceResponse: MessageFns<ResolveWorkspaceResponse> = {
   fromPartial(object: DeepPartial<ResolveWorkspaceResponse>): ResolveWorkspaceResponse {
     const message = createBaseResolveWorkspaceResponse();
     message.workspaceId = object.workspaceId ?? "";
-    message.lifecycle = object.lifecycle ?? 0;
-    message.workspaceRevision = object.workspaceRevision ?? 0n;
-    message.address = (object.address !== undefined && object.address !== null)
-      ? ResolvedWorkspaceAddress.fromPartial(object.address)
-      : undefined;
-    message.cacheExpiresAt = object.cacheExpiresAt ?? undefined;
-    return message;
-  },
-};
-
-function createBaseResolvedWorkspaceAddress(): ResolvedWorkspaceAddress {
-  return { bindingGeneration: 0n };
-}
-
-export const ResolvedWorkspaceAddress: MessageFns<ResolvedWorkspaceAddress> = {
-  encode(message: ResolvedWorkspaceAddress, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.bindingGeneration !== 0n) {
-      if (BigInt.asUintN(64, message.bindingGeneration) !== message.bindingGeneration) {
-        throw new globalThis.Error("value provided for field message.bindingGeneration of type uint64 too large");
-      }
-      writer.uint32(8).uint64(message.bindingGeneration);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ResolvedWorkspaceAddress {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseResolvedWorkspaceAddress();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.bindingGeneration = reader.uint64() as bigint;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ResolvedWorkspaceAddress {
-    return { bindingGeneration: isSet(object.bindingGeneration) ? BigInt(object.bindingGeneration) : 0n };
-  },
-
-  toJSON(message: ResolvedWorkspaceAddress): unknown {
-    const obj: any = {};
-    if (message.bindingGeneration !== 0n) {
-      obj.bindingGeneration = message.bindingGeneration.toString();
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ResolvedWorkspaceAddress>): ResolvedWorkspaceAddress {
-    return ResolvedWorkspaceAddress.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ResolvedWorkspaceAddress>): ResolvedWorkspaceAddress {
-    const message = createBaseResolvedWorkspaceAddress();
-    message.bindingGeneration = object.bindingGeneration ?? 0n;
-    return message;
-  },
-};
-
-function createBaseGetLifecycleRequest(): GetLifecycleRequest {
-  return { target: undefined };
-}
-
-export const GetLifecycleRequest: MessageFns<GetLifecycleRequest> = {
-  encode(message: GetLifecycleRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.target !== undefined) {
-      LifecycleTarget.encode(message.target, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): GetLifecycleRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetLifecycleRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.target = LifecycleTarget.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): GetLifecycleRequest {
-    return { target: isSet(object.target) ? LifecycleTarget.fromJSON(object.target) : undefined };
-  },
-
-  toJSON(message: GetLifecycleRequest): unknown {
-    const obj: any = {};
-    if (message.target !== undefined) {
-      obj.target = LifecycleTarget.toJSON(message.target);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<GetLifecycleRequest>): GetLifecycleRequest {
-    return GetLifecycleRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<GetLifecycleRequest>): GetLifecycleRequest {
-    const message = createBaseGetLifecycleRequest();
-    message.target = (object.target !== undefined && object.target !== null)
-      ? LifecycleTarget.fromPartial(object.target)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseGetLifecycleResponse(): GetLifecycleResponse {
-  return {
-    target: undefined,
-    lifecycle: 0,
-    parentTenantLifecycle: undefined,
-    resourceRevision: 0n,
-    provisioningGeneration: 0n,
-    currentOperationId: undefined,
-    cacheExpiresAt: undefined,
-  };
-}
-
-export const GetLifecycleResponse: MessageFns<GetLifecycleResponse> = {
-  encode(message: GetLifecycleResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.target !== undefined) {
-      LifecycleTarget.encode(message.target, writer.uint32(10).fork()).join();
-    }
-    if (message.lifecycle !== 0) {
-      writer.uint32(16).int32(message.lifecycle);
-    }
-    if (message.parentTenantLifecycle !== undefined) {
-      writer.uint32(24).int32(message.parentTenantLifecycle);
-    }
-    if (message.resourceRevision !== 0n) {
-      if (BigInt.asUintN(64, message.resourceRevision) !== message.resourceRevision) {
-        throw new globalThis.Error("value provided for field message.resourceRevision of type uint64 too large");
-      }
-      writer.uint32(32).uint64(message.resourceRevision);
-    }
-    if (message.provisioningGeneration !== 0n) {
-      if (BigInt.asUintN(64, message.provisioningGeneration) !== message.provisioningGeneration) {
-        throw new globalThis.Error("value provided for field message.provisioningGeneration of type uint64 too large");
-      }
-      writer.uint32(40).uint64(message.provisioningGeneration);
-    }
-    if (message.currentOperationId !== undefined) {
-      writer.uint32(50).string(message.currentOperationId);
-    }
-    if (message.cacheExpiresAt !== undefined) {
-      Timestamp.encode(toTimestamp(message.cacheExpiresAt), writer.uint32(58).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): GetLifecycleResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseGetLifecycleResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.target = LifecycleTarget.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.lifecycle = reader.int32() as any;
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.parentTenantLifecycle = reader.int32() as any;
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.resourceRevision = reader.uint64() as bigint;
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.provisioningGeneration = reader.uint64() as bigint;
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.currentOperationId = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.cacheExpiresAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): GetLifecycleResponse {
-    return {
-      target: isSet(object.target) ? LifecycleTarget.fromJSON(object.target) : undefined,
-      lifecycle: isSet(object.lifecycle) ? lifecycleStateFromJSON(object.lifecycle) : 0,
-      parentTenantLifecycle: isSet(object.parentTenantLifecycle)
-        ? lifecycleStateFromJSON(object.parentTenantLifecycle)
-        : undefined,
-      resourceRevision: isSet(object.resourceRevision) ? BigInt(object.resourceRevision) : 0n,
-      provisioningGeneration: isSet(object.provisioningGeneration) ? BigInt(object.provisioningGeneration) : 0n,
-      currentOperationId: isSet(object.currentOperationId) ? globalThis.String(object.currentOperationId) : undefined,
-      cacheExpiresAt: isSet(object.cacheExpiresAt) ? fromJsonTimestamp(object.cacheExpiresAt) : undefined,
-    };
-  },
-
-  toJSON(message: GetLifecycleResponse): unknown {
-    const obj: any = {};
-    if (message.target !== undefined) {
-      obj.target = LifecycleTarget.toJSON(message.target);
-    }
-    if (message.lifecycle !== 0) {
-      obj.lifecycle = lifecycleStateToJSON(message.lifecycle);
-    }
-    if (message.parentTenantLifecycle !== undefined) {
-      obj.parentTenantLifecycle = lifecycleStateToJSON(message.parentTenantLifecycle);
-    }
-    if (message.resourceRevision !== 0n) {
-      obj.resourceRevision = message.resourceRevision.toString();
-    }
-    if (message.provisioningGeneration !== 0n) {
-      obj.provisioningGeneration = message.provisioningGeneration.toString();
-    }
-    if (message.currentOperationId !== undefined) {
-      obj.currentOperationId = message.currentOperationId;
-    }
-    if (message.cacheExpiresAt !== undefined) {
-      obj.cacheExpiresAt = message.cacheExpiresAt.toISOString();
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<GetLifecycleResponse>): GetLifecycleResponse {
-    return GetLifecycleResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<GetLifecycleResponse>): GetLifecycleResponse {
-    const message = createBaseGetLifecycleResponse();
-    message.target = (object.target !== undefined && object.target !== null)
-      ? LifecycleTarget.fromPartial(object.target)
-      : undefined;
-    message.lifecycle = object.lifecycle ?? 0;
-    message.parentTenantLifecycle = object.parentTenantLifecycle ?? undefined;
-    message.resourceRevision = object.resourceRevision ?? 0n;
-    message.provisioningGeneration = object.provisioningGeneration ?? 0n;
-    message.currentOperationId = object.currentOperationId ?? undefined;
-    message.cacheExpiresAt = object.cacheExpiresAt ?? undefined;
-    return message;
-  },
-};
-
-function createBaseListLifecycleStepsRequest(): ListLifecycleStepsRequest {
-  return { pageSize: 0, pageToken: "" };
-}
-
-export const ListLifecycleStepsRequest: MessageFns<ListLifecycleStepsRequest> = {
-  encode(message: ListLifecycleStepsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.pageSize !== 0) {
-      writer.uint32(8).uint32(message.pageSize);
-    }
-    if (message.pageToken !== "") {
-      writer.uint32(18).string(message.pageToken);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ListLifecycleStepsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListLifecycleStepsRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.pageSize = reader.uint32();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.pageToken = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ListLifecycleStepsRequest {
-    return {
-      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
-      pageToken: isSet(object.pageToken) ? globalThis.String(object.pageToken) : "",
-    };
-  },
-
-  toJSON(message: ListLifecycleStepsRequest): unknown {
-    const obj: any = {};
-    if (message.pageSize !== 0) {
-      obj.pageSize = Math.round(message.pageSize);
-    }
-    if (message.pageToken !== "") {
-      obj.pageToken = message.pageToken;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ListLifecycleStepsRequest>): ListLifecycleStepsRequest {
-    return ListLifecycleStepsRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ListLifecycleStepsRequest>): ListLifecycleStepsRequest {
-    const message = createBaseListLifecycleStepsRequest();
-    message.pageSize = object.pageSize ?? 0;
-    message.pageToken = object.pageToken ?? "";
-    return message;
-  },
-};
-
-function createBaseListLifecycleStepsResponse(): ListLifecycleStepsResponse {
-  return { steps: [], nextPageToken: "", deliveryRevision: 0n };
-}
-
-export const ListLifecycleStepsResponse: MessageFns<ListLifecycleStepsResponse> = {
-  encode(message: ListLifecycleStepsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.steps) {
-      LifecycleStep.encode(v!, writer.uint32(10).fork()).join();
-    }
-    if (message.nextPageToken !== "") {
-      writer.uint32(18).string(message.nextPageToken);
-    }
-    if (message.deliveryRevision !== 0n) {
-      if (BigInt.asUintN(64, message.deliveryRevision) !== message.deliveryRevision) {
-        throw new globalThis.Error("value provided for field message.deliveryRevision of type uint64 too large");
-      }
-      writer.uint32(24).uint64(message.deliveryRevision);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ListLifecycleStepsResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseListLifecycleStepsResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.steps.push(LifecycleStep.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.nextPageToken = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.deliveryRevision = reader.uint64() as bigint;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ListLifecycleStepsResponse {
-    return {
-      steps: globalThis.Array.isArray(object?.steps) ? object.steps.map((e: any) => LifecycleStep.fromJSON(e)) : [],
-      nextPageToken: isSet(object.nextPageToken) ? globalThis.String(object.nextPageToken) : "",
-      deliveryRevision: isSet(object.deliveryRevision) ? BigInt(object.deliveryRevision) : 0n,
-    };
-  },
-
-  toJSON(message: ListLifecycleStepsResponse): unknown {
-    const obj: any = {};
-    if (message.steps?.length) {
-      obj.steps = message.steps.map((e) => LifecycleStep.toJSON(e));
-    }
-    if (message.nextPageToken !== "") {
-      obj.nextPageToken = message.nextPageToken;
-    }
-    if (message.deliveryRevision !== 0n) {
-      obj.deliveryRevision = message.deliveryRevision.toString();
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ListLifecycleStepsResponse>): ListLifecycleStepsResponse {
-    return ListLifecycleStepsResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ListLifecycleStepsResponse>): ListLifecycleStepsResponse {
-    const message = createBaseListLifecycleStepsResponse();
-    message.steps = object.steps?.map((e) => LifecycleStep.fromPartial(e)) || [];
-    message.nextPageToken = object.nextPageToken ?? "";
-    message.deliveryRevision = object.deliveryRevision ?? 0n;
-    return message;
-  },
-};
-
-function createBaseWatchLifecycleStepsRequest(): WatchLifecycleStepsRequest {
-  return { afterDeliverySequence: 0n };
-}
-
-export const WatchLifecycleStepsRequest: MessageFns<WatchLifecycleStepsRequest> = {
-  encode(message: WatchLifecycleStepsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.afterDeliverySequence !== 0n) {
-      if (BigInt.asUintN(64, message.afterDeliverySequence) !== message.afterDeliverySequence) {
-        throw new globalThis.Error("value provided for field message.afterDeliverySequence of type uint64 too large");
-      }
-      writer.uint32(8).uint64(message.afterDeliverySequence);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): WatchLifecycleStepsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseWatchLifecycleStepsRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.afterDeliverySequence = reader.uint64() as bigint;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): WatchLifecycleStepsRequest {
-    return { afterDeliverySequence: isSet(object.afterDeliverySequence) ? BigInt(object.afterDeliverySequence) : 0n };
-  },
-
-  toJSON(message: WatchLifecycleStepsRequest): unknown {
-    const obj: any = {};
-    if (message.afterDeliverySequence !== 0n) {
-      obj.afterDeliverySequence = message.afterDeliverySequence.toString();
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<WatchLifecycleStepsRequest>): WatchLifecycleStepsRequest {
-    return WatchLifecycleStepsRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<WatchLifecycleStepsRequest>): WatchLifecycleStepsRequest {
-    const message = createBaseWatchLifecycleStepsRequest();
-    message.afterDeliverySequence = object.afterDeliverySequence ?? 0n;
-    return message;
-  },
-};
-
-function createBaseLifecycleStepEvent(): LifecycleStepEvent {
-  return { deliverySequence: 0n, step: undefined };
-}
-
-export const LifecycleStepEvent: MessageFns<LifecycleStepEvent> = {
-  encode(message: LifecycleStepEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.deliverySequence !== 0n) {
-      if (BigInt.asUintN(64, message.deliverySequence) !== message.deliverySequence) {
-        throw new globalThis.Error("value provided for field message.deliverySequence of type uint64 too large");
-      }
-      writer.uint32(8).uint64(message.deliverySequence);
-    }
-    if (message.step !== undefined) {
-      LifecycleStep.encode(message.step, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LifecycleStepEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLifecycleStepEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.deliverySequence = reader.uint64() as bigint;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.step = LifecycleStep.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LifecycleStepEvent {
-    return {
-      deliverySequence: isSet(object.deliverySequence) ? BigInt(object.deliverySequence) : 0n,
-      step: isSet(object.step) ? LifecycleStep.fromJSON(object.step) : undefined,
-    };
-  },
-
-  toJSON(message: LifecycleStepEvent): unknown {
-    const obj: any = {};
-    if (message.deliverySequence !== 0n) {
-      obj.deliverySequence = message.deliverySequence.toString();
-    }
-    if (message.step !== undefined) {
-      obj.step = LifecycleStep.toJSON(message.step);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<LifecycleStepEvent>): LifecycleStepEvent {
-    return LifecycleStepEvent.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<LifecycleStepEvent>): LifecycleStepEvent {
-    const message = createBaseLifecycleStepEvent();
-    message.deliverySequence = object.deliverySequence ?? 0n;
-    message.step = (object.step !== undefined && object.step !== null)
-      ? LifecycleStep.fromPartial(object.step)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseLifecycleStep(): LifecycleStep {
-  return {
-    target: undefined,
-    lifecycleOperationId: "",
-    provisioningGeneration: 0n,
-    operation: 0,
-    stepKey: 0,
-    state: 0,
-    stepRevision: 0n,
-    blockedReason: undefined,
-    identity: undefined,
-    packages: undefined,
-  };
-}
-
-export const LifecycleStep: MessageFns<LifecycleStep> = {
-  encode(message: LifecycleStep, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.target !== undefined) {
-      LifecycleTarget.encode(message.target, writer.uint32(10).fork()).join();
-    }
-    if (message.lifecycleOperationId !== "") {
-      writer.uint32(18).string(message.lifecycleOperationId);
-    }
-    if (message.provisioningGeneration !== 0n) {
-      if (BigInt.asUintN(64, message.provisioningGeneration) !== message.provisioningGeneration) {
-        throw new globalThis.Error("value provided for field message.provisioningGeneration of type uint64 too large");
-      }
-      writer.uint32(24).uint64(message.provisioningGeneration);
-    }
-    if (message.operation !== 0) {
-      writer.uint32(32).int32(message.operation);
-    }
-    if (message.stepKey !== 0) {
-      writer.uint32(40).int32(message.stepKey);
-    }
-    if (message.state !== 0) {
-      writer.uint32(48).int32(message.state);
-    }
-    if (message.stepRevision !== 0n) {
-      if (BigInt.asUintN(64, message.stepRevision) !== message.stepRevision) {
-        throw new globalThis.Error("value provided for field message.stepRevision of type uint64 too large");
-      }
-      writer.uint32(56).uint64(message.stepRevision);
-    }
-    if (message.blockedReason !== undefined) {
-      writer.uint32(66).string(message.blockedReason);
-    }
-    if (message.identity !== undefined) {
-      IdentityLifecycleIntent.encode(message.identity, writer.uint32(74).fork()).join();
-    }
-    if (message.packages !== undefined) {
-      PackageLifecycleIntent.encode(message.packages, writer.uint32(82).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LifecycleStep {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLifecycleStep();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.target = LifecycleTarget.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.lifecycleOperationId = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.provisioningGeneration = reader.uint64() as bigint;
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.operation = reader.int32() as any;
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.stepKey = reader.int32() as any;
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.state = reader.int32() as any;
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.stepRevision = reader.uint64() as bigint;
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.blockedReason = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.identity = IdentityLifecycleIntent.decode(reader, reader.uint32());
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.packages = PackageLifecycleIntent.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LifecycleStep {
-    return {
-      target: isSet(object.target) ? LifecycleTarget.fromJSON(object.target) : undefined,
-      lifecycleOperationId: isSet(object.lifecycleOperationId) ? globalThis.String(object.lifecycleOperationId) : "",
-      provisioningGeneration: isSet(object.provisioningGeneration) ? BigInt(object.provisioningGeneration) : 0n,
-      operation: isSet(object.operation) ? lifecycleOperationKindFromJSON(object.operation) : 0,
-      stepKey: isSet(object.stepKey) ? lifecycleStepKeyFromJSON(object.stepKey) : 0,
-      state: isSet(object.state) ? lifecycleStepStateFromJSON(object.state) : 0,
-      stepRevision: isSet(object.stepRevision) ? BigInt(object.stepRevision) : 0n,
-      blockedReason: isSet(object.blockedReason) ? globalThis.String(object.blockedReason) : undefined,
-      identity: isSet(object.identity) ? IdentityLifecycleIntent.fromJSON(object.identity) : undefined,
-      packages: isSet(object.packages) ? PackageLifecycleIntent.fromJSON(object.packages) : undefined,
-    };
-  },
-
-  toJSON(message: LifecycleStep): unknown {
-    const obj: any = {};
-    if (message.target !== undefined) {
-      obj.target = LifecycleTarget.toJSON(message.target);
-    }
-    if (message.lifecycleOperationId !== "") {
-      obj.lifecycleOperationId = message.lifecycleOperationId;
-    }
-    if (message.provisioningGeneration !== 0n) {
-      obj.provisioningGeneration = message.provisioningGeneration.toString();
-    }
-    if (message.operation !== 0) {
-      obj.operation = lifecycleOperationKindToJSON(message.operation);
-    }
-    if (message.stepKey !== 0) {
-      obj.stepKey = lifecycleStepKeyToJSON(message.stepKey);
-    }
-    if (message.state !== 0) {
-      obj.state = lifecycleStepStateToJSON(message.state);
-    }
-    if (message.stepRevision !== 0n) {
-      obj.stepRevision = message.stepRevision.toString();
-    }
-    if (message.blockedReason !== undefined) {
-      obj.blockedReason = message.blockedReason;
-    }
-    if (message.identity !== undefined) {
-      obj.identity = IdentityLifecycleIntent.toJSON(message.identity);
-    }
-    if (message.packages !== undefined) {
-      obj.packages = PackageLifecycleIntent.toJSON(message.packages);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<LifecycleStep>): LifecycleStep {
-    return LifecycleStep.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<LifecycleStep>): LifecycleStep {
-    const message = createBaseLifecycleStep();
-    message.target = (object.target !== undefined && object.target !== null)
-      ? LifecycleTarget.fromPartial(object.target)
-      : undefined;
-    message.lifecycleOperationId = object.lifecycleOperationId ?? "";
-    message.provisioningGeneration = object.provisioningGeneration ?? 0n;
-    message.operation = object.operation ?? 0;
-    message.stepKey = object.stepKey ?? 0;
     message.state = object.state ?? 0;
-    message.stepRevision = object.stepRevision ?? 0n;
-    message.blockedReason = object.blockedReason ?? undefined;
-    message.identity = (object.identity !== undefined && object.identity !== null)
-      ? IdentityLifecycleIntent.fromPartial(object.identity)
-      : undefined;
-    message.packages = (object.packages !== undefined && object.packages !== null)
-      ? PackageLifecycleIntent.fromPartial(object.packages)
-      : undefined;
+    message.revision = object.revision ?? 0n;
     return message;
   },
 };
 
-function createBaseLifecycleTarget(): LifecycleTarget {
-  return { tenant: undefined, workspace: undefined };
+function createBaseTenant(): Tenant {
+  return {
+    tenantId: "",
+    address: "",
+    displayName: "",
+    state: 0,
+    revision: 0n,
+    createdAt: undefined,
+    updatedAt: undefined,
+  };
 }
 
-export const LifecycleTarget: MessageFns<LifecycleTarget> = {
-  encode(message: LifecycleTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.tenant !== undefined) {
-      TenantTarget.encode(message.tenant, writer.uint32(10).fork()).join();
-    }
-    if (message.workspace !== undefined) {
-      WorkspaceTarget.encode(message.workspace, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LifecycleTarget {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLifecycleTarget();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.tenant = TenantTarget.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.workspace = WorkspaceTarget.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LifecycleTarget {
-    return {
-      tenant: isSet(object.tenant) ? TenantTarget.fromJSON(object.tenant) : undefined,
-      workspace: isSet(object.workspace) ? WorkspaceTarget.fromJSON(object.workspace) : undefined,
-    };
-  },
-
-  toJSON(message: LifecycleTarget): unknown {
-    const obj: any = {};
-    if (message.tenant !== undefined) {
-      obj.tenant = TenantTarget.toJSON(message.tenant);
-    }
-    if (message.workspace !== undefined) {
-      obj.workspace = WorkspaceTarget.toJSON(message.workspace);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<LifecycleTarget>): LifecycleTarget {
-    return LifecycleTarget.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<LifecycleTarget>): LifecycleTarget {
-    const message = createBaseLifecycleTarget();
-    message.tenant = (object.tenant !== undefined && object.tenant !== null)
-      ? TenantTarget.fromPartial(object.tenant)
-      : undefined;
-    message.workspace = (object.workspace !== undefined && object.workspace !== null)
-      ? WorkspaceTarget.fromPartial(object.workspace)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseTenantTarget(): TenantTarget {
-  return { tenantId: "" };
-}
-
-export const TenantTarget: MessageFns<TenantTarget> = {
-  encode(message: TenantTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const Tenant: MessageFns<Tenant> = {
+  encode(message: Tenant, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.tenantId !== "") {
       writer.uint32(10).string(message.tenantId);
     }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): TenantTarget {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTenantTarget();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.tenantId = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
+    if (message.address !== "") {
+      writer.uint32(18).string(message.address);
     }
-    return message;
-  },
-
-  fromJSON(object: any): TenantTarget {
-    return { tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "" };
-  },
-
-  toJSON(message: TenantTarget): unknown {
-    const obj: any = {};
-    if (message.tenantId !== "") {
-      obj.tenantId = message.tenantId;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<TenantTarget>): TenantTarget {
-    return TenantTarget.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<TenantTarget>): TenantTarget {
-    const message = createBaseTenantTarget();
-    message.tenantId = object.tenantId ?? "";
-    return message;
-  },
-};
-
-function createBaseWorkspaceTarget(): WorkspaceTarget {
-  return { tenantId: "", workspaceId: "" };
-}
-
-export const WorkspaceTarget: MessageFns<WorkspaceTarget> = {
-  encode(message: WorkspaceTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.tenantId !== "") {
-      writer.uint32(10).string(message.tenantId);
-    }
-    if (message.workspaceId !== "") {
-      writer.uint32(18).string(message.workspaceId);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): WorkspaceTarget {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseWorkspaceTarget();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.tenantId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.workspaceId = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): WorkspaceTarget {
-    return {
-      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
-      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
-    };
-  },
-
-  toJSON(message: WorkspaceTarget): unknown {
-    const obj: any = {};
-    if (message.tenantId !== "") {
-      obj.tenantId = message.tenantId;
-    }
-    if (message.workspaceId !== "") {
-      obj.workspaceId = message.workspaceId;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<WorkspaceTarget>): WorkspaceTarget {
-    return WorkspaceTarget.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<WorkspaceTarget>): WorkspaceTarget {
-    const message = createBaseWorkspaceTarget();
-    message.tenantId = object.tenantId ?? "";
-    message.workspaceId = object.workspaceId ?? "";
-    return message;
-  },
-};
-
-function createBaseIdentityLifecycleIntent(): IdentityLifecycleIntent {
-  return { initialAdministrator: undefined, workspaceMemberships: [] };
-}
-
-export const IdentityLifecycleIntent: MessageFns<IdentityLifecycleIntent> = {
-  encode(message: IdentityLifecycleIntent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.initialAdministrator !== undefined) {
-      InitialAdministrator.encode(message.initialAdministrator, writer.uint32(10).fork()).join();
-    }
-    for (const v of message.workspaceMemberships) {
-      InitialWorkspaceMembership.encode(v!, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): IdentityLifecycleIntent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseIdentityLifecycleIntent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.initialAdministrator = InitialAdministrator.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.workspaceMemberships.push(InitialWorkspaceMembership.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): IdentityLifecycleIntent {
-    return {
-      initialAdministrator: isSet(object.initialAdministrator)
-        ? InitialAdministrator.fromJSON(object.initialAdministrator)
-        : undefined,
-      workspaceMemberships: globalThis.Array.isArray(object?.workspaceMemberships)
-        ? object.workspaceMemberships.map((e: any) => InitialWorkspaceMembership.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: IdentityLifecycleIntent): unknown {
-    const obj: any = {};
-    if (message.initialAdministrator !== undefined) {
-      obj.initialAdministrator = InitialAdministrator.toJSON(message.initialAdministrator);
-    }
-    if (message.workspaceMemberships?.length) {
-      obj.workspaceMemberships = message.workspaceMemberships.map((e) => InitialWorkspaceMembership.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<IdentityLifecycleIntent>): IdentityLifecycleIntent {
-    return IdentityLifecycleIntent.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<IdentityLifecycleIntent>): IdentityLifecycleIntent {
-    const message = createBaseIdentityLifecycleIntent();
-    message.initialAdministrator = (object.initialAdministrator !== undefined && object.initialAdministrator !== null)
-      ? InitialAdministrator.fromPartial(object.initialAdministrator)
-      : undefined;
-    message.workspaceMemberships = object.workspaceMemberships?.map((e) => InitialWorkspaceMembership.fromPartial(e)) ||
-      [];
-    return message;
-  },
-};
-
-function createBaseInitialAdministrator(): InitialAdministrator {
-  return { displayName: "", loginIdentifier: "", identityLink: undefined };
-}
-
-export const InitialAdministrator: MessageFns<InitialAdministrator> = {
-  encode(message: InitialAdministrator, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.displayName !== "") {
-      writer.uint32(10).string(message.displayName);
+      writer.uint32(26).string(message.displayName);
     }
-    if (message.loginIdentifier !== "") {
-      writer.uint32(18).string(message.loginIdentifier);
+    if (message.state !== 0) {
+      writer.uint32(32).int32(message.state);
     }
-    if (message.identityLink !== undefined) {
-      IdentityLinkDeclaration.encode(message.identityLink, writer.uint32(26).fork()).join();
+    if (message.revision !== 0n) {
+      if (BigInt.asUintN(64, message.revision) !== message.revision) {
+        throw new globalThis.Error("value provided for field message.revision of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.revision);
+    }
+    if (message.createdAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.createdAt), writer.uint32(50).fork()).join();
+    }
+    if (message.updatedAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.updatedAt), writer.uint32(58).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): InitialAdministrator {
+  decode(input: BinaryReader | Uint8Array, length?: number): Tenant {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseInitialAdministrator();
+    const message = createBaseTenant();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -2187,7 +1572,7 @@ export const InitialAdministrator: MessageFns<InitialAdministrator> = {
             break;
           }
 
-          message.displayName = reader.string();
+          message.tenantId = reader.string();
           continue;
         }
         case 2: {
@@ -2195,7 +1580,7 @@ export const InitialAdministrator: MessageFns<InitialAdministrator> = {
             break;
           }
 
-          message.loginIdentifier = reader.string();
+          message.address = reader.string();
           continue;
         }
         case 3: {
@@ -2203,428 +1588,7 @@ export const InitialAdministrator: MessageFns<InitialAdministrator> = {
             break;
           }
 
-          message.identityLink = IdentityLinkDeclaration.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): InitialAdministrator {
-    return {
-      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
-      loginIdentifier: isSet(object.loginIdentifier) ? globalThis.String(object.loginIdentifier) : "",
-      identityLink: isSet(object.identityLink) ? IdentityLinkDeclaration.fromJSON(object.identityLink) : undefined,
-    };
-  },
-
-  toJSON(message: InitialAdministrator): unknown {
-    const obj: any = {};
-    if (message.displayName !== "") {
-      obj.displayName = message.displayName;
-    }
-    if (message.loginIdentifier !== "") {
-      obj.loginIdentifier = message.loginIdentifier;
-    }
-    if (message.identityLink !== undefined) {
-      obj.identityLink = IdentityLinkDeclaration.toJSON(message.identityLink);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<InitialAdministrator>): InitialAdministrator {
-    return InitialAdministrator.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<InitialAdministrator>): InitialAdministrator {
-    const message = createBaseInitialAdministrator();
-    message.displayName = object.displayName ?? "";
-    message.loginIdentifier = object.loginIdentifier ?? "";
-    message.identityLink = (object.identityLink !== undefined && object.identityLink !== null)
-      ? IdentityLinkDeclaration.fromPartial(object.identityLink)
-      : undefined;
-    return message;
-  },
-};
-
-function createBaseIdentityLinkDeclaration(): IdentityLinkDeclaration {
-  return { providerId: "", providerSubject: "" };
-}
-
-export const IdentityLinkDeclaration: MessageFns<IdentityLinkDeclaration> = {
-  encode(message: IdentityLinkDeclaration, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.providerId !== "") {
-      writer.uint32(10).string(message.providerId);
-    }
-    if (message.providerSubject !== "") {
-      writer.uint32(18).string(message.providerSubject);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): IdentityLinkDeclaration {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseIdentityLinkDeclaration();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.providerId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.providerSubject = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): IdentityLinkDeclaration {
-    return {
-      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
-      providerSubject: isSet(object.providerSubject) ? globalThis.String(object.providerSubject) : "",
-    };
-  },
-
-  toJSON(message: IdentityLinkDeclaration): unknown {
-    const obj: any = {};
-    if (message.providerId !== "") {
-      obj.providerId = message.providerId;
-    }
-    if (message.providerSubject !== "") {
-      obj.providerSubject = message.providerSubject;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<IdentityLinkDeclaration>): IdentityLinkDeclaration {
-    return IdentityLinkDeclaration.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<IdentityLinkDeclaration>): IdentityLinkDeclaration {
-    const message = createBaseIdentityLinkDeclaration();
-    message.providerId = object.providerId ?? "";
-    message.providerSubject = object.providerSubject ?? "";
-    return message;
-  },
-};
-
-function createBaseInitialWorkspaceMembership(): InitialWorkspaceMembership {
-  return { userId: "", standing: 0 };
-}
-
-export const InitialWorkspaceMembership: MessageFns<InitialWorkspaceMembership> = {
-  encode(message: InitialWorkspaceMembership, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.userId !== "") {
-      writer.uint32(10).string(message.userId);
-    }
-    if (message.standing !== 0) {
-      writer.uint32(16).int32(message.standing);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): InitialWorkspaceMembership {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseInitialWorkspaceMembership();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.userId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.standing = reader.int32() as any;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): InitialWorkspaceMembership {
-    return {
-      userId: isSet(object.userId) ? globalThis.String(object.userId) : "",
-      standing: isSet(object.standing) ? membershipStandingFromJSON(object.standing) : 0,
-    };
-  },
-
-  toJSON(message: InitialWorkspaceMembership): unknown {
-    const obj: any = {};
-    if (message.userId !== "") {
-      obj.userId = message.userId;
-    }
-    if (message.standing !== 0) {
-      obj.standing = membershipStandingToJSON(message.standing);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<InitialWorkspaceMembership>): InitialWorkspaceMembership {
-    return InitialWorkspaceMembership.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<InitialWorkspaceMembership>): InitialWorkspaceMembership {
-    const message = createBaseInitialWorkspaceMembership();
-    message.userId = object.userId ?? "";
-    message.standing = object.standing ?? 0;
-    return message;
-  },
-};
-
-function createBasePackageLifecycleIntent(): PackageLifecycleIntent {
-  return { baselinePackages: [] };
-}
-
-export const PackageLifecycleIntent: MessageFns<PackageLifecycleIntent> = {
-  encode(message: PackageLifecycleIntent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.baselinePackages) {
-      BaselinePackage.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): PackageLifecycleIntent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePackageLifecycleIntent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.baselinePackages.push(BaselinePackage.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): PackageLifecycleIntent {
-    return {
-      baselinePackages: globalThis.Array.isArray(object?.baselinePackages)
-        ? object.baselinePackages.map((e: any) => BaselinePackage.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: PackageLifecycleIntent): unknown {
-    const obj: any = {};
-    if (message.baselinePackages?.length) {
-      obj.baselinePackages = message.baselinePackages.map((e) => BaselinePackage.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<PackageLifecycleIntent>): PackageLifecycleIntent {
-    return PackageLifecycleIntent.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<PackageLifecycleIntent>): PackageLifecycleIntent {
-    const message = createBasePackageLifecycleIntent();
-    message.baselinePackages = object.baselinePackages?.map((e) => BaselinePackage.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseBaselinePackage(): BaselinePackage {
-  return { packageId: "", packageVersion: "" };
-}
-
-export const BaselinePackage: MessageFns<BaselinePackage> = {
-  encode(message: BaselinePackage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.packageId !== "") {
-      writer.uint32(10).string(message.packageId);
-    }
-    if (message.packageVersion !== "") {
-      writer.uint32(18).string(message.packageVersion);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): BaselinePackage {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseBaselinePackage();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.packageId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.packageVersion = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): BaselinePackage {
-    return {
-      packageId: isSet(object.packageId) ? globalThis.String(object.packageId) : "",
-      packageVersion: isSet(object.packageVersion) ? globalThis.String(object.packageVersion) : "",
-    };
-  },
-
-  toJSON(message: BaselinePackage): unknown {
-    const obj: any = {};
-    if (message.packageId !== "") {
-      obj.packageId = message.packageId;
-    }
-    if (message.packageVersion !== "") {
-      obj.packageVersion = message.packageVersion;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<BaselinePackage>): BaselinePackage {
-    return BaselinePackage.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<BaselinePackage>): BaselinePackage {
-    const message = createBaseBaselinePackage();
-    message.packageId = object.packageId ?? "";
-    message.packageVersion = object.packageVersion ?? "";
-    return message;
-  },
-};
-
-function createBaseAcknowledgeLifecycleStepRequest(): AcknowledgeLifecycleStepRequest {
-  return {
-    target: undefined,
-    lifecycleOperationId: "",
-    provisioningGeneration: 0n,
-    stepKey: 0,
-    expectedStepRevision: 0n,
-    ownerRevision: 0n,
-    outcome: 0,
-    blockedReason: undefined,
-    idempotencyKey: "",
-  };
-}
-
-export const AcknowledgeLifecycleStepRequest: MessageFns<AcknowledgeLifecycleStepRequest> = {
-  encode(message: AcknowledgeLifecycleStepRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.target !== undefined) {
-      LifecycleTarget.encode(message.target, writer.uint32(10).fork()).join();
-    }
-    if (message.lifecycleOperationId !== "") {
-      writer.uint32(18).string(message.lifecycleOperationId);
-    }
-    if (message.provisioningGeneration !== 0n) {
-      if (BigInt.asUintN(64, message.provisioningGeneration) !== message.provisioningGeneration) {
-        throw new globalThis.Error("value provided for field message.provisioningGeneration of type uint64 too large");
-      }
-      writer.uint32(24).uint64(message.provisioningGeneration);
-    }
-    if (message.stepKey !== 0) {
-      writer.uint32(32).int32(message.stepKey);
-    }
-    if (message.expectedStepRevision !== 0n) {
-      if (BigInt.asUintN(64, message.expectedStepRevision) !== message.expectedStepRevision) {
-        throw new globalThis.Error("value provided for field message.expectedStepRevision of type uint64 too large");
-      }
-      writer.uint32(40).uint64(message.expectedStepRevision);
-    }
-    if (message.ownerRevision !== 0n) {
-      if (BigInt.asUintN(64, message.ownerRevision) !== message.ownerRevision) {
-        throw new globalThis.Error("value provided for field message.ownerRevision of type uint64 too large");
-      }
-      writer.uint32(48).uint64(message.ownerRevision);
-    }
-    if (message.outcome !== 0) {
-      writer.uint32(56).int32(message.outcome);
-    }
-    if (message.blockedReason !== undefined) {
-      writer.uint32(66).string(message.blockedReason);
-    }
-    if (message.idempotencyKey !== "") {
-      writer.uint32(74).string(message.idempotencyKey);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AcknowledgeLifecycleStepRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAcknowledgeLifecycleStepRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.target = LifecycleTarget.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.lifecycleOperationId = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.provisioningGeneration = reader.uint64() as bigint;
+          message.displayName = reader.string();
           continue;
         }
         case 4: {
@@ -2632,7 +1596,7 @@ export const AcknowledgeLifecycleStepRequest: MessageFns<AcknowledgeLifecycleSte
             break;
           }
 
-          message.stepKey = reader.int32() as any;
+          message.state = reader.int32() as any;
           continue;
         }
         case 5: {
@@ -2640,7 +1604,178 @@ export const AcknowledgeLifecycleStepRequest: MessageFns<AcknowledgeLifecycleSte
             break;
           }
 
-          message.expectedStepRevision = reader.uint64() as bigint;
+          message.revision = reader.uint64() as bigint;
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.createdAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.updatedAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Tenant {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+      state: isSet(object.state) ? resourceStateFromJSON(object.state) : 0,
+      revision: isSet(object.revision) ? BigInt(object.revision) : 0n,
+      createdAt: isSet(object.createdAt) ? fromJsonTimestamp(object.createdAt) : undefined,
+      updatedAt: isSet(object.updatedAt) ? fromJsonTimestamp(object.updatedAt) : undefined,
+    };
+  },
+
+  toJSON(message: Tenant): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.address !== "") {
+      obj.address = message.address;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.state !== 0) {
+      obj.state = resourceStateToJSON(message.state);
+    }
+    if (message.revision !== 0n) {
+      obj.revision = message.revision.toString();
+    }
+    if (message.createdAt !== undefined) {
+      obj.createdAt = message.createdAt.toISOString();
+    }
+    if (message.updatedAt !== undefined) {
+      obj.updatedAt = message.updatedAt.toISOString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Tenant>): Tenant {
+    return Tenant.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Tenant>): Tenant {
+    const message = createBaseTenant();
+    message.tenantId = object.tenantId ?? "";
+    message.address = object.address ?? "";
+    message.displayName = object.displayName ?? "";
+    message.state = object.state ?? 0;
+    message.revision = object.revision ?? 0n;
+    message.createdAt = object.createdAt ?? undefined;
+    message.updatedAt = object.updatedAt ?? undefined;
+    return message;
+  },
+};
+
+function createBaseWorkspace(): Workspace {
+  return {
+    workspaceId: "",
+    tenantId: "",
+    address: "",
+    displayName: "",
+    state: 0,
+    revision: 0n,
+    createdAt: undefined,
+    updatedAt: undefined,
+  };
+}
+
+export const Workspace: MessageFns<Workspace> = {
+  encode(message: Workspace, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workspaceId !== "") {
+      writer.uint32(10).string(message.workspaceId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.address !== "") {
+      writer.uint32(26).string(message.address);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(34).string(message.displayName);
+    }
+    if (message.state !== 0) {
+      writer.uint32(40).int32(message.state);
+    }
+    if (message.revision !== 0n) {
+      if (BigInt.asUintN(64, message.revision) !== message.revision) {
+        throw new globalThis.Error("value provided for field message.revision of type uint64 too large");
+      }
+      writer.uint32(48).uint64(message.revision);
+    }
+    if (message.createdAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.createdAt), writer.uint32(58).fork()).join();
+    }
+    if (message.updatedAt !== undefined) {
+      Timestamp.encode(toTimestamp(message.updatedAt), writer.uint32(66).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Workspace {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWorkspace();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.address = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.state = reader.int32() as any;
           continue;
         }
         case 6: {
@@ -2648,15 +1783,15 @@ export const AcknowledgeLifecycleStepRequest: MessageFns<AcknowledgeLifecycleSte
             break;
           }
 
-          message.ownerRevision = reader.uint64() as bigint;
+          message.revision = reader.uint64() as bigint;
           continue;
         }
         case 7: {
-          if (tag !== 56) {
+          if (tag !== 58) {
             break;
           }
 
-          message.outcome = reader.int32() as any;
+          message.createdAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
           continue;
         }
         case 8: {
@@ -2664,15 +1799,7 @@ export const AcknowledgeLifecycleStepRequest: MessageFns<AcknowledgeLifecycleSte
             break;
           }
 
-          message.blockedReason = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.idempotencyKey = reader.string();
+          message.updatedAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -2684,207 +1811,163 @@ export const AcknowledgeLifecycleStepRequest: MessageFns<AcknowledgeLifecycleSte
     return message;
   },
 
-  fromJSON(object: any): AcknowledgeLifecycleStepRequest {
+  fromJSON(object: any): Workspace {
     return {
-      target: isSet(object.target) ? LifecycleTarget.fromJSON(object.target) : undefined,
-      lifecycleOperationId: isSet(object.lifecycleOperationId) ? globalThis.String(object.lifecycleOperationId) : "",
-      provisioningGeneration: isSet(object.provisioningGeneration) ? BigInt(object.provisioningGeneration) : 0n,
-      stepKey: isSet(object.stepKey) ? lifecycleStepKeyFromJSON(object.stepKey) : 0,
-      expectedStepRevision: isSet(object.expectedStepRevision) ? BigInt(object.expectedStepRevision) : 0n,
-      ownerRevision: isSet(object.ownerRevision) ? BigInt(object.ownerRevision) : 0n,
-      outcome: isSet(object.outcome) ? lifecycleStepOutcomeFromJSON(object.outcome) : 0,
-      blockedReason: isSet(object.blockedReason) ? globalThis.String(object.blockedReason) : undefined,
-      idempotencyKey: isSet(object.idempotencyKey) ? globalThis.String(object.idempotencyKey) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+      state: isSet(object.state) ? resourceStateFromJSON(object.state) : 0,
+      revision: isSet(object.revision) ? BigInt(object.revision) : 0n,
+      createdAt: isSet(object.createdAt) ? fromJsonTimestamp(object.createdAt) : undefined,
+      updatedAt: isSet(object.updatedAt) ? fromJsonTimestamp(object.updatedAt) : undefined,
     };
   },
 
-  toJSON(message: AcknowledgeLifecycleStepRequest): unknown {
+  toJSON(message: Workspace): unknown {
     const obj: any = {};
-    if (message.target !== undefined) {
-      obj.target = LifecycleTarget.toJSON(message.target);
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
     }
-    if (message.lifecycleOperationId !== "") {
-      obj.lifecycleOperationId = message.lifecycleOperationId;
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
     }
-    if (message.provisioningGeneration !== 0n) {
-      obj.provisioningGeneration = message.provisioningGeneration.toString();
+    if (message.address !== "") {
+      obj.address = message.address;
     }
-    if (message.stepKey !== 0) {
-      obj.stepKey = lifecycleStepKeyToJSON(message.stepKey);
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
     }
-    if (message.expectedStepRevision !== 0n) {
-      obj.expectedStepRevision = message.expectedStepRevision.toString();
+    if (message.state !== 0) {
+      obj.state = resourceStateToJSON(message.state);
     }
-    if (message.ownerRevision !== 0n) {
-      obj.ownerRevision = message.ownerRevision.toString();
+    if (message.revision !== 0n) {
+      obj.revision = message.revision.toString();
     }
-    if (message.outcome !== 0) {
-      obj.outcome = lifecycleStepOutcomeToJSON(message.outcome);
+    if (message.createdAt !== undefined) {
+      obj.createdAt = message.createdAt.toISOString();
     }
-    if (message.blockedReason !== undefined) {
-      obj.blockedReason = message.blockedReason;
-    }
-    if (message.idempotencyKey !== "") {
-      obj.idempotencyKey = message.idempotencyKey;
+    if (message.updatedAt !== undefined) {
+      obj.updatedAt = message.updatedAt.toISOString();
     }
     return obj;
   },
 
-  create(base?: DeepPartial<AcknowledgeLifecycleStepRequest>): AcknowledgeLifecycleStepRequest {
-    return AcknowledgeLifecycleStepRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<Workspace>): Workspace {
+    return Workspace.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<AcknowledgeLifecycleStepRequest>): AcknowledgeLifecycleStepRequest {
-    const message = createBaseAcknowledgeLifecycleStepRequest();
-    message.target = (object.target !== undefined && object.target !== null)
-      ? LifecycleTarget.fromPartial(object.target)
-      : undefined;
-    message.lifecycleOperationId = object.lifecycleOperationId ?? "";
-    message.provisioningGeneration = object.provisioningGeneration ?? 0n;
-    message.stepKey = object.stepKey ?? 0;
-    message.expectedStepRevision = object.expectedStepRevision ?? 0n;
-    message.ownerRevision = object.ownerRevision ?? 0n;
-    message.outcome = object.outcome ?? 0;
-    message.blockedReason = object.blockedReason ?? undefined;
-    message.idempotencyKey = object.idempotencyKey ?? "";
-    return message;
-  },
-};
-
-function createBaseAcknowledgeLifecycleStepResponse(): AcknowledgeLifecycleStepResponse {
-  return { stepState: 0, stepRevision: 0n, lifecycle: 0, resourceRevision: 0n, provisioningGeneration: 0n };
-}
-
-export const AcknowledgeLifecycleStepResponse: MessageFns<AcknowledgeLifecycleStepResponse> = {
-  encode(message: AcknowledgeLifecycleStepResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.stepState !== 0) {
-      writer.uint32(8).int32(message.stepState);
-    }
-    if (message.stepRevision !== 0n) {
-      if (BigInt.asUintN(64, message.stepRevision) !== message.stepRevision) {
-        throw new globalThis.Error("value provided for field message.stepRevision of type uint64 too large");
-      }
-      writer.uint32(16).uint64(message.stepRevision);
-    }
-    if (message.lifecycle !== 0) {
-      writer.uint32(24).int32(message.lifecycle);
-    }
-    if (message.resourceRevision !== 0n) {
-      if (BigInt.asUintN(64, message.resourceRevision) !== message.resourceRevision) {
-        throw new globalThis.Error("value provided for field message.resourceRevision of type uint64 too large");
-      }
-      writer.uint32(32).uint64(message.resourceRevision);
-    }
-    if (message.provisioningGeneration !== 0n) {
-      if (BigInt.asUintN(64, message.provisioningGeneration) !== message.provisioningGeneration) {
-        throw new globalThis.Error("value provided for field message.provisioningGeneration of type uint64 too large");
-      }
-      writer.uint32(40).uint64(message.provisioningGeneration);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): AcknowledgeLifecycleStepResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAcknowledgeLifecycleStepResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.stepState = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.stepRevision = reader.uint64() as bigint;
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.lifecycle = reader.int32() as any;
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.resourceRevision = reader.uint64() as bigint;
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.provisioningGeneration = reader.uint64() as bigint;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): AcknowledgeLifecycleStepResponse {
-    return {
-      stepState: isSet(object.stepState) ? lifecycleStepStateFromJSON(object.stepState) : 0,
-      stepRevision: isSet(object.stepRevision) ? BigInt(object.stepRevision) : 0n,
-      lifecycle: isSet(object.lifecycle) ? lifecycleStateFromJSON(object.lifecycle) : 0,
-      resourceRevision: isSet(object.resourceRevision) ? BigInt(object.resourceRevision) : 0n,
-      provisioningGeneration: isSet(object.provisioningGeneration) ? BigInt(object.provisioningGeneration) : 0n,
-    };
-  },
-
-  toJSON(message: AcknowledgeLifecycleStepResponse): unknown {
-    const obj: any = {};
-    if (message.stepState !== 0) {
-      obj.stepState = lifecycleStepStateToJSON(message.stepState);
-    }
-    if (message.stepRevision !== 0n) {
-      obj.stepRevision = message.stepRevision.toString();
-    }
-    if (message.lifecycle !== 0) {
-      obj.lifecycle = lifecycleStateToJSON(message.lifecycle);
-    }
-    if (message.resourceRevision !== 0n) {
-      obj.resourceRevision = message.resourceRevision.toString();
-    }
-    if (message.provisioningGeneration !== 0n) {
-      obj.provisioningGeneration = message.provisioningGeneration.toString();
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<AcknowledgeLifecycleStepResponse>): AcknowledgeLifecycleStepResponse {
-    return AcknowledgeLifecycleStepResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<AcknowledgeLifecycleStepResponse>): AcknowledgeLifecycleStepResponse {
-    const message = createBaseAcknowledgeLifecycleStepResponse();
-    message.stepState = object.stepState ?? 0;
-    message.stepRevision = object.stepRevision ?? 0n;
-    message.lifecycle = object.lifecycle ?? 0;
-    message.resourceRevision = object.resourceRevision ?? 0n;
-    message.provisioningGeneration = object.provisioningGeneration ?? 0n;
+  fromPartial(object: DeepPartial<Workspace>): Workspace {
+    const message = createBaseWorkspace();
+    message.workspaceId = object.workspaceId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.address = object.address ?? "";
+    message.displayName = object.displayName ?? "";
+    message.state = object.state ?? 0;
+    message.revision = object.revision ?? 0n;
+    message.createdAt = object.createdAt ?? undefined;
+    message.updatedAt = object.updatedAt ?? undefined;
     return message;
   },
 };
 
 export type TenantServiceService = typeof TenantServiceService;
 export const TenantServiceService = {
+  createTenant: {
+    path: "/ctlflow.tenancy.v1.TenantService/CreateTenant",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: CreateTenantRequest): Buffer => Buffer.from(CreateTenantRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateTenantRequest => CreateTenantRequest.decode(value),
+    responseSerialize: (value: Tenant): Buffer => Buffer.from(Tenant.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Tenant => Tenant.decode(value),
+  },
+  getTenant: {
+    path: "/ctlflow.tenancy.v1.TenantService/GetTenant",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetTenantRequest): Buffer => Buffer.from(GetTenantRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetTenantRequest => GetTenantRequest.decode(value),
+    responseSerialize: (value: Tenant): Buffer => Buffer.from(Tenant.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Tenant => Tenant.decode(value),
+  },
+  listTenants: {
+    path: "/ctlflow.tenancy.v1.TenantService/ListTenants",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListTenantsRequest): Buffer => Buffer.from(ListTenantsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListTenantsRequest => ListTenantsRequest.decode(value),
+    responseSerialize: (value: ListTenantsResponse): Buffer => Buffer.from(ListTenantsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListTenantsResponse => ListTenantsResponse.decode(value),
+  },
+  updateTenant: {
+    path: "/ctlflow.tenancy.v1.TenantService/UpdateTenant",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: UpdateTenantRequest): Buffer => Buffer.from(UpdateTenantRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateTenantRequest => UpdateTenantRequest.decode(value),
+    responseSerialize: (value: Tenant): Buffer => Buffer.from(Tenant.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Tenant => Tenant.decode(value),
+  },
+  setTenantState: {
+    path: "/ctlflow.tenancy.v1.TenantService/SetTenantState",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: SetTenantStateRequest): Buffer =>
+      Buffer.from(SetTenantStateRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetTenantStateRequest => SetTenantStateRequest.decode(value),
+    responseSerialize: (value: Tenant): Buffer => Buffer.from(Tenant.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Tenant => Tenant.decode(value),
+  },
+  createWorkspace: {
+    path: "/ctlflow.tenancy.v1.TenantService/CreateWorkspace",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: CreateWorkspaceRequest): Buffer =>
+      Buffer.from(CreateWorkspaceRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateWorkspaceRequest => CreateWorkspaceRequest.decode(value),
+    responseSerialize: (value: Workspace): Buffer => Buffer.from(Workspace.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Workspace => Workspace.decode(value),
+  },
+  getWorkspace: {
+    path: "/ctlflow.tenancy.v1.TenantService/GetWorkspace",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetWorkspaceRequest): Buffer => Buffer.from(GetWorkspaceRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetWorkspaceRequest => GetWorkspaceRequest.decode(value),
+    responseSerialize: (value: Workspace): Buffer => Buffer.from(Workspace.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Workspace => Workspace.decode(value),
+  },
+  listWorkspaces: {
+    path: "/ctlflow.tenancy.v1.TenantService/ListWorkspaces",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListWorkspacesRequest): Buffer =>
+      Buffer.from(ListWorkspacesRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListWorkspacesRequest => ListWorkspacesRequest.decode(value),
+    responseSerialize: (value: ListWorkspacesResponse): Buffer =>
+      Buffer.from(ListWorkspacesResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListWorkspacesResponse => ListWorkspacesResponse.decode(value),
+  },
+  updateWorkspace: {
+    path: "/ctlflow.tenancy.v1.TenantService/UpdateWorkspace",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: UpdateWorkspaceRequest): Buffer =>
+      Buffer.from(UpdateWorkspaceRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateWorkspaceRequest => UpdateWorkspaceRequest.decode(value),
+    responseSerialize: (value: Workspace): Buffer => Buffer.from(Workspace.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Workspace => Workspace.decode(value),
+  },
+  setWorkspaceState: {
+    path: "/ctlflow.tenancy.v1.TenantService/SetWorkspaceState",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: SetWorkspaceStateRequest): Buffer =>
+      Buffer.from(SetWorkspaceStateRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetWorkspaceStateRequest => SetWorkspaceStateRequest.decode(value),
+    responseSerialize: (value: Workspace): Buffer => Buffer.from(Workspace.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Workspace => Workspace.decode(value),
+  },
   resolveTenant: {
     path: "/ctlflow.tenancy.v1.TenantService/ResolveTenant",
     requestStream: false,
@@ -2906,62 +1989,174 @@ export const TenantServiceService = {
       Buffer.from(ResolveWorkspaceResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ResolveWorkspaceResponse => ResolveWorkspaceResponse.decode(value),
   },
-  getLifecycle: {
-    path: "/ctlflow.tenancy.v1.TenantService/GetLifecycle",
-    requestStream: false,
-    responseStream: false,
-    requestSerialize: (value: GetLifecycleRequest): Buffer => Buffer.from(GetLifecycleRequest.encode(value).finish()),
-    requestDeserialize: (value: Buffer): GetLifecycleRequest => GetLifecycleRequest.decode(value),
-    responseSerialize: (value: GetLifecycleResponse): Buffer =>
-      Buffer.from(GetLifecycleResponse.encode(value).finish()),
-    responseDeserialize: (value: Buffer): GetLifecycleResponse => GetLifecycleResponse.decode(value),
-  },
-  listLifecycleSteps: {
-    path: "/ctlflow.tenancy.v1.TenantService/ListLifecycleSteps",
-    requestStream: false,
-    responseStream: false,
-    requestSerialize: (value: ListLifecycleStepsRequest): Buffer =>
-      Buffer.from(ListLifecycleStepsRequest.encode(value).finish()),
-    requestDeserialize: (value: Buffer): ListLifecycleStepsRequest => ListLifecycleStepsRequest.decode(value),
-    responseSerialize: (value: ListLifecycleStepsResponse): Buffer =>
-      Buffer.from(ListLifecycleStepsResponse.encode(value).finish()),
-    responseDeserialize: (value: Buffer): ListLifecycleStepsResponse => ListLifecycleStepsResponse.decode(value),
-  },
-  watchLifecycleSteps: {
-    path: "/ctlflow.tenancy.v1.TenantService/WatchLifecycleSteps",
-    requestStream: false,
-    responseStream: true,
-    requestSerialize: (value: WatchLifecycleStepsRequest): Buffer =>
-      Buffer.from(WatchLifecycleStepsRequest.encode(value).finish()),
-    requestDeserialize: (value: Buffer): WatchLifecycleStepsRequest => WatchLifecycleStepsRequest.decode(value),
-    responseSerialize: (value: LifecycleStepEvent): Buffer => Buffer.from(LifecycleStepEvent.encode(value).finish()),
-    responseDeserialize: (value: Buffer): LifecycleStepEvent => LifecycleStepEvent.decode(value),
-  },
-  acknowledgeLifecycleStep: {
-    path: "/ctlflow.tenancy.v1.TenantService/AcknowledgeLifecycleStep",
-    requestStream: false,
-    responseStream: false,
-    requestSerialize: (value: AcknowledgeLifecycleStepRequest): Buffer =>
-      Buffer.from(AcknowledgeLifecycleStepRequest.encode(value).finish()),
-    requestDeserialize: (value: Buffer): AcknowledgeLifecycleStepRequest =>
-      AcknowledgeLifecycleStepRequest.decode(value),
-    responseSerialize: (value: AcknowledgeLifecycleStepResponse): Buffer =>
-      Buffer.from(AcknowledgeLifecycleStepResponse.encode(value).finish()),
-    responseDeserialize: (value: Buffer): AcknowledgeLifecycleStepResponse =>
-      AcknowledgeLifecycleStepResponse.decode(value),
-  },
 } as const;
 
 export interface TenantServiceServer extends UntypedServiceImplementation {
+  createTenant: handleUnaryCall<CreateTenantRequest, Tenant>;
+  getTenant: handleUnaryCall<GetTenantRequest, Tenant>;
+  listTenants: handleUnaryCall<ListTenantsRequest, ListTenantsResponse>;
+  updateTenant: handleUnaryCall<UpdateTenantRequest, Tenant>;
+  setTenantState: handleUnaryCall<SetTenantStateRequest, Tenant>;
+  createWorkspace: handleUnaryCall<CreateWorkspaceRequest, Workspace>;
+  getWorkspace: handleUnaryCall<GetWorkspaceRequest, Workspace>;
+  listWorkspaces: handleUnaryCall<ListWorkspacesRequest, ListWorkspacesResponse>;
+  updateWorkspace: handleUnaryCall<UpdateWorkspaceRequest, Workspace>;
+  setWorkspaceState: handleUnaryCall<SetWorkspaceStateRequest, Workspace>;
   resolveTenant: handleUnaryCall<ResolveTenantRequest, ResolveTenantResponse>;
   resolveWorkspace: handleUnaryCall<ResolveWorkspaceRequest, ResolveWorkspaceResponse>;
-  getLifecycle: handleUnaryCall<GetLifecycleRequest, GetLifecycleResponse>;
-  listLifecycleSteps: handleUnaryCall<ListLifecycleStepsRequest, ListLifecycleStepsResponse>;
-  watchLifecycleSteps: handleServerStreamingCall<WatchLifecycleStepsRequest, LifecycleStepEvent>;
-  acknowledgeLifecycleStep: handleUnaryCall<AcknowledgeLifecycleStepRequest, AcknowledgeLifecycleStepResponse>;
 }
 
 export interface TenantServiceClient extends Client {
+  createTenant(
+    request: CreateTenantRequest,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  createTenant(
+    request: CreateTenantRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  createTenant(
+    request: CreateTenantRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  getTenant(
+    request: GetTenantRequest,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  getTenant(
+    request: GetTenantRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  getTenant(
+    request: GetTenantRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  listTenants(
+    request: ListTenantsRequest,
+    callback: (error: ServiceError | null, response: ListTenantsResponse) => void,
+  ): ClientUnaryCall;
+  listTenants(
+    request: ListTenantsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListTenantsResponse) => void,
+  ): ClientUnaryCall;
+  listTenants(
+    request: ListTenantsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListTenantsResponse) => void,
+  ): ClientUnaryCall;
+  updateTenant(
+    request: UpdateTenantRequest,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  updateTenant(
+    request: UpdateTenantRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  updateTenant(
+    request: UpdateTenantRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  setTenantState(
+    request: SetTenantStateRequest,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  setTenantState(
+    request: SetTenantStateRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  setTenantState(
+    request: SetTenantStateRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Tenant) => void,
+  ): ClientUnaryCall;
+  createWorkspace(
+    request: CreateWorkspaceRequest,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  createWorkspace(
+    request: CreateWorkspaceRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  createWorkspace(
+    request: CreateWorkspaceRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  getWorkspace(
+    request: GetWorkspaceRequest,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  getWorkspace(
+    request: GetWorkspaceRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  getWorkspace(
+    request: GetWorkspaceRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  listWorkspaces(
+    request: ListWorkspacesRequest,
+    callback: (error: ServiceError | null, response: ListWorkspacesResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaces(
+    request: ListWorkspacesRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListWorkspacesResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaces(
+    request: ListWorkspacesRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListWorkspacesResponse) => void,
+  ): ClientUnaryCall;
+  updateWorkspace(
+    request: UpdateWorkspaceRequest,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  updateWorkspace(
+    request: UpdateWorkspaceRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  updateWorkspace(
+    request: UpdateWorkspaceRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  setWorkspaceState(
+    request: SetWorkspaceStateRequest,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  setWorkspaceState(
+    request: SetWorkspaceStateRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
+  setWorkspaceState(
+    request: SetWorkspaceStateRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Workspace) => void,
+  ): ClientUnaryCall;
   resolveTenant(
     request: ResolveTenantRequest,
     callback: (error: ServiceError | null, response: ResolveTenantResponse) => void,
@@ -2991,60 +2186,6 @@ export interface TenantServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: ResolveWorkspaceResponse) => void,
-  ): ClientUnaryCall;
-  getLifecycle(
-    request: GetLifecycleRequest,
-    callback: (error: ServiceError | null, response: GetLifecycleResponse) => void,
-  ): ClientUnaryCall;
-  getLifecycle(
-    request: GetLifecycleRequest,
-    metadata: Metadata,
-    callback: (error: ServiceError | null, response: GetLifecycleResponse) => void,
-  ): ClientUnaryCall;
-  getLifecycle(
-    request: GetLifecycleRequest,
-    metadata: Metadata,
-    options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: GetLifecycleResponse) => void,
-  ): ClientUnaryCall;
-  listLifecycleSteps(
-    request: ListLifecycleStepsRequest,
-    callback: (error: ServiceError | null, response: ListLifecycleStepsResponse) => void,
-  ): ClientUnaryCall;
-  listLifecycleSteps(
-    request: ListLifecycleStepsRequest,
-    metadata: Metadata,
-    callback: (error: ServiceError | null, response: ListLifecycleStepsResponse) => void,
-  ): ClientUnaryCall;
-  listLifecycleSteps(
-    request: ListLifecycleStepsRequest,
-    metadata: Metadata,
-    options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: ListLifecycleStepsResponse) => void,
-  ): ClientUnaryCall;
-  watchLifecycleSteps(
-    request: WatchLifecycleStepsRequest,
-    options?: Partial<CallOptions>,
-  ): ClientReadableStream<LifecycleStepEvent>;
-  watchLifecycleSteps(
-    request: WatchLifecycleStepsRequest,
-    metadata?: Metadata,
-    options?: Partial<CallOptions>,
-  ): ClientReadableStream<LifecycleStepEvent>;
-  acknowledgeLifecycleStep(
-    request: AcknowledgeLifecycleStepRequest,
-    callback: (error: ServiceError | null, response: AcknowledgeLifecycleStepResponse) => void,
-  ): ClientUnaryCall;
-  acknowledgeLifecycleStep(
-    request: AcknowledgeLifecycleStepRequest,
-    metadata: Metadata,
-    callback: (error: ServiceError | null, response: AcknowledgeLifecycleStepResponse) => void,
-  ): ClientUnaryCall;
-  acknowledgeLifecycleStep(
-    request: AcknowledgeLifecycleStepRequest,
-    metadata: Metadata,
-    options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: AcknowledgeLifecycleStepResponse) => void,
   ): ClientUnaryCall;
 }
 

@@ -1,9 +1,11 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Lifecycles;
-using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
+using CtlFlow.Tenancy.Tenantd.Domain.Addresses;
+using CtlFlow.Tenancy.Tenantd.Domain.Names;
+using CtlFlow.Tenancy.Tenantd.Domain.Resources;
 using CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 using CtlFlow.Tenancy.Tenantd.Domain.Time;
 using CtlFlow.Tenancy.Tenantd.Domain.Workspaces;
 using Microsoft.EntityFrameworkCore;
+using static CtlFlow.Tenancy.Tenantd.Db.Resources.ResourceStates;
 
 namespace CtlFlow.Tenancy.Tenantd.Db.Workspaces;
 
@@ -14,68 +16,48 @@ internal static partial class WorkspaceSchema
         var workspace = modelBuilder.Entity<Workspace>();
         workspace.ToTable("workspaces");
         workspace.Ignore(value => value.Id);
+        workspace.Ignore(value => value.TenantId);
+        workspace.Ignore(value => value.Address);
         workspace.HasKey("_id");
 
         workspace.Property<string>("_id")
             .HasColumnName("workspace_id")
             .HasMaxLength(64)
             .IsRequired();
-
-        workspace.Ignore(value => value.TenantId);
         workspace.Property<string>("_tenantId")
             .HasColumnName("tenant_id")
             .HasMaxLength(64)
             .IsRequired();
-
+        workspace.Property<string>("_address")
+            .HasColumnName("address")
+            .HasMaxLength(63)
+            .IsRequired();
         workspace.Property(value => value.DisplayName)
             .HasConversion(
                 value => value.Value,
-                value => WorkspaceDisplayName.FromStorage(value))
+                value => DisplayName.FromStorage(value))
             .HasColumnName("display_name")
             .HasMaxLength(200)
             .IsRequired();
-
-        workspace.Property(value => value.Lifecycle)
+        workspace.Property(value => value.State)
             .HasConversion(
-                value => LifecycleStates.ToStorage(value),
-                value => LifecycleStates.FromStorage(value))
-            .HasColumnName("lifecycle_state")
+                value => ToStorage(value),
+                value => FromStorage(value))
+            .HasColumnName("state")
             .IsRequired();
-
         workspace.Property(value => value.Revision)
             .HasConversion(
                 value => value.Value,
-                value => WorkspaceRevision.FromStorage(value))
+                value => Revision.FromStorage(value))
             .HasColumnName("revision")
             .IsConcurrencyToken()
             .IsRequired();
-
-        workspace.Property(value => value.ProvisioningGeneration)
-            .HasConversion(
-                value => value.Value,
-                value => WorkspaceProvisioningGeneration.FromStorage(value))
-            .HasColumnName("provisioning_generation")
-            .IsRequired();
-
-        workspace.Ignore(value => value.CurrentOperationId);
-        workspace.Property<string?>("_currentOperationId")
-            .HasColumnName("current_operation_id")
-            .HasMaxLength(64);
-
-        workspace.Property(value => value.LastEventSequence)
-            .HasConversion(
-                value => value.Value,
-                value => ResourceEventSequence.FromStorage(value))
-            .HasColumnName("last_event_sequence")
-            .IsRequired();
-
         workspace.Property(value => value.CreatedAt)
             .HasConversion(
                 value => value.UnixMilliseconds,
                 value => UtcInstant.FromStorage(value))
             .HasColumnName("created_at_unix_ms")
             .IsRequired();
-
         workspace.Property(value => value.UpdatedAt)
             .HasConversion(
                 value => value.UnixMilliseconds,
@@ -83,8 +65,9 @@ internal static partial class WorkspaceSchema
             .HasColumnName("updated_at_unix_ms")
             .IsRequired();
 
-        workspace.HasIndex("_tenantId");
-
+        workspace.HasIndex("_tenantId", "_address")
+            .IsUnique();
+        workspace.HasIndex("_tenantId", "_id");
         workspace.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey("_tenantId")

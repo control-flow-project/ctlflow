@@ -13,10 +13,12 @@
   "scripts": {
     "build": "hugo --gc --minify --cleanDestinationDir",
     "dev": "hugo server --bind 0.0.0.0 --port 7780 --disableFastRender",
-    "build:tenantd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/tenantd",
+    "setup:minikube": "node tooling/minikube/install-minikube.mjs",
+    "build:tenantd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/auditd && npm run build --workspace @ctlflow/identityd && npm run build --workspace @ctlflow/tenantd",
     "test:tenantd": "npm run build:tenantd && npm run test:compiled --workspace @ctlflow/tenantd && npm run test:csharp --workspace @ctlflow/tenantd",
     "test:tooling": "node --test tooling/native/*.test.mjs",
     "verify:container:tenantd": "docker build --network=host -f services/tenantd/csharp/Containerfile -t ctlflow-tenantd:verify .",
+    "verify:migration-container:tenantd": "docker build --network=host -f services/tenantd/migrations/Containerfile -t ctlflow-tenantd-migrations:verify . && docker run --rm --tmpfs /data:rw,mode=1777 -e CTLFLOW_DATABASE_PATH=/data/tenantd.sqlite ctlflow-tenantd-migrations:verify",
     "update:diagnostics:tenantd": "node tooling/native/gated-publish.mjs services/tenantd/csharp/src/CtlFlow.Tenancy.Tenantd.Service/CtlFlow.Tenancy.Tenantd.Service.csproj services/tenantd/csharp/nativeaot-diagnostics.json .temp/nativeaot-diagnostics/tenantd --write"
   },
   "devDependencies": {

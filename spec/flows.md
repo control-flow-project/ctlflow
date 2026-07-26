@@ -13,50 +13,45 @@ remain unchanged.
  ctlflow init
    -> load selected kubeconfig context
    -> Kubernetes API authenticates operator
-   -> apply CtlFlow namespace, RBAC, API aggregation, storage, Collector, and kernel workloads
+   -> apply CtlFlow namespace, RBAC, storage, Collector, and kernel workloads
    -> verify bounded OTLP intake and configured export
    -> wait for all kernel readiness endpoints
-   -> bind authenticated Kubernetes subject as first infrastructure operator
    -> create global Placement and initial configuration
-   -> close one-time initialization permanently
    -> audit successful bootstrap
 ```
 
-Initialization is idempotent for the same signed release and authenticated operator. It cannot
-replace an initialized operator or reset an existing installation.
+Initialization is idempotent for the same signed release. Kubernetes RBAC and installation
+configuration admit operator certificate subjects; initialization does not create an operator
+domain record or reset an existing installation.
 
-## Tenant provisioning
+## Tenant creation
 
 ```text
  ctlflow create tenant -f tenant.yaml
-   -> Kubernetes API authenticates and authorizes operator
-   -> tenantd creates Tenant in provisioning state
-   -> identityd lists/watches its step, establishes the initial administrator, and acknowledges
-   -> configd lists/watches its step, establishes the Tenant configuration scope, and acknowledges
-   -> execd lists/watches its step, realizes the canonical Tenant Placement, and acknowledges
-   -> pkgd lists/watches its step, reconciles explicitly requested baseline Apps, and acknowledges
-   -> tenantd marks Tenant active
-   -> every owner delivers audit evidence
+   -> ctlflow opens a kubeconfig-authorized port-forward to tenantd
+   -> ctlflow presents the selected kubeconfig client certificate to tenantd
+   -> ctlflow calls CreateTenant with a caller-generated ID, address, and display name
+   -> tenantd commits the active Tenant, then records its required event through auditd
+   -> tenantd returns the created Tenant
 ```
 
-Each cross-service step is idempotent. A failed step leaves the Tenant visible as failed or
-provisioning with one stable reason and resumes under the same operation identity. Tenant-facing
-provisioning invokes the same `tenantd` use case through an admitted product backend.
+Creating a Tenant does not create Users, configuration, Placements, Packages, or Apps. Each of
+those records is created explicitly through its owning service when needed.
 
-## Workspace provisioning
+## Workspace creation
 
 ```text
  ctlflow create workspace --tenant TENANT -f workspace.yaml
-   -> tenantd creates Workspace in provisioning state
-   -> identityd lists/watches its step, establishes requested Memberships, and acknowledges
-   -> configd lists/watches its step, establishes the Workspace configuration scope, and acknowledges
-   -> execd lists/watches its step, realizes the canonical Workspace Placement, and acknowledges
-   -> pkgd lists/watches its step, reconciles requested Workspace Apps, and acknowledges
-   -> tenantd marks Workspace active
+   -> ctlflow opens a kubeconfig-authorized port-forward to tenantd
+   -> ctlflow presents the selected kubeconfig client certificate to tenantd
+   -> ctlflow calls CreateWorkspace with its Tenant, caller-generated ID, address, and display name
+   -> tenantd verifies the active parent Tenant
+   -> tenantd commits the active Workspace, then records its required event through auditd
+   -> tenantd returns the created Workspace
 ```
 
 A product such as a matter or deal registry separately stores its own client, stage, responsible
-person, and other business metadata. `tenantd` owns only the Workspace and its lifecycle.
+person, and other business metadata. `tenantd` owns only the Workspace record and state.
 
 ## Package publication and App installation
 
@@ -150,7 +145,7 @@ headers.
    -> backend selects declared dependency "kernel:packages"
    -> runtime proxy presents its workload token and propagates the invocation JWT
    -> pkgd validates both identities and receives Actor, backend principal, runtime, and Placement
-   -> pkgd authorizes and applies the same App operation used by the aggregated API
+   -> pkgd authorizes and applies the requested App operation
 ```
 
 Kernel bindings have fixed owners and no provider selection. They do not bypass Tenant standing,
@@ -237,8 +232,9 @@ prefix.
 ## Audit and activity
 
 ```text
- domain mutation or security decision
-   -> owner commits domain state + outbox envelope
+ contract-required mutation or security outcome
+   -> owner establishes the outcome
+   -> owner calls auditd directly
    -> auditd ingests idempotently
    -> authorized caller queries bounded Tenant or global partition
 

@@ -1,3 +1,4 @@
+using CtlFlow.Tenancy.Tenantd.Db.Providers;
 using Microsoft.EntityFrameworkCore;
 
 namespace CtlFlow.Tenancy.Tenantd.Db.Schema;
@@ -5,13 +6,13 @@ namespace CtlFlow.Tenancy.Tenantd.Db.Schema;
 public static partial class Schemas
 {
     public static async Task<SchemaCompatibility> VerifyMigrationLedger(
-        IDbContextFactory<TenantDbContext> databaseContexts,
+        TenantDatabase tenantDatabase,
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
         using var dbActivity = TenantDbTelemetry.StartOperation(
             "verify_migration_ledger");
-        await using var database = await databaseContexts.CreateDbContextAsync(
+        await using var database = await tenantDatabase.Contexts.CreateDbContextAsync(
             cancellation);
         var queryCancellation = cancellation;
 

@@ -181,12 +181,11 @@ projection operation.
 
 ### Placement contract
 
-`EnsurePlacement` receives one valid source tuple, source lifecycle-operation ID and generation,
-effective inherited constraint revisions, and idempotency key. It creates at most one Placement and
-namespace for that source. User Placement creation additionally requires one already-admitted App,
-Job, or persistent-resource intent; an empty speculative request is rejected. The result contains
-Placement ID, kind, source, lifecycle, constraint revision, realization generation, and readiness,
-never the native namespace name.
+`EnsurePlacement` receives one valid source tuple, effective inherited constraint revisions, and an
+idempotency key. It creates at most one Placement and namespace for that source. User Placement
+creation additionally requires one already-admitted App, Job, or persistent-resource intent; an
+empty speculative request is rejected. The result contains Placement ID, kind, source, lifecycle,
+constraint revision, realization generation, and readiness, never the native namespace name.
 
 `ResolvePlacement` returns that same bounded projection plus effective typed constraints and an
 expiry no later than 60 seconds. Every lifecycle operation is generation-bound:
@@ -197,18 +196,8 @@ realization and retention obligations are settled.
 Placement-constraint resources are the only mutation path for execution ceilings. Reconciliation
 computes the intersection from global through exact source scope and rejects a desired lower-scope
 record that widens an ancestor. A changed constraint does not silently rewrite admitted App or Job
-intent; it marks incompatible realization blocked and invokes the documented owner lifecycle.
-
-### Tenant lifecycle reconciliation
-
-`execd` lists and watches lifecycle work assigned to its authenticated service identity.
-Provisioning realizes the one canonical Placement for the target source. Suspension blocks new
-work before applying bounded drain policy, resumption revalidates current constraints and owner
-facts, and retirement irreversibly settles workloads, Runs, bindings, and retention obligations.
-
-Each local transition is keyed by the supplied lifecycle-operation ID, generation, and step.
-`execd` commits Placement state and audit intent before acknowledging its owner revision to
-`tenantd`.
+intent; it marks incompatible realization blocked until the owning service changes or revalidates
+that intent.
 
 ### App-realization and endpoint contract
 
@@ -314,13 +303,13 @@ resource exposes native object names, credentials, Secret material, or raw provi
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate source lifecycle/parent and consume assigned Placement lifecycle work |
+| `tenantd` | Validate exact parent Tenant or Workspace and current state |
 | `identityd` | Validate attached account and virtual principal; coordinate runtime-principal lifecycle |
 | `pkgd` | Resolve immutable App/Job Package, component, contract, and desired App generation |
 | `configd` | Resolve complete configuration/provider generations and materialize declared Secret slots |
 | `policyd` | Authorize management, Run, log, artifact, and cross-Placement operations |
 | Kubernetes API | Apply and observe only admitted realization owned by `execd` |
-| `auditd` | Deliver execution mutations and security decisions through the transactional outbox |
+| `auditd` | Deliver execution mutations and security decisions directly |
 
 Provider controllers are observed through their installed Kubernetes contracts, not private
 provider-specific calls. Program log, artifact, OCI, and other bulk systems are declared dependency
@@ -334,7 +323,7 @@ bounded startup, endpoint expiry, Job/schedule lifecycle, idempotent Run admissi
 cancellation races, terminal immutability, pages and streams, every dependency resolution class and
 Placement direction, provider output validation and cleanup, runtime-context fencing, log/artifact
 confinement, server-side-apply ownership and drift, restart/reconciliation, dependency outage,
-cross-Tenant isolation, cancellation, concurrency, telemetry, and transactional audit delivery.
+cross-Tenant isolation, cancellation, concurrency, telemetry, and direct audit delivery.
 
 ## Invariants
 

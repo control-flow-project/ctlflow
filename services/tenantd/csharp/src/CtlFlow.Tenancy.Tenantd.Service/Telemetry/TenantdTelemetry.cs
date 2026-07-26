@@ -139,12 +139,21 @@ internal sealed class TenantdTelemetry : IDisposable
             outcome == "ok"
                 ? ActivityStatusCode.Ok
                 : ActivityStatusCode.Error);
-        LogOperationCompletion(
-            _logger,
-            operation,
-            outcome,
-            durationMilliseconds,
-            null);
+        var previousActivity = Activity.Current;
+        try
+        {
+            Activity.Current = activity;
+            LogOperationCompletion(
+                _logger,
+                operation,
+                outcome,
+                durationMilliseconds,
+                null);
+        }
+        finally
+        {
+            Activity.Current = previousActivity;
+        }
     }
 
     internal Activity? StartHttpOperation(

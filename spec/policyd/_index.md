@@ -44,7 +44,7 @@ operation tokens are immutable declarations owned by the kernel service that imp
 The Actor decision intersects:
 
 ```text
-current Tenant and Workspace lifecycle
+current Tenant and Workspace state
 AND Actor account, Membership, and Group facts
 AND matching Actor grants and Role bindings
 AND exact operation and canonical path
@@ -58,7 +58,7 @@ immediate caller's attached-account authority
 AND immediate caller's virtual-principal grants
 AND Package capability ceiling
 AND source and target Placement fence
-AND current App, Job, Run, and runtime lifecycle
+AND current App, Job, Run, and runtime state
 ```
 
 No matching grant means denial. Placement limits where a decision applies but creates no grant.
@@ -67,7 +67,7 @@ Placement execution constraints remain `execd` state and are not represented as 
 An external exposure explicitly declared `anonymous` or `application-authenticated` has no Actor
 grant to evaluate. For its coarse exposure operation, `policyd` instead requires the authenticated
 immediate caller to be `edged`, the exact current `pkgd` exposure to declare that class and
-operation, and every owner/Placement lifecycle layer to admit it. This narrow reachability decision
+operation, and every owner/Placement state layer to admit it. This narrow reachability decision
 does not authenticate the external caller or authorize an application object.
 
 `check` returns one allow or deny decision. `explain` returns the same decision plus the first
@@ -91,7 +91,7 @@ identities. The owner calls `policyd` under its own identity and names one opera
 The resource-owning application applies the decision and then enforces its own domain invariants.
 A positive review is not a data capability and cannot be replayed as a credential.
 
-Authority projections called by `policyd`, such as principal, lifecycle, Package ceiling, and
+Authority projections called by `policyd`, such as principal, resource state, Package ceiling, and
 runtime-context resolution, authenticate `policyd` and enforce their exact visibility fence but do
 not recursively request another policy decision. They expose only the narrow facts listed in their
 owner contracts and are not general product reads.
@@ -104,7 +104,7 @@ owner contracts and are not general product reads.
 | ExplainAccess | The same owner with explicit explain authority | Return the same decision with bounded denying-layer detail |
 | BuildResourcePath | Kernel or Package component owning the path grammar | Build one canonical owner-qualified path from validated segments |
 
-Administrative Role, binding, and grant mutations use aggregated resources.
+Administrative Role, binding, grant, and review operations use the private `policyd` contract.
 
 ### Decision contract
 
@@ -120,9 +120,9 @@ owner resource revision when required
 
 Actor, subject account, immediate caller, caller account, source Placement, runtime principal, and
 invocation origin come only from authenticated transport context. An autonomous workload call uses
-its virtual principal as Actor. An aggregated AccessReview may name a hypothetical principal only
-because Kubernetes has independently authorized that review operation; it enters the same evaluator
-through a separate administrative adapter and never becomes invocation identity.
+its virtual principal as Actor. An AccessReview may name a hypothetical principal only when the
+authenticated infrastructure operator has review authority; it enters the same evaluator and never
+becomes invocation identity.
 
 The result contains:
 
@@ -161,7 +161,7 @@ A Role has immutable global, Tenant, or Workspace scope and a finite set of allo
 rule contains declared operation tokens, one canonical exact or subtree path, and no deny rule. A
 Role binding has immutable scope, Role, and exact User, Group, or virtual-principal subject. An
 Access grant has immutable scope and subject plus one finite direct rule set. Mutations require
-resource version and cannot move a record, subject, or path to another scope.
+the current revision and cannot move a record, subject, or path to another scope.
 
 A create-only AccessReview contains operation, path, target fence, optional infrastructure-authorized
 hypothetical principal, and the resulting decision. It is evaluated synchronously, is not retained
@@ -172,11 +172,11 @@ the common bounded collection contract.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Resolve current Tenant and Workspace lifecycle |
+| `tenantd` | Resolve current Tenant and Workspace state |
 | `identityd` | Resolve Actor, attached account, Membership, and direct Group facts |
 | `pkgd` | Validate Package operation ownership and capability ceiling |
 | `execd` | Validate source/target Placement, runtime, App, Job, and Run lifecycle |
-| `auditd` | Deliver policy mutation and decision evidence through the transactional outbox |
+| `auditd` | Deliver policy mutation and decision evidence directly |
 
 Resource-owning applications and kernel services call `CheckAccess`; `edged` calls it only for the
 coarse external exposure operation. Callers cannot ask `policyd` to read or mutate the protected

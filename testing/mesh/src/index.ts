@@ -10,15 +10,31 @@ export {
   publishCSharpService
 } from "./platforms/csharp/publish-csharp-service.js";
 export { startCSharpService } from "./platforms/csharp/start-csharp-service.js";
+export {
+  buildNodeTestImage
+} from "./platforms/node/build-node-test-image.js";
 export type {
-  RegisterTestAggregatedApiOptions,
-  TestAggregationCredentials,
-  TestCallerCredentials,
+  NodeTestImageOptions
+} from "./platforms/node/node-test-image.js";
+export type {
+  NodeTestService,
+  NodeTestServiceOptions
+} from "./platforms/node/node-test-service.js";
+export {
+  startNodeTestService
+} from "./platforms/node/start-node-test-service.js";
+export type {
   TestKubernetes,
   TestKubernetesApiCredentials,
-  TestLifecycleOwnerCredentials,
+  TestKubernetesStorage,
   TestWorkloadCredentials
 } from "./kubernetes/test-kubernetes.js";
+export type {
+  TestOperatorCredentials
+} from "./kubernetes/test-operator-credentials.js";
+export type {
+  KustomizeServiceFiles
+} from "./kubernetes/services/kustomize-service.js";
 export { startTestKubernetes } from "./kubernetes/start-test-kubernetes.js";
 export type {
   OpenTelemetryCollector
@@ -38,3 +54,18 @@ export {
 export {
   waitForReadiness
 } from "./processes/wait-for-readiness.js";
+export {
+  loadWorkloadVerificationKeys
+} from "./stubs/security/load-workload-verification-keys.js";
+export {
+  validateWorkloadToken
+} from "./stubs/security/validate-workload-token.js";
+export type {
+  WorkloadVerificationSettings
+} from "./stubs/security/workload-verification-settings.js";
+export {
+  createTestServiceTls
+} from "./tls/create-test-service-tls.js";
+export type {
+  TestServiceTls
+} from "./tls/test-service-tls.js";

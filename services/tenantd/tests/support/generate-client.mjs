@@ -29,10 +29,16 @@ await new Promise((resolve, reject) => {
       `--proto_path=${path.join(
         repositoryRoot,
         "services/auditd/api/proto")}`,
+      `--proto_path=${path.join(
+        repositoryRoot,
+        "services/identityd/api/proto")}`,
       path.join(serviceRoot, "api/proto/v1/tenantd.proto"),
       path.join(
         repositoryRoot,
-        "services/auditd/api/proto/v1/auditd.proto")
+        "services/auditd/api/proto/v1/auditd.proto"),
+      path.join(
+        repositoryRoot,
+        "services/identityd/api/proto/v1/identityd.proto")
     ],
     {
       cwd: repositoryRoot,

@@ -174,17 +174,6 @@ material only over the authenticated response to that `egressd` request, marks i
 and records the exact purpose. It is not a general Secret read and cannot be called by a workload,
 administrator, or provider.
 
-### Scope lifecycle reconciliation
-
-`configd` lists and watches lifecycle work assigned to its authenticated service identity.
-Establishment creates an empty scope plus explicit initial configuration; suspension prevents new
-generations or materializations; resumption revalidates sources; retirement rejects new use and
-removes projections only after consumers are retired.
-
-Each local transition is keyed by the supplied `tenantd` lifecycle-operation ID, generation, and
-step. Its configuration-scope revision and audit intent commit before `configd` calls
-`tenantd.AcknowledgeLifecycleStep`.
-
 ## Administrative resources
 
 A Configuration has immutable scope, schema identity, and field identity; update replaces its
@@ -203,11 +192,11 @@ retained projection references the record.
 
 | Callee | Purpose |
 | --- | --- |
-| `tenantd` | Validate scope lifecycle and consume assigned configuration lifecycle work |
+| `tenantd` | Validate exact parent Tenant or Workspace and current state |
 | `identityd` | Validate User scope and attached account standing |
 | `pkgd` | Resolve immutable Package, configuration, Secret-slot, and provider declarations |
 | `execd` | Validate Placement, consumer generation, dependency claim, runtime, and projection target |
-| `auditd` | Deliver configuration and secret-custody evidence through the transactional outbox |
+| `auditd` | Deliver configuration and secret-custody evidence directly |
 
 Only `configd` talks to the Kubernetes API for Secret custody/projection objects, using its narrow
 resource authority. `egressd` receives exact-purpose material but no generic configuration
@@ -219,9 +208,9 @@ Canonical evidence covers precedence at every applicable scope, forbidden wideni
 source revision drift, immutable generation reuse, provider selection and replacement, every
 write-only stream boundary, length/digest failure and cleanup, rotation/revocation, concurrent
 version writes, provider claim/slot spoofing, runtime projection confinement, exact-purpose egress
-release, scope lifecycle/restart, cross-Tenant and cross-user invisibility, Kubernetes Secret
-write-authority limits, dependency outage, cancellation, telemetry redaction, and transactional
-audit delivery. Evidence scans every response, error, log, trace, metric, and audit envelope for
+release, restart behavior, cross-Tenant and cross-user invisibility, Kubernetes Secret
+write-authority limits, dependency outage, cancellation, telemetry redaction, and direct audit
+delivery. Evidence scans every response, error, log, trace, metric, and audit envelope for
 submitted material.
 
 ## Invariants

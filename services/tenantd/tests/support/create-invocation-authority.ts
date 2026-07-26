@@ -1,11 +1,10 @@
 import {
   createSign,
   generateKeyPairSync,
+  randomUUID,
   type JsonWebKey,
   type KeyObject
 } from "node:crypto";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import path from "node:path";
 import type {
   InvocationAuthority,
   InvocationTokenOptions
@@ -13,21 +12,10 @@ import type {
 
 const issuer = "https://identity.test";
 const audience = "ctlflow-internal";
-const keyId = "invocation-test-key";
-
 export async function createInvocationAuthority(
-  repositoryRoot: string
+  keyId = `key_${randomUUID().replaceAll("-", "")}`
 ):
 Promise<InvocationAuthority> {
-  const root = path.join(
-    repositoryRoot,
-    ".temp",
-    "tests",
-    "invocation");
-  await mkdir(root, { recursive: true });
-  const directory = await mkdtemp(
-    path.join(root, "authority-"));
-  const jwksPath = path.join(directory, "invocation-jwks.json");
   const keys = generateKeyPairSync("rsa", {
     modulusLength: 2_048
   });
@@ -35,41 +23,43 @@ Promise<InvocationAuthority> {
     format: "jwk"
   });
 
-  await writeFile(
-    jwksPath,
-    JSON.stringify({
-      keys: [
-        createVerificationJwk(publicJwk)
-      ]
-    }),
-    "utf8");
-
   return {
     issuer,
     audience,
-    jwksPath,
-    sign: (options = {}) => signInvocationToken(keys.privateKey, options),
-    signPayload: (payloadJson) => signPayload(keys.privateKey, payloadJson),
-    stop: () => Promise.resolve()
+    verificationKey: createVerificationKey(
+      keyId,
+      publicJwk),
+    sign: (options = {}) =>
+      signInvocationToken(
+        keyId,
+        keys.privateKey,
+        options),
+    signPayload: (payloadJson) =>
+      signPayload(
+        keyId,
+        keys.privateKey,
+        payloadJson)
   };
 }
 
-function createVerificationJwk(jwk: JsonWebKey): JsonWebKey {
+function createVerificationKey(
+  keyId: string,
+  jwk: JsonWebKey
+): InvocationAuthority["verificationKey"] {
   if (jwk.n === undefined || jwk.e === undefined) {
     throw new Error("RSA key export did not include public parameters");
   }
 
   return {
-    kty: "RSA",
-    kid: keyId,
-    use: "sig",
-    alg: "RS256",
-    n: jwk.n,
-    e: jwk.e
+    keyId,
+    algorithm: "RS256",
+    modulusBase64url: jwk.n,
+    exponentBase64url: jwk.e
   };
 }
 
 function signInvocationToken(
+  keyId: string,
   privateKey: KeyObject,
   options: InvocationTokenOptions
 ): string {
@@ -106,10 +96,14 @@ function signInvocationToken(
     payload.roles = "admin";
   }
 
-  return signPayload(privateKey, JSON.stringify(payload));
+  return signPayload(
+    keyId,
+    privateKey,
+    JSON.stringify(payload));
 }
 
 function signPayload(
+  keyId: string,
   privateKey: KeyObject,
   payloadJson: string
 ): string {

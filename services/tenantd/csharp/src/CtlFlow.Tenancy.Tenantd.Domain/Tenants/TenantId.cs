@@ -1,4 +1,4 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Identifiers;
+using static CtlFlow.Tenancy.Tenantd.Domain.Identifiers.Identifiers;
 
 namespace CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 
@@ -16,16 +16,12 @@ public sealed record TenantId
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-
-        return ValueTask.FromResult(new TenantId(
-            OpaqueIdentifiers.Validate(value, "Tenant ID")));
+        return ValueTask.FromResult(
+            new TenantId(ValidateIdentifier(value, "Tenant ID")));
     }
 
     public static TenantId FromStorage(string value) =>
-        new(OpaqueIdentifiers.ValidateStored(value, "Tenant ID"));
-
-    public static TenantId Generate() =>
-        new(OpaqueIdentifiers.Generate("tnt"));
+        new(ValidateStoredIdentifier(value, "Tenant ID"));
 
     public override string ToString() => Value;
 }

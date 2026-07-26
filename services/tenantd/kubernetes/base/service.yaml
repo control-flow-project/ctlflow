@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenantd
+spec:
+  selector:
+    app.kubernetes.io/name: tenantd
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc

@@ -3,9 +3,9 @@ title: Contracts
 weight: 22
 ---
 
-These contracts close the boundaries between the ten kernel services. Protobuf and Kubernetes API
-definitions implement these semantics; implementations may not invent parallel envelopes or
-alternate ownership.
+These contracts close the boundaries between the ten kernel services. Protobuf and explicitly
+declared public HTTP definitions implement these semantics; implementations may not invent
+parallel envelopes or alternate ownership.
 
 ## Trusted runtime context
 
@@ -136,12 +136,12 @@ workload but cannot claim per-request human delegation.
 `edged` owns neither; it resolves and caches their current projection.
 
 `tenantd` resolves an external hierarchy in two explicit steps. `ResolveTenant` receives the exact
-canonical Tenant root and returns:
+Tenant address segment and returns:
 
 ```text
 canonical Tenant ID
-matched Tenant address-binding generation
-finite cache expiry
+Tenant state
+Tenant revision
 ```
 
 When the remaining path starts with the fixed `/workspaces/<workspace-address>` boundary,
@@ -149,15 +149,15 @@ When the remaining path starts with the fixed `/workspaces/<workspace-address>` 
 
 ```text
 canonical Workspace ID
-matched Workspace address-binding generation
-finite cache expiry
+Workspace state
+Workspace revision
 ```
 
-`edged` caches each narrow projection separately. The Tenant key is the normalized authority and
-canonical Tenant path prefix. The Workspace key is the canonical Tenant ID and Workspace address
-segment. It re-resolves an entry on a miss or after the earlier of the owner-supplied expiry and 60
-seconds. Neither cache contains an administrative record or permits a caller to choose a different
-parent.
+`edged` caches each narrow projection separately. The Tenant key is the Tenant address segment. The
+Workspace key is the canonical Tenant ID and Workspace address segment.
+`edged` owns a finite local cache policy and re-resolves an entry after that policy expires.
+`tenantd` does not own or return cache controls. Neither cache contains an administrative record or
+permits a caller to choose a different parent.
 
 `pkgd.ResolveExposure` uses:
 
@@ -183,7 +183,7 @@ After authentication and coarse authorization, `execd.ResolveEndpoint` returns t
 Kubernetes Service endpoint and endpoint generation. `edged` combines those owner projections with
 the trusted request context; neither owner stores the combined route.
 
-Product URL design below the resolved address root is outside the kernel. Tenant roots are `/` or
+Product URL design below the resolved address root is outside the kernel. Tenant roots are
 `/tenants/<tenant-address>`; Workspace roots append `/workspaces/<workspace-address>`. Every
 subsequent route handed to `edged` identifies its exposure with structurally separate fixed and
 user-controlled segments. Each exposure declares one fixed route root and whether a trailing path
@@ -192,9 +192,9 @@ overlap. Routes are inferred from current Tenant, Workspace, App, exposure, and 
 there is no manually managed route record.
 
 If the exact App is admitted for start-on-demand but has no ready endpoint, `edged` asks `execd` to
-realize it and waits only within the request's bounded startup policy. Cache expiry never exceeds
-the address-resolution expiry, the endpoint lifetime supplied by `execd`, or 60 seconds. Stale
-resolution can delay recovery but can never authorize another target.
+realize it and waits only within the request's bounded startup policy. Endpoint cache expiry never
+exceeds the endpoint lifetime supplied by `execd`. Stale resolution can delay recovery but can
+never authorize another target.
 
 ## Run invocation
 
@@ -246,47 +246,6 @@ returns only its opaque binding and readiness. For `egressd`, `configd` releases
 the authenticated, purpose-bound operation for one admitted request. Neither path exposes a general
 secret read.
 
-## Owner lifecycle coordination
-
-Tenant and Workspace lifecycle is owned by `tenantd`; child owners never infer or mutate it. One
-cross-service lifecycle operation contains:
-
-```text
-lifecycle-operation ID
-Tenant or Workspace target
-provisioning generation
-desired lifecycle
-finite assigned owner steps
-idempotency identity
-```
-
-`tenantd` commits that operation, its assigned owner steps, and its audit intent atomically. Each
-child owner lists or watches only the steps assigned to its authenticated service identity. The
-step contains the target, operation ID, generation, stable step key, desired lifecycle, and the
-typed creation intent that owner needs. The child commits its own idempotent state and outbox, then
-calls `tenantd.AcknowledgeLifecycleStep` with its owner revision and complete or blocked result.
-
-```text
- tenantd commit intent
-      |
-      +----> owner List/WatchLifecycleSteps
-                    |
-                    v
-             owner commits local result
-      |
-      v
- tenantd commits authenticated acknowledgement
-      |
-      +-- all required complete -> advance lifecycle
-      +-- any blocked ----------> retain retryable condition
-```
-
-No database transaction crosses a call. Work delivery is at least once; the child operation and
-acknowledgement are independently idempotent. A stale operation or generation cannot acknowledge
-current work. Suspension and deletion become visible before owner work is published, so child
-admission stops before drain or cleanup. Deletion never reverses and cannot finish until every
-required owner confirms retirement.
-
 ## External HTTP binding
 
 `execd` owns the dependency binding, `egressd` owns destination/policy and forwarding, and
@@ -309,11 +268,12 @@ propagation is separately opt-in and never carries CtlFlow identity or baggage.
 
 ## Audit envelope
 
-Every kernel mutation and security decision emits:
+Each owning service states exactly which mutation and security outcomes require
+audit evidence. Every required event emits:
 
 ```text
 source service and operation
-positive source sequence and source schema generation
+source schema generation
 Kubernetes subject for operator actions
 actor and attached account for product actions when established
 immediate caller and runtime principal when applicable
@@ -325,16 +285,16 @@ occurred time and source idempotency identity
 ```
 
 Credentials, secret values, application bodies, object bytes, model prompts, and program logs are
-forbidden. Durable source services other than `auditd` commit this envelope to a transactional
-outbox with the mutation. `auditd` commits evidence for its own mutation directly in that mutation's
-transaction. `auditd.RecordAuditBatch` permanently binds source service and source event ID to one
-canonical envelope. Exact replay is accepted and conflicting replay is rejected. A durable source
-removes its outbox row only after that acceptance; a crash between acceptance and removal therefore
-replays the same canonical event rather than inventing another one.
+forbidden. Every source service calls `auditd.RecordAuditBatch` directly for each contract-required
+outcome after establishing that outcome and while holding no database transaction. An outcome for
+which the owning contract requires no event does not create one. `auditd.RecordAuditBatch`
+permanently binds source service and source event ID to one canonical envelope. Exact replay is
+accepted and conflicting replay is rejected. A source service retains no local audit outbox,
+delivery queue, retry journal, or source sequence.
 
-Stateless authentication, ingress, and egress mediators have no local domain transaction. Before
-they return an authentication success, open a target or upstream connection, or otherwise make an
-allow externally effective, they require `auditd` to accept a correlated admission event. Audit
+Authentication, ingress, and egress mediators submit evidence by the same direct call. Before they
+return an authentication success, open a target or upstream connection, or otherwise make an allow
+externally effective, they require `auditd` to accept a correlated admission event. Audit
 unavailability before admission therefore fails closed rather than creating an unaudited allow.
 
 A later completion or failure is a separate immutable event correlated to that admission. The

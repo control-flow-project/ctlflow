@@ -22,9 +22,10 @@ are ownership boundaries, not deployment marketing terms.
 
 ## Domain control
 
-The ten kernel services own CtlFlow records and their invariants. Operator clients use aggregated
-Kubernetes APIs. Product backends use authenticated management operations over `edged`. Both
-surfaces invoke the same service semantics and never create a second record owner.
+The ten kernel services own CtlFlow records and their invariants. Operator clients use
+kubeconfig-authorized port-forwards and the selected kubeconfig client certificate to reach the
+owning private gRPC service. Product backends use authenticated management operations over `edged`.
+Both surfaces invoke the same service semantics and never create a second record owner.
 
 Domain records are not reconstructed from Kubernetes objects. Native names, labels, and status are
 derived realization details and never become CtlFlow identity or authority.

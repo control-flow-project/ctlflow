@@ -1,0 +1,1 @@
+v1/tenantd.proto	47c14d64bf3e8ebb71e1f24038f299a318bec6e390bcc05744f696bd267b96f2

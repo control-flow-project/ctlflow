@@ -1,29 +1,48 @@
-using CtlFlow.Tenancy.Tenantd.Domain.Sequences;
-using CtlFlow.Tenancy.Tenantd.Domain.Time;
-using static CtlFlow.Tenancy.Tenantd.Domain.Lifecycles.LifecycleTransitions;
+using CtlFlow.Tenancy.Tenantd.Domain.Auditing;
+using CtlFlow.Tenancy.Tenantd.Domain.Names;
+using CtlFlow.Tenancy.Tenantd.Domain.Resources;
+using static CtlFlow.Tenancy.Tenantd.Domain.Tenants.Tenants;
 
 namespace CtlFlow.Tenancy.Tenantd.Domain.Tenants;
 
 public static partial class Tenants
 {
-    public static ValueTask UpdateTenantDisplayName(
+    public static async ValueTask<TenantMutationResult> UpdateTenantDisplayName(
         Tenant tenant,
-        TenantDisplayName displayName,
-        ResourceEventSequence eventSequence,
-        UtcInstant now,
+        Revision expectedRevision,
+        DisplayName displayName,
+        AuditContext audit,
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        if (!IsDisplayMetadataUpdateAdmitted(tenant.Lifecycle))
+        if (tenant.Revision != expectedRevision)
         {
-            throw new InvalidOperationException(
-                "Tenant lifecycle does not admit display-name updates");
+            return new TenantMutationResult.RevisionMismatch();
         }
 
-        tenant.DisplayName = displayName;
-        tenant.Revision = tenant.Revision.Next();
-        tenant.LastEventSequence = eventSequence;
-        tenant.UpdatedAt = now;
-        return ValueTask.CompletedTask;
+        if (tenant.State == ResourceState.Deleted)
+        {
+            return new TenantMutationResult.FailedPrecondition();
+        }
+
+        if (tenant.DisplayName == displayName)
+        {
+            return new TenantMutationResult.Current(
+                await DescribeTenant(tenant, cancellation));
+        }
+
+        tenant.ChangeDisplayName(displayName, audit.OccurredAt);
+        var details = await DescribeTenant(tenant, cancellation);
+        return new TenantMutationResult.Changed(
+            tenant,
+            new AuditIntent(
+                AuditEventId.Generate(),
+                AuditOperation.UpdateTenant,
+                audit.Attribution,
+                new AuditTarget.Tenant(tenant.Id),
+                details.State,
+                details.Revision,
+                audit.Correlation,
+                audit.OccurredAt));
     }
 }

@@ -1,0 +1,12 @@
+{
+  "minikube": {
+    "version": "v1.38.1",
+    "linuxAmd64Sha256": "099477eaf248bcb5bcea8ce78a2898e93ac01461c35189da1848c3de82ecd22e"
+  },
+  "kubernetesVersion": "v1.34.0",
+  "profile": "ctlflow-test-mesh",
+  "driver": "docker",
+  "containerRuntime": "containerd",
+  "cpus": 4,
+  "memoryMiB": 4096
+}
