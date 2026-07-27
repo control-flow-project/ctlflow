@@ -17,6 +17,14 @@ The complete public browser contract is:
 | `GET` | `/auth/v1/callback` | Complete the selected provider callback |
 | `POST` | `/auth/v1/logout` | Revoke and clear the current Session |
 
+`identityd` owns accounts, external identity links, Sessions, and invocation
+identity. Authd owns the semantics and validation of its provider protocol
+settings. Execd supplies Authd's process-private configuration and secret
+projections from generic Configd custody; Configd does not interpret OIDC and
+no Authd-to-Configd operation exists. `authd` may hold only bounded in-flight
+protocol state. It cannot create, modify, infer, or cache an identity record
+as an independent authority.
+
 The checked `services/authd/api/http/v1/openapi.yaml` is the authoritative
 request, response, status, redirect, and cookie contract. Its manifest and
 verifier reject route, method, operation, media-type, status, or content drift.
@@ -34,6 +42,9 @@ empty `303 See Other` with one `Location`. Errors never redirect, use
 `Content-Type: text/plain; charset=utf-8`, and return the fixed body
 `Request could not be completed.` without identity, provider, callback,
 configuration, dependency, cookie, state, or return-target detail.
+For a wrong-method `HEAD` request, the status and headers are identical to the
+standard error response, while HTTP wire semantics omit the representation
+body.
 
 ## Selection and browser protections
 
@@ -235,9 +246,9 @@ attributes with `Max-Age=0` and the Unix-epoch HTTP date.
 In-flight state is process-local, at most 16 KiB per attempt, at most 4,096
 live attempts per process, one-time, and exactly ten minutes. It contains only
 the two digests, selected pair, return target, PKCE verifier, and times. It is
-never durable or placed in a cookie, log, telemetry, or audit payload. Restart
-loses it and callbacks fail closed. Replicas use state-cookie affinity for the
-ten-minute window; no shared state is implied.
+never durable or placed in a cookie, log, telemetry, or audit payload. The
+shipping deployment has one replica. Restart loses its in-flight state and
+callbacks fail closed; there is no shared-state or affinity path.
 
 ## Deployed dependencies
 
@@ -270,13 +281,15 @@ verification_keys
 
 The three endpoints and issuer are absolute ASCII HTTPS URIs of at most 2,048
 bytes with no userinfo, query, or fragment. Client IDs are one to 256 OAuth
-visible-ASCII bytes. Credential references and Egressd binding names use the
-canonical one-to-64-character identifier shape. `verification_keys` contains
-one to eight entries with unique `kid`; each contains exactly `kid`, `kty`,
-`use`, `alg`, `n`, and `e`. `kid` is one to 128 visible-ASCII bytes, `kty` is
-`RSA`, `use` is `sig`, `alg` is `RS256`, and unpadded-base64url `n` and `e`
-decode to a 2,048-to-4,096-bit modulus and an odd exponent from 3 through
-4,294,967,295.
+visible-ASCII bytes. Credential references use the canonical
+one-to-64-character identifier shape. An Egressd binding name is a
+one-to-63-character lower-case Kubernetes DNS label and selects the
+same-Namespace purpose-bound HTTP Service on port `8080`.
+`verification_keys` contains one to eight entries with unique `kid`; each
+contains exactly `kid`, `kty`, `use`, `alg`, `n`, and `e`. `kid` is one to 128
+visible-ASCII bytes, `kty` is `RSA`, `use` is `sig`, `alg` is `RS256`, and
+unpadded-base64url `n` and `e` decode to a 2,048-to-4,096-bit modulus and an
+odd exponent from 3 through 4,294,967,295.
 
 Each entry asserts one static provider registration for the exact callback
 URI, Authorization Code response type, `openid` scope, PKCE S256,

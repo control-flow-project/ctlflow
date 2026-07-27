@@ -40,8 +40,10 @@ export async function startCSharpStatelessService(
     options.containerfilePath,
     options.publication,
     options.kubernetes);
-  const publicPort = await findAvailablePort();
-  const probePort = await findAvailablePort();
+  const {
+    publicPort,
+    probePort
+  } = await allocatePorts();
   let environment = options.environment;
   let revision = 1;
   let publicForwarding: ManagedProcess | undefined;
@@ -177,6 +179,21 @@ async function stopProcesses(
       await stopProcess(process).catch(() => undefined);
     }
   }
+}
+
+async function allocatePorts(): Promise<{
+  readonly publicPort: number;
+  readonly probePort: number;
+}> {
+  const values = new Set<number>();
+  while (values.size < 2) {
+    values.add(await findAvailablePort());
+  }
+  const [publicPort, probePort] = values;
+  return {
+    publicPort: publicPort!,
+    probePort: probePort!
+  };
 }
 
 async function scaleToZero(

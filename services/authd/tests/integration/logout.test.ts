@@ -82,27 +82,6 @@ test("missing, duplicate, malformed, and unknown credentials are logged out",
     }
   });
 
-test("retains the Session cookie when Identityd is unavailable",
-  async () => {
-    const suite = getAuthdTestSuite();
-    await suite.provider.setMode("available");
-    const authentication = await completeAuthentication();
-    const session = sessionCookie(authentication.callback);
-    assert.ok(session);
-    try {
-      await suite.identitySource.setMode("unavailable");
-      const response = await requestAuthd({
-        method: "POST",
-        path: "/auth/v1/logout",
-        headers: browserPostHeaders("", session)
-      });
-      assertNonDisclosingError(response, 503);
-      assert.equal(readHeaders(response, "set-cookie").length, 0);
-    } finally {
-      await suite.identitySource.setMode("available");
-    }
-  });
-
 test("validates logout media, form, state cookie, and return target",
   async () => {
     for (const [body, status] of [

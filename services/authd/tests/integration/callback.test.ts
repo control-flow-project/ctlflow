@@ -180,6 +180,8 @@ test("maps provider, Egressd, and Identityd availability and rejection",
     for (const mode of [
       "token_unavailable",
       "userinfo_unavailable",
+      "token_oversized",
+      "userinfo_oversized",
       "token_delayed",
       "userinfo_delayed"
     ] as const) {
@@ -197,13 +199,41 @@ test("maps provider, Egressd, and Identityd availability and rejection",
     assert.equal((await suite.egressd.readEvidence()).length >= 1, true);
     await suite.egressd.setMode("available");
 
+    const active = await completeAuthentication();
+    const activeSession = sessionCookie(active.callback);
+    assert.ok(activeSession);
+    const pending = await beginAuthentication();
+    const pendingAuthorization = await suite.provider.authorize(
+      pending.authorizationLocation);
+    const pendingCallback = new URL(pendingAuthorization.location);
     await suite.identitySource.setMode("unavailable");
     try {
-      const identityUnavailable = await completeAuthentication();
-      assertNonDisclosingError(identityUnavailable.callback, 503);
-      assertClearsConsumedState(identityUnavailable.callback);
+      const identityUnavailable = await requestAuthd({
+        method: "GET",
+        path: `${pendingCallback.pathname}${pendingCallback.search}`,
+        headers: [
+          ["Host", "auth.example.test"],
+          ["Cookie", pending.stateCookie]
+        ]
+      });
+      assertNonDisclosingError(identityUnavailable, 503);
+      assertClearsConsumedState(identityUnavailable);
+      const logoutUnavailable = await requestAuthd({
+        method: "POST",
+        path: "/auth/v1/logout",
+        headers: [
+          ["Host", "auth.example.test"],
+          ["Origin", "https://auth.example.test"],
+          ["Cookie", activeSession]
+        ]
+      });
+      assertNonDisclosingError(logoutUnavailable, 503);
+      assert.equal(
+        readHeaders(logoutUnavailable, "set-cookie").length,
+        0);
     } finally {
       await suite.identitySource.setMode("available");
+      await suite.authd.restart();
     }
 
     await suite.provider.setMode("unknown_subject");
@@ -220,31 +250,34 @@ test("propagates browser cancellation and consumes the in-flight attempt",
     const suite = getAuthdTestSuite();
     await suite.provider.setMode("available");
     await suite.egressd.setMode("delayed");
-    await suite.egressd.clearEvidence();
-    const begun = await beginAuthentication();
-    const authorization = await suite.provider.authorize(
-      begun.authorizationLocation);
-    const callback = new URL(authorization.location);
-    await assert.rejects(requestAuthd({
-      method: "GET",
-      path: `${callback.pathname}${callback.search}`,
-      headers: [
-        ["Host", "auth.example.test"],
-        ["Cookie", begun.stateCookie]
-      ],
-      signal: AbortSignal.timeout(100)
-    }));
-    await suite.egressd.setMode("available");
-    const replay = await requestAuthd({
-      method: "GET",
-      path: `${callback.pathname}${callback.search}`,
-      headers: [
-        ["Host", "auth.example.test"],
-        ["Cookie", begun.stateCookie]
-      ]
-    });
-    assertNonDisclosingError(replay, 400);
-    assert.equal((await suite.egressd.readEvidence()).length, 1);
+    try {
+      await suite.egressd.clearEvidence();
+      const begun = await beginAuthentication();
+      const authorization = await suite.provider.authorize(
+        begun.authorizationLocation);
+      const callback = new URL(authorization.location);
+      await assert.rejects(requestAuthd({
+        method: "GET",
+        path: `${callback.pathname}${callback.search}`,
+        headers: [
+          ["Host", "auth.example.test"],
+          ["Cookie", begun.stateCookie]
+        ],
+        signal: AbortSignal.timeout(100)
+      }));
+      const replay = await requestAuthd({
+        method: "GET",
+        path: `${callback.pathname}${callback.search}`,
+        headers: [
+          ["Host", "auth.example.test"],
+          ["Cookie", begun.stateCookie]
+        ]
+      });
+      assertNonDisclosingError(replay, 400);
+      assert.equal((await suite.egressd.readEvidence()).length, 1);
+    } finally {
+      await suite.egressd.setMode("available");
+    }
   });
 
 test("replaces the browser cookie without revoking the previous Session",

@@ -129,7 +129,7 @@ assert(
     && (await read(path.join(
       serviceSource,
       "Egress/SendEgressRequest.cs")))
-      .includes("new Uri(provider.EgressOrigin, relative)"),
+      .includes("provider.EgressOrigin.AbsoluteUri.TrimEnd('/')"),
   "Provider HTTP must use only the purpose-bound Egressd hop");
 assertSame(
   [...allServiceSource.matchAll(

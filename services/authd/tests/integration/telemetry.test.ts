@@ -8,7 +8,6 @@ import {
 import {
   beginAuthentication,
   browserPostHeaders,
-  completeAuthentication,
   sessionCookie
 } from "../support/browser-flow.js";
 import {
@@ -18,39 +17,86 @@ import {
   readAllExports
 } from "../support/telemetry/read-all-exports.js";
 import {
+  hasHttpCompletionLog
+} from "../support/telemetry/has-http-completion-log.js";
+import {
+  readOtlpSpans
+} from "../support/telemetry/read-otlp-spans.js";
+import {
   waitForExport
 } from "../support/telemetry/wait-for-export.js";
 
 test("exports correlated route and dependency telemetry without secrets",
   async () => {
+    const traceId = "1234567890abcdef1234567890abcdef";
     const suite = getAuthdTestSuite();
     await suite.collector.resume();
     await suite.collector.clearExports();
     await suite.provider.setMode("available");
     await suite.provider.clearEvidence();
     await suite.egressd.clearEvidence();
-    const completed = await completeAuthentication(
+    const begun = await beginAuthentication(
       "/telemetry-secret-target");
-    assert.equal(completed.callback.statusCode, 303);
-    const session = sessionCookie(completed.callback);
+    const authorization = await suite.provider.authorize(
+      begun.authorizationLocation);
+    const callbackUrl = new URL(authorization.location);
+    const callback = await requestAuthd({
+      method: "GET",
+      path: `${callbackUrl.pathname}${callbackUrl.search}`,
+      headers: [
+        ["Host", "auth.example.test"],
+        ["Cookie", begun.stateCookie],
+        [
+          "traceparent",
+          `00-${traceId}-1234567890abcdef-01`
+        ]
+      ]
+    });
+    assert.equal(callback.statusCode, 303);
+    const session = sessionCookie(callback);
     assert.ok(session);
     const logout = await requestAuthd({
       method: "POST",
       path: "/auth/v1/logout",
-      headers: browserPostHeaders("", session)
+      headers: [
+        ...browserPostHeaders("", session),
+        [
+          "traceparent",
+          `00-${traceId}-fedcba0987654321-01`
+        ]
+      ]
     });
     assert.equal(logout.statusCode, 303);
 
     await waitForExport(
       suite.collector.tracesPath,
-      (value) =>
-        value.includes("authd.http.begin")
-        && value.includes("authd.http.callback")
-        && value.includes("authd.http.logout")
-        && value.includes("authd.egress.token")
-        && value.includes("authd.egress.userinfo")
-        && value.includes("authd.identity.create_session")
-        && value.includes("authd.identity.revoke_session"));
+      (value) => {
+        const exported = readOtlpSpans(value);
+        if (!exported.some(
+            (span) => span.name === "authd.http.begin")) {
+          return false;
+        }
+        const spans = exported.filter(
+          (span) => span.traceId === traceId);
+        const callbackSpan = spans.find(
+          (span) => span.name === "authd.http.callback");
+        const logoutSpan = spans.find(
+          (span) => span.name === "authd.http.logout");
+        if (typeof callbackSpan?.spanId !== "string"
+            || typeof logoutSpan?.spanId !== "string") {
+          return false;
+        }
+        return [
+          "authd.egress.token",
+          "authd.egress.userinfo",
+          "authd.identity.create_session"
+        ].every((name) => spans.some((span) =>
+          span.name === name
+          && span.parentSpanId === callbackSpan.spanId))
+          && spans.some((span) =>
+            span.name === "authd.identity.revoke_session"
+            && span.parentSpanId === logoutSpan.spanId);
+      });
     await waitForExport(
       suite.collector.metricsPath,
       (value) =>
@@ -63,21 +109,36 @@ test("exports correlated route and dependency telemetry without secrets",
     await waitForExport(
       suite.collector.logsPath,
       (value) =>
-        value.includes("authd.http.begin")
-        && value.includes("authd.http.callback")
-        && value.includes("authd.http.logout"));
+        hasHttpCompletionLog(
+          value,
+          "authd.http.callback",
+          "authenticated",
+          traceId)
+        && hasHttpCompletionLog(
+          value,
+          "authd.http.logout",
+          "logged_out",
+          traceId));
 
     const provider = await suite.provider.readEvidence();
     const egress = await suite.egressd.readEvidence();
+    assert.equal(egress.length, 2);
+    for (const request of egress) {
+      assert.match(
+        request.traceparent ?? "",
+        new RegExp(
+          `^00-${traceId}-[0-9a-f]{16}-01$`,
+          "u"));
+    }
     const exports = await readAllExports(suite.collector);
     for (const secret of [
       "acme",
       "oidc",
       "alice@example.com",
       "/telemetry-secret-target",
-      completed.begin.stateCookie,
+      begun.stateCookie,
       session,
-      new URL(completed.providerLocation).searchParams.get("code") ?? "",
+      callbackUrl.searchParams.get("code") ?? "",
       provider.tokens[0]?.authorization ?? "",
       provider.tokens[0]?.body ?? "",
       egress[1]?.authorization ?? ""
@@ -89,6 +150,13 @@ test("exports correlated route and dependency telemetry without secrets",
 
 test("replaces malformed trace context and ignores baggage",
   async () => {
+    const suite = getAuthdTestSuite();
+    const rejectedTraceId =
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const before = readOtlpSpans(
+      await readAllExports(suite.collector))
+      .filter((span) => span.name === "authd.http.begin")
+      .length;
     const body = "tenant_id=unknown&provider_id=oidc";
     const response = await requestAuthd({
       method: "POST",
@@ -98,12 +166,32 @@ test("replaces malformed trace context and ignores baggage",
         ["Origin", "https://auth.example.test"],
         ["Content-Type", "application/x-www-form-urlencoded"],
         ["Content-Length", String(Buffer.byteLength(body))],
-        ["traceparent", "not-a-traceparent"],
+        [
+          "traceparent",
+          `00-${rejectedTraceId}-0000000000000000-01`
+        ],
         ["baggage", "credential=forbidden"]
       ],
       body
     });
     assert.equal(response.statusCode, 400);
+    await waitForExport(
+      suite.collector.tracesPath,
+      (value) => {
+        const spans = readOtlpSpans(value)
+          .filter((span) => span.name === "authd.http.begin");
+        return spans.length > before
+          && spans.slice(before).some((span) =>
+            typeof span.traceId === "string"
+            && /^[0-9a-f]{32}$/u.test(span.traceId)
+            && span.traceId !== rejectedTraceId);
+      });
+    const exports = await readAllExports(suite.collector);
+    assert.equal(exports.includes("credential=forbidden"), false);
+    assert.equal(
+      readOtlpSpans(exports).some((span) =>
+        span.traceId === rejectedTraceId),
+      false);
   });
 
 test("continues browser operation during Collector outage",

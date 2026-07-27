@@ -1,4 +1,7 @@
-import { createSign } from "node:crypto";
+import {
+  createSign,
+  randomUUID
+} from "node:crypto";
 import {
   chmod,
   mkdir,
@@ -30,7 +33,6 @@ import { runCommand } from "../processes/run-command.js";
 import type { TestMinikube } from "./test-minikube.js";
 
 const audience = "ctlflow-internal";
-const namespaceName = "ctlflow-tests";
 const serviceAccountName = "kernel-caller";
 const podName = "kernel-caller";
 const unadmittedServiceAccountName = "unadmitted-caller";
@@ -38,6 +40,8 @@ const unadmittedPodName = "unadmitted-caller";
 export async function startTestKubernetes(
   repositoryRoot: string
 ): Promise<TestKubernetes> {
+  const namespaceName =
+    `ctlflow-test-${randomUUID().slice(0, 12)}`;
   const root = path.join(
     repositoryRoot,
     ".temp",
@@ -131,6 +135,7 @@ export async function startTestKubernetes(
         return createWorkloadCredentials(
           repositoryRoot,
           minikube,
+          namespaceName,
           issuer,
           jwksPath,
           signingKey,
@@ -383,6 +388,7 @@ async function validateProfile(
 async function createWorkloadCredentials(
   repositoryRoot: string,
   minikube: TestMinikube,
+  namespaceName: string,
   issuer: string,
   jwksPath: string,
   signingKey: string,
@@ -392,6 +398,7 @@ async function createWorkloadCredentials(
   const token = await createToken(
     repositoryRoot,
     minikube,
+    namespaceName,
     admittedServiceAccountName,
     audience,
     "10m",
@@ -399,6 +406,7 @@ async function createWorkloadCredentials(
   const unadmittedToken = await createToken(
     repositoryRoot,
     minikube,
+    namespaceName,
     unadmittedServiceAccountName,
     audience,
     "10m",
@@ -406,6 +414,7 @@ async function createWorkloadCredentials(
   const wrongAudienceToken = await createToken(
     repositoryRoot,
     minikube,
+    namespaceName,
     admittedServiceAccountName,
     "wrong-audience",
     "10m",
@@ -413,6 +422,7 @@ async function createWorkloadCredentials(
   const overlongToken = await createToken(
     repositoryRoot,
     minikube,
+    namespaceName,
     admittedServiceAccountName,
     audience,
     "20m",
@@ -420,6 +430,7 @@ async function createWorkloadCredentials(
   const unboundToken = await createToken(
     repositoryRoot,
     minikube,
+    namespaceName,
     admittedServiceAccountName,
     audience,
     "10m");
@@ -453,6 +464,7 @@ function validateWorkloadName(value: string): void {
 async function createToken(
   repositoryRoot: string,
   minikube: TestMinikube,
+  namespaceName: string,
   serviceAccount: string,
   tokenAudience: string,
   duration: string,

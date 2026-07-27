@@ -74,7 +74,7 @@ export async function startControlledOidcProvider(
       type: "pkcs8",
       format: "pem"
     }),
-    { mode: 0o600 });
+    { mode: 0o644 });
   const publicKey = signing.publicKey.export({
     format: "jwk"
   });

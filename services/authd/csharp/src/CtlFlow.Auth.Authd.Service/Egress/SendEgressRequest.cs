@@ -21,8 +21,10 @@ internal static partial class EgressRequests
         string? authorization,
         CancellationToken cancellation)
     {
-        var relative = providerEndpoint.PathAndQuery.TrimStart('/');
-        var bindingUri = new Uri(provider.EgressOrigin, relative);
+        var bindingUri = new Uri(
+            provider.EgressOrigin.AbsoluteUri.TrimEnd('/')
+            + providerEndpoint.PathAndQuery,
+            UriKind.Absolute);
         using var request = new HttpRequestMessage(method, bindingUri);
         request.Headers.Host = providerEndpoint.Authority;
         request.Headers.Accept.ParseAdd("application/json");

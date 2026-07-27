@@ -7,7 +7,8 @@ info:
     Exact public browser surface. Declared requests admit at most 16,384 bytes
     of headers and 8,192 bytes of cookies. Undeclared paths are 404; another
     method on a declared path is 405 with only the declared method in Allow.
-    HEAD and OPTIONS are not aliases.
+    HEAD and OPTIONS are not aliases. A wrong-method HEAD response carries the
+    standard error headers but no representation body, as required by HTTP.
 paths:
   /auth/v1/begin:
     post:

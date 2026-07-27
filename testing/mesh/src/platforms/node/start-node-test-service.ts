@@ -37,8 +37,10 @@ export async function startNodeTestService(
   if (servicePort === controlPort) {
     throw new Error("Node test service ports must be distinct");
   }
-  const hostServicePort = await findAvailablePort();
-  const hostControlPort = await findAvailablePort();
+  const {
+    service: hostServicePort,
+    control: hostControlPort
+  } = await allocatePorts();
   let serviceForwarding: ManagedProcess | undefined;
   let forwarding: ManagedProcess | undefined;
   let logs: ManagedProcess | undefined;
@@ -317,4 +319,19 @@ function validatePort(value: number): void {
   if (!Number.isInteger(value) || value < 1 || value > 65_535) {
     throw new Error("Node test service port is invalid");
   }
+}
+
+async function allocatePorts(): Promise<{
+  readonly service: number;
+  readonly control: number;
+}> {
+  const values = new Set<number>();
+  while (values.size < 2) {
+    values.add(await findAvailablePort());
+  }
+  const [service, control] = values;
+  return {
+    service: service!,
+    control: control!
+  };
 }

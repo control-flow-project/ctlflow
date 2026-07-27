@@ -249,9 +249,8 @@ internal static partial class ProviderProjections
             RequireIdentifier(
                 RequireString(element, "credential_ref"),
                 "credential reference"),
-            RequireIdentifier(
-                RequireString(element, "egress_binding"),
-                "Egress binding"),
+            RequireDnsLabel(
+                RequireString(element, "egress_binding")),
             keys);
     }
 
@@ -366,6 +365,8 @@ internal static partial class ProviderProjections
     {
         if (value.Length > 2_048
             || value.Any(character => character > 0x7f)
+            || value.Contains('?')
+            || value.Contains('#')
             || !Uri.TryCreate(value, UriKind.Absolute, out var uri)
             || uri.Scheme != Uri.UriSchemeHttps
             || string.IsNullOrEmpty(uri.Host)
@@ -393,6 +394,23 @@ internal static partial class ProviderProjections
                 exception);
         }
     }
+
+    private static string RequireDnsLabel(string value)
+    {
+        if (value.Length is < 1 or > 63
+            || !IsLowerAlphaNumeric(value[0])
+            || !IsLowerAlphaNumeric(value[^1])
+            || value.Any(character =>
+                !IsLowerAlphaNumeric(character) && character != '-'))
+        {
+            throw new InvalidDataException(
+                "Egress binding is invalid");
+        }
+        return value;
+    }
+
+    private static bool IsLowerAlphaNumeric(char value) =>
+        value is >= 'a' and <= 'z' or >= '0' and <= '9';
 
     private static string RequireVisibleAscii(
         string value,

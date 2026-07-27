@@ -32,7 +32,8 @@ export async function createKustomizeServiceOverlay(
     "trust",
     options.files.trust,
     0o644);
-  const persistentVolumeName = `${options.name}-test-data`;
+  const persistentVolumeName =
+    `${options.kubernetes.namespace}-${options.name}-data`;
 
   await writeJson(
     path.join(directory, "persistent-volume.json"),

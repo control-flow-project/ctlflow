@@ -8,6 +8,7 @@ export type OidcProviderMode =
   | "token_invalid_json"
   | "token_duplicate_member"
   | "token_invalid_values"
+  | "token_oversized"
   | "token_extra_members"
   | "invalid_signature"
   | "invalid_id_token_header"
@@ -27,5 +28,6 @@ export type OidcProviderMode =
   | "userinfo_invalid_json"
   | "userinfo_duplicate_member"
   | "userinfo_invalid_subject"
+  | "userinfo_oversized"
   | "subject_mismatch"
   | "unknown_subject";

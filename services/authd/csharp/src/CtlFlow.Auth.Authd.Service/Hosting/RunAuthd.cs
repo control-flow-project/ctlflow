@@ -124,6 +124,17 @@ internal static partial class AuthdProcess
                     route.Method);
                 return;
             }
+            if (CalculateCookieBytes(context.Request.Headers) > 8 * 1024)
+            {
+                await WriteDeclaredError(
+                    context,
+                    telemetry,
+                    route.Operation,
+                    StatusCodes.Status431RequestHeaderFieldsTooLarge,
+                    "cookie_too_large",
+                    route.Method);
+                return;
+            }
             if (CalculateTargetBytes(context.Request) > 16 * 1024)
             {
                 await WriteDeclaredError(
@@ -219,6 +230,16 @@ internal static partial class AuthdProcess
                 total = checked(
                     total + header.Key.Length + (value?.Length ?? 0) + 4);
             }
+        }
+        return total;
+    }
+
+    private static int CalculateCookieBytes(IHeaderDictionary headers)
+    {
+        var total = 0;
+        foreach (var value in headers.Cookie)
+        {
+            total = checked(total + (value?.Length ?? 0));
         }
         return total;
     }

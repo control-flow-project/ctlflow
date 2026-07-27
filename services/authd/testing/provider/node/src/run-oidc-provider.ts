@@ -215,6 +215,13 @@ async function handleToken(
       + '"token_type":"Bearer","id_token":"a.b.c"}');
     return;
   }
+  if (mode === "token_oversized") {
+    response.writeHead(200, {
+      "content-type": "application/json"
+    });
+    response.end("x".repeat(256 * 1024 + 1));
+    return;
+  }
 
   const accessToken = encodeBase64Url(randomBytes(32));
   const tokenSubject = mode === "unknown_subject"
@@ -285,6 +292,13 @@ async function handleUserInfo(
   }
   if (mode === "userinfo_duplicate_member") {
     json(response, 200, '{"sub":"first","sub":"second"}');
+    return;
+  }
+  if (mode === "userinfo_oversized") {
+    response.writeHead(200, {
+      "content-type": "application/json"
+    });
+    response.end("x".repeat(256 * 1024 + 1));
     return;
   }
   const contentType = mode === "userinfo_bad_content_type"
@@ -494,6 +508,7 @@ function isMode(value: unknown): value is OidcProviderMode {
     "token_invalid_json",
     "token_duplicate_member",
     "token_invalid_values",
+    "token_oversized",
     "token_extra_members",
     "invalid_signature",
     "invalid_id_token_header",
@@ -513,6 +528,7 @@ function isMode(value: unknown): value is OidcProviderMode {
     "userinfo_invalid_json",
     "userinfo_duplicate_member",
     "userinfo_invalid_subject",
+    "userinfo_oversized",
     "subject_mismatch",
     "unknown_subject"
   ]).has(value as OidcProviderMode);

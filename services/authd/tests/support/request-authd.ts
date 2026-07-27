@@ -28,6 +28,13 @@ export async function requestAuthd(
     : suite.authd.publicPort;
   const headers = (options.headers ?? [])
     .flatMap(([name, value]) => [name, value]);
+  if (headers.length > 0
+      && options.body === undefined
+      && permitsRequestBody(options.method)
+      && !hasHeader(headers, "content-length")
+      && !hasHeader(headers, "transfer-encoding")) {
+    headers.push("Content-Length", "0");
+  }
   return await new Promise((resolve, reject) => {
     let bodyTimer: NodeJS.Timeout | undefined;
     const request = http.request(
@@ -36,7 +43,7 @@ export async function requestAuthd(
         port,
         method: options.method,
         path: options.path,
-        headers,
+        headers: headers.length === 0 ? undefined : headers,
         signal: options.signal
       },
       (response) => {
@@ -73,6 +80,19 @@ export async function requestAuthd(
       request.end(options.body);
     }, options.bodyDelayMilliseconds);
   });
+}
+
+function permitsRequestBody(method: string): boolean {
+  return method === "POST" || method === "PUT" || method === "PATCH";
+}
+
+function hasHeader(headers: readonly string[], expected: string): boolean {
+  for (let index = 0; index < headers.length; index += 2) {
+    if (headers[index]?.toLowerCase() === expected) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function readHeader(

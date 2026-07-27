@@ -5,7 +5,7 @@ import {
 
 const supportDirectory = path.dirname(fileURLToPath(import.meta.url));
 
-export const serviceRoot = path.resolve(supportDirectory, "../..");
+export const serviceRoot = path.resolve(supportDirectory, "../../..");
 export const repositoryRoot = path.resolve(serviceRoot, "../..");
 export const csharpRoot = path.join(serviceRoot, "csharp");
 export const serviceProjectPath = path.join(

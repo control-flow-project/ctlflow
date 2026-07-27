@@ -31,26 +31,42 @@ internal sealed class AuthenticationAttemptStore : IDisposable
             stateDigest,
             nonceDigest,
             attempt);
-        lock (_gate)
+        var transferred = false;
+        try
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            RemoveExpired(currentTime);
-            if (replacedBrowserNonce is not null)
+            lock (_gate)
             {
-                RemoveByNonce(
-                    BrowserValues.CreateDigest(replacedBrowserNonce));
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                RemoveExpired(currentTime);
+                if (replacedBrowserNonce is not null)
+                {
+                    RemoveByNonce(
+                        BrowserValues.CreateDigest(replacedBrowserNonce));
+                }
+                if (_attempts.Count >= MaximumAttempts)
+                {
+                    throw new HttpContractException(
+                        StatusCodes.Status429TooManyRequests,
+                        "state_capacity");
+                }
+                if (!_attempts.TryAdd(
+                        Convert.ToHexString(stateDigest),
+                        stored))
+                {
+                    throw new InvalidOperationException(
+                        "State handle collision");
+                }
+                transferred = true;
             }
-            if (_attempts.Count >= MaximumAttempts)
+            return new CreatedAuthenticationAttempt(browserNonce);
+        }
+        finally
+        {
+            if (!transferred)
             {
                 stored.Dispose();
-                throw new HttpContractException(
-                    StatusCodes.Status429TooManyRequests,
-                    "state_capacity");
             }
-
-            _attempts.Add(Convert.ToHexString(stateDigest), stored);
         }
-        return new CreatedAuthenticationAttempt(browserNonce);
     }
 
     internal AuthenticationAttempt? Consume(

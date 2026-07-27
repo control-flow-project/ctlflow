@@ -3,7 +3,8 @@ import {
   test
 } from "node:test";
 import {
-  assertNonDisclosingError
+  assertNonDisclosingError,
+  assertSecurityHeaders
 } from "../support/assert-browser-response.js";
 import {
   readHeader,
@@ -29,7 +30,13 @@ test("serves exactly the three declared routes and isolates probes",
         path,
         headers: [["Host", "auth.example.test"]]
       });
-      assertNonDisclosingError(response, 405);
+      if (wrong === "HEAD") {
+        assert.equal(response.statusCode, 405);
+        assert.equal(response.body, "");
+        assertSecurityHeaders(response);
+      } else {
+        assertNonDisclosingError(response, 405);
+      }
       assert.equal(readHeader(response, "allow"), declared);
     }
 

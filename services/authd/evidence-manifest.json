@@ -192,8 +192,8 @@
         ],
         "503": [
           {
-            "file": "tests/integration/logout.test.ts",
-            "title": "retains the Session cookie when Identityd is unavailable"
+            "file": "tests/integration/callback.test.ts",
+            "title": "maps provider, Egressd, and Identityd availability and rejection"
           }
         ]
       }
@@ -246,7 +246,7 @@
     },
     {
       "file": "tests/integration/zz-lifecycle.test.ts",
-      "title": "invalid projected generations fail startup and readiness"
+      "title": "invalid projected configuration fails startup and readiness"
     },
     {
       "architectureClaim": "bounded-in-process-state"

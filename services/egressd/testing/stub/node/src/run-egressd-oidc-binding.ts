@@ -40,7 +40,7 @@ const proxy = http.createServer(async (request, response) => {
     return;
   }
   if (mode === "delayed") {
-    await new Promise((resolve) => setTimeout(resolve, 6_000));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   try {
     await forwardRequest(request, captured, response);
