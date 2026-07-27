@@ -177,9 +177,11 @@ RecordAuditBatch
 ```
 
 It accepts a bounded batch of typed source events and returns one acceptance
-per event. The admitted details are Tenant or Workspace mutation evidence and
-Identityd Session creation or actual revocation evidence. There is no query,
-export, watch, stream, redaction, deletion, or Kubernetes-resource API.
+per event. The finite details cover Tenant, Workspace, Identity Session,
+Package declaration, App, configuration publication, secret publication,
+projection, Placement, Workload, and Run mutations admitted by the owning
+contracts. There is no query, export, watch, stream, redaction, deletion,
+repair, or Kubernetes-resource API.
 
 ## Collections
 
@@ -237,11 +239,11 @@ evidence value.
 
 ## Cross-cutting obligations
 
-An operation with an audit obligation constructs typed evidence in Domain and
-calls `auditd.RecordAuditBatch` directly. Reads and no-op retries do not create
-mutation evidence unless their contract explicitly requires it. A source
-service retains no private audit delivery state, outbox, queue, journal, or
-source sequence.
+Only a contract-listed actual mutation constructs typed evidence in Domain and
+calls `auditd.RecordAuditBatch` directly after commit. Reads, denials,
+validation or dependency failures, retries, no-ops, and later realization
+outcomes create no mutation evidence. A source service retains no private
+audit delivery state, outbox, queue, journal, or source sequence.
 
 Every operation emits bounded OpenTelemetry traces, metrics, and structured
 logs. Trace context is the operational correlation mechanism; telemetry is

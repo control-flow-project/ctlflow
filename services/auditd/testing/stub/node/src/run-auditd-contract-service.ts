@@ -16,17 +16,21 @@ import http from "node:http";
 import {
   AuditServiceService,
   type AuditEvent,
-  IdentitySessionAction,
   type RecordAuditBatchRequest,
   type RecordAuditBatchResponse
 } from "../generated/v1/auditd.js";
-import type { AuditEventEvidence } from "./audit-event-evidence.js";
+import type {
+  AuditEventEvidence,
+  AuditPartitionEvidence
+} from "./audit-event-evidence.js";
 import type { AuditdMode } from "./auditd-mode.js";
+import {
+  createAuditEventEvidence
+} from "./create-audit-event-evidence.js";
 
 interface Source {
   readonly callerSubject: string;
   mode: AuditdMode;
-  cursor: bigint;
   readonly events: Map<string, {
     readonly canonical: string;
     readonly evidence: AuditEventEvidence;
@@ -44,6 +48,7 @@ const certificate = await readFile(
 const privateKey = await readFile(
   requireEnvironment("CTLFLOW_TEST_TLS_PRIVATE_KEY_PATH"));
 const sources = new Map<string, Source>();
+const partitionCursors = new Map<string, bigint>();
 const server = new Server();
 server.addService(AuditServiceService, {
   recordAuditBatch: recordAuditBatch as handleUnaryCall<
@@ -100,22 +105,40 @@ function recordAuditBatch(
     callback({ code: status.PERMISSION_DENIED, message: "denied" });
     return;
   }
-  if (call.request.sourceSchemaGeneration <= 0n
-      || call.request.events.length < 1
-      || call.request.events.length > 100) {
+  if (call.request.events.length < 1) {
     callback({ code: status.INVALID_ARGUMENT, message: "invalid batch" });
+    return;
+  }
+  if (call.request.events.length > 100) {
+    callback({
+      code: status.RESOURCE_EXHAUSTED,
+      message: "batch limit exceeded"
+    });
     return;
   }
 
   try {
+    const requestIds = new Set<string>();
     const additions: Array<{
       readonly event: AuditEvent;
       readonly canonical: string;
       readonly evidence: AuditEventEvidence;
+      readonly partitionKey: string;
     }> = [];
     for (const event of call.request.events) {
-      const canonical = JSON.stringify(event, (_key, value: unknown) =>
-        typeof value === "bigint" ? value.toString() : value);
+      if (requestIds.has(event.sourceEventId)) {
+        callback({
+          code: status.INVALID_ARGUMENT,
+          message: "duplicate source event ID"
+        });
+        return;
+      }
+      requestIds.add(event.sourceEventId);
+
+      const evidence = createAuditEventEvidence(
+        event,
+        readOptionalMetadata(call.metadata.get("traceparent")));
+      const canonical = canonicalEventContent(event);
       const existing = source.events.get(event.sourceEventId);
       if (existing !== undefined) {
         if (existing.canonical !== canonical) {
@@ -130,18 +153,19 @@ function recordAuditBatch(
       additions.push({
         event,
         canonical,
-        evidence: createEvidence(
-          event,
-          readOptionalMetadata(call.metadata.get("traceparent")))
+        evidence,
+        partitionKey: createPartitionKey(evidence.partition)
       });
     }
 
     for (const addition of additions) {
-      source.cursor++;
+      const cursor =
+        (partitionCursors.get(addition.partitionKey) ?? 0n) + 1n;
+      partitionCursors.set(addition.partitionKey, cursor);
       source.events.set(addition.event.sourceEventId, {
         canonical: addition.canonical,
         evidence: addition.evidence,
-        cursor: source.cursor
+        cursor
       });
     }
     callback(null, {
@@ -155,117 +179,19 @@ function recordAuditBatch(
   }
 }
 
-function createEvidence(
-  event: AuditEvent,
-  receivedTraceparent: string | undefined
-): AuditEventEvidence {
-  if (event.sourceEventId.length === 0
-      || event.idempotencyKey.length === 0
-      || event.operation.length === 0
-      || event.occurredAt === undefined
-      || event.attribution === undefined
-      || event.partition?.tenant === undefined
-      || event.traceId.length !== 32
-      || event.spanId.length !== 16) {
-    throw new Error("invalid audit event");
-  }
-  const attribution = createAttributionEvidence(event.attribution);
-  const common = {
-    sourceEventId: event.sourceEventId,
-    idempotencyKey: event.idempotencyKey,
-    operation: event.operation,
-    occurredAt: event.occurredAt.toISOString(),
-    ...attribution,
-    tenantId: event.partition.tenant.tenantId,
-    traceId: event.traceId,
-    spanId: event.spanId,
-    ...(receivedTraceparent === undefined
-      ? {}
-      : { receivedTraceparent })
-  } as const;
-  const tenancy = event.tenancyMutation;
-  if (tenancy !== undefined) {
-    if (tenancy.tenant !== undefined) {
-      return {
-        ...common,
-        targetKind: "tenant",
-        targetId: tenancy.tenant.tenantId,
-        outcome: tenancy.outcome,
-        resultingState: tenancy.resultingState,
-        resourceRevision: tenancy.resourceRevision
-      };
+function canonicalEventContent(event: AuditEvent): string {
+  return JSON.stringify(event, (key, value: unknown) => {
+    if (key === "sourceEventId") {
+      return undefined;
     }
-    if (tenancy.workspace !== undefined) {
-      return {
-        ...common,
-        targetKind: "workspace",
-        targetId: tenancy.workspace.workspaceId,
-        outcome: tenancy.outcome,
-        resultingState: tenancy.resultingState,
-        resourceRevision: tenancy.resourceRevision
-      };
-    }
-  }
-  const session = event.identitySession;
-  if (
-    session !== undefined
-    && session.sessionId.length > 0
-    && session.accountPrincipalId.length > 0
-    && session.sessionRevision > 0n
-  ) {
-    return {
-      ...common,
-      targetKind: "session",
-      sessionId: session.sessionId,
-      accountPrincipalId: session.accountPrincipalId,
-      sessionRevision: session.sessionRevision,
-      action: mapSessionAction(session.action)
-    };
-  }
-  throw new Error("audit target is required");
+    return typeof value === "bigint" ? value.toString() : value;
+  });
 }
 
-function mapSessionAction(
-  action: IdentitySessionAction
-): "created" | "revoked" {
-  switch (action) {
-    case IdentitySessionAction.IDENTITY_SESSION_ACTION_CREATED:
-      return "created";
-    case IdentitySessionAction.IDENTITY_SESSION_ACTION_REVOKED:
-      return "revoked";
-    default:
-      throw new Error("identity Session action is invalid");
-  }
-}
-
-function createAttributionEvidence(
-  attribution: NonNullable<AuditEvent["attribution"]>
-): Pick<
-  AuditEventEvidence,
-  | "kubernetesSubject"
-  | "actorPrincipalId"
-  | "attachedAccountPrincipalId"
-  | "immediateCaller"
-> {
-  if (attribution.kubernetesSubject !== undefined) {
-    return {
-      kubernetesSubject: attribution.kubernetesSubject,
-      ...(attribution.immediateCaller === undefined
-        ? {}
-        : { immediateCaller: attribution.immediateCaller })
-    };
-  }
-  if (attribution.attachedActor !== undefined) {
-    return {
-      actorPrincipalId: attribution.attachedActor.actorPrincipalId,
-      attachedAccountPrincipalId:
-        attribution.attachedActor.attachedAccountPrincipalId,
-      ...(attribution.immediateCaller === undefined
-        ? {}
-        : { immediateCaller: attribution.immediateCaller })
-    };
-  }
-  throw new Error("audit attribution is required");
+function createPartitionKey(partition: AuditPartitionEvidence): string {
+  return partition.kind === "global"
+    ? "global"
+    : `tenant:${partition.tenantId}`;
 }
 
 function authenticate(
@@ -315,7 +241,6 @@ async function handleControl(
     sources.set(body.sourceId, {
       callerSubject: body.callerSubject,
       mode: "available",
-      cursor: 0n,
       events: new Map()
     });
     sendJson(response, 201, {});

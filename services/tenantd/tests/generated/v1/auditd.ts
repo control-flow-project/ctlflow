@@ -22,46 +22,91 @@ import { Timestamp } from "../google/protobuf/timestamp.js";
 
 export const protobufPackage = "ctlflow.audit.v1";
 
-export enum AuditOutcome {
-  AUDIT_OUTCOME_UNSPECIFIED = 0,
-  AUDIT_OUTCOME_SUCCEEDED = 1,
-  AUDIT_OUTCOME_DENIED = 2,
-  AUDIT_OUTCOME_FAILED = 3,
+export enum TenantMutationAction {
+  TENANT_MUTATION_ACTION_UNSPECIFIED = 0,
+  TENANT_MUTATION_ACTION_CREATE_TENANT = 1,
+  TENANT_MUTATION_ACTION_UPDATE_TENANT = 2,
+  TENANT_MUTATION_ACTION_SET_TENANT_STATE = 3,
   UNRECOGNIZED = -1,
 }
 
-export function auditOutcomeFromJSON(object: any): AuditOutcome {
+export function tenantMutationActionFromJSON(object: any): TenantMutationAction {
   switch (object) {
     case 0:
-    case "AUDIT_OUTCOME_UNSPECIFIED":
-      return AuditOutcome.AUDIT_OUTCOME_UNSPECIFIED;
+    case "TENANT_MUTATION_ACTION_UNSPECIFIED":
+      return TenantMutationAction.TENANT_MUTATION_ACTION_UNSPECIFIED;
     case 1:
-    case "AUDIT_OUTCOME_SUCCEEDED":
-      return AuditOutcome.AUDIT_OUTCOME_SUCCEEDED;
+    case "TENANT_MUTATION_ACTION_CREATE_TENANT":
+      return TenantMutationAction.TENANT_MUTATION_ACTION_CREATE_TENANT;
     case 2:
-    case "AUDIT_OUTCOME_DENIED":
-      return AuditOutcome.AUDIT_OUTCOME_DENIED;
+    case "TENANT_MUTATION_ACTION_UPDATE_TENANT":
+      return TenantMutationAction.TENANT_MUTATION_ACTION_UPDATE_TENANT;
     case 3:
-    case "AUDIT_OUTCOME_FAILED":
-      return AuditOutcome.AUDIT_OUTCOME_FAILED;
+    case "TENANT_MUTATION_ACTION_SET_TENANT_STATE":
+      return TenantMutationAction.TENANT_MUTATION_ACTION_SET_TENANT_STATE;
     case -1:
     case "UNRECOGNIZED":
     default:
-      return AuditOutcome.UNRECOGNIZED;
+      return TenantMutationAction.UNRECOGNIZED;
   }
 }
 
-export function auditOutcomeToJSON(object: AuditOutcome): string {
+export function tenantMutationActionToJSON(object: TenantMutationAction): string {
   switch (object) {
-    case AuditOutcome.AUDIT_OUTCOME_UNSPECIFIED:
-      return "AUDIT_OUTCOME_UNSPECIFIED";
-    case AuditOutcome.AUDIT_OUTCOME_SUCCEEDED:
-      return "AUDIT_OUTCOME_SUCCEEDED";
-    case AuditOutcome.AUDIT_OUTCOME_DENIED:
-      return "AUDIT_OUTCOME_DENIED";
-    case AuditOutcome.AUDIT_OUTCOME_FAILED:
-      return "AUDIT_OUTCOME_FAILED";
-    case AuditOutcome.UNRECOGNIZED:
+    case TenantMutationAction.TENANT_MUTATION_ACTION_UNSPECIFIED:
+      return "TENANT_MUTATION_ACTION_UNSPECIFIED";
+    case TenantMutationAction.TENANT_MUTATION_ACTION_CREATE_TENANT:
+      return "TENANT_MUTATION_ACTION_CREATE_TENANT";
+    case TenantMutationAction.TENANT_MUTATION_ACTION_UPDATE_TENANT:
+      return "TENANT_MUTATION_ACTION_UPDATE_TENANT";
+    case TenantMutationAction.TENANT_MUTATION_ACTION_SET_TENANT_STATE:
+      return "TENANT_MUTATION_ACTION_SET_TENANT_STATE";
+    case TenantMutationAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum WorkspaceMutationAction {
+  WORKSPACE_MUTATION_ACTION_UNSPECIFIED = 0,
+  WORKSPACE_MUTATION_ACTION_CREATE_WORKSPACE = 1,
+  WORKSPACE_MUTATION_ACTION_UPDATE_WORKSPACE = 2,
+  WORKSPACE_MUTATION_ACTION_SET_WORKSPACE_STATE = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function workspaceMutationActionFromJSON(object: any): WorkspaceMutationAction {
+  switch (object) {
+    case 0:
+    case "WORKSPACE_MUTATION_ACTION_UNSPECIFIED":
+      return WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_UNSPECIFIED;
+    case 1:
+    case "WORKSPACE_MUTATION_ACTION_CREATE_WORKSPACE":
+      return WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_CREATE_WORKSPACE;
+    case 2:
+    case "WORKSPACE_MUTATION_ACTION_UPDATE_WORKSPACE":
+      return WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_UPDATE_WORKSPACE;
+    case 3:
+    case "WORKSPACE_MUTATION_ACTION_SET_WORKSPACE_STATE":
+      return WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_SET_WORKSPACE_STATE;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return WorkspaceMutationAction.UNRECOGNIZED;
+  }
+}
+
+export function workspaceMutationActionToJSON(object: WorkspaceMutationAction): string {
+  switch (object) {
+    case WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_UNSPECIFIED:
+      return "WORKSPACE_MUTATION_ACTION_UNSPECIFIED";
+    case WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_CREATE_WORKSPACE:
+      return "WORKSPACE_MUTATION_ACTION_CREATE_WORKSPACE";
+    case WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_UPDATE_WORKSPACE:
+      return "WORKSPACE_MUTATION_ACTION_UPDATE_WORKSPACE";
+    case WorkspaceMutationAction.WORKSPACE_MUTATION_ACTION_SET_WORKSPACE_STATE:
+      return "WORKSPACE_MUTATION_ACTION_SET_WORKSPACE_STATE";
+    case WorkspaceMutationAction.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -151,8 +196,247 @@ export function identitySessionActionToJSON(object: IdentitySessionAction): stri
   }
 }
 
+export enum AppMutationAction {
+  APP_MUTATION_ACTION_UNSPECIFIED = 0,
+  APP_MUTATION_ACTION_CREATED = 1,
+  APP_MUTATION_ACTION_PACKAGE_GENERATION_CHANGED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function appMutationActionFromJSON(object: any): AppMutationAction {
+  switch (object) {
+    case 0:
+    case "APP_MUTATION_ACTION_UNSPECIFIED":
+      return AppMutationAction.APP_MUTATION_ACTION_UNSPECIFIED;
+    case 1:
+    case "APP_MUTATION_ACTION_CREATED":
+      return AppMutationAction.APP_MUTATION_ACTION_CREATED;
+    case 2:
+    case "APP_MUTATION_ACTION_PACKAGE_GENERATION_CHANGED":
+      return AppMutationAction.APP_MUTATION_ACTION_PACKAGE_GENERATION_CHANGED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return AppMutationAction.UNRECOGNIZED;
+  }
+}
+
+export function appMutationActionToJSON(object: AppMutationAction): string {
+  switch (object) {
+    case AppMutationAction.APP_MUTATION_ACTION_UNSPECIFIED:
+      return "APP_MUTATION_ACTION_UNSPECIFIED";
+    case AppMutationAction.APP_MUTATION_ACTION_CREATED:
+      return "APP_MUTATION_ACTION_CREATED";
+    case AppMutationAction.APP_MUTATION_ACTION_PACKAGE_GENERATION_CHANGED:
+      return "APP_MUTATION_ACTION_PACKAGE_GENERATION_CHANGED";
+    case AppMutationAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ProjectionMutationAction {
+  PROJECTION_MUTATION_ACTION_UNSPECIFIED = 0,
+  PROJECTION_MUTATION_ACTION_CREATED = 1,
+  PROJECTION_MUTATION_ACTION_VERSION_CHANGED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function projectionMutationActionFromJSON(object: any): ProjectionMutationAction {
+  switch (object) {
+    case 0:
+    case "PROJECTION_MUTATION_ACTION_UNSPECIFIED":
+      return ProjectionMutationAction.PROJECTION_MUTATION_ACTION_UNSPECIFIED;
+    case 1:
+    case "PROJECTION_MUTATION_ACTION_CREATED":
+      return ProjectionMutationAction.PROJECTION_MUTATION_ACTION_CREATED;
+    case 2:
+    case "PROJECTION_MUTATION_ACTION_VERSION_CHANGED":
+      return ProjectionMutationAction.PROJECTION_MUTATION_ACTION_VERSION_CHANGED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ProjectionMutationAction.UNRECOGNIZED;
+  }
+}
+
+export function projectionMutationActionToJSON(object: ProjectionMutationAction): string {
+  switch (object) {
+    case ProjectionMutationAction.PROJECTION_MUTATION_ACTION_UNSPECIFIED:
+      return "PROJECTION_MUTATION_ACTION_UNSPECIFIED";
+    case ProjectionMutationAction.PROJECTION_MUTATION_ACTION_CREATED:
+      return "PROJECTION_MUTATION_ACTION_CREATED";
+    case ProjectionMutationAction.PROJECTION_MUTATION_ACTION_VERSION_CHANGED:
+      return "PROJECTION_MUTATION_ACTION_VERSION_CHANGED";
+    case ProjectionMutationAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum PlacementMutationAction {
+  PLACEMENT_MUTATION_ACTION_UNSPECIFIED = 0,
+  PLACEMENT_MUTATION_ACTION_DECLARED = 1,
+  PLACEMENT_MUTATION_ACTION_UPDATED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function placementMutationActionFromJSON(object: any): PlacementMutationAction {
+  switch (object) {
+    case 0:
+    case "PLACEMENT_MUTATION_ACTION_UNSPECIFIED":
+      return PlacementMutationAction.PLACEMENT_MUTATION_ACTION_UNSPECIFIED;
+    case 1:
+    case "PLACEMENT_MUTATION_ACTION_DECLARED":
+      return PlacementMutationAction.PLACEMENT_MUTATION_ACTION_DECLARED;
+    case 2:
+    case "PLACEMENT_MUTATION_ACTION_UPDATED":
+      return PlacementMutationAction.PLACEMENT_MUTATION_ACTION_UPDATED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PlacementMutationAction.UNRECOGNIZED;
+  }
+}
+
+export function placementMutationActionToJSON(object: PlacementMutationAction): string {
+  switch (object) {
+    case PlacementMutationAction.PLACEMENT_MUTATION_ACTION_UNSPECIFIED:
+      return "PLACEMENT_MUTATION_ACTION_UNSPECIFIED";
+    case PlacementMutationAction.PLACEMENT_MUTATION_ACTION_DECLARED:
+      return "PLACEMENT_MUTATION_ACTION_DECLARED";
+    case PlacementMutationAction.PLACEMENT_MUTATION_ACTION_UPDATED:
+      return "PLACEMENT_MUTATION_ACTION_UPDATED";
+    case PlacementMutationAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum WorkloadMutationAction {
+  WORKLOAD_MUTATION_ACTION_UNSPECIFIED = 0,
+  WORKLOAD_MUTATION_ACTION_DECLARED = 1,
+  WORKLOAD_MUTATION_ACTION_UPDATED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function workloadMutationActionFromJSON(object: any): WorkloadMutationAction {
+  switch (object) {
+    case 0:
+    case "WORKLOAD_MUTATION_ACTION_UNSPECIFIED":
+      return WorkloadMutationAction.WORKLOAD_MUTATION_ACTION_UNSPECIFIED;
+    case 1:
+    case "WORKLOAD_MUTATION_ACTION_DECLARED":
+      return WorkloadMutationAction.WORKLOAD_MUTATION_ACTION_DECLARED;
+    case 2:
+    case "WORKLOAD_MUTATION_ACTION_UPDATED":
+      return WorkloadMutationAction.WORKLOAD_MUTATION_ACTION_UPDATED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return WorkloadMutationAction.UNRECOGNIZED;
+  }
+}
+
+export function workloadMutationActionToJSON(object: WorkloadMutationAction): string {
+  switch (object) {
+    case WorkloadMutationAction.WORKLOAD_MUTATION_ACTION_UNSPECIFIED:
+      return "WORKLOAD_MUTATION_ACTION_UNSPECIFIED";
+    case WorkloadMutationAction.WORKLOAD_MUTATION_ACTION_DECLARED:
+      return "WORKLOAD_MUTATION_ACTION_DECLARED";
+    case WorkloadMutationAction.WORKLOAD_MUTATION_ACTION_UPDATED:
+      return "WORKLOAD_MUTATION_ACTION_UPDATED";
+    case WorkloadMutationAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum RunMutationAction {
+  RUN_MUTATION_ACTION_UNSPECIFIED = 0,
+  RUN_MUTATION_ACTION_CREATED = 1,
+  RUN_MUTATION_ACTION_CANCELLATION_REQUESTED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function runMutationActionFromJSON(object: any): RunMutationAction {
+  switch (object) {
+    case 0:
+    case "RUN_MUTATION_ACTION_UNSPECIFIED":
+      return RunMutationAction.RUN_MUTATION_ACTION_UNSPECIFIED;
+    case 1:
+    case "RUN_MUTATION_ACTION_CREATED":
+      return RunMutationAction.RUN_MUTATION_ACTION_CREATED;
+    case 2:
+    case "RUN_MUTATION_ACTION_CANCELLATION_REQUESTED":
+      return RunMutationAction.RUN_MUTATION_ACTION_CANCELLATION_REQUESTED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return RunMutationAction.UNRECOGNIZED;
+  }
+}
+
+export function runMutationActionToJSON(object: RunMutationAction): string {
+  switch (object) {
+    case RunMutationAction.RUN_MUTATION_ACTION_UNSPECIFIED:
+      return "RUN_MUTATION_ACTION_UNSPECIFIED";
+    case RunMutationAction.RUN_MUTATION_ACTION_CREATED:
+      return "RUN_MUTATION_ACTION_CREATED";
+    case RunMutationAction.RUN_MUTATION_ACTION_CANCELLATION_REQUESTED:
+      return "RUN_MUTATION_ACTION_CANCELLATION_REQUESTED";
+    case RunMutationAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ExecutionDesiredState {
+  EXECUTION_DESIRED_STATE_UNSPECIFIED = 0,
+  EXECUTION_DESIRED_STATE_ACTIVE = 1,
+  EXECUTION_DESIRED_STATE_SUSPENDED = 2,
+  EXECUTION_DESIRED_STATE_RETIRED = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function executionDesiredStateFromJSON(object: any): ExecutionDesiredState {
+  switch (object) {
+    case 0:
+    case "EXECUTION_DESIRED_STATE_UNSPECIFIED":
+      return ExecutionDesiredState.EXECUTION_DESIRED_STATE_UNSPECIFIED;
+    case 1:
+    case "EXECUTION_DESIRED_STATE_ACTIVE":
+      return ExecutionDesiredState.EXECUTION_DESIRED_STATE_ACTIVE;
+    case 2:
+    case "EXECUTION_DESIRED_STATE_SUSPENDED":
+      return ExecutionDesiredState.EXECUTION_DESIRED_STATE_SUSPENDED;
+    case 3:
+    case "EXECUTION_DESIRED_STATE_RETIRED":
+      return ExecutionDesiredState.EXECUTION_DESIRED_STATE_RETIRED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ExecutionDesiredState.UNRECOGNIZED;
+  }
+}
+
+export function executionDesiredStateToJSON(object: ExecutionDesiredState): string {
+  switch (object) {
+    case ExecutionDesiredState.EXECUTION_DESIRED_STATE_UNSPECIFIED:
+      return "EXECUTION_DESIRED_STATE_UNSPECIFIED";
+    case ExecutionDesiredState.EXECUTION_DESIRED_STATE_ACTIVE:
+      return "EXECUTION_DESIRED_STATE_ACTIVE";
+    case ExecutionDesiredState.EXECUTION_DESIRED_STATE_SUSPENDED:
+      return "EXECUTION_DESIRED_STATE_SUSPENDED";
+    case ExecutionDesiredState.EXECUTION_DESIRED_STATE_RETIRED:
+      return "EXECUTION_DESIRED_STATE_RETIRED";
+    case ExecutionDesiredState.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface RecordAuditBatchRequest {
-  sourceSchemaGeneration: bigint;
   events: AuditEvent[];
 }
 
@@ -167,27 +451,34 @@ export interface AuditAcceptance {
 
 export interface AuditEvent {
   sourceEventId: string;
-  idempotencyKey: string;
-  operation: string;
   occurredAt: Date | undefined;
   attribution: AuditAttribution | undefined;
   partition: AuditPartition | undefined;
   traceId: string;
   spanId: string;
-  tenancyMutation?: TenancyMutationAuditDetail | undefined;
+  tenantMutation?: TenantMutationAuditDetail | undefined;
+  workspaceMutation?: WorkspaceMutationAuditDetail | undefined;
   identitySession?: IdentitySessionAuditDetail | undefined;
+  packageDeclaration?: PackageDeclarationAuditDetail | undefined;
+  appMutation?: AppMutationAuditDetail | undefined;
+  configurationPublication?: ConfigurationPublicationAuditDetail | undefined;
+  secretPublication?: SecretPublicationAuditDetail | undefined;
+  projectionMutation?: ProjectionMutationAuditDetail | undefined;
+  placementMutation?: PlacementMutationAuditDetail | undefined;
+  workloadMutation?: WorkloadMutationAuditDetail | undefined;
+  runMutation?: RunMutationAuditDetail | undefined;
 }
 
 export interface AuditAttribution {
-  kubernetesSubject?: string | undefined;
-  attachedActor?: AttachedActor | undefined;
-  immediateCaller?: string | undefined;
-  runtimePrincipal?: string | undefined;
+  operatorCommonName?: string | undefined;
+  workloadSubject?: string | undefined;
+  invocation?: InvocationAuditAttribution | undefined;
 }
 
-export interface AttachedActor {
+export interface InvocationAuditAttribution {
   actorPrincipalId: string;
   attachedAccountPrincipalId: string;
+  workloadSubject: string;
 }
 
 export interface AuditPartition {
@@ -202,44 +493,147 @@ export interface TenantAuditPartition {
   tenantId: string;
 }
 
-export interface TenancyMutationAuditDetail {
-  tenant?: TenantAuditTarget | undefined;
-  workspace?: WorkspaceAuditTarget | undefined;
-  resourceRevision: bigint;
-  outcome: AuditOutcome;
-  resultingState: TenancyResourceState;
+export interface PlacementAuditTarget {
+  global?: GlobalPlacementAuditTarget | undefined;
+  tenant?: TenantPlacementAuditTarget | undefined;
+  workspace?: WorkspacePlacementAuditTarget | undefined;
+  user?: UserPlacementAuditTarget | undefined;
 }
 
-export interface TenantAuditTarget {
+export interface GlobalPlacementAuditTarget {
+}
+
+export interface TenantPlacementAuditTarget {
   tenantId: string;
 }
 
-export interface WorkspaceAuditTarget {
+export interface WorkspacePlacementAuditTarget {
   tenantId: string;
   workspaceId: string;
 }
 
+export interface UserPlacementAuditTarget {
+  tenantId: string;
+  accountPrincipalId: string;
+}
+
+export interface ConsumerBindingAuditDetail {
+  placementId: string;
+  placementTarget: PlacementAuditTarget | undefined;
+  consumerId: string;
+  purpose: string;
+}
+
+export interface ConfigurationVersionAuditTarget {
+  configurationId: string;
+  configurationVersionId: string;
+}
+
+export interface SecretVersionAuditTarget {
+  secretId: string;
+  secretVersionId: string;
+}
+
+export interface TenantMutationAuditDetail {
+  action: TenantMutationAction;
+  resourceRevision: bigint;
+  resultingState: TenancyResourceState;
+}
+
+export interface WorkspaceMutationAuditDetail {
+  workspaceId: string;
+  action: WorkspaceMutationAction;
+  resourceRevision: bigint;
+  resultingState: TenancyResourceState;
+}
+
 export interface IdentitySessionAuditDetail {
   sessionId: string;
-  accountPrincipalId: string;
+  humanAccountPrincipalId: string;
   sessionRevision: bigint;
   action: IdentitySessionAction;
 }
 
+export interface PackageDeclarationAuditDetail {
+  packageId: string;
+  generation: bigint;
+}
+
+export interface AppMutationAuditDetail {
+  appId: string;
+  scope: PlacementAuditTarget | undefined;
+  placementId: string;
+  packageId: string;
+  packageGeneration: bigint;
+  appRevision: bigint;
+  action: AppMutationAction;
+}
+
+export interface ConfigurationPublicationAuditDetail {
+  target: ConfigurationVersionAuditTarget | undefined;
+  binding: ConsumerBindingAuditDetail | undefined;
+  identityRevision: bigint;
+  dependencyClaimId?: string | undefined;
+  dependencyClaimRevision?: bigint | undefined;
+}
+
+export interface SecretPublicationAuditDetail {
+  target: SecretVersionAuditTarget | undefined;
+  binding: ConsumerBindingAuditDetail | undefined;
+  identityRevision: bigint;
+  dependencyClaimId?: string | undefined;
+  dependencyClaimRevision?: bigint | undefined;
+}
+
+export interface ProjectionMutationAuditDetail {
+  projectionId: string;
+  action: ProjectionMutationAction;
+  projectionRevision: bigint;
+  configuration?: ConfigurationVersionAuditTarget | undefined;
+  secret?: SecretVersionAuditTarget | undefined;
+  binding: ConsumerBindingAuditDetail | undefined;
+}
+
+export interface PlacementMutationAuditDetail {
+  placementId: string;
+  target: PlacementAuditTarget | undefined;
+  action: PlacementMutationAction;
+  placementRevision: bigint;
+  resultingDesiredState: ExecutionDesiredState;
+}
+
+export interface WorkloadMutationAuditDetail {
+  workloadId: string;
+  placementId: string;
+  placementTarget: PlacementAuditTarget | undefined;
+  action: WorkloadMutationAction;
+  workloadRevision: bigint;
+  resultingDesiredState: ExecutionDesiredState;
+  appId: string;
+  appRevision: bigint;
+  packageId: string;
+  packageGeneration: bigint;
+  componentId: string;
+}
+
+export interface RunMutationAuditDetail {
+  runId: string;
+  workloadId: string;
+  placementId: string;
+  placementTarget: PlacementAuditTarget | undefined;
+  action: RunMutationAction;
+  runRevision: bigint;
+  configuredActorPrincipalId?: string | undefined;
+}
+
 function createBaseRecordAuditBatchRequest(): RecordAuditBatchRequest {
-  return { sourceSchemaGeneration: 0n, events: [] };
+  return { events: [] };
 }
 
 export const RecordAuditBatchRequest: MessageFns<RecordAuditBatchRequest> = {
   encode(message: RecordAuditBatchRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sourceSchemaGeneration !== 0n) {
-      if (BigInt.asUintN(64, message.sourceSchemaGeneration) !== message.sourceSchemaGeneration) {
-        throw new globalThis.Error("value provided for field message.sourceSchemaGeneration of type uint64 too large");
-      }
-      writer.uint32(8).uint64(message.sourceSchemaGeneration);
-    }
     for (const v of message.events) {
-      AuditEvent.encode(v!, writer.uint32(18).fork()).join();
+      AuditEvent.encode(v!, writer.uint32(10).fork()).join();
     }
     return writer;
   },
@@ -252,15 +646,7 @@ export const RecordAuditBatchRequest: MessageFns<RecordAuditBatchRequest> = {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sourceSchemaGeneration = reader.uint64() as bigint;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
+          if (tag !== 10) {
             break;
           }
 
@@ -278,16 +664,12 @@ export const RecordAuditBatchRequest: MessageFns<RecordAuditBatchRequest> = {
 
   fromJSON(object: any): RecordAuditBatchRequest {
     return {
-      sourceSchemaGeneration: isSet(object.sourceSchemaGeneration) ? BigInt(object.sourceSchemaGeneration) : 0n,
       events: globalThis.Array.isArray(object?.events) ? object.events.map((e: any) => AuditEvent.fromJSON(e)) : [],
     };
   },
 
   toJSON(message: RecordAuditBatchRequest): unknown {
     const obj: any = {};
-    if (message.sourceSchemaGeneration !== 0n) {
-      obj.sourceSchemaGeneration = message.sourceSchemaGeneration.toString();
-    }
     if (message.events?.length) {
       obj.events = message.events.map((e) => AuditEvent.toJSON(e));
     }
@@ -299,7 +681,6 @@ export const RecordAuditBatchRequest: MessageFns<RecordAuditBatchRequest> = {
   },
   fromPartial(object: DeepPartial<RecordAuditBatchRequest>): RecordAuditBatchRequest {
     const message = createBaseRecordAuditBatchRequest();
-    message.sourceSchemaGeneration = object.sourceSchemaGeneration ?? 0n;
     message.events = object.events?.map((e) => AuditEvent.fromPartial(e)) || [];
     return message;
   },
@@ -449,15 +830,22 @@ export const AuditAcceptance: MessageFns<AuditAcceptance> = {
 function createBaseAuditEvent(): AuditEvent {
   return {
     sourceEventId: "",
-    idempotencyKey: "",
-    operation: "",
     occurredAt: undefined,
     attribution: undefined,
     partition: undefined,
     traceId: "",
     spanId: "",
-    tenancyMutation: undefined,
+    tenantMutation: undefined,
+    workspaceMutation: undefined,
     identitySession: undefined,
+    packageDeclaration: undefined,
+    appMutation: undefined,
+    configurationPublication: undefined,
+    secretPublication: undefined,
+    projectionMutation: undefined,
+    placementMutation: undefined,
+    workloadMutation: undefined,
+    runMutation: undefined,
   };
 }
 
@@ -466,32 +854,53 @@ export const AuditEvent: MessageFns<AuditEvent> = {
     if (message.sourceEventId !== "") {
       writer.uint32(10).string(message.sourceEventId);
     }
-    if (message.idempotencyKey !== "") {
-      writer.uint32(18).string(message.idempotencyKey);
-    }
-    if (message.operation !== "") {
-      writer.uint32(26).string(message.operation);
-    }
     if (message.occurredAt !== undefined) {
-      Timestamp.encode(toTimestamp(message.occurredAt), writer.uint32(34).fork()).join();
+      Timestamp.encode(toTimestamp(message.occurredAt), writer.uint32(18).fork()).join();
     }
     if (message.attribution !== undefined) {
-      AuditAttribution.encode(message.attribution, writer.uint32(42).fork()).join();
+      AuditAttribution.encode(message.attribution, writer.uint32(26).fork()).join();
     }
     if (message.partition !== undefined) {
-      AuditPartition.encode(message.partition, writer.uint32(50).fork()).join();
+      AuditPartition.encode(message.partition, writer.uint32(34).fork()).join();
     }
     if (message.traceId !== "") {
-      writer.uint32(58).string(message.traceId);
+      writer.uint32(42).string(message.traceId);
     }
     if (message.spanId !== "") {
-      writer.uint32(66).string(message.spanId);
+      writer.uint32(50).string(message.spanId);
     }
-    if (message.tenancyMutation !== undefined) {
-      TenancyMutationAuditDetail.encode(message.tenancyMutation, writer.uint32(162).fork()).join();
+    if (message.tenantMutation !== undefined) {
+      TenantMutationAuditDetail.encode(message.tenantMutation, writer.uint32(58).fork()).join();
+    }
+    if (message.workspaceMutation !== undefined) {
+      WorkspaceMutationAuditDetail.encode(message.workspaceMutation, writer.uint32(66).fork()).join();
     }
     if (message.identitySession !== undefined) {
-      IdentitySessionAuditDetail.encode(message.identitySession, writer.uint32(170).fork()).join();
+      IdentitySessionAuditDetail.encode(message.identitySession, writer.uint32(74).fork()).join();
+    }
+    if (message.packageDeclaration !== undefined) {
+      PackageDeclarationAuditDetail.encode(message.packageDeclaration, writer.uint32(82).fork()).join();
+    }
+    if (message.appMutation !== undefined) {
+      AppMutationAuditDetail.encode(message.appMutation, writer.uint32(90).fork()).join();
+    }
+    if (message.configurationPublication !== undefined) {
+      ConfigurationPublicationAuditDetail.encode(message.configurationPublication, writer.uint32(98).fork()).join();
+    }
+    if (message.secretPublication !== undefined) {
+      SecretPublicationAuditDetail.encode(message.secretPublication, writer.uint32(106).fork()).join();
+    }
+    if (message.projectionMutation !== undefined) {
+      ProjectionMutationAuditDetail.encode(message.projectionMutation, writer.uint32(114).fork()).join();
+    }
+    if (message.placementMutation !== undefined) {
+      PlacementMutationAuditDetail.encode(message.placementMutation, writer.uint32(122).fork()).join();
+    }
+    if (message.workloadMutation !== undefined) {
+      WorkloadMutationAuditDetail.encode(message.workloadMutation, writer.uint32(130).fork()).join();
+    }
+    if (message.runMutation !== undefined) {
+      RunMutationAuditDetail.encode(message.runMutation, writer.uint32(138).fork()).join();
     }
     return writer;
   },
@@ -516,7 +925,7 @@ export const AuditEvent: MessageFns<AuditEvent> = {
             break;
           }
 
-          message.idempotencyKey = reader.string();
+          message.occurredAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
           continue;
         }
         case 3: {
@@ -524,7 +933,7 @@ export const AuditEvent: MessageFns<AuditEvent> = {
             break;
           }
 
-          message.operation = reader.string();
+          message.attribution = AuditAttribution.decode(reader, reader.uint32());
           continue;
         }
         case 4: {
@@ -532,7 +941,7 @@ export const AuditEvent: MessageFns<AuditEvent> = {
             break;
           }
 
-          message.occurredAt = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          message.partition = AuditPartition.decode(reader, reader.uint32());
           continue;
         }
         case 5: {
@@ -540,7 +949,7 @@ export const AuditEvent: MessageFns<AuditEvent> = {
             break;
           }
 
-          message.attribution = AuditAttribution.decode(reader, reader.uint32());
+          message.traceId = reader.string();
           continue;
         }
         case 6: {
@@ -548,7 +957,7 @@ export const AuditEvent: MessageFns<AuditEvent> = {
             break;
           }
 
-          message.partition = AuditPartition.decode(reader, reader.uint32());
+          message.spanId = reader.string();
           continue;
         }
         case 7: {
@@ -556,7 +965,7 @@ export const AuditEvent: MessageFns<AuditEvent> = {
             break;
           }
 
-          message.traceId = reader.string();
+          message.tenantMutation = TenantMutationAuditDetail.decode(reader, reader.uint32());
           continue;
         }
         case 8: {
@@ -564,23 +973,79 @@ export const AuditEvent: MessageFns<AuditEvent> = {
             break;
           }
 
-          message.spanId = reader.string();
+          message.workspaceMutation = WorkspaceMutationAuditDetail.decode(reader, reader.uint32());
           continue;
         }
-        case 20: {
-          if (tag !== 162) {
-            break;
-          }
-
-          message.tenancyMutation = TenancyMutationAuditDetail.decode(reader, reader.uint32());
-          continue;
-        }
-        case 21: {
-          if (tag !== 170) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
           message.identitySession = IdentitySessionAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.packageDeclaration = PackageDeclarationAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.appMutation = AppMutationAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.configurationPublication = ConfigurationPublicationAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.secretPublication = SecretPublicationAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.projectionMutation = ProjectionMutationAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.placementMutation = PlacementMutationAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.workloadMutation = WorkloadMutationAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.runMutation = RunMutationAuditDetail.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -595,19 +1060,40 @@ export const AuditEvent: MessageFns<AuditEvent> = {
   fromJSON(object: any): AuditEvent {
     return {
       sourceEventId: isSet(object.sourceEventId) ? globalThis.String(object.sourceEventId) : "",
-      idempotencyKey: isSet(object.idempotencyKey) ? globalThis.String(object.idempotencyKey) : "",
-      operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
       occurredAt: isSet(object.occurredAt) ? fromJsonTimestamp(object.occurredAt) : undefined,
       attribution: isSet(object.attribution) ? AuditAttribution.fromJSON(object.attribution) : undefined,
       partition: isSet(object.partition) ? AuditPartition.fromJSON(object.partition) : undefined,
       traceId: isSet(object.traceId) ? globalThis.String(object.traceId) : "",
       spanId: isSet(object.spanId) ? globalThis.String(object.spanId) : "",
-      tenancyMutation: isSet(object.tenancyMutation)
-        ? TenancyMutationAuditDetail.fromJSON(object.tenancyMutation)
+      tenantMutation: isSet(object.tenantMutation)
+        ? TenantMutationAuditDetail.fromJSON(object.tenantMutation)
+        : undefined,
+      workspaceMutation: isSet(object.workspaceMutation)
+        ? WorkspaceMutationAuditDetail.fromJSON(object.workspaceMutation)
         : undefined,
       identitySession: isSet(object.identitySession)
         ? IdentitySessionAuditDetail.fromJSON(object.identitySession)
         : undefined,
+      packageDeclaration: isSet(object.packageDeclaration)
+        ? PackageDeclarationAuditDetail.fromJSON(object.packageDeclaration)
+        : undefined,
+      appMutation: isSet(object.appMutation) ? AppMutationAuditDetail.fromJSON(object.appMutation) : undefined,
+      configurationPublication: isSet(object.configurationPublication)
+        ? ConfigurationPublicationAuditDetail.fromJSON(object.configurationPublication)
+        : undefined,
+      secretPublication: isSet(object.secretPublication)
+        ? SecretPublicationAuditDetail.fromJSON(object.secretPublication)
+        : undefined,
+      projectionMutation: isSet(object.projectionMutation)
+        ? ProjectionMutationAuditDetail.fromJSON(object.projectionMutation)
+        : undefined,
+      placementMutation: isSet(object.placementMutation)
+        ? PlacementMutationAuditDetail.fromJSON(object.placementMutation)
+        : undefined,
+      workloadMutation: isSet(object.workloadMutation)
+        ? WorkloadMutationAuditDetail.fromJSON(object.workloadMutation)
+        : undefined,
+      runMutation: isSet(object.runMutation) ? RunMutationAuditDetail.fromJSON(object.runMutation) : undefined,
     };
   },
 
@@ -615,12 +1101,6 @@ export const AuditEvent: MessageFns<AuditEvent> = {
     const obj: any = {};
     if (message.sourceEventId !== "") {
       obj.sourceEventId = message.sourceEventId;
-    }
-    if (message.idempotencyKey !== "") {
-      obj.idempotencyKey = message.idempotencyKey;
-    }
-    if (message.operation !== "") {
-      obj.operation = message.operation;
     }
     if (message.occurredAt !== undefined) {
       obj.occurredAt = message.occurredAt.toISOString();
@@ -637,11 +1117,38 @@ export const AuditEvent: MessageFns<AuditEvent> = {
     if (message.spanId !== "") {
       obj.spanId = message.spanId;
     }
-    if (message.tenancyMutation !== undefined) {
-      obj.tenancyMutation = TenancyMutationAuditDetail.toJSON(message.tenancyMutation);
+    if (message.tenantMutation !== undefined) {
+      obj.tenantMutation = TenantMutationAuditDetail.toJSON(message.tenantMutation);
+    }
+    if (message.workspaceMutation !== undefined) {
+      obj.workspaceMutation = WorkspaceMutationAuditDetail.toJSON(message.workspaceMutation);
     }
     if (message.identitySession !== undefined) {
       obj.identitySession = IdentitySessionAuditDetail.toJSON(message.identitySession);
+    }
+    if (message.packageDeclaration !== undefined) {
+      obj.packageDeclaration = PackageDeclarationAuditDetail.toJSON(message.packageDeclaration);
+    }
+    if (message.appMutation !== undefined) {
+      obj.appMutation = AppMutationAuditDetail.toJSON(message.appMutation);
+    }
+    if (message.configurationPublication !== undefined) {
+      obj.configurationPublication = ConfigurationPublicationAuditDetail.toJSON(message.configurationPublication);
+    }
+    if (message.secretPublication !== undefined) {
+      obj.secretPublication = SecretPublicationAuditDetail.toJSON(message.secretPublication);
+    }
+    if (message.projectionMutation !== undefined) {
+      obj.projectionMutation = ProjectionMutationAuditDetail.toJSON(message.projectionMutation);
+    }
+    if (message.placementMutation !== undefined) {
+      obj.placementMutation = PlacementMutationAuditDetail.toJSON(message.placementMutation);
+    }
+    if (message.workloadMutation !== undefined) {
+      obj.workloadMutation = WorkloadMutationAuditDetail.toJSON(message.workloadMutation);
+    }
+    if (message.runMutation !== undefined) {
+      obj.runMutation = RunMutationAuditDetail.toJSON(message.runMutation);
     }
     return obj;
   },
@@ -652,8 +1159,6 @@ export const AuditEvent: MessageFns<AuditEvent> = {
   fromPartial(object: DeepPartial<AuditEvent>): AuditEvent {
     const message = createBaseAuditEvent();
     message.sourceEventId = object.sourceEventId ?? "";
-    message.idempotencyKey = object.idempotencyKey ?? "";
-    message.operation = object.operation ?? "";
     message.occurredAt = object.occurredAt ?? undefined;
     message.attribution = (object.attribution !== undefined && object.attribution !== null)
       ? AuditAttribution.fromPartial(object.attribution)
@@ -663,38 +1168,58 @@ export const AuditEvent: MessageFns<AuditEvent> = {
       : undefined;
     message.traceId = object.traceId ?? "";
     message.spanId = object.spanId ?? "";
-    message.tenancyMutation = (object.tenancyMutation !== undefined && object.tenancyMutation !== null)
-      ? TenancyMutationAuditDetail.fromPartial(object.tenancyMutation)
+    message.tenantMutation = (object.tenantMutation !== undefined && object.tenantMutation !== null)
+      ? TenantMutationAuditDetail.fromPartial(object.tenantMutation)
+      : undefined;
+    message.workspaceMutation = (object.workspaceMutation !== undefined && object.workspaceMutation !== null)
+      ? WorkspaceMutationAuditDetail.fromPartial(object.workspaceMutation)
       : undefined;
     message.identitySession = (object.identitySession !== undefined && object.identitySession !== null)
       ? IdentitySessionAuditDetail.fromPartial(object.identitySession)
+      : undefined;
+    message.packageDeclaration = (object.packageDeclaration !== undefined && object.packageDeclaration !== null)
+      ? PackageDeclarationAuditDetail.fromPartial(object.packageDeclaration)
+      : undefined;
+    message.appMutation = (object.appMutation !== undefined && object.appMutation !== null)
+      ? AppMutationAuditDetail.fromPartial(object.appMutation)
+      : undefined;
+    message.configurationPublication =
+      (object.configurationPublication !== undefined && object.configurationPublication !== null)
+        ? ConfigurationPublicationAuditDetail.fromPartial(object.configurationPublication)
+        : undefined;
+    message.secretPublication = (object.secretPublication !== undefined && object.secretPublication !== null)
+      ? SecretPublicationAuditDetail.fromPartial(object.secretPublication)
+      : undefined;
+    message.projectionMutation = (object.projectionMutation !== undefined && object.projectionMutation !== null)
+      ? ProjectionMutationAuditDetail.fromPartial(object.projectionMutation)
+      : undefined;
+    message.placementMutation = (object.placementMutation !== undefined && object.placementMutation !== null)
+      ? PlacementMutationAuditDetail.fromPartial(object.placementMutation)
+      : undefined;
+    message.workloadMutation = (object.workloadMutation !== undefined && object.workloadMutation !== null)
+      ? WorkloadMutationAuditDetail.fromPartial(object.workloadMutation)
+      : undefined;
+    message.runMutation = (object.runMutation !== undefined && object.runMutation !== null)
+      ? RunMutationAuditDetail.fromPartial(object.runMutation)
       : undefined;
     return message;
   },
 };
 
 function createBaseAuditAttribution(): AuditAttribution {
-  return {
-    kubernetesSubject: undefined,
-    attachedActor: undefined,
-    immediateCaller: undefined,
-    runtimePrincipal: undefined,
-  };
+  return { operatorCommonName: undefined, workloadSubject: undefined, invocation: undefined };
 }
 
 export const AuditAttribution: MessageFns<AuditAttribution> = {
   encode(message: AuditAttribution, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.kubernetesSubject !== undefined) {
-      writer.uint32(10).string(message.kubernetesSubject);
+    if (message.operatorCommonName !== undefined) {
+      writer.uint32(10).string(message.operatorCommonName);
     }
-    if (message.attachedActor !== undefined) {
-      AttachedActor.encode(message.attachedActor, writer.uint32(18).fork()).join();
+    if (message.workloadSubject !== undefined) {
+      writer.uint32(18).string(message.workloadSubject);
     }
-    if (message.immediateCaller !== undefined) {
-      writer.uint32(26).string(message.immediateCaller);
-    }
-    if (message.runtimePrincipal !== undefined) {
-      writer.uint32(34).string(message.runtimePrincipal);
+    if (message.invocation !== undefined) {
+      InvocationAuditAttribution.encode(message.invocation, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -711,7 +1236,7 @@ export const AuditAttribution: MessageFns<AuditAttribution> = {
             break;
           }
 
-          message.kubernetesSubject = reader.string();
+          message.operatorCommonName = reader.string();
           continue;
         }
         case 2: {
@@ -719,7 +1244,7 @@ export const AuditAttribution: MessageFns<AuditAttribution> = {
             break;
           }
 
-          message.attachedActor = AttachedActor.decode(reader, reader.uint32());
+          message.workloadSubject = reader.string();
           continue;
         }
         case 3: {
@@ -727,15 +1252,7 @@ export const AuditAttribution: MessageFns<AuditAttribution> = {
             break;
           }
 
-          message.immediateCaller = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.runtimePrincipal = reader.string();
+          message.invocation = InvocationAuditAttribution.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -749,26 +1266,22 @@ export const AuditAttribution: MessageFns<AuditAttribution> = {
 
   fromJSON(object: any): AuditAttribution {
     return {
-      kubernetesSubject: isSet(object.kubernetesSubject) ? globalThis.String(object.kubernetesSubject) : undefined,
-      attachedActor: isSet(object.attachedActor) ? AttachedActor.fromJSON(object.attachedActor) : undefined,
-      immediateCaller: isSet(object.immediateCaller) ? globalThis.String(object.immediateCaller) : undefined,
-      runtimePrincipal: isSet(object.runtimePrincipal) ? globalThis.String(object.runtimePrincipal) : undefined,
+      operatorCommonName: isSet(object.operatorCommonName) ? globalThis.String(object.operatorCommonName) : undefined,
+      workloadSubject: isSet(object.workloadSubject) ? globalThis.String(object.workloadSubject) : undefined,
+      invocation: isSet(object.invocation) ? InvocationAuditAttribution.fromJSON(object.invocation) : undefined,
     };
   },
 
   toJSON(message: AuditAttribution): unknown {
     const obj: any = {};
-    if (message.kubernetesSubject !== undefined) {
-      obj.kubernetesSubject = message.kubernetesSubject;
+    if (message.operatorCommonName !== undefined) {
+      obj.operatorCommonName = message.operatorCommonName;
     }
-    if (message.attachedActor !== undefined) {
-      obj.attachedActor = AttachedActor.toJSON(message.attachedActor);
+    if (message.workloadSubject !== undefined) {
+      obj.workloadSubject = message.workloadSubject;
     }
-    if (message.immediateCaller !== undefined) {
-      obj.immediateCaller = message.immediateCaller;
-    }
-    if (message.runtimePrincipal !== undefined) {
-      obj.runtimePrincipal = message.runtimePrincipal;
+    if (message.invocation !== undefined) {
+      obj.invocation = InvocationAuditAttribution.toJSON(message.invocation);
     }
     return obj;
   },
@@ -778,35 +1291,37 @@ export const AuditAttribution: MessageFns<AuditAttribution> = {
   },
   fromPartial(object: DeepPartial<AuditAttribution>): AuditAttribution {
     const message = createBaseAuditAttribution();
-    message.kubernetesSubject = object.kubernetesSubject ?? undefined;
-    message.attachedActor = (object.attachedActor !== undefined && object.attachedActor !== null)
-      ? AttachedActor.fromPartial(object.attachedActor)
+    message.operatorCommonName = object.operatorCommonName ?? undefined;
+    message.workloadSubject = object.workloadSubject ?? undefined;
+    message.invocation = (object.invocation !== undefined && object.invocation !== null)
+      ? InvocationAuditAttribution.fromPartial(object.invocation)
       : undefined;
-    message.immediateCaller = object.immediateCaller ?? undefined;
-    message.runtimePrincipal = object.runtimePrincipal ?? undefined;
     return message;
   },
 };
 
-function createBaseAttachedActor(): AttachedActor {
-  return { actorPrincipalId: "", attachedAccountPrincipalId: "" };
+function createBaseInvocationAuditAttribution(): InvocationAuditAttribution {
+  return { actorPrincipalId: "", attachedAccountPrincipalId: "", workloadSubject: "" };
 }
 
-export const AttachedActor: MessageFns<AttachedActor> = {
-  encode(message: AttachedActor, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const InvocationAuditAttribution: MessageFns<InvocationAuditAttribution> = {
+  encode(message: InvocationAuditAttribution, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.actorPrincipalId !== "") {
       writer.uint32(10).string(message.actorPrincipalId);
     }
     if (message.attachedAccountPrincipalId !== "") {
       writer.uint32(18).string(message.attachedAccountPrincipalId);
     }
+    if (message.workloadSubject !== "") {
+      writer.uint32(26).string(message.workloadSubject);
+    }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): AttachedActor {
+  decode(input: BinaryReader | Uint8Array, length?: number): InvocationAuditAttribution {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseAttachedActor();
+    const message = createBaseInvocationAuditAttribution();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -826,6 +1341,14 @@ export const AttachedActor: MessageFns<AttachedActor> = {
           message.attachedAccountPrincipalId = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workloadSubject = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -835,16 +1358,17 @@ export const AttachedActor: MessageFns<AttachedActor> = {
     return message;
   },
 
-  fromJSON(object: any): AttachedActor {
+  fromJSON(object: any): InvocationAuditAttribution {
     return {
       actorPrincipalId: isSet(object.actorPrincipalId) ? globalThis.String(object.actorPrincipalId) : "",
       attachedAccountPrincipalId: isSet(object.attachedAccountPrincipalId)
         ? globalThis.String(object.attachedAccountPrincipalId)
         : "",
+      workloadSubject: isSet(object.workloadSubject) ? globalThis.String(object.workloadSubject) : "",
     };
   },
 
-  toJSON(message: AttachedActor): unknown {
+  toJSON(message: InvocationAuditAttribution): unknown {
     const obj: any = {};
     if (message.actorPrincipalId !== "") {
       obj.actorPrincipalId = message.actorPrincipalId;
@@ -852,16 +1376,20 @@ export const AttachedActor: MessageFns<AttachedActor> = {
     if (message.attachedAccountPrincipalId !== "") {
       obj.attachedAccountPrincipalId = message.attachedAccountPrincipalId;
     }
+    if (message.workloadSubject !== "") {
+      obj.workloadSubject = message.workloadSubject;
+    }
     return obj;
   },
 
-  create(base?: DeepPartial<AttachedActor>): AttachedActor {
-    return AttachedActor.fromPartial(base ?? {});
+  create(base?: DeepPartial<InvocationAuditAttribution>): InvocationAuditAttribution {
+    return InvocationAuditAttribution.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<AttachedActor>): AttachedActor {
-    const message = createBaseAttachedActor();
+  fromPartial(object: DeepPartial<InvocationAuditAttribution>): InvocationAuditAttribution {
+    const message = createBaseInvocationAuditAttribution();
     message.actorPrincipalId = object.actorPrincipalId ?? "";
     message.attachedAccountPrincipalId = object.attachedAccountPrincipalId ?? "";
+    message.workloadSubject = object.workloadSubject ?? "";
     return message;
   },
 };
@@ -1047,37 +1575,31 @@ export const TenantAuditPartition: MessageFns<TenantAuditPartition> = {
   },
 };
 
-function createBaseTenancyMutationAuditDetail(): TenancyMutationAuditDetail {
-  return { tenant: undefined, workspace: undefined, resourceRevision: 0n, outcome: 0, resultingState: 0 };
+function createBasePlacementAuditTarget(): PlacementAuditTarget {
+  return { global: undefined, tenant: undefined, workspace: undefined, user: undefined };
 }
 
-export const TenancyMutationAuditDetail: MessageFns<TenancyMutationAuditDetail> = {
-  encode(message: TenancyMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const PlacementAuditTarget: MessageFns<PlacementAuditTarget> = {
+  encode(message: PlacementAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.global !== undefined) {
+      GlobalPlacementAuditTarget.encode(message.global, writer.uint32(10).fork()).join();
+    }
     if (message.tenant !== undefined) {
-      TenantAuditTarget.encode(message.tenant, writer.uint32(10).fork()).join();
+      TenantPlacementAuditTarget.encode(message.tenant, writer.uint32(18).fork()).join();
     }
     if (message.workspace !== undefined) {
-      WorkspaceAuditTarget.encode(message.workspace, writer.uint32(18).fork()).join();
+      WorkspacePlacementAuditTarget.encode(message.workspace, writer.uint32(26).fork()).join();
     }
-    if (message.resourceRevision !== 0n) {
-      if (BigInt.asUintN(64, message.resourceRevision) !== message.resourceRevision) {
-        throw new globalThis.Error("value provided for field message.resourceRevision of type uint64 too large");
-      }
-      writer.uint32(24).uint64(message.resourceRevision);
-    }
-    if (message.outcome !== 0) {
-      writer.uint32(32).int32(message.outcome);
-    }
-    if (message.resultingState !== 0) {
-      writer.uint32(40).int32(message.resultingState);
+    if (message.user !== undefined) {
+      UserPlacementAuditTarget.encode(message.user, writer.uint32(34).fork()).join();
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): TenancyMutationAuditDetail {
+  decode(input: BinaryReader | Uint8Array, length?: number): PlacementAuditTarget {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTenancyMutationAuditDetail();
+    const message = createBasePlacementAuditTarget();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1086,7 +1608,7 @@ export const TenancyMutationAuditDetail: MessageFns<TenancyMutationAuditDetail> 
             break;
           }
 
-          message.tenant = TenantAuditTarget.decode(reader, reader.uint32());
+          message.global = GlobalPlacementAuditTarget.decode(reader, reader.uint32());
           continue;
         }
         case 2: {
@@ -1094,31 +1616,23 @@ export const TenancyMutationAuditDetail: MessageFns<TenancyMutationAuditDetail> 
             break;
           }
 
-          message.workspace = WorkspaceAuditTarget.decode(reader, reader.uint32());
+          message.tenant = TenantPlacementAuditTarget.decode(reader, reader.uint32());
           continue;
         }
         case 3: {
-          if (tag !== 24) {
+          if (tag !== 26) {
             break;
           }
 
-          message.resourceRevision = reader.uint64() as bigint;
+          message.workspace = WorkspacePlacementAuditTarget.decode(reader, reader.uint32());
           continue;
         }
         case 4: {
-          if (tag !== 32) {
+          if (tag !== 34) {
             break;
           }
 
-          message.outcome = reader.int32() as any;
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.resultingState = reader.int32() as any;
+          message.user = UserPlacementAuditTarget.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1130,70 +1644,112 @@ export const TenancyMutationAuditDetail: MessageFns<TenancyMutationAuditDetail> 
     return message;
   },
 
-  fromJSON(object: any): TenancyMutationAuditDetail {
+  fromJSON(object: any): PlacementAuditTarget {
     return {
-      tenant: isSet(object.tenant) ? TenantAuditTarget.fromJSON(object.tenant) : undefined,
-      workspace: isSet(object.workspace) ? WorkspaceAuditTarget.fromJSON(object.workspace) : undefined,
-      resourceRevision: isSet(object.resourceRevision) ? BigInt(object.resourceRevision) : 0n,
-      outcome: isSet(object.outcome) ? auditOutcomeFromJSON(object.outcome) : 0,
-      resultingState: isSet(object.resultingState) ? tenancyResourceStateFromJSON(object.resultingState) : 0,
+      global: isSet(object.global) ? GlobalPlacementAuditTarget.fromJSON(object.global) : undefined,
+      tenant: isSet(object.tenant) ? TenantPlacementAuditTarget.fromJSON(object.tenant) : undefined,
+      workspace: isSet(object.workspace) ? WorkspacePlacementAuditTarget.fromJSON(object.workspace) : undefined,
+      user: isSet(object.user) ? UserPlacementAuditTarget.fromJSON(object.user) : undefined,
     };
   },
 
-  toJSON(message: TenancyMutationAuditDetail): unknown {
+  toJSON(message: PlacementAuditTarget): unknown {
     const obj: any = {};
+    if (message.global !== undefined) {
+      obj.global = GlobalPlacementAuditTarget.toJSON(message.global);
+    }
     if (message.tenant !== undefined) {
-      obj.tenant = TenantAuditTarget.toJSON(message.tenant);
+      obj.tenant = TenantPlacementAuditTarget.toJSON(message.tenant);
     }
     if (message.workspace !== undefined) {
-      obj.workspace = WorkspaceAuditTarget.toJSON(message.workspace);
+      obj.workspace = WorkspacePlacementAuditTarget.toJSON(message.workspace);
     }
-    if (message.resourceRevision !== 0n) {
-      obj.resourceRevision = message.resourceRevision.toString();
-    }
-    if (message.outcome !== 0) {
-      obj.outcome = auditOutcomeToJSON(message.outcome);
-    }
-    if (message.resultingState !== 0) {
-      obj.resultingState = tenancyResourceStateToJSON(message.resultingState);
+    if (message.user !== undefined) {
+      obj.user = UserPlacementAuditTarget.toJSON(message.user);
     }
     return obj;
   },
 
-  create(base?: DeepPartial<TenancyMutationAuditDetail>): TenancyMutationAuditDetail {
-    return TenancyMutationAuditDetail.fromPartial(base ?? {});
+  create(base?: DeepPartial<PlacementAuditTarget>): PlacementAuditTarget {
+    return PlacementAuditTarget.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<TenancyMutationAuditDetail>): TenancyMutationAuditDetail {
-    const message = createBaseTenancyMutationAuditDetail();
+  fromPartial(object: DeepPartial<PlacementAuditTarget>): PlacementAuditTarget {
+    const message = createBasePlacementAuditTarget();
+    message.global = (object.global !== undefined && object.global !== null)
+      ? GlobalPlacementAuditTarget.fromPartial(object.global)
+      : undefined;
     message.tenant = (object.tenant !== undefined && object.tenant !== null)
-      ? TenantAuditTarget.fromPartial(object.tenant)
+      ? TenantPlacementAuditTarget.fromPartial(object.tenant)
       : undefined;
     message.workspace = (object.workspace !== undefined && object.workspace !== null)
-      ? WorkspaceAuditTarget.fromPartial(object.workspace)
+      ? WorkspacePlacementAuditTarget.fromPartial(object.workspace)
       : undefined;
-    message.resourceRevision = object.resourceRevision ?? 0n;
-    message.outcome = object.outcome ?? 0;
-    message.resultingState = object.resultingState ?? 0;
+    message.user = (object.user !== undefined && object.user !== null)
+      ? UserPlacementAuditTarget.fromPartial(object.user)
+      : undefined;
     return message;
   },
 };
 
-function createBaseTenantAuditTarget(): TenantAuditTarget {
+function createBaseGlobalPlacementAuditTarget(): GlobalPlacementAuditTarget {
+  return {};
+}
+
+export const GlobalPlacementAuditTarget: MessageFns<GlobalPlacementAuditTarget> = {
+  encode(_: GlobalPlacementAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GlobalPlacementAuditTarget {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGlobalPlacementAuditTarget();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): GlobalPlacementAuditTarget {
+    return {};
+  },
+
+  toJSON(_: GlobalPlacementAuditTarget): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<GlobalPlacementAuditTarget>): GlobalPlacementAuditTarget {
+    return GlobalPlacementAuditTarget.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<GlobalPlacementAuditTarget>): GlobalPlacementAuditTarget {
+    const message = createBaseGlobalPlacementAuditTarget();
+    return message;
+  },
+};
+
+function createBaseTenantPlacementAuditTarget(): TenantPlacementAuditTarget {
   return { tenantId: "" };
 }
 
-export const TenantAuditTarget: MessageFns<TenantAuditTarget> = {
-  encode(message: TenantAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const TenantPlacementAuditTarget: MessageFns<TenantPlacementAuditTarget> = {
+  encode(message: TenantPlacementAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.tenantId !== "") {
       writer.uint32(10).string(message.tenantId);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): TenantAuditTarget {
+  decode(input: BinaryReader | Uint8Array, length?: number): TenantPlacementAuditTarget {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTenantAuditTarget();
+    const message = createBaseTenantPlacementAuditTarget();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1214,11 +1770,11 @@ export const TenantAuditTarget: MessageFns<TenantAuditTarget> = {
     return message;
   },
 
-  fromJSON(object: any): TenantAuditTarget {
+  fromJSON(object: any): TenantPlacementAuditTarget {
     return { tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "" };
   },
 
-  toJSON(message: TenantAuditTarget): unknown {
+  toJSON(message: TenantPlacementAuditTarget): unknown {
     const obj: any = {};
     if (message.tenantId !== "") {
       obj.tenantId = message.tenantId;
@@ -1226,22 +1782,22 @@ export const TenantAuditTarget: MessageFns<TenantAuditTarget> = {
     return obj;
   },
 
-  create(base?: DeepPartial<TenantAuditTarget>): TenantAuditTarget {
-    return TenantAuditTarget.fromPartial(base ?? {});
+  create(base?: DeepPartial<TenantPlacementAuditTarget>): TenantPlacementAuditTarget {
+    return TenantPlacementAuditTarget.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<TenantAuditTarget>): TenantAuditTarget {
-    const message = createBaseTenantAuditTarget();
+  fromPartial(object: DeepPartial<TenantPlacementAuditTarget>): TenantPlacementAuditTarget {
+    const message = createBaseTenantPlacementAuditTarget();
     message.tenantId = object.tenantId ?? "";
     return message;
   },
 };
 
-function createBaseWorkspaceAuditTarget(): WorkspaceAuditTarget {
+function createBaseWorkspacePlacementAuditTarget(): WorkspacePlacementAuditTarget {
   return { tenantId: "", workspaceId: "" };
 }
 
-export const WorkspaceAuditTarget: MessageFns<WorkspaceAuditTarget> = {
-  encode(message: WorkspaceAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const WorkspacePlacementAuditTarget: MessageFns<WorkspacePlacementAuditTarget> = {
+  encode(message: WorkspacePlacementAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.tenantId !== "") {
       writer.uint32(10).string(message.tenantId);
     }
@@ -1251,10 +1807,10 @@ export const WorkspaceAuditTarget: MessageFns<WorkspaceAuditTarget> = {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): WorkspaceAuditTarget {
+  decode(input: BinaryReader | Uint8Array, length?: number): WorkspacePlacementAuditTarget {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseWorkspaceAuditTarget();
+    const message = createBaseWorkspacePlacementAuditTarget();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -1283,14 +1839,14 @@ export const WorkspaceAuditTarget: MessageFns<WorkspaceAuditTarget> = {
     return message;
   },
 
-  fromJSON(object: any): WorkspaceAuditTarget {
+  fromJSON(object: any): WorkspacePlacementAuditTarget {
     return {
       tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
       workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
     };
   },
 
-  toJSON(message: WorkspaceAuditTarget): unknown {
+  toJSON(message: WorkspacePlacementAuditTarget): unknown {
     const obj: any = {};
     if (message.tenantId !== "") {
       obj.tenantId = message.tenantId;
@@ -1301,19 +1857,567 @@ export const WorkspaceAuditTarget: MessageFns<WorkspaceAuditTarget> = {
     return obj;
   },
 
-  create(base?: DeepPartial<WorkspaceAuditTarget>): WorkspaceAuditTarget {
-    return WorkspaceAuditTarget.fromPartial(base ?? {});
+  create(base?: DeepPartial<WorkspacePlacementAuditTarget>): WorkspacePlacementAuditTarget {
+    return WorkspacePlacementAuditTarget.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<WorkspaceAuditTarget>): WorkspaceAuditTarget {
-    const message = createBaseWorkspaceAuditTarget();
+  fromPartial(object: DeepPartial<WorkspacePlacementAuditTarget>): WorkspacePlacementAuditTarget {
+    const message = createBaseWorkspacePlacementAuditTarget();
     message.tenantId = object.tenantId ?? "";
     message.workspaceId = object.workspaceId ?? "";
     return message;
   },
 };
 
+function createBaseUserPlacementAuditTarget(): UserPlacementAuditTarget {
+  return { tenantId: "", accountPrincipalId: "" };
+}
+
+export const UserPlacementAuditTarget: MessageFns<UserPlacementAuditTarget> = {
+  encode(message: UserPlacementAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.accountPrincipalId !== "") {
+      writer.uint32(18).string(message.accountPrincipalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UserPlacementAuditTarget {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUserPlacementAuditTarget();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.accountPrincipalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UserPlacementAuditTarget {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      accountPrincipalId: isSet(object.accountPrincipalId) ? globalThis.String(object.accountPrincipalId) : "",
+    };
+  },
+
+  toJSON(message: UserPlacementAuditTarget): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.accountPrincipalId !== "") {
+      obj.accountPrincipalId = message.accountPrincipalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UserPlacementAuditTarget>): UserPlacementAuditTarget {
+    return UserPlacementAuditTarget.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UserPlacementAuditTarget>): UserPlacementAuditTarget {
+    const message = createBaseUserPlacementAuditTarget();
+    message.tenantId = object.tenantId ?? "";
+    message.accountPrincipalId = object.accountPrincipalId ?? "";
+    return message;
+  },
+};
+
+function createBaseConsumerBindingAuditDetail(): ConsumerBindingAuditDetail {
+  return { placementId: "", placementTarget: undefined, consumerId: "", purpose: "" };
+}
+
+export const ConsumerBindingAuditDetail: MessageFns<ConsumerBindingAuditDetail> = {
+  encode(message: ConsumerBindingAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.placementId !== "") {
+      writer.uint32(10).string(message.placementId);
+    }
+    if (message.placementTarget !== undefined) {
+      PlacementAuditTarget.encode(message.placementTarget, writer.uint32(18).fork()).join();
+    }
+    if (message.consumerId !== "") {
+      writer.uint32(26).string(message.consumerId);
+    }
+    if (message.purpose !== "") {
+      writer.uint32(34).string(message.purpose);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ConsumerBindingAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseConsumerBindingAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.placementId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.placementTarget = PlacementAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.consumerId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.purpose = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ConsumerBindingAuditDetail {
+    return {
+      placementId: isSet(object.placementId) ? globalThis.String(object.placementId) : "",
+      placementTarget: isSet(object.placementTarget)
+        ? PlacementAuditTarget.fromJSON(object.placementTarget)
+        : undefined,
+      consumerId: isSet(object.consumerId) ? globalThis.String(object.consumerId) : "",
+      purpose: isSet(object.purpose) ? globalThis.String(object.purpose) : "",
+    };
+  },
+
+  toJSON(message: ConsumerBindingAuditDetail): unknown {
+    const obj: any = {};
+    if (message.placementId !== "") {
+      obj.placementId = message.placementId;
+    }
+    if (message.placementTarget !== undefined) {
+      obj.placementTarget = PlacementAuditTarget.toJSON(message.placementTarget);
+    }
+    if (message.consumerId !== "") {
+      obj.consumerId = message.consumerId;
+    }
+    if (message.purpose !== "") {
+      obj.purpose = message.purpose;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ConsumerBindingAuditDetail>): ConsumerBindingAuditDetail {
+    return ConsumerBindingAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ConsumerBindingAuditDetail>): ConsumerBindingAuditDetail {
+    const message = createBaseConsumerBindingAuditDetail();
+    message.placementId = object.placementId ?? "";
+    message.placementTarget = (object.placementTarget !== undefined && object.placementTarget !== null)
+      ? PlacementAuditTarget.fromPartial(object.placementTarget)
+      : undefined;
+    message.consumerId = object.consumerId ?? "";
+    message.purpose = object.purpose ?? "";
+    return message;
+  },
+};
+
+function createBaseConfigurationVersionAuditTarget(): ConfigurationVersionAuditTarget {
+  return { configurationId: "", configurationVersionId: "" };
+}
+
+export const ConfigurationVersionAuditTarget: MessageFns<ConfigurationVersionAuditTarget> = {
+  encode(message: ConfigurationVersionAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.configurationId !== "") {
+      writer.uint32(10).string(message.configurationId);
+    }
+    if (message.configurationVersionId !== "") {
+      writer.uint32(18).string(message.configurationVersionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ConfigurationVersionAuditTarget {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseConfigurationVersionAuditTarget();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.configurationId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.configurationVersionId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ConfigurationVersionAuditTarget {
+    return {
+      configurationId: isSet(object.configurationId) ? globalThis.String(object.configurationId) : "",
+      configurationVersionId: isSet(object.configurationVersionId)
+        ? globalThis.String(object.configurationVersionId)
+        : "",
+    };
+  },
+
+  toJSON(message: ConfigurationVersionAuditTarget): unknown {
+    const obj: any = {};
+    if (message.configurationId !== "") {
+      obj.configurationId = message.configurationId;
+    }
+    if (message.configurationVersionId !== "") {
+      obj.configurationVersionId = message.configurationVersionId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ConfigurationVersionAuditTarget>): ConfigurationVersionAuditTarget {
+    return ConfigurationVersionAuditTarget.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ConfigurationVersionAuditTarget>): ConfigurationVersionAuditTarget {
+    const message = createBaseConfigurationVersionAuditTarget();
+    message.configurationId = object.configurationId ?? "";
+    message.configurationVersionId = object.configurationVersionId ?? "";
+    return message;
+  },
+};
+
+function createBaseSecretVersionAuditTarget(): SecretVersionAuditTarget {
+  return { secretId: "", secretVersionId: "" };
+}
+
+export const SecretVersionAuditTarget: MessageFns<SecretVersionAuditTarget> = {
+  encode(message: SecretVersionAuditTarget, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.secretId !== "") {
+      writer.uint32(10).string(message.secretId);
+    }
+    if (message.secretVersionId !== "") {
+      writer.uint32(18).string(message.secretVersionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SecretVersionAuditTarget {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSecretVersionAuditTarget();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.secretId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.secretVersionId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SecretVersionAuditTarget {
+    return {
+      secretId: isSet(object.secretId) ? globalThis.String(object.secretId) : "",
+      secretVersionId: isSet(object.secretVersionId) ? globalThis.String(object.secretVersionId) : "",
+    };
+  },
+
+  toJSON(message: SecretVersionAuditTarget): unknown {
+    const obj: any = {};
+    if (message.secretId !== "") {
+      obj.secretId = message.secretId;
+    }
+    if (message.secretVersionId !== "") {
+      obj.secretVersionId = message.secretVersionId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SecretVersionAuditTarget>): SecretVersionAuditTarget {
+    return SecretVersionAuditTarget.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SecretVersionAuditTarget>): SecretVersionAuditTarget {
+    const message = createBaseSecretVersionAuditTarget();
+    message.secretId = object.secretId ?? "";
+    message.secretVersionId = object.secretVersionId ?? "";
+    return message;
+  },
+};
+
+function createBaseTenantMutationAuditDetail(): TenantMutationAuditDetail {
+  return { action: 0, resourceRevision: 0n, resultingState: 0 };
+}
+
+export const TenantMutationAuditDetail: MessageFns<TenantMutationAuditDetail> = {
+  encode(message: TenantMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.action !== 0) {
+      writer.uint32(8).int32(message.action);
+    }
+    if (message.resourceRevision !== 0n) {
+      if (BigInt.asUintN(64, message.resourceRevision) !== message.resourceRevision) {
+        throw new globalThis.Error("value provided for field message.resourceRevision of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.resourceRevision);
+    }
+    if (message.resultingState !== 0) {
+      writer.uint32(24).int32(message.resultingState);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TenantMutationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTenantMutationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.resourceRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.resultingState = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TenantMutationAuditDetail {
+    return {
+      action: isSet(object.action) ? tenantMutationActionFromJSON(object.action) : 0,
+      resourceRevision: isSet(object.resourceRevision) ? BigInt(object.resourceRevision) : 0n,
+      resultingState: isSet(object.resultingState) ? tenancyResourceStateFromJSON(object.resultingState) : 0,
+    };
+  },
+
+  toJSON(message: TenantMutationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.action !== 0) {
+      obj.action = tenantMutationActionToJSON(message.action);
+    }
+    if (message.resourceRevision !== 0n) {
+      obj.resourceRevision = message.resourceRevision.toString();
+    }
+    if (message.resultingState !== 0) {
+      obj.resultingState = tenancyResourceStateToJSON(message.resultingState);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TenantMutationAuditDetail>): TenantMutationAuditDetail {
+    return TenantMutationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TenantMutationAuditDetail>): TenantMutationAuditDetail {
+    const message = createBaseTenantMutationAuditDetail();
+    message.action = object.action ?? 0;
+    message.resourceRevision = object.resourceRevision ?? 0n;
+    message.resultingState = object.resultingState ?? 0;
+    return message;
+  },
+};
+
+function createBaseWorkspaceMutationAuditDetail(): WorkspaceMutationAuditDetail {
+  return { workspaceId: "", action: 0, resourceRevision: 0n, resultingState: 0 };
+}
+
+export const WorkspaceMutationAuditDetail: MessageFns<WorkspaceMutationAuditDetail> = {
+  encode(message: WorkspaceMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workspaceId !== "") {
+      writer.uint32(10).string(message.workspaceId);
+    }
+    if (message.action !== 0) {
+      writer.uint32(16).int32(message.action);
+    }
+    if (message.resourceRevision !== 0n) {
+      if (BigInt.asUintN(64, message.resourceRevision) !== message.resourceRevision) {
+        throw new globalThis.Error("value provided for field message.resourceRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.resourceRevision);
+    }
+    if (message.resultingState !== 0) {
+      writer.uint32(32).int32(message.resultingState);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WorkspaceMutationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWorkspaceMutationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.resourceRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.resultingState = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WorkspaceMutationAuditDetail {
+    return {
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      action: isSet(object.action) ? workspaceMutationActionFromJSON(object.action) : 0,
+      resourceRevision: isSet(object.resourceRevision) ? BigInt(object.resourceRevision) : 0n,
+      resultingState: isSet(object.resultingState) ? tenancyResourceStateFromJSON(object.resultingState) : 0,
+    };
+  },
+
+  toJSON(message: WorkspaceMutationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.action !== 0) {
+      obj.action = workspaceMutationActionToJSON(message.action);
+    }
+    if (message.resourceRevision !== 0n) {
+      obj.resourceRevision = message.resourceRevision.toString();
+    }
+    if (message.resultingState !== 0) {
+      obj.resultingState = tenancyResourceStateToJSON(message.resultingState);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WorkspaceMutationAuditDetail>): WorkspaceMutationAuditDetail {
+    return WorkspaceMutationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WorkspaceMutationAuditDetail>): WorkspaceMutationAuditDetail {
+    const message = createBaseWorkspaceMutationAuditDetail();
+    message.workspaceId = object.workspaceId ?? "";
+    message.action = object.action ?? 0;
+    message.resourceRevision = object.resourceRevision ?? 0n;
+    message.resultingState = object.resultingState ?? 0;
+    return message;
+  },
+};
+
 function createBaseIdentitySessionAuditDetail(): IdentitySessionAuditDetail {
-  return { sessionId: "", accountPrincipalId: "", sessionRevision: 0n, action: 0 };
+  return { sessionId: "", humanAccountPrincipalId: "", sessionRevision: 0n, action: 0 };
 }
 
 export const IdentitySessionAuditDetail: MessageFns<IdentitySessionAuditDetail> = {
@@ -1321,8 +2425,8 @@ export const IdentitySessionAuditDetail: MessageFns<IdentitySessionAuditDetail> 
     if (message.sessionId !== "") {
       writer.uint32(10).string(message.sessionId);
     }
-    if (message.accountPrincipalId !== "") {
-      writer.uint32(18).string(message.accountPrincipalId);
+    if (message.humanAccountPrincipalId !== "") {
+      writer.uint32(18).string(message.humanAccountPrincipalId);
     }
     if (message.sessionRevision !== 0n) {
       if (BigInt.asUintN(64, message.sessionRevision) !== message.sessionRevision) {
@@ -1356,7 +2460,7 @@ export const IdentitySessionAuditDetail: MessageFns<IdentitySessionAuditDetail> 
             break;
           }
 
-          message.accountPrincipalId = reader.string();
+          message.humanAccountPrincipalId = reader.string();
           continue;
         }
         case 3: {
@@ -1387,7 +2491,9 @@ export const IdentitySessionAuditDetail: MessageFns<IdentitySessionAuditDetail> 
   fromJSON(object: any): IdentitySessionAuditDetail {
     return {
       sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
-      accountPrincipalId: isSet(object.accountPrincipalId) ? globalThis.String(object.accountPrincipalId) : "",
+      humanAccountPrincipalId: isSet(object.humanAccountPrincipalId)
+        ? globalThis.String(object.humanAccountPrincipalId)
+        : "",
       sessionRevision: isSet(object.sessionRevision) ? BigInt(object.sessionRevision) : 0n,
       action: isSet(object.action) ? identitySessionActionFromJSON(object.action) : 0,
     };
@@ -1398,8 +2504,8 @@ export const IdentitySessionAuditDetail: MessageFns<IdentitySessionAuditDetail> 
     if (message.sessionId !== "") {
       obj.sessionId = message.sessionId;
     }
-    if (message.accountPrincipalId !== "") {
-      obj.accountPrincipalId = message.accountPrincipalId;
+    if (message.humanAccountPrincipalId !== "") {
+      obj.humanAccountPrincipalId = message.humanAccountPrincipalId;
     }
     if (message.sessionRevision !== 0n) {
       obj.sessionRevision = message.sessionRevision.toString();
@@ -1416,9 +2522,1253 @@ export const IdentitySessionAuditDetail: MessageFns<IdentitySessionAuditDetail> 
   fromPartial(object: DeepPartial<IdentitySessionAuditDetail>): IdentitySessionAuditDetail {
     const message = createBaseIdentitySessionAuditDetail();
     message.sessionId = object.sessionId ?? "";
-    message.accountPrincipalId = object.accountPrincipalId ?? "";
+    message.humanAccountPrincipalId = object.humanAccountPrincipalId ?? "";
     message.sessionRevision = object.sessionRevision ?? 0n;
     message.action = object.action ?? 0;
+    return message;
+  },
+};
+
+function createBasePackageDeclarationAuditDetail(): PackageDeclarationAuditDetail {
+  return { packageId: "", generation: 0n };
+}
+
+export const PackageDeclarationAuditDetail: MessageFns<PackageDeclarationAuditDetail> = {
+  encode(message: PackageDeclarationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.packageId !== "") {
+      writer.uint32(10).string(message.packageId);
+    }
+    if (message.generation !== 0n) {
+      if (BigInt.asUintN(64, message.generation) !== message.generation) {
+        throw new globalThis.Error("value provided for field message.generation of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.generation);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PackageDeclarationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePackageDeclarationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.packageId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.generation = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PackageDeclarationAuditDetail {
+    return {
+      packageId: isSet(object.packageId) ? globalThis.String(object.packageId) : "",
+      generation: isSet(object.generation) ? BigInt(object.generation) : 0n,
+    };
+  },
+
+  toJSON(message: PackageDeclarationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.packageId !== "") {
+      obj.packageId = message.packageId;
+    }
+    if (message.generation !== 0n) {
+      obj.generation = message.generation.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PackageDeclarationAuditDetail>): PackageDeclarationAuditDetail {
+    return PackageDeclarationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PackageDeclarationAuditDetail>): PackageDeclarationAuditDetail {
+    const message = createBasePackageDeclarationAuditDetail();
+    message.packageId = object.packageId ?? "";
+    message.generation = object.generation ?? 0n;
+    return message;
+  },
+};
+
+function createBaseAppMutationAuditDetail(): AppMutationAuditDetail {
+  return {
+    appId: "",
+    scope: undefined,
+    placementId: "",
+    packageId: "",
+    packageGeneration: 0n,
+    appRevision: 0n,
+    action: 0,
+  };
+}
+
+export const AppMutationAuditDetail: MessageFns<AppMutationAuditDetail> = {
+  encode(message: AppMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.appId !== "") {
+      writer.uint32(10).string(message.appId);
+    }
+    if (message.scope !== undefined) {
+      PlacementAuditTarget.encode(message.scope, writer.uint32(18).fork()).join();
+    }
+    if (message.placementId !== "") {
+      writer.uint32(26).string(message.placementId);
+    }
+    if (message.packageId !== "") {
+      writer.uint32(34).string(message.packageId);
+    }
+    if (message.packageGeneration !== 0n) {
+      if (BigInt.asUintN(64, message.packageGeneration) !== message.packageGeneration) {
+        throw new globalThis.Error("value provided for field message.packageGeneration of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.packageGeneration);
+    }
+    if (message.appRevision !== 0n) {
+      if (BigInt.asUintN(64, message.appRevision) !== message.appRevision) {
+        throw new globalThis.Error("value provided for field message.appRevision of type uint64 too large");
+      }
+      writer.uint32(48).uint64(message.appRevision);
+    }
+    if (message.action !== 0) {
+      writer.uint32(56).int32(message.action);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AppMutationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAppMutationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.appId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.scope = PlacementAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.placementId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.packageId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.packageGeneration = reader.uint64() as bigint;
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.appRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AppMutationAuditDetail {
+    return {
+      appId: isSet(object.appId) ? globalThis.String(object.appId) : "",
+      scope: isSet(object.scope) ? PlacementAuditTarget.fromJSON(object.scope) : undefined,
+      placementId: isSet(object.placementId) ? globalThis.String(object.placementId) : "",
+      packageId: isSet(object.packageId) ? globalThis.String(object.packageId) : "",
+      packageGeneration: isSet(object.packageGeneration) ? BigInt(object.packageGeneration) : 0n,
+      appRevision: isSet(object.appRevision) ? BigInt(object.appRevision) : 0n,
+      action: isSet(object.action) ? appMutationActionFromJSON(object.action) : 0,
+    };
+  },
+
+  toJSON(message: AppMutationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.appId !== "") {
+      obj.appId = message.appId;
+    }
+    if (message.scope !== undefined) {
+      obj.scope = PlacementAuditTarget.toJSON(message.scope);
+    }
+    if (message.placementId !== "") {
+      obj.placementId = message.placementId;
+    }
+    if (message.packageId !== "") {
+      obj.packageId = message.packageId;
+    }
+    if (message.packageGeneration !== 0n) {
+      obj.packageGeneration = message.packageGeneration.toString();
+    }
+    if (message.appRevision !== 0n) {
+      obj.appRevision = message.appRevision.toString();
+    }
+    if (message.action !== 0) {
+      obj.action = appMutationActionToJSON(message.action);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AppMutationAuditDetail>): AppMutationAuditDetail {
+    return AppMutationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AppMutationAuditDetail>): AppMutationAuditDetail {
+    const message = createBaseAppMutationAuditDetail();
+    message.appId = object.appId ?? "";
+    message.scope = (object.scope !== undefined && object.scope !== null)
+      ? PlacementAuditTarget.fromPartial(object.scope)
+      : undefined;
+    message.placementId = object.placementId ?? "";
+    message.packageId = object.packageId ?? "";
+    message.packageGeneration = object.packageGeneration ?? 0n;
+    message.appRevision = object.appRevision ?? 0n;
+    message.action = object.action ?? 0;
+    return message;
+  },
+};
+
+function createBaseConfigurationPublicationAuditDetail(): ConfigurationPublicationAuditDetail {
+  return {
+    target: undefined,
+    binding: undefined,
+    identityRevision: 0n,
+    dependencyClaimId: undefined,
+    dependencyClaimRevision: undefined,
+  };
+}
+
+export const ConfigurationPublicationAuditDetail: MessageFns<ConfigurationPublicationAuditDetail> = {
+  encode(message: ConfigurationPublicationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.target !== undefined) {
+      ConfigurationVersionAuditTarget.encode(message.target, writer.uint32(10).fork()).join();
+    }
+    if (message.binding !== undefined) {
+      ConsumerBindingAuditDetail.encode(message.binding, writer.uint32(18).fork()).join();
+    }
+    if (message.identityRevision !== 0n) {
+      if (BigInt.asUintN(64, message.identityRevision) !== message.identityRevision) {
+        throw new globalThis.Error("value provided for field message.identityRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.identityRevision);
+    }
+    if (message.dependencyClaimId !== undefined) {
+      writer.uint32(34).string(message.dependencyClaimId);
+    }
+    if (message.dependencyClaimRevision !== undefined) {
+      if (BigInt.asUintN(64, message.dependencyClaimRevision) !== message.dependencyClaimRevision) {
+        throw new globalThis.Error("value provided for field message.dependencyClaimRevision of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.dependencyClaimRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ConfigurationPublicationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseConfigurationPublicationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.target = ConfigurationVersionAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.binding = ConsumerBindingAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.identityRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.dependencyClaimId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.dependencyClaimRevision = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ConfigurationPublicationAuditDetail {
+    return {
+      target: isSet(object.target) ? ConfigurationVersionAuditTarget.fromJSON(object.target) : undefined,
+      binding: isSet(object.binding) ? ConsumerBindingAuditDetail.fromJSON(object.binding) : undefined,
+      identityRevision: isSet(object.identityRevision) ? BigInt(object.identityRevision) : 0n,
+      dependencyClaimId: isSet(object.dependencyClaimId) ? globalThis.String(object.dependencyClaimId) : undefined,
+      dependencyClaimRevision: isSet(object.dependencyClaimRevision)
+        ? BigInt(object.dependencyClaimRevision)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ConfigurationPublicationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.target !== undefined) {
+      obj.target = ConfigurationVersionAuditTarget.toJSON(message.target);
+    }
+    if (message.binding !== undefined) {
+      obj.binding = ConsumerBindingAuditDetail.toJSON(message.binding);
+    }
+    if (message.identityRevision !== 0n) {
+      obj.identityRevision = message.identityRevision.toString();
+    }
+    if (message.dependencyClaimId !== undefined) {
+      obj.dependencyClaimId = message.dependencyClaimId;
+    }
+    if (message.dependencyClaimRevision !== undefined) {
+      obj.dependencyClaimRevision = message.dependencyClaimRevision.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ConfigurationPublicationAuditDetail>): ConfigurationPublicationAuditDetail {
+    return ConfigurationPublicationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ConfigurationPublicationAuditDetail>): ConfigurationPublicationAuditDetail {
+    const message = createBaseConfigurationPublicationAuditDetail();
+    message.target = (object.target !== undefined && object.target !== null)
+      ? ConfigurationVersionAuditTarget.fromPartial(object.target)
+      : undefined;
+    message.binding = (object.binding !== undefined && object.binding !== null)
+      ? ConsumerBindingAuditDetail.fromPartial(object.binding)
+      : undefined;
+    message.identityRevision = object.identityRevision ?? 0n;
+    message.dependencyClaimId = object.dependencyClaimId ?? undefined;
+    message.dependencyClaimRevision = object.dependencyClaimRevision ?? undefined;
+    return message;
+  },
+};
+
+function createBaseSecretPublicationAuditDetail(): SecretPublicationAuditDetail {
+  return {
+    target: undefined,
+    binding: undefined,
+    identityRevision: 0n,
+    dependencyClaimId: undefined,
+    dependencyClaimRevision: undefined,
+  };
+}
+
+export const SecretPublicationAuditDetail: MessageFns<SecretPublicationAuditDetail> = {
+  encode(message: SecretPublicationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.target !== undefined) {
+      SecretVersionAuditTarget.encode(message.target, writer.uint32(10).fork()).join();
+    }
+    if (message.binding !== undefined) {
+      ConsumerBindingAuditDetail.encode(message.binding, writer.uint32(18).fork()).join();
+    }
+    if (message.identityRevision !== 0n) {
+      if (BigInt.asUintN(64, message.identityRevision) !== message.identityRevision) {
+        throw new globalThis.Error("value provided for field message.identityRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.identityRevision);
+    }
+    if (message.dependencyClaimId !== undefined) {
+      writer.uint32(34).string(message.dependencyClaimId);
+    }
+    if (message.dependencyClaimRevision !== undefined) {
+      if (BigInt.asUintN(64, message.dependencyClaimRevision) !== message.dependencyClaimRevision) {
+        throw new globalThis.Error("value provided for field message.dependencyClaimRevision of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.dependencyClaimRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SecretPublicationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSecretPublicationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.target = SecretVersionAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.binding = ConsumerBindingAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.identityRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.dependencyClaimId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.dependencyClaimRevision = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SecretPublicationAuditDetail {
+    return {
+      target: isSet(object.target) ? SecretVersionAuditTarget.fromJSON(object.target) : undefined,
+      binding: isSet(object.binding) ? ConsumerBindingAuditDetail.fromJSON(object.binding) : undefined,
+      identityRevision: isSet(object.identityRevision) ? BigInt(object.identityRevision) : 0n,
+      dependencyClaimId: isSet(object.dependencyClaimId) ? globalThis.String(object.dependencyClaimId) : undefined,
+      dependencyClaimRevision: isSet(object.dependencyClaimRevision)
+        ? BigInt(object.dependencyClaimRevision)
+        : undefined,
+    };
+  },
+
+  toJSON(message: SecretPublicationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.target !== undefined) {
+      obj.target = SecretVersionAuditTarget.toJSON(message.target);
+    }
+    if (message.binding !== undefined) {
+      obj.binding = ConsumerBindingAuditDetail.toJSON(message.binding);
+    }
+    if (message.identityRevision !== 0n) {
+      obj.identityRevision = message.identityRevision.toString();
+    }
+    if (message.dependencyClaimId !== undefined) {
+      obj.dependencyClaimId = message.dependencyClaimId;
+    }
+    if (message.dependencyClaimRevision !== undefined) {
+      obj.dependencyClaimRevision = message.dependencyClaimRevision.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SecretPublicationAuditDetail>): SecretPublicationAuditDetail {
+    return SecretPublicationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SecretPublicationAuditDetail>): SecretPublicationAuditDetail {
+    const message = createBaseSecretPublicationAuditDetail();
+    message.target = (object.target !== undefined && object.target !== null)
+      ? SecretVersionAuditTarget.fromPartial(object.target)
+      : undefined;
+    message.binding = (object.binding !== undefined && object.binding !== null)
+      ? ConsumerBindingAuditDetail.fromPartial(object.binding)
+      : undefined;
+    message.identityRevision = object.identityRevision ?? 0n;
+    message.dependencyClaimId = object.dependencyClaimId ?? undefined;
+    message.dependencyClaimRevision = object.dependencyClaimRevision ?? undefined;
+    return message;
+  },
+};
+
+function createBaseProjectionMutationAuditDetail(): ProjectionMutationAuditDetail {
+  return {
+    projectionId: "",
+    action: 0,
+    projectionRevision: 0n,
+    configuration: undefined,
+    secret: undefined,
+    binding: undefined,
+  };
+}
+
+export const ProjectionMutationAuditDetail: MessageFns<ProjectionMutationAuditDetail> = {
+  encode(message: ProjectionMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.projectionId !== "") {
+      writer.uint32(10).string(message.projectionId);
+    }
+    if (message.action !== 0) {
+      writer.uint32(16).int32(message.action);
+    }
+    if (message.projectionRevision !== 0n) {
+      if (BigInt.asUintN(64, message.projectionRevision) !== message.projectionRevision) {
+        throw new globalThis.Error("value provided for field message.projectionRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.projectionRevision);
+    }
+    if (message.configuration !== undefined) {
+      ConfigurationVersionAuditTarget.encode(message.configuration, writer.uint32(34).fork()).join();
+    }
+    if (message.secret !== undefined) {
+      SecretVersionAuditTarget.encode(message.secret, writer.uint32(42).fork()).join();
+    }
+    if (message.binding !== undefined) {
+      ConsumerBindingAuditDetail.encode(message.binding, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ProjectionMutationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseProjectionMutationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.projectionId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.projectionRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.configuration = ConfigurationVersionAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.secret = SecretVersionAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.binding = ConsumerBindingAuditDetail.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ProjectionMutationAuditDetail {
+    return {
+      projectionId: isSet(object.projectionId) ? globalThis.String(object.projectionId) : "",
+      action: isSet(object.action) ? projectionMutationActionFromJSON(object.action) : 0,
+      projectionRevision: isSet(object.projectionRevision) ? BigInt(object.projectionRevision) : 0n,
+      configuration: isSet(object.configuration)
+        ? ConfigurationVersionAuditTarget.fromJSON(object.configuration)
+        : undefined,
+      secret: isSet(object.secret) ? SecretVersionAuditTarget.fromJSON(object.secret) : undefined,
+      binding: isSet(object.binding) ? ConsumerBindingAuditDetail.fromJSON(object.binding) : undefined,
+    };
+  },
+
+  toJSON(message: ProjectionMutationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.projectionId !== "") {
+      obj.projectionId = message.projectionId;
+    }
+    if (message.action !== 0) {
+      obj.action = projectionMutationActionToJSON(message.action);
+    }
+    if (message.projectionRevision !== 0n) {
+      obj.projectionRevision = message.projectionRevision.toString();
+    }
+    if (message.configuration !== undefined) {
+      obj.configuration = ConfigurationVersionAuditTarget.toJSON(message.configuration);
+    }
+    if (message.secret !== undefined) {
+      obj.secret = SecretVersionAuditTarget.toJSON(message.secret);
+    }
+    if (message.binding !== undefined) {
+      obj.binding = ConsumerBindingAuditDetail.toJSON(message.binding);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ProjectionMutationAuditDetail>): ProjectionMutationAuditDetail {
+    return ProjectionMutationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ProjectionMutationAuditDetail>): ProjectionMutationAuditDetail {
+    const message = createBaseProjectionMutationAuditDetail();
+    message.projectionId = object.projectionId ?? "";
+    message.action = object.action ?? 0;
+    message.projectionRevision = object.projectionRevision ?? 0n;
+    message.configuration = (object.configuration !== undefined && object.configuration !== null)
+      ? ConfigurationVersionAuditTarget.fromPartial(object.configuration)
+      : undefined;
+    message.secret = (object.secret !== undefined && object.secret !== null)
+      ? SecretVersionAuditTarget.fromPartial(object.secret)
+      : undefined;
+    message.binding = (object.binding !== undefined && object.binding !== null)
+      ? ConsumerBindingAuditDetail.fromPartial(object.binding)
+      : undefined;
+    return message;
+  },
+};
+
+function createBasePlacementMutationAuditDetail(): PlacementMutationAuditDetail {
+  return { placementId: "", target: undefined, action: 0, placementRevision: 0n, resultingDesiredState: 0 };
+}
+
+export const PlacementMutationAuditDetail: MessageFns<PlacementMutationAuditDetail> = {
+  encode(message: PlacementMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.placementId !== "") {
+      writer.uint32(10).string(message.placementId);
+    }
+    if (message.target !== undefined) {
+      PlacementAuditTarget.encode(message.target, writer.uint32(18).fork()).join();
+    }
+    if (message.action !== 0) {
+      writer.uint32(24).int32(message.action);
+    }
+    if (message.placementRevision !== 0n) {
+      if (BigInt.asUintN(64, message.placementRevision) !== message.placementRevision) {
+        throw new globalThis.Error("value provided for field message.placementRevision of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.placementRevision);
+    }
+    if (message.resultingDesiredState !== 0) {
+      writer.uint32(40).int32(message.resultingDesiredState);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PlacementMutationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePlacementMutationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.placementId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.target = PlacementAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.placementRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.resultingDesiredState = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PlacementMutationAuditDetail {
+    return {
+      placementId: isSet(object.placementId) ? globalThis.String(object.placementId) : "",
+      target: isSet(object.target) ? PlacementAuditTarget.fromJSON(object.target) : undefined,
+      action: isSet(object.action) ? placementMutationActionFromJSON(object.action) : 0,
+      placementRevision: isSet(object.placementRevision) ? BigInt(object.placementRevision) : 0n,
+      resultingDesiredState: isSet(object.resultingDesiredState)
+        ? executionDesiredStateFromJSON(object.resultingDesiredState)
+        : 0,
+    };
+  },
+
+  toJSON(message: PlacementMutationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.placementId !== "") {
+      obj.placementId = message.placementId;
+    }
+    if (message.target !== undefined) {
+      obj.target = PlacementAuditTarget.toJSON(message.target);
+    }
+    if (message.action !== 0) {
+      obj.action = placementMutationActionToJSON(message.action);
+    }
+    if (message.placementRevision !== 0n) {
+      obj.placementRevision = message.placementRevision.toString();
+    }
+    if (message.resultingDesiredState !== 0) {
+      obj.resultingDesiredState = executionDesiredStateToJSON(message.resultingDesiredState);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PlacementMutationAuditDetail>): PlacementMutationAuditDetail {
+    return PlacementMutationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PlacementMutationAuditDetail>): PlacementMutationAuditDetail {
+    const message = createBasePlacementMutationAuditDetail();
+    message.placementId = object.placementId ?? "";
+    message.target = (object.target !== undefined && object.target !== null)
+      ? PlacementAuditTarget.fromPartial(object.target)
+      : undefined;
+    message.action = object.action ?? 0;
+    message.placementRevision = object.placementRevision ?? 0n;
+    message.resultingDesiredState = object.resultingDesiredState ?? 0;
+    return message;
+  },
+};
+
+function createBaseWorkloadMutationAuditDetail(): WorkloadMutationAuditDetail {
+  return {
+    workloadId: "",
+    placementId: "",
+    placementTarget: undefined,
+    action: 0,
+    workloadRevision: 0n,
+    resultingDesiredState: 0,
+    appId: "",
+    appRevision: 0n,
+    packageId: "",
+    packageGeneration: 0n,
+    componentId: "",
+  };
+}
+
+export const WorkloadMutationAuditDetail: MessageFns<WorkloadMutationAuditDetail> = {
+  encode(message: WorkloadMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.workloadId !== "") {
+      writer.uint32(10).string(message.workloadId);
+    }
+    if (message.placementId !== "") {
+      writer.uint32(18).string(message.placementId);
+    }
+    if (message.placementTarget !== undefined) {
+      PlacementAuditTarget.encode(message.placementTarget, writer.uint32(26).fork()).join();
+    }
+    if (message.action !== 0) {
+      writer.uint32(32).int32(message.action);
+    }
+    if (message.workloadRevision !== 0n) {
+      if (BigInt.asUintN(64, message.workloadRevision) !== message.workloadRevision) {
+        throw new globalThis.Error("value provided for field message.workloadRevision of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.workloadRevision);
+    }
+    if (message.resultingDesiredState !== 0) {
+      writer.uint32(48).int32(message.resultingDesiredState);
+    }
+    if (message.appId !== "") {
+      writer.uint32(58).string(message.appId);
+    }
+    if (message.appRevision !== 0n) {
+      if (BigInt.asUintN(64, message.appRevision) !== message.appRevision) {
+        throw new globalThis.Error("value provided for field message.appRevision of type uint64 too large");
+      }
+      writer.uint32(64).uint64(message.appRevision);
+    }
+    if (message.packageId !== "") {
+      writer.uint32(74).string(message.packageId);
+    }
+    if (message.packageGeneration !== 0n) {
+      if (BigInt.asUintN(64, message.packageGeneration) !== message.packageGeneration) {
+        throw new globalThis.Error("value provided for field message.packageGeneration of type uint64 too large");
+      }
+      writer.uint32(80).uint64(message.packageGeneration);
+    }
+    if (message.componentId !== "") {
+      writer.uint32(90).string(message.componentId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WorkloadMutationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWorkloadMutationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.workloadId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.placementId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.placementTarget = PlacementAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.workloadRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.resultingDesiredState = reader.int32() as any;
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.appId = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.appRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.packageId = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.packageGeneration = reader.uint64() as bigint;
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.componentId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WorkloadMutationAuditDetail {
+    return {
+      workloadId: isSet(object.workloadId) ? globalThis.String(object.workloadId) : "",
+      placementId: isSet(object.placementId) ? globalThis.String(object.placementId) : "",
+      placementTarget: isSet(object.placementTarget)
+        ? PlacementAuditTarget.fromJSON(object.placementTarget)
+        : undefined,
+      action: isSet(object.action) ? workloadMutationActionFromJSON(object.action) : 0,
+      workloadRevision: isSet(object.workloadRevision) ? BigInt(object.workloadRevision) : 0n,
+      resultingDesiredState: isSet(object.resultingDesiredState)
+        ? executionDesiredStateFromJSON(object.resultingDesiredState)
+        : 0,
+      appId: isSet(object.appId) ? globalThis.String(object.appId) : "",
+      appRevision: isSet(object.appRevision) ? BigInt(object.appRevision) : 0n,
+      packageId: isSet(object.packageId) ? globalThis.String(object.packageId) : "",
+      packageGeneration: isSet(object.packageGeneration) ? BigInt(object.packageGeneration) : 0n,
+      componentId: isSet(object.componentId) ? globalThis.String(object.componentId) : "",
+    };
+  },
+
+  toJSON(message: WorkloadMutationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.workloadId !== "") {
+      obj.workloadId = message.workloadId;
+    }
+    if (message.placementId !== "") {
+      obj.placementId = message.placementId;
+    }
+    if (message.placementTarget !== undefined) {
+      obj.placementTarget = PlacementAuditTarget.toJSON(message.placementTarget);
+    }
+    if (message.action !== 0) {
+      obj.action = workloadMutationActionToJSON(message.action);
+    }
+    if (message.workloadRevision !== 0n) {
+      obj.workloadRevision = message.workloadRevision.toString();
+    }
+    if (message.resultingDesiredState !== 0) {
+      obj.resultingDesiredState = executionDesiredStateToJSON(message.resultingDesiredState);
+    }
+    if (message.appId !== "") {
+      obj.appId = message.appId;
+    }
+    if (message.appRevision !== 0n) {
+      obj.appRevision = message.appRevision.toString();
+    }
+    if (message.packageId !== "") {
+      obj.packageId = message.packageId;
+    }
+    if (message.packageGeneration !== 0n) {
+      obj.packageGeneration = message.packageGeneration.toString();
+    }
+    if (message.componentId !== "") {
+      obj.componentId = message.componentId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WorkloadMutationAuditDetail>): WorkloadMutationAuditDetail {
+    return WorkloadMutationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WorkloadMutationAuditDetail>): WorkloadMutationAuditDetail {
+    const message = createBaseWorkloadMutationAuditDetail();
+    message.workloadId = object.workloadId ?? "";
+    message.placementId = object.placementId ?? "";
+    message.placementTarget = (object.placementTarget !== undefined && object.placementTarget !== null)
+      ? PlacementAuditTarget.fromPartial(object.placementTarget)
+      : undefined;
+    message.action = object.action ?? 0;
+    message.workloadRevision = object.workloadRevision ?? 0n;
+    message.resultingDesiredState = object.resultingDesiredState ?? 0;
+    message.appId = object.appId ?? "";
+    message.appRevision = object.appRevision ?? 0n;
+    message.packageId = object.packageId ?? "";
+    message.packageGeneration = object.packageGeneration ?? 0n;
+    message.componentId = object.componentId ?? "";
+    return message;
+  },
+};
+
+function createBaseRunMutationAuditDetail(): RunMutationAuditDetail {
+  return {
+    runId: "",
+    workloadId: "",
+    placementId: "",
+    placementTarget: undefined,
+    action: 0,
+    runRevision: 0n,
+    configuredActorPrincipalId: undefined,
+  };
+}
+
+export const RunMutationAuditDetail: MessageFns<RunMutationAuditDetail> = {
+  encode(message: RunMutationAuditDetail, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.runId !== "") {
+      writer.uint32(10).string(message.runId);
+    }
+    if (message.workloadId !== "") {
+      writer.uint32(18).string(message.workloadId);
+    }
+    if (message.placementId !== "") {
+      writer.uint32(26).string(message.placementId);
+    }
+    if (message.placementTarget !== undefined) {
+      PlacementAuditTarget.encode(message.placementTarget, writer.uint32(34).fork()).join();
+    }
+    if (message.action !== 0) {
+      writer.uint32(40).int32(message.action);
+    }
+    if (message.runRevision !== 0n) {
+      if (BigInt.asUintN(64, message.runRevision) !== message.runRevision) {
+        throw new globalThis.Error("value provided for field message.runRevision of type uint64 too large");
+      }
+      writer.uint32(48).uint64(message.runRevision);
+    }
+    if (message.configuredActorPrincipalId !== undefined) {
+      writer.uint32(58).string(message.configuredActorPrincipalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RunMutationAuditDetail {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRunMutationAuditDetail();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.runId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workloadId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.placementId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.placementTarget = PlacementAuditTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.runRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.configuredActorPrincipalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RunMutationAuditDetail {
+    return {
+      runId: isSet(object.runId) ? globalThis.String(object.runId) : "",
+      workloadId: isSet(object.workloadId) ? globalThis.String(object.workloadId) : "",
+      placementId: isSet(object.placementId) ? globalThis.String(object.placementId) : "",
+      placementTarget: isSet(object.placementTarget)
+        ? PlacementAuditTarget.fromJSON(object.placementTarget)
+        : undefined,
+      action: isSet(object.action) ? runMutationActionFromJSON(object.action) : 0,
+      runRevision: isSet(object.runRevision) ? BigInt(object.runRevision) : 0n,
+      configuredActorPrincipalId: isSet(object.configuredActorPrincipalId)
+        ? globalThis.String(object.configuredActorPrincipalId)
+        : undefined,
+    };
+  },
+
+  toJSON(message: RunMutationAuditDetail): unknown {
+    const obj: any = {};
+    if (message.runId !== "") {
+      obj.runId = message.runId;
+    }
+    if (message.workloadId !== "") {
+      obj.workloadId = message.workloadId;
+    }
+    if (message.placementId !== "") {
+      obj.placementId = message.placementId;
+    }
+    if (message.placementTarget !== undefined) {
+      obj.placementTarget = PlacementAuditTarget.toJSON(message.placementTarget);
+    }
+    if (message.action !== 0) {
+      obj.action = runMutationActionToJSON(message.action);
+    }
+    if (message.runRevision !== 0n) {
+      obj.runRevision = message.runRevision.toString();
+    }
+    if (message.configuredActorPrincipalId !== undefined) {
+      obj.configuredActorPrincipalId = message.configuredActorPrincipalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RunMutationAuditDetail>): RunMutationAuditDetail {
+    return RunMutationAuditDetail.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RunMutationAuditDetail>): RunMutationAuditDetail {
+    const message = createBaseRunMutationAuditDetail();
+    message.runId = object.runId ?? "";
+    message.workloadId = object.workloadId ?? "";
+    message.placementId = object.placementId ?? "";
+    message.placementTarget = (object.placementTarget !== undefined && object.placementTarget !== null)
+      ? PlacementAuditTarget.fromPartial(object.placementTarget)
+      : undefined;
+    message.action = object.action ?? 0;
+    message.runRevision = object.runRevision ?? 0n;
+    message.configuredActorPrincipalId = object.configuredActorPrincipalId ?? undefined;
     return message;
   },
 };

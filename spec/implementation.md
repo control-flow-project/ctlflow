@@ -160,18 +160,17 @@ forbidden. They do not implement domain transitions, immutability, revision chan
 audit admission, lifecycle, or cross-record decisions.
 
 Every domain decision executes in the service implementation language through the service's Domain
-layer. A request returns a closed typed outcome from which Domain code creates the complete typed
-audit event for each outcome required by that service's contract. The persistence operation only
-projects stored state, invokes the Domain decision, and persists the returned domain state. A database
-constraint is defense against corrupt storage; it is never an alternate domain path or a substitute
-for the Domain decision.
+layer. Only a contract-listed actual mutation produces a complete typed audit intent. Reads,
+denials, validation or dependency failures, retries, no-ops, and later realization outcomes do not.
+The persistence operation only projects stored state, invokes the Domain decision, and persists the
+returned domain state. A database constraint is defense against corrupt storage; it is never an
+alternate domain path or a substitute for the Domain decision.
 
-Services call `auditd.RecordAuditBatch` directly after a contract-required outcome is established
-and before returning that outcome to the caller. They do not persist an audit outbox, delivery
-queue, retry journal, source sequence, or audit fallback in their own database. A storage or
-dependency failure is audited only when the owning service contract requires that failure event.
-Network calls never occur while a database transaction is held. Transactions are bounded; mutable
-records use optimistic concurrency; retryable operations use their contract-defined identity.
+Services call `auditd.RecordAuditBatch` directly after a listed actual mutation commits and before
+returning success to the caller. They do not persist an audit outbox, delivery queue, retry journal,
+source sequence, or audit fallback in their own database. Network calls never occur while a database
+transaction is held. Transactions are bounded; mutable records use optimistic concurrency;
+retryable operations use their contract-defined identity.
 
 ## Kubernetes ownership
 

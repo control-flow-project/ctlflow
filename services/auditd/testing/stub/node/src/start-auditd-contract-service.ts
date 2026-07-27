@@ -141,6 +141,8 @@ async function createSource(
           body: { mode }
         });
     },
+    readEvents: async () =>
+      await readEvents(controlEndpoint, sourceId),
     readTenancyEvents: async () =>
       readTenancyEvents(
         await readEvents(controlEndpoint, sourceId)),
@@ -160,15 +162,17 @@ async function createSource(
   };
 }
 
+type JsonSerialized<T> =
+  T extends bigint
+    ? string
+    : T extends readonly (infer Item)[]
+      ? readonly JsonSerialized<Item>[]
+      : T extends object
+        ? { readonly [Key in keyof T]: JsonSerialized<T[Key]> }
+        : T;
+
 type SerializedAuditEventEvidence =
-  | (
-      Omit<TenancyAuditEventEvidence, "resourceRevision">
-      & { readonly resourceRevision: string }
-    )
-  | (
-      Omit<IdentitySessionAuditEventEvidence, "sessionRevision">
-      & { readonly sessionRevision: string }
-    );
+  JsonSerialized<AuditEventEvidence>;
 
 async function readEvents(
   controlEndpoint: string,
@@ -179,22 +183,83 @@ async function readEvents(
   >(
     controlEndpoint,
     `/sources/${sourceId}/events`);
-  return events.map((event) =>
-    event.targetKind === "session"
-      ? {
-          ...event,
-          sessionRevision: BigInt(event.sessionRevision)
-        }
-      : {
-          ...event,
-          resourceRevision: BigInt(event.resourceRevision)
-        });
+  return events.map(deserializeAuditEventEvidence);
+}
+
+function deserializeAuditEventEvidence(
+  event: SerializedAuditEventEvidence
+): AuditEventEvidence {
+  switch (event.detailKind) {
+    case "tenant_mutation":
+    case "workspace_mutation":
+      return {
+        ...event,
+        resourceRevision: BigInt(event.resourceRevision)
+      };
+    case "identity_session":
+      return {
+        ...event,
+        sessionRevision: BigInt(event.sessionRevision)
+      };
+    case "package_declaration":
+      return {
+        ...event,
+        generation: BigInt(event.generation)
+      };
+    case "app_mutation":
+      return {
+        ...event,
+        packageGeneration: BigInt(event.packageGeneration),
+        appRevision: BigInt(event.appRevision)
+      };
+    case "configuration_publication":
+    case "secret_publication": {
+      const {
+        dependencyClaimRevision,
+        ...serializedEvent
+      } = event;
+      return {
+        ...serializedEvent,
+        identityRevision: BigInt(event.identityRevision),
+        ...(dependencyClaimRevision === undefined
+          ? {}
+          : {
+              dependencyClaimRevision:
+                BigInt(dependencyClaimRevision)
+            })
+      };
+    }
+    case "projection_mutation":
+      return {
+        ...event,
+        projectionRevision: BigInt(event.projectionRevision)
+      };
+    case "placement_mutation":
+      return {
+        ...event,
+        placementRevision: BigInt(event.placementRevision)
+      };
+    case "workload_mutation":
+      return {
+        ...event,
+        workloadRevision: BigInt(event.workloadRevision),
+        appRevision: BigInt(event.appRevision),
+        packageGeneration: BigInt(event.packageGeneration)
+      };
+    case "run_mutation":
+      return {
+        ...event,
+        runRevision: BigInt(event.runRevision)
+      };
+  }
 }
 
 function readTenancyEvents(
   events: readonly AuditEventEvidence[]
 ): readonly TenancyAuditEventEvidence[] {
-  if (events.some((event) => event.targetKind === "session")) {
+  if (events.some((event) =>
+    event.detailKind !== "tenant_mutation"
+    && event.detailKind !== "workspace_mutation")) {
     throw new Error("Audit source contains non-tenancy evidence");
   }
 
@@ -204,7 +269,7 @@ function readTenancyEvents(
 function readIdentitySessionEvents(
   events: readonly AuditEventEvidence[]
 ): readonly IdentitySessionAuditEventEvidence[] {
-  if (events.some((event) => event.targetKind !== "session")) {
+  if (events.some((event) => event.detailKind !== "identity_session")) {
     throw new Error(
       "Audit source contains non-identity-Session evidence");
   }

@@ -178,8 +178,8 @@ identity cannot be supplied or replaced by a request field or
 caller-asserted metadata.
 
 The operator certificate must chain to the installation's Kubernetes client
-CA and contain exactly one common name. That common name has one to 253 Unicode
-scalar values, has no control scalar, and is not whitespace-only so it is
+CA and contain exactly one common name. That common name has one to 253
+characters and contains no Unicode whitespace or control character, so it is
 admissible as typed Auditd attribution. A missing or untrusted certificate is
 `UNAUTHENTICATED`; a trusted subject absent from tenantd's finite operator
 allowlist is `PERMISSION_DENIED`. Workload calls never obtain operator
@@ -233,7 +233,7 @@ policy or identity dependency failure is `UNAVAILABLE`. tenantd never accepts
 a Role, capability, operation token, Actor, or resource path from its caller.
 
 Every actual mutation produces one typed audit intent in Domain containing a
-canonical source event ID, typed operation, infrastructure operator or
+canonical `evt_<32 lower-hex>` source event ID, typed operation, infrastructure operator or
 invocation Actor, immediate workload when present, Tenant partition, target
 ID, resulting state and revision, occurrence time, and trace identity. Db
 persists only Tenant or Workspace state. After Db completes and no transaction

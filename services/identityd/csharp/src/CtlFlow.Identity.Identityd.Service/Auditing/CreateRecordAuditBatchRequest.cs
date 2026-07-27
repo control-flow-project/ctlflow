@@ -6,34 +6,21 @@ namespace CtlFlow.Identity.Identityd.Service.Auditing;
 
 internal static partial class AuditDelivery
 {
-    private const ulong SourceSchemaGeneration = 1;
-
     internal static ValueTask<RecordAuditBatchRequest>
         CreateRecordAuditBatchRequest(
             SessionAuditIntent intent,
             CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        var request = new RecordAuditBatchRequest
-        {
-            SourceSchemaGeneration = SourceSchemaGeneration
-        };
+        var request = new RecordAuditBatchRequest();
         request.Events.Add(new AuditEvent
         {
             SourceEventId = intent.EventId.Value,
-            IdempotencyKey = intent.EventId.Value,
-            Operation = intent.Action switch
-            {
-                SessionAuditAction.Created => "create_session",
-                SessionAuditAction.Revoked => "revoke_session",
-                _ => throw new InvalidOperationException(
-                    "Session audit action is invalid")
-            },
             OccurredAt = Timestamp.FromDateTimeOffset(
                 intent.OccurredAt.Value),
             Attribution = new CtlFlow.Audit.V1.AuditAttribution
             {
-                KubernetesSubject = intent.Caller.Value
+                WorkloadSubject = intent.Caller.Value
             },
             Partition = new AuditPartition
             {
@@ -47,7 +34,7 @@ internal static partial class AuditDelivery
             IdentitySession = new IdentitySessionAuditDetail
             {
                 SessionId = intent.SessionId.Value,
-                AccountPrincipalId = intent.AccountId.Value,
+                HumanAccountPrincipalId = intent.AccountId.Value,
                 SessionRevision = checked(
                     (ulong)intent.SessionRevision.Value),
                 Action = intent.Action switch

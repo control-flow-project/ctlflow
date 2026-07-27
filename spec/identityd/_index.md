@@ -443,9 +443,9 @@ has no audit table, outbox, queue, retry journal, or fallback. Audit failure is
 `UNAVAILABLE` and does not roll back the committed Session state.
 
 The exact typed Session actions are `CREATED` and `REVOKED`. The event is
-Tenant-partitioned and contains a canonical source event ID, Session ID, human
-account principal ID, resulting positive Session revision, action,
-authenticated Authd workload, occurrence time, and trace correlation. It
+Tenant-partitioned and contains a canonical `evt_<32 lower-hex>` source event
+ID, Session ID, human account principal ID, resulting positive Session
+revision, action, authenticated Authd workload, occurrence time, and trace correlation. It
 contains no credential, digest, provider identity, invocation token, signing
 material, or generic operation string.
 

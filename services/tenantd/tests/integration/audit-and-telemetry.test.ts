@@ -6,10 +6,6 @@ import {
   status
 } from "@grpc/grpc-js";
 import {
-  AuditOutcome,
-  TenancyResourceState
-} from "../generated/v1/auditd.js";
-import {
   ResourceState,
   type ListTenantsResponse,
   type ResolveTenantResponse,
@@ -92,7 +88,7 @@ test("records one complete audit event for each mutation operation", async () =>
   const events =
     (await context.auditd.readTenancyEvents()).slice(baseline);
   assert.deepEqual(
-    events.map((event) => event.operation),
+    events.map((event) => event.action),
     [
       "create_tenant",
       "update_tenant",
@@ -107,31 +103,43 @@ test("records one complete audit event for each mutation operation", async () =>
   assert.deepEqual(
     events.map((event) => event.resultingState),
     [
-      TenancyResourceState.TENANCY_RESOURCE_STATE_ACTIVE,
-      TenancyResourceState.TENANCY_RESOURCE_STATE_ACTIVE,
-      TenancyResourceState.TENANCY_RESOURCE_STATE_ACTIVE,
-      TenancyResourceState.TENANCY_RESOURCE_STATE_ACTIVE,
-      TenancyResourceState.TENANCY_RESOURCE_STATE_SUSPENDED,
-      TenancyResourceState.TENANCY_RESOURCE_STATE_SUSPENDED
+      "active",
+      "active",
+      "active",
+      "active",
+      "suspended",
+      "suspended"
     ]);
   assert.deepEqual(
-    events.map((event) => event.targetKind),
-    ["tenant", "tenant", "workspace", "workspace", "workspace", "tenant"]);
+    events.map((event) => event.detailKind),
+    [
+      "tenant_mutation",
+      "tenant_mutation",
+      "workspace_mutation",
+      "workspace_mutation",
+      "workspace_mutation",
+      "tenant_mutation"
+    ]);
 
   for (const event of events) {
-    assert.equal(event.idempotencyKey, event.sourceEventId);
     assert.match(event.sourceEventId, /^evt_[0-9a-f]{32}$/u);
-    assert.equal(event.kubernetesSubject, context.operatorSubject);
-    assert.equal(event.actorPrincipalId, undefined);
-    assert.equal(event.attachedAccountPrincipalId, undefined);
-    assert.equal(event.tenantId, tenant.tenantId);
-    assert.equal(event.outcome, AuditOutcome.AUDIT_OUTCOME_SUCCEEDED);
+    assert.deepEqual(event.attribution, {
+      kind: "operator",
+      operatorCommonName: context.operatorSubject
+    });
+    assert.deepEqual(event.partition, {
+      kind: "tenant",
+      tenantId: tenant.tenantId
+    });
     assert.match(event.traceId, /^[0-9a-f]{32}$/u);
     assert.match(event.spanId, /^[0-9a-f]{16}$/u);
     assert.ok(Number.isFinite(Date.parse(event.occurredAt)));
   }
   assert.deepEqual(
-    events.map((event) => event.targetId),
+    events.map((event) =>
+      event.detailKind === "workspace_mutation"
+        ? event.workspaceId
+        : tenant.tenantId),
     [
       tenant.tenantId,
       tenant.tenantId,

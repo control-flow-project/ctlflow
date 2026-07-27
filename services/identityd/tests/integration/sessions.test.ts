@@ -71,15 +71,19 @@ test("creates a digest-only Session and delivers typed audit", async () => {
   assert.equal(auditAfter.length, auditBefore.length + 1);
   const event = auditAfter.at(-1);
   assert.ok(event !== undefined);
-  assert.equal(event.operation, "create_session");
+  assert.match(event.sourceEventId, /^evt_[0-9a-f]{32}$/u);
   assert.equal(event.action, "created");
   assert.equal(event.sessionId, created.sessionId);
-  assert.equal(event.accountPrincipalId, "user:alice");
-  assert.equal(event.tenantId, "acme");
+  assert.equal(event.humanAccountPrincipalId, "user:alice");
+  assert.deepEqual(event.partition, {
+    kind: "tenant",
+    tenantId: "acme"
+  });
   assert.equal(event.sessionRevision, 1n);
-  assert.equal(
-    event.kubernetesSubject,
-    context.authdWorkload.callerSubject);
+  assert.deepEqual(event.attribution, {
+    kind: "workload",
+    workloadSubject: context.authdWorkload.callerSubject
+  });
   const serialized = JSON.stringify(
     event,
     (_key, value: unknown) =>
@@ -190,7 +194,6 @@ test("revocation mutates and audits once, then remains idempotent",
     assert.equal(auditAfter.length, auditBefore.length + 1);
     const event = auditAfter.at(-1);
     assert.ok(event !== undefined);
-    assert.equal(event.operation, "revoke_session");
     assert.equal(event.action, "revoked");
     assert.equal(event.sessionId, created.sessionId);
     assert.equal(event.sessionRevision, 2n);

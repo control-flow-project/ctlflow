@@ -6,42 +6,15 @@ namespace CtlFlow.Tenancy.Tenantd.Service.Auditing;
 
 internal static partial class AuditDelivery
 {
-    private const ulong SourceSchemaGeneration = 1;
-
     internal static ValueTask<RecordAuditBatchRequest>
         CreateRecordAuditBatchRequest(
             AuditIntent intent,
             CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        var target = CreateTarget(intent.Target);
-        var detail = new TenancyMutationAuditDetail
-        {
-            ResourceRevision = checked((ulong)intent.ResultingRevision.Value),
-            Outcome = CtlFlow.Audit.V1.AuditOutcome.Succeeded,
-            ResultingState = MapState(intent.ResultingState)
-        };
-        switch (target)
-        {
-            case TenantAuditTarget tenant:
-                detail.Tenant = tenant;
-                break;
-            case WorkspaceAuditTarget workspace:
-                detail.Workspace = workspace;
-                break;
-            default:
-                throw new InvalidOperationException("Audit target is invalid");
-        }
-
-        var request = new RecordAuditBatchRequest
-        {
-            SourceSchemaGeneration = SourceSchemaGeneration
-        };
-        request.Events.Add(new AuditEvent
+        var auditEvent = new AuditEvent
         {
             SourceEventId = intent.EventId.Value,
-            IdempotencyKey = intent.EventId.Value,
-            Operation = MapOperation(intent.Operation),
             OccurredAt = Timestamp.FromDateTimeOffset(intent.OccurredAt.Value),
             Attribution = CreateAttribution(intent.Attribution),
             Partition = new AuditPartition
@@ -52,9 +25,37 @@ internal static partial class AuditDelivery
                 }
             },
             TraceId = intent.Correlation.TraceId,
-            SpanId = intent.Correlation.SpanId,
-            TenancyMutation = detail
-        });
+            SpanId = intent.Correlation.SpanId
+        };
+
+        switch (intent.Target)
+        {
+            case AuditTarget.Tenant:
+                auditEvent.TenantMutation = new TenantMutationAuditDetail
+                {
+                    Action = MapTenantAction(intent.Operation),
+                    ResourceRevision = checked(
+                        (ulong)intent.ResultingRevision.Value),
+                    ResultingState = MapState(intent.ResultingState)
+                };
+                break;
+            case AuditTarget.Workspace workspace:
+                auditEvent.WorkspaceMutation =
+                    new WorkspaceMutationAuditDetail
+                    {
+                        WorkspaceId = workspace.WorkspaceId.Value,
+                        Action = MapWorkspaceAction(intent.Operation),
+                        ResourceRevision = checked(
+                            (ulong)intent.ResultingRevision.Value),
+                        ResultingState = MapState(intent.ResultingState)
+                    };
+                break;
+            default:
+                throw new InvalidOperationException("Audit target is invalid");
+        }
+
+        var request = new RecordAuditBatchRequest();
+        request.Events.Add(auditEvent);
         return ValueTask.FromResult(request);
     }
 
@@ -62,40 +63,26 @@ internal static partial class AuditDelivery
         Domain.Auditing.AuditAttribution attribution) =>
         attribution switch
         {
-            Domain.Auditing.AuditAttribution.Kubernetes kubernetes =>
+            Domain.Auditing.AuditAttribution.Kubernetes certificate =>
                 new CtlFlow.Audit.V1.AuditAttribution
                 {
-                    KubernetesSubject = kubernetes.Subject.Value
+                    OperatorCommonName = certificate.Subject.Value
                 },
-            Domain.Auditing.AuditAttribution.AttachedActor attached =>
+            Domain.Auditing.AuditAttribution.AttachedActor invocation =>
                 new CtlFlow.Audit.V1.AuditAttribution
                 {
-                    AttachedActor = new AttachedActor
+                    Invocation = new InvocationAuditAttribution
                     {
                         ActorPrincipalId =
-                            attached.ActorPrincipal.Value,
+                            invocation.ActorPrincipal.Value,
                         AttachedAccountPrincipalId =
-                            attached.AttachedAccountPrincipal.Value
-                    },
-                    ImmediateCaller = attached.ImmediateCaller.Value
+                            invocation.AttachedAccountPrincipal.Value,
+                        WorkloadSubject =
+                            invocation.ImmediateCaller.Value
+                    }
                 },
             _ => throw new InvalidOperationException(
                 "Audit attribution is invalid")
-        };
-
-    private static object CreateTarget(AuditTarget target) =>
-        target switch
-        {
-            AuditTarget.Tenant tenant => new TenantAuditTarget
-            {
-                TenantId = tenant.TenantId.Value
-            },
-            AuditTarget.Workspace workspace => new WorkspaceAuditTarget
-            {
-                TenantId = workspace.TenantId.Value,
-                WorkspaceId = workspace.WorkspaceId.Value
-            },
-            _ => throw new InvalidOperationException("Audit target is invalid")
         };
 
     private static string GetTenantId(AuditTarget target) =>
@@ -106,17 +93,32 @@ internal static partial class AuditDelivery
             _ => throw new InvalidOperationException("Audit target is invalid")
         };
 
-    private static string MapOperation(AuditOperation operation) =>
+    private static TenantMutationAction MapTenantAction(
+        AuditOperation operation) =>
         operation switch
         {
-            AuditOperation.CreateTenant => "create_tenant",
-            AuditOperation.UpdateTenant => "update_tenant",
-            AuditOperation.SetTenantState => "set_tenant_state",
-            AuditOperation.CreateWorkspace => "create_workspace",
-            AuditOperation.UpdateWorkspace => "update_workspace",
-            AuditOperation.SetWorkspaceState => "set_workspace_state",
+            AuditOperation.CreateTenant =>
+                TenantMutationAction.CreateTenant,
+            AuditOperation.UpdateTenant =>
+                TenantMutationAction.UpdateTenant,
+            AuditOperation.SetTenantState =>
+                TenantMutationAction.SetTenantState,
             _ => throw new InvalidOperationException(
-                "Audit operation is invalid")
+                "Tenant audit action is invalid")
+        };
+
+    private static WorkspaceMutationAction MapWorkspaceAction(
+        AuditOperation operation) =>
+        operation switch
+        {
+            AuditOperation.CreateWorkspace =>
+                WorkspaceMutationAction.CreateWorkspace,
+            AuditOperation.UpdateWorkspace =>
+                WorkspaceMutationAction.UpdateWorkspace,
+            AuditOperation.SetWorkspaceState =>
+                WorkspaceMutationAction.SetWorkspaceState,
+            _ => throw new InvalidOperationException(
+                "Workspace audit action is invalid")
         };
 
     private static TenancyResourceState MapState(
