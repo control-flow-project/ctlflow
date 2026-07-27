@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "service": "authd.http.v1",
+  "operations": [
+    {
+      "method": "POST",
+      "path": "/auth/v1/begin",
+      "operationId": "beginAuthentication",
+      "statuses": {
+        "303": [
+          {
+            "file": "tests/integration/begin.test.ts",
+            "title": "builds the exact OIDC authorization request and bounded state cookie"
+          }
+        ],
+        "400": [
+          {
+            "file": "tests/integration/begin.test.ts",
+            "title": "selects exact tenant and provider and strictly validates forms"
+          }
+        ],
+        "403": [
+          {
+            "file": "tests/integration/begin.test.ts",
+            "title": "requires canonical Origin and authority on both browser POST routes"
+          }
+        ],
+        "413": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "414": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "415": [
+          {
+            "file": "tests/integration/begin.test.ts",
+            "title": "selects exact tenant and provider and strictly validates forms"
+          }
+        ],
+        "429": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "applies each route token bucket with bounded Retry-After"
+          }
+        ],
+        "431": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "500": [
+          {
+            "architectureClaim": "begin-unexpected-failure-500"
+          }
+        ],
+        "503": [
+          {
+            "file": "tests/integration/begin.test.ts",
+            "title": "enforces the finite Begin deadline"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/v1/callback",
+      "operationId": "completeProviderCallback",
+      "statuses": {
+        "303": [
+          {
+            "file": "tests/integration/callback.test.ts",
+            "title": "completes OIDC through exactly two Egressd calls and creates a Session"
+          }
+        ],
+        "400": [
+          {
+            "file": "tests/integration/callback.test.ts",
+            "title": "rejects every undeclared or ambiguous callback query shape"
+          }
+        ],
+        "401": [
+          {
+            "file": "tests/integration/callback.test.ts",
+            "title": "maps strict token, signature, claim, and UserInfo rejection to 401"
+          }
+        ],
+        "413": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "414": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "429": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "admits at most 32 consumed callbacks without queueing"
+          },
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "applies each route token bucket with bounded Retry-After"
+          }
+        ],
+        "431": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "500": [
+          {
+            "architectureClaim": "callback-unexpected-failure-500"
+          }
+        ],
+        "503": [
+          {
+            "file": "tests/integration/callback.test.ts",
+            "title": "maps provider, Egressd, and Identityd availability and rejection"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/v1/logout",
+      "operationId": "logout",
+      "statuses": {
+        "303": [
+          {
+            "file": "tests/integration/logout.test.ts",
+            "title": "revokes a usable Session and clears both cookies on success"
+          }
+        ],
+        "400": [
+          {
+            "file": "tests/integration/logout.test.ts",
+            "title": "validates logout media, form, state cookie, and return target"
+          }
+        ],
+        "403": [
+          {
+            "file": "tests/integration/begin.test.ts",
+            "title": "requires canonical Origin and authority on both browser POST routes"
+          }
+        ],
+        "413": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "414": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "415": [
+          {
+            "file": "tests/integration/logout.test.ts",
+            "title": "validates logout media, form, state cookie, and return target"
+          }
+        ],
+        "429": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "applies each route token bucket with bounded Retry-After"
+          }
+        ],
+        "431": [
+          {
+            "file": "tests/integration/bounds.test.ts",
+            "title": "enforces declared body, target, and header bounds on every route"
+          }
+        ],
+        "500": [
+          {
+            "architectureClaim": "logout-unexpected-failure-500"
+          }
+        ],
+        "503": [
+          {
+            "file": "tests/integration/logout.test.ts",
+            "title": "retains the Session cookie when Identityd is unavailable"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "serves exactly the three declared routes and isolates probes"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "returns fixed non-disclosing browser errors with security headers"
+    },
+    {
+      "file": "tests/integration/begin.test.ts",
+      "title": "binds one-time state to the browser and loses it on restart"
+    },
+    {
+      "file": "tests/integration/callback.test.ts",
+      "title": "consumes a valid provider error without a dependency call"
+    },
+    {
+      "file": "tests/integration/callback.test.ts",
+      "title": "propagates browser cancellation and consumes the in-flight attempt"
+    },
+    {
+      "file": "tests/integration/callback.test.ts",
+      "title": "replaces the browser cookie without revoking the previous Session"
+    },
+    {
+      "file": "tests/integration/callback.test.ts",
+      "title": "accepts a sole audience array and ignores extra token members"
+    },
+    {
+      "file": "tests/integration/logout.test.ts",
+      "title": "missing, duplicate, malformed, and unknown credentials are logged out"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "exports correlated route and dependency telemetry without secrets"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "replaces malformed trace context and ignores baggage"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "continues browser operation during Collector outage"
+    },
+    {
+      "file": "tests/integration/zz-lifecycle.test.ts",
+      "title": "invalid projected generations fail startup and readiness"
+    },
+    {
+      "architectureClaim": "bounded-in-process-state"
+    }
+  ],
+  "releaseGates": [
+    "npm run verify:api-manifest --workspace @ctlflow/authd",
+    "npm run verify:architecture --workspace @ctlflow/authd",
+    "npm run build:provider --workspace @ctlflow/authd",
+    "npm run build:tests --workspace @ctlflow/authd",
+    "npm run build:csharp --workspace @ctlflow/authd",
+    "npm run test:compiled --workspace @ctlflow/authd",
+    "npm run verify:container:authd"
+  ]
+}

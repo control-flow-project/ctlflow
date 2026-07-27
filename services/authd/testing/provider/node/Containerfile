@@ -1,0 +1,32 @@
+FROM node:26.1.0-bookworm-slim AS build
+
+WORKDIR /workspace
+COPY package.json package-lock.json ./
+COPY tsconfig.base.json ./
+COPY tooling/clean-directories.mjs tooling/clean-directories.mjs
+COPY testing/mesh/package.json testing/mesh/package.json
+COPY services/auditd/package.json services/auditd/package.json
+COPY services/authd/package.json services/authd/package.json
+COPY services/egressd/package.json services/egressd/package.json
+COPY services/identityd/package.json services/identityd/package.json
+RUN npm ci \
+    --workspace @ctlflow/test-mesh \
+    --workspace @ctlflow/authd \
+    --include-workspace-root=false
+
+COPY testing/mesh/tsconfig.json testing/mesh/tsconfig.json
+COPY testing/mesh/src testing/mesh/src
+COPY services/authd/testing services/authd/testing
+RUN npm run build --workspace @ctlflow/test-mesh \
+    && npm run build:provider --workspace @ctlflow/authd
+
+FROM node:26.1.0-bookworm-slim
+
+WORKDIR /workspace
+COPY --from=build /workspace/node_modules /workspace/node_modules
+COPY --from=build /workspace/testing/mesh/package.json /workspace/testing/mesh/package.json
+COPY --from=build /workspace/testing/mesh/dist /workspace/testing/mesh/dist
+COPY --from=build /workspace/services/authd/.generated /workspace/services/authd/.generated
+
+USER node
+ENTRYPOINT ["node", "/workspace/services/authd/.generated/testing/provider/node/src/run-oidc-provider.js"]

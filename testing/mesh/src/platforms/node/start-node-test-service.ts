@@ -19,8 +19,8 @@ import type {
   NodeTestServiceOptions
 } from "./node-test-service.js";
 
-const grpcPort = 50051;
-const controlPort = 8080;
+const defaultServicePort = 50051;
+const defaultControlPort = 8080;
 
 export async function startNodeTestService(
   options: NodeTestServiceOptions
@@ -29,17 +29,39 @@ export async function startNodeTestService(
   validateStorageDirectory(options.storageDirectory);
   validateWorkloadTokenAudience(
     options.workloadTokenAudience);
+  const servicePort = options.servicePort ?? defaultServicePort;
+  const controlPort = options.controlPort ?? defaultControlPort;
+  const serviceScheme = options.serviceScheme ?? "https";
+  validatePort(servicePort);
+  validatePort(controlPort);
+  if (servicePort === controlPort) {
+    throw new Error("Node test service ports must be distinct");
+  }
+  const hostServicePort = await findAvailablePort();
   const hostControlPort = await findAvailablePort();
+  let serviceForwarding: ManagedProcess | undefined;
   let forwarding: ManagedProcess | undefined;
   let logs: ManagedProcess | undefined;
 
   try {
     await options.kubernetes.runKubectl(
       ["apply", "-f", "-"],
-      JSON.stringify(createManifest(options)));
+      JSON.stringify(createManifest(
+        options,
+        servicePort,
+        controlPort)));
     await waitForKubernetesDeployment(
       options.kubernetes,
       options.name);
+    serviceForwarding = options.kubernetes.startKubectl([
+      "port-forward",
+      `service/${options.name}`,
+      "--namespace",
+      options.kubernetes.namespace,
+      "--address",
+      "127.0.0.1",
+      `${String(hostServicePort)}:${String(servicePort)}`
+    ]);
     forwarding = options.kubernetes.startKubectl([
       "port-forward",
       `service/${options.name}`,
@@ -49,10 +71,10 @@ export async function startNodeTestService(
       "127.0.0.1",
       `${String(hostControlPort)}:${String(controlPort)}`
     ]);
-    await waitForEndpoint(
-      "127.0.0.1",
-      hostControlPort,
-      30_000);
+    await Promise.all([
+      waitForEndpoint("127.0.0.1", hostServicePort, 30_000),
+      waitForEndpoint("127.0.0.1", hostControlPort, 30_000)
+    ]);
     logs = options.kubernetes.startKubectl([
       "logs",
       "--follow",
@@ -62,7 +84,7 @@ export async function startNodeTestService(
       "--all-containers=true"
     ]);
   } catch (error) {
-    await stopProcesses(forwarding, logs);
+    await stopProcesses(serviceForwarding, forwarding, logs);
     await scaleToZero(options).catch(() => undefined);
     throw error;
   }
@@ -70,12 +92,15 @@ export async function startNodeTestService(
   let stopped = false;
   return {
     endpoint:
-      `https://${options.name}.${options.kubernetes.namespace}.svc:`
-      + String(grpcPort),
+      `${serviceScheme}://${options.name}.`
+      + `${options.kubernetes.namespace}.svc:${String(servicePort)}`,
+    localEndpoint:
+      `${serviceScheme}://127.0.0.1:${String(hostServicePort)}`,
     controlEndpoint:
       `http://127.0.0.1:${String(hostControlPort)}`,
     diagnostics: () => [
       logs?.diagnostics() ?? "",
+      serviceForwarding?.diagnostics() ?? "",
       forwarding?.diagnostics() ?? ""
     ].filter((value) => value.length > 0).join("\n"),
     stop: async () => {
@@ -83,14 +108,16 @@ export async function startNodeTestService(
         return;
       }
       stopped = true;
-      await stopProcesses(forwarding, logs);
+      await stopProcesses(serviceForwarding, forwarding, logs);
       await scaleToZero(options);
     }
   };
 }
 
 function createManifest(
-  options: NodeTestServiceOptions
+  options: NodeTestServiceOptions,
+  servicePort: number,
+  controlPort: number
 ): object {
   const namespace = options.kubernetes.namespace;
   const selector = { "app.kubernetes.io/name": options.name };
@@ -137,7 +164,7 @@ function createManifest(
                   env: Object.entries(options.environment).map(
                     ([name, value]) => ({ name, value })),
                   ports: [
-                    { containerPort: grpcPort, name: "grpc" },
+                    { containerPort: servicePort, name: "service" },
                     { containerPort: controlPort, name: "control" }
                   ],
                   readinessProbe: {
@@ -213,9 +240,9 @@ function createManifest(
           selector,
           ports: [
             {
-              name: "grpc",
-              port: grpcPort,
-              targetPort: "grpc"
+              name: "service",
+              port: servicePort,
+              targetPort: "service"
             },
             {
               name: "control",
@@ -230,9 +257,13 @@ function createManifest(
 }
 
 async function stopProcesses(
+  serviceForwarding: ManagedProcess | undefined,
   forwarding: ManagedProcess | undefined,
   logs: ManagedProcess | undefined
 ): Promise<void> {
+  if (serviceForwarding !== undefined) {
+    await stopProcess(serviceForwarding).catch(() => undefined);
+  }
   if (forwarding !== undefined) {
     await stopProcess(forwarding).catch(() => undefined);
   }
@@ -279,5 +310,11 @@ function validateWorkloadTokenAudience(
   ) {
     throw new Error(
       "Node test service workload token audience is invalid");
+  }
+}
+
+function validatePort(value: number): void {
+  if (!Number.isInteger(value) || value < 1 || value > 65_535) {
+    throw new Error("Node test service port is invalid");
   }
 }

@@ -2,6 +2,9 @@ export type {
   IdentitydMode
 } from "./identityd-mode.js";
 export type {
+  ExternalIdentityLink
+} from "./external-identity-link.js";
+export type {
   IdentitydProductionService
 } from "./identityd-production-service.js";
 export type {

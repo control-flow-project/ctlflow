@@ -3,12 +3,31 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./testing/provider": {
+      "types": "./.generated/testing/provider/node/src/index.d.ts",
+      "default": "./.generated/testing/provider/node/src/index.js"
+    }
+  },
   "scripts": {
     "update:api-manifest": "node tooling/api/verify-api-manifest.mjs --write",
     "verify:api-manifest": "node tooling/api/verify-api-manifest.mjs",
-    "build": "npm run verify:api-manifest"
+    "verify:architecture": "node tooling/architecture/verify-implementation.mjs",
+    "build:provider": "node ../../tooling/clean-directories.mjs .generated/testing/provider/node && tsc --project testing/provider/node/tsconfig.json",
+    "build:tests": "node ../../tooling/clean-directories.mjs tests/dist && tsc --project tests/tsconfig.json",
+    "build:csharp": "dotnet restore csharp/CtlFlow.Auth.Authd.slnx --locked-mode && dotnet build csharp/CtlFlow.Auth.Authd.slnx --configuration Release --no-restore",
+    "verify:evidence": "node tooling/evidence/verify-evidence-manifest.mjs",
+    "build": "npm run verify:api-manifest && npm run verify:architecture && npm run build:provider && npm run build:tests && npm run verify:evidence && npm run build:csharp",
+    "test": "npm run test:compiled",
+    "test:compiled": "node --test --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-authd-test-suite.js tests/dist/integration/authd.test.js"
   },
   "devDependencies": {
+    "@ctlflow/test-mesh": "0.0.0",
+    "@ctlflow/auditd": "0.0.0",
+    "@ctlflow/egressd": "0.0.0",
+    "@ctlflow/identityd": "0.0.0",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3",
     "yaml": "2.9.0"
   }
 }
