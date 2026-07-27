@@ -9,8 +9,8 @@ import type {
   IdentitydMode
 } from "./identityd-mode.js";
 import type {
-  AuditdTestSource
-} from "@ctlflow/auditd/testing/stub";
+  AuditdProductionSource
+} from "@ctlflow/auditd/testing/production";
 import type {
   IdentitydProductionService
 } from "./identityd-production-service.js";
@@ -62,7 +62,7 @@ export async function startIdentitydProductionService(
   });
   let database: IdentityTestDatabase | undefined;
   let service: CSharpService | undefined;
-  let auditSource: AuditdTestSource | undefined;
+  let auditSource: AuditdProductionSource | undefined;
 
   try {
     database = await createIdentityDatabase(
@@ -220,7 +220,7 @@ function createService(
   stopPublication: () => Promise<void>,
   database: IdentityTestDatabase,
   service: CSharpService,
-  auditSource: AuditdTestSource,
+  auditSource: AuditdProductionSource,
   certificateAuthorityPath: string,
   serverName: string,
   baseEnvironment: Readonly<Record<string, string>>
@@ -350,7 +350,7 @@ async function scaleIdentityd(
 async function stopResources(
   service: CSharpService,
   database: IdentityTestDatabase,
-  auditSource: AuditdTestSource,
+  auditSource: AuditdProductionSource,
   stopPublication: () => Promise<void>
 ): Promise<void> {
   let failure: unknown;

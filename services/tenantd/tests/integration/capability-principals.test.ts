@@ -274,15 +274,12 @@ test("virtual-principal mutations audit both identities", async () => {
   const audit = (await context.auditd.readTenancyEvents())
     .slice(auditBaseline);
   assert.equal(audit.length, 1);
-  assert.equal(
-    audit[0]?.actorPrincipalId,
-    "agent:renamer");
-  assert.equal(
-    audit[0]?.attachedAccountPrincipalId,
-    "service:automation");
-  assert.equal(
-    audit[0]?.immediateCaller,
-    context.capabilityWorkload.callerSubject);
+  assert.deepEqual(audit[0]?.attribution, {
+    kind: "invocation",
+    actorPrincipalId: "agent:renamer",
+    attachedAccountPrincipalId: "service:automation",
+    workloadSubject: context.capabilityWorkload.callerSubject
+  });
 });
 
 function grant(

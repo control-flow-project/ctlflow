@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: auditd
+spec:
+  selector:
+    app.kubernetes.io/name: auditd
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc

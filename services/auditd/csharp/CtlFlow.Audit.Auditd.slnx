@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/CtlFlow.Audit.Auditd.Domain/CtlFlow.Audit.Auditd.Domain.csproj" />
+  <Project Path="src/CtlFlow.Audit.Auditd.Db/CtlFlow.Audit.Auditd.Db.csproj" />
+  <Project Path="src/CtlFlow.Audit.Auditd.Service/CtlFlow.Audit.Auditd.Service.csproj" />
+  <Project Path="tests/CtlFlow.Audit.Auditd.IntegrationTests/CtlFlow.Audit.Auditd.IntegrationTests.csproj" />
+</Solution>

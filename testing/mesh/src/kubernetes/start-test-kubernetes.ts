@@ -201,9 +201,32 @@ export async function startTestKubernetes(
         }
 
         stopped = true;
+        await runKubectl(
+          repositoryRoot,
+          minikube,
+          [
+            "delete",
+            "namespace",
+            namespaceName,
+            "--ignore-not-found=true",
+            "--wait=true",
+            "--timeout=30s"
+          ]);
       }
     };
   } catch (error) {
+    await runKubectl(
+      repositoryRoot,
+      minikube,
+      [
+        "delete",
+        "namespace",
+        namespaceName,
+        "--ignore-not-found=true",
+        "--wait=true",
+        "--timeout=30s"
+      ])
+      .catch(() => undefined);
     throw error;
   }
 }

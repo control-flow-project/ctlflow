@@ -231,10 +231,25 @@ test("every operation emits correlated telemetry and Session audit",
       ["created", "revoked"]);
     for (const event of events) {
       assert.equal(event.traceId, traceId);
-      assert.match(
-        event.receivedTraceparent ?? "",
-        new RegExp(`^00-${traceId}-[a-f0-9]{16}-01$`, "u"));
     }
+    await waitForExport(
+      context.collector.tracesPath,
+      (value) => {
+        const spans = findSpansForTrace(value, traceId);
+        const deliverySpanIds = new Set(
+          spans
+            .filter((span) =>
+              span.name === "identityd.RecordAuditBatch")
+            .map((span) => span.spanId)
+            .filter((spanId): spanId is string =>
+              typeof spanId === "string"));
+        const auditSpans = spans.filter((span) =>
+          span.name === "auditd.RecordAuditBatch");
+        return auditSpans.length >= 2
+          && auditSpans.every((span) =>
+            typeof span.parentSpanId === "string"
+            && deliverySpanIds.has(span.parentSpanId));
+      });
 
     const exports = await readAllExports(context.collector);
     for (const sensitive of [

@@ -5,9 +5,9 @@ import {
   type TestKubernetes
 } from "@ctlflow/test-mesh";
 import {
-  startAuditdContractService,
-  type AuditdContractService
-} from "@ctlflow/auditd/testing/stub";
+  startAuditdProductionService,
+  type AuditdProductionService
+} from "@ctlflow/auditd/testing/production";
 import {
   loadIdentitydTestRuntime
 } from "../runtime/load-identityd-test-runtime.js";
@@ -26,7 +26,7 @@ Promise<IdentitydTestSuite> {
   let runtime: IdentitydTestRuntime | undefined;
   let kubernetes: TestKubernetes | undefined;
   let collector: OpenTelemetryCollector | undefined;
-  let auditd: AuditdContractService | undefined;
+  let auditd: AuditdProductionService | undefined;
 
   try {
     runtime = await loadIdentitydTestRuntime();
@@ -34,9 +34,10 @@ Promise<IdentitydTestSuite> {
     collector = await startOpenTelemetryCollector(
       repositoryRoot,
       kubernetes);
-    auditd = await startAuditdContractService({
+    auditd = await startAuditdProductionService({
       repositoryRoot,
-      kubernetes
+      kubernetes,
+      telemetryEndpoint: collector.endpoint
     });
     let stopped = false;
     return {
@@ -65,7 +66,7 @@ async function stopResources(
   runtime: IdentitydTestRuntime | undefined,
   kubernetes: TestKubernetes | undefined,
   collector: OpenTelemetryCollector | undefined,
-  auditd: AuditdContractService | undefined
+  auditd: AuditdProductionService | undefined
 ): Promise<void> {
   let failure: unknown;
   for (const stop of [

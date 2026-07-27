@@ -4,6 +4,8 @@ namespace CtlFlow.Identity.Identityd.Domain.Auditing;
 
 public sealed record AuditEventId
 {
+    private const string Prefix = "evt_";
+
     private AuditEventId(string value)
     {
         Value = value;
@@ -12,6 +14,6 @@ public sealed record AuditEventId
     public string Value { get; }
 
     public static AuditEventId Generate() =>
-        new(Convert.ToHexString(
+        new(Prefix + Convert.ToHexString(
             RandomNumberGenerator.GetBytes(16)).ToLowerInvariant());
 }

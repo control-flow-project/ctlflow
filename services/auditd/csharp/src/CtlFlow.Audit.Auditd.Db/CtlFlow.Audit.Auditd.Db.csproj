@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>CtlFlow.Audit.Auditd.Db</AssemblyName>
+    <RootNamespace>CtlFlow.Audit.Auditd.Db</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.EntityFrameworkCore.GeneratedInterceptors</InterceptorsNamespaces>
+    <EFTargetNamespace>CtlFlow.Audit.Auditd.Db.Generated</EFTargetNamespace>
+    <EFOptimizeContext Condition="'$(Configuration)' == 'Release'">true</EFOptimizeContext>
+    <EFStartupProject>../CtlFlow.Audit.Auditd.Service/CtlFlow.Audit.Auditd.Service.csproj</EFStartupProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CtlFlow.Audit.Auditd.Domain/CtlFlow.Audit.Auditd.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../../schema-manifest.txt"
+                      LogicalName="CtlFlow.Audit.Auditd.SchemaManifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tasks" PrivateAssets="all" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: auditd
+spec:
+  replicas: 1
+  serviceName: auditd
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: auditd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: auditd
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: auditd
+      securityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+      containers:
+        - name: auditd
+          image: auditd
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: auditd-runtime
+          env:
+            - name: CTLFLOW_GRPC_URL
+              value: https://0.0.0.0:50051
+            - name: CTLFLOW_PROBE_URL
+              value: http://0.0.0.0:8080
+            - name: CTLFLOW_DATABASE_PROVIDER
+              value: sqlite
+            - name: CTLFLOW_DATABASE_PATH
+              value: /var/lib/ctlflow/auditd.sqlite
+            - name: CTLFLOW_TLS_CERTIFICATE_PATH
+              value: /var/run/ctlflow/tls/tls.crt
+            - name: CTLFLOW_TLS_PRIVATE_KEY_PATH
+              value: /var/run/ctlflow/tls/tls.key
+            - name: CTLFLOW_WORKLOAD_JWKS_PATH
+              value: /var/run/ctlflow/trust/workload-jwks.json
+          ports:
+            - name: grpc
+              containerPort: 50051
+            - name: probe
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: probe
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: probe
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 65532
+            runAsUser: 65532
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ctlflow
+            - name: tls
+              mountPath: /var/run/ctlflow/tls
+              readOnly: true
+            - name: trust
+              mountPath: /var/run/ctlflow/trust
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: auditd-data
+        - name: tls
+          secret:
+            secretName: auditd-tls
+            defaultMode: 288
+        - name: trust
+          configMap:
+            name: auditd-trust
+        - name: tmp
+          emptyDir: {}

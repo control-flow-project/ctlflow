@@ -50,8 +50,15 @@ edged
 
 execd
   +-> identityd.IssueRunInvocation
+  +-> auditd.RecordAuditBatch
 
 identityd
+  +-> auditd.RecordAuditBatch
+
+pkgd
+  +-> auditd.RecordAuditBatch
+
+configd
   +-> auditd.RecordAuditBatch
 ```
 

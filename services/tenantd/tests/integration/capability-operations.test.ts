@@ -97,13 +97,12 @@ test("tenant capabilities use exact operations and resource paths", async () => 
   const audit = (await context.auditd.readTenancyEvents())
     .slice(auditBaseline);
   assert.equal(audit.length, 1);
-  assert.equal(audit[0]?.actorPrincipalId, "user:alice");
-  assert.equal(
-    audit[0]?.attachedAccountPrincipalId,
-    "user:alice");
-  assert.equal(
-    audit[0]?.immediateCaller,
-    context.capabilityWorkload.callerSubject);
+  assert.deepEqual(audit[0]?.attribution, {
+    kind: "invocation",
+    actorPrincipalId: "user:alice",
+    attachedAccountPrincipalId: "user:alice",
+    workloadSubject: context.capabilityWorkload.callerSubject
+  });
 });
 
 test("workspace capabilities cover collection and exact targets", async () => {

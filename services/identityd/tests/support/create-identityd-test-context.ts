@@ -10,8 +10,8 @@ import type {
   TestWorkloadCredentials
 } from "@ctlflow/test-mesh";
 import type {
-  AuditdTestSource
-} from "@ctlflow/auditd/testing/stub";
+  AuditdProductionSource
+} from "@ctlflow/auditd/testing/production";
 import {
   IdentityServiceClient
 } from "../generated/v1/identityd.js";
@@ -48,7 +48,7 @@ export interface IdentitydTestContext {
   readonly execdWorkload: TestWorkloadCredentials;
   readonly policydWorkload: TestWorkloadCredentials;
   readonly tenantdWorkload: TestWorkloadCredentials;
-  readonly auditd: AuditdTestSource;
+  readonly auditd: AuditdProductionSource;
   readonly collector: OpenTelemetryCollector;
   readonly invocation: InvocationAuthority;
   readonly database: TestDatabase;
@@ -66,7 +66,7 @@ Promise<IdentitydTestContext> {
   let database: TestDatabase | undefined;
   let service: IdentitydRunningService | undefined;
   let client: IdentityServiceClient | undefined;
-  let auditd: AuditdTestSource | undefined;
+  let auditd: AuditdProductionSource | undefined;
 
   try {
     await suite.collector.resume();
@@ -235,7 +235,7 @@ function createClientOptions(serverName: string): ClientOptions {
 async function stopResources(
   service: IdentitydRunningService | undefined,
   database: TestDatabase | undefined,
-  auditd: AuditdTestSource | undefined
+  auditd: AuditdProductionSource | undefined
 ): Promise<void> {
   let failure: unknown;
   try {

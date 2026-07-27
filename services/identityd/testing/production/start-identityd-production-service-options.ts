@@ -2,8 +2,8 @@ import type {
   TestKubernetes
 } from "@ctlflow/test-mesh";
 import type {
-  AuditdContractService
-} from "@ctlflow/auditd/testing/stub";
+  AuditdProductionService
+} from "@ctlflow/auditd/testing/production";
 import type {
   InvocationVerificationKey
 } from "./invocation-verification-key.js";
@@ -16,7 +16,7 @@ export interface InvocationSigningProvision {
 export interface StartIdentitydProductionServiceOptions {
   readonly repositoryRoot: string;
   readonly kubernetes: TestKubernetes;
-  readonly auditd: AuditdContractService;
+  readonly auditd: AuditdProductionService;
   readonly signing: InvocationSigningProvision;
   readonly telemetryEndpoint: string;
   readonly invocationIssuer: string;

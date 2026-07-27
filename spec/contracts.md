@@ -161,16 +161,19 @@ After an audited mutation commits and no transaction is held, the source calls
 `auditd.RecordAuditBatch` directly.
 
 ```text
-Domain outcome -> source service -> auditd
+listed committed mutation -> source service -> auditd
 ```
 
-The source event identity makes an identical replay idempotent and a
-conflicting replay invalid. The source stores no audit outbox, queue, journal,
-cursor, delivery worker, or fallback copy.
+The authenticated source and source event ID make an identical replay
+idempotent. A replay with different canonical event content is
+`ALREADY_EXISTS`. The source stores no audit outbox, queue, journal, cursor,
+delivery worker, or fallback copy.
 
 Reads, rejected calls, create retries, and no-op mutations emit no successful
 mutation event. Identityd audits only successful Session creation and an
-actual Session revocation.
+actual Session revocation. The exact audited mutations for Tenantd, Identityd,
+Pkgd, Configd, and Execd are closed by their owner contracts and the Auditd
+detail inventory.
 
 ## Complete call inventory
 
@@ -187,5 +190,8 @@ actual Session revocation.
 | `edged` | `identityd.ExchangeSession` | Exchange one current Session for an exact-target invocation |
 | `execd` | `identityd.IssueRunInvocation` | Issue an exact-target invocation for one owned Run |
 | `identityd` | `auditd.RecordAuditBatch` | Record one committed Session creation or actual revocation |
+| `pkgd` | `auditd.RecordAuditBatch` | Record one committed Package or App mutation |
+| `configd` | `auditd.RecordAuditBatch` | Record one committed publication or Projection mutation |
+| `execd` | `auditd.RecordAuditBatch` | Record one committed Placement, Workload, or Run mutation |
 
 No other kernel-to-kernel call is approved by this specification.

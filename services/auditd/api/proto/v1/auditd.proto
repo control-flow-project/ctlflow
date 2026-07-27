@@ -12,8 +12,7 @@ service AuditService {
 }
 
 message RecordAuditBatchRequest {
-  uint64 source_schema_generation = 1;
-  repeated AuditEvent events = 2;
+  repeated AuditEvent events = 1;
 }
 
 message RecordAuditBatchResponse {
@@ -27,33 +26,39 @@ message AuditAcceptance {
 
 message AuditEvent {
   string source_event_id = 1;
-  string idempotency_key = 2;
-  string operation = 3;
-  google.protobuf.Timestamp occurred_at = 4;
-  AuditAttribution attribution = 5;
-  AuditPartition partition = 6;
-  string trace_id = 7;
-  string span_id = 8;
+  google.protobuf.Timestamp occurred_at = 2;
+  AuditAttribution attribution = 3;
+  AuditPartition partition = 4;
+  string trace_id = 5;
+  string span_id = 6;
 
   oneof detail {
-    TenancyMutationAuditDetail tenancy_mutation = 20;
-    IdentitySessionAuditDetail identity_session = 21;
+    TenantMutationAuditDetail tenant_mutation = 7;
+    WorkspaceMutationAuditDetail workspace_mutation = 8;
+    IdentitySessionAuditDetail identity_session = 9;
+    PackageDeclarationAuditDetail package_declaration = 10;
+    AppMutationAuditDetail app_mutation = 11;
+    ConfigurationPublicationAuditDetail configuration_publication = 12;
+    SecretPublicationAuditDetail secret_publication = 13;
+    ProjectionMutationAuditDetail projection_mutation = 14;
+    PlacementMutationAuditDetail placement_mutation = 15;
+    WorkloadMutationAuditDetail workload_mutation = 16;
+    RunMutationAuditDetail run_mutation = 17;
   }
 }
 
 message AuditAttribution {
-  oneof subject {
-    string kubernetes_subject = 1;
-    AttachedActor attached_actor = 2;
+  oneof attribution {
+    string operator_common_name = 1;
+    string workload_subject = 2;
+    InvocationAuditAttribution invocation = 3;
   }
-
-  optional string immediate_caller = 3;
-  optional string runtime_principal = 4;
 }
 
-message AttachedActor {
+message InvocationAuditAttribution {
   string actor_principal_id = 1;
   string attached_account_principal_id = 2;
+  string workload_subject = 3;
 }
 
 message AuditPartition {
@@ -69,38 +74,156 @@ message TenantAuditPartition {
   string tenant_id = 1;
 }
 
-message TenancyMutationAuditDetail {
+message PlacementAuditTarget {
   oneof target {
-    TenantAuditTarget tenant = 1;
-    WorkspaceAuditTarget workspace = 2;
+    GlobalPlacementAuditTarget global = 1;
+    TenantPlacementAuditTarget tenant = 2;
+    WorkspacePlacementAuditTarget workspace = 3;
+    UserPlacementAuditTarget user = 4;
   }
-
-  uint64 resource_revision = 3;
-  AuditOutcome outcome = 4;
-  TenancyResourceState resulting_state = 5;
 }
 
-message TenantAuditTarget {
+message GlobalPlacementAuditTarget {}
+
+message TenantPlacementAuditTarget {
   string tenant_id = 1;
 }
 
-message WorkspaceAuditTarget {
+message WorkspacePlacementAuditTarget {
   string tenant_id = 1;
   string workspace_id = 2;
 }
 
+message UserPlacementAuditTarget {
+  string tenant_id = 1;
+  string account_principal_id = 2;
+}
+
+message ConsumerBindingAuditDetail {
+  string placement_id = 1;
+  PlacementAuditTarget placement_target = 2;
+  string consumer_id = 3;
+  string purpose = 4;
+}
+
+message ConfigurationVersionAuditTarget {
+  string configuration_id = 1;
+  string configuration_version_id = 2;
+}
+
+message SecretVersionAuditTarget {
+  string secret_id = 1;
+  string secret_version_id = 2;
+}
+
+message TenantMutationAuditDetail {
+  TenantMutationAction action = 1;
+  uint64 resource_revision = 2;
+  TenancyResourceState resulting_state = 3;
+}
+
+message WorkspaceMutationAuditDetail {
+  string workspace_id = 1;
+  WorkspaceMutationAction action = 2;
+  uint64 resource_revision = 3;
+  TenancyResourceState resulting_state = 4;
+}
+
 message IdentitySessionAuditDetail {
   string session_id = 1;
-  string account_principal_id = 2;
+  string human_account_principal_id = 2;
   uint64 session_revision = 3;
   IdentitySessionAction action = 4;
 }
 
-enum AuditOutcome {
-  AUDIT_OUTCOME_UNSPECIFIED = 0;
-  AUDIT_OUTCOME_SUCCEEDED = 1;
-  AUDIT_OUTCOME_DENIED = 2;
-  AUDIT_OUTCOME_FAILED = 3;
+message PackageDeclarationAuditDetail {
+  string package_id = 1;
+  uint64 generation = 2;
+}
+
+message AppMutationAuditDetail {
+  string app_id = 1;
+  PlacementAuditTarget scope = 2;
+  string placement_id = 3;
+  string package_id = 4;
+  uint64 package_generation = 5;
+  uint64 app_revision = 6;
+  AppMutationAction action = 7;
+}
+
+message ConfigurationPublicationAuditDetail {
+  ConfigurationVersionAuditTarget target = 1;
+  ConsumerBindingAuditDetail binding = 2;
+  uint64 identity_revision = 3;
+  optional string dependency_claim_id = 4;
+  optional uint64 dependency_claim_revision = 5;
+}
+
+message SecretPublicationAuditDetail {
+  SecretVersionAuditTarget target = 1;
+  ConsumerBindingAuditDetail binding = 2;
+  uint64 identity_revision = 3;
+  optional string dependency_claim_id = 4;
+  optional uint64 dependency_claim_revision = 5;
+}
+
+message ProjectionMutationAuditDetail {
+  string projection_id = 1;
+  ProjectionMutationAction action = 2;
+  uint64 projection_revision = 3;
+
+  oneof target {
+    ConfigurationVersionAuditTarget configuration = 4;
+    SecretVersionAuditTarget secret = 5;
+  }
+
+  ConsumerBindingAuditDetail binding = 6;
+}
+
+message PlacementMutationAuditDetail {
+  string placement_id = 1;
+  PlacementAuditTarget target = 2;
+  PlacementMutationAction action = 3;
+  uint64 placement_revision = 4;
+  ExecutionDesiredState resulting_desired_state = 5;
+}
+
+message WorkloadMutationAuditDetail {
+  string workload_id = 1;
+  string placement_id = 2;
+  PlacementAuditTarget placement_target = 3;
+  WorkloadMutationAction action = 4;
+  uint64 workload_revision = 5;
+  ExecutionDesiredState resulting_desired_state = 6;
+  string app_id = 7;
+  uint64 app_revision = 8;
+  string package_id = 9;
+  uint64 package_generation = 10;
+  string component_id = 11;
+}
+
+message RunMutationAuditDetail {
+  string run_id = 1;
+  string workload_id = 2;
+  string placement_id = 3;
+  PlacementAuditTarget placement_target = 4;
+  RunMutationAction action = 5;
+  uint64 run_revision = 6;
+  optional string configured_actor_principal_id = 7;
+}
+
+enum TenantMutationAction {
+  TENANT_MUTATION_ACTION_UNSPECIFIED = 0;
+  TENANT_MUTATION_ACTION_CREATE_TENANT = 1;
+  TENANT_MUTATION_ACTION_UPDATE_TENANT = 2;
+  TENANT_MUTATION_ACTION_SET_TENANT_STATE = 3;
+}
+
+enum WorkspaceMutationAction {
+  WORKSPACE_MUTATION_ACTION_UNSPECIFIED = 0;
+  WORKSPACE_MUTATION_ACTION_CREATE_WORKSPACE = 1;
+  WORKSPACE_MUTATION_ACTION_UPDATE_WORKSPACE = 2;
+  WORKSPACE_MUTATION_ACTION_SET_WORKSPACE_STATE = 3;
 }
 
 enum TenancyResourceState {
@@ -114,4 +237,41 @@ enum IdentitySessionAction {
   IDENTITY_SESSION_ACTION_UNSPECIFIED = 0;
   IDENTITY_SESSION_ACTION_CREATED = 1;
   IDENTITY_SESSION_ACTION_REVOKED = 2;
+}
+
+enum AppMutationAction {
+  APP_MUTATION_ACTION_UNSPECIFIED = 0;
+  APP_MUTATION_ACTION_CREATED = 1;
+  APP_MUTATION_ACTION_PACKAGE_GENERATION_CHANGED = 2;
+}
+
+enum ProjectionMutationAction {
+  PROJECTION_MUTATION_ACTION_UNSPECIFIED = 0;
+  PROJECTION_MUTATION_ACTION_CREATED = 1;
+  PROJECTION_MUTATION_ACTION_VERSION_CHANGED = 2;
+}
+
+enum PlacementMutationAction {
+  PLACEMENT_MUTATION_ACTION_UNSPECIFIED = 0;
+  PLACEMENT_MUTATION_ACTION_DECLARED = 1;
+  PLACEMENT_MUTATION_ACTION_UPDATED = 2;
+}
+
+enum WorkloadMutationAction {
+  WORKLOAD_MUTATION_ACTION_UNSPECIFIED = 0;
+  WORKLOAD_MUTATION_ACTION_DECLARED = 1;
+  WORKLOAD_MUTATION_ACTION_UPDATED = 2;
+}
+
+enum RunMutationAction {
+  RUN_MUTATION_ACTION_UNSPECIFIED = 0;
+  RUN_MUTATION_ACTION_CREATED = 1;
+  RUN_MUTATION_ACTION_CANCELLATION_REQUESTED = 2;
+}
+
+enum ExecutionDesiredState {
+  EXECUTION_DESIRED_STATE_UNSPECIFIED = 0;
+  EXECUTION_DESIRED_STATE_ACTIVE = 1;
+  EXECUTION_DESIRED_STATE_SUSPENDED = 2;
+  EXECUTION_DESIRED_STATE_RETIRED = 3;
 }

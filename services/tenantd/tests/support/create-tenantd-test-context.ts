@@ -10,8 +10,8 @@ import {
   type TestWorkloadCredentials
 } from "@ctlflow/test-mesh";
 import type {
-  AuditdTestSource
-} from "@ctlflow/auditd/testing/stub";
+  AuditdProductionSource
+} from "@ctlflow/auditd/testing/production";
 import type {
   IdentitydProductionSource
 } from "@ctlflow/identityd/testing/production";
@@ -50,7 +50,7 @@ export interface TenantdTestContext {
     TestWorkloadCredentials;
   readonly collector: OpenTelemetryCollector;
   readonly invocation: InvocationAuthority;
-  readonly auditd: AuditdTestSource;
+  readonly auditd: AuditdProductionSource;
   readonly identityd: IdentitydProductionSource;
   readonly policyIdentityd: IdentitydProductionSource;
   readonly policyd: PolicyTestSource;
@@ -71,7 +71,7 @@ export async function createTenantdTestContext():
 Promise<TenantdTestContext> {
   const suite = getTenantdTestSuite();
   let database: TestDatabase | undefined;
-  let auditd: AuditdTestSource | undefined;
+  let auditd: AuditdProductionSource | undefined;
   let identityd: IdentitydProductionSource | undefined;
   let policyIdentityd: IdentitydProductionSource | undefined;
   let policyd: PolicyTestSource | undefined;
@@ -333,7 +333,7 @@ function createClientOptions(serverName: string): ClientOptions {
 async function stopResources(
   service: TenantdRunningService | undefined,
   database: TestDatabase | undefined,
-  auditd: AuditdTestSource | undefined,
+  auditd: AuditdProductionSource | undefined,
   identityd: IdentitydProductionSource | undefined,
   policyIdentityd: IdentitydProductionSource | undefined,
   policyd: PolicyTestSource | undefined

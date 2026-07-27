@@ -82,7 +82,11 @@ export async function createKustomizeServiceOverlay(
           spec: {
             containers: [{
               name: options.name,
-              imagePullPolicy: "Never"
+              imagePullPolicy: "Never",
+              env: Object.entries(options.environment)
+                .sort(([left], [right]) =>
+                  left < right ? -1 : left > right ? 1 : 0)
+                .map(([name, value]) => ({ name, value }))
             }]
           }
         }

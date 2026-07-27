@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "service": "ctlflow.audit.v1.AuditService",
+  "operations": [
+    {
+      "name": "RecordAuditBatch",
+      "success": [
+        {
+          "file": "tests/integration/acceptance.test.ts",
+          "title": "auditd durably accepts typed Tenant evidence"
+        },
+        {
+          "file": "tests/integration/success-matrix.test.ts",
+          "title": "accepts every admitted source, detail, attribution, action, state, and target combination"
+        },
+        {
+          "file": "tests/integration/envelope-validation.test.ts",
+          "title": "accepts operator common-name boundary lengths"
+        },
+        {
+          "file": "tests/integration/envelope-validation.test.ts",
+          "title": "accepts a virtual Actor distinct from its attached account"
+        },
+        {
+          "file": "tests/integration/batch-semantics.test.ts",
+          "title": "replays identical content without advancing its partition"
+        },
+        {
+          "file": "tests/integration/batch-semantics.test.ts",
+          "title": "allocates partition cursors in request order"
+        },
+        {
+          "file": "tests/integration/batch-semantics.test.ts",
+          "title": "serializes concurrent cursor allocation without gaps"
+        },
+        {
+          "file": "tests/integration/admission.test.ts",
+          "title": "accepts source-attested upstream workload attribution"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/envelope-validation.test.ts",
+            "title": "requires every event envelope field and oneof"
+          },
+          {
+            "file": "tests/integration/envelope-validation.test.ts",
+            "title": "validates event, trace, span, partition, and timestamp values"
+          },
+          {
+            "file": "tests/integration/envelope-validation.test.ts",
+            "title": "rejects invalid operator common names"
+          },
+          {
+            "file": "tests/integration/envelope-validation.test.ts",
+            "title": "validates workload attribution subjects"
+          },
+          {
+            "file": "tests/integration/envelope-validation.test.ts",
+            "title": "validates invocation Actor and attached account structure"
+          },
+          {
+            "file": "tests/integration/detail-validation.test.ts",
+            "title": "validates Tenant and Workspace mutation details"
+          },
+          {
+            "file": "tests/integration/detail-validation.test.ts",
+            "title": "validates Identity Session and Package details"
+          },
+          {
+            "file": "tests/integration/detail-validation.test.ts",
+            "title": "validates App mutation details"
+          },
+          {
+            "file": "tests/integration/detail-validation.test.ts",
+            "title": "validates Configuration and Secret publication details"
+          },
+          {
+            "file": "tests/integration/detail-validation.test.ts",
+            "title": "validates Projection mutation details"
+          },
+          {
+            "file": "tests/integration/detail-validation.test.ts",
+            "title": "validates Placement, Workload, and Run mutation details"
+          },
+          {
+            "file": "tests/integration/batch-semantics.test.ts",
+            "title": "rejects duplicate request event IDs without writing"
+          },
+          {
+            "file": "tests/integration/batch-semantics.test.ts",
+            "title": "rolls back a mixed valid and invalid batch"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/batch-semantics.test.ts",
+            "title": "rejects conflicting replay and rolls back novel events"
+          }
+        ],
+        "RESOURCE_EXHAUSTED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "transport rejects an encoded request above 256 KiB"
+          },
+          {
+            "file": "tests/integration/batch-semantics.test.ts",
+            "title": "enforces the one-to-100 event batch bounds"
+          },
+          {
+            "file": "tests/integration/batch-semantics.test.ts",
+            "title": "fails atomically when a partition cursor is exhausted"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "requires exactly one canonical Bearer workload token"
+          },
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "rejects invalid bound workload identity claims"
+          },
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "rejects a valid but unadmitted workload"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/admission.test.ts",
+            "title": "only the owning source may submit each typed detail"
+          },
+          {
+            "file": "tests/integration/admission.test.ts",
+            "title": "source-specific attribution admission is exact"
+          },
+          {
+            "file": "tests/integration/admission.test.ts",
+            "title": "detail and target partitions must be coherent"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/batch-semantics.test.ts",
+            "title": "rolls back the event and cursor on persistence failure"
+          },
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "readiness and the owning operation fail on missing mapped schema"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "cancels an in-flight batch before durable commit"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "expires an in-flight batch before durable commit"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "auditd exposes exactly the approved RPC inventory"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "auditd health and readiness probes are available"
+    },
+    {
+      "file": "tests/integration/security.test.ts",
+      "title": "authentication precedes ordinary body validation"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "exports correlated and redacted traces, metrics, and logs"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "exports cancellation and deadline outcomes before commit"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "telemetry outage is bounded and preserves acceptance"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "readiness rejects an ahead or locked migration ledger"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "startup rejects malformed and duplicate source admission"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "startup and readiness reject unavailable local trust"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "SQLite contains only migration metadata and audit domain tables"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "preserves evidence, replay, and cursor state across restart"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:auditd",
+    "npm run test:compiled --workspace @ctlflow/auditd",
+    "npm run test:csharp --workspace @ctlflow/auditd",
+    "npm run verify:container:auditd",
+    "npm run verify:migration-container:auditd"
+  ]
+}

@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <AssemblyName>CtlFlow.Audit.Auditd.Service</AssemblyName>
+    <RootNamespace>CtlFlow.Audit.Auditd.Service</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <PublishAot>true</PublishAot>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <SelfContained>true</SelfContained>
+    <OptimizationPreference>Speed</OptimizationPreference>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+    <TrimmerTreatWarningsAsErrors>true</TrimmerTreatWarningsAsErrors>
+    <IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <SuppressAotAnalysisWarnings>false</SuppressAotAnalysisWarnings>
+    <SuppressSingleFileAnalysisWarnings>false</SuppressSingleFileAnalysisWarnings>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.EntityFrameworkCore.GeneratedInterceptors</InterceptorsNamespaces>
+    <EFScaffoldModelStage>none</EFScaffoldModelStage>
+    <EFPrecompileQueriesStage>none</EFPrecompileQueriesStage>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CtlFlow.Audit.Auditd.Domain/CtlFlow.Audit.Auditd.Domain.csproj" />
+    <ProjectReference Include="../CtlFlow.Audit.Auditd.Db/CtlFlow.Audit.Auditd.Db.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Core.Api" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tasks" PrivateAssets="all" />
+    <PackageReference Include="OpenTelemetry" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="../../../api/proto/v1/auditd.proto"
+              GrpcServices="Server"
+              ProtoRoot="../../../api/proto" />
+  </ItemGroup>
+</Project>

@@ -1,7 +1,7 @@
 import {
-  startAuditdContractService,
-  type AuditdContractService
-} from "@ctlflow/auditd/testing/stub";
+  startAuditdProductionService,
+  type AuditdProductionService
+} from "@ctlflow/auditd/testing/production";
 import {
   startControlledOidcProvider,
   type ControlledOidcProvider
@@ -47,7 +47,7 @@ Promise<AuthdTestSuite> {
   let runtime: AuthdTestRuntime | undefined;
   let kubernetes: TestKubernetes | undefined;
   let collector: OpenTelemetryCollector | undefined;
-  let auditd: AuditdContractService | undefined;
+  let auditd: AuditdProductionService | undefined;
   let identityd: IdentitydProductionService | undefined;
   let identitySource: IdentitydProductionSource | undefined;
   let provider: ControlledOidcProvider | undefined;
@@ -60,9 +60,10 @@ Promise<AuthdTestSuite> {
     collector = await startOpenTelemetryCollector(
       repositoryRoot,
       kubernetes);
-    auditd = await startAuditdContractService({
+    auditd = await startAuditdProductionService({
       repositoryRoot,
-      kubernetes
+      kubernetes,
+      telemetryEndpoint: collector.endpoint
     });
     const signing = createInvocationSigning();
     const policydSubject =

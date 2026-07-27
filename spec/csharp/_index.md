@@ -548,8 +548,8 @@ transaction when needed. It explicitly projects the complete stored state requir
 transition, asks a verb-named Domain function to rehydrate the mapped Domain entity, attaches that
 entity to the context, records the projected concurrency revision as the original value, calls the
 Domain decision function, and commits only after the decision succeeds. Domain creates the complete
-typed audit intent for each contract-required outcome. Reads, retries, no-ops, denials, and failures
-create no audit intent unless their service contract explicitly requires one.
+typed audit intent only for each contract-listed actual mutation. Reads, retries, no-ops, denials,
+validation or dependency failures, and later realization outcomes create no audit intent.
 
 Rehydration validates storage invariants and reconstructs the same Domain entity used for creation
 and business logic. It does not introduce an `Entity`, `Row`, `Record`, or other parallel
@@ -562,9 +562,8 @@ and generated query interceptor executes in the real NativeAOT integration suite
 
 Db persists only service-owned domain state. After Db completes and no database transaction is
 held, Service maps the Domain-produced audit intent to the shared wire contract and calls
-`auditd.RecordAuditBatch` directly before returning the corresponding outcome. Infrastructure
-failures are mapped through a Domain function to the required typed failure evidence and submitted
-the same way. No local audit outbox, queue, retry journal, source sequence, or fallback path exists.
+`auditd.RecordAuditBatch` directly before returning success. No local audit outbox, queue, retry
+journal, source sequence, or fallback path exists.
 
 Entity Framework mappings and common migrations contain structural schema only. C# behavior must
 not depend on a database trigger, stored procedure, user-defined database function, computed side
