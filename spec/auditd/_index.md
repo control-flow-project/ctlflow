@@ -158,6 +158,11 @@ the five sources. No request field, attribution value, invocation JWT, TLS
 server identity, network location, or trace context can replace the
 authenticated direct source. Auditd stores the canonical source and concrete
 authenticated source subject with each newly accepted event, never the token.
+Workload and invocation attribution identify an upstream caller already
+authenticated by that source and therefore need not equal the source's own
+ServiceAccount subject. Auditd validates the attribution shape and the
+source-specific admission matrix; it does not authenticate the upstream caller
+a second time.
 
 ## Acceptance
 

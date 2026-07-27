@@ -12,8 +12,8 @@ import {
   createTestServiceTls
 } from "@ctlflow/test-mesh";
 import type {
-  AuditdContractService
-} from "@ctlflow/auditd/testing/stub";
+  AuditdProductionService
+} from "@ctlflow/auditd/testing/production";
 import type {
   IdentitydProductionService
 } from "@ctlflow/identityd/testing/production";
@@ -40,7 +40,7 @@ export interface PrepareTenantdContextFilesOptions {
   readonly serviceName: string;
   readonly workload: TestWorkloadCredentials;
   readonly kubernetes: TestKubernetes;
-  readonly auditd: AuditdContractService;
+  readonly auditd: AuditdProductionService;
   readonly identityd: IdentitydProductionService;
   readonly policyd: PolicyContractService;
 }

@@ -1,6 +1,6 @@
 import type {
-  AuditdContractService
-} from "@ctlflow/auditd/testing/stub";
+  AuditdProductionService
+} from "@ctlflow/auditd/testing/production";
 import type {
   ControlledOidcProvider
 } from "@ctlflow/authd/testing/provider";
@@ -28,7 +28,7 @@ export interface AuthdTestSuite {
   readonly runtime: AuthdTestRuntime;
   readonly kubernetes: TestKubernetes;
   readonly collector: OpenTelemetryCollector;
-  readonly auditd: AuditdContractService;
+  readonly auditd: AuditdProductionService;
   readonly identityd: IdentitydProductionService;
   readonly identitySource: IdentitydProductionSource;
   readonly provider: ControlledOidcProvider;

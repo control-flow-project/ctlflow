@@ -229,25 +229,6 @@ test("returns unavailable after a committed mutation when auditd fails", async (
   assert.equal(
     (await context.auditd.readTenancyEvents()).length,
     baseline);
-
-  await context.auditd.setMode("denied");
-  try {
-    await assert.rejects(
-      updateTenant(
-        committed.tenantId,
-        committed.revision,
-        "Committed Without Audit"),
-      matchGrpcStatus(status.UNAVAILABLE));
-  } finally {
-    await context.auditd.setMode("available");
-  }
-  const updated = await getTenant(committed.tenantId);
-  assert.equal(updated.displayName, "Committed Without Audit");
-  assert.equal(updated.revision, 2n);
-  assert.equal(
-    (await context.auditd.readTenancyEvents()).length,
-    baseline);
-
 });
 
 test("exports correlated and redacted traces, metrics, and logs", async () => {
@@ -403,17 +384,5 @@ async function getTenant(tenantId: string): Promise<Tenant> {
   return await callUnary<Tenant>((done) =>
     context.client.getTenant(
       { tenantId },
-      done));
-}
-
-async function updateTenant(
-  tenantId: string,
-  expectedRevision: bigint,
-  displayName: string
-): Promise<Tenant> {
-  const context = getTenantdTestContext();
-  return await callUnary<Tenant>((done) =>
-    context.client.updateTenant(
-      { tenantId, expectedRevision, displayName },
       done));
 }

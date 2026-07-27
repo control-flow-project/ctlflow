@@ -5,9 +5,9 @@ import {
   type TestKubernetes
 } from "@ctlflow/test-mesh";
 import {
-  startAuditdContractService,
-  type AuditdContractService
-} from "@ctlflow/auditd/testing/stub";
+  startAuditdProductionService,
+  type AuditdProductionService
+} from "@ctlflow/auditd/testing/production";
 import {
   startIdentitydProductionService,
   type IdentitydProductionService
@@ -42,7 +42,7 @@ Promise<TenantdTestSuite> {
   let runtime: TenantdTestRuntime | undefined;
   let kubernetes: TestKubernetes | undefined;
   let collector: OpenTelemetryCollector | undefined;
-  let auditd: AuditdContractService | undefined;
+  let auditd: AuditdProductionService | undefined;
   let identityd: IdentitydProductionService | undefined;
   let policyd: PolicyContractService | undefined;
 
@@ -54,9 +54,10 @@ Promise<TenantdTestSuite> {
     collector = await startOpenTelemetryCollector(
       repositoryRoot,
       kubernetes);
-    auditd = await startAuditdContractService({
+    auditd = await startAuditdProductionService({
       repositoryRoot,
-      kubernetes
+      kubernetes,
+      telemetryEndpoint: collector.endpoint
     });
     identityd = await startIdentitydProductionService({
       repositoryRoot,
@@ -128,7 +129,7 @@ async function stopResources(
   runtime: TenantdTestRuntime | undefined,
   kubernetes: TestKubernetes | undefined,
   collector: OpenTelemetryCollector | undefined,
-  auditd: AuditdContractService | undefined,
+  auditd: AuditdProductionService | undefined,
   identityd: IdentitydProductionService | undefined,
   policyd: PolicyContractService | undefined
 ): Promise<void> {
