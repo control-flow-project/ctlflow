@@ -44,13 +44,13 @@ paths:
     get:
       operationId: completeProviderCallback
       description: >-
-        Completes the selected provider callback. The installed adapter fixes
-        any bounded provider-specific query fields; they are not CtlFlow API
-        fields. There is no body. The strictly decoded UTF-8 request target is
-        at most 16,384 bytes and contains at most 32 query fields.
+        Completes the sole OIDC Authorization Code with PKCE callback. There
+        is no body. The strictly decoded UTF-8 request target is at most
+        16,384 bytes and contains exactly the selected two- or three-field
+        query shape.
       security: []
       parameters:
-        - $ref: "#/components/parameters/State"
+        - $ref: "#/components/parameters/CallbackQuery"
         - $ref: "#/components/parameters/RequiredStateCookie"
       responses:
         "303": { $ref: "#/components/responses/CallbackRedirect" }
@@ -105,13 +105,17 @@ components:
         type: string
         format: uri
         pattern: "^https://"
-    State:
-      name: state
+    CallbackQuery:
+      name: callback
       in: query
       required: true
-      description: Exactly one one-time authentication state handle.
+      style: form
+      explode: true
+      description: >-
+        The exploded object properties are the exact query field names. Each
+        field occurs once; there is no serialized callback field.
       schema:
-        $ref: "#/components/schemas/Opaque32ByteValue"
+        $ref: "#/components/schemas/CallbackQuery"
     OptionalStateCookie:
       name: __Host-ctlflow-auth-state
       in: cookie
@@ -161,6 +165,56 @@ components:
       maxLength: 43
       pattern: "^[A-Za-z0-9_-]{43}$"
       description: Unpadded base64url encoding of exactly 32 bytes.
+    AuthorizationCode:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      pattern: '^[\u0020-\u007E]+$'
+      description: One OAuth visible-ASCII authorization code.
+    ProviderError:
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: '^[\u0020-\u0021\u0023-\u005B\u005D-\u007E]+$'
+      description: One OAuth NQSCHAR error value.
+    ProviderErrorDescription:
+      type: string
+      minLength: 1
+      maxLength: 256
+      pattern: '^[\u0020-\u0021\u0023-\u005B\u005D-\u007E]+$'
+      description: >-
+        Optional provider error detail accepted only for bounded parsing,
+        then discarded without logging.
+    CallbackQuery:
+      type: object
+      additionalProperties: false
+      minProperties: 2
+      maxProperties: 3
+      required:
+        - state
+      properties:
+        state:
+          $ref: "#/components/schemas/Opaque32ByteValue"
+        code:
+          $ref: "#/components/schemas/AuthorizationCode"
+        error:
+          $ref: "#/components/schemas/ProviderError"
+        error_description:
+          $ref: "#/components/schemas/ProviderErrorDescription"
+      oneOf:
+        - required:
+            - code
+          properties:
+            error: false
+            error_description: false
+        - required:
+            - error
+          properties:
+            code: false
+      description: >-
+        Exactly state plus code, or state plus error and optional
+        error_description. A valid error branch is 401 after state consumption;
+        an invalid shape is 400. Duplicate values and error_uri are forbidden.
     BeginForm:
       type: object
       additionalProperties: false

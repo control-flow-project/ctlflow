@@ -114,10 +114,12 @@ on every page.
 ## Session and invocation issuance
 
 ```text
-authd -> purpose-bound Egressd provider endpoint -> configured provider
-  <- bounded provider HTTP response
+authd -> purpose-bound Egressd binding -> configured OIDC token endpoint
+  <- bounded token response
+authd -> same purpose-bound Egressd binding -> configured UserInfo endpoint
+  <- bounded UserInfo response
 
-validated provider result
+validated matching OIDC subject
   -> authd
        -> identityd.CreateSession
             -> auditd.RecordAuditBatch
@@ -150,8 +152,8 @@ Identityd. Invocation-signing private material never leaves Identityd.
 Authd receives provider settings and credentials only from the Configd-owned,
 purpose-bound deployed projection defined by Authd; it makes no Configd call.
 All Authd-originated provider HTTP crosses the deployed purpose-bound Egressd
-endpoint. Authd owns authentication-protocol semantics; the binding creates no
-Egressd administration or callable kernel method.
+endpoint. Authd owns the sole OIDC Authorization Code with PKCE profile; the
+binding creates no Egressd administration or callable kernel method.
 
 ## Audit delivery
 

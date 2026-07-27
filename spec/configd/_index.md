@@ -37,7 +37,9 @@ non-secret manifest and one disjoint secret file, both purpose-bound to the
 Authd workload. Authd resolves them once at startup and a changed generation
 replaces the process. This creates no Configd method, watch, reload, fallback,
 provider catalog, or combined secret/configuration read surface. Authd owns
-the exact consumer bounds in its [HTTP contract](../authd/#deployed-dependencies).
+the exact versioned JSON fields and consumer bounds in its [HTTP
+contract](../authd/#deployed-dependencies); Configd materializes that
+projection without interpreting OIDC.
 
 ## Kubernetes boundary
 
@@ -53,6 +55,7 @@ secret material directly.
   payloads.
 - A projection is bound to one admitted consumer and cannot be reused by
   another runtime.
-- Provider-specific schemas and behavior remain owned by the provider.
+- Purpose-specific projection schemas and protocol behavior remain owned by
+  the consuming boundary; Configd only materializes the approved projection.
 - Mutations are explicit and directly audited through the approved audit
   contract.

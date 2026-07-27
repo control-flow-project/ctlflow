@@ -78,14 +78,16 @@ Resolution returns only active records and never creates route or cache state.
 ```text
 POST /auth/v1/begin(tenant_id, provider_id, return_to)
   -> authd validates exact Origin, selection, and same-origin return target
-  -> authd uses its startup-loaded Configd-owned provider projection
+  -> authd loads the exact projected OIDC entry and creates PKCE S256 proof
   -> authd stores one browser-bound, ten-minute in-flight attempt
-  <- 303 to the exact configured provider
+  <- 303 to the exact authorization endpoint with code, openid, state, and PKCE
 
-GET /auth/v1/callback(state, bounded provider fields)
+GET /auth/v1/callback(state, code XOR error [+ error_description])
   -> authd consumes the browser-bound attempt
-  -> selected adapter uses the purpose-bound Egressd provider endpoint
-  -> selected adapter validates the bounded provider result
+  -> on code: purpose-bound Egressd POST to the exact token endpoint
+  -> authd validates Bearer token response and projected-key RS256 ID token
+  -> purpose-bound Egressd GET to the exact UserInfo endpoint
+  -> authd requires exact ID-token/UserInfo sub match
   -> identityd.CreateSession(tenant, provider, provider_subject)
        bound Authd workload bearer; no invocation JWT or account ID
        -> resolve current external identity link and Tenant standing
@@ -118,8 +120,10 @@ call: the purpose-bound projection is mounted before startup. Every
 Authd-originated provider request crosses the selected deployed Egressd
 binding; the binding is not an Egressd administration API. Unknown, malformed,
 expired, mismatched, and replayed callback state fail without an Identityd
-call. Provider or dependency failures never select another Tenant, provider,
-return target, adapter, or identity.
+call. A valid provider error makes no Egressd call; a code result makes exactly
+the token call and, only after its validation, the UserInfo call. There is no
+retry, discovery, or third call. Provider or dependency failures never select
+another Tenant, provider, return target, or identity.
 
 ## Run invocation
 

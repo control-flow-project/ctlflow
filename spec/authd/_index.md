@@ -78,33 +78,111 @@ return_to    optional once
 ```
 
 After validation, Authd replaces any live attempt bound to the existing state
-cookie, creates one random state handle and independent browser-binding nonce,
-stores their digests with the selected pair, return target, adapter state, and
-ten-minute expiry, and sets the state cookie.
+cookie, creates one random state handle, independent browser-binding nonce, and
+independent 32-byte PKCE verifier, and sets the state cookie. The verifier is
+encoded as 43-character unpadded base64url and stored with the two digests,
+selected pair, return target, and ten-minute expiry.
 
-The selected adapter constructs an HTTPS provider authorization URL from the
-projected entry, fixed callback URI, and state handle. Authd makes no provider
-request during Begin. It returns `303` to that URL, which is at most 4,096
-bytes. Unknown selection is `400`; an invalid selected configuration is `503`.
+The sole production adapter is OIDC Authorization Code with PKCE S256. The
+projected authorization endpoint has no query or fragment. Authd appends
+exactly these UTF-8 form-encoded query parameters in this order:
+
+```text
+response_type=code
+client_id=<projected client_id>
+redirect_uri=<public-origin>/auth/v1/callback
+scope=openid
+state=<state handle>
+code_challenge=BASE64URL(SHA-256(ASCII(PKCE verifier)))
+code_challenge_method=S256
+```
+
+There is no other authorization parameter and no `plain` PKCE fallback. Authd
+makes no provider request during Begin. It returns `303` to the resulting
+HTTPS URL, which is at most 4,096 bytes. Unknown selection is `400`; an invalid
+selected configuration is `503`.
 
 ## Callback
 
-`GET /auth/v1/callback` accepts no body and requires exactly one 43-character
-unpadded-base64url `state` query value. The selected installed adapter fixes
-the remaining callback field names, cardinalities, and parser; configuration
-cannot add a method, path, body, header, or callback field.
+`GET /auth/v1/callback` accepts no body and exactly one of these query shapes:
+
+```text
+state + code
+state + error [+ error_description]
+```
+
+`state` is exactly one 43-character unpadded-base64url value. `code` is one
+non-empty OAuth visible-ASCII value of at most 2,048 bytes. `error` is one
+OAuth NQSCHAR value of at most 64 bytes. `error_description`, admitted only
+with `error`, is one NQSCHAR value of at most 256 bytes and is discarded
+without logging. Duplicate, empty, mixed-result, or other fields, including
+`error_uri`, are `400`; configuration cannot add a callback field.
 
 Authd requires a live state-handle digest and the independent state-cookie
 nonce digest, compares them in constant time, and atomically consumes the
 attempt before provider validation. Missing, malformed, expired, replayed, or
 mismatched state is the same `400`.
 
-Authd owns OAuth/OIDC construction, correlation, proof, provider-response
-validation, and extraction of one exact case-sensitive provider subject of at
-most 512 characters. Every Authd-originated provider back-channel request
-crosses the selected purpose-bound Egressd endpoint; Authd never opens a
-direct provider connection. Egressd owns external destination, TLS, redirect,
-header, and body enforcement but does not interpret authentication semantics.
+A valid provider `error` is `401`, clears the consumed state cookie, and makes
+no Egressd or Identityd call. For `code`, Authd makes at most two back-channel
+calls through the selected purpose-bound Egressd binding and never opens a
+direct provider connection; the successful path makes exactly two.
+
+The first call is `POST` to the projected token endpoint. It uses
+`application/x-www-form-urlencoded`, `Accept: application/json`, and
+`client_secret_basic`. The Basic value is standard Base64 of the independently
+form-encoded client ID and client secret joined by `:`, and the body contains
+exactly:
+
+```text
+grant_type=authorization_code
+code=<callback code>
+redirect_uri=<public-origin>/auth/v1/callback
+code_verifier=<stored PKCE verifier>
+```
+
+Success requires HTTP `200`, `Content-Type: application/json` with only an
+optional UTF-8 charset, and a strict UTF-8 JSON object containing one Bearer
+`access_token` of at most 8,192 ASCII characters, one `token_type` equal to
+`Bearer` case-insensitively, and one compact `id_token` of at most 16,384
+ASCII characters. The access token must have the RFC 6750 `b64token` shape.
+Duplicate members, invalid media, or invalid required values are rejected.
+Unrecognized token members are ignored without materialization; Authd never
+requests, stores, returns, or uses a refresh token.
+
+The ID token must be a three-segment JWS whose protected header and claims are
+strict JSON objects with no duplicate member names. The header contains
+`alg=RS256`, a `kid` selecting exactly one projected key, and optional
+`typ=JWT`; other protected fields are rejected. Authd verifies the RS256
+signature and then requires:
+
+- `iss` exactly equal to the projected issuer;
+- `aud` equal to the projected client ID, either directly or as its sole array
+  member, with any present `azp` also equal to that client ID;
+- integer `exp` later than current time minus 60 seconds and integer `iat` no
+  later than current time plus 60 seconds and no earlier than the attempt
+  creation time minus 60 seconds;
+- optional integer `nbf` no later than current time plus that skew;
+- one case-sensitive `sub` of one to 255 ASCII characters; and
+- any present `at_hash` equal to unpadded base64url of the leftmost 128 bits of
+  SHA-256 over the ASCII access token.
+
+Other ID-token claims are ignored without materialization.
+
+The second call is `GET` to the projected UserInfo endpoint with no body,
+`Accept: application/json`, and the exact access token in
+`Authorization: Bearer`. Success requires HTTP `200`,
+`Content-Type: application/json` with only an optional UTF-8 charset, and a
+strict UTF-8 JSON object with one case-sensitive `sub` of one to 255 ASCII
+characters. Duplicate members and signed or encrypted UserInfo responses are
+rejected. Other claims are ignored without materialization. The UserInfo `sub`
+must exactly match the validated ID-token `sub`; only that value becomes the
+provider subject.
+
+Egressd owns exact external destination, TLS, redirect, header, and body
+enforcement but does not interpret OIDC. A provider rejection, token or
+UserInfo rejection, invalid protocol result, signature or claim failure, or
+subject mismatch is the same `401`.
 
 After validation, Authd calls:
 
@@ -114,9 +192,8 @@ identityd.CreateSession(tenant_id, provider_id, provider_subject)
 
 Tenant and provider come only from consumed state; Authd never supplies an
 account ID. Success sets the Session cookie, clears the matched state cookie,
-and returns `303` to the stored return target. A provider rejection, invalid
-protocol result, or Identityd `UNAUTHENTICATED` is the same `401 Unauthorized`.
-A consumed attempt clears its state cookie on failure.
+and returns `303` to the stored return target. Identityd `UNAUTHENTICATED` is
+also `401`. A consumed attempt clears its state cookie on failure.
 
 A successful callback replaces any existing browser Session cookie but does
 not inspect or revoke the replaced credential. A Session committed after the
@@ -157,32 +234,76 @@ attributes with `Max-Age=0` and the Unix-epoch HTTP date.
 
 In-flight state is process-local, at most 16 KiB per attempt, at most 4,096
 live attempts per process, one-time, and exactly ten minutes. It contains only
-the two digests, selected pair, return target, adapter identity and correlation
-material, and times. It is never durable or placed in a cookie, log, telemetry,
-or audit payload. Restart loses it and callbacks fail closed. Replicas use
-state-cookie affinity for the ten-minute window; no shared state is implied.
+the two digests, selected pair, return target, PKCE verifier, and times. It is
+never durable or placed in a cookie, log, telemetry, or audit payload. Restart
+loses it and callbacks fail closed. Replicas use state-cookie affinity for the
+ten-minute window; no shared state is implied.
 
 ## Deployed dependencies
 
-Authd reads one Configd-owned, purpose-bound generation at startup:
+Authd reads one Configd-owned, purpose-bound generation at startup. Both files
+are strict UTF-8 JSON objects with integer `schema_version` equal to `1`;
+duplicate or unknown member names are invalid. The non-secret document
+contains exactly:
 
 ```text
-non-secret manifest: public origin and at most 4,096 Tenant/provider entries
-secret file:          only provider credentials referenced by that manifest
+schema_version
+public_origin
+providers
 ```
 
-Each entry selects one installed adapter and one purpose-bound Egressd endpoint
-whose policy fixes the admitted external provider traffic. Both files are
-read-only, process-private, disjoint, and at most 4 MiB. Missing, malformed,
-oversized, duplicate, dangling, or incompatible material fails startup and
-readiness. Changes replace the process; Authd has no Configd call, watch,
-reload, discovery, or fallback.
+`providers` is an array containing one to 4,096 entries. Each entry contains
+exactly:
+
+```text
+tenant_id
+provider_id
+issuer
+authorization_endpoint
+token_endpoint
+userinfo_endpoint
+client_id
+credential_ref
+egress_binding
+verification_keys
+```
+
+The three endpoints and issuer are absolute ASCII HTTPS URIs of at most 2,048
+bytes with no userinfo, query, or fragment. Client IDs are one to 256 OAuth
+visible-ASCII bytes. Credential references and Egressd binding names use the
+canonical one-to-64-character identifier shape. `verification_keys` contains
+one to eight entries with unique `kid`; each contains exactly `kid`, `kty`,
+`use`, `alg`, `n`, and `e`. `kid` is one to 128 visible-ASCII bytes, `kty` is
+`RSA`, `use` is `sig`, `alg` is `RS256`, and unpadded-base64url `n` and `e`
+decode to a 2,048-to-4,096-bit modulus and an odd exponent from 3 through
+4,294,967,295.
+
+Each entry asserts one static provider registration for the exact callback
+URI, Authorization Code response type, `openid` scope, PKCE S256,
+`client_secret_basic`, RS256 ID tokens, and plain JSON UserInfo response.
+
+The disjoint secret document contains exactly `schema_version` and
+`credentials`. `credentials` is an array with exactly one entry per provider;
+each contains exactly `credential_ref` and a one-to-2,048-byte OAuth
+visible-ASCII `client_secret`. Tenant/provider pairs and credential references
+are unique; every provider resolves one credential and there are no unused
+credentials.
+
+Both files are read-only, process-private, disjoint, and at most 4 MiB.
+Missing, malformed, oversized, duplicate, dangling, unused, or incompatible
+material fails startup and readiness. Changes, including verification-key
+rotation, replace the process. Authd has no Configd call, watch, reload,
+discovery, dynamic registration, JWKS fetch, adapter catalog, or fallback.
 
 The Egressd endpoint is a deployed proxy binding, not an Egressd
 administration API or generic caller-selected proxy. Authd can use only the
-entry selected before callback consumption. Each callback admits at most two
-provider back-channel exchanges, each with a five-second deadline and a
-256-KiB response bound.
+entry selected before callback consumption. The binding admits only the
+projected token `POST` and, only after its successful validation, the projected
+UserInfo `GET`, including the exact OIDC headers and bounds above. Each call
+has at most 16 KiB of request headers, the token form body is at most 8 KiB,
+and the UserInfo request has no body. Each call has a five-second deadline and
+a 256-KiB response bound. There is no redirect, retry, discovery, JWKS,
+introspection, revocation, or third provider call.
 
 Authd's only kernel RPCs are `Identityd.CreateSession` and
 `Identityd.RevokeSession`. They use the established [private
@@ -199,7 +320,7 @@ and Identityd.
 ## Bounds and errors
 
 Headers are at most 16 KiB, cookies 8 KiB, either form body 4 KiB, and the
-callback request target 16 KiB with at most 32 query fields. A process admits
+callback request target 16 KiB with at most three query fields. A process admits
 at most 128 public requests and 32 consumed callbacks concurrently. Begin and
 Logout token buckets have capacity 20 and refill 120 requests per minute;
 Callback has capacity 40 and refill 240 per minute. There is no unbounded
@@ -230,17 +351,21 @@ propagation under the shared telemetry contract.
 Bounded traces, metrics, and logs contain only route, method, status, closed
 outcome, dependency class, latency, and saturation. They exclude selected IDs,
 subjects, return targets, fields, bodies, cookies, state, credentials, secrets,
-provider payloads, and raw exceptions. Collector failure is bounded and does
-not change behavior. Authd has no Auditd call; Identityd audits actual Session
-creation and revocation.
+authorization codes, PKCE verifiers, client secrets, access or ID tokens,
+provider error detail, provider payloads, and raw exceptions. Collector
+failure is bounded and does not change behavior. Authd has no Auditd call;
+Identityd audits actual Session creation and revocation.
 
 Canonical evidence uses the shipping public listener, real Identityd over the
 production bearer-authenticated private channel, the mounted Configd-shaped
 files, a real purpose-bound Egressd endpoint, and a separately controlled
-external provider process. It proves the exact three-route inventory,
-selection, return targets, Origin and callback CSRF defenses, state lifecycle,
-cookies, provider mediation without direct egress, both Identityd mappings,
-all errors and bounds, deadlines and cancellation, telemetry redaction and
-Collector outage, invalid projection readiness, and restart with no durable
-Authd state. Test controls are separately bound and create no production
-route, provider catalog, Egressd API, or weaker transport.
+OIDC process. It proves the exact three-route inventory, strict projection,
+authorization URL and PKCE, both callback branches, token and UserInfo
+requests, RS256 and claim validation, exact subject match, the zero-to-two
+provider-call bound and exact two-call success path, selection, return targets,
+Origin and callback CSRF defenses, state lifecycle, cookies, mediation without
+direct egress, both Identityd mappings, all errors and bounds, deadlines and
+cancellation, telemetry redaction and Collector outage, invalid projection
+readiness, and restart with no durable Authd state. Test controls are
+separately bound and create no production route, discovery, provider catalog,
+adapter framework, Egressd API, or weaker transport.
