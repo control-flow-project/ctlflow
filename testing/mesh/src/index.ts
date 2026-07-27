@@ -14,6 +14,14 @@ export {
   publishCSharpService
 } from "./platforms/csharp/publish-csharp-service.js";
 export { startCSharpService } from "./platforms/csharp/start-csharp-service.js";
+export type {
+  CSharpStatelessService,
+  CSharpStatelessServiceOptions,
+  StatelessServiceFiles
+} from "./platforms/csharp/csharp-stateless-service.js";
+export {
+  startCSharpStatelessService
+} from "./platforms/csharp/start-csharp-stateless-service.js";
 export {
   buildNodeTestImage
 } from "./platforms/node/build-node-test-image.js";

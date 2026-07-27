@@ -8,21 +8,26 @@ This page defines the C# realization of a CtlFlow service. It applies only insid
 implementation; those implementations use patterns natural to their own languages while
 meeting the shared contract in [Implementation](../implementation/).
 
-The C# design is deliberately small and functional. A service has three production projects:
+The C# design is deliberately small and functional. A durable service has three production
+projects:
 
 - **Domain** owns service concepts, invariants, decisions, and purpose-named results.
 - **Db** owns the concrete Entity Framework context, mappings, provider configuration, and fixed
   persistence operations.
-- **Service** owns process startup, gRPC translation, authentication integration, and lifecycle.
+- **Service** owns process startup, HTTP or gRPC translation, authentication integration, and lifecycle.
+
+A service whose owned contract declares no durable state has exactly Domain and Service production
+projects and no empty Db project, database provider, migration, or schema-readiness path.
 
 There is no Application project, generic repository layer, persistence port layer, dependency bag,
 or duplicate persistence model. Add a boundary only when a concrete requirement cannot be expressed
-cleanly by these three projects.
+cleanly by the applicable two or three projects.
 
 ## Project structure
 
-The shared API, Knex migrations, and canonical tests remain outside `csharp/`; C# consumes them and
-does not copy or replace them. The following generic Customer service uses proposed filenames:
+The shared API, Knex migrations when present, and canonical tests remain outside `csharp/`; C#
+consumes them and does not copy or replace them. The following durable Customer service uses
+proposed filenames:
 
 ```text
 services/examples/customerd/
@@ -390,7 +395,7 @@ Service is a thin process and translation boundary. It owns:
 - calls to Domain decisions and Db persistence operations;
 - mapping Domain results into generated wire responses and statuses; and
 - cancellation and deadline propagation;
-- Kubernetes workload and invocation-JWT validation; and
+- declared HTTP or gRPC authentication and invocation-JWT validation; and
 - OpenTelemetry span, metric, and structured-log integration.
 
 It does not contain service rules or database query expressions.
@@ -588,7 +593,8 @@ asynchronous work into blocking calls.
 C# projects never own schema migrations. They contain no Entity Framework migration history and do
 not call `EnsureCreated`, `Migrate`, or equivalent startup schema mutation.
 
-Deployment runs the Knex migration job before starting the C# Service process. The build
+For a durable service, deployment runs the Knex migration job before starting the C# Service
+process. The build
 deterministically embeds the exact ordered compiled migration filenames in the native artifact.
 Readiness queries `knex_migrations` and succeeds only when its ordered names equal that embedded
 manifest. C# owns no second schema-version table or manually maintained version number.
@@ -602,14 +608,16 @@ Generic enum converters that require runtime enum discovery are forbidden in the
 ## Testing
 
 The service-root TypeScript suite is the authoritative C# behavior suite, exactly as it is for any
-other implementation. It starts the published process, applies the real Knex migrations, calls the
-public wire API, and verifies the same behavior without C#-specific branches.
+other implementation. It starts the published process, applies the real Knex migrations when the
+service is durable, calls the public wire API, and verifies the same behavior without C#-specific
+branches.
 
 `csharp/tests/` contains only C#-specific integration evidence, for example:
 
 - NativeAOT publication succeeds without unexpected trim or AOT diagnostics;
 - the native artifact starts without the development SDK or managed fallback;
-- Entity Framework's selected provider and mappings match the migrated schema; and
+- for a durable service, Entity Framework's selected provider and mappings match the migrated
+  schema; and
 - packaging, shutdown, and diagnostics behave correctly in the shipping native process.
 
 It does not repeat RPC success, validation, authorization, pagination, or failure scenarios owned

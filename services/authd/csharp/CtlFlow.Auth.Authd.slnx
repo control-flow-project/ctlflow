@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/CtlFlow.Auth.Authd.Domain/CtlFlow.Auth.Authd.Domain.csproj" />
+  <Project Path="src/CtlFlow.Auth.Authd.Service/CtlFlow.Auth.Authd.Service.csproj" />
+</Solution>

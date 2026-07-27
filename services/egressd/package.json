@@ -1,0 +1,20 @@
+{
+  "name": "@ctlflow/egressd",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./testing/stub": {
+      "types": "./.generated/testing/stub/node/src/index.d.ts",
+      "default": "./.generated/testing/stub/node/src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../tooling/clean-directories.mjs .generated/testing/stub/node && tsc --project testing/stub/node/tsconfig.json"
+  },
+  "devDependencies": {
+    "@ctlflow/test-mesh": "0.0.0",
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}

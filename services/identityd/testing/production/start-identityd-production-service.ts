@@ -28,6 +28,9 @@ import {
   replacePrincipalFacts
 } from "./replace-principal-facts.js";
 import {
+  replaceExternalIdentityLinks
+} from "./replace-external-identity-links.js";
+import {
   replaceVerificationKeys
 } from "./replace-verification-keys.js";
 
@@ -237,6 +240,11 @@ function createService(
       await replacePrincipalFacts(
         database.connection,
         configuration.principalFacts);
+      if (configuration.externalIdentityLinks !== undefined) {
+        await replaceExternalIdentityLinks(
+          database.connection,
+          configuration.externalIdentityLinks);
+      }
       return {
         setMode: async (mode) => {
           modes.set(configuration.callerSubject, mode);

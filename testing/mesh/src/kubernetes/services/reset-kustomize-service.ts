@@ -5,6 +5,8 @@ import type {
 export async function resetKustomizeService(
   options: KustomizeServiceOptions
 ): Promise<void> {
+  const persistentVolumeName =
+    `${options.kubernetes.namespace}-${options.name}-data`;
   await options.kubernetes.runKubectl([
     "delete",
     `statefulset/${options.name}`,
@@ -18,7 +20,7 @@ export async function resetKustomizeService(
   ]);
   await options.kubernetes.runKubectl([
     "delete",
-    `persistentvolume/${options.name}-test-data`,
+    `persistentvolume/${persistentVolumeName}`,
     "--ignore-not-found=true",
     "--wait=true"
   ]);

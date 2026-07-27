@@ -1,0 +1,411 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: CtlFlow Authd browser API
+  version: 1.0.0
+  description: >-
+    Exact public browser surface. Declared requests admit at most 16,384 bytes
+    of headers and 8,192 bytes of cookies. Undeclared paths are 404; another
+    method on a declared path is 405 with only the declared method in Allow.
+    HEAD and OPTIONS are not aliases. A wrong-method HEAD response carries the
+    standard error headers but no representation body, as required by HTTP.
+paths:
+  /auth/v1/begin:
+    post:
+      operationId: beginAuthentication
+      description: >-
+        Begins one authentication attempt. Origin and effective authority must
+        match the projected canonical public origin. The strictly decoded
+        UTF-8 form body is at most 4,096 bytes.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Origin"
+        - $ref: "#/components/parameters/OptionalStateCookie"
+      requestBody:
+        required: true
+        description: >-
+          The base media type is exact; its only optional parameter is a UTF-8
+          charset.
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/BeginForm"
+      responses:
+        "303": { $ref: "#/components/responses/BeginRedirect" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+        "414": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "431": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /auth/v1/callback:
+    get:
+      operationId: completeProviderCallback
+      description: >-
+        Completes the sole OIDC Authorization Code with PKCE callback. There
+        is no body. The strictly decoded UTF-8 request target is at most
+        16,384 bytes and contains exactly the selected two- or three-field
+        query shape.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CallbackQuery"
+        - $ref: "#/components/parameters/RequiredStateCookie"
+      responses:
+        "303": { $ref: "#/components/responses/CallbackRedirect" }
+        "400": { $ref: "#/components/responses/CallbackError" }
+        "401": { $ref: "#/components/responses/CallbackError" }
+        "413": { $ref: "#/components/responses/Error" }
+        "414": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "431": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/CallbackError" }
+        "503": { $ref: "#/components/responses/CallbackError" }
+  /auth/v1/logout:
+    post:
+      operationId: logout
+      description: >-
+        Revokes and clears the current Session. Origin and effective authority
+        must match the projected canonical public origin. The optional strictly
+        decoded UTF-8 form body is at most 4,096 bytes.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Origin"
+        - $ref: "#/components/parameters/OptionalStateCookie"
+        - $ref: "#/components/parameters/OptionalSessionCookie"
+      requestBody:
+        required: false
+        description: >-
+          Empty, or the exact base media type with only an optional UTF-8
+          charset parameter.
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/LogoutForm"
+      responses:
+        "303": { $ref: "#/components/responses/LogoutRedirect" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+        "414": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "431": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/LogoutUnavailable" }
+components:
+  parameters:
+    Origin:
+      name: Origin
+      in: header
+      required: true
+      description: Exactly the projected canonical HTTPS public origin.
+      schema:
+        type: string
+        format: uri
+        pattern: "^https://"
+    CallbackQuery:
+      name: callback
+      in: query
+      required: true
+      style: form
+      explode: true
+      description: >-
+        The exploded object properties are the exact query field names. Each
+        field occurs once; there is no serialized callback field.
+      schema:
+        $ref: "#/components/schemas/CallbackQuery"
+    OptionalStateCookie:
+      name: __Host-ctlflow-auth-state
+      in: cookie
+      required: false
+      description: >-
+        At most one existing browser-binding nonce. Duplicate or malformed
+        values are rejected.
+      schema:
+        $ref: "#/components/schemas/Opaque32ByteValue"
+    RequiredStateCookie:
+      name: __Host-ctlflow-auth-state
+      in: cookie
+      required: true
+      description: >-
+        Exactly one browser-binding nonce. Duplicate or malformed values are
+        rejected.
+      schema:
+        $ref: "#/components/schemas/Opaque32ByteValue"
+    OptionalSessionCookie:
+      name: __Host-ctlflow-session
+      in: cookie
+      required: false
+      description: >-
+        At most one Identityd Session credential. Missing, duplicate, or
+        malformed values have already-logged-out semantics.
+      schema:
+        $ref: "#/components/schemas/Opaque32ByteValue"
+  schemas:
+    Identifier:
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+    ReturnTarget:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      pattern: '^/(?!/)(?:%[0-9A-Fa-f]{2}|[\u0021\u0022\u0024\u0026-\u005B\u005D-\u007E])*$'
+      default: /
+      description: >-
+        ASCII same-origin origin-form path and optional query. Schemes,
+        authorities, fragments, backslashes, controls, spaces, and invalid
+        percent encoding are forbidden.
+    Opaque32ByteValue:
+      type: string
+      minLength: 43
+      maxLength: 43
+      pattern: "^[A-Za-z0-9_-]{43}$"
+      description: Unpadded base64url encoding of exactly 32 bytes.
+    AuthorizationCode:
+      type: string
+      minLength: 1
+      maxLength: 2048
+      pattern: '^[\u0020-\u007E]+$'
+      description: One OAuth visible-ASCII authorization code.
+    ProviderError:
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: '^[\u0020-\u0021\u0023-\u005B\u005D-\u007E]+$'
+      description: One OAuth NQSCHAR error value.
+    ProviderErrorDescription:
+      type: string
+      minLength: 1
+      maxLength: 256
+      pattern: '^[\u0020-\u0021\u0023-\u005B\u005D-\u007E]+$'
+      description: >-
+        Optional provider error detail accepted only for bounded parsing,
+        then discarded without logging.
+    CallbackQuery:
+      type: object
+      additionalProperties: false
+      minProperties: 2
+      maxProperties: 3
+      required:
+        - state
+      properties:
+        state:
+          $ref: "#/components/schemas/Opaque32ByteValue"
+        code:
+          $ref: "#/components/schemas/AuthorizationCode"
+        error:
+          $ref: "#/components/schemas/ProviderError"
+        error_description:
+          $ref: "#/components/schemas/ProviderErrorDescription"
+      oneOf:
+        - required:
+            - code
+          properties:
+            error: false
+            error_description: false
+        - required:
+            - error
+          properties:
+            code: false
+      description: >-
+        Exactly state plus code, or state plus error and optional
+        error_description. A valid error branch is 401 after state consumption;
+        an invalid shape is 400. Duplicate values and error_uri are forbidden.
+    BeginForm:
+      type: object
+      additionalProperties: false
+      minProperties: 2
+      maxProperties: 3
+      required:
+        - tenant_id
+        - provider_id
+      properties:
+        tenant_id:
+          $ref: "#/components/schemas/Identifier"
+        provider_id:
+          $ref: "#/components/schemas/Identifier"
+        return_to:
+          $ref: "#/components/schemas/ReturnTarget"
+      description: Each admitted field occurs exactly once.
+    LogoutForm:
+      type: object
+      additionalProperties: false
+      maxProperties: 1
+      properties:
+        return_to:
+          $ref: "#/components/schemas/ReturnTarget"
+      description: Empty, or return_to exactly once.
+  headers:
+    NoStore:
+      required: true
+      schema:
+        type: string
+        const: no-store
+    NoReferrer:
+      required: true
+      schema:
+        type: string
+        const: no-referrer
+    NoSniff:
+      required: true
+      schema:
+        type: string
+        const: nosniff
+    ContentSecurityPolicy:
+      required: true
+      schema:
+        type: string
+        const: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    BeginLocation:
+      required: true
+      description: Adapter-constructed HTTPS provider authorization URL.
+      schema:
+        type: string
+        format: uri
+        maxLength: 4096
+        pattern: "^https://"
+    ReturnLocation:
+      required: true
+      description: Validated stored or submitted same-origin return target.
+      schema:
+        $ref: "#/components/schemas/ReturnTarget"
+    BeginCookie:
+      required: true
+      description: >-
+        One __Host-ctlflow-auth-state field with a new opaque value and exactly
+        Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=600; no Domain.
+      schema:
+        type: string
+    CallbackCookies:
+      required: true
+      description: >-
+        Two separate Set-Cookie fields: __Host-ctlflow-session with Identityd's
+        opaque credential, Path=/; Secure; HttpOnly; SameSite=Lax, and
+        Identityd expiry not exceeding 30 days; then
+        __Host-ctlflow-auth-state cleared with the same security attributes,
+        Max-Age=0, and the Unix-epoch HTTP date. Neither has Domain.
+      schema:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+    LogoutCookies:
+      required: true
+      description: >-
+        Two separate Set-Cookie fields clearing __Host-ctlflow-session and
+        __Host-ctlflow-auth-state with Path=/; Secure; HttpOnly; SameSite=Lax;
+        Max-Age=0; the Unix-epoch HTTP date; and no Domain.
+      schema:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: string
+    ConsumedStateCookie:
+      description: >-
+        Present only after attempt consumption; clears
+        __Host-ctlflow-auth-state with Path=/; Secure; HttpOnly; SameSite=Lax;
+        Max-Age=0; the Unix-epoch HTTP date; and no Domain.
+      schema:
+        type: string
+    RetryAfter:
+      required: true
+      description: Bounded decimal delay in seconds.
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    BeginRedirect:
+      description: Empty 303 response beginning provider authorization.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Content-Security-Policy:
+          $ref: "#/components/headers/ContentSecurityPolicy"
+        Location: { $ref: "#/components/headers/BeginLocation" }
+        Set-Cookie: { $ref: "#/components/headers/BeginCookie" }
+    CallbackRedirect:
+      description: Empty 303 response completing authentication.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Content-Security-Policy:
+          $ref: "#/components/headers/ContentSecurityPolicy"
+        Location: { $ref: "#/components/headers/ReturnLocation" }
+        Set-Cookie: { $ref: "#/components/headers/CallbackCookies" }
+    LogoutRedirect:
+      description: Empty 303 response completing logout.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Content-Security-Policy:
+          $ref: "#/components/headers/ContentSecurityPolicy"
+        Location: { $ref: "#/components/headers/ReturnLocation" }
+        Set-Cookie: { $ref: "#/components/headers/LogoutCookies" }
+    Error:
+      description: Non-disclosing error with no redirect.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Content-Security-Policy:
+          $ref: "#/components/headers/ContentSecurityPolicy"
+      content:
+        "text/plain; charset=utf-8":
+          schema:
+            type: string
+            const: Request could not be completed.
+    CallbackError:
+      description: >-
+        Non-disclosing error with no redirect. If the attempt was consumed,
+        the matched state cookie is cleared.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Content-Security-Policy:
+          $ref: "#/components/headers/ContentSecurityPolicy"
+        Set-Cookie: { $ref: "#/components/headers/ConsumedStateCookie" }
+      content:
+        "text/plain; charset=utf-8":
+          schema:
+            type: string
+            const: Request could not be completed.
+    RateLimited:
+      description: Non-disclosing bounded-admission error with no redirect.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Content-Security-Policy:
+          $ref: "#/components/headers/ContentSecurityPolicy"
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+      content:
+        "text/plain; charset=utf-8":
+          schema:
+            type: string
+            const: Request could not be completed.
+    LogoutUnavailable:
+      description: >-
+        Non-disclosing dependency error with no redirect or cookie clearing;
+        the Session cookie is retained for retry.
+      headers:
+        Cache-Control: { $ref: "#/components/headers/NoStore" }
+        Referrer-Policy: { $ref: "#/components/headers/NoReferrer" }
+        X-Content-Type-Options: { $ref: "#/components/headers/NoSniff" }
+        Content-Security-Policy:
+          $ref: "#/components/headers/ContentSecurityPolicy"
+      content:
+        "text/plain; charset=utf-8":
+          schema:
+            type: string
+            const: Request could not be completed.
