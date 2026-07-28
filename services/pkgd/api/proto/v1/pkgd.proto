@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package ctlflow.packages.v1;
+
+option csharp_namespace = "CtlFlow.Packages.V1";
+
+import "google/protobuf/timestamp.proto";
+
+service PackageService {
+  rpc DeclarePackage(DeclarePackageRequest) returns (Package);
+  rpc GetPackage(GetPackageRequest) returns (Package);
+
+  rpc CreateApp(CreateAppRequest) returns (App);
+  rpc GetApp(GetAppRequest) returns (App);
+  rpc SetAppPackageGeneration(SetAppPackageGenerationRequest) returns (App);
+}
+
+message DeclarePackageRequest {
+  string package_id = 1;
+  uint64 generation = 2;
+  string version = 3;
+  PackageProvenance provenance = 4;
+  repeated PackageComponent components = 5;
+  repeated PackageInterface interfaces = 6;
+  repeated PackageDependency dependencies = 7;
+  repeated PackageExposure exposures = 8;
+}
+
+message GetPackageRequest {
+  string package_id = 1;
+  uint64 generation = 2;
+}
+
+message Package {
+  string package_id = 1;
+  uint64 generation = 2;
+  string version = 3;
+  PackageProvenance provenance = 4;
+  repeated PackageComponent components = 5;
+  repeated PackageInterface interfaces = 6;
+  repeated PackageDependency dependencies = 7;
+  repeated PackageExposure exposures = 8;
+  google.protobuf.Timestamp declared_at = 9;
+}
+
+message PackageProvenance {
+  string source_uri = 1;
+  string source_digest = 2;
+}
+
+message PackageComponent {
+  string component_id = 1;
+  OciArtifact artifact = 2;
+}
+
+message OciArtifact {
+  string repository = 1;
+  string manifest_digest = 2;
+}
+
+message PackageInterface {
+  string interface_id = 1;
+  string component_id = 2;
+  InterfaceProtocol protocol = 3;
+  string contract_id = 4;
+  uint32 port = 5;
+}
+
+message PackageDependency {
+  string name = 1;
+  optional string dependency_id = 2;
+  string component_id = 3;
+  string dependency_type = 4;
+  DependencyOptionsContent options = 5;
+}
+
+message DependencyOptionsContent {
+  bytes canonical_json = 1;
+}
+
+message PackageExposure {
+  string exposure_id = 1;
+  string interface_id = 2;
+}
+
+enum InterfaceProtocol {
+  INTERFACE_PROTOCOL_UNSPECIFIED = 0;
+  INTERFACE_PROTOCOL_HTTP = 1;
+  INTERFACE_PROTOCOL_GRPC = 2;
+}
+
+message CreateAppRequest {
+  string app_id = 1;
+  AppScope scope = 2;
+  string placement_id = 3;
+  string package_id = 4;
+  uint64 desired_package_generation = 5;
+}
+
+message GetAppRequest {
+  string app_id = 1;
+}
+
+message SetAppPackageGenerationRequest {
+  string app_id = 1;
+  uint64 expected_revision = 2;
+  uint64 desired_package_generation = 3;
+}
+
+message App {
+  string app_id = 1;
+  AppScope scope = 2;
+  string placement_id = 3;
+  string package_id = 4;
+  uint64 desired_package_generation = 5;
+  uint64 revision = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message AppScope {
+  oneof scope {
+    GlobalAppScope global = 1;
+    TenantAppScope tenant = 2;
+    WorkspaceAppScope workspace = 3;
+    UserAppScope user = 4;
+  }
+}
+
+message GlobalAppScope {}
+
+message TenantAppScope {
+  string tenant_id = 1;
+}
+
+message WorkspaceAppScope {
+  string tenant_id = 1;
+  string workspace_id = 2;
+}
+
+message UserAppScope {
+  string tenant_id = 1;
+  string account_principal_id = 2;
+}

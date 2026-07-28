@@ -86,6 +86,45 @@ delimiter-bounded subtree.
 No matching rule is deny. Missing current target standing is concealed as not
 found rather than exposed as policy detail.
 
+## Packages and installed Apps
+
+A Package is an installation-global lineage of immutable positive
+generations. Each generation has one Semantic Version, source provenance,
+digest-bound OCI component artifacts, provided interfaces, named exposures,
+and open typed dependencies with stable names, optional explicit IDs, and
+bounded consumer options. Generations are sequential and permanently retained.
+A dependency is a provider-generic requirement rather than a binding or
+provisioning request, and an exposure is a declaration rather than a route or
+grant.
+
+An App is globally identified installed intent in one closed Global, Tenant,
+Workspace, or User scope. Workspace scope includes its parent Tenant; User
+scope includes its Tenant and human or service account principal. Its
+Placement reference, Package identity, and scope are immutable. Only its
+desired Package generation changes under a positive optimistic-concurrency
+revision. Pkgd owns that expected scope and reference; Execd owns the
+referenced Placement and requires exact scope equality before realization.
+
+## Configuration and secret custody
+
+A Configuration and a Secret each have one immutable identity and one binding
+to an Execd-owned Placement, consumer, and purpose. Each publication creates
+one immutable version and advances the identity's positive revision.
+Configuration versions contain bounded non-secret JSON and may be read by
+exact version through their management operation. Secret versions contain only
+encrypted opaque material and have no material-read operation.
+
+Provider-generated output enters the same Configd-owned version model only
+after Configd validates the exact current Execd-owned dependency claim selected
+by the request's claim ID and positive revision. The selector is not authority,
+and Configd owns no parallel claim record.
+
+A projection is Configd-owned desired state keyed by exact data kind and
+ConsumerBinding. Its convention-derived ID, kind, binding, and first target
+identity are immutable; selected version may change. Execd alone applies and
+mounts the projection without receiving content. Configuration may select any
+retained version; secret may select only its current version.
+
 ## Placement and realization
 
 Placement means where execution and persistent state belong. It is a domain

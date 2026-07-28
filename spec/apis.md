@@ -115,10 +115,39 @@ The complete messages and behavior are defined by
 [tenantd](../tenantd/) and its owned protobuf contract. It has no HTTP,
 Kubernetes-resource, watch, or streaming surface.
 
-## Approved tenant authorization dependencies
+## Approved pkgd contract
 
-The capability path used by `tenantd` requires exactly these `identityd`
-operations:
+`pkgd` exposes exactly:
+
+```text
+DeclarePackage
+GetPackage
+
+CreateApp
+GetApp
+SetAppPackageGeneration
+```
+
+The complete messages and behavior are defined by [pkgd](../pkgd/) and its
+owned protobuf contract. Infrastructure operators may call every operation.
+The exact `SERVICE/svc_execd` workload may additionally call `GetPackage` and
+`GetApp`. Configured product backends may additionally call `CreateApp`,
+`GetApp`, and `SetAppPackageGeneration` for Tenant, Workspace, or User scope
+only through the validated invocation and Policyd capability path. Global
+Apps have no capability path.
+
+Package generations are immutable, sequential, exact-ID declarations. App
+scope, Placement reference, and Package identity are immutable; the desired
+Package generation is its only revision-controlled transition. App scope is
+closed over Global, Tenant, Workspace, and User. There is no HTTP, list,
+pagination, build, artifact-transfer, lifecycle, watch, stream, provider,
+routing, dependency-provisioning, identity, policy, or Kubernetes-resource
+surface.
+
+## Approved capability authorization dependencies
+
+The capability paths used by Tenantd, Pkgd, and Configd require exactly these
+`identityd` operations:
 
 ```text
 GetInvocationVerificationKeys
@@ -168,6 +197,38 @@ audience, key, permission, or claim bag. There is no HTTP mirror, generic
 token-minting method, introspection method, Session list, or Session
 administration API.
 
+## Approved configuration and secret custody
+
+`configd` exposes exactly:
+
+```text
+PublishConfiguration
+ResolveConfiguration
+PublishSecret
+GetSecretMetadata
+ApplyProjection
+```
+
+These are private unary operations defined completely by
+[configd](../configd/) and its owned protobuf contract. Configuration is one
+bounded non-secret JSON document. Secret material enters only through
+`PublishSecret`, never appears in a response, and may leave custody only
+through `ApplyProjection` for an exact current version into the persisted
+closed Placement-scope, consumer, and purpose binding. The same closed
+projection target admits an exact configuration version without returning its
+bytes to Execd.
+
+Infrastructure operators manage every scope. Exact capability-admitted product
+backends may use the four management operations only at non-global scope with
+validated invocation and policy. `SERVICE/svc_execd` may call only
+`ApplyProjection`. An exact configured provisioner controller may call only
+the two publication operations for its non-Global Execd claim's exact
+Placement and Workload consumer. It must provide the opaque claim ID and
+positive revision for which it computed output; other callers must omit both.
+Configd validates the exact current claim before publication. No operation
+lists identities or versions, returns secret material, manages bindings,
+selects a provider, or accepts or returns a Kubernetes resource name.
+
 ## Approved audit dependency
 
 `auditd` exposes exactly:
@@ -211,6 +272,9 @@ They return only direct Groups at the exact requested target and repeat
 workload admission, invocation validation, standing, and fence checks for
 every page.
 
+Pkgd and Configd have no list operation and therefore own no page size,
+continuation value, or cursor state.
+
 ## Statuses
 
 gRPC services use only the statuses needed by an operation:
@@ -219,7 +283,7 @@ gRPC services use only the statuses needed by an operation:
 | --- | --- |
 | `INVALID_ARGUMENT` | A required value is absent, malformed, conflicting, or outside its bound |
 | `NOT_FOUND` | The exact visible target does not exist |
-| `ALREADY_EXISTS` | An immutable identity, publication key, or audit event identity already owns conflicting content |
+| `ALREADY_EXISTS` | An immutable identity, declaration or publication key, or audit event identity already owns conflicting content |
 | `FAILED_PRECONDITION` | Current domain state forbids the request |
 | `ABORTED` | An expected revision no longer matches |
 | `RESOURCE_EXHAUSTED` | A documented finite input or capacity bound is reached |

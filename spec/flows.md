@@ -73,6 +73,59 @@ admitted autonomous caller
 
 Resolution returns only active records and never creates route or cache state.
 
+## Package and App intent
+
+```text
+operator
+  -> pkgd.DeclarePackage(complete immutable generation)
+       -> commit generation
+       -> auditd.RecordAuditBatch
+
+operator or admitted scoped product backend
+  -> pkgd.CreateApp(scope, Placement, Package generation)
+       -> validate invocation and policyd.CheckAccess when capability-scoped
+       -> commit App revision 1
+       -> auditd.RecordAuditBatch
+
+operator or admitted scoped product backend
+  -> pkgd.SetAppPackageGeneration(App, expected revision, generation)
+       -> validate invocation and policyd.CheckAccess when capability-scoped
+       -> commit the sole App transition
+       -> auditd.RecordAuditBatch
+
+execd -> pkgd.GetApp -> pkgd.GetPackage
+```
+
+Pkgd has no list, build, artifact-transfer, lifecycle, dependency-provisioning,
+or Kubernetes operation. Reads and no-op App updates emit no audit event.
+
+## Configuration and secret publication
+
+```text
+operator or admitted scoped product backend
+  -> configd.PublishConfiguration | configd.PublishSecret
+       -> validate invocation and policyd.CheckAccess when capability-scoped
+       -> commit one immutable version
+       -> auditd.RecordAuditBatch
+
+exact configured provisioner controller at non-Global scope
+  -> configd.PublishConfiguration | configd.PublishSecret(claim ID, revision)
+       -> exact Kubernetes GET of the Execd-owned claim
+       -> verify owner, current revision, provisioner, Placement, and Workload
+       -> commit and audit one generated output
+
+execd
+  -> configd.ApplyProjection(exact version, exact consumer binding)
+       -> verify Execd-owned Namespace and Workload ServiceAccount
+       -> apply the convention-named ConfigMap or Secret
+       -> audit semantic create or version change
+  <- opaque projection metadata, never content or native coordinates
+```
+
+Configuration has one exact management read. Secret exposes metadata only.
+There is no secret read, list, binding mutation, provider catalog, watch,
+stream, delete, or background materialization flow.
+
 ## Browser authentication and invocation
 
 ```text

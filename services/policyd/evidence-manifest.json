@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "service": "ctlflow.policy.v1.PolicyService",
+  "operations": [
+    {
+      "name": "CheckAccess",
+      "success": [
+        {
+          "file": "tests/integration/catalog.test.ts",
+          "title": "allows every catalog operation from its exact owner and target"
+        },
+        {
+          "file": "tests/integration/rules.test.ts",
+          "title": "allows direct Group and Role-bound principal authority"
+        },
+        {
+          "file": "tests/integration/principals.test.ts",
+          "title": "requires virtual Actor and attached account authority"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "distinguishes malformed operations from invalid known targets"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "conceals invocation and account-scope fence mismatches"
+          },
+          {
+            "file": "tests/integration/principals.test.ts",
+            "title": "conceals missing current standing"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "requires a current bound workload token"
+          },
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "requires an independently valid invocation JWT"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "rejects each catalog partition from another authenticated owner"
+          },
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "rejects an unadmitted workload and unknown operation"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/dependencies.test.ts",
+            "title": "maps Identityd outage and caller rejection to unavailable"
+          },
+          {
+            "file": "tests/integration/dependencies.test.ts",
+            "title": "maps malformed stored Identityd facts to unavailable"
+          },
+          {
+            "file": "tests/integration/lifecycle.test.ts",
+            "title": "fails readiness and calls when mapped policy storage is absent"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/dependencies.test.ts",
+            "title": "cancels an in-flight policy database query"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/dependencies.test.ts",
+            "title": "honors an in-flight RPC deadline"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "publishes exactly the approved unary CheckAccess API"
+    },
+    {
+      "file": "tests/integration/catalog.test.ts",
+      "title": "allows every catalog operation from its exact owner and target"
+    },
+    {
+      "file": "tests/integration/principals.test.ts",
+      "title": "consumes every Group page before deciding"
+    },
+    {
+      "file": "tests/integration/lifecycle.test.ts",
+      "title": "preserves provisioned policy across restart"
+    },
+    {
+      "file": "tests/integration/lifecycle.test.ts",
+      "title": "schema enforces exact policy representations and uniqueness"
+    },
+    {
+      "file": "tests/integration/lifecycle.test.ts",
+      "title": "owns no mutation journal, audit state, or decision cache tables"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "exports correlated, parented, redacted traces, metrics, and logs"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "Collector outage is bounded and does not change a decision"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:policyd",
+    "npm run test:compiled --workspace @ctlflow/policyd",
+    "npm run test:csharp --workspace @ctlflow/policyd",
+    "npm run verify:container:policyd",
+    "npm run verify:migration-container:policyd"
+  ]
+}

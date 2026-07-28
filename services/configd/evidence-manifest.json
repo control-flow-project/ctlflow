@@ -1,0 +1,416 @@
+{
+  "schemaVersion": 1,
+  "service": "ctlflow.configuration.v1.ConfigurationService",
+  "operations": [
+    {
+      "name": "PublishConfiguration",
+      "success": [
+        {
+          "file": "tests/integration/configurations.test.ts",
+          "title": "publishes and resolves exact configuration bytes in every scope"
+        },
+        {
+          "file": "tests/integration/provisioner.test.ts",
+          "title": "provisioner publishes configuration and secrets through an exact claim"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "rejects malformed configuration bindings, revisions, and JSON"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "enforces configuration create, revision, binding, and replay rules"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "enforces configuration create, revision, binding, and replay rules"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "refuses configuration revision exhaustion and transport overflow"
+          },
+          {
+            "file": "tests/integration/provisioner.test.ts",
+            "title": "provisioner claim fences caller, revision, placement, and workload"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "serializes concurrent configuration publication by revision"
+          }
+        ],
+        "RESOURCE_EXHAUSTED": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "refuses configuration revision exhaustion and transport overflow"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all five RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/provisioner.test.ts",
+            "title": "provisioner cannot publish into Global scope"
+          },
+          {
+            "file": "tests/integration/provisioner.test.ts",
+            "title": "unadmitted workloads cannot use the provisioner path"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/audit-and-telemetry.test.ts",
+            "title": "reports audit failure after commit without replay redelivery"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolveConfiguration",
+      "success": [
+        {
+          "file": "tests/integration/configurations.test.ts",
+          "title": "publishes and resolves exact configuration bytes in every scope"
+        },
+        {
+          "file": "tests/integration/security.test.ts",
+          "title": "capabilities publish and read exact Tenant resources"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "configuration resolution rejects malformed selectors"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/configurations.test.ts",
+            "title": "configuration resolution requires exact identity, version, and binding"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/invocation-security.test.ts",
+            "title": "capability callers require a valid invocation token"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "policy denial and disabled principal fail closed"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "readiness and RPCs fail closed when a mapped table is missing"
+          },
+          {
+            "file": "tests/integration/invocation-security.test.ts",
+            "title": "unknown invocation keys fail unavailable with Identityd unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PublishSecret",
+      "success": [
+        {
+          "file": "tests/integration/secrets.test.ts",
+          "title": "publishes arbitrary secret material and returns metadata in every scope"
+        },
+        {
+          "file": "tests/integration/provisioner.test.ts",
+          "title": "provisioner publishes configuration and secrets through an exact claim"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "rejects malformed secret bindings, revisions, and material bounds"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "enforces secret create, revision, binding, and replay rules"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "enforces secret create, revision, binding, and replay rules"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "refuses secret revision exhaustion and transport overflow"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "serializes concurrent secret publication by revision"
+          }
+        ],
+        "RESOURCE_EXHAUSTED": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "refuses secret revision exhaustion and transport overflow"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all five RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/provisioner.test.ts",
+            "title": "provisioner cannot publish into Global scope"
+          },
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "per-RPC caller allowlists separate read and publication workloads"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "capability operations fail unavailable when Policyd is unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetSecretMetadata",
+      "success": [
+        {
+          "file": "tests/integration/secrets.test.ts",
+          "title": "publishes arbitrary secret material and returns metadata in every scope"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "secret metadata rejects malformed selectors"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/secrets.test.ts",
+            "title": "secret metadata requires exact identity and binding"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all five RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "policy denial and disabled principal fail closed"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "capability operations fail unavailable when Policyd is unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ApplyProjection",
+      "success": [
+        {
+          "file": "tests/integration/projections.test.ts",
+          "title": "projects exact configuration and secret content into owned objects"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/projections.test.ts",
+            "title": "projection validation requires exact targets, bindings, and owners"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/projections.test.ts",
+            "title": "projection validation requires exact targets, bindings, and owners"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/projections.test.ts",
+            "title": "refuses a native object not owned by the exact projection"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/projections.test.ts",
+            "title": "configuration projections advance once and refuse rollback"
+          },
+          {
+            "file": "tests/integration/projections.test.ts",
+            "title": "secret projections accept only the current version"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all five RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/projections.test.ts",
+            "title": "only the exact admitted Execd workload can apply projections"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "authenticated encryption rejects altered retained secret state"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all five RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "configd exposes exactly the approved RPC inventory"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "configd health and readiness probes are available"
+    },
+    {
+      "file": "tests/integration/secrets.test.ts",
+      "title": "encrypts secret material without retaining plaintext or a digest"
+    },
+    {
+      "file": "tests/integration/provisioner.test.ts",
+      "title": "provisioner claim fences caller, revision, placement, and workload"
+    },
+    {
+      "file": "tests/integration/invocation-security.test.ts",
+      "title": "unknown invocation keys refresh through real Identityd and Policyd"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "records complete publication and projection audit facts"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "does not audit reads, publication replay, or projection reconciliation"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "exports correlated redacted RPC, Db, crypto, metrics, and logs"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "telemetry outage is bounded and does not change domain results"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "SQLite contains only migration metadata and Configd domain tables"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "persists configuration, secret, and projection across restart"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:configd",
+    "npm run test:compiled --workspace @ctlflow/configd",
+    "npm run test:csharp --workspace @ctlflow/configd",
+    "npm run verify:container:configd",
+    "npm run verify:migration-container:configd"
+  ]
+}

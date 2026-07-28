@@ -3,9 +3,8 @@ import {
   test
 } from "node:test";
 import type {
-  PolicyGrant,
-  PolicyRequestEvidence
-} from "@ctlflow/policyd/testing/stub";
+  CapabilityGrant
+} from "../support/authorization/capability-grant.js";
 import {
   ResourceState,
   type ListWorkspacesResponse,
@@ -50,7 +49,6 @@ test("tenant capabilities use exact operations and resource paths", async () => 
     tenantId: tenant.tenantId,
     tokenId: "capability-tenant-operations"
   });
-  const baseline = (await context.policyd.readRequests()).length;
   const auditBaseline =
     (await context.auditd.readTenancyEvents()).length;
 
@@ -75,25 +73,6 @@ test("tenant capabilities use exact operations and resource paths", async () => 
     "Capability Tenant Updated");
   assert.equal(updated.revision, tenant.revision + 1n);
 
-  assert.deepEqual(
-    summarizeRequests(
-      (await context.policyd.readRequests()).slice(baseline)),
-    [
-      {
-        operation: "tenants.read",
-        resourcePath: path,
-        tenantId: tenant.tenantId,
-        actorId: "user:alice",
-        subjectAccountId: "user:alice"
-      },
-      {
-        operation: "tenants.update_display_name",
-        resourcePath: path,
-        tenantId: tenant.tenantId,
-        actorId: "user:alice",
-        subjectAccountId: "user:alice"
-      }
-    ]);
   const audit = (await context.auditd.readTenancyEvents())
     .slice(auditBaseline);
   assert.equal(audit.length, 1);
@@ -125,8 +104,6 @@ test("workspace capabilities cover collection and exact targets", async () => {
     tenantId: tenant.tenantId,
     tokenId: "capability-workspace-collection"
   });
-  const baseline = (await context.policyd.readRequests()).length;
-
   const created = await callUnary<Workspace>((done) =>
     context.workloadClient.createWorkspace(
       {
@@ -202,106 +179,21 @@ test("workspace capabilities cover collection and exact targets", async () => {
     deleted.state,
     ResourceState.RESOURCE_STATE_DELETED);
 
-  assert.deepEqual(
-    summarizeRequests(
-      (await context.policyd.readRequests()).slice(baseline)),
-    [
-      request("workspaces.create", collection, tenant.tenantId),
-      request("workspaces.read", collection, tenant.tenantId),
-      request(
-        "workspaces.read",
-        exact,
-        tenant.tenantId,
-        created.workspaceId),
-      request(
-        "workspaces.update_display_name",
-        exact,
-        tenant.tenantId,
-        created.workspaceId),
-      request(
-        "workspaces.suspend",
-        exact,
-        tenant.tenantId,
-        created.workspaceId),
-      request(
-        "workspaces.resume",
-        exact,
-        tenant.tenantId,
-        created.workspaceId),
-      request(
-        "workspaces.delete",
-        exact,
-        tenant.tenantId,
-        created.workspaceId)
-    ]);
 });
 
 function grant(
   subjectId: string,
   operation: string,
   resourcePath: string
-): PolicyGrant {
+): CapabilityGrant {
   return {
-    subjectId,
+    subject: {
+      kind: subjectId.includes(":") ? "principal" : "group",
+      id: subjectId
+    },
     operation,
-    resourcePath,
+    basePath: resourcePath,
     match: "exact"
-  };
-}
-
-function request(
-  operation: string,
-  resourcePath: string,
-  tenantId: string,
-  workspaceId?: string
-): ReturnType<typeof summarizeRequest> {
-  return {
-    operation,
-    resourcePath,
-    tenantId,
-    ...(workspaceId === undefined ? {} : { workspaceId }),
-    actorId: "user:alice",
-    subjectAccountId: "user:alice"
-  };
-}
-
-function summarizeRequests(
-  requests: readonly PolicyRequestEvidence[]
-): readonly ReturnType<typeof summarizeRequest>[] {
-  return requests.map(summarizeRequest);
-}
-
-function summarizeRequest(requestEvidence: PolicyRequestEvidence): {
-  readonly operation: string;
-  readonly resourcePath: string;
-  readonly tenantId: string;
-  readonly workspaceId?: string;
-  readonly actorId?: string;
-  readonly subjectAccountId?: string;
-} {
-  assert.equal(requestEvidence.receivedInvocation, true);
-  assert.match(
-    requestEvidence.receivedTraceparent ?? "",
-    /^00-[0-9a-f]{32}-[0-9a-f]{16}-0[01]$/u);
-  const actorId = requestEvidence.actorId;
-  const subjectAccountId =
-    requestEvidence.subjectAccountId;
-  if (
-    actorId === undefined
-    || subjectAccountId === undefined
-  ) {
-    throw new Error(
-      "Policy evidence did not include both invocation identities");
-  }
-  return {
-    operation: requestEvidence.operation,
-    resourcePath: requestEvidence.resourcePath,
-    tenantId: requestEvidence.tenantId,
-    ...(requestEvidence.workspaceId === undefined
-      ? {}
-      : { workspaceId: requestEvidence.workspaceId }),
-    actorId,
-    subjectAccountId
   };
 }
 

@@ -182,9 +182,9 @@ ownership labels for:
 - trusted runtime proxies; and
 - selected provider controllers' custom resources.
 
-`configd` has one disjoint Kubernetes write boundary: Secret custody and authorized projections in
-exact Placements. It cannot write another resource kind, and `execd` never receives secret
-material.
+`configd` has one disjoint Kubernetes write boundary: Secret custody and authorized ConfigMap or
+Secret projections in exact Placements. It cannot write another resource kind, and `execd` never
+receives configuration or secret material.
 
 Kernel installation resources are applied by `ctlflow init` and release operations. Installed
 provider controllers own their provider-specific custom resources and external systems. Generated

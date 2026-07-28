@@ -12,7 +12,7 @@ CtlFlow has ten kernel ownership boundaries.
 | [`identityd`](../identityd/) | Accounts, standing, Groups, identity links, Sessions, and invocation identity |
 | [`policyd`](../policyd/) | Roles, grants, operation ownership, and access decisions |
 | [`pkgd`](../pkgd/) | Packages and installed application intent |
-| [`configd`](../configd/) | Configuration and secret custody |
+| [`configd`](../configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections |
 | [`execd`](../execd/) | Placements and Kubernetes realization intent |
 | [`edged`](../edged/) | Public application reverse proxy; no route authority |
 | [`egressd`](../egressd/) | Controlled external HTTP |
@@ -49,6 +49,9 @@ edged
   +-> identityd.ExchangeSession
 
 execd
+  +-> pkgd.GetApp
+  +-> pkgd.GetPackage
+  +-> configd.ApplyProjection
   +-> identityd.IssueRunInvocation
   +-> auditd.RecordAuditBatch
 
@@ -56,10 +59,18 @@ identityd
   +-> auditd.RecordAuditBatch
 
 pkgd
+  +-> identityd.GetInvocationVerificationKeys
+  +-> policyd.CheckAccess
   +-> auditd.RecordAuditBatch
 
 configd
+  +-> identityd.GetInvocationVerificationKeys
+  +-> policyd.CheckAccess
   +-> auditd.RecordAuditBatch
+
+configured provisioner controller
+  +-> configd.PublishConfiguration(dependency_claim_id, dependency_claim_revision)
+  +-> configd.PublishSecret(dependency_claim_id, dependency_claim_revision)
 ```
 
 No other cross-service method is implied by the architecture diagrams,

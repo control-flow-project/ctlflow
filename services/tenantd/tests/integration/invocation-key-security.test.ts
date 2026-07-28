@@ -155,8 +155,8 @@ test("unavailable identityd key states fail unavailable", async () => {
     await context.identityd.setVerificationKeys(
       keyResponse(
         context.invocation.verificationKey));
-    await context.service.restart(context.environment);
     await context.reconnectPolicyIdentity();
+    await context.service.restart(context.environment);
   }
 });
 

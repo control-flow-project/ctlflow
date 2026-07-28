@@ -6,8 +6,8 @@ import {
   status
 } from "@grpc/grpc-js";
 import type {
-  PolicyGrant
-} from "@ctlflow/policyd/testing/stub";
+  CapabilityGrant
+} from "../support/authorization/capability-grant.js";
 import type {
   Tenant
 } from "../generated/v1/tenantd.js";
@@ -51,8 +51,6 @@ test("a current direct Group grant authorizes a human principal", async () => {
     { length: 101 },
     (_value, index) =>
       `tenant_readers_${String(index).padStart(3, "0")}`);
-  const policyBaseline =
-    (await context.policyd.readRequests()).length;
   await configureCapabilityPolicy(context, {
     tenantId: tenant.tenantId,
     actorGroups: groups,
@@ -73,24 +71,17 @@ test("a current direct Group grant authorizes a human principal", async () => {
   assert.equal(loaded.tenantId, tenant.tenantId);
   await waitForExport(
     context.collector.tracesPath,
-    (value) => findSpansForTrace(value, traceId)
-      .filter((span) =>
-        span.name === "identityd.ListPrincipalGroups")
-      .length === 2);
-  const policyRequest =
-    (await context.policyd.readRequests())[policyBaseline];
-  assert.notEqual(policyRequest, undefined);
-  const receivedTraceparent =
-    policyRequest?.receivedTraceparent ?? "";
-  assert.match(
-    receivedTraceparent,
-    /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/u);
-  assert.equal(
-    receivedTraceparent.slice(3, 35),
-    traceId);
-  assert.notEqual(
-    receivedTraceparent,
-    `00-${traceId}-2234567890abcdef-01`);
+    (value) => {
+      const spans = findSpansForTrace(value, traceId);
+      const policyCall = spans.find(
+        (span) => span.name === "tenantd.CheckAccess");
+      const policyServer = spans.find(
+        (span) => span.name === "policyd.CheckAccess");
+      return spans.filter((span) =>
+        span.name === "identityd.ListPrincipalGroups").length === 2
+        && typeof policyCall?.spanId === "string"
+        && policyServer?.parentSpanId === policyCall.spanId;
+    });
 });
 
 test("subtree grants match only at canonical path boundaries", async () => {
@@ -286,12 +277,15 @@ function grant(
   subjectId: string,
   operation: string,
   resourcePath: string,
-  match: PolicyGrant["match"] = "exact"
-): PolicyGrant {
+  match: CapabilityGrant["match"] = "exact"
+): CapabilityGrant {
   return {
-    subjectId,
+    subject: {
+      kind: subjectId.includes(":") ? "principal" : "group",
+      id: subjectId
+    },
     operation,
-    resourcePath,
+    basePath: resourcePath,
     match
   };
 }

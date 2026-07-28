@@ -1,0 +1,7 @@
+namespace CtlFlow.Policy.Policyd.IntegrationTests.Model;
+
+internal sealed record SqliteColumn(
+    string Name,
+    string Affinity,
+    bool Required,
+    int PrimaryKeyOrder);

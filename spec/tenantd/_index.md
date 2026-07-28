@@ -200,9 +200,9 @@ names only a Workspace ID, tenantd reads the retained Workspace to derive its
 immutable parent before applying the fence; it holds no transaction while
 calling a dependency. `CreateWorkspace` and `ListWorkspaces` target the
 Tenant's Workspace collection and therefore require a Tenant-scoped invocation
-rather than a narrower Workspace invocation. An autonomous admitted workload
-without an invocation JWT remains bounded by its exact per-operation
-allowlist.
+rather than a narrower Workspace invocation. A Workspace-scoped invocation
+also cannot target the parent Tenant. An autonomous admitted workload without
+an invocation JWT remains bounded by its exact per-operation allowlist.
 
 The tenant capability catalog is:
 

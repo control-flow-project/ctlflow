@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: policyd-migrate
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+        runAsNonRoot: true
+      containers:
+        - name: migrate
+          image: policyd-migrations
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CTLFLOW_DATABASE_PATH
+              value: /var/lib/ctlflow/policyd.sqlite
+            - name: CTLFLOW_POLICY_SEED_PATH
+              value: /var/run/ctlflow/policy/policy-seed.json
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 65532
+            runAsUser: 65532
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ctlflow
+            - name: policy
+              mountPath: /var/run/ctlflow/policy
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: policyd-data
+        - name: policy
+          configMap:
+            name: policyd-policy
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,35 @@
+FROM node:26.1.0-bookworm-slim@sha256:8c676dbdbfc322815df09c910e80685fc5de08baa21c3b6189627e302b1bf131 AS build
+
+WORKDIR /workspace
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY tooling/clean-directories.mjs tooling/clean-directories.mjs
+COPY services/pkgd/package.json services/pkgd/package.json
+RUN npm ci \
+    --workspace @ctlflow/pkgd \
+    --include-workspace-root=false
+
+COPY services/pkgd/knexfile.ts services/pkgd/knexfile.ts
+COPY services/pkgd/migrations services/pkgd/migrations
+COPY services/pkgd/schema-manifest.txt \
+    services/pkgd/schema-manifest.txt
+COPY services/pkgd/tooling services/pkgd/tooling
+COPY services/pkgd/tsconfig.migrations.json \
+    services/pkgd/tsconfig.migrations.json
+RUN npm run build:migrations --workspace @ctlflow/pkgd
+RUN npm run verify:schema-manifest --workspace @ctlflow/pkgd
+RUN npm prune \
+    --omit=dev \
+    --workspace @ctlflow/pkgd \
+    --include-workspace-root=false
+
+FROM node:26.1.0-bookworm-slim@sha256:8c676dbdbfc322815df09c910e80685fc5de08baa21c3b6189627e302b1bf131
+
+WORKDIR /workspace
+COPY --from=build /workspace/node_modules /workspace/node_modules
+COPY --from=build /workspace/services/pkgd/package.json \
+    /workspace/services/pkgd/package.json
+COPY --from=build /workspace/services/pkgd/.generated \
+    /workspace/services/pkgd/.generated
+
+USER 65532:65532
+ENTRYPOINT ["node", "/workspace/services/pkgd/.generated/migrations/tooling/migrations/run.js"]
