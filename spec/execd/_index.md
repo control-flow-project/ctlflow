@@ -43,6 +43,12 @@ realization boundaries and cannot replace Placement identity or policy.
 Provider-owned custom resources may be used by installed provider
 controllers; they are not `execd` domain records.
 
+Execd owns the Placement Namespace, Workload ServiceAccount, and namespaced
+DependencyClaim shapes consumed by Configd. Their exact names, annotations,
+group, and Configd-visible fields are fixed by the
+[deterministic realization contract](../contracts/#deterministic-realization-convention).
+This Kubernetes ownership contract does not create an Execd gRPC operation.
+
 When one admitted Run must act through product or kernel APIs, Execd calls
 `identityd.IssueRunInvocation` with the Run ID, configured Actor, and exact
 target. Execd never supplies an attached account or signing material.

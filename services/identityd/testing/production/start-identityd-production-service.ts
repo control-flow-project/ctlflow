@@ -18,6 +18,9 @@ import type {
   StartIdentitydProductionServiceOptions
 } from "./start-identityd-production-service-options.js";
 import {
+  corruptPrincipalKind
+} from "./corrupt-principal-kind.js";
+import {
   createIdentityDatabase,
   type IdentityTestDatabase
 } from "./create-identity-database.js";
@@ -226,6 +229,7 @@ function createService(
   baseEnvironment: Readonly<Record<string, string>>
 ): IdentitydProductionService {
   const modes = new Map<string, IdentitydMode>();
+  let suspended = false;
   let stopped = false;
   return {
     endpoint:
@@ -246,13 +250,16 @@ function createService(
           configuration.externalIdentityLinks);
       }
       return {
+        corruptPrincipalKind: (principalId, kind) =>
+          corruptPrincipalKind(database.connection, principalId, kind),
         setMode: async (mode) => {
           modes.set(configuration.callerSubject, mode);
-          await applyModes(
+          suspended = await applyModes(
             options,
             service,
             baseEnvironment,
-            modes);
+            modes,
+            suspended);
         },
         setVerificationKeys: async (response) => {
           await replaceVerificationKeys(database.connection, response);
@@ -283,60 +290,93 @@ async function applyModes(
   options: StartIdentitydProductionServiceOptions,
   service: CSharpService,
   baseEnvironment: Readonly<Record<string, string>>,
-  modes: ReadonlyMap<string, IdentitydMode>
-): Promise<void> {
+  modes: ReadonlyMap<string, IdentitydMode>,
+  suspended: boolean
+): Promise<boolean> {
   const unavailable = [...modes.values()]
     .some((mode) => mode === "unavailable");
   if (unavailable) {
-    await scaleIdentityd(options, 0);
-    return;
+    if (!suspended) {
+      await suspendIdentityd(options);
+    }
+    return true;
   }
 
-  await scaleIdentityd(options, 1);
   const denied = new Set(
     [...modes.entries()]
       .filter(([, mode]) => mode === "denied")
       .map(([caller]) => caller));
+  if (suspended) {
+    await resumeIdentityd(options);
+    await service.reconnect();
+    if (denied.size === 0) {
+      return false;
+    }
+  }
   await service.restart({
     ...baseEnvironment,
     CTLFLOW_GET_INVOCATION_VERIFICATION_KEYS_CALLERS:
-      options.verificationKeyCallers
-        .filter((caller) => !denied.has(caller))
-        .join(","),
+      admittedCallers(
+        options,
+        options.verificationKeyCallers,
+        denied),
     CTLFLOW_RESOLVE_PRINCIPAL_CALLERS:
-      options.principalFactCallers
-        .filter((caller) => !denied.has(caller))
-        .join(","),
+      admittedCallers(
+        options,
+        options.principalFactCallers,
+        denied),
     CTLFLOW_LIST_PRINCIPAL_GROUPS_CALLERS:
-      options.principalFactCallers
-        .filter((caller) => !denied.has(caller))
-        .join(",")
+      admittedCallers(
+        options,
+        options.principalFactCallers,
+        denied)
   });
+  return false;
 }
 
-async function scaleIdentityd(
+function admittedCallers(
   options: StartIdentitydProductionServiceOptions,
-  replicas: 0 | 1
+  callers: readonly string[],
+  denied: ReadonlySet<string>
+): string {
+  const admitted = callers.filter((candidate) => !denied.has(candidate));
+  return (
+    admitted.length > 0
+      ? admitted
+      : [caller(options, "unadmitted-test-caller")]
+  ).join(",");
+}
+
+async function suspendIdentityd(
+  options: StartIdentitydProductionServiceOptions
 ): Promise<void> {
   await options.kubernetes.runKubectl([
     "scale",
     `statefulset/${serviceName}`,
     "--namespace",
     options.kubernetes.namespace,
-    `--replicas=${String(replicas)}`
+    "--replicas=0"
   ]);
-  if (replicas === 0) {
-    await options.kubernetes.runKubectl([
-      "wait",
-      "--for=delete",
-      `pod/${serviceName}-0`,
-      "--namespace",
-      options.kubernetes.namespace,
-      "--timeout=30s"
-    ]);
-    return;
-  }
+  await options.kubernetes.runKubectl([
+    "wait",
+    "--for=delete",
+    `pod/${serviceName}-0`,
+    "--namespace",
+    options.kubernetes.namespace,
+    "--timeout=30s"
+  ]);
+}
 
+async function resumeIdentityd(
+  options: StartIdentitydProductionServiceOptions
+): Promise<void> {
+  await options.kubernetes.runKubectl([
+    "scale",
+    `statefulset/${serviceName}`,
+    "--namespace",
+    options.kubernetes.namespace,
+    "--replicas=1"
+  ]);
   await options.kubernetes.runKubectl([
     "rollout",
     "status",

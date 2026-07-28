@@ -46,7 +46,7 @@ and storage primitives. `execd` is the sole general CtlFlow owner that
 translates admitted workload intent into those primitives.
 
 `configd` has one narrow disjoint write boundary for secret custody and
-authorized projections. Provider controllers may own their own custom
+authorized ConfigMap or Secret projections. Provider controllers may own their own custom
 resources and external systems; those objects are not CtlFlow domain APIs.
 
 CtlFlow never gives application code Kubernetes credentials or authority to

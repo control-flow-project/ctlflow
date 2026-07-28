@@ -1,0 +1,42 @@
+# Digest-pinned builder. The SDK digest must resolve to the exact SDK pinned in
+# global.json so NativeAOT diagnostics reproduce the reviewed manifest; the
+# canonical suite, local verification, and this container all publish through
+# tooling/native/gated-publish.mjs with that one SDK. Repin this digest whenever
+# global.json changes, and regenerate the manifest under the same SDK.
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:ed034a8bf0b24ded0cbbac07e17825d8e9ebfe21e308191d0f7421eaf5ad4664 AS build
+# Not /src: the repository already contains a `.../csharp/src/` path, and the
+# gated publisher's diagnostic normalization replaces the build root by string,
+# so a root of /src would corrupt those paths and break the manifest match.
+WORKDIR /workspace
+
+# NativeAOT toolchain (clang/zlib) plus a pinned Node to run the gated publisher.
+# Node comes from a fixed release tarball, verified against its published
+# SHA-256, rather than apt — the version and content are both exact.
+ARG NODE_VERSION=26.1.0
+ARG NODE_SHA256=62d555c329e05e3625109f2e3a8b5195b368d5ef38266292469d32f63cd98ffd
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends clang zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.gz" \
+        -o /tmp/node.tar.gz \
+    && echo "${NODE_SHA256}  /tmp/node.tar.gz" | sha256sum --check --strict - \
+    && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
+    && rm /tmp/node.tar.gz
+
+COPY . .
+# The release build uses the single repository-owned gated publisher, so it
+# compiles NativeAOT and fails on any diagnostic that is not in the reviewed
+# manifest instead of tolerating warnings.
+RUN node tooling/native/gated-publish.mjs \
+    services/configd/csharp/src/CtlFlow.Configuration.Configd.Service/CtlFlow.Configuration.Configd.Service.csproj \
+    services/configd/csharp/nativeaot-diagnostics.json \
+    /out
+
+FROM scratch AS publication
+COPY --from=build /out/ /
+
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0@sha256:894098eafc82e5fa02ba9f2b71d426dc78252876b9e914caae77ed95cfce185a
+WORKDIR /app
+COPY --from=build /out/ ./
+USER 65532:65532
+ENTRYPOINT ["/app/CtlFlow.Configuration.Configd.Service"]

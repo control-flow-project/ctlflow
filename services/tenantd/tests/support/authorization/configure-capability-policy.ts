@@ -3,8 +3,8 @@ import type {
   PrincipalAuthorizationKind
 } from "@ctlflow/identityd/testing/production";
 import type {
-  PolicyGrant
-} from "@ctlflow/policyd/testing/stub";
+  CapabilityGrant
+} from "./capability-grant.js";
 import type {
   TenantdTestContext
 } from "../create-tenantd-test-context.js";
@@ -19,7 +19,7 @@ export interface ConfigureCapabilityPolicyOptions {
   readonly subjectAccountEnabled?: boolean;
   readonly actorGroups?: readonly string[];
   readonly accountGroups?: readonly string[];
-  readonly grants: readonly PolicyGrant[];
+  readonly grants: readonly CapabilityGrant[];
 }
 
 export async function configureCapabilityPolicy(
@@ -69,8 +69,19 @@ export async function configureCapabilityPolicy(
     });
   }
 
-  await context.policyIdentityd.setPrincipalFacts(facts);
-  await context.policyd.setGrants(options.grants);
+  await context.policyd.setPrincipalFacts(facts);
+  await context.policyd.replacePolicy({
+    roles: [],
+    grants: options.grants.map((grant) => ({
+      ...grant,
+      target: {
+        tenantId: options.tenantId,
+        ...(options.workspaceId === undefined
+          ? {}
+          : { workspaceId: options.workspaceId })
+      }
+    }))
+  });
 }
 
 function inferPrincipalKind(

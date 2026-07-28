@@ -13,9 +13,9 @@ import {
   type IdentitydProductionService
 } from "@ctlflow/identityd/testing/production";
 import {
-  startPolicyContractService,
-  type PolicyContractService
-} from "@ctlflow/policyd/testing/stub";
+  startPolicydProductionService,
+  type PolicydProductionService
+} from "@ctlflow/policyd/testing/production";
 import {
   loadTenantdTestRuntime
 } from "../runtime/load-tenantd-test-runtime.js";
@@ -44,7 +44,7 @@ Promise<TenantdTestSuite> {
   let collector: OpenTelemetryCollector | undefined;
   let auditd: AuditdProductionService | undefined;
   let identityd: IdentitydProductionService | undefined;
-  let policyd: PolicyContractService | undefined;
+  let policyd: PolicydProductionService | undefined;
 
   try {
     const invocation = await createInvocationAuthority(
@@ -70,22 +70,30 @@ Promise<TenantdTestSuite> {
       invocationMaximumLifetimeSeconds,
       verificationKeyCallers: [
         `system:serviceaccount:${kubernetes.namespace}:tenantd`,
-        `system:serviceaccount:${kubernetes.namespace}:policyd-test`
+        `system:serviceaccount:${kubernetes.namespace}:policyd`
       ],
       principalFactCallers: [
-        `system:serviceaccount:${kubernetes.namespace}:policyd-test`
+        `system:serviceaccount:${kubernetes.namespace}:policyd`
       ]
     });
-      policyd = await startPolicyContractService({
+    policyd = await startPolicydProductionService({
       repositoryRoot,
       kubernetes,
-      identityEndpoint: identityd.endpoint,
-      identityServerName: identityd.serverName,
-      identityCertificateAuthorityPath:
-        identityd.certificateAuthorityPath,
+      identityd,
+      telemetryEndpoint: collector.endpoint,
       invocationIssuer,
       invocationAudience,
-      invocationMaximumLifetimeSeconds
+      invocationMaximumLifetimeSeconds,
+      verificationKeys: {
+        keys: [invocation.verificationKey],
+        expiresAt: new Date(
+          Date.now() + 4 * 60_000).toISOString()
+      },
+      principalFacts: [],
+      policy: {
+        roles: [],
+        grants: []
+      }
     });
     let stopped = false;
     return {
@@ -131,7 +139,7 @@ async function stopResources(
   collector: OpenTelemetryCollector | undefined,
   auditd: AuditdProductionService | undefined,
   identityd: IdentitydProductionService | undefined,
-  policyd: PolicyContractService | undefined
+  policyd: PolicydProductionService | undefined
 ): Promise<void> {
   let failure: unknown;
 

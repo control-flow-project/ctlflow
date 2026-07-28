@@ -5,21 +5,29 @@ package ctlflow.policy.v1;
 option csharp_namespace = "CtlFlow.Policy.V1";
 
 service PolicyService {
+  // Returns one ephemeral decision for an authenticated operation owner and
+  // independently authenticated invocation Actor.
   rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
 }
 
 message CheckAccessRequest {
+  // Immutable operation token declared by the authenticated resource owner.
   string operation = 1;
+  // Canonical operation-specific path built by that owner.
   string resource_path = 2;
+  // Exact target used for current Identityd standing and policy evaluation.
   string tenant_id = 3;
+  // Present only when the exact authorization target is one Workspace.
   optional string workspace_id = 4;
 }
 
 message CheckAccessResponse {
+  // A conforming success contains ALLOW or DENY, never UNSPECIFIED.
   AccessDecision decision = 1;
 }
 
 enum AccessDecision {
+  // Wire sentinel only. Policyd never emits this value.
   ACCESS_DECISION_UNSPECIFIED = 0;
   ACCESS_DECISION_ALLOW = 1;
   ACCESS_DECISION_DENY = 2;

@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package ctlflow.configuration.v1;
+
+option csharp_namespace = "CtlFlow.Configuration.V1";
+
+import "google/protobuf/timestamp.proto";
+
+service ConfigurationService {
+  rpc PublishConfiguration(PublishConfigurationRequest)
+      returns (PublishConfigurationResponse);
+  rpc ResolveConfiguration(ResolveConfigurationRequest)
+      returns (ResolveConfigurationResponse);
+  rpc PublishSecret(PublishSecretRequest)
+      returns (PublishSecretResponse);
+  rpc GetSecretMetadata(GetSecretMetadataRequest)
+      returns (GetSecretMetadataResponse);
+  rpc ApplyProjection(ApplyProjectionRequest)
+      returns (Projection);
+}
+
+message ConsumerBinding {
+  PlacementBinding placement = 1;
+  string consumer_id = 2;
+  string purpose = 3;
+}
+
+message PlacementBinding {
+  string placement_id = 1;
+
+  oneof scope {
+    GlobalPlacementScope global = 2;
+    TenantPlacementScope tenant = 3;
+    WorkspacePlacementScope workspace = 4;
+    UserPlacementScope user = 5;
+  }
+}
+
+message GlobalPlacementScope {}
+
+message TenantPlacementScope {
+  string tenant_id = 1;
+}
+
+message WorkspacePlacementScope {
+  string tenant_id = 1;
+  string workspace_id = 2;
+}
+
+message UserPlacementScope {
+  string tenant_id = 1;
+  string account_principal_id = 2;
+}
+
+message PublishConfigurationRequest {
+  string configuration_id = 1;
+  string configuration_version_id = 2;
+  ConsumerBinding binding = 3;
+  optional uint64 expected_revision = 4;
+  bytes content_json = 5;
+  optional string dependency_claim_id = 6;
+  optional uint64 dependency_claim_revision = 7;
+}
+
+message PublishConfigurationResponse {
+  ConfigurationMetadata configuration = 1;
+  ConfigurationVersionMetadata version = 2;
+}
+
+message ResolveConfigurationRequest {
+  string configuration_id = 1;
+  string configuration_version_id = 2;
+  ConsumerBinding binding = 3;
+}
+
+message ResolveConfigurationResponse {
+  ConfigurationMetadata configuration = 1;
+  ConfigurationVersionMetadata version = 2;
+  bytes content_json = 3;
+}
+
+message ConfigurationMetadata {
+  string configuration_id = 1;
+  ConsumerBinding binding = 2;
+  string current_configuration_version_id = 3;
+  uint64 revision = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ConfigurationVersionMetadata {
+  string configuration_version_id = 1;
+  string configuration_id = 2;
+  uint32 content_length = 3;
+  bytes content_sha256 = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message PublishSecretRequest {
+  string secret_id = 1;
+  string secret_version_id = 2;
+  ConsumerBinding binding = 3;
+  optional uint64 expected_revision = 4;
+  bytes material = 5;
+  optional string dependency_claim_id = 6;
+  optional uint64 dependency_claim_revision = 7;
+}
+
+message PublishSecretResponse {
+  SecretMetadata secret = 1;
+  SecretVersionMetadata version = 2;
+}
+
+message GetSecretMetadataRequest {
+  string secret_id = 1;
+  ConsumerBinding binding = 2;
+}
+
+message GetSecretMetadataResponse {
+  SecretMetadata secret = 1;
+  SecretVersionMetadata current_version = 2;
+}
+
+message SecretMetadata {
+  string secret_id = 1;
+  ConsumerBinding binding = 2;
+  string current_secret_version_id = 3;
+  uint64 revision = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message SecretVersionMetadata {
+  string secret_version_id = 1;
+  string secret_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message ProjectionTarget {
+  oneof target {
+    ConfigurationProjectionTarget configuration = 1;
+    SecretProjectionTarget secret = 2;
+  }
+}
+
+message ConfigurationProjectionTarget {
+  string configuration_id = 1;
+  string configuration_version_id = 2;
+}
+
+message SecretProjectionTarget {
+  string secret_id = 1;
+  string secret_version_id = 2;
+}
+
+message ApplyProjectionRequest {
+  ProjectionTarget target = 1;
+  ConsumerBinding binding = 2;
+}
+
+message Projection {
+  string projection_id = 1;
+  ProjectionTarget target = 2;
+  ConsumerBinding binding = 3;
+  uint64 projection_revision = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}

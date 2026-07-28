@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/CtlFlow.Configuration.Configd.Domain/CtlFlow.Configuration.Configd.Domain.csproj" />
+  <Project Path="src/CtlFlow.Configuration.Configd.Db/CtlFlow.Configuration.Configd.Db.csproj" />
+  <Project Path="src/CtlFlow.Configuration.Configd.Service/CtlFlow.Configuration.Configd.Service.csproj" />
+  <Project Path="tests/CtlFlow.Configuration.Configd.IntegrationTests/CtlFlow.Configuration.Configd.IntegrationTests.csproj" />
+</Solution>

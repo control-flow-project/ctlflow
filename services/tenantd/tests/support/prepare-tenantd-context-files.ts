@@ -18,8 +18,8 @@ import type {
   IdentitydProductionService
 } from "@ctlflow/identityd/testing/production";
 import type {
-  PolicyContractService
-} from "@ctlflow/policyd/testing/stub";
+  PolicydProductionService
+} from "@ctlflow/policyd/testing/production";
 
 export interface TenantdContextFiles {
   readonly workloadJwks: string;
@@ -42,7 +42,7 @@ export interface PrepareTenantdContextFilesOptions {
   readonly kubernetes: TestKubernetes;
   readonly auditd: AuditdProductionService;
   readonly identityd: IdentitydProductionService;
-  readonly policyd: PolicyContractService;
+  readonly policyd: PolicydProductionService;
 }
 
 export async function prepareTenantdContextFiles(

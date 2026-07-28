@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": ".generated/migrations",
+    "rootDir": "."
+  },
+  "include": [
+    "knexfile.ts",
+    "migrations/**/*.ts",
+    "tooling/migrations/**/*.ts"
+  ]
+}

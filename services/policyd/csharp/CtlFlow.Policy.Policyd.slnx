@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/CtlFlow.Policy.Policyd.Domain/CtlFlow.Policy.Policyd.Domain.csproj" />
+  <Project Path="src/CtlFlow.Policy.Policyd.Db/CtlFlow.Policy.Policyd.Db.csproj" />
+  <Project Path="src/CtlFlow.Policy.Policyd.Service/CtlFlow.Policy.Policyd.Service.csproj" />
+  <Project Path="tests/CtlFlow.Policy.Policyd.IntegrationTests/CtlFlow.Policy.Policyd.IntegrationTests.csproj" />
+</Solution>

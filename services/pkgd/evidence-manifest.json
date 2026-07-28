@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "service": "ctlflow.packages.v1.PackageService",
+  "operations": [
+    {
+      "name": "DeclarePackage",
+      "success": [
+        {
+          "file": "tests/integration/packages.test.ts",
+          "title": "declares, retries, gets, and canonically orders a Package"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/packages.test.ts",
+            "title": "validates every Package scalar family"
+          },
+          {
+            "file": "tests/integration/packages.test.ts",
+            "title": "validates Package messages, uniqueness, and local references"
+          }
+        ],
+        "RESOURCE_EXHAUSTED": [
+          {
+            "file": "tests/integration/package-content-and-limits.test.ts",
+            "title": "enforces Package collection bounds"
+          },
+          {
+            "file": "tests/integration/package-content-and-limits.test.ts",
+            "title": "enforces dependency option byte and nesting bounds"
+          },
+          {
+            "file": "tests/integration/package-content-and-limits.test.ts",
+            "title": "enforces the encoded Package declaration bound"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/packages.test.ts",
+            "title": "enforces immutable keys, versions, and consecutive generations"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/packages.test.ts",
+            "title": "enforces immutable keys, versions, and consecutive generations"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/audit-and-telemetry.test.ts",
+            "title": "reports audit failure after commit without retry redelivery"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetPackage",
+      "success": [
+        {
+          "file": "tests/integration/packages.test.ts",
+          "title": "declares, retries, gets, and canonically orders a Package"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/packages.test.ts",
+            "title": "returns not found for an absent Package generation"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "operator authentication rejects missing, mixed, and unadmitted identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "operator authentication rejects missing, mixed, and unadmitted identity"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "readiness and RPCs fail closed when a mapped table is missing"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/audit-and-telemetry.test.ts",
+            "title": "records cancellation for an in-flight database operation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/audit-and-telemetry.test.ts",
+            "title": "honors an in-flight database operation deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateApp",
+      "success": [
+        {
+          "file": "tests/integration/apps.test.ts",
+          "title": "creates and gets Apps in every closed scope"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/apps.test.ts",
+            "title": "validates App identity, scope, placement, Package, and generation"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/apps.test.ts",
+            "title": "returns not found for absent Apps and Package generations"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/apps.test.ts",
+            "title": "retries identical App creation and rejects conflicting reuse"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "configured read-only workloads cannot invoke mutations"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetApp",
+      "success": [
+        {
+          "file": "tests/integration/apps.test.ts",
+          "title": "creates and gets Apps in every closed scope"
+        },
+        {
+          "file": "tests/integration/security.test.ts",
+          "title": "capability callers use exact Tenant, Workspace, and User paths"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "capability scope fences conceal cross-scope targets"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/invocation-security.test.ts",
+            "title": "capability callers require a valid invocation token"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "capability paths deny Global Apps and require Policyd allow"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "capability paths fail closed when Policyd is unavailable"
+          },
+          {
+            "file": "tests/integration/invocation-security.test.ts",
+            "title": "unknown invocation keys fail unavailable when Identityd is unavailable"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetAppPackageGeneration",
+      "success": [
+        {
+          "file": "tests/integration/apps.test.ts",
+          "title": "handles App generation no-op, change, retry, and conflicts"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/apps.test.ts",
+            "title": "handles App generation no-op, change, retry, and conflicts"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/apps.test.ts",
+            "title": "handles App generation no-op, change, retry, and conflicts"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/apps.test.ts",
+            "title": "does not advance an App already at maximum revision"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/apps.test.ts",
+            "title": "handles App generation no-op, change, retry, and conflicts"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "admits the exact operator and autonomous Execd surfaces"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "pkgd exposes exactly the approved RPC inventory"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "pkgd health and readiness probes are available"
+    },
+    {
+      "file": "tests/integration/package-content-and-limits.test.ts",
+      "title": "accepts and returns RFC 8785 canonical dependency options"
+    },
+    {
+      "file": "tests/integration/security.test.ts",
+      "title": "admits the exact operator and autonomous Execd surfaces"
+    },
+    {
+      "file": "tests/integration/invocation-security.test.ts",
+      "title": "unknown invocation keys refresh through real Identityd and Policyd"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "records complete Package and App mutation audit events"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "does not audit reads, retries, or no-op App updates"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "exports correlated and redacted traces, metrics, and logs"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "telemetry outage is bounded and does not change domain results"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "persists Package and App state across a production restart"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "SQLite contains only migration metadata and Pkgd domain tables"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:pkgd",
+    "npm run test:compiled --workspace @ctlflow/pkgd",
+    "npm run test:csharp --workspace @ctlflow/pkgd",
+    "npm run verify:container:pkgd",
+    "npm run verify:migration-container:pkgd"
+  ]
+}

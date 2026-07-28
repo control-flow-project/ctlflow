@@ -30,7 +30,8 @@ An egress rule may generically:
 - constrain origin, method, path, headers, body, redirect, and response bounds;
 - add, remove, or replace headers and path segments;
 - derive a consumer namespace from trusted runtime context; and
-- request one purpose-bound secret projection from `configd`.
+- consume one purpose-bound secret projection already realized for its
+  workload by Configd and Execd.
 
 Rules do not name S3, PostgreSQL, Anthropic, OpenAI, or another provider
 protocol. Those are configurations of generic HTTP behavior.
@@ -53,5 +54,4 @@ App or Run -> bound egress endpoint -> egressd -> approved HTTP origin
 - Rewrites use trusted runtime and binding facts, not protected request fields.
 - Redirects and streaming remain inside the same admitted destination policy.
 - Failure is bounded and fail-closed.
-- Required decisions are directly audited through the approved audit contract;
-  telemetry remains non-authoritative.
+- Decisions emit bounded operational telemetry and no mutation audit event.

@@ -21,13 +21,15 @@ CtlFlow records with one owning service each.
    -> owning versioned gRPC contract
 
  product backend
-   -> tenantd
+   -> tenantd | pkgd | configd | execd
+      -> identityd
       -> policyd
-         -> identityd
-      -> auditd
+      -> auditd                 mutation only
 
  CtlFlow realization ownership
    -> execd
+      -> pkgd                    exact App and Package reads
+      -> configd                 exact consumer projections
    -> Kubernetes workloads, Services, volumes, and policy
 
  every process -> bounded OTLP -> OpenTelemetry Collector
@@ -39,10 +41,10 @@ owning service's private gRPC contract directly with the selected kubeconfig cli
 imply a route; public routes exist only in checked versioned HTTP contracts.
 Changing the client surface never changes record ownership or semantics.
 
-`execd` is the sole CtlFlow owner of general Placement realization and workload execution. Other
-services own domain intent and call `execd`. The only narrow Kubernetes write exception is
-`configd`, which writes Secret custody and authorized projections without exposing their material
-to `execd`.
+`execd` is the sole CtlFlow owner of general Placement realization and workload execution. It reads
+Pkgd-owned intent and asks Configd to realize exact consumer projections. The only narrow
+Kubernetes write exception is `configd`, which writes Secret custody and authorized projections
+without exposing their material to `execd`.
 
 ## Kernel services
 
@@ -52,8 +54,8 @@ to `execd`.
 | [`authd`](authd/) | Public authentication protocol mediation; no durable domain records |
 | [`identityd`](identityd/) | Accounts, groups, memberships, external identity links, Sessions, virtual principals, and invocation identity |
 | [`policyd`](policyd/) | Path-and-operation grants and authorization decisions |
-| [`pkgd`](pkgd/) | Packages, artifacts, service contracts, exposures, and installations |
-| [`configd`](configd/) | Configuration, secret custody, and provider configuration |
+| [`pkgd`](pkgd/) | Immutable Package generations and installed App intent |
+| [`configd`](configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections |
 | [`execd`](execd/) | Placements, constraints, dependencies, workloads, Jobs, Runs, storage, endpoints, and Kubernetes realization |
 | [`edged`](edged/) | External ingress and reverse proxying |
 | [`egressd`](egressd/) | Controlled external HTTP |

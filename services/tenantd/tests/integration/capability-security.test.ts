@@ -7,8 +7,8 @@ import {
   status
 } from "@grpc/grpc-js";
 import type {
-  PolicyGrant
-} from "@ctlflow/policyd/testing/stub";
+  CapabilityGrant
+} from "../support/authorization/capability-grant.js";
 import type {
   ListTenantsResponse,
   ResolveTenantResponse,
@@ -50,7 +50,10 @@ test("capability callers require both admitted workload and invocation identitie
     address: "capability-identity-tenant",
     displayName: "Capability Identity Tenant"
   });
-  await configureReadPolicy(tenant.tenantId);
+  await configureCapabilityPolicy(context, {
+    tenantId: tenant.tenantId,
+    grants: []
+  });
 
   for (const metadata of [
     workloadMetadata(
@@ -90,14 +93,9 @@ test("autonomous, capability, and operator-only paths stay disjoint", async () =
       tenantId: tenant.tenantId,
       tokenId: "capability-autonomous"
     }));
-  const policyBaseline =
-    (await context.policyd.readRequests()).length;
   assert.equal(
     (await getTenant(tenant.tenantId, autonomous)).tenantId,
     tenant.tenantId);
-  assert.equal(
-    (await context.policyd.readRequests()).length,
-    policyBaseline);
   await assert.rejects(
     callUnary<Tenant>((done) =>
       context.workloadClient.updateTenant(
@@ -110,6 +108,7 @@ test("autonomous, capability, and operator-only paths stay disjoint", async () =
         done)),
     matchGrpcStatus(status.PERMISSION_DENIED));
 
+  await configureReadPolicy(tenant.tenantId);
   const readOnly = workloadMetadata(
     context.readOnlyCapabilityWorkload.callerToken,
     context.invocation.sign({
@@ -199,10 +198,13 @@ test("capability denial, standing, and identity state fail closed", async () => 
     getTenant(tenant.tenantId, metadata),
     matchGrpcStatus(status.PERMISSION_DENIED));
 
-  await context.policyIdentityd.setPrincipalFacts([]);
-  await context.policyd.setGrants([
-    grant("user:alice", "tenants.read", path)
-  ]);
+  await configureCapabilityPolicy(context, {
+    tenantId: tenant.tenantId,
+    grants: [
+      grant("user:alice", "tenants.read", path)
+    ]
+  });
+  await context.policyd.setPrincipalFacts([]);
   await assert.rejects(
     getTenant(tenant.tenantId, metadata),
     matchGrpcStatus(status.NOT_FOUND));
@@ -233,7 +235,7 @@ test("policy and identity dependency failures preserve canonical statuses", asyn
     tokenId: "capability-dependencies"
   });
 
-  await context.policyd.setMode("unavailable");
+  await context.policyd.setAvailable(false);
   try {
     assert.equal(
       (await callUnary<Tenant>((done) =>
@@ -245,50 +247,42 @@ test("policy and identity dependency failures preserve canonical statuses", asyn
       getTenant(tenant.tenantId, metadata),
       matchGrpcStatus(status.UNAVAILABLE));
   } finally {
-    await context.policyd.setMode("available");
+    await context.policyd.setAvailable(true);
+    await context.service.restart(context.environment);
   }
 
-  await context.policyd.setMode("denied");
-  try {
-    await assert.rejects(
-      getTenant(tenant.tenantId, metadata),
-      matchGrpcStatus(status.PERMISSION_DENIED));
-  } finally {
-    await context.policyd.setMode("available");
-  }
+  await context.policyd.replacePolicy({
+    roles: [],
+    grants: []
+  });
+  await assert.rejects(
+    getTenant(tenant.tenantId, metadata),
+    matchGrpcStatus(status.PERMISSION_DENIED));
 
-  await context.policyd.setMode("malformed");
-  try {
-    await assert.rejects(
-      getTenant(tenant.tenantId, metadata),
-      matchGrpcStatus(status.UNAVAILABLE));
-  } finally {
-    await context.policyd.setMode("available");
-  }
-
-  await context.policyIdentityd.setMode("unavailable");
+  await configureReadPolicy(tenant.tenantId);
+  await context.policyd.setIdentityMode("unavailable");
   try {
     await assert.rejects(
       getTenant(tenant.tenantId, metadata),
       matchGrpcStatus(status.UNAVAILABLE));
   } finally {
-    await context.policyIdentityd.setMode("available");
+    await context.policyd.setIdentityMode("available");
   }
   await context.reconnectPolicyIdentity();
   await context.service.restart(context.environment);
 
-  await context.policyd.setMode("blocked");
+  await context.policyd.database.raw("BEGIN EXCLUSIVE");
   try {
     await assert.rejects(
       callUnary<Tenant>((done) =>
         context.workloadClient.getTenant(
           { tenantId: tenant.tenantId },
           metadata,
-          { deadline: Date.now() + 50 },
+          { deadline: Date.now() + 200 },
           done)),
       matchGrpcStatus(status.DEADLINE_EXCEEDED));
   } finally {
-    await context.policyd.setMode("available");
+    await context.policyd.database.raw("ROLLBACK");
   }
 });
 
@@ -310,11 +304,12 @@ test("policyd independently validates the invocation signature", async () => {
       })));
   const otherAuthority = await createInvocationAuthority(
     "policy-other-key");
-  await context.policyIdentityd.setVerificationKeys({
+  await context.policyd.setVerificationKeys({
     keys: [otherAuthority.verificationKey],
     expiresAt:
       new Date(Date.now() + 4 * 60_000).toISOString()
   });
+  await context.reconnectPolicyIdentity();
   try {
     await assert.rejects(
       getTenant(
@@ -325,11 +320,12 @@ test("policyd independently validates the invocation signature", async () => {
         })),
       matchGrpcStatus(status.UNAUTHENTICATED));
   } finally {
-    await context.policyIdentityd.setVerificationKeys({
+    await context.policyd.setVerificationKeys({
       keys: [context.invocation.verificationKey],
       expiresAt:
         new Date(Date.now() + 4 * 60_000).toISOString()
     });
+    await context.reconnectPolicyIdentity();
   }
 });
 
@@ -353,49 +349,50 @@ test("capability fences reject hidden targets before policy", async () => {
     displayName: "Capability Fence Sibling"
   });
   await configureReadPolicy(tenant.tenantId);
-  const baseline = (await context.policyd.readRequests()).length;
-
-  await assert.rejects(
-    getTenant(
-      tenant.tenantId,
-      createCapabilityMetadata(context, {
-        tenantId: "another_tenant",
-        tokenId: "capability-tenant-fence"
-      })),
-    matchGrpcStatus(status.NOT_FOUND));
-  await assert.rejects(
-    callUnary<import(
-      "../generated/v1/tenantd.js"
-    ).ListWorkspacesResponse>((done) =>
-      context.workloadClient.listWorkspaces(
-        {
-          tenantId: tenant.tenantId,
-          pageSize: 10
-        },
+  await context.policyd.setAvailable(false);
+  try {
+    await assert.rejects(
+      getTenant(
+        tenant.tenantId,
         createCapabilityMetadata(context, {
-          tenantId: tenant.tenantId,
-          workspaceId: workspace.workspaceId,
-          tokenId: "capability-collection-fence"
-        }),
-        done)),
-    matchGrpcStatus(status.NOT_FOUND));
-  await assert.rejects(
-    callUnary<Workspace>((done) =>
-      context.workloadClient.getWorkspace(
-        { workspaceId: workspace.workspaceId },
-        createCapabilityMetadata(context, {
-          tenantId: tenant.tenantId,
-          workspaceId: sibling.workspaceId,
-          tokenId: "capability-workspace-fence"
-        }),
-        done)),
-    matchGrpcStatus(status.NOT_FOUND));
-  assert.equal(
-    (await context.policyd.readRequests()).length,
-    baseline);
+          tenantId: "another_tenant",
+          tokenId: "capability-tenant-fence"
+        })),
+      matchGrpcStatus(status.NOT_FOUND));
+    await assert.rejects(
+      callUnary<import(
+        "../generated/v1/tenantd.js"
+      ).ListWorkspacesResponse>((done) =>
+        context.workloadClient.listWorkspaces(
+          {
+            tenantId: tenant.tenantId,
+            pageSize: 10
+          },
+          createCapabilityMetadata(context, {
+            tenantId: tenant.tenantId,
+            workspaceId: workspace.workspaceId,
+            tokenId: "capability-collection-fence"
+          }),
+          done)),
+      matchGrpcStatus(status.NOT_FOUND));
+    await assert.rejects(
+      callUnary<Workspace>((done) =>
+        context.workloadClient.getWorkspace(
+          { workspaceId: workspace.workspaceId },
+          createCapabilityMetadata(context, {
+            tenantId: tenant.tenantId,
+            workspaceId: sibling.workspaceId,
+            tokenId: "capability-workspace-fence"
+          }),
+          done)),
+      matchGrpcStatus(status.NOT_FOUND));
+  } finally {
+    await context.policyd.setAvailable(true);
+    await context.service.restart(context.environment);
+  }
 });
 
-test("workspace-scoped invocation can read its parent Tenant", async () => {
+test("workspace-scoped invocation cannot read its parent Tenant", async () => {
   const context = getTenantdTestContext();
   const tenant = await createTenant(context, {
     tenantId: "capability_parent_tenant",
@@ -409,14 +406,15 @@ test("workspace-scoped invocation can read its parent Tenant", async () => {
     displayName: "Capability Parent Workspace"
   });
   await configureReadPolicy(tenant.tenantId);
-  const loaded = await getTenant(
-    tenant.tenantId,
-    createCapabilityMetadata(context, {
-      tenantId: tenant.tenantId,
-      workspaceId: workspace.workspaceId,
-      tokenId: "capability-parent-read"
-    }));
-  assert.equal(loaded.tenantId, tenant.tenantId);
+  await assert.rejects(
+    getTenant(
+      tenant.tenantId,
+      createCapabilityMetadata(context, {
+        tenantId: tenant.tenantId,
+        workspaceId: workspace.workspaceId,
+        tokenId: "capability-parent-read"
+      })),
+    matchGrpcStatus(status.NOT_FOUND));
 });
 
 async function configureReadPolicy(
@@ -438,11 +436,14 @@ function grant(
   subjectId: string,
   operation: string,
   resourcePath: string
-): PolicyGrant {
+): CapabilityGrant {
   return {
-    subjectId,
+    subject: {
+      kind: subjectId.includes(":") ? "principal" : "group",
+      id: subjectId
+    },
     operation,
-    resourcePath,
+    basePath: resourcePath,
     match: "exact"
   };
 }

@@ -1,0 +1,35 @@
+FROM node:26.1.0-bookworm-slim@sha256:8c676dbdbfc322815df09c910e80685fc5de08baa21c3b6189627e302b1bf131 AS build
+
+WORKDIR /workspace
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY tooling/clean-directories.mjs tooling/clean-directories.mjs
+COPY services/policyd/package.json services/policyd/package.json
+RUN npm ci \
+    --workspace @ctlflow/policyd \
+    --include-workspace-root=false
+
+COPY services/policyd/knexfile.ts services/policyd/knexfile.ts
+COPY services/policyd/migrations services/policyd/migrations
+COPY services/policyd/schema-manifest.txt \
+    services/policyd/schema-manifest.txt
+COPY services/policyd/tooling services/policyd/tooling
+COPY services/policyd/tsconfig.migrations.json \
+    services/policyd/tsconfig.migrations.json
+RUN npm run build:migrations --workspace @ctlflow/policyd
+RUN npm run verify:schema-manifest --workspace @ctlflow/policyd
+RUN npm prune \
+    --omit=dev \
+    --workspace @ctlflow/policyd \
+    --include-workspace-root=false
+
+FROM node:26.1.0-bookworm-slim@sha256:8c676dbdbfc322815df09c910e80685fc5de08baa21c3b6189627e302b1bf131
+
+WORKDIR /workspace
+COPY --from=build /workspace/node_modules /workspace/node_modules
+COPY --from=build /workspace/services/policyd/package.json \
+    /workspace/services/policyd/package.json
+COPY --from=build /workspace/services/policyd/.generated \
+    /workspace/services/policyd/.generated
+
+USER 65532:65532
+ENTRYPOINT ["node", "/workspace/services/policyd/.generated/migrations/tooling/migrations/run.js"]

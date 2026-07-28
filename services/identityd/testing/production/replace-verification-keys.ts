@@ -21,7 +21,7 @@ export async function replaceVerificationKeys(
         algorithm: key.algorithm,
         modulus_base64url: key.modulusBase64url,
         exponent_base64url: key.exponentBase64url,
-        state: 1,
+        state: index === 0 ? 1 : 2,
         revision: index + 1
       })));
   });

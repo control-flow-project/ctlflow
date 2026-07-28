@@ -9,6 +9,10 @@ import type {
 } from "./principal-authorization-facts.js";
 
 export interface IdentitydProductionSource {
+  readonly corruptPrincipalKind: (
+    principalId: string,
+    kind: "human" | "service"
+  ) => Promise<void>;
   readonly setMode: (mode: IdentitydMode) => Promise<void>;
   readonly setVerificationKeys: (
     response: InvocationVerificationKeyResponse

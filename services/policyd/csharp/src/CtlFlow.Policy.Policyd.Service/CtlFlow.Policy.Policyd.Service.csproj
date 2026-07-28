@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <AssemblyName>CtlFlow.Policy.Policyd.Service</AssemblyName>
+    <RootNamespace>CtlFlow.Policy.Policyd.Service</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <PublishAot>true</PublishAot>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>full</TrimMode>
+    <SelfContained>true</SelfContained>
+    <OptimizationPreference>Speed</OptimizationPreference>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+    <TrimmerTreatWarningsAsErrors>true</TrimmerTreatWarningsAsErrors>
+    <IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <SuppressAotAnalysisWarnings>false</SuppressAotAnalysisWarnings>
+    <SuppressSingleFileAnalysisWarnings>false</SuppressSingleFileAnalysisWarnings>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.EntityFrameworkCore.GeneratedInterceptors</InterceptorsNamespaces>
+    <EFScaffoldModelStage>none</EFScaffoldModelStage>
+    <EFPrecompileQueriesStage>none</EFPrecompileQueriesStage>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CtlFlow.Policy.Policyd.Domain/CtlFlow.Policy.Policyd.Domain.csproj" />
+    <ProjectReference Include="../CtlFlow.Policy.Policyd.Db/CtlFlow.Policy.Policyd.Db.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Core.Api" />
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tasks" PrivateAssets="all" />
+    <PackageReference Include="OpenTelemetry" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="../../../api/proto/v1/policyd.proto"
+              GrpcServices="Server"
+              ProtoRoot="../../../api/proto" />
+    <Protobuf Include="../../../../identityd/api/proto/v1/identityd.proto"
+              GrpcServices="Client"
+              ProtoRoot="../../../../identityd/api/proto" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../catalog/operation-owners.tsv"
+             Link="operation-owners.tsv"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="Always" />
+  </ItemGroup>
+</Project>

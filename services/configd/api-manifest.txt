@@ -1,0 +1,1 @@
+v1/configd.proto	ccd024aeb0cbc5667e9f5b1fba8fac25bd212e01d821f74a93e76bdfa911d062

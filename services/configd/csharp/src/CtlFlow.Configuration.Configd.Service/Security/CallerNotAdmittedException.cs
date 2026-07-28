@@ -1,0 +1,9 @@
+namespace CtlFlow.Configuration.Configd.Service.Security;
+
+internal sealed class CallerNotAdmittedException : Exception
+{
+    internal CallerNotAdmittedException()
+        : base("The authenticated caller is not admitted")
+    {
+    }
+}

@@ -16,8 +16,8 @@ import type {
   IdentitydProductionSource
 } from "@ctlflow/identityd/testing/production";
 import type {
-  PolicyTestSource
-} from "@ctlflow/policyd/testing/stub";
+  PolicydProductionService
+} from "@ctlflow/policyd/testing/production";
 import {
   TenantServiceClient
 } from "../generated/v1/tenantd.js";
@@ -52,8 +52,7 @@ export interface TenantdTestContext {
   readonly invocation: InvocationAuthority;
   readonly auditd: AuditdProductionSource;
   readonly identityd: IdentitydProductionSource;
-  readonly policyIdentityd: IdentitydProductionSource;
-  readonly policyd: PolicyTestSource;
+  readonly policyd: PolicydProductionService;
   readonly reconnectPolicyIdentity: () => Promise<void>;
   readonly database: TestDatabase;
   readonly service: TenantdRunningService;
@@ -73,8 +72,6 @@ Promise<TenantdTestContext> {
   let database: TestDatabase | undefined;
   let auditd: AuditdProductionSource | undefined;
   let identityd: IdentitydProductionSource | undefined;
-  let policyIdentityd: IdentitydProductionSource | undefined;
-  let policyd: PolicyTestSource | undefined;
   let service: TenantdRunningService | undefined;
   const clients: TenantServiceClient[] = [];
 
@@ -106,15 +103,6 @@ Promise<TenantdTestContext> {
       callerSubject: serviceAccountSubject,
       verificationKeys,
       principalFacts: []
-    });
-    policyIdentityd = await suite.identityd.createSource({
-      callerSubject: suite.policyd.identityCallerSubject,
-      verificationKeys,
-      principalFacts: []
-    });
-    policyd = await suite.policyd.createSource({
-      callerSubject: serviceAccountSubject,
-      grants: []
     });
     const files = await prepareTenantdContextFiles({
       repositoryRoot: suite.repositoryRoot,
@@ -192,8 +180,7 @@ Promise<TenantdTestContext> {
       invocation,
       auditd,
       identityd,
-      policyIdentityd,
-      policyd,
+      policyd: suite.policyd,
       reconnectPolicyIdentity:
         suite.policyd.reconnectIdentity,
       database,
@@ -218,9 +205,7 @@ Promise<TenantdTestContext> {
           service,
           database,
           auditd,
-          identityd,
-          policyIdentityd,
-          policyd);
+          identityd);
       }
     };
   } catch (error) {
@@ -231,9 +216,7 @@ Promise<TenantdTestContext> {
       service,
       database,
       auditd,
-      identityd,
-      policyIdentityd,
-      policyd).catch(() => undefined);
+      identityd).catch(() => undefined);
     throw error;
   }
 }
@@ -334,16 +317,12 @@ async function stopResources(
   service: TenantdRunningService | undefined,
   database: TestDatabase | undefined,
   auditd: AuditdProductionSource | undefined,
-  identityd: IdentitydProductionSource | undefined,
-  policyIdentityd: IdentitydProductionSource | undefined,
-  policyd: PolicyTestSource | undefined
+  identityd: IdentitydProductionSource | undefined
 ): Promise<void> {
   let failure: unknown;
 
   for (const stop of [
     service?.stop,
-    policyd?.stop,
-    policyIdentityd?.stop,
     identityd?.stop,
     auditd?.stop,
     database?.stop

@@ -111,6 +111,8 @@ AND owning-service Domain invariants
 The owner constructs operation and path from validated domain values and
 forwards the unchanged invocation JWT to Policyd. Policyd independently
 validates it and loads current Identityd standing and Group facts.
+A Workspace fence admits only that exact Workspace target; it does not admit
+the parent Tenant or the Tenant's Workspace collection.
 
 Membership proves standing only. It contains no Role or administrator flag.
 A virtual Actor is allowed only when both the virtual principal and its one
