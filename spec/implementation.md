@@ -1,5 +1,6 @@
 ---
 title: Implementation
+description: Language-neutral repository, contract, persistence, test, transport, and release rules.
 weight: 30
 ---
 
@@ -165,7 +166,7 @@ fallback provider, dual write, or dormant provider branch exists.
 
 Each provider supplies the coordination needed for its cross-record invariants. The current SQLite
 deployment runs one service process per database and uses finite process-local coordination before
-related Entity Framework operations. A provider admitted for multiple service processes must
+related persistence operations. A provider admitted for multiple service processes must
 provide equivalent cross-process atomicity without changing Domain or API behavior.
 
 Database schemas contain structural storage rules only: types, bounds, requiredness, keys, foreign

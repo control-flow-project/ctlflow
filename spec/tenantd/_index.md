@@ -1,11 +1,14 @@
 ---
 title: tenantd
+description: Tenant and Workspace record ownership, lifecycle, resolution, and authorization.
 weight: 40
 ---
 
 `tenantd` is the sole authority for Tenant and Workspace records. It exposes
 only the gRPC contract in
 `services/tenantd/api/proto/v1/tenantd.proto`.
+
+**Wire reference:** [tenantd gRPC API](../apis/tenantd/)
 
 ## Ownership
 

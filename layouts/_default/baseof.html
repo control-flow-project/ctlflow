@@ -3,25 +3,58 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="CtlFlow specification">
+    <meta name="description" content="{{ .Description | default .Site.Params.description }}">
     <title>{{ if not .IsHome }}{{ .Title }} | {{ end }}{{ .Site.Title }}</title>
     <link rel="stylesheet" href="{{ "css/site.css" | relURL }}">
+    <link rel="stylesheet" href="{{ "css/responsive.css" | relURL }}">
   </head>
   <body>
+    <a class="skip-link" href="#content">Skip to content</a>
     <header class="masthead">
-      <a class="brand" href="{{ .Site.Home.RelPermalink }}">CtlFlow</a>
-      <span class="site-label">Specification</span>
+      <div class="masthead-inner">
+        <div class="masthead-identity">
+          <a class="brand" href="{{ .Site.Home.RelPermalink }}">CtlFlow</a>
+          <span class="site-label">Kernel specification</span>
+        </div>
+        <nav class="masthead-actions" aria-label="Repository">
+          <a href="{{ "/apis/" | relURL }}">API reference</a>
+          <a href="{{ .Site.Params.repository }}">Source</a>
+        </nav>
+      </div>
     </header>
+    <details class="mobile-navigation">
+      <summary>Documentation navigation</summary>
+      {{ partial "navigation.html" . }}
+    </details>
     <div class="shell">
-      <nav class="navigation" aria-label="Specification">
-        <a class="nav-link{{ if .IsHome }} is-active{{ end }}" href="{{ .Site.Home.RelPermalink }}">Overview</a>
-        {{ range .Site.Home.Pages.ByWeight }}
-          <a class="nav-link{{ if eq $.RelPermalink .RelPermalink }} is-active{{ end }}" href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
-        {{ end }}
-      </nav>
+      <aside class="sidebar">
+        {{ partial "navigation.html" . }}
+      </aside>
       <main class="content" id="content">
+        {{ if not .IsHome }}
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a href="{{ .Site.Home.RelPermalink }}">Overview</a>
+            {{ range .Ancestors.Reverse }}
+              {{ if not .IsHome }}
+                <span aria-hidden="true">/</span>
+                <a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a>
+              {{ end }}
+            {{ end }}
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">{{ .LinkTitle }}</span>
+          </nav>
+        {{ end }}
         {{ block "main" . }}{{ end }}
       </main>
+      {{ $tableOfContents := .TableOfContents }}
+      <aside class="page-outline"{{ if strings.Contains $tableOfContents "<li>" }} aria-label="On this page"{{ else }} aria-hidden="true"{{ end }}>
+        {{ if strings.Contains $tableOfContents "<li>" }}
+          <div class="page-outline-inner">
+            <div class="page-outline-title">On this page</div>
+            {{ $tableOfContents }}
+          </div>
+        {{ end }}
+      </aside>
     </div>
   </body>
 </html>

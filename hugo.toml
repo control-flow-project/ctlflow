@@ -5,9 +5,256 @@ title = "CtlFlow"
 
 disableKinds = ["taxonomy", "term"]
 
+[params]
+  description = "CtlFlow kernel architecture, contracts, and implementation specification."
+  repository = "https://github.com/control-flow-project/ctlflow"
+
 [markup]
   [markup.highlight]
     noClasses = false
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+    ordered = false
   [markup.goldmark]
     [markup.goldmark.renderer]
       unsafe = false
+
+[[menus.main]]
+  name = "Overview"
+  pageRef = "/"
+  weight = 10
+
+[[menus.main]]
+  identifier = "architecture"
+  name = "Architecture"
+  weight = 20
+
+[[menus.main]]
+  name = "Planes"
+  pageRef = "/planes"
+  parent = "architecture"
+  weight = 10
+
+[[menus.main]]
+  name = "Model"
+  pageRef = "/model"
+  parent = "architecture"
+  weight = 20
+
+[[menus.main]]
+  name = "Access"
+  pageRef = "/access"
+  parent = "architecture"
+  weight = 30
+
+[[menus.main]]
+  name = "Contracts"
+  pageRef = "/contracts"
+  parent = "architecture"
+  weight = 40
+
+[[menus.main]]
+  name = "Flows"
+  pageRef = "/flows"
+  parent = "architecture"
+  weight = 50
+
+[[menus.main]]
+  name = "Service map"
+  pageRef = "/services"
+  parent = "architecture"
+  weight = 60
+
+[[menus.main]]
+  name = "Telemetry"
+  pageRef = "/telemetry"
+  parent = "architecture"
+  weight = 70
+
+[[menus.main]]
+  identifier = "api-reference"
+  name = "API reference"
+  pageRef = "/apis"
+  weight = 30
+
+[[menus.main]]
+  identifier = "api-tenantd"
+  name = "tenantd"
+  pageRef = "/apis/tenantd"
+  parent = "api-reference"
+  weight = 10
+
+[[menus.main]]
+  identifier = "api-identityd"
+  name = "identityd"
+  pageRef = "/apis/identityd"
+  parent = "api-reference"
+  weight = 20
+
+[[menus.main]]
+  identifier = "api-policyd"
+  name = "policyd"
+  pageRef = "/apis/policyd"
+  parent = "api-reference"
+  weight = 30
+
+[[menus.main]]
+  identifier = "api-pkgd"
+  name = "pkgd"
+  pageRef = "/apis/pkgd"
+  parent = "api-reference"
+  weight = 40
+
+[[menus.main]]
+  identifier = "api-configd"
+  name = "configd"
+  pageRef = "/apis/configd"
+  parent = "api-reference"
+  weight = 50
+
+[[menus.main]]
+  identifier = "api-execd"
+  name = "execd"
+  pageRef = "/apis/execd"
+  parent = "api-reference"
+  weight = 60
+
+[[menus.main]]
+  identifier = "api-auditd"
+  name = "auditd"
+  pageRef = "/apis/auditd"
+  parent = "api-reference"
+  weight = 70
+
+[[menus.main]]
+  identifier = "api-authd"
+  name = "authd"
+  pageRef = "/apis/authd"
+  parent = "api-reference"
+  weight = 80
+
+[[menus.main]]
+  identifier = "api-edged"
+  name = "edged"
+  pageRef = "/apis/edged"
+  parent = "api-reference"
+  weight = 90
+
+[[menus.main]]
+  identifier = "api-egressd"
+  name = "egressd"
+  pageRef = "/apis/egressd"
+  parent = "api-reference"
+  weight = 100
+
+[[menus.main]]
+  identifier = "service-behavior"
+  name = "Service behavior"
+  weight = 40
+
+[[menus.main]]
+  identifier = "service-tenantd"
+  name = "tenantd"
+  pageRef = "/tenantd"
+  parent = "service-behavior"
+  weight = 10
+
+[[menus.main]]
+  identifier = "service-authd"
+  name = "authd"
+  pageRef = "/authd"
+  parent = "service-behavior"
+  weight = 20
+
+[[menus.main]]
+  identifier = "service-identityd"
+  name = "identityd"
+  pageRef = "/identityd"
+  parent = "service-behavior"
+  weight = 30
+
+[[menus.main]]
+  identifier = "service-policyd"
+  name = "policyd"
+  pageRef = "/policyd"
+  parent = "service-behavior"
+  weight = 40
+
+[[menus.main]]
+  identifier = "service-pkgd"
+  name = "pkgd"
+  pageRef = "/pkgd"
+  parent = "service-behavior"
+  weight = 50
+
+[[menus.main]]
+  identifier = "service-configd"
+  name = "configd"
+  pageRef = "/configd"
+  parent = "service-behavior"
+  weight = 60
+
+[[menus.main]]
+  identifier = "service-execd"
+  name = "execd"
+  pageRef = "/execd"
+  parent = "service-behavior"
+  weight = 70
+
+[[menus.main]]
+  identifier = "service-edged"
+  name = "edged"
+  pageRef = "/edged"
+  parent = "service-behavior"
+  weight = 80
+
+[[menus.main]]
+  identifier = "service-egressd"
+  name = "egressd"
+  pageRef = "/egressd"
+  parent = "service-behavior"
+  weight = 90
+
+[[menus.main]]
+  identifier = "service-auditd"
+  name = "auditd"
+  pageRef = "/auditd"
+  parent = "service-behavior"
+  weight = 100
+
+[[menus.main]]
+  identifier = "operator-cli"
+  name = "Operator CLI"
+  pageRef = "/cli"
+  weight = 50
+
+[[menus.main]]
+  name = "Tenants"
+  pageRef = "/cli/tenants"
+  parent = "operator-cli"
+  weight = 10
+
+[[menus.main]]
+  name = "Workspaces"
+  pageRef = "/cli/workspaces"
+  parent = "operator-cli"
+  weight = 20
+
+[[menus.main]]
+  identifier = "implementation"
+  name = "Implementation"
+  pageRef = "/implementation"
+  weight = 60
+
+[[menus.main]]
+  name = "C#"
+  pageRef = "/csharp"
+  parent = "implementation"
+  weight = 10
+
+[[menus.main]]
+  name = "C# runtime and release"
+  pageRef = "/csharp/runtime"
+  parent = "implementation"
+  weight = 20

@@ -1,11 +1,14 @@
 ---
 title: edged
+description: Public Session-authenticated reverse proxy for one application exposure.
 weight: 70
 ---
 
 `edged` is the stateless public reverse-proxy boundary for one admitted HTTP
 Package exposure. It owns no Tenant, route, Package, Placement, endpoint,
 identity, policy, or durable record.
+
+**Wire reference:** [edged HTTP API](../apis/edged/)
 
 ## Deployment model
 

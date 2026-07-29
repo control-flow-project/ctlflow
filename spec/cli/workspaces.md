@@ -1,5 +1,6 @@
 ---
 title: Workspaces
+description: Operator commands for Workspace creation, reads, updates, lifecycle, and resolution.
 weight: 20
 ---
 

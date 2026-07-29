@@ -1,11 +1,14 @@
 ---
 title: configd
+description: Versioned configuration, encrypted secret custody, and exact consumer projections.
 weight: 60
 ---
 
 `configd` is the durable authority for scoped non-secret configuration,
 encrypted secret custody, and projection of both data classes. It alone owns
 projection; its sole wire contract is `services/configd/api/proto/v1/configd.proto`.
+
+**Wire reference:** [configd gRPC API](../apis/configd/)
 
 ## Contract
 

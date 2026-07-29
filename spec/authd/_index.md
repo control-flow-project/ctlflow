@@ -1,11 +1,14 @@
 ---
 title: authd
+description: Public OIDC mediation, browser cookies, and Session creation and revocation.
 weight: 45
 ---
 
 `authd` is the public authentication-protocol boundary. It owns no durable
 identity, Session, configuration, provider, or other domain record and exposes
 no private inbound RPC.
+
+**Wire reference:** [authd HTTP API](../apis/authd/)
 
 ## Surface
 

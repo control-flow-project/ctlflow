@@ -1,22 +1,23 @@
 ---
 title: Services
+description: Kernel service inventory, responsibilities, dependencies, and exclusions.
 weight: 25
 ---
 
 CtlFlow has ten kernel ownership boundaries.
 
-| Service | Authority |
-| --- | --- |
-| [`tenantd`](../tenantd/) | Tenants and Workspaces |
-| [`authd`](../authd/) | Public authentication protocol; no durable records |
-| [`identityd`](../identityd/) | Accounts, standing, Groups, identity links, Sessions, and invocation identity |
-| [`policyd`](../policyd/) | Roles, grants, operation ownership, and access decisions |
-| [`pkgd`](../pkgd/) | Packages and installed application intent |
-| [`configd`](../configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections |
-| [`execd`](../execd/) | Placements and Kubernetes realization intent |
-| [`edged`](../edged/) | Public application reverse proxy; no route authority |
-| [`egressd`](../egressd/) | Controlled external HTTP |
-| [`auditd`](../auditd/) | Required kernel audit evidence |
+| Service | Authority | API |
+| --- | --- | --- |
+| [`tenantd`](../tenantd/) | Tenants and Workspaces | [gRPC](../apis/tenantd/) |
+| [`authd`](../authd/) | Public authentication protocol; no durable records | [HTTP](../apis/authd/) |
+| [`identityd`](../identityd/) | Accounts, standing, Groups, identity links, Sessions, and invocation identity | [gRPC](../apis/identityd/) |
+| [`policyd`](../policyd/) | Roles, grants, operation ownership, and access decisions | [gRPC](../apis/policyd/) |
+| [`pkgd`](../pkgd/) | Packages and installed application intent | [gRPC](../apis/pkgd/) |
+| [`configd`](../configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections | [gRPC](../apis/configd/) |
+| [`execd`](../execd/) | Placements and Kubernetes realization intent | [gRPC](../apis/execd/) |
+| [`edged`](../edged/) | Public application reverse proxy; no route authority | [HTTP](../apis/edged/) |
+| [`egressd`](../egressd/) | Controlled external HTTP | [HTTP](../apis/egressd/) |
+| [`auditd`](../auditd/) | Required kernel audit evidence | [gRPC](../apis/auditd/) |
 
 Application domains remain outside this list. Chat, Files, Tasks,
 Notifications, realtime delivery, agent management, and vertical business

@@ -1,5 +1,6 @@
 ---
 title: CLI
+description: Infrastructure-operator connection, command, input, and output rules.
 weight: 30
 ---
 

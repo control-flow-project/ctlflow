@@ -1,0 +1,143 @@
+@media (max-width: 1220px) {
+  .shell {
+    grid-template-columns: var(--sidebar-width) minmax(0, var(--content-width));
+  }
+
+  .page-outline {
+    display: none;
+  }
+}
+
+@media (max-width: 840px) {
+  .masthead-inner {
+    padding: 0 18px;
+  }
+
+  .site-label {
+    display: none;
+  }
+
+  .masthead-actions {
+    gap: 14px;
+  }
+
+  .mobile-navigation {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: block;
+  }
+
+  .mobile-navigation summary {
+    color: var(--text);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 650;
+    list-style-position: inside;
+    padding: 12px 18px;
+  }
+
+  .mobile-navigation[open] summary {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-navigation .navigation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(65vh, 620px);
+    padding: 14px 16px 24px;
+    position: static;
+  }
+
+  .mobile-navigation .nav-link-root {
+    grid-column: 1 / -1;
+  }
+
+  .mobile-navigation .nav-group {
+    margin-top: 12px;
+    min-width: 0;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .shell {
+    display: block;
+    min-height: 0;
+  }
+
+  .content {
+    margin: 0 auto;
+    max-width: var(--content-width);
+    padding: 30px 26px 72px;
+  }
+}
+
+@media (max-width: 560px) {
+  .masthead-actions a:first-child {
+    display: none;
+  }
+
+  .mobile-navigation .navigation {
+    display: block;
+  }
+
+  .mobile-navigation .nav-group {
+    margin-top: 18px;
+  }
+
+  .content {
+    padding: 26px 18px 60px;
+  }
+
+  .breadcrumbs {
+    margin-bottom: 18px;
+  }
+
+  .document-header {
+    margin-bottom: 24px;
+    padding-bottom: 18px;
+  }
+
+  h1 {
+    font-size: 29px;
+  }
+
+  h2 {
+    font-size: 21px;
+    margin-top: 38px;
+  }
+
+  pre {
+    border-radius: 3px;
+    padding: 15px;
+  }
+
+  th,
+  td {
+    min-width: 110px;
+    padding: 9px 11px;
+  }
+}
+
+@media print {
+  .masthead,
+  .sidebar,
+  .mobile-navigation,
+  .page-outline,
+  .breadcrumbs {
+    display: none;
+  }
+
+  .shell {
+    display: block;
+  }
+
+  .content {
+    padding: 0;
+  }
+
+  pre {
+    white-space: pre-wrap;
+  }
+}

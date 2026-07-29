@@ -1,5 +1,6 @@
 ---
 title: egressd
+description: Private purpose-bound external HTTP rules, rewriting, and isolation.
 weight: 75
 ---
 
@@ -7,6 +8,8 @@ weight: 75
 purpose-bound consumer binding. It owns the allow-or-reject decision for that
 binding but no Tenant, Placement, Package, secret, provider, or durable
 record.
+
+**Wire reference:** [egressd HTTP API](../apis/egressd/)
 
 ## Deployment model
 
