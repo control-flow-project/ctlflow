@@ -1,5 +1,4 @@
 import {
-  createSign,
   randomUUID
 } from "node:crypto";
 import {
@@ -20,12 +19,18 @@ import {
   createKubernetesOperatorCredentials
 } from "./create-kubernetes-operator-credentials.js";
 import {
+  createSignedTokenVariant
+} from "./create-signed-token-variant.js";
+import {
   createTestWorkloads
 } from "./create-test-workloads.js";
 import { loadTestToolchain } from "./load-test-toolchain.js";
 import { readMinikubeFile } from "./read-minikube-file.js";
 import { resolveKubectl } from "./resolve-kubectl.js";
 import { resolveMinikube } from "./resolve-minikube.js";
+import {
+  resolveLoadedImageArtifact
+} from "./resolve-loaded-image-artifact.js";
 import { runMinikube } from "./run-minikube.js";
 import { runKubectl } from "./run-kubectl.js";
 import { startKubectl } from "./start-kubectl.js";
@@ -117,7 +122,8 @@ export async function startTestKubernetes(
       api,
       storage,
       createWorkloadCredentials: async (
-        requestedServiceAccountName = serviceAccountName
+        requestedServiceAccountName = serviceAccountName,
+        requestedAudience = audience
       ) => {
         if (stopped) {
           throw new Error("Test Kubernetes cluster is stopped");
@@ -140,7 +146,8 @@ export async function startTestKubernetes(
           jwksPath,
           signingKey,
           requestedServiceAccountName,
-          requestedServiceAccountName);
+          requestedServiceAccountName,
+          requestedAudience);
       },
       createOperatorCredentials: async (subject) => {
         if (stopped) {
@@ -172,6 +179,15 @@ export async function startTestKubernetes(
           minikube,
           ["image", "load", image]);
         loadedImages.add(canonical);
+      },
+      resolveImageArtifact: async (image) => {
+        if (stopped) {
+          throw new Error("Test Kubernetes cluster is stopped");
+        }
+        return await resolveLoadedImageArtifact(
+          repositoryRoot,
+          minikube,
+          image);
       },
       runKubectl: async (arguments_, input) => {
         if (stopped) {
@@ -209,8 +225,7 @@ export async function startTestKubernetes(
             "namespace",
             namespaceName,
             "--ignore-not-found=true",
-            "--wait=true",
-            "--timeout=30s"
+            "--wait=false"
           ]);
       }
     };
@@ -416,14 +431,15 @@ async function createWorkloadCredentials(
   jwksPath: string,
   signingKey: string,
   admittedServiceAccountName: string,
-  admittedPodName: string
+  admittedPodName: string,
+  tokenAudience: string
 ): Promise<TestWorkloadCredentials> {
   const token = await createToken(
     repositoryRoot,
     minikube,
     namespaceName,
     admittedServiceAccountName,
-    audience,
+    tokenAudience,
     "10m",
     admittedPodName);
   const unadmittedToken = await createToken(
@@ -431,7 +447,7 @@ async function createWorkloadCredentials(
     minikube,
     namespaceName,
     unadmittedServiceAccountName,
-    audience,
+    tokenAudience,
     "10m",
     unadmittedPodName);
   const wrongAudienceToken = await createToken(
@@ -447,7 +463,7 @@ async function createWorkloadCredentials(
     minikube,
     namespaceName,
     admittedServiceAccountName,
-    audience,
+    tokenAudience,
     "20m",
     admittedPodName);
   const unboundToken = await createToken(
@@ -460,7 +476,7 @@ async function createWorkloadCredentials(
 
   return {
     issuer,
-    audience,
+    audience: tokenAudience,
     callerSubject:
       `system:serviceaccount:${namespaceName}:`
       + admittedServiceAccountName,
@@ -469,6 +485,24 @@ async function createWorkloadCredentials(
     overlongToken,
     unadmittedToken,
     wrongAudienceToken,
+    wrongIssuerToken: createSignedTokenVariant(
+      token,
+      signingKey,
+      (payload) => {
+        payload.iss = "https://wrong-issuer.invalid";
+      }),
+    wrongNamespaceToken: createSignedTokenVariant(
+      token,
+      signingKey,
+      (payload) => {
+        const namespaceName = "wrong-namespace";
+        payload.sub =
+          `system:serviceaccount:${namespaceName}:`
+          + admittedServiceAccountName;
+        const kubernetes = payload["kubernetes.io"] as
+          Record<string, unknown>;
+        kubernetes.namespace = namespaceName;
+      }),
     unboundToken,
     jwksPath
   };
@@ -521,27 +555,10 @@ async function createToken(
 }
 
 function createExpiredToken(token: string, privateKey: string): string {
-  const segments = token.split(".");
-  if (segments.length !== 3) {
-    throw new Error("Kubernetes returned a malformed workload token");
-  }
-
-  const payload = JSON.parse(
-    Buffer.from(segments[1]!, "base64url").toString("utf8")
-  ) as Record<string, unknown>;
-  const now = Math.floor(Date.now() / 1_000);
-  payload.iat = now - 120;
-  payload.nbf = now - 120;
-  payload.exp = now - 60;
-
-  const encodedPayload = Buffer.from(
-    JSON.stringify(payload),
-    "utf8"
-  ).toString("base64url");
-  const signingInput = `${segments[0]!}.${encodedPayload}`;
-  const signer = createSign("RSA-SHA256");
-  signer.update(signingInput);
-  signer.end();
-  const signature = signer.sign(privateKey).toString("base64url");
-  return `${signingInput}.${signature}`;
+  return createSignedTokenVariant(token, privateKey, (payload) => {
+    const now = Math.floor(Date.now() / 1_000);
+    payload.iat = now - 120;
+    payload.nbf = now - 120;
+    payload.exp = now - 60;
+  });
 }

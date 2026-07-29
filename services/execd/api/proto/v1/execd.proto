@@ -1,0 +1,341 @@
+syntax = "proto3";
+
+package ctlflow.execution.v1;
+
+option csharp_namespace = "CtlFlow.Execution.V1";
+
+import "google/protobuf/timestamp.proto";
+
+service ExecutionService {
+  rpc DeclarePlacement(DeclarePlacementRequest) returns (Placement);
+  rpc GetPlacement(GetPlacementRequest) returns (Placement);
+  rpc ListPlacements(ListPlacementsRequest)
+      returns (ListPlacementsResponse);
+
+  rpc DeclareWorkload(DeclareWorkloadRequest) returns (Workload);
+  rpc GetWorkload(GetWorkloadRequest) returns (Workload);
+  rpc ListWorkloads(ListWorkloadsRequest)
+      returns (ListWorkloadsResponse);
+
+  rpc CreateRun(CreateRunRequest) returns (Run);
+  rpc GetRun(GetRunRequest) returns (Run);
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+  rpc CancelRun(CancelRunRequest) returns (Run);
+}
+
+message DeclarePlacementRequest {
+  string placement_id = 1;
+  PlacementTarget target = 2;
+  optional string parent_placement_id = 3;
+  PlacementConstraints constraints = 4;
+  DesiredState desired_state = 5;
+  optional uint64 expected_revision = 6;
+}
+
+message GetPlacementRequest {
+  string placement_id = 1;
+}
+
+message ListPlacementsRequest {
+  PlacementTarget target = 1;
+  uint32 page_size = 2;
+  optional string after_placement_id = 3;
+}
+
+message ListPlacementsResponse {
+  repeated Placement placements = 1;
+  optional string next_after_placement_id = 2;
+}
+
+message Placement {
+  string placement_id = 1;
+  PlacementTarget target = 2;
+  optional string parent_placement_id = 3;
+  PlacementConstraints constraints = 4;
+  DesiredState desired_state = 5;
+  uint64 revision = 6;
+  RealizationStatus realization = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message PlacementTarget {
+  oneof level {
+    GlobalPlacementTarget global = 1;
+    TenantPlacementTarget tenant = 2;
+    WorkspacePlacementTarget workspace = 3;
+    UserPlacementTarget user = 4;
+  }
+}
+
+message GlobalPlacementTarget {}
+
+message TenantPlacementTarget {
+  string tenant_id = 1;
+}
+
+message WorkspacePlacementTarget {
+  string tenant_id = 1;
+  string workspace_id = 2;
+}
+
+message UserPlacementTarget {
+  string tenant_id = 1;
+  string account_principal_id = 2;
+}
+
+message PlacementConstraints {
+  repeated WorkloadMode admitted_modes = 1;
+  uint32 max_replicas_per_continuous_workload = 2;
+  uint64 max_run_duration_seconds = 3;
+  uint32 max_run_attempts = 4;
+  ExecutionResources max_resources_per_execution = 5;
+  uint64 max_persistent_storage_bytes_per_workload = 6;
+  repeated DependencyProvisionerSelection dependency_provisioners = 7;
+}
+
+message DependencyProvisionerSelection {
+  string dependency_type_id = 1;
+  string provisioner_id = 2;
+}
+
+message DeclareWorkloadRequest {
+  string workload_id = 1;
+  string placement_id = 2;
+  WorkloadDeclaration declaration = 3;
+  optional uint64 expected_revision = 4;
+}
+
+message GetWorkloadRequest {
+  string workload_id = 1;
+}
+
+message ListWorkloadsRequest {
+  string placement_id = 1;
+  uint32 page_size = 2;
+  optional string after_workload_id = 3;
+}
+
+message ListWorkloadsResponse {
+  repeated Workload workloads = 1;
+  optional string next_after_workload_id = 2;
+}
+
+message Workload {
+  string workload_id = 1;
+  string placement_id = 2;
+  WorkloadDeclaration declaration = 3;
+  AdmittedPackageComponent admitted_package_component = 4;
+  uint64 revision = 5;
+  RealizationStatus realization = 6;
+  repeated EndpointStatus endpoints = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message WorkloadDeclaration {
+  DesiredState desired_state = 1;
+  PackageComponentReference package_component = 2;
+  ExecutionResources resources = 3;
+  repeated ConfigdTargetReference configd_targets = 4;
+  repeated DependencySelection dependencies = 5;
+  repeated PersistentStorage persistent_storage = 6;
+
+  oneof behavior {
+    ContinuousWorkload continuous = 7;
+    FiniteWorkload finite = 8;
+  }
+}
+
+message PackageComponentReference {
+  string app_id = 1;
+  string component_id = 2;
+}
+
+message AdmittedPackageComponent {
+  string app_id = 1;
+  uint64 app_revision = 2;
+  string package_id = 3;
+  uint64 package_generation = 4;
+  string component_id = 5;
+}
+
+message ExecutionResources {
+  uint32 cpu_millis = 1;
+  uint64 memory_bytes = 2;
+}
+
+message ConfigdTargetReference {
+  string purpose = 1;
+
+  oneof target {
+    ConfigurationVersionTarget configuration = 2;
+    SecretVersionTarget secret = 3;
+  }
+}
+
+message ConfigurationVersionTarget {
+  string configuration_id = 1;
+  string configuration_version_id = 2;
+}
+
+message SecretVersionTarget {
+  string secret_id = 1;
+  string secret_version_id = 2;
+}
+
+message DependencySelection {
+  string component_id = 1;
+  string dependency_name = 2;
+  optional string dependency_id = 3;
+  repeated ProvisioningParameterReference provisioning_parameters = 4;
+}
+
+message ProvisioningParameterReference {
+  string parameter_name = 1;
+  ConfigdTargetReference target = 2;
+}
+
+message PersistentStorage {
+  string storage_id = 1;
+  string mount_path = 2;
+  uint64 capacity_bytes = 3;
+}
+
+message ContinuousWorkload {
+  uint32 replicas = 1;
+  repeated string interface_ids = 2;
+}
+
+message FiniteWorkload {
+  optional string actor_principal_id = 1;
+  uint64 run_duration_seconds = 2;
+  uint32 max_attempts = 3;
+}
+
+message EndpointStatus {
+  string interface_id = 1;
+  optional string host = 2;
+  bool ready = 3;
+}
+
+message CreateRunRequest {
+  string run_id = 1;
+  string workload_id = 2;
+}
+
+message GetRunRequest {
+  string run_id = 1;
+}
+
+message ListRunsRequest {
+  string workload_id = 1;
+  uint32 page_size = 2;
+  optional string after_run_id = 3;
+}
+
+message ListRunsResponse {
+  repeated Run runs = 1;
+  optional string next_after_run_id = 2;
+}
+
+message CancelRunRequest {
+  string run_id = 1;
+}
+
+message Run {
+  string run_id = 1;
+  string workload_id = 2;
+  uint64 workload_revision = 3;
+  string placement_id = 4;
+  PlacementTarget target = 5;
+  optional string actor_principal_id = 6;
+  RunExecutionSnapshot execution = 7;
+  RunPhase phase = 8;
+  RunReason reason = 9;
+  uint32 attempt_count = 10;
+  uint64 revision = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp started_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  google.protobuf.Timestamp completed_at = 15;
+}
+
+message RunExecutionSnapshot {
+  AdmittedPackageComponent admitted_package_component = 1;
+  ExecutionResources resources = 2;
+  repeated ConfigdTargetReference configd_targets = 3;
+  repeated DependencySelection dependencies = 4;
+  repeated PersistentStorage persistent_storage = 5;
+  uint64 run_duration_seconds = 6;
+  uint32 max_attempts = 7;
+}
+
+message RealizationStatus {
+  uint64 status_revision = 1;
+  uint64 observed_revision = 2;
+  RealizationPhase phase = 3;
+  RealizationReason reason = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+enum WorkloadMode {
+  WORKLOAD_MODE_UNSPECIFIED = 0;
+  WORKLOAD_MODE_CONTINUOUS = 1;
+  WORKLOAD_MODE_FINITE = 2;
+}
+
+enum DesiredState {
+  DESIRED_STATE_UNSPECIFIED = 0;
+  DESIRED_STATE_ACTIVE = 1;
+  DESIRED_STATE_SUSPENDED = 2;
+  DESIRED_STATE_RETIRED = 3;
+}
+
+enum RealizationPhase {
+  REALIZATION_PHASE_UNSPECIFIED = 0;
+  REALIZATION_PHASE_PENDING = 1;
+  REALIZATION_PHASE_READY = 2;
+  REALIZATION_PHASE_SUSPENDED = 3;
+  REALIZATION_PHASE_DEGRADED = 4;
+  REALIZATION_PHASE_RETIRED = 5;
+}
+
+enum RealizationReason {
+  REALIZATION_REASON_UNSPECIFIED = 0;
+  REALIZATION_REASON_NONE = 1;
+  REALIZATION_REASON_PLACEMENT_NOT_READY = 2;
+  REALIZATION_REASON_BINDING_UNAVAILABLE = 3;
+  REALIZATION_REASON_KUBERNETES_UNAVAILABLE = 4;
+  REALIZATION_REASON_REALIZATION_REJECTED = 5;
+  REALIZATION_REASON_OWNERSHIP_CONFLICT = 6;
+  REALIZATION_REASON_STORAGE_UNAVAILABLE = 7;
+  REALIZATION_REASON_EXECUTION_UNREADY = 8;
+}
+
+enum RunPhase {
+  RUN_PHASE_UNSPECIFIED = 0;
+  RUN_PHASE_PENDING = 1;
+  RUN_PHASE_STARTING = 2;
+  RUN_PHASE_RUNNING = 3;
+  RUN_PHASE_CANCELLING = 4;
+  RUN_PHASE_SUCCEEDED = 5;
+  RUN_PHASE_FAILED = 6;
+  RUN_PHASE_CANCELLED = 7;
+}
+
+enum RunReason {
+  RUN_REASON_UNSPECIFIED = 0;
+  RUN_REASON_NONE = 1;
+  RUN_REASON_CANCEL_REQUESTED = 2;
+  RUN_REASON_PLACEMENT_INACTIVE = 3;
+  RUN_REASON_WORKLOAD_INACTIVE = 4;
+  RUN_REASON_BINDING_UNAVAILABLE = 5;
+  RUN_REASON_INVOCATION_NOT_ADMITTED = 6;
+  RUN_REASON_INVOCATION_UNAVAILABLE = 7;
+  RUN_REASON_KUBERNETES_UNAVAILABLE = 8;
+  RUN_REASON_REALIZATION_REJECTED = 9;
+  RUN_REASON_OWNERSHIP_CONFLICT = 10;
+  RUN_REASON_EXECUTION_FAILED = 11;
+  RUN_REASON_DURATION_EXCEEDED = 12;
+}

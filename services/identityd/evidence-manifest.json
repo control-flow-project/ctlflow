@@ -281,9 +281,7 @@
           {
             "file": "tests/integration/invocations.test.ts",
             "title": "Session exchange rejects invalid, expired, and revoked credentials"
-          }
-        ],
-        "PERMISSION_DENIED": [
+          },
           {
             "file": "tests/integration/security.test.ts",
             "title": "every RPC rejects an unadmitted workload"
@@ -468,6 +466,9 @@
   ],
   "releaseGates": [
     "npm run build:identityd",
-    "npm run test:compiled --workspace @ctlflow/identityd"
+    "npm run test:compiled --workspace @ctlflow/identityd",
+    "npm run test:csharp --workspace @ctlflow/identityd",
+    "npm run verify:container:identityd",
+    "npm run verify:migration-container:identityd"
   ]
 }

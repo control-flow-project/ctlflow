@@ -67,8 +67,10 @@ export async function waitForKubernetesStatefulSet(
     ])).stdout);
     const failure = findKubernetesPodFailure(pods);
     if (failure !== undefined) {
+      const diagnostics = await readDiagnostics(kubernetes, name);
       throw new Error(
-        `Kubernetes stateful set ${name} failed: ${failure}`);
+        `Kubernetes stateful set ${name} failed: ${failure}`
+        + (diagnostics.length === 0 ? "" : `\n${diagnostics}`));
     }
 
     lastState = JSON.stringify(state ?? {});
@@ -77,4 +79,38 @@ export async function waitForKubernetesStatefulSet(
 
   throw new Error(
     `Kubernetes stateful set ${name} did not become ready: ${lastState}`);
+}
+
+async function readDiagnostics(
+  kubernetes: TestKubernetes,
+  name: string
+): Promise<string> {
+  const values: string[] = [];
+  for (const arguments_ of [
+    [
+      "logs",
+      `statefulset/${name}`,
+      "--namespace",
+      kubernetes.namespace,
+      "--all-containers=true",
+      "--tail=200"
+    ],
+    [
+      "describe",
+      `statefulset/${name}`,
+      "--namespace",
+      kubernetes.namespace
+    ]
+  ]) {
+    try {
+      const result = await kubernetes.runKubectl(arguments_);
+      const output = `${result.stdout}\n${result.stderr}`.trim();
+      if (output.length > 0) {
+        values.push(output);
+      }
+    } catch {
+      // The original workload failure remains authoritative.
+    }
+  }
+  return values.join("\n");
 }

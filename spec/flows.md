@@ -30,7 +30,7 @@ ctlflow create tenant -f tenant.yaml
   -> tenantd returns the Tenant
 ```
 
-The call creates no User, configuration, Placement, Package, App, Job, or
+The call creates no User, configuration, Placement, Package, App, Run, or
 Workspace.
 
 ## Workspace creation
@@ -99,6 +99,46 @@ execd -> pkgd.GetApp -> pkgd.GetPackage
 Pkgd has no list, build, artifact-transfer, lifecycle, dependency-provisioning,
 or Kubernetes operation. Reads and no-op App updates emit no audit event.
 
+## Placement and execution
+
+```text
+operator or admitted scoped product backend
+  -> execd.DeclarePlacement
+       -> validate parent and inherited constraints
+       -> commit Placement intent
+       -> auditd.RecordAuditBatch
+       -> reconciler applies the owned Namespace
+
+operator or admitted scoped product backend
+  -> execd.DeclareWorkload
+       -> pkgd.GetApp
+       -> verify exact App Placement and scope
+       -> pkgd.GetPackage
+       -> validate and snapshot component, artifact, interfaces, dependencies
+       -> commit Workload intent
+       -> auditd.RecordAuditBatch
+       -> reconciler applies projections, claims, storage, and workload objects
+
+operator or admitted scoped product backend
+  -> execd.CreateRun(finite Workload)
+       -> commit immutable Run snapshot
+       -> auditd.RecordAuditBatch
+       -> reconciler calls identityd.IssueRunInvocation for a non-Global Run
+       -> reconciler maintains the process-private invocation projection
+       -> reconciler applies one owned Kubernetes Job
+
+operator or admitted scoped product backend
+  -> execd.CancelRun(nonterminal Run)
+       -> commit first cancellation request
+       -> auditd.RecordAuditBatch
+       -> reconciler removes or terminates the owned Job
+```
+
+Intent RPC success does not mean ready. `Get*` and keyset-paginated `List*`
+return stored intent and bounded observed status. Configd, provisioner,
+Kubernetes, and process failures update status without creating a second
+mutation API or fallback.
+
 ## Configuration and secret publication
 
 ```text
@@ -151,11 +191,13 @@ GET /auth/v1/callback(state, code XOR error [+ error_description])
   <- 303 to the stored same-origin return target
 
 authenticated application request
-  -> edged
+  -> installation ingress
+  -> Execd-created Edged sidecar
+       Pod-bound ctlflow-edged audience; application has no token
   -> identityd.ExchangeSession(cookie credential, exact target)
        -> validate Session, account, standing, and target
        -> sign short-lived Session-origin invocation JWT
-  -> private product target with invocation JWT
+  -> loopback product listener with Authorization: Bearer <invocation JWT>
 
 POST /auth/v1/logout(return_to)
   -> authd validates exact Origin and opaque cookie
@@ -177,6 +219,22 @@ call. A valid provider error makes no Egressd call; a code result makes exactly
 the token call and, only after its validation, the UserInfo call. There is no
 retry, discovery, or third call. Provider or dependency failures never select
 another Tenant, provider, return target, or identity.
+
+## Controlled external HTTP
+
+```text
+consumer
+  -> purpose-bound Egressd Service
+       Proxy-Authorization: Bearer <bound workload token>
+  -> Egressd validates exact namespace and ServiceAccount
+  -> Egressd matches one configured method/path rule
+  -> Egressd applies generic path/header/secret rewrites
+  -> exact configured HTTPS origin
+```
+
+The caller supplies neither destination nor rule. Egressd never follows a
+redirect, interprets the provider protocol, or returns a projected secret.
+An unmatched request fails rather than selecting another rule or origin.
 
 ## Run invocation
 

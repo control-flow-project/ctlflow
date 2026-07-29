@@ -126,10 +126,7 @@ assertSame(
   "probe route inventory");
 assert(
   (allServiceSource.match(/\.SendAsync\(/gu) ?? []).length === 1
-    && (await read(path.join(
-      serviceSource,
-      "Egress/SendEgressRequest.cs")))
-      .includes("provider.EgressOrigin.AbsoluteUri.TrimEnd('/')"),
+    && await hasPurposeBoundEgress(),
   "Provider HTTP must use only the purpose-bound Egressd hop");
 assertSame(
   [...allServiceSource.matchAll(
@@ -181,6 +178,22 @@ async function hasUnexpectedFailureMapping(relativePath) {
   const source = await read(path.join(serviceSource, relativePath));
   return /_ => \(StatusCodes\.Status500InternalServerError,\s*"internal"/u
     .test(source);
+}
+
+async function hasPurposeBoundEgress() {
+  const request = await read(path.join(
+    serviceSource,
+    "Egress/SendEgressRequest.cs"));
+  const provider = await read(path.join(
+    serviceSource,
+    "Configuration/ProviderRegistration.cs"));
+  return request.includes(
+    "provider.EgressOrigin.AbsoluteUri.TrimEnd('/')")
+    && request.includes('"Proxy-Authorization"')
+    && request.includes('"egressd"')
+    && !request.includes("request.Headers.Host")
+    && provider.includes(
+      'new($"http://{EgressBinding}:8081/", UriKind.Absolute)');
 }
 
 async function hasBoundedState() {

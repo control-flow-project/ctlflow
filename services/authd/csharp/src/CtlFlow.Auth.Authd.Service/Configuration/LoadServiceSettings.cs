@@ -47,7 +47,8 @@ internal static partial class AuthdConfiguration
             new IdentitySettings(
                 identityEndpoint,
                 RequireDnsName("CTLFLOW_IDENTITY_TLS_SERVER_NAME"),
-                RequireAbsoluteFile("CTLFLOW_IDENTITY_TLS_CA_PATH"),
+                RequireAbsoluteFile("CTLFLOW_IDENTITY_TLS_CA_PATH")),
+            new WorkloadSettings(
                 RequireAbsoluteFile("CTLFLOW_WORKLOAD_TOKEN_FILE")),
             Telemetry.TelemetrySettings.Parse(
                 RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT")));

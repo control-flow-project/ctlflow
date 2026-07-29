@@ -19,7 +19,7 @@
     "verify:evidence": "node tooling/evidence/verify-evidence-manifest.mjs",
     "build": "npm run verify:api-manifest && npm run verify:architecture && npm run build:provider && npm run build:tests && npm run verify:evidence && npm run build:csharp",
     "test": "npm run test:compiled",
-    "test:compiled": "node --test --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-authd-test-suite.js tests/dist/integration/authd.test.js"
+    "test:compiled": "node --test --test-force-exit --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-authd-test-suite.js tests/dist/integration/authd.test.js"
   },
   "devDependencies": {
     "@ctlflow/test-mesh": "0.0.0",

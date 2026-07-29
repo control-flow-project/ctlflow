@@ -230,9 +230,11 @@ test("policy and identity dependency failures preserve canonical statuses", asyn
     displayName: "Capability Dependency Tenant"
   });
   await configureReadPolicy(tenant.tenantId);
-  const metadata = createCapabilityMetadata(context, {
+  let invocationSequence = 0;
+  const currentMetadata = () => createCapabilityMetadata(context, {
     tenantId: tenant.tenantId,
-    tokenId: "capability-dependencies"
+    tokenId:
+      `capability-dependencies-${String(++invocationSequence)}`
   });
 
   await context.policyd.setAvailable(false);
@@ -244,7 +246,7 @@ test("policy and identity dependency failures preserve canonical statuses", asyn
           done))).tenantId,
       tenant.tenantId);
     await assert.rejects(
-      getTenant(tenant.tenantId, metadata),
+      getTenant(tenant.tenantId, currentMetadata()),
       matchGrpcStatus(status.UNAVAILABLE));
   } finally {
     await context.policyd.setAvailable(true);
@@ -256,14 +258,14 @@ test("policy and identity dependency failures preserve canonical statuses", asyn
     grants: []
   });
   await assert.rejects(
-    getTenant(tenant.tenantId, metadata),
+    getTenant(tenant.tenantId, currentMetadata()),
     matchGrpcStatus(status.PERMISSION_DENIED));
 
   await configureReadPolicy(tenant.tenantId);
   await context.policyd.setIdentityMode("unavailable");
   try {
     await assert.rejects(
-      getTenant(tenant.tenantId, metadata),
+      getTenant(tenant.tenantId, currentMetadata()),
       matchGrpcStatus(status.UNAVAILABLE));
   } finally {
     await context.policyd.setIdentityMode("available");
@@ -277,7 +279,7 @@ test("policy and identity dependency failures preserve canonical statuses", asyn
       callUnary<Tenant>((done) =>
         context.workloadClient.getTenant(
           { tenantId: tenant.tenantId },
-          metadata,
+          currentMetadata(),
           { deadline: Date.now() + 200 },
           done)),
       matchGrpcStatus(status.DEADLINE_EXCEEDED));
@@ -316,6 +318,16 @@ test("policyd independently validates the invocation signature", async () => {
         tenant.tenantId,
         createCapabilityMetadata(context, {
           tenantId: tenant.tenantId,
+          tokenId: "capability-independent-reconnect"
+        })),
+      (error) =>
+        matchGrpcStatus(status.UNAVAILABLE)(error)
+        || matchGrpcStatus(status.UNAUTHENTICATED)(error));
+    await assert.rejects(
+      getTenant(
+        tenant.tenantId,
+        createCapabilityMetadata(context, {
+          tenantId: tenant.tenantId,
           tokenId: "capability-independent-validation"
         })),
       matchGrpcStatus(status.UNAUTHENTICATED));
@@ -325,7 +337,6 @@ test("policyd independently validates the invocation signature", async () => {
       expiresAt:
         new Date(Date.now() + 4 * 60_000).toISOString()
     });
-    await context.reconnectPolicyIdentity();
   }
 });
 

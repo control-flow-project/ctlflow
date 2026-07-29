@@ -28,8 +28,6 @@ test("completes OIDC through exactly two Egressd calls and creates a Session",
     const suite = getAuthdTestSuite();
     await suite.provider.setMode("available");
     await suite.provider.clearEvidence();
-    await suite.egressd.setMode("available");
-    await suite.egressd.clearEvidence();
     const completed = await completeAuthentication("/home?view=compact");
 
     assert.equal(completed.callback.statusCode, 303);
@@ -66,16 +64,11 @@ test("completes OIDC through exactly two Egressd calls and creates a Session",
       state?.includes("Thu, 01 Jan 1970 00:00:00 GMT"),
       true);
 
-    const egress = await suite.egressd.readEvidence();
-    assert.deepEqual(
-      egress.map((item) => [item.method, item.path]),
-      [["POST", "/token"], ["GET", "/userinfo"]]);
-    assert.match(egress[0]!.authorization, /^Basic /u);
-    assert.match(egress[1]!.authorization, /^Bearer /u);
-    assert.equal(egress[0]!.traceparent?.length, 55);
     const provider = await suite.provider.readEvidence();
     assert.equal(provider.tokens.length, 1);
     assert.equal(provider.userInfo.length, 1);
+    assert.match(provider.tokens[0]!.authorization, /^Basic /u);
+    assert.match(provider.userInfo[0]!.authorization, /^Bearer /u);
     assert.equal(provider.tokens[0]!.traceparent, undefined);
     assert.equal(provider.userInfo[0]!.traceparent, undefined);
   });
@@ -84,10 +77,12 @@ test("consumes a valid provider error without a dependency call",
   async () => {
     const suite = getAuthdTestSuite();
     await suite.provider.setMode("authorization_error");
-    await suite.egressd.clearEvidence();
+    await suite.provider.clearEvidence();
     const completed = await completeAuthentication();
     assertNonDisclosingError(completed.callback, 401);
-    assert.equal((await suite.egressd.readEvidence()).length, 0);
+    const evidence = await suite.provider.readEvidence();
+    assert.equal(evidence.tokens.length, 0);
+    assert.equal(evidence.userInfo.length, 0);
     const state = readHeaders(completed.callback, "set-cookie");
     assert.equal(state.length, 1);
     assert.equal(state[0]!.includes("Max-Age=0"), true);
@@ -148,12 +143,14 @@ test("maps strict token, signature, claim, and UserInfo rejection to 401",
     ];
     for (const mode of modes) {
       await suite.provider.setMode(mode);
-      await suite.egressd.clearEvidence();
+      await suite.provider.clearEvidence();
       const completed = await completeAuthentication();
       assertNonDisclosingError(completed.callback, 401);
       assertClearsConsumedState(completed.callback);
-      const calls = await suite.egressd.readEvidence();
-      assert.equal(calls.length >= 1 && calls.length <= 2, true);
+      const evidence = await suite.provider.readEvidence();
+      const calls =
+        evidence.tokens.length + evidence.userInfo.length;
+      assert.equal(calls >= 1 && calls <= 2, true);
     }
     await suite.provider.setMode("available");
   });
@@ -166,10 +163,12 @@ test("accepts a sole audience array and ignores extra token members",
       "token_extra_members"
     ] as const) {
       await suite.provider.setMode(mode);
-      await suite.egressd.clearEvidence();
+      await suite.provider.clearEvidence();
       const completed = await completeAuthentication();
       assert.equal(completed.callback.statusCode, 303);
-      assert.equal((await suite.egressd.readEvidence()).length, 2);
+      const evidence = await suite.provider.readEvidence();
+      assert.equal(evidence.tokens.length, 1);
+      assert.equal(evidence.userInfo.length, 1);
     }
     await suite.provider.setMode("available");
   });
@@ -192,14 +191,20 @@ test("maps provider, Egressd, and Identityd availability and rejection",
     }
 
     await suite.provider.setMode("available");
-    await suite.egressd.setMode("unavailable");
-    const unavailable = await completeAuthentication();
-    assertNonDisclosingError(unavailable.callback, 503);
-    assertClearsConsumedState(unavailable.callback);
-    assert.equal((await suite.egressd.readEvidence()).length >= 1, true);
-    await suite.egressd.setMode("available");
+    await suite.provider.clearEvidence();
+    await suite.egressd.suspend();
+    try {
+      const unavailable = await completeAuthentication();
+      assertNonDisclosingError(unavailable.callback, 503);
+      assertClearsConsumedState(unavailable.callback);
+      const evidence = await suite.provider.readEvidence();
+      assert.equal(evidence.tokens.length, 0);
+      assert.equal(evidence.userInfo.length, 0);
+    } finally {
+      await suite.egressd.resume();
+    }
 
-    const active = await completeAuthentication();
+    const active = await completeAfterEgressRecovery();
     const activeSession = sessionCookie(active.callback);
     assert.ok(activeSession);
     const pending = await beginAuthentication();
@@ -237,21 +242,22 @@ test("maps provider, Egressd, and Identityd availability and rejection",
     }
 
     await suite.provider.setMode("unknown_subject");
-    await suite.egressd.clearEvidence();
+    await suite.provider.clearEvidence();
     const rejected = await completeAuthentication();
     assertNonDisclosingError(rejected.callback, 401);
     assertClearsConsumedState(rejected.callback);
-    assert.equal((await suite.egressd.readEvidence()).length, 2);
+    const rejectedEvidence = await suite.provider.readEvidence();
+    assert.equal(rejectedEvidence.tokens.length, 1);
+    assert.equal(rejectedEvidence.userInfo.length, 1);
     await suite.provider.setMode("available");
   });
 
 test("propagates browser cancellation and consumes the in-flight attempt",
   async () => {
     const suite = getAuthdTestSuite();
-    await suite.provider.setMode("available");
-    await suite.egressd.setMode("delayed");
+    await suite.provider.setMode("token_slow");
     try {
-      await suite.egressd.clearEvidence();
+      await suite.provider.clearEvidence();
       const begun = await beginAuthentication();
       const authorization = await suite.provider.authorize(
         begun.authorizationLocation);
@@ -274,9 +280,34 @@ test("propagates browser cancellation and consumes the in-flight attempt",
         ]
       });
       assertNonDisclosingError(replay, 400);
-      assert.equal((await suite.egressd.readEvidence()).length, 1);
+      const evidence = await suite.provider.readEvidence();
+      assert.equal(evidence.tokens.length, 1);
+      assert.equal(evidence.userInfo.length, 0);
     } finally {
-      await suite.egressd.setMode("available");
+      await suite.provider.setMode("available");
+    }
+  });
+
+test("maps Egressd workload authentication rejection to unavailable",
+  async () => {
+    const suite = getAuthdTestSuite();
+    await suite.provider.setMode("available");
+    await suite.provider.clearEvidence();
+    await suite.authd.restart({
+      CTLFLOW_WORKLOAD_TOKEN_FILE:
+        "/var/run/ctlflow/secrets/unadmitted-workload-token"
+    });
+    try {
+      const completed = await completeAuthentication();
+      assertNonDisclosingError(completed.callback, 503);
+      assertClearsConsumedState(completed.callback);
+      const evidence = await suite.provider.readEvidence();
+      assert.equal(evidence.tokens.length, 0);
+    } finally {
+      await suite.authd.restart({
+        CTLFLOW_WORKLOAD_TOKEN_FILE:
+          "/var/run/secrets/ctlflow-workload/token"
+      });
     }
   });
 
@@ -312,4 +343,28 @@ function assertClearsConsumedState(
     cookies[0]!.startsWith("__Host-ctlflow-auth-state=; "),
     true);
   assert.equal(cookies[0]!.includes("Max-Age=0"), true);
+}
+
+async function completeAfterEgressRecovery(): Promise<
+  Awaited<ReturnType<typeof completeAuthentication>>
+> {
+  const suite = getAuthdTestSuite();
+  let completed:
+    Awaited<ReturnType<typeof completeAuthentication>> | undefined;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    completed = await completeAuthentication();
+    if (completed.callback.statusCode === 303) {
+      return completed;
+    }
+    assertNonDisclosingError(completed.callback, 503);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal(
+    completed?.callback.statusCode,
+    303,
+    [
+      suite.authd.diagnostics(),
+      suite.egressd.diagnostics()
+    ].join("\n"));
+  throw new Error("unreachable");
 }

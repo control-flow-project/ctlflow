@@ -12,7 +12,8 @@ internal static partial class KubernetesApis
         ProjectionMetadata projection,
         ProjectionPayloadLease payload,
         VerifiedWorkload workload,
-        string objectName)
+        string objectName,
+        string? resourceVersion)
     {
         var material = new byte[payload.Length];
         payload.CopyTo(material);
@@ -33,7 +34,8 @@ internal static partial class KubernetesApis
                     writer,
                     projection,
                     workload,
-                    objectName);
+                    objectName,
+                    resourceVersion);
                 if (projection.Target.Kind == ProjectionDataKind.Secret)
                 {
                     writer.WriteString("type", "Opaque");
@@ -72,11 +74,18 @@ internal static partial class KubernetesApis
         Utf8JsonWriter writer,
         ProjectionMetadata projection,
         VerifiedWorkload workload,
-        string objectName)
+        string objectName,
+        string? resourceVersion)
     {
         writer.WriteStartObject("metadata");
         writer.WriteString("name", objectName);
         writer.WriteString("namespace", workload.NamespaceName);
+        if (resourceVersion is not null)
+        {
+            writer.WriteString(
+                "resourceVersion",
+                resourceVersion);
+        }
         writer.WriteStartObject("annotations");
         writer.WriteString(
             "configuration.ctlflow.io/owner-service",

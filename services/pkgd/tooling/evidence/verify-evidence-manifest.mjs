@@ -3,6 +3,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import protobuf from "protobufjs";
 import ts from "typescript";
+import {
+  verifyReleaseGates
+} from "../../../../tooling/evidence/verify-release-gates.mjs";
 
 const manifestService = "ctlflow.packages.v1.PackageService";
 const allowedStatuses = new Set([
@@ -66,6 +69,7 @@ function parseManifest(value) {
       || new Set(value.releaseGates).size !== value.releaseGates.length) {
     throw new Error("Pkgd evidence manifest shape is invalid");
   }
+  verifyReleaseGates(value.releaseGates, "pkgd", true);
 
   return {
     operations: value.operations.map(parseOperation),

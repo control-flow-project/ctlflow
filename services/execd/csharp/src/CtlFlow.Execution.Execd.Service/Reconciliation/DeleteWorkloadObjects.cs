@@ -1,0 +1,119 @@
+using CtlFlow.Execution.Execd.Db.Providers;
+using CtlFlow.Execution.Execd.Domain.Placements;
+using CtlFlow.Execution.Execd.Domain.Workloads;
+using CtlFlow.Execution.Execd.Service.Kubernetes;
+using static CtlFlow.Execution.Execd.Db.Reconciliation.ReconciliationState;
+using static CtlFlow.Execution.Execd.Service.Kubernetes.ExecutionOwnership;
+using static CtlFlow.Execution.Execd.Service.Kubernetes.KubernetesApis;
+
+namespace CtlFlow.Execution.Execd.Service.Reconciliation;
+
+internal static partial class ExecutionReconciliation
+{
+    internal static async Task DeleteWorkloadObjects(
+        ExecutionDatabase database,
+        KubernetesApi kubernetes,
+        PlacementRecord placement,
+        WorkloadRecord workload,
+        string namespaceName,
+        CancellationToken cancellation)
+    {
+        var annotations = WorkloadAnnotations(
+            placement.Id,
+            workload.Id);
+        var accountName = NativeNames.WorkloadServiceAccount(
+            workload.Id);
+        if (workload.Behavior is WorkloadBehavior.Continuous)
+        {
+            await DeleteOwnedObject(
+                kubernetes,
+                KubernetesResourcePaths.Deployment(
+                    namespaceName,
+                    accountName),
+                "Deployment",
+                accountName,
+                annotations,
+                "workload_deployment",
+                cancellation);
+        }
+
+        foreach (var item in workload.Interfaces)
+        {
+            var serviceName = NativeNames.InterfaceService(
+                workload.Id,
+                item.InterfaceId);
+            await DeleteOwnedObject(
+                kubernetes,
+                KubernetesResourcePaths.Service(
+                    namespaceName,
+                    serviceName),
+                "Service",
+                serviceName,
+                annotations,
+                "interface_service",
+                cancellation);
+            await UpdateInterfaceEndpoint(
+                database,
+                workload.Id,
+                workload.Revision,
+                item.InterfaceId,
+                null,
+                false,
+                cancellation);
+        }
+
+        foreach (var dependency in workload.Dependencies)
+        {
+            await DeleteOwnedObject(
+                kubernetes,
+                KubernetesResourcePaths.DependencyClaim(
+                    namespaceName,
+                    dependency.ClaimId),
+                "DependencyClaim",
+                dependency.ClaimId,
+                annotations,
+                "dependency_claim",
+                cancellation);
+        }
+
+        foreach (var storage in workload.Storage)
+        {
+            var claimName = NativeNames.StorageClaim(
+                workload.Id,
+                storage.StorageId);
+            await DeleteOwnedObject(
+                kubernetes,
+                KubernetesResourcePaths.PersistentVolumeClaim(
+                    namespaceName,
+                    claimName),
+                "PersistentVolumeClaim",
+                claimName,
+                annotations,
+                "persistent_volume_claim",
+                cancellation);
+        }
+
+        var trustName = NativeNames.EdgedTrustConfigMap(workload.Id);
+        await DeleteOwnedObject(
+            kubernetes,
+            KubernetesResourcePaths.ConfigMap(
+                namespaceName,
+                trustName),
+            "ConfigMap",
+            trustName,
+            annotations,
+            "edged_trust_config_map",
+            cancellation);
+
+        await DeleteOwnedObject(
+            kubernetes,
+            KubernetesResourcePaths.ServiceAccount(
+                namespaceName,
+                accountName),
+            "ServiceAccount",
+            accountName,
+            annotations,
+            "workload_service_account",
+            cancellation);
+    }
+}

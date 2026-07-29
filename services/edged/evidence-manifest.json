@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "service": "edged.http.v1",
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/{path}",
+      "operationId": "proxyGet",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "proxies every declared method at root and nested paths"
+          }
+        ]
+      }
+    },
+    {
+      "method": "HEAD",
+      "path": "/{path}",
+      "operationId": "proxyHead",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "proxies every declared method at root and nested paths"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/{path}",
+      "operationId": "proxyPost",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "proxies every declared method at root and nested paths"
+          }
+        ]
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/{path}",
+      "operationId": "proxyPut",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "proxies every declared method at root and nested paths"
+          }
+        ]
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/{path}",
+      "operationId": "proxyPatch",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "proxies every declared method at root and nested paths"
+          }
+        ]
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/{path}",
+      "operationId": "proxyDelete",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "proxies every declared method at root and nested paths"
+          }
+        ]
+      }
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/{path}",
+      "operationId": "proxyOptions",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "proxies every declared method at root and nested paths"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "rejects every undeclared method with the fixed Allow set"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "isolates health and readiness on the probe listener"
+    },
+    {
+      "file": "tests/integration/sessions.test.ts",
+      "title": "rejects missing, duplicate, and malformed session cookies"
+    },
+    {
+      "file": "tests/integration/sessions.test.ts",
+      "title": "rejects unknown, revoked, and expired sessions"
+    },
+    {
+      "file": "tests/integration/sessions.test.ts",
+      "title": "requires the session account to be eligible for the exact target"
+    },
+    {
+      "file": "tests/integration/sessions.test.ts",
+      "title": "exchanges the session on every request without a credential cache"
+    },
+    {
+      "file": "tests/integration/sessions.test.ts",
+      "title": "fails closed when Identityd is unavailable"
+    },
+    {
+      "file": "tests/integration/proxy.test.ts",
+      "title": "replaces protected request context and retains application data"
+    },
+    {
+      "file": "tests/integration/proxy.test.ts",
+      "title": "retains application response headers and cookies only"
+    },
+    {
+      "file": "tests/integration/proxy.test.ts",
+      "title": "passes ordinary application status, media type, and body"
+    },
+    {
+      "file": "tests/integration/proxy.test.ts",
+      "title": "maps an unavailable application connection to fixed 502"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "enforces request-target, header, and cookie bounds"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "enforces declared and streaming request-body bounds"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "rejects oversized application responses before commitment"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "enforces application deadlines with fixed 504"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "admits at most 256 active requests without queueing"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "streams bounded binary responses and server-sent events"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "propagates public cancellation to the application request"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "exports correlated request and dependency telemetry without data"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "replaces malformed trace context and discards baggage"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "continues proxying during Collector outage"
+    },
+    {
+      "file": "tests/integration/zz-startup.test.ts",
+      "title": "rejects every malformed or incompatible binding at startup"
+    },
+    {
+      "file": "tests/integration/zz-startup.test.ts",
+      "title": "keeps the admitted binding ready after rejection checks"
+    },
+    {
+      "architectureClaim": "application-unexpected-failure-502"
+    },
+    {
+      "architectureClaim": "boundary-unexpected-failure-502"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:edged",
+    "npm run test:compiled --workspace @ctlflow/edged",
+    "npm run verify:container:edged"
+  ]
+}

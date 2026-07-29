@@ -23,7 +23,8 @@ export async function prepareAuthdFiles(
   kubernetes: TestKubernetes,
   provider: ControlledOidcProvider,
   egressBinding: string,
-  identityCertificateAuthorityPath: string
+  identityCertificateAuthorityPath: string,
+  unadmittedWorkloadToken: string
 ): Promise<PreparedAuthdFiles> {
   const directory = path.join(
     kubernetes.storage.hostRoot,
@@ -37,6 +38,9 @@ export async function prepareAuthdFiles(
   const identityAuthorityPath = path.join(
     directory,
     "identityd-ca.crt");
+  const unadmittedWorkloadTokenPath = path.join(
+    directory,
+    "unadmitted-workload-token");
   if (provider.publicKey.kty !== "RSA"
       || typeof provider.publicKey.n !== "string"
       || typeof provider.publicKey.e !== "string") {
@@ -81,6 +85,10 @@ export async function prepareAuthdFiles(
   await copyFile(
     identityCertificateAuthorityPath,
     identityAuthorityPath);
+  await writeFile(
+    unadmittedWorkloadTokenPath,
+    unadmittedWorkloadToken,
+    { mode: 0o600 });
   return {
     directory,
     providerConfigPath,
@@ -88,7 +96,9 @@ export async function prepareAuthdFiles(
     deployment: {
       config: { "providers.json": providerConfigPath },
       secret: {
-        "provider-credentials.json": providerSecretPath
+        "provider-credentials.json": providerSecretPath,
+        "unadmitted-workload-token":
+          unadmittedWorkloadTokenPath
       },
       trust: { "identityd-ca.crt": identityAuthorityPath }
     }

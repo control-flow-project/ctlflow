@@ -18,11 +18,9 @@ internal sealed partial class IdentityGrpcService
         ServerCallContext context)
     {
         var now = DateTimeOffset.UtcNow;
-        await AuthenticateIdentityRequest(
+        await AuthenticateEdgedRequest(
             context.RequestHeaders,
             _tokenAuthorities,
-            _settings.ExchangeSessionCallers,
-            requireInvocation: false,
             now,
             context.CancellationToken);
         using var credential = SessionCredential.Parse(

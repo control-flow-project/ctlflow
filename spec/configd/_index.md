@@ -251,12 +251,14 @@ convention-named ConfigMap or `Opaque` Secret with its sole `content` payload
 entry, exact Configd ownership annotations, and the exact Workload
 ServiceAccount owner reference defined by the shared convention. It cannot
 adopt an ownership collision, list, watch, delete, write another kind, or
-accept native names, paths, environment mappings, or webhooks. After every
-ownership field has been proved exact, Configd may force-apply only its owned
-payload and exact ownership shape to repair drift; it never uses force to
-adopt or rewrite an ownership collision. Execd derives the name from the
-returned ID and mounts `content` read-only at the convention path only into
-that Workload; ServiceAccount deletion garbage-collects it.
+accept native names, paths, environment mappings, or webhooks. An absent
+projection object is created with create-only semantics. After every ownership
+field has been proved exact, Configd may force-apply only its owned payload and
+exact ownership shape with the observed Kubernetes resource version to repair
+drift. A create race or stale apply cannot adopt or rewrite a replacement
+object. Execd derives the name from the returned ID and mounts `content`
+read-only at the convention path only into that Workload; ServiceAccount
+deletion garbage-collects it.
 
 ## Audit and telemetry
 

@@ -42,31 +42,17 @@ test("every RPC rejects an unadmitted workload", async () => {
   for (const call of allCalls(metadata)) {
     await assert.rejects(
       call.request(),
-      matchGrpcStatus(status.PERMISSION_DENIED),
+      matchGrpcStatus(
+        call.name === "ExchangeSession"
+          ? status.UNAUTHENTICATED
+          : status.PERMISSION_DENIED),
       call.name);
   }
 });
 
 test("operation caller sets are exact", async () => {
   const context = getIdentitydTestContext();
-  const tenantd = workloadMetadata(
-    context.tenantdWorkload.callerToken,
-    directInvocation());
-  const keys = await callUnary<GetInvocationVerificationKeysResponse>(
-    (done) => context.client.getInvocationVerificationKeys(
-      {},
-      tenantd,
-      done));
-  assert.equal(keys.keys.length, 1);
-
-  for (const call of factCalls(tenantd)) {
-    await assert.rejects(
-      call.request(),
-      matchGrpcStatus(status.PERMISSION_DENIED),
-      call.name);
-  }
-
-  for (const caller of [
+  const callers = [
     {
       name: "tenantd",
       token: context.tenantdWorkload.callerToken,
@@ -82,6 +68,16 @@ test("operation caller sets are exact", async () => {
       ])
     },
     {
+      name: "pkgd",
+      token: context.pkgdWorkload.callerToken,
+      allowed: new Set(["GetInvocationVerificationKeys"])
+    },
+    {
+      name: "configd",
+      token: context.configdWorkload.callerToken,
+      allowed: new Set(["GetInvocationVerificationKeys"])
+    },
+    {
       name: "authd",
       token: context.authdWorkload.callerToken,
       allowed: new Set(["CreateSession", "RevokeSession"])
@@ -94,9 +90,26 @@ test("operation caller sets are exact", async () => {
     {
       name: "execd",
       token: context.execdWorkload.callerToken,
-      allowed: new Set(["IssueRunInvocation"])
+      allowed: new Set([
+        "GetInvocationVerificationKeys",
+        "IssueRunInvocation"
+      ])
     }
-  ]) {
+  ];
+
+  for (const caller of callers.filter(
+    ({ allowed }) =>
+      allowed.has("GetInvocationVerificationKeys")
+  )) {
+    const keys = await callUnary<GetInvocationVerificationKeysResponse>(
+      (done) => context.client.getInvocationVerificationKeys(
+        {},
+        workloadMetadata(caller.token),
+        done));
+    assert.equal(keys.keys.length, 1, caller.name);
+  }
+
+  for (const caller of callers) {
     const metadata = workloadMetadata(
       caller.token,
       directInvocation());
@@ -106,7 +119,11 @@ test("operation caller sets are exact", async () => {
       }
       await assert.rejects(
         call.request(),
-        matchGrpcStatus(status.PERMISSION_DENIED),
+        matchGrpcStatus(
+          caller.name === "edged"
+            || call.name === "ExchangeSession"
+            ? status.UNAUTHENTICATED
+            : status.PERMISSION_DENIED),
         `${caller.name}:${call.name}`);
     }
   }

@@ -83,6 +83,7 @@ internal static partial class BrowserRoutes
                     await RevokeSession(
                         identityClient,
                         settings.Identity,
+                        settings.Workload,
                         telemetry,
                         credential,
                         timeout.Token);

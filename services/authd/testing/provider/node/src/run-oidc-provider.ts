@@ -200,6 +200,10 @@ async function handleToken(
     respond(response, 503);
     return;
   }
+  if (mode === "token_slow") {
+    await delay(
+      500 + ((evidence.tokens.length - 1) % 32) * 20);
+  }
   if (mode === "token_delayed") {
     await delay(6_000);
   }
@@ -503,6 +507,7 @@ function isMode(value: unknown): value is OidcProviderMode {
     "authorization_error",
     "token_rejected",
     "token_unavailable",
+    "token_slow",
     "token_delayed",
     "token_bad_content_type",
     "token_invalid_json",

@@ -44,8 +44,10 @@ const serviceName = "identityd";
 
 export interface IdentitydTestContext {
   readonly authdWorkload: TestWorkloadCredentials;
+  readonly configdWorkload: TestWorkloadCredentials;
   readonly edgedWorkload: TestWorkloadCredentials;
   readonly execdWorkload: TestWorkloadCredentials;
+  readonly pkgdWorkload: TestWorkloadCredentials;
   readonly policydWorkload: TestWorkloadCredentials;
   readonly tenantdWorkload: TestWorkloadCredentials;
   readonly auditd: AuditdProductionSource;
@@ -73,10 +75,16 @@ Promise<IdentitydTestContext> {
     await suite.collector.clearExports();
     const authdWorkload =
       await suite.kubernetes.createWorkloadCredentials("authd");
+    const configdWorkload =
+      await suite.kubernetes.createWorkloadCredentials("configd");
     const edgedWorkload =
-      await suite.kubernetes.createWorkloadCredentials("edged");
+      await suite.kubernetes.createWorkloadCredentials(
+        "edged",
+        "ctlflow-edged");
     const execdWorkload =
       await suite.kubernetes.createWorkloadCredentials("execd");
+    const pkgdWorkload =
+      await suite.kubernetes.createWorkloadCredentials("pkgd");
     const policydWorkload =
       await suite.kubernetes.createWorkloadCredentials("policyd");
     const tenantdWorkload =
@@ -103,8 +111,9 @@ Promise<IdentitydTestContext> {
       suite.auditd.serverName,
       invocation.verificationKey.keyId,
       authdWorkload,
-      edgedWorkload,
+      configdWorkload,
       execdWorkload,
+      pkgdWorkload,
       policydWorkload,
       tenantdWorkload,
       invocation);
@@ -130,8 +139,10 @@ Promise<IdentitydTestContext> {
     let stopped = false;
     return {
       authdWorkload,
+      configdWorkload,
       edgedWorkload,
       execdWorkload,
+      pkgdWorkload,
       policydWorkload,
       tenantdWorkload,
       auditd,
@@ -168,8 +179,9 @@ function createEnvironment(
   auditServerName: string,
   signingKeyId: string,
   authdWorkload: TestWorkloadCredentials,
-  edgedWorkload: TestWorkloadCredentials,
+  configdWorkload: TestWorkloadCredentials,
   execdWorkload: TestWorkloadCredentials,
+  pkgdWorkload: TestWorkloadCredentials,
   policydWorkload: TestWorkloadCredentials,
   tenantdWorkload: TestWorkloadCredentials,
   invocation: InvocationAuthority
@@ -207,7 +219,10 @@ function createEnvironment(
     CTLFLOW_GET_INVOCATION_VERIFICATION_KEYS_CALLERS:
       [
         tenantdWorkload.callerSubject,
-        policydWorkload.callerSubject
+        policydWorkload.callerSubject,
+        pkgdWorkload.callerSubject,
+        configdWorkload.callerSubject,
+        execdWorkload.callerSubject
       ].join(","),
     CTLFLOW_RESOLVE_PRINCIPAL_CALLERS:
       policydWorkload.callerSubject,
@@ -215,8 +230,6 @@ function createEnvironment(
       policydWorkload.callerSubject,
     CTLFLOW_CREATE_SESSION_CALLERS:
       authdWorkload.callerSubject,
-    CTLFLOW_EXCHANGE_SESSION_CALLERS:
-      edgedWorkload.callerSubject,
     CTLFLOW_REVOKE_SESSION_CALLERS:
       authdWorkload.callerSubject,
     CTLFLOW_ISSUE_RUN_INVOCATION_CALLERS:

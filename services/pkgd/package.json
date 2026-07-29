@@ -14,7 +14,7 @@
     "build": "npm run build:migrations && npm run verify:schema-manifest && npm run verify:api-manifest && npm run generate && node ../../tooling/clean-directories.mjs tests/dist && tsc --project tests/tsconfig.json && npm run verify:evidence",
     "migrate": "npm run build:migrations && node .generated/migrations/tooling/migrations/run.js",
     "test": "npm run build --workspace @ctlflow/test-mesh && npm run build && npm run test:compiled && npm run test:csharp",
-    "test:compiled": "node --test --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-pkgd-test-suite.js tests/dist/integration/pkgd.test.js",
+    "test:compiled": "node --test --test-force-exit --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-pkgd-test-suite.js tests/dist/integration/pkgd.test.js",
     "test:csharp": "node csharp/tests/run-model-audit.mjs"
   },
   "dependencies": {

@@ -1,0 +1,26 @@
+FROM node:26.1.0-bookworm-slim AS build
+
+WORKDIR /workspace
+COPY package.json package-lock.json ./
+COPY tsconfig.base.json ./
+COPY tooling/clean-directories.mjs tooling/clean-directories.mjs
+COPY testing/mesh/package.json testing/mesh/package.json
+COPY services/egressd/package.json services/egressd/package.json
+RUN npm ci \
+    --workspace @ctlflow/test-mesh \
+    --workspace @ctlflow/egressd \
+    --include-workspace-root=false
+
+COPY testing/mesh/tsconfig.json testing/mesh/tsconfig.json
+COPY testing/mesh/src testing/mesh/src
+COPY services/egressd/testing/origin/node \
+    services/egressd/testing/origin/node
+RUN npm run build --workspace @ctlflow/test-mesh \
+    && npm run build:origin --workspace @ctlflow/egressd
+
+FROM node:26.1.0-bookworm-slim
+WORKDIR /workspace
+COPY --from=build /workspace/services/egressd/.generated \
+    /workspace/services/egressd/.generated
+USER node
+ENTRYPOINT ["node", "/workspace/services/egressd/.generated/testing/origin/node/src/run-controlled-origin.js"]

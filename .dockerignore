@@ -12,5 +12,4 @@ spec
 layouts
 static
 .analysis
-services/identityd/tests
-services/tenantd/tests
+services/*/tests

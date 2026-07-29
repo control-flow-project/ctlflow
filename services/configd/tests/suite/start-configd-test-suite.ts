@@ -54,7 +54,9 @@ Promise<ConfigdTestSuite> {
       "identity-primary-key");
     runtime = await loadConfigdTestRuntime();
     kubernetes = await startTestKubernetes(repositoryRoot);
-    await installDependencyClaimCrd(kubernetes);
+    await installDependencyClaimCrd(
+      kubernetes,
+      repositoryRoot);
     collector = await startOpenTelemetryCollector(
       repositoryRoot,
       kubernetes);

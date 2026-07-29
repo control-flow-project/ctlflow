@@ -7,7 +7,7 @@ CtlFlow separates domain ownership, trusted protocol mediation, and Kubernetes
 realization.
 
 ```text
-DOMAIN OWNERS                 PUBLIC BOUNDARIES           KUBERNETES
+DOMAIN OWNERS                 PROTOCOL BOUNDARIES         KUBERNETES
 
 tenant and identity           authd                      namespaces
 policy and packages           edged                      workloads
@@ -27,15 +27,16 @@ a kubeconfig-authorized port-forward and end-to-end client certificate.
 Domain identity is not reconstructed from Kubernetes names, labels, or
 objects. Kubernetes objects are derived realization state.
 
-## Public mediation
+## Protocol mediation
 
-`authd`, `edged`, and `egressd` reserve distinct public protocol boundaries:
+`authd`, `edged`, and `egressd` reserve distinct protocol boundaries:
 
 - authentication HTTP;
 - general application HTTP; and
 - controlled outbound HTTP.
 
-A route exists only in a checked versioned HTTP contract. Public boundaries
+Authd and Edged are public; Egressd is a purpose-bound private HTTP Service.
+A route exists only in a checked versioned HTTP contract. A mediation boundary
 cannot expose another service's private gRPC API or become another domain
 record owner.
 

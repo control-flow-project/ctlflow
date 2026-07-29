@@ -128,6 +128,10 @@
           {
             "file": "tests/integration/callback.test.ts",
             "title": "maps provider, Egressd, and Identityd availability and rejection"
+          },
+          {
+            "file": "tests/integration/callback.test.ts",
+            "title": "maps Egressd workload authentication rejection to unavailable"
           }
         ]
       }
@@ -253,11 +257,7 @@
     }
   ],
   "releaseGates": [
-    "npm run verify:api-manifest --workspace @ctlflow/authd",
-    "npm run verify:architecture --workspace @ctlflow/authd",
-    "npm run build:provider --workspace @ctlflow/authd",
-    "npm run build:tests --workspace @ctlflow/authd",
-    "npm run build:csharp --workspace @ctlflow/authd",
+    "npm run build:authd",
     "npm run test:compiled --workspace @ctlflow/authd",
     "npm run verify:container:authd"
   ]

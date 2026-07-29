@@ -99,6 +99,15 @@ async function loadCollectorImage(
     "docker",
     ["pull", `${imageTag}@${imageDigest}`],
     { cwd: repositoryRoot });
+  await runCommand(
+    "docker",
+    [
+      "image",
+      "tag",
+      `${imageTag}@${imageDigest}`,
+      imageTag
+    ],
+    { cwd: repositoryRoot });
   const digests = JSON.parse((await runCommand(
     "docker",
     [

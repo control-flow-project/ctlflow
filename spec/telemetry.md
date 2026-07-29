@@ -32,7 +32,7 @@ Trace context remains separate from:
 
 ```text
 Kubernetes workload token   immediate process identity
-invocation JWT              User or Job Actor context
+invocation JWT              User or Run Actor context
 source event ID             retry identity for direct audit delivery
 ```
 
@@ -64,7 +64,7 @@ Kubernetes workload, and Placement using standard OpenTelemetry semantic convent
 exists and `ctlflow.*` attributes otherwise. Trusted Kubernetes enrichment overwrites conflicting
 workload-supplied ownership attributes.
 
-Validated Tenant, Workspace, Placement, App, Job, Run, Actor kind, and outcome may be span or
+Validated Tenant, Workspace, Placement, App, Workload, Run, Actor kind, and outcome may be span or
 structured-log attributes when required by policy. User, Actor, request, Run, object, trace, and
 other unbounded identifiers are forbidden as metric dimensions.
 
@@ -117,6 +117,15 @@ External trace propagation through `egressd` is disabled unless the exact destin
 admits it. Even when admitted, baggage, identity context, and internal authorization metadata are
 never forwarded.
 
+Edged uses an external parent only for correlation, then injects the resulting
+context into Identityd and the loopback application. Edged telemetry excludes
+request targets, cookies, application headers and bodies, Session credentials,
+and invocation JWTs.
+
+Egressd records only its closed rule ID, method, status class, outcome,
+latency, and saturation. It excludes origin, path, query, caller identity,
+headers, bodies, and projected secret values.
+
 ## Failure and sampling
 
 Telemetry is never a synchronous dependency of domain work. Export uses finite queues, batches,
@@ -124,7 +133,7 @@ timeouts, retry budgets, and memory. Collector or backend failure drops bounded 
 telemetry and increments local failure measurements; it does not fail readiness, reject domain
 requests, or create an unbounded backlog.
 
-Sampling is an installation concern and propagates through standard trace flags. Delayed Jobs and
+Sampling is an installation concern and propagates through standard trace flags. Delayed Runs and
 other work that outlives an initiating request start a new trace linked to the admitted parent
 context rather than retaining an indefinitely open parent span.
 
@@ -145,8 +154,8 @@ audit evidence, and a telemetry export cannot satisfy a direct audit obligation.
 
 Canonical integration evidence runs a real OpenTelemetry Collector and proves:
 
-- trace continuity across Tenantd, Policyd, Identityd, Auditd, and database
-  calls;
+- trace continuity across kernel dependencies, Edged application calls, and
+  admitted Egressd external calls;
 - correct parent-child relationships;
 - malformed external context replacement and baggage rejection;
 - correlation of structured logs without credential or payload disclosure;

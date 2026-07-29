@@ -86,8 +86,11 @@ finite Run:
   run_id = Run origin
 ```
 
-Both callers authenticate as exact admitted workloads. Neither can provide an
-attached account, key, issuer, audience, permission, Role, or grant.
+Execd authenticates as an exact admitted workload under the installation
+internal audience. Each Edged sidecar authenticates with its Pod-bound
+`ctlflow-edged` purpose audience, which Identityd accepts only for
+`ExchangeSession`. Neither caller can provide an attached account, key,
+issuer, invocation audience, permission, Role, or grant.
 Identityd re-establishes current account standing and target fences before
 signing.
 
@@ -140,6 +143,21 @@ tracestate           optional
 Calls have finite deadlines and propagate cancellation. Protected identity
 headers from an untrusted caller are stripped before a trusted boundary adds
 validated context.
+
+Egressd is the one private HTTP transport. It authenticates its exact bound
+consumer with:
+
+```text
+Proxy-Authorization: Bearer <bound workload token>
+```
+
+That header is consumed and never forwarded. The ordinary `Authorization`
+header is external-protocol data admitted only by the matched Egressd rule.
+
+Edged consumes the platform Session cookie at the public boundary, exchanges
+it through Identityd, and sends only standard
+`Authorization: Bearer <invocation JWT>` to the loopback application.
+Caller-supplied Authorization and CtlFlow-protected headers are removed first.
 
 ## Public boundary
 

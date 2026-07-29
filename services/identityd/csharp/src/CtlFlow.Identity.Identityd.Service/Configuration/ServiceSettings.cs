@@ -16,6 +16,7 @@ internal sealed record ServiceSettings(
     DatabaseConfiguration Database,
     AuditSettings Audit,
     WorkloadTokenSettings WorkloadTokens,
+    TokenValidationSettings EdgedTokens,
     TokenValidationSettings InvocationTokens,
     SigningSettings Signing,
     SessionLifetime SessionLifetime,
@@ -28,8 +29,6 @@ internal sealed record ServiceSettings(
         ListPrincipalGroupsCallers,
     IReadOnlySet<KubernetesServiceAccountSubject>
         CreateSessionCallers,
-    IReadOnlySet<KubernetesServiceAccountSubject>
-        ExchangeSessionCallers,
     IReadOnlySet<KubernetesServiceAccountSubject>
         RevokeSessionCallers,
     IReadOnlySet<KubernetesServiceAccountSubject>

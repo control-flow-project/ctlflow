@@ -262,13 +262,13 @@ function createEnvironment(
       identityServerName,
     CTLFLOW_IDENTITY_TLS_CA_PATH:
       files.identityCertificateAuthority,
-    CTLFLOW_IDENTITY_CALL_TIMEOUT_MILLISECONDS: "2000",
+    CTLFLOW_IDENTITY_CALL_TIMEOUT_MILLISECONDS: "3000",
     CTLFLOW_POLICY_URL: policyEndpoint,
     CTLFLOW_POLICY_TLS_SERVER_NAME:
       policyServerName,
     CTLFLOW_POLICY_TLS_CA_PATH:
       files.policyCertificateAuthority,
-    CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS: "2000",
+    CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS: "3000",
     CTLFLOW_WORKLOAD_TOKEN_ISSUER: workload.issuer,
     CTLFLOW_WORKLOAD_TOKEN_AUDIENCE: workload.audience,
     CTLFLOW_WORKLOAD_JWKS_PATH: files.workloadJwks,

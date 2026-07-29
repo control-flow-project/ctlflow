@@ -18,7 +18,7 @@ only the gRPC contract in
 - permanent retention of deleted records and their addresses.
 
 It does not own Users, Memberships, configuration, Placements, Packages,
-applications, Jobs, Runs, or their provisioning. Their owning services manage
+applications, Workloads, Runs, or their provisioning. Their owning services manage
 them through separate operations.
 
 ## Records

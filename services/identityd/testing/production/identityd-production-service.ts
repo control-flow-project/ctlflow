@@ -7,6 +7,7 @@ import type {
 
 export interface IdentitydProductionService {
   readonly endpoint: string;
+  readonly grpcPort: number;
   readonly certificateAuthorityPath: string;
   readonly serverName: string;
   readonly createSource: (

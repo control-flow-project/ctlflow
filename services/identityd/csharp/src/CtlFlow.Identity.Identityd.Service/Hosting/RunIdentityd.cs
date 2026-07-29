@@ -41,6 +41,7 @@ internal static partial class IdentitydProcess
                     settings.WorkloadTokens.VerificationKeySetPath,
                     settings.WorkloadTokens.KeyCacheLifetime,
                     cancellation)),
+            settings.EdgedTokens,
             settings.InvocationTokens,
             new VerificationKeys(cancellation =>
                 LoadInvocationVerificationKeys(

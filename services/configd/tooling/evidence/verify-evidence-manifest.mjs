@@ -7,6 +7,9 @@ import {
 } from "node:url";
 import protobuf from "protobufjs";
 import ts from "typescript";
+import {
+  verifyReleaseGates
+} from "../../../../tooling/evidence/verify-release-gates.mjs";
 
 const manifestService =
   "ctlflow.configuration.v1.ConfigurationService";
@@ -71,6 +74,7 @@ function parseManifest(value) {
       || new Set(value.releaseGates).size !== value.releaseGates.length) {
     throw new Error("Configd evidence manifest shape is invalid");
   }
+  verifyReleaseGates(value.releaseGates, "configd", true);
   return {
     operations: value.operations.map(parseOperation),
     crossCutting: value.crossCutting.map(parseReference)

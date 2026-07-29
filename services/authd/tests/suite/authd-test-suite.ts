@@ -5,8 +5,8 @@ import type {
   ControlledOidcProvider
 } from "@ctlflow/authd/testing/provider";
 import type {
-  EgressdOidcBinding
-} from "@ctlflow/egressd/testing/stub";
+  EgressdProductionService
+} from "@ctlflow/egressd/testing/production";
 import type {
   IdentitydProductionService,
   IdentitydProductionSource
@@ -32,7 +32,7 @@ export interface AuthdTestSuite {
   readonly identityd: IdentitydProductionService;
   readonly identitySource: IdentitydProductionSource;
   readonly provider: ControlledOidcProvider;
-  readonly egressd: EgressdOidcBinding;
+  readonly egressd: EgressdProductionService;
   readonly authd: CSharpStatelessService;
   readonly files: PreparedAuthdFiles;
   readonly stop: () => Promise<void>;

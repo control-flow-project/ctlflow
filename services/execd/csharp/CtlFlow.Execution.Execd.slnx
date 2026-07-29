@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/CtlFlow.Execution.Execd.Domain/CtlFlow.Execution.Execd.Domain.csproj" />
+  <Project Path="src/CtlFlow.Execution.Execd.Db/CtlFlow.Execution.Execd.Db.csproj" />
+  <Project Path="src/CtlFlow.Execution.Execd.Service/CtlFlow.Execution.Execd.Service.csproj" />
+  <Project Path="tests/CtlFlow.Execution.Execd.IntegrationTests/CtlFlow.Execution.Execd.IntegrationTests.csproj" />
+</Solution>

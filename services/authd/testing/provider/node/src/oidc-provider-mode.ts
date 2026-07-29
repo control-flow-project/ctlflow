@@ -3,6 +3,7 @@ export type OidcProviderMode =
   | "authorization_error"
   | "token_rejected"
   | "token_unavailable"
+  | "token_slow"
   | "token_delayed"
   | "token_bad_content_type"
   | "token_invalid_json"

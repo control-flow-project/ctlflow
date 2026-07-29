@@ -7,4 +7,5 @@ internal sealed record AuthdSettings(
     ListenSettings Probe,
     ProviderProjection Projection,
     IdentitySettings Identity,
+    WorkloadSettings Workload,
     TelemetrySettings Telemetry);

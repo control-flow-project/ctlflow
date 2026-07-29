@@ -1,0 +1,309 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: dependencyclaims.execution.ctlflow.io
+  labels:
+    app.kubernetes.io/managed-by: execd
+    app.kubernetes.io/part-of: ctlflow-kernel
+spec:
+  group: execution.ctlflow.io
+  scope: Namespaced
+  names:
+    plural: dependencyclaims
+    singular: dependencyclaim
+    kind: DependencyClaim
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          x-kubernetes-validations:
+            - rule: "!has(self.status) || self.status.observedClaimRevision <= self.spec.claimRevision"
+              message: status cannot observe a future claim revision
+          properties:
+            spec:
+              type: object
+              required:
+                - claimId
+                - claimRevision
+                - placementId
+                - workloadId
+                - placementTarget
+                - componentId
+                - dependencyName
+                - dependencyType
+                - provisionerId
+                - provisionerSubject
+                - optionsCanonicalJson
+                - parameters
+              properties:
+                claimId:
+                  type: string
+                  pattern: ^dpc-[0-9a-f]{32}$
+                claimRevision:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                placementId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                workloadId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                placementTarget:
+                  type: object
+                  minProperties: 1
+                  maxProperties: 1
+                  properties:
+                    global:
+                      type: object
+                      maxProperties: 0
+                    tenant:
+                      type: object
+                      required:
+                        - tenantId
+                      properties:
+                        tenantId:
+                          type: string
+                          minLength: 1
+                          maxLength: 64
+                          pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                    workspace:
+                      type: object
+                      required:
+                        - tenantId
+                        - workspaceId
+                      properties:
+                        tenantId:
+                          type: string
+                          minLength: 1
+                          maxLength: 64
+                          pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                        workspaceId:
+                          type: string
+                          minLength: 1
+                          maxLength: 64
+                          pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                    user:
+                      type: object
+                      required:
+                        - tenantId
+                        - accountPrincipalId
+                      properties:
+                        tenantId:
+                          type: string
+                          minLength: 1
+                          maxLength: 64
+                          pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                        accountPrincipalId:
+                          type: string
+                          minLength: 6
+                          maxLength: 256
+                          pattern: ^(user|service):[a-z0-9][a-z0-9._-]*$
+                componentId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                dependencyName:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                dependencyId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                dependencyType:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: ^[a-z0-9][a-z0-9._-]*(:[a-z0-9][a-z0-9._-]*)*$
+                provisionerId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                  pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                provisionerSubject:
+                  type: string
+                  minLength: 1
+                  maxLength: 253
+                  pattern: ^system:serviceaccount:[a-z0-9-]+:[a-z0-9-]+$
+                optionsCanonicalJson:
+                  type: string
+                  minLength: 2
+                  maxLength: 65536
+                parameters:
+                  type: array
+                  maxItems: 64
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - parameterName
+                  items:
+                    type: object
+                    required:
+                      - parameterName
+                      - purpose
+                      - dataKind
+                      - projectionId
+                      - projectionRevision
+                    properties:
+                      parameterName:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                        pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                      purpose:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                        pattern: ^[a-z][a-z0-9]*(_[a-z0-9]+)*$
+                      dataKind:
+                        type: string
+                        enum:
+                          - configuration
+                          - secret
+                      projectionId:
+                        type: string
+                        pattern: ^prj_[a-z2-7]{52}$
+                      projectionRevision:
+                        type: integer
+                        format: int64
+                        minimum: 1
+            status:
+              type: object
+              required:
+                - observedClaimRevision
+                - phase
+              x-kubernetes-validations:
+                - rule: (self.phase == 'ready') == has(self.ready)
+                  message: ready details exist exactly when phase is ready
+              properties:
+                observedClaimRevision:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                phase:
+                  type: string
+                  enum:
+                    - pending
+                    - ready
+                    - rejected
+                ready:
+                  type: object
+                  required:
+                    - bindingId
+                    - bindingRevision
+                    - configdTargets
+                  properties:
+                    bindingId:
+                      type: string
+                      minLength: 1
+                      maxLength: 128
+                    bindingRevision:
+                      type: integer
+                      format: int64
+                      minimum: 1
+                    configdTargets:
+                      type: array
+                      maxItems: 64
+                      x-kubernetes-list-type: atomic
+                      x-kubernetes-validations:
+                        - rule: self.all(t, self.exists_one(u, t.purpose == u.purpose && ((has(t.configuration) && has(u.configuration)) || (has(t.secret) && has(u.secret)))))
+                          message: data kind and purpose must be unique together
+                      items:
+                        type: object
+                        required:
+                          - purpose
+                        oneOf:
+                          - required:
+                              - configuration
+                          - required:
+                              - secret
+                        properties:
+                          purpose:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                            pattern: ^[a-z][a-z0-9]*(_[a-z0-9]+)*$
+                          configuration:
+                            type: object
+                            required:
+                              - configurationId
+                              - configurationVersionId
+                            properties:
+                              configurationId:
+                                type: string
+                                minLength: 1
+                                maxLength: 64
+                                pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                              configurationVersionId:
+                                type: string
+                                minLength: 1
+                                maxLength: 64
+                                pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                          secret:
+                            type: object
+                            required:
+                              - secretId
+                              - secretVersionId
+                            properties:
+                              secretId:
+                                type: string
+                                minLength: 1
+                                maxLength: 64
+                                pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+                              secretVersionId:
+                                type: string
+                                minLength: 1
+                                maxLength: 64
+                                pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: dependencyclaim-owner.execution.ctlflow.io
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - execution.ctlflow.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - dependencyclaims
+          - dependencyclaims/status
+        scope: Namespaced
+  validations:
+    - expression: >-
+        has(object.metadata.annotations) &&
+        'execution.ctlflow.io/owner-service' in object.metadata.annotations &&
+        object.metadata.annotations['execution.ctlflow.io/owner-service'] == 'execd'
+      message: execution.ctlflow.io/owner-service must be execd
+      reason: Invalid
+    - expression: object.metadata.name == object.spec.claimId
+      message: metadata.name must equal spec.claimId
+      reason: Invalid
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: dependencyclaim-owner.execution.ctlflow.io
+spec:
+  policyName: dependencyclaim-owner.execution.ctlflow.io
+  validationActions:
+    - Deny

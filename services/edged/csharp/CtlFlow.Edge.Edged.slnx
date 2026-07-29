@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/CtlFlow.Edge.Edged.Domain/CtlFlow.Edge.Edged.Domain.csproj" />
+  <Project Path="src/CtlFlow.Edge.Edged.Service/CtlFlow.Edge.Edged.Service.csproj" />
+</Solution>

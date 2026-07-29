@@ -10,6 +10,12 @@ import type {
   CSharpStatelessServiceOptions
 } from "./csharp-stateless-service.js";
 
+interface KustomizeGenerator {
+  readonly name: string;
+  readonly literals?: readonly string[];
+  readonly files?: readonly string[];
+}
+
 export async function createStatelessServiceOverlay(
   options: CSharpStatelessServiceOptions,
   image: string,
@@ -38,6 +44,37 @@ export async function createStatelessServiceOverlay(
     options.files.trust,
     0o644);
 
+  const configMapGenerator: KustomizeGenerator[] = [
+    {
+      name: `${options.name}-runtime`,
+      literals: Object.entries({
+        ...environment,
+        DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE: "false"
+      })
+        .sort(([left], [right]) =>
+          left < right ? -1 : left > right ? 1 : 0)
+        .map(([name, value]) => `${name}=${value}`)
+    }
+  ];
+  if (config.length > 0) {
+    configMapGenerator.push({
+      name: `${options.name}-provider-config`,
+      files: config
+    });
+  }
+  if (trust.length > 0) {
+    configMapGenerator.push({
+      name: `${options.name}-trust`,
+      files: trust
+    });
+  }
+  const secretGenerator: KustomizeGenerator[] = secret.length > 0
+    ? [{
+        name: `${options.name}-provider-secrets`,
+        files: secret
+      }]
+    : [];
+
   await writeJson(
     path.join(directory, "deployment-patch.json"),
     {
@@ -55,7 +92,11 @@ export async function createStatelessServiceOverlay(
           spec: {
             containers: [{
               name: options.name,
-              imagePullPolicy: "Never"
+              imagePullPolicy: "Never",
+              env: Object.entries(environment)
+                .sort(([left], [right]) =>
+                  left < right ? -1 : left > right ? 1 : 0)
+                .map(([name, value]) => ({ name, value }))
             }]
           }
         }
@@ -73,34 +114,16 @@ export async function createStatelessServiceOverlay(
           .join("/")
       ],
       patches: [{ path: "deployment-patch.json" }],
-      configMapGenerator: [
-        {
-          name: `${options.name}-runtime`,
-          literals: Object.entries({
-            ...environment,
-            DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE: "false"
-          })
-            .sort(([left], [right]) =>
-              left < right ? -1 : left > right ? 1 : 0)
-            .map(([name, value]) => `${name}=${value}`)
-        },
-        {
-          name: `${options.name}-provider-config`,
-          files: config
-        },
-        {
-          name: `${options.name}-trust`,
-          files: trust
-        }
-      ],
-      secretGenerator: [{
-        name: `${options.name}-provider-secrets`,
-        files: secret
-      }],
+      configMapGenerator,
+      secretGenerator,
       generatorOptions: {
         disableNameSuffixHash: true
       },
-      images: [createImageReplacement(options.name, image)]
+      images: [
+        createImageReplacement(options.name, image),
+        ...(options.additionalImages ?? []).map((value) =>
+          createImageReplacement(value.name, value.image))
+      ]
     });
   return directory;
 }
@@ -125,9 +148,6 @@ async function copyFiles(
     await copyFile(source, destination);
     await chmod(destination, mode);
     mappings.push(`${name}=${path.posix.join(group, name)}`);
-  }
-  if (mappings.length === 0) {
-    throw new Error("Stateless service file group cannot be empty");
   }
   return mappings;
 }

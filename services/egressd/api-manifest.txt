@@ -1,0 +1,10 @@
+config/v1/binding.schema.json	9ba52281bc41ab773764e3cf1689e09806649b3aaee4aff5bccb99b14d47af70
+config/v1/secrets.schema.json	c5d3c9e871ce3124552e972b114b7a26c0ccc4025417aeb8bd4c6ba8788f0340
+http/v1/openapi.yaml	b62ef501305fa1dfac5eae55c3d3f7ea671b74f7dcc51e4ffc998447640fa788
+GET	/{path}	forwardGet
+HEAD	/{path}	forwardHead
+POST	/{path}	forwardPost
+PUT	/{path}	forwardPut
+PATCH	/{path}	forwardPatch
+DELETE	/{path}	forwardDelete
+OPTIONS	/{path}	forwardOptions

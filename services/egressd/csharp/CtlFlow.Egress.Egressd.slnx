@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/CtlFlow.Egress.Egressd.Domain/CtlFlow.Egress.Egressd.Domain.csproj" />
+  <Project Path="src/CtlFlow.Egress.Egressd.Service/CtlFlow.Egress.Egressd.Service.csproj" />
+</Solution>

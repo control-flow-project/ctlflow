@@ -1,9 +1,11 @@
 using CtlFlow.Auth.Authd.Service.Configuration;
 using CtlFlow.Auth.Authd.Service.Dependencies;
+using CtlFlow.Auth.Authd.Service.Security;
 using CtlFlow.Auth.Authd.Service.Telemetry;
 using CtlFlow.Identity.V1;
 using Google.Protobuf;
 using Grpc.Core;
+using static CtlFlow.Auth.Authd.Service.Security.WorkloadAuthentication;
 using static CtlFlow.Auth.Authd.Service.Telemetry.TraceContexts;
 
 namespace CtlFlow.Auth.Authd.Service.Identity;
@@ -13,12 +15,14 @@ internal static partial class IdentityCalls
     internal static async Task RevokeSession(
         IdentityService.IdentityServiceClient client,
         IdentitySettings settings,
+        WorkloadSettings workload,
         AuthdTelemetry telemetry,
         SessionCredential credential,
         CancellationToken cancellation)
     {
         var bearer = await ReadWorkloadBearer(
-            settings.WorkloadTokenPath,
+            workload,
+            "identityd",
             cancellation);
         var headers = new Metadata
         {

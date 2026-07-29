@@ -4,17 +4,32 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./testing/stub": {
-      "types": "./.generated/testing/stub/node/src/index.d.ts",
-      "default": "./.generated/testing/stub/node/src/index.js"
+    "./testing/production": {
+      "types": "./.generated/testing/production/index.d.ts",
+      "default": "./.generated/testing/production/index.js"
+    },
+    "./testing/origin": {
+      "types": "./.generated/testing/origin/node/src/index.d.ts",
+      "default": "./.generated/testing/origin/node/src/index.js"
     }
   },
   "scripts": {
-    "build": "node ../../tooling/clean-directories.mjs .generated/testing/stub/node && tsc --project testing/stub/node/tsconfig.json"
+    "update:api-manifest": "node tooling/api/verify-api-manifest.mjs --write",
+    "verify:api-manifest": "node tooling/api/verify-api-manifest.mjs",
+    "verify:architecture": "node tooling/architecture/verify-implementation.mjs",
+    "build:testing:production": "node ../../tooling/clean-directories.mjs .generated/testing/production && tsc --project testing/production/tsconfig.json",
+    "build:origin": "node ../../tooling/clean-directories.mjs .generated/testing/origin/node && tsc --project testing/origin/node/tsconfig.json",
+    "build:tests": "node ../../tooling/clean-directories.mjs tests/dist && tsc --project tests/tsconfig.json",
+    "build:csharp": "dotnet restore csharp/CtlFlow.Egress.Egressd.slnx --runtime linux-x64 --locked-mode && dotnet build csharp/CtlFlow.Egress.Egressd.slnx --configuration Release --no-restore",
+    "verify:evidence": "node tooling/evidence/verify-evidence-manifest.mjs",
+    "build": "npm run verify:api-manifest && npm run verify:architecture && npm run build:testing:production && npm run build:origin && npm run build:tests && npm run verify:evidence && npm run build:csharp",
+    "test": "npm run test:compiled",
+    "test:compiled": "node --test --test-force-exit --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-egressd-test-suite.js tests/dist/integration/egressd.test.js"
   },
   "devDependencies": {
     "@ctlflow/test-mesh": "0.0.0",
     "@types/node": "24.10.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "yaml": "2.9.0"
   }
 }

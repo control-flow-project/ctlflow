@@ -34,7 +34,6 @@ test("exports correlated route and dependency telemetry without secrets",
     await suite.collector.clearExports();
     await suite.provider.setMode("available");
     await suite.provider.clearEvidence();
-    await suite.egressd.clearEvidence();
     const begun = await beginAuthentication(
       "/telemetry-secret-target");
     const authorization = await suite.provider.authorize(
@@ -95,7 +94,11 @@ test("exports correlated route and dependency telemetry without secrets",
           && span.parentSpanId === callbackSpan.spanId))
           && spans.some((span) =>
             span.name === "authd.identity.revoke_session"
-            && span.parentSpanId === logoutSpan.spanId);
+            && span.parentSpanId === logoutSpan.spanId)
+          && spans.some((span) =>
+            span.name === "egressd.http.post")
+          && spans.some((span) =>
+            span.name === "egressd.http.get");
       });
     await waitForExport(
       suite.collector.metricsPath,
@@ -121,15 +124,19 @@ test("exports correlated route and dependency telemetry without secrets",
           traceId));
 
     const provider = await suite.provider.readEvidence();
-    const egress = await suite.egressd.readEvidence();
-    assert.equal(egress.length, 2);
-    for (const request of egress) {
-      assert.match(
-        request.traceparent ?? "",
-        new RegExp(
-          `^00-${traceId}-[0-9a-f]{16}-01$`,
-          "u"));
-    }
+    assert.equal(provider.tokens.length, 1);
+    assert.equal(provider.userInfo.length, 1);
+    assert.equal(provider.tokens[0]!.traceparent, undefined);
+    assert.equal(provider.userInfo[0]!.traceparent, undefined);
+    const spans = readOtlpSpans(
+      await readAllExports(suite.collector))
+      .filter((span) => span.traceId === traceId);
+    assert.equal(
+      spans.some((span) => span.name === "egressd.http.post"),
+      true);
+    assert.equal(
+      spans.some((span) => span.name === "egressd.http.get"),
+      true);
     const exports = await readAllExports(suite.collector);
     for (const secret of [
       "acme",
@@ -141,7 +148,7 @@ test("exports correlated route and dependency telemetry without secrets",
       callbackUrl.searchParams.get("code") ?? "",
       provider.tokens[0]?.authorization ?? "",
       provider.tokens[0]?.body ?? "",
-      egress[1]?.authorization ?? ""
+      provider.userInfo[0]?.authorization ?? ""
     ]) {
       assert.notEqual(secret, "");
       assert.equal(exports.includes(secret), false);
