@@ -16,12 +16,13 @@ checked versioned contracts.
 | Role, grant, operation ownership, access decision | `policyd` |
 | Package and installed App intent | `pkgd` |
 | Configuration and secret custody | `configd` |
-| Placement and workload realization intent | `execd` |
-| External HTTP destination and mediation policy | `egressd` |
+| Placement, Workload, Run, and realization intent | `execd` |
+| Bound external HTTP admission and mediation | `egressd` |
 | Required kernel audit evidence | `auditd` |
 
-`authd` and `edged` are public protocol boundaries and own no durable domain
-record.
+`authd`, `edged`, and `egressd` are protocol boundaries and own no durable
+domain record. Egressd's strict projected binding is process configuration,
+not an independently mutable destination record.
 
 No service reads or writes another service's database.
 
@@ -136,9 +137,16 @@ CtlFlow domain records.
 through the Kubernetes API. `configd` has the sole narrow exception for secret
 custody and projections.
 
-Exact Placement, Package, App, Job, Run, dependency, and endpoint shapes are
-defined only when their owning versioned contracts define operations that use
-them.
+A Placement contains one immutable Global, Tenant, Workspace, or User target,
+required parentage, narrowing constraints, desired state, and observed
+realization status. A Workload is reusable continuous or finite intent and
+stores an admitted Package-component snapshot. A Run is one immutable
+admission of one finite Workload revision. There is no separate Job record;
+Kubernetes Job is one possible realization of a Run.
+
+Execd-owned intent remains authoritative when Kubernetes objects are absent,
+edited, or unavailable. Native state updates bounded observed status and
+never becomes another domain-write path.
 
 ## Audit and telemetry
 

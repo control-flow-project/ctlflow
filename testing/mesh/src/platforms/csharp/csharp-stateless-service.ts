@@ -21,6 +21,10 @@ export interface CSharpStatelessServiceOptions {
   readonly kustomizeBasePath: string;
   readonly environment: Readonly<Record<string, string>>;
   readonly files: StatelessServiceFiles;
+  readonly additionalImages?: readonly {
+    readonly name: string;
+    readonly image: string;
+  }[];
 }
 
 export interface CSharpStatelessService {

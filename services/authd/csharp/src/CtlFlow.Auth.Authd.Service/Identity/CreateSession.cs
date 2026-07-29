@@ -3,9 +3,11 @@ using CtlFlow.Auth.Authd.Domain.State;
 using CtlFlow.Auth.Authd.Service.Configuration;
 using CtlFlow.Auth.Authd.Service.Dependencies;
 using CtlFlow.Auth.Authd.Service.Oidc;
+using CtlFlow.Auth.Authd.Service.Security;
 using CtlFlow.Auth.Authd.Service.Telemetry;
 using CtlFlow.Identity.V1;
 using Grpc.Core;
+using static CtlFlow.Auth.Authd.Service.Security.WorkloadAuthentication;
 using static CtlFlow.Auth.Authd.Service.Telemetry.TraceContexts;
 
 namespace CtlFlow.Auth.Authd.Service.Identity;
@@ -15,13 +17,15 @@ internal static partial class IdentityCalls
     internal static async Task<CreatedSession> CreateSession(
         IdentityService.IdentityServiceClient client,
         IdentitySettings settings,
+        WorkloadSettings workload,
         AuthdTelemetry telemetry,
         AuthenticationAttempt attempt,
         ProviderSubject subject,
         CancellationToken cancellation)
     {
         var bearer = await ReadWorkloadBearer(
-            settings.WorkloadTokenPath,
+            workload,
+            "identityd",
             cancellation);
         var headers = new Metadata
         {

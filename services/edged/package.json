@@ -1,0 +1,32 @@
+{
+  "name": "@ctlflow/edged",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate:tests": "node tests/support/generate-client.mjs",
+    "update:api-manifest": "node tooling/api/verify-api-manifest.mjs --write",
+    "verify:api-manifest": "node tooling/api/verify-api-manifest.mjs",
+    "verify:architecture": "node tooling/architecture/verify-implementation.mjs",
+    "build:application": "node ../../tooling/clean-directories.mjs .generated/testing/application/node && tsc --project testing/application/node/tsconfig.json",
+    "build:tests": "node ../../tooling/clean-directories.mjs tests/dist && tsc --project tests/tsconfig.json",
+    "build:csharp": "dotnet restore csharp/CtlFlow.Edge.Edged.slnx --runtime linux-x64 --locked-mode && dotnet build csharp/CtlFlow.Edge.Edged.slnx --configuration Release --no-restore",
+    "verify:evidence": "node tooling/evidence/verify-evidence-manifest.mjs",
+    "build": "npm run verify:api-manifest && npm run verify:architecture && npm run build:application && npm run generate:tests && npm run build:tests && npm run verify:evidence && npm run build:csharp",
+    "test": "npm run test:compiled",
+    "test:compiled": "node --test --test-force-exit --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-edged-test-suite.js tests/dist/integration/edged.test.js"
+  },
+  "devDependencies": {
+    "@grpc/grpc-js": "1.14.4",
+    "@ctlflow/auditd": "0.0.0",
+    "@ctlflow/identityd": "0.0.0",
+    "@ctlflow/test-mesh": "0.0.0",
+    "@types/node": "24.10.1",
+    "grpc-tools": "1.13.0",
+    "long": "5.3.2",
+    "protobufjs": "7.6.4",
+    "ts-proto": "2.8.3",
+    "typescript": "5.9.3",
+    "yaml": "2.9.0"
+  }
+}

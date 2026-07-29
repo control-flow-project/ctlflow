@@ -1,7 +1,9 @@
 using CtlFlow.Auth.Authd.Service.Configuration;
 using CtlFlow.Auth.Authd.Service.Dependencies;
 using CtlFlow.Auth.Authd.Service.Oidc;
+using CtlFlow.Auth.Authd.Service.Security;
 using CtlFlow.Auth.Authd.Service.Telemetry;
+using static CtlFlow.Auth.Authd.Service.Security.WorkloadAuthentication;
 using static CtlFlow.Auth.Authd.Service.Telemetry.TraceContexts;
 
 namespace CtlFlow.Auth.Authd.Service.Egress;
@@ -13,6 +15,7 @@ internal static partial class EgressRequests
     internal static async Task<EgressResponse> SendEgressRequest(
         HttpClient client,
         AuthdTelemetry telemetry,
+        WorkloadSettings workload,
         ProviderRegistration provider,
         Uri providerEndpoint,
         HttpMethod method,
@@ -25,8 +28,14 @@ internal static partial class EgressRequests
             provider.EgressOrigin.AbsoluteUri.TrimEnd('/')
             + providerEndpoint.PathAndQuery,
             UriKind.Absolute);
+        var bearer = await ReadWorkloadBearer(
+            workload,
+            "egressd",
+            cancellation);
         using var request = new HttpRequestMessage(method, bindingUri);
-        request.Headers.Host = providerEndpoint.Authority;
+        request.Headers.TryAddWithoutValidation(
+            "Proxy-Authorization",
+            $"Bearer {bearer}");
         request.Headers.Accept.ParseAdd("application/json");
         if (authorization is not null)
         {
@@ -55,6 +64,14 @@ internal static partial class EgressRequests
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
                 timeout.Token);
+            if (response.StatusCode
+                    == System.Net.HttpStatusCode
+                        .ProxyAuthenticationRequired
+                || response.StatusCode
+                    == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                throw new DependencyUnavailableException("egressd");
+            }
             if (response.StatusCode
                 != System.Net.HttpStatusCode.OK
                 && (int)response.StatusCode < 500)

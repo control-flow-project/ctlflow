@@ -73,6 +73,7 @@ internal static partial class BrowserRoutes
             var subject = await CompleteOidcAuthentication(
                 egressClient,
                 telemetry,
+                settings.Workload,
                 provider,
                 settings.Projection.CallbackUri,
                 attempt,
@@ -82,6 +83,7 @@ internal static partial class BrowserRoutes
             using var session = await CreateSession(
                 identityClient,
                 settings.Identity,
+                settings.Workload,
                 telemetry,
                 attempt,
                 subject,

@@ -24,7 +24,6 @@ test("builds the exact OIDC authorization request and bounded state cookie",
     const suite = getAuthdTestSuite();
     await suite.provider.setMode("available");
     await suite.provider.clearEvidence();
-    await suite.egressd.clearEvidence();
     const begun = await beginAuthentication("/workspace?tab=active");
 
     assert.equal(begun.response.statusCode, 303);
@@ -62,8 +61,9 @@ test("builds the exact OIDC authorization request and bounded state cookie",
         "state",
         "code_challenge",
         "code_challenge_method"
-      ]);
-    assert.equal((await suite.egressd.readEvidence()).length, 0);
+    ]);
+    assert.equal(evidence.tokens.length, 0);
+    assert.equal(evidence.userInfo.length, 0);
   });
 
 test("selects exact tenant and provider and strictly validates forms",

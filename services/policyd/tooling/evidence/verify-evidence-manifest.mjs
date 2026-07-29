@@ -3,6 +3,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import protobuf from "protobufjs";
 import ts from "typescript";
+import {
+  verifyReleaseGates
+} from "../../../../tooling/evidence/verify-release-gates.mjs";
 
 const manifestService = "ctlflow.policy.v1.PolicyService";
 const allowedStatuses = new Set([
@@ -72,6 +75,7 @@ function parseManifest(value) {
       || new Set(value.releaseGates).size !== value.releaseGates.length) {
     throw new Error("Policyd evidence manifest shape is invalid");
   }
+  verifyReleaseGates(value.releaseGates, "policyd", true);
 
   return {
     operations: value.operations.map(parseOperation),

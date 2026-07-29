@@ -11,6 +11,7 @@ internal static partial class OidcProtocol
         CompleteOidcAuthentication(
             HttpClient egressClient,
             AuthdTelemetry telemetry,
+            WorkloadSettings workload,
             ProviderRegistration provider,
             Uri callbackUri,
             AuthenticationAttempt attempt,
@@ -20,6 +21,7 @@ internal static partial class OidcProtocol
         var tokens = await ExchangeAuthorizationCode(
             egressClient,
             telemetry,
+            workload,
             provider,
             callbackUri,
             code,
@@ -33,6 +35,7 @@ internal static partial class OidcProtocol
         var userInfoSubject = await ReadUserInfo(
             egressClient,
             telemetry,
+            workload,
             provider,
             tokens.AccessToken,
             cancellation);

@@ -7,6 +7,8 @@ export interface TestWorkloadCredentials {
   readonly overlongToken: string;
   readonly unadmittedToken: string;
   readonly wrongAudienceToken: string;
+  readonly wrongIssuerToken: string;
+  readonly wrongNamespaceToken: string;
   readonly unboundToken: string;
   readonly jwksPath: string;
 }
@@ -29,11 +31,13 @@ export interface TestKubernetes {
   readonly api: TestKubernetesApiCredentials;
   readonly storage: TestKubernetesStorage;
   readonly createWorkloadCredentials:
-    (serviceAccountName?: string) =>
+    (serviceAccountName?: string, audience?: string) =>
       Promise<TestWorkloadCredentials>;
   readonly createOperatorCredentials:
     (subject: string) => Promise<TestOperatorCredentials>;
   readonly loadImage: (image: string) => Promise<void>;
+  readonly resolveImageArtifact:
+    (image: string) => Promise<TestContainerArtifact>;
   readonly runKubectl: (
     arguments_: readonly string[],
     input?: string
@@ -52,3 +56,6 @@ import type {
 import type {
   TestOperatorCredentials
 } from "./test-operator-credentials.js";
+import type {
+  TestContainerArtifact
+} from "./test-container-artifact.js";

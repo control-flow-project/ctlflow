@@ -14,6 +14,7 @@ internal static partial class OidcProtocol
     internal static async Task<TokenResponse> ExchangeAuthorizationCode(
         HttpClient egressClient,
         AuthdTelemetry telemetry,
+        WorkloadSettings workload,
         ProviderRegistration provider,
         Uri callbackUri,
         string code,
@@ -48,6 +49,7 @@ internal static partial class OidcProtocol
         var response = await SendEgressRequest(
             egressClient,
             telemetry,
+            workload,
             provider,
             provider.TokenEndpoint,
             HttpMethod.Post,

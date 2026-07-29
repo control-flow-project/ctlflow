@@ -60,6 +60,9 @@ internal static partial class IdentitydConfiguration
         var invocationTokens = CreateTokenSettings(
             "CTLFLOW_INVOCATION",
             DefaultInvocationTokenLifetimeSeconds);
+        var workloadTokens = CreateTokenSettings(
+            "CTLFLOW_WORKLOAD",
+            DefaultWorkloadTokenLifetimeSeconds);
 
         return new ServiceSettings(
             IPAddress.Parse(grpcUri.Host),
@@ -80,11 +83,13 @@ internal static partial class IdentitydConfiguration
                     "CTLFLOW_AUDIT_CALL_TIMEOUT_MILLISECONDS",
                     DefaultAuditCallTimeoutMilliseconds))),
             new WorkloadTokenSettings(
-                CreateTokenSettings(
-                    "CTLFLOW_WORKLOAD",
-                    DefaultWorkloadTokenLifetimeSeconds),
+                workloadTokens,
                 RequireAbsoluteFile("CTLFLOW_WORKLOAD_JWKS_PATH"),
                 TimeSpan.FromSeconds(keyCacheSeconds)),
+            new TokenValidationSettings(
+                workloadTokens.Issuer,
+                "ctlflow-edged",
+                workloadTokens.MaximumLifetime),
             invocationTokens,
             new SigningSettings(
                 VerificationKeyId.Parse(
@@ -106,7 +111,6 @@ internal static partial class IdentitydConfiguration
             ParseRequiredCallers(
                 "CTLFLOW_LIST_PRINCIPAL_GROUPS_CALLERS"),
             ParseRequiredCallers("CTLFLOW_CREATE_SESSION_CALLERS"),
-            ParseRequiredCallers("CTLFLOW_EXCHANGE_SESSION_CALLERS"),
             ParseRequiredCallers("CTLFLOW_REVOKE_SESSION_CALLERS"),
             ParseRequiredCallers(
                 "CTLFLOW_ISSUE_RUN_INVOCATION_CALLERS"),

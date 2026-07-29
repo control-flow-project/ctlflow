@@ -65,11 +65,22 @@ inventory and its wire contract. Bounds, dependencies, security, telemetry,
 and evidence are defined by [authd](../authd/). Authd has no other public
 method or route and no private inbound RPC.
 
+Edged and Egressd each own one checked catch-all HTTP contract for a
+process-private binding. The contracts admit exactly `GET`, `HEAD`, `POST`,
+`PUT`, `PATCH`, `DELETE`, and `OPTIONS` at root and nested paths. The binding,
+not a caller parameter, fixes the target or destination.
+
+Edged is public and requires one opaque Identityd Session cookie. Egressd is
+private and requires one bound Kubernetes workload bearer in
+`Proxy-Authorization`; ordinary `Authorization` remains rule-controlled
+upstream data. Neither has a route-management, destination-management,
+configuration, preview, or cache API.
+
 Public cookie headers and external bearer credentials never become authentication metadata for a
 private service call. A public boundary may extract an approved opaque credential and pass it only
 as typed request data to the service that owns that credential, such as `ExchangeSession`.
 The receiving boundary establishes a short-lived internal invocation identity when a call acts on
-behalf of a User or Job.
+behalf of a User or Run Actor.
 
 ## Private gRPC
 
@@ -229,6 +240,69 @@ Configd validates the exact current claim before publication. No operation
 lists identities or versions, returns secret material, manages bindings,
 selects a provider, or accepts or returns a Kubernetes resource name.
 
+## Approved execution contract
+
+`execd` exposes exactly:
+
+```text
+DeclarePlacement
+GetPlacement
+ListPlacements
+
+DeclareWorkload
+GetWorkload
+ListWorkloads
+
+CreateRun
+GetRun
+ListRuns
+CancelRun
+```
+
+These are private unary operations defined by [execd](../execd/) and its
+owned protobuf contract. Infrastructure operators may call every operation.
+Configured product backends may use the non-Global capability path.
+
+Execd owns only semantic Placement, Workload, and Run intent and status.
+Kubernetes resources, Configd projections, dependency claims, and short-lived
+Run invocation JWTs are realization details and never become another RPC or
+caller-selected field. There is no Job record, HTTP mirror, watch, stream,
+wait, log, exec, route, generic manifest, endpoint-resolution, or
+dependency-management method.
+
+Public HTTP Package exposures are admitted only for Tenant or Workspace
+continuous Workloads. Global, User, and finite Workloads have no Edged
+exposure in this contract.
+
+## Approved Edged contract
+
+Edged owns exactly the method/path inventory in
+`services/edged/api/http/v1/openapi.yaml`. One Execd-created sidecar serves one
+HTTP Package exposure and one strict binding from
+`services/edged/api/config/v1/binding.schema.json`.
+
+Each request exchanges one opaque Session credential through
+`identityd.ExchangeSession` for the binding's exact Tenant and optional
+Workspace target. Edged forwards only the resulting invocation JWT to the
+loopback application. Its Identityd call authenticates with the fixed
+`ctlflow-edged` purpose audience projected only into the sidecar. It has no
+private inbound RPC or durable state.
+
+## Approved Egressd contract
+
+Egressd owns exactly the method/path inventory in
+`services/egressd/api/http/v1/openapi.yaml`. One private process serves one
+strict purpose-bound binding and one exact HTTPS origin using:
+
+```text
+services/egressd/api/config/v1/binding.schema.json
+services/egressd/api/config/v1/secrets.schema.json
+```
+
+The binding fixes caller identity, methods, paths, rewrite rules, headers,
+body bounds, trace propagation, and secret substitutions. Egressd has no
+private gRPC contract, durable state, or runtime management API.
+
 ## Approved audit dependency
 
 `auditd` exposes exactly:
@@ -272,8 +346,19 @@ They return only direct Groups at the exact requested target and repeat
 workload admission, invocation validation, standing, and fence checks for
 every page.
 
-Pkgd and Configd have no list operation and therefore own no page size,
-continuation value, or cursor state.
+Execd Placement, Workload, and Run lists use ascending immutable-ID keysets:
+
+```text
+page_size
+after_placement_id, after_workload_id, or after_run_id
+```
+
+Page size zero means 50; an explicit size is 1 through 100. Execd returns a
+last-emitted-ID continuation only when another record exists and stores no
+cursor.
+
+Pkgd, Configd, Edged, and Egressd have no list operation and therefore own no
+page size, continuation value, or cursor state.
 
 ## Statuses
 

@@ -1,0 +1,615 @@
+{
+  "schemaVersion": 1,
+  "service": "ctlflow.execution.v1.ExecutionService",
+  "operations": [
+    {
+      "name": "DeclarePlacement",
+      "success": [
+        {
+          "file": "tests/integration/placements.test.ts",
+          "title": "declares and reads the four placement target levels"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/placements.test.ts",
+            "title": "rejects malformed placements and missing placement reads"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/placements.test.ts",
+            "title": "enforces placement revision and identity idempotency"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/lifecycle.test.ts",
+            "title": "propagates suspension and enforces retirement ordering"
+          },
+          {
+            "file": "tests/integration/placements.test.ts",
+            "title": "rejects invalid placement hierarchy and widening constraints"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/placements.test.ts",
+            "title": "enforces placement revision and identity idempotency"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/audit-and-telemetry.test.ts",
+            "title": "reports audit failure after commit without replay delivery"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetPlacement",
+      "success": [
+        {
+          "file": "tests/integration/placements.test.ts",
+          "title": "declares and reads the four placement target levels"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/placements.test.ts",
+            "title": "rejects malformed placements and missing placement reads"
+          },
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "capability access fails closed on invocation, target, and policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "capability access fails closed on invocation, target, and policy"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "readiness and RPCs fail closed when a mapped table is missing"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListPlacements",
+      "success": [
+        {
+          "file": "tests/integration/placements.test.ts",
+          "title": "lists placements with stateless immutable-id pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/placements.test.ts",
+            "title": "rejects malformed placements and missing placement reads"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeclareWorkload",
+      "success": [
+        {
+          "file": "tests/integration/workloads.test.ts",
+          "title": "declares, realizes, reads, and lists both workload modes"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workloads.test.ts",
+            "title": "rejects malformed, missing, and over-constraint workloads"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workloads.test.ts",
+            "title": "enforces package scope, component, dependency, and exposure admission"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/workloads.test.ts",
+            "title": "enforces workload revision, identity, and immutable placement"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/workloads.test.ts",
+            "title": "rejects malformed, missing, and over-constraint workloads"
+          },
+          {
+            "file": "tests/integration/lifecycle.test.ts",
+            "title": "propagates suspension and enforces retirement ordering"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/workloads.test.ts",
+            "title": "enforces workload revision, identity, and immutable placement"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/realization-failures.test.ts",
+            "title": "fails synchronously when Pkgd is unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetWorkload",
+      "success": [
+        {
+          "file": "tests/integration/workloads.test.ts",
+          "title": "declares, realizes, reads, and lists both workload modes"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workloads.test.ts",
+            "title": "rejects malformed, missing, and over-constraint workloads"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "readiness and RPCs fail closed when a mapped table is missing"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListWorkloads",
+      "success": [
+        {
+          "file": "tests/integration/workloads.test.ts",
+          "title": "declares, realizes, reads, and lists both workload modes"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workloads.test.ts",
+            "title": "rejects malformed, missing, and over-constraint workloads"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateRun",
+      "success": [
+        {
+          "file": "tests/integration/runs.test.ts",
+          "title": "creates, snapshots, lists, realizes, and cancels global runs"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/runs.test.ts",
+            "title": "enforces run identity, readiness, pagination, and immutable snapshots"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/runs.test.ts",
+            "title": "enforces run identity, readiness, pagination, and immutable snapshots"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/runs.test.ts",
+            "title": "enforces run identity, readiness, pagination, and immutable snapshots"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/lifecycle.test.ts",
+            "title": "propagates suspension and enforces retirement ordering"
+          }
+        ],
+        "RESOURCE_EXHAUSTED": [
+          {
+            "file": "tests/integration/runs.test.ts",
+            "title": "rejects a second run while workload-private storage is occupied"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetRun",
+      "success": [
+        {
+          "file": "tests/integration/runs.test.ts",
+          "title": "creates, snapshots, lists, realizes, and cancels global runs"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/runs.test.ts",
+            "title": "enforces run identity, readiness, pagination, and immutable snapshots"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "readiness and RPCs fail closed when a mapped table is missing"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListRuns",
+      "success": [
+        {
+          "file": "tests/integration/runs.test.ts",
+          "title": "creates, snapshots, lists, realizes, and cancels global runs"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/runs.test.ts",
+            "title": "enforces run identity, readiness, pagination, and immutable snapshots"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CancelRun",
+      "success": [
+        {
+          "file": "tests/integration/runs.test.ts",
+          "title": "creates, snapshots, lists, realizes, and cancels global runs"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/runs.test.ts",
+            "title": "enforces run identity, readiness, pagination, and immutable snapshots"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/lifecycle.test.ts",
+            "title": "records successful, failed, and deadline-exceeded Run terminals"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "all ten RPCs reject absent and unadmitted caller identity"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "all ten RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "execd exposes exactly the approved RPC inventory"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "execd health and readiness probes are available"
+    },
+    {
+      "file": "tests/integration/security.test.ts",
+      "title": "capability backend calls all ten RPCs in one Tenant fence"
+    },
+    {
+      "file": "tests/integration/security.test.ts",
+      "title": "capability access fails closed on invocation, target, and policy"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "records complete Placement, Workload, and Run mutation audit events"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "records capability actor and attached-account audit attribution"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "does not audit reads, replays, denials, or reconciliation"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "exports correlated and redacted execution telemetry"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "telemetry outage is bounded and does not change domain results"
+    },
+    {
+      "file": "tests/integration/exposures.test.ts",
+      "title": "realizes tenant and workspace HTTP exposures through Edged sidecars"
+    },
+    {
+      "file": "tests/integration/realization.test.ts",
+      "title": "realizes exact configuration, secret, and persistent storage"
+    },
+    {
+      "file": "tests/integration/realization.test.ts",
+      "title": "realizes a provisioner-owned dependency claim and output"
+    },
+    {
+      "file": "tests/integration/reconciliation.test.ts",
+      "title": "does not rewrite unchanged realization state"
+    },
+    {
+      "file": "tests/integration/realization-failures.test.ts",
+      "title": "rejects and recovers from a Kubernetes ownership collision"
+    },
+    {
+      "file": "tests/integration/realization-failures.test.ts",
+      "title": "degrades and recovers a Workload when Configd is unavailable"
+    },
+    {
+      "file": "tests/integration/realization-failures.test.ts",
+      "title": "keeps a Run pending and recovers when Identityd is unavailable"
+    },
+    {
+      "file": "tests/integration/runs.test.ts",
+      "title": "projects a tenant run invocation into only its exact job"
+    },
+    {
+      "file": "tests/integration/lifecycle.test.ts",
+      "title": "records successful, failed, and deadline-exceeded Run terminals"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "persists intent and converges one Run Job across a production restart"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "SQLite contains only migration metadata and Execd domain tables"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "readiness rejects behind, ahead, and locked migration ledgers"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "readiness and RPCs fail closed when a mapped table is missing"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:execd",
+    "npm run test:compiled --workspace @ctlflow/execd",
+    "npm run test:csharp --workspace @ctlflow/execd",
+    "npm run verify:container:execd",
+    "npm run verify:migration-container:execd"
+  ]
+}

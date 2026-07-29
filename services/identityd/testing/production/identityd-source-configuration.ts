@@ -11,6 +11,6 @@ import type {
 export interface IdentitydSourceConfiguration {
   readonly callerSubject: string;
   readonly verificationKeys: InvocationVerificationKeyResponse;
-  readonly principalFacts: readonly PrincipalAuthorizationFacts[];
+  readonly principalFacts?: readonly PrincipalAuthorizationFacts[];
   readonly externalIdentityLinks?: readonly ExternalIdentityLink[];
 }

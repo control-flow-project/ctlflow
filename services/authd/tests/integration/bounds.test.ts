@@ -135,8 +135,7 @@ test("applies each route token bucket with bounded Retry-After",
 test("admits at most 32 consumed callbacks without queueing",
   async () => {
     const suite = getAuthdTestSuite();
-    await suite.provider.setMode("available");
-    await suite.egressd.setMode("delayed");
+    await suite.provider.setMode("token_slow");
     try {
       const callbacks: Array<{
         readonly path: string;
@@ -171,6 +170,6 @@ test("admits at most 32 consumed callbacks without queueing",
           (response) => response.statusCode === 303).length,
         32);
     } finally {
-      await suite.egressd.setMode("available");
+      await suite.provider.setMode("available");
     }
   });

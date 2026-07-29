@@ -7,9 +7,9 @@ import {
   type ControlledOidcProvider
 } from "@ctlflow/authd/testing/provider";
 import {
-  startEgressdOidcBinding,
-  type EgressdOidcBinding
-} from "@ctlflow/egressd/testing/stub";
+  startEgressdProductionService,
+  type EgressdProductionService
+} from "@ctlflow/egressd/testing/production";
 import {
   startIdentitydProductionService,
   type IdentitydProductionService,
@@ -32,6 +32,9 @@ import {
   createInvocationSigning
 } from "../support/create-invocation-signing.js";
 import {
+  prepareAuthdEgressFiles
+} from "../support/prepare-authd-egress-files.js";
+import {
   prepareAuthdFiles,
   type PreparedAuthdFiles
 } from "../support/prepare-authd-files.js";
@@ -51,7 +54,7 @@ Promise<AuthdTestSuite> {
   let identityd: IdentitydProductionService | undefined;
   let identitySource: IdentitydProductionSource | undefined;
   let provider: ControlledOidcProvider | undefined;
-  let egressd: EgressdOidcBinding | undefined;
+  let egressd: EgressdProductionService | undefined;
   let authd: CSharpStatelessService | undefined;
   let files: PreparedAuthdFiles | undefined;
   try {
@@ -113,20 +116,28 @@ Promise<AuthdTestSuite> {
       callbackUri:
         "https://auth.example.test/auth/v1/callback"
     });
-    egressd = await startEgressdOidcBinding({
+    const authdWorkload =
+      await kubernetes.createWorkloadCredentials("authd");
+    const unadmittedWorkload =
+      await kubernetes.createWorkloadCredentials(
+        "authd-unadmitted");
+    const egressFiles = await prepareAuthdEgressFiles(
+      kubernetes,
+      authdWorkload,
+      provider);
+    egressd = await startEgressdProductionService({
       repositoryRoot,
       kubernetes,
-      bindingName: "oidc-egress",
-      upstreamEndpoint: new URL(provider.issuer).origin,
-      upstreamServerName: provider.serverName,
-      upstreamCertificateAuthorityPath:
-        provider.certificateAuthorityPath
+      workload: authdWorkload,
+      files: egressFiles,
+      telemetryEndpoint: collector.endpoint
     });
     files = await prepareAuthdFiles(
       kubernetes,
       provider,
       egressd.bindingName,
-      identityd.certificateAuthorityPath);
+      identityd.certificateAuthorityPath,
+      unadmittedWorkload.callerToken);
     authd = await runtime.start({
       kubernetes,
       environment: {

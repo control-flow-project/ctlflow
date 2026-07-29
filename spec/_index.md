@@ -3,13 +3,13 @@ title: CtlFlow
 weight: 1
 ---
 
-CtlFlow is a multi-tenant substrate for installing and running applications and finite Jobs on
+CtlFlow is a multi-tenant substrate for installing and running applications and finite Runs on
 Kubernetes. A product built on CtlFlow supplies its distro, application domains, and tenant-facing
 experience. CtlFlow supplies the tenant, identity, Package, configuration, Placement, execution,
 policy, authentication, ingress, egress, audit, and telemetry foundations beneath that product.
 
 Kubernetes is the only infrastructure, containment, and execution substrate. It is not the CtlFlow
-domain model. Tenants, Workspaces, Placements, Packages, installations, Jobs, and Runs remain
+domain model. Tenants, Workspaces, Placements, Packages, installations, Workloads, and Runs remain
 CtlFlow records with one owning service each.
 
 ## Architecture
@@ -56,14 +56,14 @@ without exposing their material to `execd`.
 | [`policyd`](policyd/) | Path-and-operation grants and authorization decisions |
 | [`pkgd`](pkgd/) | Immutable Package generations and installed App intent |
 | [`configd`](configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections |
-| [`execd`](execd/) | Placements, constraints, dependencies, workloads, Jobs, Runs, storage, endpoints, and Kubernetes realization |
+| [`execd`](execd/) | Placements, constraints, dependencies, Workloads, Runs, storage, endpoints, and Kubernetes realization |
 | [`edged`](edged/) | External ingress and reverse proxying |
 | [`egressd`](egressd/) | Controlled external HTTP |
 | [`auditd`](auditd/) | Immutable authoritative kernel evidence |
 
 Chat, Files, Tasks, Notifications, realtime delivery, application events, agent management, and
 vertical business domains are Packages, not kernel services. An agent is a product composition of a
-virtual principal, a Job, persistent state, and product-owned activation rules.
+virtual principal, a finite Workload, persistent state, and product-owned activation rules.
 
 ## Public surfaces
 
@@ -88,7 +88,7 @@ virtual principal, a Job, persistent state, and product-owned activation rules.
 6. Every concrete runtime has a process-specific identity and cannot reuse another runtime's
    credentials or resource namespace.
 7. Every internal hop authenticates its immediate Kubernetes workload. A short-lived invocation
-   JWT carries User or Job context when the call acts on behalf of one.
+   JWT carries User or Run context when the call acts on behalf of one.
 8. Configuration and secrets are separate data classes even though `configd` owns both. Secret
    material has no general read operation.
 9. Provider-specific dependency behavior belongs to installed Kubernetes controllers or service

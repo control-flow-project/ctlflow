@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "service": "egressd.http.v1",
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/{path}",
+      "operationId": "forwardGet",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at root"
+          },
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at a nested path"
+          }
+        ]
+      }
+    },
+    {
+      "method": "HEAD",
+      "path": "/{path}",
+      "operationId": "forwardHead",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at root"
+          },
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at a nested path"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/{path}",
+      "operationId": "forwardPost",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at root"
+          },
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at a nested path"
+          }
+        ]
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/{path}",
+      "operationId": "forwardPut",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at root"
+          },
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at a nested path"
+          }
+        ]
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/{path}",
+      "operationId": "forwardPatch",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at root"
+          },
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at a nested path"
+          }
+        ]
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/{path}",
+      "operationId": "forwardDelete",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at root"
+          },
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at a nested path"
+          }
+        ]
+      }
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/{path}",
+      "operationId": "forwardOptions",
+      "statuses": {
+        "default": [
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at root"
+          },
+          {
+            "file": "tests/integration/api.test.ts",
+            "title": "forwards every admitted HTTP method at a nested path"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "serves health and readiness only on the probe listener"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "rejects methods outside the fixed HTTP surface"
+    },
+    {
+      "file": "tests/integration/authentication.test.ts",
+      "title": "requires exactly one proxy bearer credential"
+    },
+    {
+      "file": "tests/integration/authentication.test.ts",
+      "title": "rejects invalid signed workload credentials"
+    },
+    {
+      "file": "tests/integration/authentication.test.ts",
+      "title": "rejects expired and overlong workload credentials"
+    },
+    {
+      "file": "tests/integration/authentication.test.ts",
+      "title": "rejects the wrong audience and an unbound workload"
+    },
+    {
+      "file": "tests/integration/authentication.test.ts",
+      "title": "admits only the configured namespace and service account"
+    },
+    {
+      "file": "tests/integration/rules.test.ts",
+      "title": "selects longest and exact rules and preserves the query"
+    },
+    {
+      "file": "tests/integration/rules.test.ts",
+      "title": "returns not found when no rule admits the path"
+    },
+    {
+      "file": "tests/integration/rules.test.ts",
+      "title": "returns the sorted method union for a matched path"
+    },
+    {
+      "file": "tests/integration/rules.test.ts",
+      "title": "rejects unsafe or malformed request targets"
+    },
+    {
+      "file": "tests/integration/headers.test.ts",
+      "title": "forwards only admitted request headers and applies replacements"
+    },
+    {
+      "file": "tests/integration/headers.test.ts",
+      "title": "forwards only admitted response headers"
+    },
+    {
+      "file": "tests/integration/headers.test.ts",
+      "title": "never exposes proxy credentials or replacement secrets downstream"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "rejects a request target larger than 16 KiB"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "rejects request headers larger than 32 KiB"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "rejects an oversized request with a declared length"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "rejects an oversized chunked request while streaming"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "rejects a declared oversized upstream response before commitment"
+    },
+    {
+      "file": "tests/integration/bounds.test.ts",
+      "title": "aborts an oversized upstream response after streaming commitment"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "passes binary response bytes without interpretation"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "streams server-sent events without interpretation"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "returns redirects without following them"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "maps the finite upstream deadline to gateway timeout"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "propagates caller cancellation to the upstream request"
+    },
+    {
+      "file": "tests/integration/streaming.test.ts",
+      "title": "maps an unavailable origin to bad gateway and stays ready"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "correlates local proxy telemetry and forwards trace only by rule"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "replaces malformed trace context and never forwards baggage"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "continues proxying and stays ready during Collector outage"
+    },
+    {
+      "file": "tests/integration/capacity.test.ts",
+      "title": "admits at most 256 active requests without a queue"
+    },
+    {
+      "file": "tests/integration/zz-startup.test.ts",
+      "title": "fails startup for every incompatible binding class"
+    },
+    {
+      "file": "tests/integration/zz-startup.test.ts",
+      "title": "fails startup for every incompatible secret document class"
+    },
+    {
+      "file": "tests/integration/zz-startup.test.ts",
+      "title": "fails startup for malformed trust and bootstrap settings"
+    },
+    {
+      "architectureClaim": "boundary-unexpected-failure-502"
+    },
+    {
+      "architectureClaim": "sensitive-formatting-redacted"
+    },
+    {
+      "architectureClaim": "startup-failure-bounded"
+    },
+    {
+      "architectureClaim": "upstream-unexpected-failure-502"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:egressd",
+    "npm run test:compiled --workspace @ctlflow/egressd",
+    "npm run verify:container:egressd"
+  ]
+}

@@ -16,5 +16,5 @@ internal sealed record ProviderRegistration(
     ClientSecret ClientSecret)
 {
     internal Uri EgressOrigin { get; } =
-        new($"http://{EgressBinding}:8080/", UriKind.Absolute);
+        new($"http://{EgressBinding}:8081/", UriKind.Absolute);
 }

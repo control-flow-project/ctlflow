@@ -1,0 +1,18 @@
+FROM node:26.1.0-bookworm-slim AS build
+
+WORKDIR /workspace
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY tooling/clean-directories.mjs tooling/clean-directories.mjs
+COPY services/edged/package.json services/edged/package.json
+RUN npm ci \
+    --workspace @ctlflow/edged \
+    --include-workspace-root=false
+
+COPY services/edged/testing services/edged/testing
+RUN npm run build:application --workspace @ctlflow/edged
+
+FROM node:26.1.0-bookworm-slim
+WORKDIR /app
+COPY --from=build /workspace/services/edged/.generated/testing/application/node/src ./
+USER 1000:1000
+ENTRYPOINT ["node", "/app/run-controlled-application.js"]

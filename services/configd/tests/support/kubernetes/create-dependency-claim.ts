@@ -26,10 +26,19 @@ metadata:
   annotations:
     execution.ctlflow.io/owner-service: execd
 spec:
+  claimId: ${options.claimId}
   claimRevision: ${String(options.claimRevision)}
   placementId: ${options.placementId}
   workloadId: ${options.workloadId}
+  placementTarget:
+    global: {}
+  componentId: configd_test_component
+  dependencyName: configd-test-dependency
+  dependencyType: test
+  provisionerId: configd_test_provisioner
   provisionerSubject: ${options.provisionerSubject}
+  optionsCanonicalJson: "{}"
+  parameters: []
 `;
   await kubernetes.runKubectl(["apply", "-f", "-"], manifest);
 }

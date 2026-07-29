@@ -1,0 +1,54 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: execd
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - create
+      - delete
+      - get
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+      - configmaps
+      - secrets
+      - persistentvolumeclaims
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - patch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - delete
+      - get
+      - patch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - create
+      - delete
+      - get
+      - patch
+  - apiGroups:
+      - execution.ctlflow.io
+    resources:
+      - dependencyclaims
+    verbs:
+      - create
+      - delete
+      - get
+      - patch

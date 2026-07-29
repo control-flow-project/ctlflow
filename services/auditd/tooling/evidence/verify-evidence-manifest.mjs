@@ -6,6 +6,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import protobuf from "protobufjs";
 import ts from "typescript";
+import {
+  verifyReleaseGates
+} from "../../../../tooling/evidence/verify-release-gates.mjs";
 
 const manifestService = "ctlflow.audit.v1.AuditService";
 const expectedStatuses = [
@@ -70,6 +73,7 @@ function parseManifest(value) {
       || new Set(value.releaseGates).size !== value.releaseGates.length) {
     throw new Error("Auditd evidence manifest shape is invalid");
   }
+  verifyReleaseGates(value.releaseGates, "auditd", true);
 
   return {
     operations: value.operations.map(parseOperation),

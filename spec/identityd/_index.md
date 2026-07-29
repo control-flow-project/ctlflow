@@ -322,6 +322,12 @@ Unknown identity links, disabled accounts, and missing Tenant standing are
 
 Edged calls `ExchangeSession` with the exact 32-byte credential received in a
 browser cookie and the resolved Tenant plus optional Workspace target.
+The immediate caller presents a Pod-bound Kubernetes ServiceAccount token
+projected only into that Edged sidecar with the exact audience
+`ctlflow-edged`. Identityd rejects the installation internal audience and
+every other audience for this operation. The purpose-bound audience admits
+dynamic Execd-created sidecars without granting the colocated application
+access to the credential.
 Identityd hashes the credential, requires one unexpired and unrevoked Session,
 requires its enabled human account, and re-establishes current standing at the
 exact target. Session expiry is evaluated against the full current instant;
@@ -376,24 +382,27 @@ key-state failure is `UNAVAILABLE`.
 
 ## Admission and invocation identity
 
-Every operation authenticates a bound Kubernetes ServiceAccount token and
-admits an exact per-operation caller set.
+Every operation authenticates a bound Kubernetes ServiceAccount token.
+`ExchangeSession` admits only the purpose-bound `ctlflow-edged` audience.
+Every other operation uses the installation internal audience and an exact
+per-operation caller set.
 
 The approved callers are:
 
 | Operation | Caller |
 | --- | --- |
-| `GetInvocationVerificationKeys` | `SERVICE/svc_tenantd`, `SERVICE/svc_policyd` |
+| `GetInvocationVerificationKeys` | `SERVICE/svc_tenantd`, `SERVICE/svc_policyd`, `SERVICE/svc_pkgd`, `SERVICE/svc_configd`, `SERVICE/svc_execd` |
 | `ResolvePrincipal` | `SERVICE/svc_policyd` |
 | `ListPrincipalGroups` | `SERVICE/svc_policyd` |
 | `CreateSession` | `SERVICE/svc_authd` |
-| `ExchangeSession` | `SERVICE/svc_edged` |
 | `RevokeSession` | `SERVICE/svc_authd` |
 | `IssueRunInvocation` | `SERVICE/svc_execd` |
 
 Installation configuration maps those canonical principals to exact
 Kubernetes ServiceAccount subjects. Startup fails when an operation has an
-empty caller set or a configured subject is malformed.
+empty caller set or a configured subject is malformed. This mapping does not
+apply to `ExchangeSession`; its fixed purpose audience is the complete caller
+admission rule.
 
 `GetInvocationVerificationKeys`, `CreateSession`, `ExchangeSession`,
 `RevokeSession`, and `IssueRunInvocation` require workload authentication but
@@ -491,7 +500,7 @@ Canonical integration evidence covers:
 - cancellation, deadline, restart, and incompatible schema;
 - redacted correlated traces, metrics, logs, and database spans;
 - bounded Collector outage; and
-- NativeAOT publication, generated Entity Framework model selection,
+- implementation release gates, generated persistence-model selection,
   migration-image execution, and shipping Kubernetes assets.
 
 There is no public listener, HTTP API, operator API, Role or grant API,

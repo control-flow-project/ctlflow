@@ -284,7 +284,7 @@ bytes with no userinfo, query, or fragment. Client IDs are one to 256 OAuth
 visible-ASCII bytes. Credential references use the canonical
 one-to-64-character identifier shape. An Egressd binding name is a
 one-to-63-character lower-case Kubernetes DNS label and selects the
-same-Namespace purpose-bound HTTP Service on port `8080`.
+same-Namespace purpose-bound HTTP Service on port `8081`.
 `verification_keys` contains one to eight entries with unique `kid`; each
 contains exactly `kid`, `kty`, `use`, `alg`, `n`, and `e`. `kid` is one to 128
 visible-ASCII bytes, `kty` is `RSA`, `use` is `sig`, `alg` is `RS256`, and
@@ -317,6 +317,16 @@ has at most 16 KiB of request headers, the token form body is at most 8 KiB,
 and the UserInfo request has no body. Each call has a five-second deadline and
 a 256-KiB response bound. There is no redirect, retry, discovery, JWKS,
 introspection, revocation, or third provider call.
+
+Each request authenticates Authd to the binding with
+`Proxy-Authorization: Bearer <bound Authd workload token>`. Egressd consumes
+that header. The OIDC `Authorization` header remains independent upstream
+protocol data. The same process-private workload-token projection authenticates
+Authd's Egressd and Identityd calls; it is not provider configuration and never
+crosses either dependency boundary. Authd cannot name or override an Egressd
+origin or rule. Egressd workload-authentication rejection (`407`) or admission
+exhaustion (`429`) is dependency unavailability and maps to public `503`, never
+to provider rejection.
 
 Authd's only kernel RPCs are `Identityd.CreateSession` and
 `Identityd.RevokeSession`. They use the established [private

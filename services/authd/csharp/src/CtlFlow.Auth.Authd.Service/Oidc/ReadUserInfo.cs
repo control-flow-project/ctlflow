@@ -12,6 +12,7 @@ internal static partial class OidcProtocol
     internal static async Task<ProviderSubject> ReadUserInfo(
         HttpClient egressClient,
         AuthdTelemetry telemetry,
+        WorkloadSettings workload,
         ProviderRegistration provider,
         AccessToken accessToken,
         CancellationToken cancellation)
@@ -19,6 +20,7 @@ internal static partial class OidcProtocol
         var response = await SendEgressRequest(
             egressClient,
             telemetry,
+            workload,
             provider,
             provider.UserInfoEndpoint,
             HttpMethod.Get,

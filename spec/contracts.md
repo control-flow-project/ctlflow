@@ -187,6 +187,7 @@ admitted Run
   -> execd
        -> identityd.IssueRunInvocation
        <- short-lived Run-origin invocation JWT
+       -> rotate process-private /run/ctlflow/invocation/token before expiry
 
 logout credential
   -> authd
@@ -207,6 +208,65 @@ purpose-bound deployed projection defined by Authd; it makes no Configd call.
 All Authd-originated provider HTTP crosses the deployed purpose-bound Egressd
 endpoint. Authd owns the sole OIDC Authorization Code with PKCE profile; the
 binding creates no Egressd administration or callable kernel method.
+
+## Edged exposure binding
+
+Execd admits an HTTP Package exposure only for a Tenant or Workspace
+continuous Workload and realizes Edged in the same Pod as the application
+component:
+
+```text
+public request
+  -> installation ingress
+  -> Edged listener
+       -> identityd.ExchangeSession(opaque cookie, exact configured target)
+       <- short-lived invocation JWT
+  -> loopback application listener
+       Authorization: Bearer <invocation JWT>
+```
+
+The strict Edged binding contains only schema version, exact Tenant and
+optional Workspace target, and loopback port. Execd derives it from the
+stored Placement and admitted Package interface. The application listener is
+not selected by a Kubernetes Service. Edged never receives a caller-selected
+target or upstream.
+
+Execd projects a distinct Pod-bound token with audience `ctlflow-edged` and
+the Identityd trust anchor into only the Edged sidecar. Identityd accepts that
+audience only for `ExchangeSession`. The application container receives
+neither projection.
+
+The Session cookie is removed, caller authentication and CtlFlow-protected
+headers are replaced, and an application cannot set or clear the platform
+Session cookie in its response. Edged owns no route record and makes no Pkgd,
+Execd, Policyd, Configd, or Auditd call.
+
+## Egressd binding
+
+An admitted provisioner or Execd realizes one Egressd process and private
+Service per purpose-bound consumer binding:
+
+```text
+consumer
+  Proxy-Authorization: Bearer <bound workload token>
+  -> Egressd binding
+       -> validate exact namespace and ServiceAccount
+       -> select one configured method/path rule
+       -> apply generic path and header rewrites
+       -> read only named projected secret values
+       -> exact configured HTTPS origin
+```
+
+The caller cannot submit an origin, binding, rule, Tenant, Placement,
+consumer, upstream credential, or trace policy. Egressd strips proxy
+authentication and protected context before forwarding. It does not follow
+redirects, interpret an application protocol, call Configd, or return
+projected secret material.
+
+Authd's selected `egress_binding` is one such Service. Its token and UserInfo
+requests remain ordinary rule-controlled HTTP and carry Authd's bound workload
+token in `Proxy-Authorization`. Provider `Authorization` is separate
+upstream data.
 
 ## Configuration, secrets, and projection
 
@@ -298,6 +358,7 @@ metadata:
   annotations:
     execution.ctlflow.io/owner-service: execd
 spec:
+  claimId: <same canonical claim ID as metadata.name>
   claimRevision: <positive uint64>
   placementId: <canonical placement ID>
   workloadId: <canonical workload ID>
@@ -307,6 +368,17 @@ spec:
 Configd performs one namespaced GET and validates every listed value. It does
 not list, watch, mutate, cache, or infer a claim and does not treat the
 resource as its own API.
+
+The complete Execd/provisioner shape, including target, Package dependency,
+provisioner, options, parameter projections, and bounded status, is fixed by
+`services/execd/api/kubernetes/v1/dependency-claim-crd.yaml`. Configd consumes
+only the subset above and must tolerate no substitute group, kind, owner, or
+revision.
+
+Execd installation configuration maps each admitted provisioner ID to one
+exact controller ServiceAccount subject. That map supplies
+`spec.provisionerSubject`; a caller, Package, Placement, Workload, or claim
+status cannot choose or replace it.
 
 One Configd projection exists per exact `(data kind, ConsumerBinding)` semantic
 key. Binding includes Placement ID, closed scope and anchors, consumer ID, and
@@ -365,12 +437,13 @@ collision is `ALREADY_EXISTS`.
 
 Configd creates or server-side applies with field manager `ctlflow-configd`.
 After proving the exact name, kind, ownership annotations, and owner reference,
-it may force-apply only its owned payload and exact ownership shape to repair
-drift. It never uses force to adopt or rewrite an ownership collision, and
-requires the returned payload to contain only the exact `content` entry.
-Disagreeing ownership or another payload entry is an `ALREADY_EXISTS`
-collision rather than an object Configd may overwrite. Execd mounts that key
-read-only at exactly:
+it may force-apply only its owned payload and exact ownership shape with the
+observed `metadata.resourceVersion` to repair drift. An absent object is
+created through the collection create operation; an intervening create or
+stale apply is an `ALREADY_EXISTS` collision rather than an object Configd may
+adopt or overwrite. It requires the returned payload to contain only the exact
+`content` entry. Disagreeing ownership or another payload entry is likewise an
+`ALREADY_EXISTS` collision. Execd mounts that key read-only at exactly:
 
 ```text
 configuration  /run/ctlflow/configurations/<purpose>/content
@@ -415,9 +488,12 @@ by their owner contracts and the Auditd detail inventory.
 | `policyd` | `identityd.GetInvocationVerificationKeys` | Independently validate the invocation |
 | `policyd` | `identityd.ResolvePrincipal` | Obtain current exact-target identity and standing facts |
 | `policyd` | `identityd.ListPrincipalGroups` | Obtain bounded pages of direct Group IDs |
+| `authd` | purpose-bound `egressd` HTTP binding | Reach the configured external identity provider without ambient egress |
 | `authd` | `identityd.CreateSession` | Resolve a validated external identity and create one Session |
 | `authd` | `identityd.RevokeSession` | Revoke one Session by opaque credential |
 | `edged` | `identityd.ExchangeSession` | Exchange one current Session for an exact-target invocation |
+| `execd` | `identityd.GetInvocationVerificationKeys` | Validate invocation JWTs |
+| `execd` | `policyd.CheckAccess` | Authorize one scoped execution capability |
 | `execd` | `identityd.IssueRunInvocation` | Issue an exact-target invocation for one owned Run |
 | `execd` | `pkgd.GetApp` | Read one authoritative installed App intent |
 | `execd` | `pkgd.GetPackage` | Read one immutable Package generation |

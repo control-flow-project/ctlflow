@@ -1,0 +1,100 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: CtlFlow Edged application proxy
+  version: 1.0.0
+  description: >-
+    Exact public HTTP surface for one Execd-bound application exposure. The
+    path template is a catch-all that includes the root path and nested paths.
+    The installation ingress terminates public TLS and selects this binding.
+paths:
+  /{path}:
+    x-ctlflow-catch-all-includes-root: true
+    parameters:
+      - $ref: "#/components/parameters/CatchAllPath"
+    get:
+      operationId: proxyGet
+      security:
+        - sessionCookie: []
+      responses:
+        default: { $ref: "#/components/responses/Proxied" }
+    head:
+      operationId: proxyHead
+      security:
+        - sessionCookie: []
+      responses:
+        default: { $ref: "#/components/responses/Proxied" }
+    post:
+      operationId: proxyPost
+      security:
+        - sessionCookie: []
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Proxied" }
+    put:
+      operationId: proxyPut
+      security:
+        - sessionCookie: []
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Proxied" }
+    patch:
+      operationId: proxyPatch
+      security:
+        - sessionCookie: []
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Proxied" }
+    delete:
+      operationId: proxyDelete
+      security:
+        - sessionCookie: []
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Proxied" }
+    options:
+      operationId: proxyOptions
+      security:
+        - sessionCookie: []
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Proxied" }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-ctlflow-session
+      description: >-
+        Exactly one unpadded-base64url credential that decodes to 32 bytes.
+  parameters:
+    CatchAllPath:
+      name: path
+      in: path
+      required: true
+      description: >-
+        Origin-form root or nested application path. The complete request
+        target, including query, is bounded to 16 KiB.
+      schema:
+        type: string
+        maxLength: 16384
+  requestBodies:
+    StreamingBody:
+      required: false
+      description: Opaque streaming body bounded to 64 MiB.
+      content:
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+            maxLength: 67108864
+  responses:
+    Proxied:
+      description: >-
+        The admitted application response, or one fixed Edged boundary error:
+        401, 405, 413, 414, 429, 431, 502, 503, or 504.

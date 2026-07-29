@@ -22,6 +22,12 @@ services/<service>/
     proto/
       v1/
         <service>.proto
+    http/
+      v1/
+        openapi.yaml
+    config/
+      v1/
+        binding.schema.json
 
   knexfile.ts
   migrations/
@@ -46,7 +52,7 @@ placeholders are forbidden.
 
 | Path | Authority |
 | --- | --- |
-| `api/` | Callee-owned language-neutral wire contracts |
+| `api/` | Callee-owned language-neutral gRPC, HTTP, configuration, and explicit Kubernetes contracts |
 | `knexfile.ts`, `migrations/` | Sole ordered logical schema history |
 | `tests/` | Canonical language-neutral behavior and interoperability suite |
 | `kubernetes/` | Versioned plain service deployment and migration assets |
@@ -55,12 +61,16 @@ placeholders are forbidden.
 Shared repository packages may provide generation, migration, test-mesh, and build mechanics. They
 cannot own service behavior or create a second API.
 
-Each shipping service owns one `kubernetes/base/` Kustomize base containing its ServiceAccount,
-workload, private and probe Services, required storage, process-private projections, and pre-start
-Knex migration Job where the service is durable. Installation overlays supply concrete OCI images,
-storage classes, trust and credential bindings, dependency endpoints, and environment-specific
-configuration. A test-only generated workload cannot replace these checked shipping assets as
-installation evidence.
+Each independently deployed shipping daemon owns one `kubernetes/base/` Kustomize base containing
+its ServiceAccount, workload, private and probe Services, required storage, process-private
+projections, and pre-start Knex migration Job where the service is durable. Installation overlays
+supply concrete OCI images, storage classes, trust and credential bindings, dependency endpoints,
+and environment-specific configuration. A test-only generated workload cannot replace these
+checked shipping assets as installation evidence.
+
+Edged is a shipping sidecar rather than an independently deployed daemon. It owns a checked
+Containerfile but no standalone Kubernetes base. Execd realizes the Edged container, projections,
+ports, and Services as part of the application Workload that owns the public exposure.
 
 Every hand-authored source and test file is at most 600 lines. Larger concepts split into cohesive
 noun directories and operation files. Deterministic generated output is exempt but remains
@@ -83,6 +93,11 @@ callee contract into a caller-owned proto.
 Kernel domain operations use the service-root gRPC contract. `authd`, `edged`, and `egressd`
 additionally preserve the standard HTTP semantics they mediate. Kubernetes resources are
 realization details unless an explicit service contract says otherwise.
+
+Edged and Egressd have no invented gRPC mirror. Their checked OpenAPI and
+strict projected binding schemas are the language-neutral contract. Execd's
+checked DependencyClaim CRD is an internal multi-owner Kubernetes contract,
+not a caller operation.
 
 ## Implementation independence
 
@@ -182,6 +197,28 @@ ownership labels for:
 - trusted runtime proxies; and
 - selected provider controllers' custom resources.
 
+Execd receives a finite installation-owned map from admitted provisioner IDs
+to exact controller ServiceAccount subjects. It does not discover controllers
+by label, accept a caller-supplied subject, or infer authority from
+reachability.
+
+An admitted HTTP Package exposure runs the shipping Edged image as a sidecar
+in a Tenant or Workspace continuous application Pod. Only the Edged port is
+selected by the public Service; the application port is loopback-private.
+Execd writes the strict non-secret Edged binding and cannot supply a
+caller-selected upstream. Each sidecar receives its own projected Pod-bound
+token with audience `ctlflow-edged` and its own Identityd trust mount. Those
+projections are not mounted into the application container.
+
+An Egressd binding runs the shipping Egressd image with one exact HTTPS
+origin, one exact consumer ServiceAccount, and disjoint Configd-origin
+non-secret and secret projections. Execd or an installed provisioner may
+realize that workload, but Egressd alone enforces the HTTP rule set. The
+consumer reaches only the purpose-bound private Service. Installation-owned
+workload-token verification parameters and the finite upstream TLS trust
+bundle are separate process-private bootstrap projections; neither comes from
+the consumer or from a binding rule.
+
 `configd` has one disjoint Kubernetes write boundary: Secret custody and authorized ConfigMap or
 Secret projections in exact Placements. It cannot write another resource kind, and `execd` never
 receives configuration or secret material.
@@ -193,6 +230,12 @@ secret outputs enter through `configd`; provider status contains only Secret ref
 Unchanged desired generation produces no semantic Kubernetes change. Native object deletion or
 editing does not mutate CtlFlow domain intent; `execd` reports or reconciles drift. An unowned native
 object is never adopted automatically.
+
+Ownership verification and mutation form one optimistic Kubernetes operation. When an exact object
+is absent, the owner uses create-only semantics; an intervening create is a collision and is never
+adopted. When an exact object exists, update carries its observed `metadata.resourceVersion`.
+Deletion carries its observed UID and resource version as preconditions. A stale update or delete
+fails without mutating the replacement object and is handled by a later reconciliation.
 
 ## Canonical tests
 
@@ -257,6 +300,11 @@ Mocks, in-memory repositories, caller-owned substitute kernel services, and call
 handwritten protocol servers do not establish product behavior. Controlled processes are
 permitted for external systems outside the kernel constellation.
 
+Edged tests place the real Edged process and a controlled loopback
+application in one Pod. Egressd tests use the real Egressd process and a
+separately controlled external HTTPS origin. Those fixtures exercise an
+external boundary; they are not substitutes for either shipping service.
+
 A kernel dependency without a production implementation may provide one service-owned contract
 stub under its own service root. The stub uses the callee-owned generated contract, runs as a real
 Kubernetes workload under the callee's ServiceAccount and Service, and implements only explicit
@@ -279,7 +327,9 @@ coverage.
 
 Each service checks in one service-root evidence manifest. It maps every
 generated RPC or public route and every documented result to an exact ordinary
-test file and test title, and lists the implementation-neutral release gates.
+test file and test title, and lists the exact repository commands for every
+applicable build, canonical test, implementation-local test, shipping-container,
+and migration-container release gate.
 A verifier rejects missing descriptor members, stale or duplicate test
 ownership, nonexistent tests, unowned documented results, and unknown manifest
 entries. The manifest is an inventory only; it does not introduce scenario
@@ -303,6 +353,9 @@ maximum token lifetime, and verification-key source. Services validate bound tok
 keys for a finite owner-supplied lifetime, and refresh only on expiry or an unknown key ID.
 Validation never accepts an unsigned token, another audience, an overlong lifetime, or a
 caller-asserted ServiceAccount name. It does not add a TokenReview call to each request.
+The sole purpose audience is `ctlflow-edged`, projected only into an
+Execd-created Edged sidecar and accepted by Identityd only for
+`ExchangeSession`.
 
 Kernel bootstrap trust and credential material arrives only through process-private file
 projections. It is never an environment value or `configd` record. In particular, only `identityd`
@@ -315,6 +368,19 @@ gRPC listener uses installation-provisioned server TLS so operator port-forwards
 clients validate the intended service endpoint. That server identity never authenticates the
 caller. An admitted kubeconfig client certificate authenticates an operator; a bound Kubernetes
 workload token authenticates an internal caller.
+
+Egressd is private HTTP rather than gRPC. It validates the bound workload
+token in `Proxy-Authorization` and consumes that header before applying the
+configured external HTTP rule. Its ordinary `Authorization` header remains
+rule-controlled upstream data. Its domain listener supports bounded HTTP/1.1
+and HTTP/2; its probe listener remains separate.
+
+Edged's public listener receives traffic only through the installation
+ingress. Its application upstream is fixed to loopback by the binding
+document. It uses its own projected workload token for the private Identityd
+call and never uses a browser credential as transport authentication. That
+token uses the fixed `ctlflow-edged` audience; the colocated application does
+not receive its token or Identityd trust projection.
 
 A private service exposes direct gRPC over TLS on an HTTP/2-only listener and health probes on a
 separate HTTP/1.1-only listener. The probe listener serves only `/healthz` and `/readyz`; it never

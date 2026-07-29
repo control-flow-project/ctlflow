@@ -1,0 +1,521 @@
+{
+  "schemaVersion": 1,
+  "service": "ctlflow.tenancy.v1.TenantService",
+  "operations": [
+    {
+      "name": "CreateTenant",
+      "success": [
+        {
+          "file": "tests/integration/tenants.test.ts",
+          "title": "creates, retries, and gets a Tenant"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "enforces Tenant identity, address ownership, and field bounds"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "enforces Tenant identity, address ownership, and field bounds"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "operator RPCs require a client certificate"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "operator RPCs reject a trusted but unadmitted certificate"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/audit-and-telemetry.test.ts",
+            "title": "returns unavailable after a committed mutation when auditd fails"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetTenant",
+      "success": [
+        {
+          "file": "tests/integration/security.test.ts",
+          "title": "an admitted operator certificate reaches the domain contract"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "rejects invalid or absent Tenant lookups and state requests"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "rejects invalid or absent Tenant lookups and state requests"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/capability-security.test.ts",
+            "title": "capability denial, standing, and identity state fail closed"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/capability-security.test.ts",
+            "title": "policy and identity dependency failures preserve canonical statuses"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListTenants",
+      "success": [
+        {
+          "file": "tests/integration/tenants.test.ts",
+          "title": "lists Tenants with bounded last-ID pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "lists Tenants with bounded last-ID pagination"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "operator RPCs require a client certificate"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "operator RPCs reject a trusted but unadmitted certificate"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateTenant",
+      "success": [
+        {
+          "file": "tests/integration/tenants.test.ts",
+          "title": "updates a Tenant with optimistic revision checks"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "updates a Tenant with optimistic revision checks"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "rejects invalid or absent Tenant lookups and state requests"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "updates a Tenant with optimistic revision checks"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/capability-security.test.ts",
+            "title": "capability denial, standing, and identity state fail closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetTenantState",
+      "success": [
+        {
+          "file": "tests/integration/tenants.test.ts",
+          "title": "enforces Tenant state, child, retention, and resolution rules"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "rejects invalid or absent Tenant lookups and state requests"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "rejects invalid or absent Tenant lookups and state requests"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "enforces Tenant state, child, retention, and resolution rules"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "enforces Tenant state, child, retention, and resolution rules"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateWorkspace",
+      "success": [
+        {
+          "file": "tests/integration/workspaces.test.ts",
+          "title": "creates, retries, and gets a Workspace"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "validates every Workspace field"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "enforces Workspace identity, scoped address ownership, and parents"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "enforces Workspace identity, scoped address ownership, and parents"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "enforces Workspace state, parent fencing, retention, and resolution"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetWorkspace",
+      "success": [
+        {
+          "file": "tests/integration/workspaces.test.ts",
+          "title": "creates, retries, and gets a Workspace"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "rejects invalid, absent, and cross-parent Workspace lookups"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "rejects invalid, absent, and cross-parent Workspace lookups"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/capability-security.test.ts",
+            "title": "capability fences reject hidden targets before policy"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListWorkspaces",
+      "success": [
+        {
+          "file": "tests/integration/workspace-pagination.test.ts",
+          "title": "lists Workspaces with bounded last-ID pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workspace-pagination.test.ts",
+            "title": "lists Workspaces with bounded last-ID pagination"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workspace-pagination.test.ts",
+            "title": "lists Workspaces with bounded last-ID pagination"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/capability-security.test.ts",
+            "title": "capability fences reject hidden targets before policy"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateWorkspace",
+      "success": [
+        {
+          "file": "tests/integration/workspaces.test.ts",
+          "title": "updates a Workspace with optimistic revision checks"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "updates a Workspace with optimistic revision checks"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "rejects invalid, absent, and cross-parent Workspace lookups"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "updates a Workspace with optimistic revision checks"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/capability-security.test.ts",
+            "title": "capability denial, standing, and identity state fail closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetWorkspaceState",
+      "success": [
+        {
+          "file": "tests/integration/workspaces.test.ts",
+          "title": "enforces Workspace state, parent fencing, retention, and resolution"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "rejects invalid, absent, and cross-parent Workspace lookups"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "rejects invalid, absent, and cross-parent Workspace lookups"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "enforces Workspace state, parent fencing, retention, and resolution"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "enforces Workspace state, parent fencing, retention, and resolution"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/capability-security.test.ts",
+            "title": "capability denial, standing, and identity state fail closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolveTenant",
+      "success": [
+        {
+          "file": "tests/integration/security.test.ts",
+          "title": "resolution accepts valid session and run invocation identities"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "rejects invalid or absent Tenant lookups and state requests"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/tenants.test.ts",
+            "title": "enforces Tenant state, child, retention, and resolution rules"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "resolution rejects every malformed invocation token shape"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/invocation-key-security.test.ts",
+            "title": "unknown keys fail unavailable when identityd cannot provide authority"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolveWorkspace",
+      "success": [
+        {
+          "file": "tests/integration/security.test.ts",
+          "title": "resolution accepts valid session and run invocation identities"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "rejects invalid, absent, and cross-parent Workspace lookups"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/workspaces.test.ts",
+            "title": "enforces Workspace state, parent fencing, retention, and resolution"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "resolution rejects every malformed invocation token shape"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/invocation-key-security.test.ts",
+            "title": "unavailable identityd key states fail unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/audit-and-telemetry.test.ts",
+            "title": "records cancellation when an in-flight database query is cancelled"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/security.test.ts",
+            "title": "resolution propagates deadlines and client cancellation"
+          }
+        ]
+      }
+    }
+  ],
+  "crossCutting": [
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "tenantd exposes exactly the approved RPC inventory"
+    },
+    {
+      "file": "tests/integration/api.test.ts",
+      "title": "tenantd health and readiness probes are available"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "records one complete audit event for each mutation operation"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "does not audit reads, rejections, retries, or no-op mutations"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "exports correlated and redacted traces, metrics, and logs"
+    },
+    {
+      "file": "tests/integration/audit-and-telemetry.test.ts",
+      "title": "telemetry outage is bounded and does not change domain results"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "readiness and RPCs fail closed when a mapped table is missing"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "readiness rejects an ahead or locked migration ledger"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "SQLite contains only migration metadata and tenantd domain tables"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "persists Tenant state across a production-process restart"
+    },
+    {
+      "file": "tests/integration/parent-child-concurrency.test.ts",
+      "title": "one concurrent update wins each expected Tenant revision"
+    },
+    {
+      "file": "tests/integration/parent-child-concurrency.test.ts",
+      "title": "Tenant deletion cannot race Workspace creation past parent fencing"
+    },
+    {
+      "file": "tests/integration/parent-child-concurrency.test.ts",
+      "title": "Tenant deletion cannot race Workspace reactivation past parent fencing"
+    },
+    {
+      "file": "tests/integration/security.test.ts",
+      "title": "workload reads apply Tenant and Workspace invocation fences"
+    },
+    {
+      "file": "tests/integration/capability-operations.test.ts",
+      "title": "tenant capabilities use exact operations and resource paths"
+    },
+    {
+      "file": "tests/integration/capability-operations.test.ts",
+      "title": "workspace capabilities cover collection and exact targets"
+    },
+    {
+      "file": "tests/integration/capability-principals.test.ts",
+      "title": "a virtual principal and attached account must both be authorized"
+    },
+    {
+      "file": "tests/integration/capability-principals.test.ts",
+      "title": "virtual-principal mutations audit both identities"
+    },
+    {
+      "file": "tests/integration/invocation-key-security.test.ts",
+      "title": "a current known invocation key remains usable during identityd outage"
+    },
+    {
+      "file": "tests/integration/invocation-key-security.test.ts",
+      "title": "an unknown invocation key refreshes through identityd"
+    }
+  ],
+  "releaseGates": [
+    "npm run build:tenantd",
+    "npm run test:compiled --workspace @ctlflow/tenantd",
+    "npm run test:csharp --workspace @ctlflow/tenantd",
+    "npm run verify:container:tenantd",
+    "npm run verify:migration-container:tenantd"
+  ]
+}

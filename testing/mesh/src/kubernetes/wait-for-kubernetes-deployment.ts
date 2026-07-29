@@ -55,8 +55,10 @@ export async function waitForKubernetesDeployment(
     ])).stdout);
     const failure = findKubernetesPodFailure(pods);
     if (failure !== undefined) {
+      const diagnostics = await readDeploymentLogs(kubernetes, name);
       throw new Error(
-        `Kubernetes deployment ${name} failed: ${failure}`);
+        `Kubernetes deployment ${name} failed: ${failure}`
+        + (diagnostics.length === 0 ? "" : `\n${diagnostics}`));
     }
 
     lastState = JSON.stringify(status ?? {});
@@ -65,4 +67,20 @@ export async function waitForKubernetesDeployment(
 
   throw new Error(
     `Kubernetes deployment ${name} did not become ready: ${lastState}`);
+}
+
+async function readDeploymentLogs(
+  kubernetes: TestKubernetes,
+  name: string
+): Promise<string> {
+  return await kubernetes.runKubectl([
+    "logs",
+    `deployment/${name}`,
+    "--namespace",
+    kubernetes.namespace,
+    "--all-containers=true",
+    "--prefix=true",
+    "--tail=100"
+  ]).then((result) => result.stdout.trim())
+    .catch(() => "");
 }

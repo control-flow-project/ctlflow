@@ -13,6 +13,9 @@ export interface IdentitydProductionSource {
     principalId: string,
     kind: "human" | "service"
   ) => Promise<void>;
+  readonly expireSession: (
+    credential: Uint8Array
+  ) => Promise<void>;
   readonly setMode: (mode: IdentitydMode) => Promise<void>;
   readonly setVerificationKeys: (
     response: InvocationVerificationKeyResponse

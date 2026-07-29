@@ -21,6 +21,9 @@ import {
   corruptPrincipalKind
 } from "./corrupt-principal-kind.js";
 import {
+  expireSession
+} from "./expire-session.js";
+import {
   createIdentityDatabase,
   type IdentityTestDatabase
 } from "./create-identity-database.js";
@@ -201,8 +204,6 @@ function createEnvironment(
       options.principalFactCallers.join(","),
     CTLFLOW_CREATE_SESSION_CALLERS:
       caller(options, "authd"),
-    CTLFLOW_EXCHANGE_SESSION_CALLERS:
-      caller(options, "edged"),
     CTLFLOW_REVOKE_SESSION_CALLERS:
       caller(options, "authd"),
     CTLFLOW_ISSUE_RUN_INVOCATION_CALLERS:
@@ -234,6 +235,7 @@ function createService(
   return {
     endpoint:
       `https://${serviceName}.${options.kubernetes.namespace}.svc:50051`,
+    grpcPort: service.grpcPort,
     certificateAuthorityPath,
     serverName,
     createSource: async (configuration) => {
@@ -241,9 +243,11 @@ function createService(
       await replaceVerificationKeys(
         database.connection,
         configuration.verificationKeys);
-      await replacePrincipalFacts(
-        database.connection,
-        configuration.principalFacts);
+      if (configuration.principalFacts !== undefined) {
+        await replacePrincipalFacts(
+          database.connection,
+          configuration.principalFacts);
+      }
       if (configuration.externalIdentityLinks !== undefined) {
         await replaceExternalIdentityLinks(
           database.connection,
@@ -252,6 +256,8 @@ function createService(
       return {
         corruptPrincipalKind: (principalId, kind) =>
           corruptPrincipalKind(database.connection, principalId, kind),
+        expireSession: (credential) =>
+          expireSession(database.connection, credential),
         setMode: async (mode) => {
           modes.set(configuration.callerSubject, mode);
           suspended = await applyModes(

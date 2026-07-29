@@ -29,8 +29,10 @@ internal static partial class KubernetesApis
             == ProjectionDataKind.Configuration
             ? "configmaps"
             : "secrets";
-        var path = $"/api/v1/namespaces/{workload.NamespaceName}"
-            + $"/{collection}/{objectName}";
+        var collectionPath = $"/api/v1/namespaces/{workload.NamespaceName}"
+            + $"/{collection}";
+        var path = $"{collectionPath}/{objectName}";
+        string? resourceVersion = null;
         using (var current = await SendKubernetesRequest(
                    api,
                    HttpMethod.Get,
@@ -53,6 +55,8 @@ internal static partial class KubernetesApis
                 {
                     return;
                 }
+                resourceVersion = ReadProjectionResourceVersion(
+                    document.RootElement);
             }
             else if (current.StatusCode != HttpStatusCode.NotFound)
             {
@@ -66,25 +70,35 @@ internal static partial class KubernetesApis
             projection,
             payload,
             workload,
-            objectName);
+            objectName,
+            resourceVersion);
         try
         {
             using var applied = await SendKubernetesRequest(
                 api,
-                HttpMethod.Patch,
-                path + "?fieldManager=ctlflow-configd&force=true",
+                resourceVersion is null
+                    ? HttpMethod.Post
+                    : HttpMethod.Patch,
+                resourceVersion is null
+                    ? collectionPath
+                    : path + "?fieldManager=ctlflow-configd&force=true",
                 body,
-                "application/apply-patch+yaml",
-                "apply_projection",
+                resourceVersion is null
+                    ? "application/json"
+                    : "application/apply-patch+yaml",
+                resourceVersion is null
+                    ? "create_projection"
+                    : "apply_projection",
                 cancellation);
             if (applied.StatusCode == HttpStatusCode.Conflict)
             {
                 throw new KubernetesOwnershipCollisionException();
             }
 
-            if (applied.StatusCode is not (
-                    HttpStatusCode.OK
-                    or HttpStatusCode.Created))
+            var expectedStatus = resourceVersion is null
+                ? HttpStatusCode.Created
+                : HttpStatusCode.OK;
+            if (applied.StatusCode != expectedStatus)
             {
                 throw new KubernetesUnavailableException(
                     new InvalidOperationException(
@@ -108,6 +122,24 @@ internal static partial class KubernetesApis
         finally
         {
             Array.Clear(body);
+        }
+    }
+
+    private static string ReadProjectionResourceVersion(
+        System.Text.Json.JsonElement document)
+    {
+        try
+        {
+            return KubernetesJson.ReadRequiredString(
+                KubernetesJson.ReadRequiredObject(
+                    document,
+                    "metadata"),
+                "resourceVersion",
+                128);
+        }
+        catch (InvalidDataException)
+        {
+            throw new KubernetesOwnershipCollisionException();
         }
     }
 }

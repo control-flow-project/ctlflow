@@ -1,0 +1,18 @@
+FROM node:26.1.0-bookworm-slim AS build
+
+WORKDIR /workspace
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY tooling/clean-directories.mjs tooling/clean-directories.mjs
+COPY services/execd/package.json services/execd/package.json
+RUN npm ci \
+    --workspace @ctlflow/execd \
+    --include-workspace-root=false
+
+COPY services/execd/testing services/execd/testing
+RUN npm run build:application --workspace @ctlflow/execd
+
+FROM node:26.1.0-bookworm-slim
+WORKDIR /app
+COPY --from=build /workspace/services/execd/.generated/testing/application/node/src ./
+USER 1000:1000
+ENTRYPOINT ["node", "/app/run-controlled-application.js"]

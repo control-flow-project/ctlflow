@@ -7,6 +7,9 @@ import {
 } from "node:url";
 import ts from "typescript";
 import {
+  verifyReleaseGates
+} from "../../../../tooling/evidence/verify-release-gates.mjs";
+import {
   parseDocument
 } from "yaml";
 import {
@@ -80,6 +83,7 @@ function parseManifest(value) {
       && value.releaseGates.every(isNonemptyString)
       && new Set(value.releaseGates).size === value.releaseGates.length,
     "Authd evidence manifest shape is invalid");
+  verifyReleaseGates(value.releaseGates, "authd", false);
   return {
     operations: value.operations.map(parseOperation),
     crossCutting: value.crossCutting.map(parseReference)

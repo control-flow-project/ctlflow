@@ -1,0 +1,92 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: CtlFlow Egressd bound HTTP proxy
+  version: 1.0.0
+  description: >-
+    Exact private HTTP surface for one purpose-bound consumer and one exact
+    HTTPS origin. The path template is a catch-all that includes root and
+    nested paths. The projected binding independently narrows methods, paths,
+    headers, bodies, and trace propagation.
+paths:
+  /{path}:
+    x-ctlflow-catch-all-includes-root: true
+    parameters:
+      - $ref: "#/components/parameters/CatchAllPath"
+      - $ref: "#/components/parameters/WorkloadAuthentication"
+    get:
+      operationId: forwardGet
+      responses:
+        default: { $ref: "#/components/responses/Mediated" }
+    head:
+      operationId: forwardHead
+      responses:
+        default: { $ref: "#/components/responses/Mediated" }
+    post:
+      operationId: forwardPost
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Mediated" }
+    put:
+      operationId: forwardPut
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Mediated" }
+    patch:
+      operationId: forwardPatch
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Mediated" }
+    delete:
+      operationId: forwardDelete
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Mediated" }
+    options:
+      operationId: forwardOptions
+      requestBody:
+        $ref: "#/components/requestBodies/StreamingBody"
+      responses:
+        default: { $ref: "#/components/responses/Mediated" }
+components:
+  parameters:
+    CatchAllPath:
+      name: path
+      in: path
+      required: true
+      description: >-
+        Origin-form root or nested path. The complete request target,
+        including query, is bounded to 16 KiB.
+      schema:
+        type: string
+        maxLength: 16384
+    WorkloadAuthentication:
+      name: Proxy-Authorization
+      in: header
+      required: true
+      description: >-
+        Bearer token bound to the exact admitted Kubernetes namespace and
+        ServiceAccount. It is never sent to the upstream.
+      schema:
+        type: string
+        pattern: "^[Bb][Ee][Aa][Rr][Ee][Rr] [A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+        maxLength: 16384
+  requestBodies:
+    StreamingBody:
+      required: false
+      description: Opaque streaming body bounded by the matched rule.
+      content:
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+            maxLength: 67108864
+  responses:
+    Mediated:
+      description: >-
+        The admitted upstream response, or one fixed Egressd boundary error:
+        400, 404, 405, 407, 413, 414, 429, 431, 502, or 504.

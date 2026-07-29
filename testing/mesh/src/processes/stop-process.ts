@@ -1,32 +1,69 @@
 import type { ManagedProcess } from "./managed-process.js";
 
-const gracefulStopMilliseconds = 5_000;
+const gracefulStopMilliseconds = 250;
+const forcedStopMilliseconds = 2_000;
 
 export async function stopProcess(process_: ManagedProcess): Promise<void> {
-  if (process_.child.exitCode !== null || process_.child.signalCode !== null) {
+  const child = process_.child;
+  if (hasExited(child)) {
     return;
   }
 
-  process_.child.ref();
-  setStreamReference(process_.child.stdout, true);
-  setStreamReference(process_.child.stderr, true);
-  process_.child.kill("SIGTERM");
+  child.ref();
+  setStreamReference(child.stdout, true);
+  setStreamReference(child.stderr, true);
+  try {
+    const gracefulExit = waitForExit(
+      child,
+      gracefulStopMilliseconds);
+    child.kill("SIGTERM");
+    if (await gracefulExit) {
+      return;
+    }
 
-  const stopped = await Promise.race([
-    new Promise<boolean>((resolve) => {
-      process_.child.once("exit", () => resolve(true));
-    }),
-    new Promise<boolean>((resolve) => {
-      setTimeout(() => resolve(false), gracefulStopMilliseconds);
-    })
-  ]);
-
-  if (!stopped && process_.child.exitCode === null) {
-    process_.child.kill("SIGKILL");
-    await new Promise<void>((resolve) => {
-      process_.child.once("exit", () => resolve());
-    });
+    const forcedExit = waitForExit(child, forcedStopMilliseconds);
+    if (!hasExited(child)) {
+      child.kill("SIGKILL");
+    }
+    if (!await forcedExit) {
+      throw new Error(
+        `Process ${String(child.pid)} did not stop after SIGKILL`);
+    }
+  } finally {
+    child.unref();
+    setStreamReference(child.stdout, false);
+    setStreamReference(child.stderr, false);
   }
+}
+
+function waitForExit(
+  child: ManagedProcess["child"],
+  timeoutMilliseconds: number
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (exited: boolean): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      child.removeListener("exit", onExit);
+      resolve(exited);
+    };
+    const onExit = (): void => finish(true);
+    const timer = setTimeout(
+      () => finish(hasExited(child)),
+      timeoutMilliseconds);
+    child.once("exit", onExit);
+    if (hasExited(child)) {
+      finish(true);
+    }
+  });
+}
+
+function hasExited(child: ManagedProcess["child"]): boolean {
+  return child.exitCode !== null || child.signalCode !== null;
 }
 
 function setStreamReference(

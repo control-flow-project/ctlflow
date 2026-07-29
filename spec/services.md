@@ -44,16 +44,22 @@ policyd
 authd
   +-> identityd.CreateSession
   +-> identityd.RevokeSession
+  +-> purpose-bound egressd HTTP binding
 
 edged
   +-> identityd.ExchangeSession
 
 execd
+  +-> identityd.GetInvocationVerificationKeys
+  +-> policyd.CheckAccess
   +-> pkgd.GetApp
   +-> pkgd.GetPackage
   +-> configd.ApplyProjection
   +-> identityd.IssueRunInvocation
   +-> auditd.RecordAuditBatch
+
+egressd
+  +-> no kernel RPC; consumes process-private projected binding material
 
 identityd
   +-> auditd.RecordAuditBatch
@@ -75,6 +81,10 @@ configured provisioner controller
 
 No other cross-service method is implied by the architecture diagrams,
 ownership table, CLI naming, or an implementation helper.
+
+Execd realizes Edged sidecars and may realize or select Egressd binding
+workloads through Kubernetes. Deployment and process-private projection are
+not service-to-service RPCs and do not make either proxy an Execd record.
 
 ## Ownership rules
 

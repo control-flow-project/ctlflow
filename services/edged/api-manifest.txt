@@ -1,0 +1,9 @@
+config/v1/binding.schema.json	e23fe1cb7bf51d22c2c55ad16dc3de3d96b111d6df0204a80a4a654895a90b9a
+http/v1/openapi.yaml	5a497323a4ce89eeeb0175ff113430e388458a22ff4f465684e5231359cc241c
+GET	/{path}	proxyGet
+HEAD	/{path}	proxyHead
+POST	/{path}	proxyPost
+PUT	/{path}	proxyPut
+PATCH	/{path}	proxyPatch
+DELETE	/{path}	proxyDelete
+OPTIONS	/{path}	proxyOptions

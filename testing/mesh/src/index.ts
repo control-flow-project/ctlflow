@@ -13,6 +13,9 @@ export {
 export {
   publishCSharpService
 } from "./platforms/csharp/publish-csharp-service.js";
+export {
+  buildCSharpServiceImage
+} from "./platforms/csharp/build-csharp-service-image.js";
 export { startCSharpService } from "./platforms/csharp/start-csharp-service.js";
 export type {
   CSharpStatelessService,
@@ -45,6 +48,9 @@ export type {
   TestOperatorCredentials
 } from "./kubernetes/test-operator-credentials.js";
 export type {
+  TestContainerArtifact
+} from "./kubernetes/test-container-artifact.js";
+export type {
   KustomizeServiceFiles
 } from "./kubernetes/services/kustomize-service.js";
 export { startTestKubernetes } from "./kubernetes/start-test-kubernetes.js";
@@ -66,15 +72,6 @@ export {
 export {
   waitForReadiness
 } from "./processes/wait-for-readiness.js";
-export {
-  loadWorkloadVerificationKeys
-} from "./stubs/security/load-workload-verification-keys.js";
-export {
-  validateWorkloadToken
-} from "./stubs/security/validate-workload-token.js";
-export type {
-  WorkloadVerificationSettings
-} from "./stubs/security/workload-verification-settings.js";
 export {
   createTestServiceTls
 } from "./tls/create-test-service-tls.js";
