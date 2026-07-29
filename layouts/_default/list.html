@@ -1,15 +1,9 @@
 {{ define "main" }}
   <article class="document">
-    <h1>{{ .Title }}</h1>
+    <header class="document-header">
+      <h1>{{ .Title }}</h1>
+      {{ with .Description }}<p class="document-description">{{ . }}</p>{{ end }}
+    </header>
     {{ .Content }}
-    {{ if and (not .IsHome) .Pages }}
-      <nav class="section-pages" aria-label="{{ .Title }} pages">
-        <ul>
-          {{ range .Pages.ByWeight }}
-            <li><a href="{{ .RelPermalink }}">{{ .LinkTitle }}</a></li>
-          {{ end }}
-        </ul>
-      </nav>
-    {{ end }}
   </article>
 {{ end }}

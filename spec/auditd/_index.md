@@ -1,11 +1,14 @@
 ---
 title: auditd
+description: Immutable typed kernel mutation evidence and source admission.
 weight: 80
 ---
 
 `auditd` is the sole authority for immutable kernel audit evidence. It accepts
 only the typed successful-mutation evidence declared by its protobuf contract;
 operational observations remain in [Telemetry](../telemetry/).
+
+**Wire reference:** [auditd gRPC API](../apis/auditd/)
 
 ## Surface
 

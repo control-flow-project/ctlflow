@@ -1,5 +1,6 @@
 ---
 title: CtlFlow
+description: Kernel architecture, contracts, services, and implementation rules.
 weight: 1
 ---
 
@@ -48,18 +49,18 @@ without exposing their material to `execd`.
 
 ## Kernel services
 
-| Service | Owns |
-| --- | --- |
-| [`tenantd`](tenantd/) | Tenants and Workspaces |
-| [`authd`](authd/) | Public authentication protocol mediation; no durable domain records |
-| [`identityd`](identityd/) | Accounts, groups, memberships, external identity links, Sessions, virtual principals, and invocation identity |
-| [`policyd`](policyd/) | Path-and-operation grants and authorization decisions |
-| [`pkgd`](pkgd/) | Immutable Package generations and installed App intent |
-| [`configd`](configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections |
-| [`execd`](execd/) | Placements, constraints, dependencies, Workloads, Runs, storage, endpoints, and Kubernetes realization |
-| [`edged`](edged/) | External ingress and reverse proxying |
-| [`egressd`](egressd/) | Controlled external HTTP |
-| [`auditd`](auditd/) | Immutable authoritative kernel evidence |
+| Service | Owns | Wire reference |
+| --- | --- | --- |
+| [`tenantd`](tenantd/) | Tenants and Workspaces | [12 gRPC methods](apis/tenantd/) |
+| [`authd`](authd/) | Public authentication protocol mediation; no durable domain records | [3 HTTP routes](apis/authd/) |
+| [`identityd`](identityd/) | Accounts, groups, memberships, external identity links, Sessions, virtual principals, and invocation identity | [7 gRPC methods](apis/identityd/) |
+| [`policyd`](policyd/) | Path-and-operation grants and authorization decisions | [1 gRPC method](apis/policyd/) |
+| [`pkgd`](pkgd/) | Immutable Package generations and installed App intent | [5 gRPC methods](apis/pkgd/) |
+| [`configd`](configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections | [5 gRPC methods](apis/configd/) |
+| [`execd`](execd/) | Placements, constraints, dependencies, Workloads, Runs, storage, endpoints, and Kubernetes realization | [10 gRPC methods](apis/execd/) |
+| [`edged`](edged/) | External ingress and reverse proxying | [7 HTTP methods](apis/edged/) |
+| [`egressd`](egressd/) | Controlled external HTTP | [7 HTTP methods](apis/egressd/) |
+| [`auditd`](auditd/) | Immutable authoritative kernel evidence | [1 gRPC method](apis/auditd/) |
 
 Chat, Files, Tasks, Notifications, realtime delivery, application events, agent management, and
 vertical business domains are Packages, not kernel services. An agent is a product composition of a
@@ -100,6 +101,13 @@ virtual principal, a finite Workload, persistent state, and product-owned activa
 13. OpenTelemetry is the sole operational telemetry model. It is bounded and non-authoritative;
     required security and mutation evidence remains in `auditd`.
 
-Continue with [Planes](planes/), [Model](model/), [Access](access/), [APIs](apis/),
-[Contracts](contracts/), [Telemetry](telemetry/), [Flows](flows/), [Services](services/),
-[Implementation](implementation/), and the [CLI](cli/).
+## Reading order
+
+1. [Planes](planes/) defines control-plane and data-plane boundaries.
+2. [Model](model/) defines the records and their owners.
+3. [Access](access/) defines caller, Actor, account, and Placement authority.
+4. [API reference](apis/) shows every approved gRPC method and HTTP route.
+5. [Contracts](contracts/) and [Flows](flows/) connect the services end to end.
+6. [Services](services/) and each service page define detailed behavior.
+7. [Implementation](implementation/) and [C#](csharp/) define repository and release rules.
+8. [CLI](cli/) defines the operator surface.

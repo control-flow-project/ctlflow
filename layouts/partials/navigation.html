@@ -1,0 +1,30 @@
+<nav class="navigation" aria-label="Specification">
+  {{ range .Site.Menus.main }}
+    {{ $active := or ($.IsMenuCurrent "main" .) ($.HasMenuCurrent "main" .) }}
+    {{ if .HasChildren }}
+      <section class="nav-group">
+        {{ if .Page }}
+          <a
+            class="nav-group-title{{ if $active }} is-active{{ end }}"
+            href="{{ .URL }}"
+          >{{ .Name }}</a>
+        {{ else }}
+          <div class="nav-group-title{{ if $active }} is-active{{ end }}">{{ .Name }}</div>
+        {{ end }}
+        <div class="nav-children">
+          {{ range .Children }}
+            <a
+              class="nav-link{{ if $.IsMenuCurrent "main" . }} is-active{{ end }}"
+              href="{{ .URL }}"
+            >{{ .Name }}</a>
+          {{ end }}
+        </div>
+      </section>
+    {{ else }}
+      <a
+        class="nav-link nav-link-root{{ if $active }} is-active{{ end }}"
+        href="{{ .URL }}"
+      >{{ .Name }}</a>
+    {{ end }}
+  {{ end }}
+</nav>

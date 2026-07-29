@@ -1,5 +1,6 @@
 ---
 title: C# Implementation
+description: C# service layering, functional source structure, Entity Framework, and translation.
 weight: 31
 ---
 

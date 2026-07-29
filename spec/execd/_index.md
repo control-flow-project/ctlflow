@@ -1,5 +1,6 @@
 ---
 title: execd
+description: Placement, Workload, and Run intent plus Kubernetes realization.
 weight: 65
 ---
 
@@ -7,6 +8,8 @@ weight: 65
 the sole general boundary from CtlFlow execution intent to Kubernetes. Its
 only caller-visible API is the unary gRPC contract in
 `services/execd/api/proto/v1/execd.proto`.
+
+**Wire reference:** [execd gRPC API](../apis/execd/)
 
 ## Owned records
 

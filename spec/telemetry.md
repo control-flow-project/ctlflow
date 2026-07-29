@@ -1,5 +1,6 @@
 ---
 title: Telemetry
+description: OpenTelemetry propagation, attributes, collection, failure, and audit separation.
 weight: 24
 ---
 

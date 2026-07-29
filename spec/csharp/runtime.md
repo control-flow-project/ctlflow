@@ -1,5 +1,6 @@
 ---
 title: C# Runtime and Release
+description: C# authentication, telemetry, NativeAOT publication, and release gates.
 weight: 32
 ---
 

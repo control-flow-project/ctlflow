@@ -1,5 +1,6 @@
 ---
 title: Tenants
+description: Operator commands for Tenant creation, reads, updates, lifecycle, and resolution.
 weight: 10
 ---
 

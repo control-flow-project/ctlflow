@@ -1,5 +1,6 @@
 ---
 title: policyd
+description: Capability grants and current operation-and-path authorization decisions.
 weight: 50
 ---
 
@@ -7,6 +8,8 @@ weight: 50
 has one declared operation on one canonical resource path. The resource owner
 enforces the result and its own Domain invariants; Policyd never reads or
 mutates the protected object.
+
+**Wire reference:** [policyd gRPC API](../apis/policyd/)
 
 ## Ownership and records
 

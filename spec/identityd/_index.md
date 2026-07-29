@@ -1,5 +1,6 @@
 ---
 title: identityd
+description: Principal facts, standing, Groups, Sessions, and invocation identity.
 weight: 46
 ---
 
@@ -7,6 +8,8 @@ weight: 46
 Membership, direct-Group, external-identity-link, Session, and invocation
 identity. It exposes only the gRPC contract in
 `services/identityd/api/proto/v1/identityd.proto` and has no public listener.
+
+**Wire reference:** [identityd gRPC API](../apis/identityd/)
 
 ## Approved ownership
 

@@ -1,5 +1,6 @@
 ---
 title: Model
+description: Kernel records, ownership, scope, placement, and identity relationships.
 weight: 10
 ---
 

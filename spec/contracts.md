@@ -1,5 +1,6 @@
 ---
 title: Contracts
+description: Cross-service ownership, dependency, transport, and failure contracts.
 weight: 22
 ---
 

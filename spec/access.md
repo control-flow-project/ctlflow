@@ -1,5 +1,6 @@
 ---
 title: Access
+description: Immediate caller identity, invocation Actors, target fences, and capability decisions.
 weight: 15
 ---
 

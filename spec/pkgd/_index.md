@@ -1,11 +1,14 @@
 ---
 title: pkgd
+description: Immutable Package generations and installed App intent.
 weight: 55
 ---
 
 `pkgd` is the private authority for immutable Package declarations and
 installed App intent. Its only domain surface is the unary gRPC contract in
 `services/pkgd/api/proto/v1/pkgd.proto`.
+
+**Wire reference:** [pkgd gRPC API](../apis/pkgd/)
 
 ## Ownership and records
 

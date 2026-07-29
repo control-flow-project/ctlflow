@@ -1,5 +1,6 @@
 ---
 title: Planes
+description: Control-plane, data-plane, and external-boundary ownership.
 weight: 5
 ---
 

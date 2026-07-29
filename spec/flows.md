@@ -1,5 +1,6 @@
 ---
 title: Flows
+description: Approved end-to-end operator, browser, product, execution, and failure flows.
 weight: 24
 ---
 
