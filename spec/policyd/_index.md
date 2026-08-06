@@ -102,13 +102,130 @@ The `workspaces.read` collection path is
 `/<workspace_id>`. IDs in the path must equal the request target. Collection
 targets omit `workspace_id`; exact Workspace targets require it.
 
-Pkgd, Configd, and Execd never send Global scope to Policyd. Execd's list and
+Pkgd, Configd, and Execd never send Global scope to Policyd, and there is no
+Global capability target for a product operation either; a globally placed
+workload acts through the non-Global invocation it is serving. Execd's list and
 exact read paths share their corresponding read operation. Every ID and purpose
 segment retains the canonical grammar and bound declared by its owning service.
 
 `CreateTenant`, `ListTenants`, and `SetTenantState` remain operator operations.
 `ResolveTenant` and `ResolveWorkspace` remain autonomous-kernel operations.
 They have no Policyd catalog entry.
+
+## Operation identity
+
+Every operation has a tagged identity. All three fields are non-empty and
+participate in stored policy keys:
+
+```text
+operation_owner_kind = kernel | package
+operation_owner_id   = svc_tenantd | <package_id>
+operation            = tenants.read | widgets.read
+```
+
+`operation_owner_kind` is a closed union. There is no sentinel or magic value.
+Two packages may each declare `widgets.read`, and a package may use a token that
+is lexically identical to a kernel token; owner kind and owner ID keep them
+distinct.
+
+Policyd selects the owner namespace from the authenticated immediate caller
+**before** it interprets the token:
+
+```text
+exact admitted kernel caller  -> fixed kernel catalog
+other admitted workload       -> Execd product-operation binding
+```
+
+A product workload therefore cannot enter the kernel branch, whatever token it
+names, and Pkgd never needs a copy of the kernel catalog.
+
+## Product operation authority
+
+Product operations are declared by Pkgd, admitted by Execd, and resolved by
+Policyd at decision time. Policyd stores no ownership of its own and holds no
+product-operation registry, projected ownership file, or mutable authority
+cache.
+
+For a product operation Policyd calls exactly one dependency:
+
+```text
+execd.ResolveWorkloadOperationBinding(service_account_subject, operation)
+  -> effective Placement target, App ID, Package ID
+```
+
+`service_account_subject` is derived by Policyd from the workload token it has
+already validated, never from a request field. `operation` is an untrusted
+selector that Execd confirms against its retained admitted snapshot. Execd
+returns `NOT_FOUND` when the subject is unknown, the Workload or any Placement
+ancestor is inactive, or the operation is not admitted for that Workload.
+`NOT_FOUND` means the workload owns no active admitted binding and is a
+product caller denial. Cancellation and deadline outcomes propagate unchanged;
+every other Execd failure is dependency `UNAVAILABLE`.
+
+Policyd validates the resolver response at its own boundary before any fence
+or policy step: the Placement target must carry exactly one well-formed level,
+and the App ID and Package ID must be non-empty canonical identifiers. A
+missing, malformed, or structurally impossible response is dependency
+`UNAVAILABLE`; generated-message defaults never reach the fence or the policy
+evaluator. The call is a private Execd dependency call and carries Policyd's
+own bound workload identity, finite deadline, cancellation, and W3C trace
+context, and no invocation JWT; its telemetry names the Execd dependency and
+RPC.
+
+Policyd then applies, in order:
+
+1. the Placement fence — the validated invocation target must be inside the
+   workload's effective containment;
+2. the App anchor — the resource path must be anchored to the admitted App; and
+3. ordinary policy evaluation using the tagged identity
+   `(package, <package_id>, <operation>)`.
+
+The fence and anchor precede policy evaluation. No Role, binding, or grant can
+widen them.
+
+### Placement fence
+
+Global is a Placement, not an authorization target. A globally placed workload
+carries no narrower containment; it still acts only through a non-Global
+invocation.
+
+| Placement target | Admitted invocation targets |
+| --- | --- |
+| Global | Any non-Global target otherwise permitted by policy |
+| Tenant | That exact Tenant, including a descendant Workspace invocation |
+| Workspace | That exact Tenant and that exact Workspace only |
+| User | That exact Tenant and subject account, with no Workspace target |
+
+Containment narrows and never widens: a Workspace-placed workload cannot serve a
+Tenant-root or sibling-Workspace invocation, and a User-placed workload cannot
+serve a sibling account.
+
+A User-placed workload additionally requires the account-scoped resource path
+`/tenants/<tenant_id>/accounts/<account_principal_id>/apps/<app_id>[...]` whose
+account equals the invocation subject account. A Tenant-root App path is not
+admitted for a User Placement merely because the invocation subject matches;
+the exact account path is required before the invocation account fence
+applies.
+
+### Product resource paths
+
+A product path is anchored under the admitted App. The App root is itself a
+valid target, so an operation needs no trailing product segment:
+
+```text
+/tenants/<tenant_id>/apps/<app_id>[/<product path>]
+/tenants/<tenant_id>/workspaces/<workspace_id>/apps/<app_id>[/<product path>]
+/tenants/<tenant_id>/accounts/<account_principal_id>/apps/<app_id>[/<product path>]
+```
+
+There is no Global capability path. Policyd verifies the canonical scope and the
+exact admitted `app_id`; the product owns only the trailing domain path. Each
+trailing segment starts `[a-z0-9]`, continues `[a-z0-9_.-]`, and is one to 128
+characters. Spaces, encoded forms, traversal, and duplicate separators are
+rejected, and the 512-character resource-path bound governs total length.
+
+An operation that Execd does not confirm for the authenticated workload is
+denied. Ownership is never asserted by a caller.
 
 ## CheckAccess
 
@@ -127,17 +244,22 @@ reason are not body fields.
 
 For every call, Policyd:
 
-1. authenticates the immediate workload and requires it to own the requested
-   catalog operation;
-2. independently validates the required invocation JWT under
+1. authenticates the immediate workload and classifies it as an exact admitted
+   kernel caller or as another admitted workload, before interpreting the
+   operation token;
+2. for a kernel caller, requires the caller to own the requested fixed-catalog
+   operation; for any other workload, calls
+   `execd.ResolveWorkloadOperationBinding` with the authenticated subject and
+   the requested operation, and denies on `NOT_FOUND`;
+3. independently validates the required invocation JWT under
    [Access](../access/) and [Contracts](../contracts/);
-3. requires the request target and path to match the catalog and invocation
-   fence;
-4. calls `identityd.ResolvePrincipal` for the invocation Actor and exact target;
-5. consumes every `identityd.ListPrincipalGroups` page for that Actor and, for
+4. requires the request target and path to match the catalog fence, or, for a
+   product operation, the returned Placement fence and App anchor;
+5. calls `identityd.ResolvePrincipal` for the invocation Actor and exact target;
+6. consumes every `identityd.ListPrincipalGroups` page for that Actor and, for
    a virtual Actor, its resolved attached account; and
-6. evaluates exact-target direct grants and Role bindings for the operation and
-   path.
+7. evaluates exact-target direct grants and Role bindings for the tagged
+   operation identity and path.
 
 Policyd obtains invocation verification keys through
 `identityd.GetInvocationVerificationKeys`. It caches Identityd's exact bounded
@@ -184,8 +306,9 @@ lease, reusable review, or permission snapshot.
 | `deny` | Identity is current but disabled, or no matching effective allow exists |
 
 Unknown well-formed operations are `PERMISSION_DENIED`; a known operation with
-an invalid path or target is `INVALID_ARGUMENT`. Identityd dependency failures
-other than concealed `NOT_FOUND`, cancellation, or deadline are `UNAVAILABLE`.
+an invalid path or target is `INVALID_ARGUMENT`. Identityd and Execd dependency
+failures other than concealed `NOT_FOUND`, cancellation, or deadline are
+`UNAVAILABLE`.
 Dependency failure never becomes deny and never falls back to an expired key,
 earlier identity fact, broader target, or earlier allow.
 
@@ -193,8 +316,12 @@ earlier identity fact, broader target, or earlier allow.
 
 Policyd is durable and reads only its own Knex-migrated file-backed SQLite
 database. Its logical policy schema contains `roles`, `role_rules`,
-`role_bindings`, and `access_grants`. The operation-owner catalog is checked
-deployment configuration, not a database table.
+`role_bindings`, and `access_grants`. Role rules and access grants store the
+tagged operation identity `operation_owner_kind`, `operation_owner_id`, and
+`operation`, all non-empty and participating in their keys and uniqueness. The
+kernel operation-owner catalog is checked deployment configuration, not a
+database table, and product operation authority is resolved at decision time
+rather than stored.
 
 The schema enforces requiredness, bounds, canonical representations, exact
 targets, closed subject and match kinds, keys, foreign keys, uniqueness, and
@@ -203,16 +330,24 @@ operation ownership, path matching, Actor intersection, and allow evaluation
 remain Domain behavior. The common migration, runtime, and release rules are
 defined by [Implementation](../implementation/).
 
-Readiness requires the exact migration ledger and compatible schema, catalog,
-stored policy, and process-private workload, TLS, database, and dependency
-custody. The serving process does not migrate, repair, or seed state. Restart
-preserves provisioned policy. Dependency outage never activates a fallback.
+Readiness requires the exact migration ledger and compatible schema, kernel
+catalog, stored policy structure, and process-private workload, TLS, database,
+and dependency custody. It verifies infrastructure only: it never requires an
+active Workload for a stored product policy entry, so valid policy naming a
+suspended or absent Workload does not make Policyd unready. Migration validates
+structure, readiness validates infrastructure, and runtime validates current
+authority. The serving process does not migrate, repair, or seed state. Restart
+preserves provisioned policy. Dependency outage never activates a fallback, and
+Policyd caches no mutable Workload eligibility, so suspension, retirement,
+deletion, or ancestor deactivation takes effect on the next request.
 
 ## Telemetry and audit
 
 CheckAccess emits bounded traces, metrics, and structured logs under
 [Telemetry](../telemetry/). Trace context continues through verification-key,
-principal, Group-page, and database calls. Successful allow and deny responses
+principal, Group-page, Execd product-operation resolution, and database calls.
+Every dependency call, including the Execd resolver, records its canonical
+gRPC status in `ctlflow.outcome` on its own client span. Successful allow and deny responses
 have gRPC outcome `OK` and separate `ctlflow.decision` values.
 
 Telemetry excludes credentials, invocation claims, IDs, resource paths, Group

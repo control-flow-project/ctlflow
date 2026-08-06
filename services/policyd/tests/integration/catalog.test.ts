@@ -45,6 +45,7 @@ test("allows every catalog operation from its exact owner and target", async () 
     roles: [],
     grants: catalogCases.map((entry) =>
       directGrant(
+        `svc_${entry.owner}`,
         entry.operation,
         entry.resourcePath,
         {
@@ -99,9 +100,12 @@ test("rejects each catalog partition from another authenticated owner", async ()
   }
 });
 
-test("rejects an unadmitted workload and unknown operation", async () => {
+test("routes a non-kernel workload to Execd and fails closed without it", async () => {
   const context = getPolicydTestContext();
   const invocation = context.invocation.sign({ tenantId: "acme" });
+  // A workload outside the exact kernel set is a product workload. Its
+  // authority lives in Execd's admission state; with Execd unavailable the
+  // decision fails closed rather than guessing.
   await assert.rejects(
     callCheckAccess(
       {
@@ -114,7 +118,10 @@ test("rejects an unadmitted workload and unknown operation", async () => {
           context.workloads.unadmitted.callerToken,
           invocation)
       }),
-    matchGrpcStatus(status.PERMISSION_DENIED));
+    matchGrpcStatus(status.UNAVAILABLE));
+});
+
+test("rejects an unknown operation from a kernel owner", async () => {
   await assert.rejects(
     callCheckAccess({
       operation: "widgets.read",
@@ -209,6 +216,68 @@ test("conceals invocation and account-scope fence mismatches", async () => {
       }),
     matchGrpcStatus(status.NOT_FOUND));
 });
+
+// Product operations are namespaced by the caller: Policyd classifies the
+// authenticated workload before interpreting the token, and resolves product
+// authority through Execd at decision time. This suite deploys no Execd, so
+// the product branch is proven to route and fail closed here; the complete
+// production flow is exercised in the Execd suite.
+const productOperation = "messages.post";
+const productResourcePath =
+  "/tenants/acme/workspaces/atlas/apps/app_chat/topics/topic_1/messages";
+
+test("fails closed for a product operation when Execd is unavailable", async () => {
+  const context = getPolicydTestContext();
+  await context.reset();
+  await context.policyd.setPrincipalFacts([
+    principalFact({ workspaceId: "atlas", membershipRevision: 2 })
+  ]);
+  await assert.rejects(
+    callCheckAccess(
+      {
+        operation: productOperation,
+        resourcePath: productResourcePath,
+        tenantId: "acme",
+        workspaceId: "atlas"
+      },
+      { owner: "product" }),
+    matchGrpcStatus(status.UNAVAILABLE));
+});
+
+test("keeps a product workload out of the kernel branch", async () => {
+  // Whatever token it names, a non-kernel caller is resolved through Execd:
+  // classification precedes token interpretation, so a lexically kernel token
+  // cannot cross into the kernel namespace. Without Execd it fails closed.
+  await assert.rejects(
+    callCheckAccess(
+      {
+        operation: "tenants.read",
+        resourcePath: "/tenants/acme",
+        tenantId: "acme"
+      },
+      { owner: "product" }),
+    matchGrpcStatus(status.UNAVAILABLE));
+});
+
+
+test("rejects a product operation from a kernel owner", async () => {
+  // An exact kernel caller enforces only its own catalog operations; a
+  // package token is not among them, whatever its spelling.
+  for (const owner of ["tenantd", "pkgd", "execd"] as const) {
+    await assert.rejects(
+      callCheckAccess(
+        {
+          operation: productOperation,
+          resourcePath: productResourcePath,
+          tenantId: "acme",
+          workspaceId: "atlas"
+        },
+        { owner }),
+      matchGrpcStatus(status.PERMISSION_DENIED),
+      owner);
+  }
+});
+
 
 function ownerFor(operation: string): PolicyOwner {
   if (operation.startsWith("apps.")) {

@@ -37,6 +37,14 @@ internal static partial class PackageRequests
                     "Every Package component requires an OCI artifact");
             }
 
+            var declaredOperations = new List<DeclaredOperation>(
+                component.DeclaredOperations.Count);
+            foreach (var operation in component.DeclaredOperations)
+            {
+                declaredOperations.Add(
+                    await DeclaredOperation.Parse(operation, cancellation));
+            }
+
             components.Add(new PackageComponentSpec(
                 await ComponentId.Parse(
                     component.ComponentId,
@@ -47,7 +55,10 @@ internal static partial class PackageRequests
                         cancellation),
                     await Sha256Digest.Parse(
                         component.Artifact.ManifestDigest,
-                        cancellation))));
+                        cancellation)),
+                declaredOperations
+                    .OrderBy(value => value.Value, StringComparer.Ordinal)
+                    .ToArray()));
         }
 
         var interfaces = new List<PackageInterfaceSpec>(

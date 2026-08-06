@@ -68,6 +68,18 @@ public static partial class Packages
                     EF.Property<string>(value, "_manifestDigest")
             })
             .ToListAsync(queryCancellation);
+        var operationRows = await database.PackageComponentOperations
+            .AsNoTracking()
+            .Where(value =>
+                EF.Property<string>(value, "_packageId") == packageIdValue
+                && EF.Property<long>(value, "_generation") == generationValue)
+            .OrderBy(value => EF.Property<string>(value, "_operation"))
+            .Select(value => new
+            {
+                ComponentId = EF.Property<string>(value, "_componentId"),
+                Operation = EF.Property<string>(value, "_operation")
+            })
+            .ToListAsync(queryCancellation);
         var interfaceRows = await database.PackageInterfaces
             .AsNoTracking()
             .Where(value =>
@@ -192,7 +204,11 @@ public static partial class Packages
                 ComponentId.FromStorage(value.ComponentId),
                 new OciArtifact(
                     OciRepository.FromStorage(value.Repository),
-                    Sha256Digest.FromStorage(value.ManifestDigest))))
+                    Sha256Digest.FromStorage(value.ManifestDigest)),
+                operationRows
+                    .Where(row => row.ComponentId == value.ComponentId)
+                    .Select(row => DeclaredOperation.FromStorage(row.Operation))
+                    .ToArray()))
                 .ToArray(),
             interfaceRows.Select(value => new PackageInterfaceSpec(
                 InterfaceId.FromStorage(value.InterfaceId),

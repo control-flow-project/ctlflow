@@ -22,8 +22,6 @@ internal sealed record ServiceSettings(
     SessionLifetime SessionLifetime,
     TimeSpan InvocationKeyCacheLifetime,
     IReadOnlySet<KubernetesServiceAccountSubject>
-        GetInvocationVerificationKeysCallers,
-    IReadOnlySet<KubernetesServiceAccountSubject>
         ResolvePrincipalCallers,
     IReadOnlySet<KubernetesServiceAccountSubject>
         ListPrincipalGroupsCallers,

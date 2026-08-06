@@ -19,6 +19,9 @@ export interface DeclareTestAppOptions {
     readonly repository: string;
     readonly manifestDigest: string;
   };
+  // Product operations declared by the package's "service" component.
+  readonly serviceOperations?: readonly string[];
+  readonly generation?: bigint;
 }
 
 interface TestArtifact {
@@ -26,21 +29,33 @@ interface TestArtifact {
   readonly manifestDigest: string;
 }
 
-export async function declareTestApp(
+export interface DeclareTestPackageOptions {
+  readonly packageId: string;
+  readonly generation?: bigint | undefined;
+  readonly artifact?: TestArtifact | undefined;
+  readonly serviceOperations?: readonly string[] | undefined;
+}
+
+export async function declareTestPackage(
   client: PackageServiceClient,
-  options: DeclareTestAppOptions
-): Promise<App> {
-  const packageId = `package.${options.appId.replaceAll("_", ".")}`;
+  options: DeclareTestPackageOptions
+): Promise<void> {
+  const packageId = options.packageId;
+  const generation = options.generation ?? 1n;
   await callUnary((done) => client.declarePackage({
     packageId,
-    generation: 1n,
-    version: "1.0.0",
+    generation,
+    // Each generation carries its own version.
+    version: `${String(generation)}.0.0`,
     provenance: {
       sourceUri: `https://packages.example/${packageId}`,
       sourceDigest: `sha256:${"a".repeat(64)}`
     },
     components: [
-      component("service", options.artifact),
+      component(
+        "service",
+        options.artifact,
+        options.serviceOperations),
       component("web", options.artifact),
       component("finite", options.artifact),
       component("dependent", options.artifact)
@@ -68,27 +83,43 @@ export async function declareTestApp(
       interfaceId: "http"
     }]
   }, done));
+}
+
+export async function declareTestApp(
+  client: PackageServiceClient,
+  options: DeclareTestAppOptions
+): Promise<App> {
+  const packageId = `package.${options.appId.replaceAll("_", ".")}`;
+  await declareTestPackage(client, {
+    packageId,
+    generation: options.generation,
+    artifact: options.artifact,
+    serviceOperations: options.serviceOperations
+  });
   return await callUnary<App>((done) => client.createApp({
     appId: options.appId,
     scope: options.scope,
     placementId: options.placementId,
     packageId,
-    desiredPackageGeneration: 1n
+    desiredPackageGeneration: options.generation ?? 1n
   }, done));
 }
 
 function component(
   componentId: string,
-  artifact: TestArtifact = testWorkloadImage
+  artifact: TestArtifact = testWorkloadImage,
+  declaredOperations: readonly string[] = []
 ): {
   readonly componentId: string;
   readonly artifact: {
     readonly repository: string;
     readonly manifestDigest: string;
   };
+  readonly declaredOperations: string[];
 } {
   return {
     componentId,
-    artifact
+    artifact,
+    declaredOperations: [...declaredOperations]
   };
 }

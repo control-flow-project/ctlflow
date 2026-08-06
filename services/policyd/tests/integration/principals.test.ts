@@ -44,8 +44,8 @@ test("allows current human and service Actors", async () => {
   await context.policyd.replacePolicy({
     roles: [],
     grants: [
-      directGrant("apps.read", request.resourcePath),
-      directGrant("apps.read", request.resourcePath, {
+      directGrant("svc_pkgd", "apps.read", request.resourcePath),
+      directGrant("svc_pkgd", "apps.read", request.resourcePath, {
         subject: {
           kind: "principal",
           id: "service:automation"
@@ -79,13 +79,13 @@ test("requires virtual Actor and attached account authority", async () => {
       subjectAccountId: "user:alice"
     })
   ]);
-  const actor = directGrant("apps.read", request.resourcePath, {
+  const actor = directGrant("svc_pkgd", "apps.read", request.resourcePath, {
     subject: {
       kind: "principal",
       id: "agent:reviewer"
     }
   });
-  const account = directGrant("apps.read", request.resourcePath);
+  const account = directGrant("svc_pkgd", "apps.read", request.resourcePath);
   const invocation = {
     subject: "user:alice",
     actorSubject: "agent:reviewer",
@@ -120,8 +120,8 @@ test("denies disabled Actor or attached account", async () => {
   await context.policyd.replacePolicy({
     roles: [],
     grants: [
-      directGrant("apps.read", request.resourcePath),
-      directGrant("apps.read", request.resourcePath, {
+      directGrant("svc_pkgd", "apps.read", request.resourcePath),
+      directGrant("svc_pkgd", "apps.read", request.resourcePath, {
         subject: {
           kind: "principal",
           id: "agent:reviewer"
@@ -185,7 +185,7 @@ test("consumes every Group page before deciding", async () => {
   ]);
   await context.policyd.replacePolicy({
     roles: [],
-    grants: [directGrant("apps.read", request.resourcePath, {
+    grants: [directGrant("svc_pkgd", "apps.read", request.resourcePath, {
       subject: {
         kind: "group",
         id: groups[204]!
@@ -221,13 +221,13 @@ test("paginates virtual Actor and attached-account Groups separately", async () 
   await context.policyd.replacePolicy({
     roles: [],
     grants: [
-      directGrant("apps.read", request.resourcePath, {
+      directGrant("svc_pkgd", "apps.read", request.resourcePath, {
         subject: {
           kind: "group",
           id: actorGroups[100]!
         }
       }),
-      directGrant("apps.read", request.resourcePath, {
+      directGrant("svc_pkgd", "apps.read", request.resourcePath, {
         subject: {
           kind: "group",
           id: accountGroups[100]!

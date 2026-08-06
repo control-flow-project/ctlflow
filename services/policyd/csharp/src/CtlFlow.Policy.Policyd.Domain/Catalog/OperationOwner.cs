@@ -1,5 +1,7 @@
 namespace CtlFlow.Policy.Policyd.Domain.Catalog;
 
+// The fixed kernel operation owners. Product operations never appear here:
+// their owner is the resolved Package identity, not a catalog member.
 public enum OperationOwner
 {
     Tenantd = 1,

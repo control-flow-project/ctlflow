@@ -5,6 +5,7 @@ import {
 import path from "node:path";
 import {
   createTestServiceTls,
+  type TestServiceTls,
   type KustomizeServiceFiles,
   type TestKubernetes,
   type TestWorkloadCredentials
@@ -29,12 +30,15 @@ export interface PrepareServiceFilesOptions {
   readonly kubernetes: TestKubernetes;
   readonly trust: readonly ServiceFileSource[];
   readonly secrets?: readonly ServiceFileSource[];
+  readonly tls?: TestServiceTls;
 }
 
 export async function prepareServiceFiles(
   options: PrepareServiceFilesOptions
 ): Promise<PreparedServiceFiles> {
-  const tls = await createTestServiceTls(
+  // A caller may supply one shared TLS identity so a dependency started
+  // earlier (policyd) can already trust this service's certificate authority.
+  const tls = options.tls ?? await createTestServiceTls(
     options.repositoryRoot,
     options.directory,
     options.serviceName,

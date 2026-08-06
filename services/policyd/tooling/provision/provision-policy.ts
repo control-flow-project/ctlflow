@@ -37,6 +37,8 @@ async function insertPolicy(
     "role_rules",
     seed.roles.flatMap((role) => role.rules.map((rule) => ({
       role_id: role.roleId,
+      operation_owner_kind: rule.owner.kind === "kernel" ? 1 : 2,
+      operation_owner_id: rule.owner.id,
       operation: rule.operation,
       base_path: rule.basePath,
       match_kind: rule.match === "exact" ? 1 : 2
@@ -58,6 +60,8 @@ async function insertPolicy(
       workspace_id: grant.target.workspaceId ?? null,
       subject_kind: grant.subject.kind === "principal" ? 1 : 2,
       subject_id: grant.subject.id,
+      operation_owner_kind: grant.owner.kind === "kernel" ? 1 : 2,
+      operation_owner_id: grant.owner.id,
       operation: grant.operation,
       base_path: grant.basePath,
       match_kind: grant.match === "exact" ? 1 : 2

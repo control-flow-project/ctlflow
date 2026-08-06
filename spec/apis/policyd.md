@@ -28,7 +28,7 @@ Request fields:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `operation` | string | Immutable operation token declared by the authenticated resource owner |
+| `operation` | string | Immutable operation token. Policyd classifies the authenticated caller first, so a kernel service and a package may use the same lexical token without crossing authority |
 | `resource_path` | string | Canonical operation-specific path built by that owner |
 | `tenant_id` | string | Exact Tenant target for standing and policy evaluation |
 | `workspace_id` | optional string | Present only when the exact target is one Workspace |
@@ -100,6 +100,35 @@ validated invocation JWT and current Identityd facts. The calling service
 cannot supply a Role, Group list, grant, decision cache key, or reusable
 authorization credential.
 
+### Product workload example
+
+A realized chat workload enforces one operation declared by its admitted
+Package generation:
+
+```json
+{
+  "operation": "messages.post",
+  "resourcePath": "/tenants/northwind/workspaces/atlas/apps/chat_atlas/topics/general",
+  "tenantId": "northwind",
+  "workspaceId": "atlas"
+}
+```
+
+```text
+chat workload
+  -> identityd.GetInvocationVerificationKeys   on cache miss
+  -> policyd.CheckAccess
+       -> execd.ResolveWorkloadOperationBinding
+       -> apply Placement and App fences
+       -> identityd.ResolvePrincipal
+       -> identityd.ListPrincipalGroups
+       -> evaluate (package, chat, messages.post)
+       <- allow | deny
+```
+
+The lexical operation token is namespaced by the Package ID returned by Execd.
+Another Package may declare `messages.post` without sharing its grants.
+
 ## Matching
 
 The decision is allow only when all required conditions hold:
@@ -122,7 +151,7 @@ There are no deny rules. Absence of a current matching allow produces
 | `UNAUTHENTICATED` | Workload or invocation identity is invalid |
 | `PERMISSION_DENIED` | The immediate workload does not own the operation |
 | `NOT_FOUND` | The invocation target lies outside visible standing |
-| `UNAVAILABLE` | Policy persistence or required Identityd facts are unavailable |
+| `UNAVAILABLE` | Policy persistence, Execd authority, or required Identityd facts are unavailable |
 | `CANCELLED`, `DEADLINE_EXCEEDED` | The unary call did not complete |
 
 Checks are ephemeral reads. Policyd does not mint a reusable decision token,

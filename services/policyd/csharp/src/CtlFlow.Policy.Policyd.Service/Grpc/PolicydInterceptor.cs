@@ -1,5 +1,6 @@
 using System.Data.Common;
 using CtlFlow.Policy.Policyd.Service.Catalog;
+using CtlFlow.Policy.Policyd.Service.Decisions;
 using CtlFlow.Policy.Policyd.Service.Identity;
 using CtlFlow.Policy.Policyd.Service.Security;
 using CtlFlow.Policy.Policyd.Service.Security.Tokens;
@@ -84,6 +85,7 @@ internal sealed class PolicydInterceptor(PolicydTelemetry telemetry)
         }
         catch (Exception exception) when (
             exception is CatalogUnavailableException
+                or ExecutionUnavailableException
                 or IdentityUnavailableException
                 or DbException
                 or DbUpdateException

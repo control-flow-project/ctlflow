@@ -57,7 +57,7 @@ without exposing their material to `execd`.
 | [`policyd`](policyd/) | Path-and-operation grants and authorization decisions | [1 gRPC method](apis/policyd/) |
 | [`pkgd`](pkgd/) | Immutable Package generations and installed App intent | [5 gRPC methods](apis/pkgd/) |
 | [`configd`](configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections | [5 gRPC methods](apis/configd/) |
-| [`execd`](execd/) | Placements, constraints, dependencies, Workloads, Runs, storage, endpoints, and Kubernetes realization | [10 gRPC methods](apis/execd/) |
+| [`execd`](execd/) | Placements, constraints, dependencies, Workloads, Runs, storage, endpoints, and Kubernetes realization | [11 gRPC methods](apis/execd/) |
 | [`edged`](edged/) | External ingress and reverse proxying | [7 HTTP methods](apis/edged/) |
 | [`egressd`](egressd/) | Controlled external HTTP | [7 HTTP methods](apis/egressd/) |
 | [`auditd`](auditd/) | Immutable authoritative kernel evidence | [1 gRPC method](apis/auditd/) |

@@ -196,8 +196,6 @@ function createEnvironment(
     CTLFLOW_INVOCATION_SIGNING_PRIVATE_KEY_PATH:
       "/var/run/ctlflow/tls/invocation-signing.pem",
     CTLFLOW_SESSION_LIFETIME_SECONDS: "43200",
-    CTLFLOW_GET_INVOCATION_VERIFICATION_KEYS_CALLERS:
-      options.verificationKeyCallers.join(","),
     CTLFLOW_RESOLVE_PRINCIPAL_CALLERS:
       options.principalFactCallers.join(","),
     CTLFLOW_LIST_PRINCIPAL_GROUPS_CALLERS:
@@ -321,11 +319,6 @@ async function applyModes(
   }
   await service.restart({
     ...baseEnvironment,
-    CTLFLOW_GET_INVOCATION_VERIFICATION_KEYS_CALLERS:
-      admittedCallers(
-        options,
-        options.verificationKeyCallers,
-        denied),
     CTLFLOW_RESOLVE_PRINCIPAL_CALLERS:
       admittedCallers(
         options,

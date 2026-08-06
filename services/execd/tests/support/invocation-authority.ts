@@ -11,8 +11,16 @@ export interface InvocationTokenOptions {
   readonly issuedAt?: number;
   readonly notBefore?: number;
   readonly expiresAt?: number;
-  readonly authorityClaim?: boolean;
+  readonly authorityClaim?: ForbiddenAuthorityClaim;
 }
+
+export type ForbiddenAuthorityClaim =
+  | "roles"
+  | "capabilities"
+  | "grants"
+  | "kubernetes"
+  | "kubernetes.io"
+  | "kubernetes.io/serviceaccount/namespace";
 
 export interface InvocationAuthority {
   readonly issuer: string;
@@ -20,6 +28,10 @@ export interface InvocationAuthority {
   readonly verificationKey: InvocationVerificationKey;
   readonly sign: (options?: InvocationTokenOptions) => string;
   readonly signPayload: (payloadJson: string) => string;
+  readonly signToken: (
+    headerJson: string,
+    payloadJson: string
+  ) => string;
   readonly writePrivateKey: (path: string) => Promise<void>;
 }
 import type {

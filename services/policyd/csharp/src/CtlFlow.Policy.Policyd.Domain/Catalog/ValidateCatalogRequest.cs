@@ -39,7 +39,6 @@ public static partial class OperationCatalog
         };
         return new CatalogRequest(
             operation,
-            owner,
             resourcePath,
             target,
             account);

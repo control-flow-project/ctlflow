@@ -16,5 +16,6 @@ internal sealed record ServiceSettings(
     WorkloadTokenSettings WorkloadTokens,
     TokenValidationSettings InvocationTokens,
     OwnerCallerSettings OwnerCallers,
+    ExecutionSettings Execution,
     string CatalogPath,
     TelemetrySettings Telemetry);

@@ -33,7 +33,7 @@ service IdentityService {
 
 | Method | Request fields | Returns | Primary callers |
 | --- | --- | --- | --- |
-| `GetInvocationVerificationKeys` | none | active and retiring public keys, cache expiry | Kernel services that validate invocation JWTs |
+| `GetInvocationVerificationKeys` | none | active and retiring public keys, cache expiry | Any valid installation-issued bound workload token, including Execd-realized product workloads |
 | `ResolvePrincipal` | `principal_id`, `tenant_id`, optional `workspace_id` | principal, attached account, standing revisions | `policyd` |
 | `ListPrincipalGroups` | target selector, `page_size`, optional `after_group_id` | Group ID page | `policyd` |
 | `CreateSession` | `tenant_id`, `provider_id`, `provider_subject` | opaque Session ID, credential, expiry | `authd` |

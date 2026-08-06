@@ -1,3 +1,4 @@
+using CtlFlow.Execution.V1;
 using CtlFlow.Identity.V1;
 using CtlFlow.Policy.Policyd.Db.Providers;
 using CtlFlow.Policy.Policyd.Service.Configuration;
@@ -15,6 +16,7 @@ internal sealed class PolicyGrpcService(
     TokenAuthorities authorities,
     PolicyDatabase database,
     IdentityService.IdentityServiceClient identityClient,
+    ExecutionService.ExecutionServiceClient executionClient,
     PolicydTelemetry telemetry)
     : PolicyService.PolicyServiceBase
 {
@@ -32,6 +34,7 @@ internal sealed class PolicyGrpcService(
             authorities,
             database,
             identityClient,
+            executionClient,
             telemetry,
             context.CancellationToken);
         return new CheckAccessResponse

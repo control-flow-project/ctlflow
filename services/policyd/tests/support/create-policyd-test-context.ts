@@ -27,6 +27,9 @@ export interface PolicydOwnerWorkloads {
   readonly pkgd: TestWorkloadCredentials;
   readonly configd: TestWorkloadCredentials;
   readonly execd: TestWorkloadCredentials;
+  // A product workload outside every kernel caller set; its authority
+  // resolves through Execd at decision time.
+  readonly product: TestWorkloadCredentials;
   readonly unadmitted: TestWorkloadCredentials;
 }
 
@@ -52,6 +55,8 @@ Promise<PolicydTestContext> {
       await suite.kubernetes.createWorkloadCredentials("configd"),
     execd:
       await suite.kubernetes.createWorkloadCredentials("execd"),
+    product:
+      await suite.kubernetes.createWorkloadCredentials("product-chat"),
     unadmitted:
       await suite.kubernetes.createWorkloadCredentials("other-service")
   };

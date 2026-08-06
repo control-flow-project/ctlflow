@@ -1,3 +1,4 @@
+using CtlFlow.Execution.V1;
 using CtlFlow.Identity.V1;
 using CtlFlow.Policy.Policyd.Db.Providers;
 using CtlFlow.Policy.Policyd.Domain.Catalog;
@@ -31,6 +32,7 @@ internal static partial class AccessDecisions
         TokenAuthorities authorities,
         PolicyDatabase database,
         IdentityService.IdentityServiceClient identityClient,
+        ExecutionService.ExecutionServiceClient executionClient,
         PolicydTelemetry telemetry,
         CancellationToken cancellation)
     {
@@ -39,13 +41,36 @@ internal static partial class AccessDecisions
             authorities,
             DateTimeOffset.UtcNow,
             cancellation);
+        // The owner namespace is selected from the authenticated caller
+        // before the token is interpreted, so a kernel service and a package
+        // may use the same lexical token without crossing authority.
+        var kernelOwner = settings.OwnerCallers.FindOwner(caller);
         var operation = OperationToken.Parse(operationValue);
-        var owner = FindOperationOwner(operation)
-            ?? throw new CallerNotAdmittedException();
-        if (caller != settings.OwnerCallers.GetCaller(owner))
+        if (kernelOwner is { } admittedOwner)
         {
-            throw new CallerNotAdmittedException();
+            // An exact kernel caller may enforce only its own catalog
+            // operations.
+            if (FindOperationOwner(operation) != admittedOwner)
+            {
+                throw new CallerNotAdmittedException();
+            }
         }
+
+        // Product authority is resolved from Execd's retained admission state
+        // before the invocation is interpreted: a caller with no admitted
+        // binding is denied without any invocation being considered. Policyd
+        // stores no ownership and caches no mutable Workload eligibility, and
+        // the resolver response is boundary-validated before it is used.
+        var binding = kernelOwner is not null
+            ? null
+            : await ResolveWorkloadOperationBinding(
+                executionClient,
+                settings.Execution,
+                settings.Identity.WorkloadTokenFilePath,
+                telemetry,
+                caller,
+                operation,
+                cancellation);
 
         var invocation = await AuthenticateInvocation(
             headers,
@@ -57,10 +82,48 @@ internal static partial class AccessDecisions
             workspaceIdValue is null
                 ? null
                 : WorkspaceId.Parse(workspaceIdValue));
-        var catalogRequest = ValidateCatalogRequest(
-            operation,
-            ResourcePath.Parse(resourcePathValue),
-            target);
+        CatalogRequest catalogRequest;
+        OperationIdentity taggedOperation;
+        if (kernelOwner is { } owner)
+        {
+            var resourcePath = ResourcePath.Parse(resourcePathValue);
+            catalogRequest = ValidateCatalogRequest(
+                operation,
+                resourcePath,
+                target);
+            taggedOperation = OperationIdentity.Kernel(
+                GetKernelOwnerId(owner),
+                operation);
+        }
+        else
+        {
+            // Containment is decided from the target and invocation alone,
+            // before any resource path is examined, so a request outside the
+            // workload's Placement is concealed rather than answered with the
+            // path detail of an App it may not see.
+            var containment = binding!.Containment;
+            await EnsurePlacementFence(
+                containment,
+                target,
+                invocation,
+                cancellation);
+            var resourcePath = ResourcePath.Parse(resourcePathValue);
+            catalogRequest = ValidateProductRequest(
+                operation,
+                resourcePath,
+                target,
+                binding.AppId);
+            // A User Placement owns only its account-scoped resources; the
+            // anchor has now established the path's canonical scope.
+            await EnsureResourceScope(
+                containment,
+                catalogRequest.AccountScope,
+                cancellation);
+            taggedOperation = OperationIdentity.Package(
+                binding.PackageId,
+                operation);
+        }
+
         EnsureInvocationFence(invocation, catalogRequest);
 
         var facts = await ResolvePrincipal(
@@ -78,7 +141,7 @@ internal static partial class AccessDecisions
             invocation,
             facts.Principal,
             target,
-            operation,
+            taggedOperation,
             catalogRequest.ResourcePath,
             cancellation);
 
@@ -97,7 +160,7 @@ internal static partial class AccessDecisions
             invocation,
             facts.SubjectAccount,
             target,
-            operation,
+            taggedOperation,
             catalogRequest.ResourcePath,
             cancellation);
         return facts.PrincipalEnabled

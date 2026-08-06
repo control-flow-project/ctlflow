@@ -89,9 +89,7 @@ internal static partial class InvocationTokens
     {
         if (!payload.TryGetProperty("act", out var actor))
         {
-            return sessionOrigin
-                ? subject
-                : throw new TokenValidationException();
+            return subject;
         }
 
         if (sessionOrigin
@@ -103,7 +101,7 @@ internal static partial class InvocationTokens
 
         var actorId = SecurityPrincipalId.Parse(
             ReadRequiredString(actor, "sub"));
-        return actorId == subject
+        return actorId.Kind != "agent" || actorId == subject
             ? throw new TokenValidationException()
             : actorId;
     }
@@ -142,6 +140,12 @@ internal static partial class InvocationTokens
             "scopes",
             "endpoint",
             "endpoints",
+            "capability",
+            "capabilities",
+            "grant",
+            "grants",
+            "kubernetes",
+            "kubernetes.io",
             "traceparent",
             "tracestate"
         })
@@ -150,6 +154,13 @@ internal static partial class InvocationTokens
             {
                 throw new TokenValidationException();
             }
+        }
+        if (payload.EnumerateObject().Any(
+            property => property.Name.StartsWith(
+                "kubernetes.io/",
+                StringComparison.Ordinal)))
+        {
+            throw new TokenValidationException();
         }
     }
 

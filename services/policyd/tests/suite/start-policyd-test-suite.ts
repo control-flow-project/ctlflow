@@ -62,7 +62,6 @@ Promise<PolicydTestSuite> {
       invocationIssuer,
       invocationAudience,
       invocationMaximumLifetimeSeconds,
-      verificationKeyCallers: [policydCaller],
       principalFactCallers: [policydCaller]
     });
     policyd = await startPolicydProductionService({

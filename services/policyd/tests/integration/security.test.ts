@@ -36,6 +36,15 @@ const request = {
   tenantId: "acme"
 };
 
+const forbiddenAuthorityClaims = [
+  "roles",
+  "capabilities",
+  "grants",
+  "kubernetes",
+  "kubernetes.io",
+  "kubernetes.io/serviceaccount/namespace"
+] as const;
+
 test("requires a current bound workload token", async () => {
   const context = await arrangeAllow();
   const invocation = context.invocation.sign({ tenantId: "acme" });
@@ -83,10 +92,11 @@ test("requires an independently valid invocation JWT", async () => {
       notBefore: now,
       expiresAt: now + 61
     }),
-    context.invocation.sign({
-      tenantId: "acme",
-      authorityClaim: true
-    }),
+    ...forbiddenAuthorityClaims.map((authorityClaim) =>
+      context.invocation.sign({
+        tenantId: "acme",
+        authorityClaim
+      })),
     context.invocation.sign({
       tenantId: "acme",
       subject: "agent:reviewer"
@@ -195,7 +205,7 @@ async function arrangeAllow() {
   await context.policyd.setPrincipalFacts([principalFact()]);
   await context.policyd.replacePolicy({
     roles: [],
-    grants: [directGrant("tenants.read", "/tenants/acme")]
+    grants: [directGrant("svc_tenantd", "tenants.read", "/tenants/acme")]
   });
   return context;
 }

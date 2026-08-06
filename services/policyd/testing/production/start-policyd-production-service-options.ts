@@ -24,4 +24,12 @@ export interface StartPolicydProductionServiceOptions {
   };
   readonly principalFacts: readonly PrincipalAuthorizationFacts[];
   readonly policy?: PolicyState;
+  // The Execd dependency for product-operation resolution. Absent in the
+  // policyd-only suite, where the endpoint names the (undeployed) execd
+  // Service and the product branch fails closed as UNAVAILABLE.
+  readonly execution?: {
+    readonly endpoint: string;
+    readonly serverName: string;
+    readonly certificateAuthorityPath: string;
+  };
 }

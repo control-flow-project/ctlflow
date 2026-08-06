@@ -7,7 +7,7 @@ weight: 60
 `execd` owns Placement, Workload, and Run intent plus their bounded observed
 status. Its checked contract is
 [`ctlflow.execution.v1.ExecutionService`](https://github.com/control-flow-project/ctlflow/blob/main/services/execd/api/proto/v1/execd.proto).
-All ten methods are unary gRPC. See the
+All eleven methods are unary gRPC. See the
 [execd service specification](../../execd/) for admission, reconciliation,
 Kubernetes ownership, and dependency-claim rules.
 
@@ -27,6 +27,9 @@ service ExecutionService {
   rpc GetRun(GetRunRequest) returns (Run);
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
   rpc CancelRun(CancelRunRequest) returns (Run);
+  rpc ResolveWorkloadOperationBinding(
+      ResolveWorkloadOperationBindingRequest)
+      returns (ResolveWorkloadOperationBindingResponse);
 }
 ```
 
@@ -44,10 +47,45 @@ service ExecutionService {
 | `GetRun` | `run_id` | `Run` | Reads one retained Run. |
 | `ListRuns` | `workload_id`, page fields | Run page | Lists Runs for one finite Workload. |
 | `CancelRun` | `run_id` | `Run` | Convergently requests cancellation of a nonterminal Run. |
+| `ResolveWorkloadOperationBinding` | `service_account_subject`, `operation` | effective Placement target, App ID, Package ID | Confirms one admitted product operation for one authenticated Workload subject. Admits only Policyd and never calls Policyd. |
 
 There is no separate Job record or RPC. There is also no watch, wait, log,
 exec, generic manifest, route, endpoint-resolution, or dependency-management
 operation.
+
+## Product operation binding
+
+Only Policyd may resolve product authority. It authenticates with its own bound
+workload token, supplies no invocation JWT, and sends the subject derived from
+the product workload token it already validated:
+
+```json
+{
+  "serviceAccountSubject": "system:serviceaccount:plc-0123456789abcdef0123456789abcdef:wld-fedcba9876543210fedcba9876543210",
+  "operation": "messages.post"
+}
+```
+
+An active admitted binding returns only the facts Policyd needs:
+
+```json
+{
+  "effectivePlacementTarget": {
+    "workspace": {
+      "tenantId": "northwind",
+      "workspaceId": "atlas"
+    }
+  },
+  "appId": "chat_atlas",
+  "packageId": "chat"
+}
+```
+
+An unknown subject, inactive Workload or Placement ancestor, and unadmitted
+operation all return `NOT_FOUND`. Malformed selectors return
+`INVALID_ARGUMENT`; unreadable retained state and other dependency failures
+return `UNAVAILABLE`. Cancellation and deadlines remain their original gRPC
+outcomes.
 
 ## Placement
 

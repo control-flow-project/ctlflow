@@ -14,7 +14,9 @@ internal static partial class PolicydProcess
         PolicyDatabase database,
         CancellationToken cancellation)
     {
-        if (await VerifySchema(database, cancellation)
+        if (await VerifySchema(
+                database,
+                cancellation)
             != SchemaCompatibility.Compatible)
         {
             return false;

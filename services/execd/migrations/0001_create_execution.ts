@@ -8,6 +8,12 @@ const packageIdCheck =
   "length(??) BETWEEN 1 AND 128"
   + " AND ?? GLOB '[a-z0-9]*'"
   + " AND ?? NOT GLOB '*[^a-z0-9._-]*'";
+const lowercaseHex32Glob = "[0-9a-f]".repeat(32);
+const serviceAccountSubjectCheck =
+  "length(service_account_subject) = 95"
+  + " AND service_account_subject GLOB "
+  + `'system:serviceaccount:plc-${lowercaseHex32Glob}`
+  + `:wld-${lowercaseHex32Glob}'`;
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema.createTable("placements", (table) => {
@@ -91,6 +97,9 @@ export async function up(knex: Knex): Promise<void> {
     table.string("package_id", 128).notNullable();
     table.bigInteger("package_generation").notNullable();
     table.string("component_id", 64).notNullable();
+    // Derived by Execd in the admission transaction and never supplied by a
+    // caller. Unique so Policyd can resolve a subject to exactly one Workload.
+    table.string("service_account_subject", 512).notNullable();
     table.string("artifact_repository", 255).notNullable();
     table.string("artifact_manifest_digest", 71).notNullable();
     table.integer("cpu_millis").notNullable();
@@ -108,6 +117,10 @@ export async function up(knex: Knex): Promise<void> {
     table.bigInteger("updated_at_unix_ms").notNullable();
     table.bigInteger("status_updated_at_unix_ms").notNullable();
     table.index(["placement_id", "workload_id"], "workloads_placement_page_idx");
+    table.unique(["service_account_subject"], {
+      indexName: "workloads_service_account_subject_unique_idx"
+    });
+    table.check(serviceAccountSubjectCheck);
     table.check(executionIdCheck, ["workload_id", "workload_id", "workload_id"]);
     table.check(executionIdCheck, ["app_id", "app_id", "app_id"]);
     table.check(packageIdCheck, ["package_id", "package_id", "package_id"]);
@@ -179,6 +192,21 @@ export async function up(knex: Knex): Promise<void> {
     "workload_dependencies");
   await createStorage(knex, "workload_storage", "workload_id", "workloads");
 
+  // Operations admitted for this Workload, snapshotted from the admitted
+  // package component at admission. Authority reflects what was admitted, not a
+  // later Pkgd read. Not exposed in the caller-visible Workload projection.
+  await knex.schema.createTable("workload_operations", (table) => {
+    table.string("workload_id", 64).notNullable()
+      .references("workload_id").inTable("workloads").onDelete("RESTRICT");
+    table.string("operation", 128).notNullable();
+    table.primary(["workload_id", "operation"]);
+    table.check("length(operation) BETWEEN 3 AND 128");
+    table.check("operation NOT GLOB '*[^a-z0-9_.]*'");
+    table.check(
+      "length(operation) - length(replace(operation, '.', '')) = 1");
+    table.check("operation NOT GLOB '.*'");
+    table.check("operation NOT GLOB '*.'");
+  });
   await knex.schema.createTable("workload_interfaces", (table) => {
     table.string("workload_id", 64).notNullable()
       .references("workload_id").inTable("workloads").onDelete("CASCADE");
@@ -434,6 +462,7 @@ export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTableIfExists("run_storage");
   await knex.schema.dropTableIfExists("run_config_targets");
   await knex.schema.dropTableIfExists("runs");
+  await knex.schema.dropTableIfExists("workload_operations");
   await knex.schema.dropTableIfExists("workload_interfaces");
   await knex.schema.dropTableIfExists("workload_storage");
   await knex.schema.dropTableIfExists("workload_dependency_outputs");

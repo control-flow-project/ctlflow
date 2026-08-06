@@ -1,5 +1,6 @@
 using CtlFlow.Execution.Execd.Domain.Configuration;
 using CtlFlow.Execution.Execd.Domain.Identifiers;
+using CtlFlow.Execution.Execd.Domain.Operations;
 using CtlFlow.Execution.Execd.Domain.Resources;
 using CtlFlow.Execution.Execd.Domain.Time;
 
@@ -17,6 +18,8 @@ public sealed record WorkloadRecord(
     WorkloadBehavior Behavior,
     AdmittedPackageComponent AdmittedPackage,
     IReadOnlyList<AdmittedInterface> Interfaces,
+    IReadOnlyList<OperationToken> AdmittedOperations,
+    string ServiceAccountSubject,
     Revision Revision,
     RealizationStatus Realization,
     UtcInstant CreatedAt,

@@ -22,7 +22,8 @@ export async function preparePolicydFiles(
   serviceName: string,
   workload: TestWorkloadCredentials,
   kubernetes: TestKubernetes,
-  identityCertificateAuthorityPath: string
+  identityCertificateAuthorityPath: string,
+  executionCertificateAuthorityPath?: string
 ): Promise<PreparedPolicydFiles> {
   const tls = await createTestServiceTls(
     repositoryRoot,
@@ -45,6 +46,16 @@ export async function preparePolicydFiles(
     identityAuthorityPath);
   await chmod(workloadJwksPath, 0o644);
   await chmod(identityAuthorityPath, 0o644);
+  // The execution CA: real when the suite deploys Execd, otherwise the
+  // identityd CA stands in so the required trust file exists and the product
+  // branch fails closed on the unreachable endpoint.
+  const executionAuthorityPath = path.join(
+    directory,
+    "execd-ca.crt");
+  await copyFile(
+    executionCertificateAuthorityPath ?? identityCertificateAuthorityPath,
+    executionAuthorityPath);
+  await chmod(executionAuthorityPath, 0o644);
 
   return {
     certificateAuthorityPath: tls.certificateAuthorityPath,
@@ -56,7 +67,8 @@ export async function preparePolicydFiles(
       },
       trust: {
         "workload-jwks.json": workloadJwksPath,
-        "identityd-ca.crt": identityAuthorityPath
+        "identityd-ca.crt": identityAuthorityPath,
+        "execd-ca.crt": executionAuthorityPath
       }
     }
   };

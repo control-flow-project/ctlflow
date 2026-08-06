@@ -1,6 +1,8 @@
 using CtlFlow.Execution.Execd.Db.Persistence;
 using CtlFlow.Execution.Execd.Domain.Errors;
 using CtlFlow.Execution.Execd.Domain.Identifiers;
+using CtlFlow.Execution.Execd.Domain.Naming;
+using CtlFlow.Execution.Execd.Domain.Operations;
 using CtlFlow.Execution.Execd.Domain.Resources;
 using CtlFlow.Execution.Execd.Domain.Time;
 using CtlFlow.Execution.Execd.Domain.Workloads;
@@ -16,13 +18,28 @@ internal static partial class WorkloadRows
         IReadOnlyList<WorkloadDependencyParameter> parameters,
         IReadOnlyList<WorkloadDependencyOutput> outputs,
         IReadOnlyList<WorkloadStorage> storage,
-        IReadOnlyList<WorkloadInterface> interfaces)
+        IReadOnlyList<WorkloadInterface> interfaces,
+        IReadOnlyList<WorkloadOperation> operations)
     {
         try
         {
+            var workloadId = WorkloadId.Parse(row.WorkloadId);
+            var placementId = PlacementId.Parse(row.PlacementId);
+            var expectedSubject = NativeNames.CreateServiceAccountSubject(
+                placementId,
+                workloadId);
+            if (!string.Equals(
+                    row.ServiceAccountSubject,
+                    expectedSubject,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Stored Workload subject is invalid");
+            }
+
             return new WorkloadRecord(
-                WorkloadId.Parse(row.WorkloadId),
-                PlacementId.Parse(row.PlacementId),
+                workloadId,
+                placementId,
                 ParseDesiredState(row.DesiredState),
                 new PackageComponentReference(
                     AppId.Parse(row.AppId),
@@ -74,6 +91,12 @@ internal static partial class WorkloadRows
                             : EndpointHost.Parse(item.EndpointHost),
                         item.Ready))
                     .ToArray(),
+                operations
+                    .OrderBy(item => item.Operation, StringComparer.Ordinal)
+                    .Select(item =>
+                        OperationToken.FromStorage(item.Operation))
+                    .ToArray(),
+                row.ServiceAccountSubject,
                 Revision.FromStorage(row.Revision),
                 new RealizationStatus(
                     Revision.FromStorage(row.StatusRevision),

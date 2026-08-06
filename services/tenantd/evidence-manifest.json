@@ -376,7 +376,7 @@
         "UNAVAILABLE": [
           {
             "file": "tests/integration/invocation-key-security.test.ts",
-            "title": "unknown keys fail unavailable when identityd cannot provide authority"
+            "title": "unknown keys fail closed during Identityd outage and after recovery"
           }
         ]
       }

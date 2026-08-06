@@ -17,6 +17,8 @@ public class Workload
     internal string PackageId { get; set; } = null!;
     internal long PackageGeneration { get; set; }
     internal string ComponentId { get; set; } = null!;
+    // Derived by Execd in the admission transaction; never caller-supplied.
+    internal string ServiceAccountSubject { get; set; } = null!;
     internal string ArtifactRepository { get; set; } = null!;
     internal string ArtifactManifestDigest { get; set; } = null!;
     internal int CpuMillis { get; set; }
@@ -51,6 +53,7 @@ public class Workload
         string packageId,
         long packageGeneration,
         string componentId,
+        string serviceAccountSubject,
         string artifactRepository,
         string artifactManifestDigest,
         int cpuMillis,
@@ -70,6 +73,7 @@ public class Workload
         new()
         {
             WorkloadId = workloadId,
+            ServiceAccountSubject = serviceAccountSubject,
             PlacementId = placementId,
             DesiredState = desiredState,
             Mode = mode,
@@ -100,6 +104,9 @@ public class Workload
     {
         WorkloadId = record.Id.Value;
         PlacementId = record.PlacementId.Value;
+        // The admission decision derived the subject; persistence retains it
+        // so realization consumes a retained identity rather than creating one.
+        ServiceAccountSubject = record.ServiceAccountSubject;
         DesiredState = (int)record.DesiredState;
         AppId = record.AdmittedPackage.AppId.Value;
         AppRevision = record.AdmittedPackage.AppRevision.Value;

@@ -15,11 +15,12 @@ internal sealed partial class IdentityGrpcService
             ServerCallContext context)
     {
         _ = request;
-        await AuthenticateIdentityRequest(
+        // Verification keys are public material, so this bootstrap operation
+        // admits any valid installation-issued bound workload token. It is the
+        // only Identityd operation that does.
+        await AuthenticateAnyWorkloadRequest(
             context.RequestHeaders,
             _tokenAuthorities,
-            _settings.GetInvocationVerificationKeysCallers,
-            requireInvocation: false,
             DateTimeOffset.UtcNow,
             context.CancellationToken);
         var keys = await IdentityKeys.GetInvocationVerificationKeys(

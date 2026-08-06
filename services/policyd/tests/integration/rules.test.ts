@@ -33,6 +33,7 @@ test("exact rules match only the exact canonical path", async () => {
   await context.policyd.replacePolicy({
     roles: [],
     grants: [directGrant(
+      "svc_tenantd",
       "workspaces.read",
       request.resourcePath,
       {
@@ -64,6 +65,7 @@ test("subtree rules are delimiter bounded", async () => {
   await context.policyd.replacePolicy({
     roles: [],
     grants: [directGrant(
+      "svc_tenantd",
       "workspaces.read",
       "/tenants/acme/workspaces",
       {
@@ -86,6 +88,7 @@ test("subtree rules are delimiter bounded", async () => {
   await context.policyd.replacePolicy({
     roles: [],
     grants: [directGrant(
+      "svc_tenantd",
       "workspaces.read",
       "/tenants/acme/workspaces/at",
       {
@@ -115,6 +118,7 @@ test("allows direct Group and Role-bound principal authority", async () => {
       workspaceId: "atlas"
     },
     rules: [{
+      owner: { kind: "kernel", id: "svc_tenantd" },
       operation: "workspaces.read",
       basePath: request.resourcePath,
       match: "exact"
@@ -135,6 +139,7 @@ test("allows direct Group and Role-bound principal authority", async () => {
   await context.policyd.replacePolicy({
     roles: [],
     grants: [directGrant(
+      "svc_tenantd",
       "workspaces.read",
       request.resourcePath,
       {
@@ -163,6 +168,7 @@ test("allows Role-bound Group authority and isolates exact targets", async () =>
         workspaceId: "atlas"
       },
       rules: [{
+        owner: { kind: "kernel", id: "svc_tenantd" },
         operation: "workspaces.read",
         basePath: request.resourcePath,
         match: "exact"

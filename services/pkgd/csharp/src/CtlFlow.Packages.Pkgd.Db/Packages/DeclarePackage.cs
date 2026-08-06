@@ -71,6 +71,8 @@ public static partial class Packages
 
         database.PackageGenerations.Add(changed.Package.Declaration);
         database.PackageComponents.AddRange(changed.Package.Components);
+        database.PackageComponentOperations.AddRange(
+            changed.Package.ComponentOperations);
         database.PackageInterfaces.AddRange(changed.Package.Interfaces);
         database.PackageDependencies.AddRange(changed.Package.Dependencies);
         database.PackageDependencyOptions.AddRange(options.Select(value =>

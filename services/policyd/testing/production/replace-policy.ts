@@ -28,6 +28,8 @@ export async function replacePolicy(
       state.roles.flatMap((role) =>
         role.rules.map((rule) => ({
           role_id: role.roleId,
+          operation_owner_kind: rule.owner.kind === "kernel" ? 1 : 2,
+          operation_owner_id: rule.owner.id,
           operation: rule.operation,
           base_path: rule.basePath,
           match_kind: matchKind(rule.match)
@@ -48,6 +50,8 @@ export async function replacePolicy(
         ...targetColumns(grant.target),
         subject_kind: subjectKind(grant.subject.kind),
         subject_id: grant.subject.id,
+        operation_owner_kind: grant.owner.kind === "kernel" ? 1 : 2,
+        operation_owner_id: grant.owner.id,
         operation: grant.operation,
         base_path: grant.basePath,
         match_kind: matchKind(grant.match)

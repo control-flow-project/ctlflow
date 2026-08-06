@@ -3,7 +3,7 @@ using CtlFlow.Policy.Policyd.Service.Security.Workloads;
 
 namespace CtlFlow.Policy.Policyd.Service.Configuration;
 
-internal sealed record OwnerCallerSettings(
+internal sealed partial record OwnerCallerSettings(
     KubernetesServiceAccountSubject Tenantd,
     KubernetesServiceAccountSubject Pkgd,
     KubernetesServiceAccountSubject Configd,

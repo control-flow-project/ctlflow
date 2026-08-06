@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using CtlFlow.Policy.Policyd.Domain.Catalog;
+using CtlFlow.Policy.Policyd.Domain.Operations;
 using CtlFlow.Policy.Policyd.Service.Security.Tokens;
 using CtlFlow.Policy.Policyd.Service.Security.Workloads;
 using CtlFlow.Policy.Policyd.Service.Telemetry;
@@ -11,6 +13,7 @@ internal static partial class PolicydConfiguration
 {
     private const int DefaultDatabasePoolSize = 16;
     private const int DefaultIdentityCallTimeoutMilliseconds = 2_000;
+    private const int DefaultExecutionCallTimeoutMilliseconds = 2_000;
     private const int DefaultWorkloadTokenLifetimeSeconds = 3_600;
     private const int DefaultInvocationTokenLifetimeSeconds = 60;
     private static readonly TimeSpan WorkloadKeyCacheLifetime =
@@ -80,6 +83,16 @@ internal static partial class PolicydConfiguration
                 "CTLFLOW_INVOCATION",
                 DefaultInvocationTokenLifetimeSeconds),
             ownerCallers,
+            new ExecutionSettings(
+                new PrivateGrpcSettings(
+                    ParsePrivateOrigin(
+                        "CTLFLOW_EXECUTION_URL",
+                        RequireEnvironment("CTLFLOW_EXECUTION_URL")),
+                    RequireDnsName("CTLFLOW_EXECUTION_TLS_SERVER_NAME"),
+                    RequireAbsoluteFile("CTLFLOW_EXECUTION_TLS_CA_PATH")),
+                TimeSpan.FromMilliseconds(ReadPositiveInteger(
+                    "CTLFLOW_EXECUTION_CALL_TIMEOUT_MILLISECONDS",
+                    DefaultExecutionCallTimeoutMilliseconds))),
             RequireAbsoluteFile("CTLFLOW_OPERATION_CATALOG_PATH"),
             TelemetrySettings.Parse(
                 RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT")));

@@ -52,6 +52,9 @@ public static partial class Workloads
                     EF.Property<long>(item, "PackageGeneration"),
                 ComponentId =
                     EF.Property<string>(item, "ComponentId"),
+                ServiceAccountSubject = EF.Property<string>(
+                    item,
+                    "ServiceAccountSubject"),
                 ArtifactRepository = EF.Property<string>(
                     item,
                     "ArtifactRepository"),
@@ -237,6 +240,16 @@ public static partial class Workloads
                 Ready = EF.Property<bool>(item, "Ready")
             })
             .ToListAsync(queryCancellation);
+        var operations = await context.WorkloadOperations
+            .AsNoTracking()
+            .Where(item =>
+                EF.Property<string>(item, "WorkloadId") == id)
+            .Select(item => new
+            {
+                WorkloadId = EF.Property<string>(item, "WorkloadId"),
+                Operation = EF.Property<string>(item, "Operation")
+            })
+            .ToListAsync(queryCancellation);
         return WorkloadRows.MapWorkload(
             Workload.RestoreStorage(
                 row.WorkloadId,
@@ -248,6 +261,7 @@ public static partial class Workloads
                 row.PackageId,
                 row.PackageGeneration,
                 row.ComponentId,
+                row.ServiceAccountSubject,
                 row.ArtifactRepository,
                 row.ArtifactManifestDigest,
                 row.CpuMillis,
@@ -335,6 +349,11 @@ public static partial class Workloads
                 ExposureId = item.ExposureId,
                 EndpointHost = item.EndpointHost,
                 Ready = item.Ready
+            }).ToArray(),
+            operations.Select(item => new WorkloadOperation
+            {
+                WorkloadId = item.WorkloadId,
+                Operation = item.Operation
             }).ToArray());
     }
 }

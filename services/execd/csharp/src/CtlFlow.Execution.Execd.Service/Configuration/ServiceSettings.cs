@@ -25,4 +25,6 @@ internal sealed record ServiceSettings(
     TokenValidationSettings InvocationTokens,
     IReadOnlySet<KubernetesOperatorSubject> OperatorSubjects,
     IReadOnlySet<KubernetesServiceAccountSubject> CapabilityCallers,
+    // The single caller admitted to ResolveWorkloadOperationBinding.
+    KubernetesServiceAccountSubject PolicydCaller,
     TelemetrySettings Telemetry);

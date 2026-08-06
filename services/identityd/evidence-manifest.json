@@ -12,6 +12,10 @@
         {
           "file": "tests/integration/keys.test.ts",
           "title": "returns active and retiring keys in ordinal key-ID order"
+        },
+        {
+          "file": "tests/integration/security.test.ts",
+          "title": "any valid workload token can bootstrap verification keys"
         }
       ],
       "results": {
@@ -19,12 +23,6 @@
           {
             "file": "tests/integration/security.test.ts",
             "title": "every RPC requires an authenticated workload"
-          }
-        ],
-        "PERMISSION_DENIED": [
-          {
-            "file": "tests/integration/security.test.ts",
-            "title": "every RPC rejects an unadmitted workload"
           }
         ],
         "UNAVAILABLE": [

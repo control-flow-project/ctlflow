@@ -38,8 +38,12 @@ binding, namespace, and exact ServiceAccount subject.
 authorization: Bearer <bound workload token>
 ```
 
-Reachability or a valid token does not admit an operation. Every operation has
-an exact finite caller set.
+Reachability or a valid token does not admit an authority-bearing operation.
+Every authority-bearing operation has an exact finite caller set.
+`identityd.GetInvocationVerificationKeys` is the sole exception: any valid
+installation-issued bound workload token may retrieve the bounded public
+verification-key set. That bootstrap returns no identity fact, authority, or
+decision.
 
 ## Invocation identity
 

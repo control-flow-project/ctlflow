@@ -42,6 +42,10 @@
     <Protobuf Include="../../../../identityd/api/proto/v1/identityd.proto"
               GrpcServices="Client"
               ProtoRoot="../../../../identityd/api/proto" />
+    <Protobuf Include="../../../../execd/api/proto/v1/execd.proto"
+              GrpcServices="Client"
+              ProtoRoot="../../../../execd/api/proto" />
+
   </ItemGroup>
   <ItemGroup>
     <Content Include="../../../catalog/operation-owners.tsv"

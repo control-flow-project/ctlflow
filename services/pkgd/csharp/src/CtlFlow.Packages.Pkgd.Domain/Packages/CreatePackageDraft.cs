@@ -20,6 +20,7 @@ public static partial class Packages
         EnsureCount(interfaces.Count, 0, 256, "interfaces");
         EnsureCount(dependencies.Count, 0, 256, "dependencies");
         EnsureCount(exposures.Count, 0, 256, "exposures");
+        EnsureDeclaredOperations(components);
 
         var componentIds = CreateUniqueSet(
             components.Select(value => value.ComponentId.Value),
@@ -82,6 +83,42 @@ public static partial class Packages
             exposures
                 .OrderBy(value => value.ExposureId.Value, StringComparer.Ordinal)
                 .ToArray()));
+    }
+
+    // A component declares at most 64 operations and a generation at most
+    // 512, and one component owns a token within the generation. The Package
+    // ID supplies the namespace, so a token may repeat in another Package or
+    // match a kernel token.
+    private const int MaximumOperationsPerComponent = 64;
+    private const int MaximumOperationsPerGeneration = 512;
+
+    private static void EnsureDeclaredOperations(
+        IReadOnlyList<PackageComponentSpec> components)
+    {
+        var total = 0;
+        foreach (var component in components)
+        {
+            if (component.DeclaredOperations.Count
+                > MaximumOperationsPerComponent)
+            {
+                throw new PackageLimitExceededException(
+                    "A component declares at most 64 operations");
+            }
+
+            total += component.DeclaredOperations.Count;
+        }
+
+        if (total > MaximumOperationsPerGeneration)
+        {
+            throw new PackageLimitExceededException(
+                "A Package generation declares at most 512 operations");
+        }
+
+        CreateUniqueSet(
+            components.SelectMany(component =>
+                component.DeclaredOperations.Select(
+                    operation => operation.Value)),
+            "declared operation");
     }
 
     private static void EnsureCount(

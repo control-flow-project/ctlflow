@@ -22,6 +22,5 @@ export interface StartIdentitydProductionServiceOptions {
   readonly invocationIssuer: string;
   readonly invocationAudience: string;
   readonly invocationMaximumLifetimeSeconds: number;
-  readonly verificationKeyCallers: readonly string[];
   readonly principalFactCallers: readonly string[];
 }

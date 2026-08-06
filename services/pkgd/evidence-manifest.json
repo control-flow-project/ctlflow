@@ -8,6 +8,10 @@
         {
           "file": "tests/integration/packages.test.ts",
           "title": "declares, retries, gets, and canonically orders a Package"
+        },
+        {
+          "file": "tests/integration/packages.test.ts",
+          "title": "declares, orders, retains, and freezes component operations"
         }
       ],
       "results": {
@@ -19,6 +23,10 @@
           {
             "file": "tests/integration/packages.test.ts",
             "title": "validates Package messages, uniqueness, and local references"
+          },
+          {
+            "file": "tests/integration/packages.test.ts",
+            "title": "rejects malformed and duplicated component operations"
           }
         ],
         "RESOURCE_EXHAUSTED": [
@@ -39,6 +47,10 @@
           {
             "file": "tests/integration/packages.test.ts",
             "title": "enforces immutable keys, versions, and consecutive generations"
+          },
+          {
+            "file": "tests/integration/packages.test.ts",
+            "title": "declares, orders, retains, and freezes component operations"
           }
         ],
         "FAILED_PRECONDITION": [
@@ -61,6 +73,10 @@
         {
           "file": "tests/integration/packages.test.ts",
           "title": "declares, retries, gets, and canonically orders a Package"
+        },
+        {
+          "file": "tests/integration/packages.test.ts",
+          "title": "declares, orders, retains, and freezes component operations"
         }
       ],
       "results": {

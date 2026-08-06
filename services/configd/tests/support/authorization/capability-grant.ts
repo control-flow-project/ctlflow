@@ -3,6 +3,6 @@ import type {
   PolicySubject
 } from "@ctlflow/policyd/testing/production";
 
-export interface CapabilityGrant extends PolicyRule {
+export interface CapabilityGrant extends Omit<PolicyRule, "owner"> {
   readonly subject: PolicySubject;
 }

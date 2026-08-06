@@ -2,6 +2,7 @@ import path from "node:path";
 import {
   buildCSharpServiceImage,
   buildNodeTestImage,
+  createTestServiceTls,
   publishContainerizedCSharpService,
   startOpenTelemetryCollector,
   startTestKubernetes,
@@ -123,11 +124,6 @@ Promise<ExecdTestSuite> {
       invocationIssuer,
       invocationAudience,
       invocationMaximumLifetimeSeconds,
-      verificationKeyCallers: [
-        serviceSubject(kubernetes, "configd"),
-        serviceSubject(kubernetes, "execd"),
-        serviceSubject(kubernetes, "policyd")
-      ],
       principalFactCallers: [
         serviceSubject(kubernetes, "policyd")
       ]
@@ -135,6 +131,17 @@ Promise<ExecdTestSuite> {
     const authdWorkload =
       await kubernetes.createWorkloadCredentials("authd");
     identityClient = await createIdentityClient(identityd);
+    // One shared execd TLS identity, created before policyd so policyd can
+    // trust the execd resolver endpoint from startup. Execd contexts reuse it.
+    const execdTls = await createTestServiceTls(
+      repositoryRoot,
+      path.join(repositoryRoot, ".temp", "execd-shared-tls"),
+      "execd",
+      [
+        "execd",
+        `execd.${kubernetes.namespace}`,
+        `execd.${kubernetes.namespace}.svc`
+      ]);
     policyd = await startPolicydProductionService({
       repositoryRoot,
       kubernetes,
@@ -152,6 +159,11 @@ Promise<ExecdTestSuite> {
       policy: {
         roles: [],
         grants: []
+      },
+      execution: {
+        endpoint: `https://execd.${kubernetes.namespace}.svc:50051`,
+        serverName: `execd.${kubernetes.namespace}.svc`,
+        certificateAuthorityPath: execdTls.certificateAuthorityPath
       }
     });
 
@@ -166,6 +178,7 @@ Promise<ExecdTestSuite> {
       identityClient: activeIdentityClient,
       authdWorkload,
       policyd,
+      execdTls,
       edgedImage,
       applicationArtifact,
       invocation,

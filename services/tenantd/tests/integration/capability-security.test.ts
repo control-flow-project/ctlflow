@@ -313,16 +313,30 @@ test("policyd independently validates the invocation signature", async () => {
   });
   await context.reconnectPolicyIdentity();
   try {
-    await assert.rejects(
-      getTenant(
-        tenant.tenantId,
-        createCapabilityMetadata(context, {
-          tenantId: tenant.tenantId,
-          tokenId: "capability-independent-reconnect"
-        })),
-      (error) =>
-        matchGrpcStatus(status.UNAVAILABLE)(error)
-        || matchGrpcStatus(status.UNAUTHENTICATED)(error));
+    // The restarted policyd may be briefly unreachable while tenantd's channel
+    // reconnects; once reachable, the stale-authority invocation is refused as
+    // unauthenticated, not unavailable.
+    const deadline = Date.now() + 30_000;
+    for (;;) {
+      try {
+        await getTenant(
+          tenant.tenantId,
+          createCapabilityMetadata(context, {
+            tenantId: tenant.tenantId,
+            tokenId: "capability-independent-reconnect"
+          }));
+        assert.fail("A stale-authority invocation was accepted");
+      } catch (error) {
+        if (matchGrpcStatus(status.UNAUTHENTICATED)(error)) {
+          break;
+        }
+        if (!matchGrpcStatus(status.UNAVAILABLE)(error)
+            || Date.now() > deadline) {
+          throw error;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
     await assert.rejects(
       getTenant(
         tenant.tenantId,

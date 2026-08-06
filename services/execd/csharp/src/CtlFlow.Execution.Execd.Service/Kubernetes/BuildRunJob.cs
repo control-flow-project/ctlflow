@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using CtlFlow.Execution.Execd.Domain.Resources;
 using CtlFlow.Execution.Execd.Domain.Runs;
+using CtlFlow.Execution.Execd.Service.Configuration;
 using static CtlFlow.Execution.Execd.Service.Kubernetes.ExecutionOwnership;
 
 namespace CtlFlow.Execution.Execd.Service.Kubernetes;
@@ -13,7 +14,8 @@ internal static partial class KubernetesBodies
         string namespaceName,
         string accountName,
         string jobName,
-        string? invocationSecretName)
+        string? invocationSecretName,
+        ProductBootstrapSettings bootstrap)
     {
         var labels = new Dictionary<string, string>(
             StringComparer.Ordinal)
@@ -53,16 +55,28 @@ internal static partial class KubernetesBodies
             writer.WriteBoolean(
                 "automountServiceAccountToken",
                 false);
+            // The product runtime bootstrap is projected read-only for the
+            // pod's group; without the same fsGroup a Run container cannot
+            // read its own token.
+            writer.WriteStartObject("securityContext");
+            writer.WriteNumber("fsGroup", 65_532);
+            writer.WriteString(
+                "fsGroupChangePolicy",
+                "OnRootMismatch");
+            writer.WriteBoolean("runAsNonRoot", true);
+            writer.WriteEndObject();
             writer.WriteStartArray("containers");
             WriteRunContainer(
                 writer,
                 run,
-                invocationSecretName);
+                invocationSecretName,
+                bootstrap);
             writer.WriteEndArray();
             WriteRunVolumes(
                 writer,
                 run,
-                invocationSecretName);
+                invocationSecretName,
+                bootstrap);
             writer.WriteEndObject();
             writer.WriteEndObject();
             writer.WriteEndObject();
@@ -73,7 +87,8 @@ internal static partial class KubernetesBodies
     private static void WriteRunContainer(
         Utf8JsonWriter writer,
         RunRecord run,
-        string? invocationSecretName)
+        string? invocationSecretName,
+        ProductBootstrapSettings bootstrap)
     {
         writer.WriteStartObject();
         writer.WriteString("name", "run");
@@ -84,6 +99,12 @@ internal static partial class KubernetesBodies
             + run.Execution.AdmittedPackage
                 .ArtifactManifestDigest.Value);
         writer.WriteString("imagePullPolicy", "IfNotPresent");
+        writer.WriteStartArray("env");
+        WriteProductBootstrapEnvironment(
+            writer,
+            bootstrap,
+            run.Execution.AdmittedPackage.AppId.Value);
+        writer.WriteEndArray();
         writer.WriteStartObject("resources");
         writer.WriteStartObject("requests");
         WriteRunResources(writer, run);
@@ -93,6 +114,7 @@ internal static partial class KubernetesBodies
         writer.WriteEndObject();
         writer.WriteEndObject();
         writer.WriteStartArray("volumeMounts");
+        WriteProductBootstrapMounts(writer);
         var projectionIndex = 0;
         foreach (var target in AllRunTargets(run))
         {
@@ -142,9 +164,14 @@ internal static partial class KubernetesBodies
     private static void WriteRunVolumes(
         Utf8JsonWriter writer,
         RunRecord run,
-        string? invocationSecretName)
+        string? invocationSecretName,
+        ProductBootstrapSettings bootstrap)
     {
         writer.WriteStartArray("volumes");
+        WriteProductBootstrapVolumes(
+            writer,
+            run.WorkloadId,
+            bootstrap);
         var projectionIndex = 0;
         foreach (var target in AllRunTargets(run))
         {

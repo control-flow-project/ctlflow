@@ -51,7 +51,7 @@ contract.
 | `policyd` | Capability grants and access decisions | [1 unary RPC](spec/apis/policyd.md) |
 | `pkgd` | Immutable Package generations and installed App intent | [5 unary RPCs](spec/apis/pkgd.md) |
 | `configd` | Configuration, secret custody, exact consumer projections | [5 unary RPCs](spec/apis/configd.md) |
-| `execd` | Placements, Workloads, Runs, Kubernetes realization | [10 unary RPCs](spec/apis/execd.md) |
+| `execd` | Placements, Workloads, Runs, Kubernetes realization | [11 unary RPCs](spec/apis/execd.md) |
 | `auditd` | Immutable typed kernel mutation evidence | [1 unary RPC](spec/apis/auditd.md) |
 | `authd` | Public browser authentication protocol | [3 HTTP routes](spec/apis/authd.md) |
 | `edged` | Public bound application reverse proxy | [7 HTTP methods](spec/apis/edged.md) |

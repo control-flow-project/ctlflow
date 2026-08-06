@@ -11,11 +11,26 @@ internal static partial class RoleSchema
         rule.ToTable("role_rules");
         rule.Ignore(value => value.RoleId);
         rule.Ignore(value => value.Operation);
+        rule.Ignore(value => value.OperationOwnerKind);
+        rule.Ignore(value => value.OperationOwnerId);
         rule.Ignore(value => value.BasePath);
         rule.Ignore(value => value.MatchKind);
-        rule.HasKey("_roleId", "_operation", "_basePath", "_matchKind");
+        rule.HasKey(
+            "_roleId",
+            "_operationOwnerKind",
+            "_operationOwnerId",
+            "_operation",
+            "_basePath",
+            "_matchKind");
         rule.Property<string>("_roleId")
             .HasColumnName("role_id")
+            .HasMaxLength(128)
+            .IsRequired();
+        rule.Property<int>("_operationOwnerKind")
+            .HasColumnName("operation_owner_kind")
+            .IsRequired();
+        rule.Property<string>("_operationOwnerId")
+            .HasColumnName("operation_owner_id")
             .HasMaxLength(128)
             .IsRequired();
         rule.Property<string>("_operation")
@@ -34,7 +49,11 @@ internal static partial class RoleSchema
             .HasForeignKey("_roleId")
             .HasPrincipalKey("_id")
             .OnDelete(DeleteBehavior.Restrict);
-        rule.HasIndex("_operation", "_roleId")
+        rule.HasIndex(
+                "_operationOwnerKind",
+                "_operationOwnerId",
+                "_operation",
+                "_roleId")
             .HasDatabaseName("role_rules_operation_role_idx");
     }
 }

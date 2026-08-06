@@ -127,7 +127,7 @@ async function arrangeAllow() {
   await context.policyd.setPrincipalFacts([principalFact()]);
   await context.policyd.replacePolicy({
     roles: [],
-    grants: [directGrant("tenants.read", "/tenants/acme")]
+    grants: [directGrant("svc_tenantd", "tenants.read", "/tenants/acme")]
   });
   return context;
 }

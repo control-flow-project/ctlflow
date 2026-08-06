@@ -24,7 +24,7 @@ internal static partial class AccessDecisions
         InvocationIdentity invocation,
         PrincipalId principal,
         PolicyTarget target,
-        OperationToken operation,
+        OperationIdentity operation,
         ResourcePath resourcePath,
         CancellationToken cancellation)
     {

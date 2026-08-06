@@ -15,6 +15,8 @@ public class AccessGrant
     private string? _workspaceId;
     private int _subjectKind;
     private string _subjectId = null!;
+    private int _operationOwnerKind;
+    private string _operationOwnerId = null!;
     private string _operation = null!;
     private string _basePath = null!;
     private int _matchKind;
@@ -30,7 +32,7 @@ public class AccessGrant
         WorkspaceId? workspaceId,
         SubjectKind subjectKind,
         SubjectId subjectId,
-        OperationToken operation,
+        OperationIdentity operation,
         ResourcePath basePath,
         RuleMatchKind matchKind)
     {
@@ -40,7 +42,9 @@ public class AccessGrant
         _workspaceId = workspaceId?.Value;
         _subjectKind = SubjectKindCodes.ToStorage(subjectKind);
         _subjectId = subjectId.Value;
-        _operation = operation.Value;
+        _operationOwnerKind = operation.OwnerKind;
+        _operationOwnerId = operation.OwnerId;
+        _operation = operation.Operation.Value;
         _basePath = basePath.Value;
         _matchKind = RuleMatchKindCodes.ToStorage(matchKind);
     }
@@ -56,6 +60,10 @@ public class AccessGrant
             ? null
             : CtlFlow.Policy.Policyd.Domain.Identifiers.WorkspaceId
                 .FromStorage(_workspaceId);
+
+    public int OperationOwnerKind => _operationOwnerKind;
+
+    public string OperationOwnerId => _operationOwnerId;
 
     public SubjectKind SubjectKind =>
         SubjectKindCodes.FromStorage(_subjectKind);

@@ -44,6 +44,11 @@ Promise<InvocationAuthority> {
         keyId,
         keys.privateKey,
         payloadJson),
+    signToken: (headerJson, payloadJson) =>
+      signToken(
+        keys.privateKey,
+        headerJson,
+        payloadJson),
     writePrivateKey: async (filePath) => {
       await writeFile(
         filePath,
@@ -106,8 +111,8 @@ function signInvocationToken(
       sub: options.actorSubject
     };
   }
-  if (options.authorityClaim === true) {
-    payload.roles = "admin";
+  if (options.authorityClaim !== undefined) {
+    payload[options.authorityClaim] = true;
   }
 
   return signPayload(
@@ -121,11 +126,22 @@ function signPayload(
   privateKey: KeyObject,
   payloadJson: string
 ): string {
-  const header = encodeJson({
-    alg: "RS256",
-    kid: keyId,
-    typ: "JWT"
-  });
+  return signToken(
+    privateKey,
+    JSON.stringify({
+      alg: "RS256",
+      kid: keyId,
+      typ: "JWT"
+    }),
+    payloadJson);
+}
+
+function signToken(
+  privateKey: KeyObject,
+  headerJson: string,
+  payloadJson: string
+): string {
+  const header = Buffer.from(headerJson, "utf8").toString("base64url");
   const claims = Buffer.from(payloadJson, "utf8").toString("base64url");
   const signingInput = `${header}.${claims}`;
   const signer = createSign("RSA-SHA256");
@@ -133,8 +149,4 @@ function signPayload(
   signer.end();
   const signature = signer.sign(privateKey).toString("base64url");
   return `${signingInput}.${signature}`;
-}
-
-function encodeJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
 }

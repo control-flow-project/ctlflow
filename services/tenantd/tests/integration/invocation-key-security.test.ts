@@ -91,33 +91,30 @@ test("an unknown invocation key refreshes through identityd", async () => {
     }));
 });
 
-test("unknown keys fail unavailable when identityd cannot provide authority", async () => {
-  const context = getTenantdTestContext();
-  const unknown = await createInvocationAuthority(
-    "unknown-key");
-  const token = unknown.sign({
-    tenantId,
-    tokenId: "security-unknown-key"
+test("unknown keys fail closed during Identityd outage and after recovery",
+  async () => {
+    const context = getTenantdTestContext();
+    const unknown = await createInvocationAuthority(
+      "unknown-key");
+    const token = unknown.sign({
+      tenantId,
+      tokenId: "security-unknown-key"
+    });
+
+    await context.identityd.setMode("unavailable");
+    try {
+      await assert.rejects(
+        resolveWithInvocation(token),
+        matchGrpcStatus(status.UNAVAILABLE));
+    } finally {
+      await context.identityd.setMode("available");
+      await context.service.restart(context.environment);
+    }
+
+    await assert.rejects(
+      resolveWithInvocation(token),
+      matchGrpcStatus(status.UNAUTHENTICATED));
   });
-
-  await context.identityd.setMode("unavailable");
-  try {
-    await assert.rejects(
-      resolveWithInvocation(token),
-      matchGrpcStatus(status.UNAVAILABLE));
-  } finally {
-    await context.identityd.setMode("available");
-  }
-
-  await context.identityd.setMode("denied");
-  try {
-    await assert.rejects(
-      resolveWithInvocation(token),
-      matchGrpcStatus(status.UNAVAILABLE));
-  } finally {
-    await context.identityd.setMode("available");
-  }
-});
 
 test("unavailable identityd key states fail unavailable", async () => {
   const context = getTenantdTestContext();

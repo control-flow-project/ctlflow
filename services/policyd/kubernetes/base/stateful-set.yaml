@@ -47,6 +47,8 @@ spec:
               value: /var/run/ctlflow/trust/identityd-ca.crt
             - name: CTLFLOW_OPERATION_CATALOG_PATH
               value: /app/operation-owners.tsv
+            - name: CTLFLOW_EXECUTION_TLS_CA_PATH
+              value: /var/run/ctlflow/trust/execd-ca.crt
           ports:
             - name: grpc
               containerPort: 50051

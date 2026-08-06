@@ -214,11 +214,15 @@
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(327,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(321,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(335,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(329,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(338,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
@@ -230,23 +234,19 @@
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(350,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(350,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(356,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(357,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(363,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(364,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(370,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
-      "count": 1
-    },
-    {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(377,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(422,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
@@ -254,35 +254,31 @@
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(433,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(430,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(441,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(439,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(450,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(445,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(456,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(451,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(462,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(458,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(469,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(465,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(476,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
-      "count": 1
-    },
-    {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(483,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(472,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
@@ -290,27 +286,35 @@
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(543,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(528,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(551,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(536,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(560,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(545,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(566,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(551,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(572,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(557,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(579,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(564,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(571,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(578,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
@@ -318,11 +322,35 @@
       "count": 1
     },
     {
-      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(586,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(638,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {
       "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(64,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(646,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(655,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(661,46): warning CS8669: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. Auto-generated code requires an explicit '#nullable' directive in source. [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(667,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(674,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
+      "count": 1
+    },
+    {
+      "fingerprint": "<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/obj/Release/net10.0/GetPackage.EFInterceptors.PackageDbContext.g.cs(681,10): warning CS9270: 'InterceptsLocationAttribute(string, int, int)' is not supported. Move to 'InterceptableLocation'-based generation of these attributes instead. (https://github.com/dotnet/roslyn/issues/72133) [<repository>/services/pkgd/csharp/src/CtlFlow.Packages.Pkgd.Db/CtlFlow.Packages.Pkgd.Db.csproj]",
       "count": 1
     },
     {

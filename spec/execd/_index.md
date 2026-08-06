@@ -95,6 +95,15 @@ state, not caller identity and not an attached-account field.
 Workload retirement requires every Run to be terminal. A retired Workload is
 terminal and cannot be redeclared active or suspended.
 
+A Workload's admitted package identity — App, Package, Package generation, and
+component — is immutable for its Workload ID, exactly as its Placement is.
+Redeclaring the same Workload ID after the App moved to another generation is
+`FAILED_PRECONDITION`. This is what keeps a Workload's authority fixed for the
+life of its identity: the derived ServiceAccount subject is stable, so an
+already realized Pod can never acquire a later generation's operations while
+it is still running. Adopting a new generation is a new Workload ID, and
+therefore a new subject, a new admission, and a new operation snapshot.
+
 Configuration targets name an exact Configd configuration or secret version
 and one purpose. Execd passes the stored Placement target, Workload as
 consumer, and purpose to `configd.ApplyProjection`; it never receives content
@@ -121,9 +130,10 @@ internal but is not publicly exposed by Edged v1.
 
 For each Edged sidecar, Execd projects a distinct short-lived Pod-bound
 Kubernetes token with audience `ctlflow-edged`, the Identityd trust anchor,
-and the configured telemetry endpoint. Only that sidecar mounts the token and
-trust projection. The application container receives neither and cannot
-substitute a target, Identityd endpoint, trust anchor, or credential.
+and the configured telemetry endpoint. Only that sidecar mounts the Edged
+token and trust projection. The application container receives the separate
+[product runtime bootstrap](#product-runtime-bootstrap) and can neither read
+nor substitute the Edged credential, target, or trust anchor.
 
 ## Run
 
@@ -153,7 +163,7 @@ changing the observed phase.
 
 ## Exact API
 
-Execd exposes exactly ten unary RPCs:
+Execd exposes exactly eleven unary RPCs:
 
 | RPC | Purpose |
 | --- | --- |
@@ -167,6 +177,7 @@ Execd exposes exactly ten unary RPCs:
 | `GetRun` | Read one Run |
 | `ListRuns` | List retained Runs for one finite Workload |
 | `CancelRun` | Convergently request one nonterminal Run cancellation |
+| `ResolveWorkloadOperationBinding` | Confirm one admitted product operation for one authenticated Workload subject |
 
 Lists use ascending immutable-ID keyset pagination. Page size zero means 50;
 an explicit size is 1 through 100. A continuation is the last emitted ID and
@@ -175,6 +186,42 @@ appears only when another record exists. Execd stores no cursor.
 There is no HTTP mirror, watch, stream, wait, log, exec, route, preview,
 cache, generic manifest, endpoint-resolution, dependency-management, or
 administrative convenience operation.
+
+### ResolveWorkloadOperationBinding
+
+This operation exists only so Policyd can confirm product-operation authority.
+It admits exactly one caller, `SERVICE/svc_policyd`, by exact method-specific
+admission, and it **never calls Policyd**; that is what prevents authorization
+recursion. It carries a workload token and trace context and no invocation JWT.
+
+```text
+ResolveWorkloadOperationBinding(service_account_subject, operation)
+  -> effective Placement target, App ID, Package ID
+```
+
+`service_account_subject` is supplied by Policyd from a workload token Policyd
+has already validated; Execd resolves it through its retained unique subject
+index. `operation` is an untrusted selector that grants nothing by itself:
+Execd confirms exact membership in the Workload's admitted operation snapshot.
+Both fields are validated before any lookup: a subject outside Execd's own
+derived-subject form, or an operation outside the canonical token grammar, is
+`INVALID_ARGUMENT` like any other malformed request field, never a concealed
+`NOT_FOUND`.
+
+The response carries only the three facts Policyd consumes. The full admitted
+operation set, Workload ID, Placement ID, revision, component ID, and package
+generation are deliberately not returned.
+
+`NOT_FOUND` is returned when the subject is unknown, the Workload or any
+Placement ancestor is inactive, or the operation is not admitted for that
+Workload. There is no separate active flag and no state for a caller to
+interpret.
+
+Resolution reads the subject, the operation-snapshot membership, the Workload
+state, its App and Package facts, and the full Placement ancestor state from
+one consistent database snapshot — a single composed query or one read
+transaction. A concurrent admission update cannot combine facts from one
+revision with an operation from another.
 
 ## Bounds
 
@@ -224,7 +271,30 @@ outbox, queue, or repair path.
 ## Admission
 
 An admitted infrastructure operator may call every operation. Global access
-is operator-only.
+is operator-only. `ResolveWorkloadOperationBinding` is the sole exception: it
+admits only `SERVICE/svc_policyd` and no operator.
+
+Admitting a Workload also establishes its product-operation authority. In the
+same transaction that admits the Workload, Execd:
+
+- snapshots the operations declared by the admitted package component for the
+  admitted generation, so authority reflects what was admitted rather than a
+  later Pkgd read; and
+- derives and retains that Workload's ServiceAccount subject from its own
+  deterministic convention, stored uniquely and indexed for exact lookup.
+
+Pkgd is a network dependency, and its declaration output is dependency data,
+not caller input. Before persisting the snapshot, Execd itself validates the
+received declared operations: canonical token grammar, no duplicate within the
+generation, the per-component and per-generation bounds, and that each
+operation belongs to the admitted component. A Pkgd response that violates any
+of these is a dependency failure and surfaces as `UNAVAILABLE`; it is never
+persisted and never mapped to caller input validation.
+
+The snapshot is Execd persistence. It is not added to the caller-visible
+admitted-component projection, and no caller may supply or influence either the
+snapshot or the subject. Kubernetes realization consumes the retained subject;
+it never creates or mutates that identity mapping.
 
 A configured non-Global product backend presents its bound workload token and
 invocation JWT. Execd validates the invocation, fences the exact target, and
@@ -290,6 +360,45 @@ retried on the short reconciliation interval; settled native state is
 re-observed on a slower finite sweep so drift remains bounded without placing
 unchanged objects on the hot path.
 
+### Product runtime bootstrap
+
+The application container of a realized Workload receives a distro-neutral
+bootstrap so the running product can make its own production Identityd and
+Policyd calls. Realization projects, from Execd's own admitted configuration
+and trust material:
+
+```text
+/var/run/secrets/ctlflow/token
+  Pod-bound token for the Workload's retained ServiceAccount,
+  installation internal audience, short expiry, kubelet rotation
+
+/var/run/ctlflow/trust/workload-jwks.json
+/var/run/ctlflow/trust/identityd-ca.crt
+/var/run/ctlflow/trust/policyd-ca.crt
+
+CTLFLOW_WORKLOAD_TOKEN_FILE
+CTLFLOW_WORKLOAD_JWKS_PATH
+CTLFLOW_IDENTITYD_ENDPOINT
+CTLFLOW_IDENTITYD_TLS_CA_PATH
+CTLFLOW_POLICYD_ENDPOINT
+CTLFLOW_POLICYD_TLS_CA_PATH
+CTLFLOW_WORKLOAD_TOKEN_ISSUER
+CTLFLOW_WORKLOAD_TOKEN_AUDIENCE
+CTLFLOW_WORKLOAD_TOKEN_MAX_LIFETIME_SECONDS
+CTLFLOW_INVOCATION_ISSUER
+CTLFLOW_INVOCATION_AUDIENCE
+CTLFLOW_APP_ID
+```
+
+The bootstrap carries identity, trust, endpoints, validation settings, and the
+admitted App ID — nothing else. Package ID, operation grants, and policy state
+are not projected; the workload learns only ALLOW or DENY per decision. The
+Edged exposure token keeps its distinct `ctlflow-edged` audience and remains
+projected only into the Edged sidecar, never into the application container.
+The configured product workload-token lifetime is at least 600 seconds, the
+minimum Kubernetes admits for a projected ServiceAccount token; Execd rejects
+a lower value at startup rather than emitting an invalid Pod or Job.
+
 ## DependencyClaim
 
 The sole claim contract is
@@ -331,7 +440,7 @@ boundary.
 
 ## Verification
 
-Canonical evidence covers all ten RPCs, four targets, parent narrowing,
+Canonical evidence covers all eleven RPCs, four targets, parent narrowing,
 revision/idempotency rules, pagination, Package admission, projections,
 DependencyClaim ownership, storage bounds, both workload modes, Run
 invocation and cancellation, operator and capability paths, required audit,

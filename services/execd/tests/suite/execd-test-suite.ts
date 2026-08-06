@@ -2,6 +2,7 @@ import type {
   TestContainerArtifact,
   OpenTelemetryCollector,
   TestKubernetes,
+  TestServiceTls,
   TestWorkloadCredentials
 } from "@ctlflow/test-mesh";
 import type {
@@ -32,6 +33,8 @@ export interface ExecdTestSuite {
   readonly identityClient: IdentityServiceClient;
   readonly authdWorkload: TestWorkloadCredentials;
   readonly policyd: PolicydProductionService;
+  // The shared execd TLS identity policyd already trusts; contexts reuse it.
+  readonly execdTls: TestServiceTls;
   readonly edgedImage: string;
   readonly applicationArtifact: TestContainerArtifact;
   readonly invocation: InvocationAuthority;

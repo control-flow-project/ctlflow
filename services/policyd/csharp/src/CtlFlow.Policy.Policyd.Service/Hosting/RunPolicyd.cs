@@ -1,4 +1,5 @@
 using System.Data.Common;
+using CtlFlow.Execution.V1;
 using CtlFlow.Identity.V1;
 using CtlFlow.Policy.Policyd.Db.Providers;
 using CtlFlow.Policy.Policyd.Service.Catalog;
@@ -37,6 +38,10 @@ internal static partial class PolicydProcess
             settings.Identity.Grpc);
         var identityClient = new IdentityService.IdentityServiceClient(
             identityChannel);
+        using var executionChannel = CreatePrivateGrpcChannel(
+            settings.Execution.Endpoint);
+        var executionClient = new ExecutionService.ExecutionServiceClient(
+            executionChannel);
 
         var builder = WebApplication.CreateSlimBuilder(args);
         builder.WebHost.ConfigureKestrel(options =>
@@ -69,6 +74,7 @@ internal static partial class PolicydProcess
         builder.Services.AddSingleton(catalog);
         builder.Services.AddSingleton(policyDatabase);
         builder.Services.AddSingleton(identityClient);
+        builder.Services.AddSingleton(executionClient);
         builder.Services.AddSingleton<TokenAuthorities>(services =>
             new TokenAuthorities(
                 settings.WorkloadTokens.Validation,

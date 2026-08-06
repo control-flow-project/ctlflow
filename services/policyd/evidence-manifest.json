@@ -52,7 +52,11 @@
           },
           {
             "file": "tests/integration/catalog.test.ts",
-            "title": "rejects an unadmitted workload and unknown operation"
+            "title": "rejects an unknown operation from a kernel owner"
+          },
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "rejects a product operation from a kernel owner"
           }
         ],
         "UNAVAILABLE": [
@@ -67,6 +71,18 @@
           {
             "file": "tests/integration/lifecycle.test.ts",
             "title": "fails readiness and calls when mapped policy storage is absent"
+          },
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "routes a non-kernel workload to Execd and fails closed without it"
+          },
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "fails closed for a product operation when Execd is unavailable"
+          },
+          {
+            "file": "tests/integration/catalog.test.ts",
+            "title": "keeps a product workload out of the kernel branch"
           }
         ],
         "CANCELLED": [
@@ -116,6 +132,22 @@
     {
       "file": "tests/integration/telemetry.test.ts",
       "title": "Collector outage is bounded and does not change a decision"
+    },
+    {
+      "file": "tests/integration/provisioning.test.ts",
+      "title": "provisions tagged kernel and package policy through the seed path"
+    },
+    {
+      "file": "tests/integration/provisioning.test.ts",
+      "title": "rejects a seed whose operation owner is not canonical"
+    },
+    {
+      "file": "tests/integration/provisioning.test.ts",
+      "title": "rejects a kernel-owned seed rule for a foreign operation"
+    },
+    {
+      "file": "tests/integration/telemetry.test.ts",
+      "title": "records the Execd dependency span and its outcome"
     }
   ],
   "releaseGates": [

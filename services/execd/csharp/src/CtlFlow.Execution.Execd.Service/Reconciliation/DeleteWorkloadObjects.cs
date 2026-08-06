@@ -21,8 +21,8 @@ internal static partial class ExecutionReconciliation
         var annotations = WorkloadAnnotations(
             placement.Id,
             workload.Id);
-        var accountName = NativeNames.WorkloadServiceAccount(
-            workload.Id);
+        var accountName = Domain.Naming.NativeNames.ParseServiceAccountSubject(
+            workload.ServiceAccountSubject).Name;
         if (workload.Behavior is WorkloadBehavior.Continuous)
         {
             await DeleteOwnedObject(
@@ -103,6 +103,19 @@ internal static partial class ExecutionReconciliation
             trustName,
             annotations,
             "edged_trust_config_map",
+            cancellation);
+
+        var workloadTrustName =
+            NativeNames.WorkloadTrustConfigMap(workload.Id);
+        await DeleteOwnedObject(
+            kubernetes,
+            KubernetesResourcePaths.ConfigMap(
+                namespaceName,
+                workloadTrustName),
+            "ConfigMap",
+            workloadTrustName,
+            annotations,
+            "workload_trust_config_map",
             cancellation);
 
         await DeleteOwnedObject(

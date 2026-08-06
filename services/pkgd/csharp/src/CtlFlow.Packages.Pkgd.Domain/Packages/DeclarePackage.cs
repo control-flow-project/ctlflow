@@ -51,6 +51,14 @@ public static partial class Packages
                 value.ComponentId,
                 value.Artifact))
             .ToArray();
+        var componentOperations = draft.Components
+            .SelectMany(component => component.DeclaredOperations
+                .Select(operation => new PackageComponentOperation(
+                    draft.PackageId,
+                    draft.Generation,
+                    component.ComponentId,
+                    operation)))
+            .ToArray();
         var interfaces = draft.Interfaces
             .Select(value => new PackageInterface(
                 draft.PackageId,
@@ -93,6 +101,7 @@ public static partial class Packages
                 new PackageWriteSet(
                     declaration,
                     components,
+                    componentOperations,
                     interfaces,
                     dependencies,
                     exposures),

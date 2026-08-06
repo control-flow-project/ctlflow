@@ -96,7 +96,15 @@ export interface PackageProvenance {
 
 export interface PackageComponent {
   componentId: string;
-  artifact: OciArtifact | undefined;
+  artifact:
+    | OciArtifact
+    | undefined;
+  /**
+   * Product operations this component implements. Unique across the whole
+   * generation, at most 64 per component and 512 per generation, immutable
+   * with the generation. The Package ID supplies the operation namespace.
+   */
+  declaredOperations: string[];
 }
 
 export interface OciArtifact {
@@ -743,7 +751,7 @@ export const PackageProvenance: MessageFns<PackageProvenance> = {
 };
 
 function createBasePackageComponent(): PackageComponent {
-  return { componentId: "", artifact: undefined };
+  return { componentId: "", artifact: undefined, declaredOperations: [] };
 }
 
 export const PackageComponent: MessageFns<PackageComponent> = {
@@ -753,6 +761,9 @@ export const PackageComponent: MessageFns<PackageComponent> = {
     }
     if (message.artifact !== undefined) {
       OciArtifact.encode(message.artifact, writer.uint32(18).fork()).join();
+    }
+    for (const v of message.declaredOperations) {
+      writer.uint32(26).string(v!);
     }
     return writer;
   },
@@ -780,6 +791,14 @@ export const PackageComponent: MessageFns<PackageComponent> = {
           message.artifact = OciArtifact.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.declaredOperations.push(reader.string());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -793,6 +812,9 @@ export const PackageComponent: MessageFns<PackageComponent> = {
     return {
       componentId: isSet(object.componentId) ? globalThis.String(object.componentId) : "",
       artifact: isSet(object.artifact) ? OciArtifact.fromJSON(object.artifact) : undefined,
+      declaredOperations: globalThis.Array.isArray(object?.declaredOperations)
+        ? object.declaredOperations.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -803,6 +825,9 @@ export const PackageComponent: MessageFns<PackageComponent> = {
     }
     if (message.artifact !== undefined) {
       obj.artifact = OciArtifact.toJSON(message.artifact);
+    }
+    if (message.declaredOperations?.length) {
+      obj.declaredOperations = message.declaredOperations;
     }
     return obj;
   },
@@ -816,6 +841,7 @@ export const PackageComponent: MessageFns<PackageComponent> = {
     message.artifact = (object.artifact !== undefined && object.artifact !== null)
       ? OciArtifact.fromPartial(object.artifact)
       : undefined;
+    message.declaredOperations = object.declaredOperations?.map((e) => e) || [];
     return message;
   },
 };

@@ -12,7 +12,8 @@ COPY services/execd/testing services/execd/testing
 RUN npm run build:application --workspace @ctlflow/execd
 
 FROM node:26.1.0-bookworm-slim
-WORKDIR /app
+WORKDIR /workspace/app
+COPY --from=build /workspace/node_modules /workspace/node_modules
 COPY --from=build /workspace/services/execd/.generated/testing/application/node/src ./
 USER 1000:1000
-ENTRYPOINT ["node", "/app/run-controlled-application.js"]
+ENTRYPOINT ["node", "/workspace/app/run-controlled-application.js"]

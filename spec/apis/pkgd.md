@@ -46,7 +46,7 @@ A Package generation is a complete immutable declaration:
 | `generation` | positive uint64 | Sequential immutable generation |
 | `version` | string | Package-supplied version label |
 | `provenance` | `source_uri`, `source_digest` | Source identity and digest |
-| `components` | component ID plus OCI repository and manifest digest | Independently runnable artifacts |
+| `components` | component ID, OCI repository and manifest digest, and declared product operations | Independently runnable artifacts and the operations they implement |
 | `interfaces` | interface ID, component, protocol, contract ID, port | Component-owned network interfaces |
 | `dependencies` | name, optional ID, component, type, canonical options JSON | Required provisioned or service dependency |
 | `exposures` | exposure ID and interface ID | Package interfaces that may be exposed |
@@ -72,7 +72,11 @@ as base64.
       "artifact": {
         "repository": "registry.example.com/products/chat-api",
         "manifestDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-      }
+      },
+      "declaredOperations": [
+        "messages.post",
+        "messages.read"
+      ]
     }
   ],
   "interfaces": [

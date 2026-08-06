@@ -16,6 +16,7 @@ internal static partial class KubernetesBodies
         string namespaceName,
         string accountName,
         EdgedSettings edged,
+        ProductBootstrapSettings bootstrap,
         int replicas)
     {
         var continuous = workload.Behavior as
@@ -62,14 +63,14 @@ internal static partial class KubernetesBodies
             writer.WriteBoolean("runAsNonRoot", true);
             writer.WriteEndObject();
             writer.WriteStartArray("containers");
-            WriteApplicationContainer(writer, workload);
+            WriteApplicationContainer(writer, workload, bootstrap);
             WriteEdgedContainers(
                 writer,
                 placement.Target,
                 workload,
                 edged);
             writer.WriteEndArray();
-            WriteVolumes(writer, workload);
+            WriteVolumes(writer, workload, bootstrap);
             writer.WriteEndObject();
             writer.WriteEndObject();
             writer.WriteEndObject();
@@ -79,7 +80,8 @@ internal static partial class KubernetesBodies
 
     private static void WriteApplicationContainer(
         Utf8JsonWriter writer,
-        WorkloadRecord workload)
+        WorkloadRecord workload,
+        ProductBootstrapSettings bootstrap)
     {
         writer.WriteStartObject();
         writer.WriteString("name", "application");
@@ -89,6 +91,12 @@ internal static partial class KubernetesBodies
             + "@"
             + workload.AdmittedPackage.ArtifactManifestDigest.Value);
         writer.WriteString("imagePullPolicy", "IfNotPresent");
+        writer.WriteStartArray("env");
+        WriteProductBootstrapEnvironment(
+            writer,
+            bootstrap,
+            workload.AdmittedPackage.AppId.Value);
+        writer.WriteEndArray();
         writer.WriteStartObject("resources");
         writer.WriteStartObject("requests");
         WriteResourceValues(writer, workload);
@@ -221,11 +229,129 @@ internal static partial class KubernetesBodies
         }
     }
 
+    // The distro-neutral product runtime bootstrap. The values name identity,
+    // trust, endpoints, validation settings, and the admitted App ID only.
+    private static void WriteProductBootstrapEnvironment(
+        Utf8JsonWriter writer,
+        ProductBootstrapSettings bootstrap,
+        string appId)
+    {
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_WORKLOAD_TOKEN_FILE",
+            ProductTokenPath);
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_WORKLOAD_JWKS_PATH",
+            $"{ProductTrustDirectory}/workload-jwks.json");
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_IDENTITYD_ENDPOINT",
+            bootstrap.IdentityEndpoint.AbsoluteUri);
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_IDENTITYD_TLS_CA_PATH",
+            $"{ProductTrustDirectory}/identityd-ca.crt");
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_POLICYD_ENDPOINT",
+            bootstrap.PolicyEndpoint.AbsoluteUri);
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_POLICYD_TLS_CA_PATH",
+            $"{ProductTrustDirectory}/policyd-ca.crt");
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_WORKLOAD_TOKEN_ISSUER",
+            bootstrap.WorkloadTokenIssuer);
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_WORKLOAD_TOKEN_AUDIENCE",
+            bootstrap.WorkloadTokenAudience);
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_WORKLOAD_TOKEN_MAX_LIFETIME_SECONDS",
+            bootstrap.WorkloadTokenMaximumLifetimeSeconds.ToString(
+                CultureInfo.InvariantCulture));
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_INVOCATION_ISSUER",
+            bootstrap.InvocationIssuer);
+        WriteEnvironment(
+            writer,
+            "CTLFLOW_INVOCATION_AUDIENCE",
+            bootstrap.InvocationAudience);
+        WriteEnvironment(writer, "CTLFLOW_APP_ID", appId);
+    }
+
+    private static void WriteProductBootstrapMounts(
+        Utf8JsonWriter writer)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("name", "product-token");
+        writer.WriteString(
+            "mountPath",
+            ProductTokenDirectory);
+        writer.WriteBoolean("readOnly", true);
+        writer.WriteEndObject();
+        writer.WriteStartObject();
+        writer.WriteString("name", "product-trust");
+        writer.WriteString(
+            "mountPath",
+            ProductTrustDirectory);
+        writer.WriteBoolean("readOnly", true);
+        writer.WriteEndObject();
+    }
+
+    private static void WriteProductBootstrapVolumes(
+        Utf8JsonWriter writer,
+        Domain.Identifiers.WorkloadId workloadId,
+        ProductBootstrapSettings bootstrap)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("name", "product-token");
+        writer.WriteStartObject("projected");
+        writer.WriteNumber("defaultMode", 288);
+        writer.WriteStartArray("sources");
+        writer.WriteStartObject();
+        writer.WriteStartObject("serviceAccountToken");
+        writer.WriteString(
+            "audience",
+            bootstrap.WorkloadTokenAudience);
+        writer.WriteNumber(
+            "expirationSeconds",
+            bootstrap.WorkloadTokenMaximumLifetimeSeconds);
+        writer.WriteString("path", "token");
+        writer.WriteEndObject();
+        writer.WriteEndObject();
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+        writer.WriteEndObject();
+
+        writer.WriteStartObject();
+        writer.WriteString("name", "product-trust");
+        writer.WriteStartObject("configMap");
+        writer.WriteString(
+            "name",
+            NativeNames.WorkloadTrustConfigMap(workloadId));
+        writer.WriteEndObject();
+        writer.WriteEndObject();
+    }
+
+    private const string ProductTokenDirectory =
+        "/var/run/secrets/ctlflow";
+    private const string ProductTokenPath =
+        $"{ProductTokenDirectory}/token";
+    private const string ProductTrustDirectory =
+        "/var/run/ctlflow/trust";
+
     private static void WriteVolumes(
         Utf8JsonWriter writer,
-        WorkloadRecord workload)
+        WorkloadRecord workload,
+        ProductBootstrapSettings bootstrap)
     {
         writer.WriteStartArray("volumes");
+        WriteProductBootstrapVolumes(writer, workload.Id, bootstrap);
         var projectionIndex = 0;
         foreach (var target in AllProjectionTargets(workload))
         {
@@ -311,6 +437,7 @@ internal static partial class KubernetesBodies
         WorkloadRecord workload)
     {
         writer.WriteStartArray("volumeMounts");
+        WriteProductBootstrapMounts(writer);
         var projectionIndex = 0;
         foreach (var target in AllProjectionTargets(workload))
         {

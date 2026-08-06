@@ -37,8 +37,8 @@ internal static partial class ExecutionReconciliation
             return;
         }
 
-        var accountName = NativeNames.WorkloadServiceAccount(
-            workload.Id);
+        var accountName = Domain.Naming.NativeNames.ParseServiceAccountSubject(
+            workload.ServiceAccountSubject).Name;
         var path = KubernetesResourcePaths.Deployment(
             namespaceName,
             accountName);
@@ -63,6 +63,7 @@ internal static partial class ExecutionReconciliation
                 namespaceName,
                 accountName,
                 kubernetes.Settings.Edged,
+                kubernetes.Settings.Bootstrap,
                 0),
             "workload_deployment",
             cancellation);

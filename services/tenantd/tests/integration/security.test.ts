@@ -166,13 +166,21 @@ test("resolution accepts valid session and run invocation identities", async () 
     workspaceId: workspace.workspaceId,
     tokenId: "security-session"
   });
-  const run = context.invocation.sign({
+  const directRun = context.invocation.sign({
+    tenantId: tenant.tenantId,
+    workspaceId: workspace.workspaceId,
+    subject: "service:automation",
+    sessionId: null,
+    runId: "security-direct-run",
+    tokenId: "security-direct-run-token"
+  });
+  const virtualRun = context.invocation.sign({
     tenantId: tenant.tenantId,
     workspaceId: workspace.workspaceId,
     subject: "service:automation",
     sessionId: null,
     runId: "security-run",
-    actorSubject: "job:security-agent",
+    actorSubject: "agent:security-agent",
     tokenId: "security-run-token"
   });
   const autonomous = workloadMetadata(context.workload.callerToken);
@@ -191,7 +199,7 @@ test("resolution accepts valid session and run invocation identities", async () 
     autonomouslyFoundWorkspace.workspaceId,
     workspace.workspaceId);
 
-  for (const invocation of [session, run]) {
+  for (const invocation of [session, directRun, virtualRun]) {
     const metadata = workloadMetadata(
       context.workload.callerToken,
       invocation);

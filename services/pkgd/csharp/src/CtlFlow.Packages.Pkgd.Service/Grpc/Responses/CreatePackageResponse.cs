@@ -35,7 +35,8 @@ internal static partial class PackageResponses
                 package.DeclaredAt.Value)
         };
         response.Components.Add(package.Components.Select(value =>
-            new V1.PackageComponent
+        {
+            var component = new V1.PackageComponent
             {
                 ComponentId = value.ComponentId.Value,
                 Artifact = new V1.OciArtifact
@@ -43,7 +44,11 @@ internal static partial class PackageResponses
                     Repository = value.Artifact.Repository.Value,
                     ManifestDigest = value.Artifact.ManifestDigest.Value
                 }
-            }));
+            };
+            component.DeclaredOperations.Add(
+                value.DeclaredOperations.Select(operation => operation.Value));
+            return component;
+        }));
         response.Interfaces.Add(package.Interfaces.Select(value =>
             new V1.PackageInterface
             {

@@ -111,11 +111,8 @@ Promise<IdentitydTestContext> {
       suite.auditd.serverName,
       invocation.verificationKey.keyId,
       authdWorkload,
-      configdWorkload,
       execdWorkload,
-      pkgdWorkload,
       policydWorkload,
-      tenantdWorkload,
       invocation);
     const provisionDatabase = database;
     service = await suite.runtime.start({
@@ -179,11 +176,8 @@ function createEnvironment(
   auditServerName: string,
   signingKeyId: string,
   authdWorkload: TestWorkloadCredentials,
-  configdWorkload: TestWorkloadCredentials,
   execdWorkload: TestWorkloadCredentials,
-  pkgdWorkload: TestWorkloadCredentials,
   policydWorkload: TestWorkloadCredentials,
-  tenantdWorkload: TestWorkloadCredentials,
   invocation: InvocationAuthority
 ): Readonly<Record<string, string>> {
   return {
@@ -216,14 +210,6 @@ function createEnvironment(
     CTLFLOW_INVOCATION_SIGNING_PRIVATE_KEY_PATH:
       "/var/run/ctlflow/tls/invocation-signing.pem",
     CTLFLOW_SESSION_LIFETIME_SECONDS: "43200",
-    CTLFLOW_GET_INVOCATION_VERIFICATION_KEYS_CALLERS:
-      [
-        tenantdWorkload.callerSubject,
-        policydWorkload.callerSubject,
-        pkgdWorkload.callerSubject,
-        configdWorkload.callerSubject,
-        execdWorkload.callerSubject
-      ].join(","),
     CTLFLOW_RESOLVE_PRINCIPAL_CALLERS:
       policydWorkload.callerSubject,
     CTLFLOW_LIST_PRINCIPAL_GROUPS_CALLERS:

@@ -655,6 +655,26 @@ export interface RealizationStatus {
   updatedAt: Date | undefined;
 }
 
+/**
+ * Policyd supplies a subject it derived from a workload token it has already
+ * validated. The operation is an untrusted selector: it grants nothing unless
+ * Execd finds it in that Workload's admitted operation snapshot.
+ */
+export interface ResolveWorkloadOperationBindingRequest {
+  serviceAccountSubject: string;
+  operation: string;
+}
+
+/**
+ * Only the facts Policyd consumes. An unknown subject, an inactive Workload or
+ * Placement ancestor, or an unadmitted operation is NOT_FOUND.
+ */
+export interface ResolveWorkloadOperationBindingResponse {
+  effectivePlacementTarget: PlacementTarget | undefined;
+  appId: string;
+  packageId: string;
+}
+
 function createBaseDeclarePlacementRequest(): DeclarePlacementRequest {
   return {
     placementId: "",
@@ -4712,6 +4732,179 @@ export const RealizationStatus: MessageFns<RealizationStatus> = {
   },
 };
 
+function createBaseResolveWorkloadOperationBindingRequest(): ResolveWorkloadOperationBindingRequest {
+  return { serviceAccountSubject: "", operation: "" };
+}
+
+export const ResolveWorkloadOperationBindingRequest: MessageFns<ResolveWorkloadOperationBindingRequest> = {
+  encode(message: ResolveWorkloadOperationBindingRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.serviceAccountSubject !== "") {
+      writer.uint32(10).string(message.serviceAccountSubject);
+    }
+    if (message.operation !== "") {
+      writer.uint32(18).string(message.operation);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveWorkloadOperationBindingRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolveWorkloadOperationBindingRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.serviceAccountSubject = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.operation = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ResolveWorkloadOperationBindingRequest {
+    return {
+      serviceAccountSubject: isSet(object.serviceAccountSubject) ? globalThis.String(object.serviceAccountSubject) : "",
+      operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+    };
+  },
+
+  toJSON(message: ResolveWorkloadOperationBindingRequest): unknown {
+    const obj: any = {};
+    if (message.serviceAccountSubject !== "") {
+      obj.serviceAccountSubject = message.serviceAccountSubject;
+    }
+    if (message.operation !== "") {
+      obj.operation = message.operation;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ResolveWorkloadOperationBindingRequest>): ResolveWorkloadOperationBindingRequest {
+    return ResolveWorkloadOperationBindingRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ResolveWorkloadOperationBindingRequest>): ResolveWorkloadOperationBindingRequest {
+    const message = createBaseResolveWorkloadOperationBindingRequest();
+    message.serviceAccountSubject = object.serviceAccountSubject ?? "";
+    message.operation = object.operation ?? "";
+    return message;
+  },
+};
+
+function createBaseResolveWorkloadOperationBindingResponse(): ResolveWorkloadOperationBindingResponse {
+  return { effectivePlacementTarget: undefined, appId: "", packageId: "" };
+}
+
+export const ResolveWorkloadOperationBindingResponse: MessageFns<ResolveWorkloadOperationBindingResponse> = {
+  encode(message: ResolveWorkloadOperationBindingResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.effectivePlacementTarget !== undefined) {
+      PlacementTarget.encode(message.effectivePlacementTarget, writer.uint32(10).fork()).join();
+    }
+    if (message.appId !== "") {
+      writer.uint32(18).string(message.appId);
+    }
+    if (message.packageId !== "") {
+      writer.uint32(26).string(message.packageId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveWorkloadOperationBindingResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseResolveWorkloadOperationBindingResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.effectivePlacementTarget = PlacementTarget.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.appId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.packageId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ResolveWorkloadOperationBindingResponse {
+    return {
+      effectivePlacementTarget: isSet(object.effectivePlacementTarget)
+        ? PlacementTarget.fromJSON(object.effectivePlacementTarget)
+        : undefined,
+      appId: isSet(object.appId) ? globalThis.String(object.appId) : "",
+      packageId: isSet(object.packageId) ? globalThis.String(object.packageId) : "",
+    };
+  },
+
+  toJSON(message: ResolveWorkloadOperationBindingResponse): unknown {
+    const obj: any = {};
+    if (message.effectivePlacementTarget !== undefined) {
+      obj.effectivePlacementTarget = PlacementTarget.toJSON(message.effectivePlacementTarget);
+    }
+    if (message.appId !== "") {
+      obj.appId = message.appId;
+    }
+    if (message.packageId !== "") {
+      obj.packageId = message.packageId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ResolveWorkloadOperationBindingResponse>): ResolveWorkloadOperationBindingResponse {
+    return ResolveWorkloadOperationBindingResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ResolveWorkloadOperationBindingResponse>): ResolveWorkloadOperationBindingResponse {
+    const message = createBaseResolveWorkloadOperationBindingResponse();
+    message.effectivePlacementTarget =
+      (object.effectivePlacementTarget !== undefined && object.effectivePlacementTarget !== null)
+        ? PlacementTarget.fromPartial(object.effectivePlacementTarget)
+        : undefined;
+    message.appId = object.appId ?? "";
+    message.packageId = object.packageId ?? "";
+    return message;
+  },
+};
+
 export type ExecutionServiceService = typeof ExecutionServiceService;
 export const ExecutionServiceService = {
   declarePlacement: {
@@ -4809,6 +5002,24 @@ export const ExecutionServiceService = {
     responseSerialize: (value: Run): Buffer => Buffer.from(Run.encode(value).finish()),
     responseDeserialize: (value: Buffer): Run => Run.decode(value),
   },
+  /**
+   * Confirms one admitted product operation for one authenticated Workload
+   * ServiceAccount subject. Admits only Policyd and never calls Policyd, so
+   * authorization cannot recurse.
+   */
+  resolveWorkloadOperationBinding: {
+    path: "/ctlflow.execution.v1.ExecutionService/ResolveWorkloadOperationBinding",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ResolveWorkloadOperationBindingRequest): Buffer =>
+      Buffer.from(ResolveWorkloadOperationBindingRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolveWorkloadOperationBindingRequest =>
+      ResolveWorkloadOperationBindingRequest.decode(value),
+    responseSerialize: (value: ResolveWorkloadOperationBindingResponse): Buffer =>
+      Buffer.from(ResolveWorkloadOperationBindingResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolveWorkloadOperationBindingResponse =>
+      ResolveWorkloadOperationBindingResponse.decode(value),
+  },
 } as const;
 
 export interface ExecutionServiceServer extends UntypedServiceImplementation {
@@ -4822,6 +5033,15 @@ export interface ExecutionServiceServer extends UntypedServiceImplementation {
   getRun: handleUnaryCall<GetRunRequest, Run>;
   listRuns: handleUnaryCall<ListRunsRequest, ListRunsResponse>;
   cancelRun: handleUnaryCall<CancelRunRequest, Run>;
+  /**
+   * Confirms one admitted product operation for one authenticated Workload
+   * ServiceAccount subject. Admits only Policyd and never calls Policyd, so
+   * authorization cannot recurse.
+   */
+  resolveWorkloadOperationBinding: handleUnaryCall<
+    ResolveWorkloadOperationBindingRequest,
+    ResolveWorkloadOperationBindingResponse
+  >;
 }
 
 export interface ExecutionServiceClient extends Client {
@@ -4965,6 +5185,26 @@ export interface ExecutionServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: Run) => void,
+  ): ClientUnaryCall;
+  /**
+   * Confirms one admitted product operation for one authenticated Workload
+   * ServiceAccount subject. Admits only Policyd and never calls Policyd, so
+   * authorization cannot recurse.
+   */
+  resolveWorkloadOperationBinding(
+    request: ResolveWorkloadOperationBindingRequest,
+    callback: (error: ServiceError | null, response: ResolveWorkloadOperationBindingResponse) => void,
+  ): ClientUnaryCall;
+  resolveWorkloadOperationBinding(
+    request: ResolveWorkloadOperationBindingRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolveWorkloadOperationBindingResponse) => void,
+  ): ClientUnaryCall;
+  resolveWorkloadOperationBinding(
+    request: ResolveWorkloadOperationBindingRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolveWorkloadOperationBindingResponse) => void,
   ): ClientUnaryCall;
 }
 

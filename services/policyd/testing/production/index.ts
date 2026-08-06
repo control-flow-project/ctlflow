@@ -9,7 +9,8 @@ export type {
   PolicyRole
 } from "./policy-role.js";
 export type {
-  PolicyRule
+  PolicyRule,
+  PolicyRuleOwner
 } from "./policy-rule.js";
 export type {
   PolicyState

@@ -21,9 +21,17 @@ export interface AccessGrantSeed extends RuleSeed {
 }
 
 export interface RuleSeed {
+  readonly owner: OwnerSeed;
   readonly operation: string;
   readonly basePath: string;
   readonly match: "exact" | "subtree";
+}
+
+// The tagged operation owner. Kernel rules name the owning kernel service;
+// package rules name the owning Package ID.
+export interface OwnerSeed {
+  readonly kind: "kernel" | "package";
+  readonly id: string;
 }
 
 export interface TargetSeed {

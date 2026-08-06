@@ -10,6 +10,7 @@ after(async () => {
 });
 
 await import("./api.test.js");
+await import("./provisioning.test.js");
 await import("./catalog.test.js");
 await import("./rules.test.js");
 await import("./principals.test.js");

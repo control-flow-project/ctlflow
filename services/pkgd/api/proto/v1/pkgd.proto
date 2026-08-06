@@ -51,6 +51,10 @@ message PackageProvenance {
 message PackageComponent {
   string component_id = 1;
   OciArtifact artifact = 2;
+  // Product operations this component implements. Unique across the whole
+  // generation, at most 64 per component and 512 per generation, immutable
+  // with the generation. The Package ID supplies the operation namespace.
+  repeated string declared_operations = 3;
 }
 
 message OciArtifact {

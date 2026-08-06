@@ -200,6 +200,16 @@ export async function startTestKubernetes(
           arguments_,
           input === undefined ? undefined : { input });
       },
+      runNodeCommand: async (arguments_) => {
+        if (stopped) {
+          throw new Error("Test Kubernetes cluster is stopped");
+        }
+
+        return await runMinikube(
+          repositoryRoot,
+          minikube,
+          ["ssh", "--", "sudo", ...arguments_]);
+      },
       startKubectl: (arguments_) => {
         if (stopped) {
           throw new Error("Test Kubernetes cluster is stopped");
