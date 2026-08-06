@@ -11,7 +11,7 @@ CtlFlow has ten kernel ownership boundaries.
 | [`tenantd`](../tenantd/) | Tenants and Workspaces | [gRPC](../apis/tenantd/) |
 | [`authd`](../authd/) | Public authentication protocol; no durable records | [HTTP](../apis/authd/) |
 | [`identityd`](../identityd/) | Accounts, standing, Groups, identity links, Sessions, and invocation identity | [gRPC](../apis/identityd/) |
-| [`policyd`](../policyd/) | Roles, grants, operation ownership, and access decisions | [gRPC](../apis/policyd/) |
+| [`policyd`](../policyd/) | Roles, grants, the fixed kernel operation catalog, and access decisions | [gRPC](../apis/policyd/) |
 | [`pkgd`](../pkgd/) | Packages and installed application intent | [gRPC](../apis/pkgd/) |
 | [`configd`](../configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections | [gRPC](../apis/configd/) |
 | [`execd`](../execd/) | Placements and Kubernetes realization intent | [gRPC](../apis/execd/) |
@@ -32,6 +32,10 @@ contract and has matching normative behavior and canonical evidence.
 The approved private call graph is:
 
 ```text
+admitted product workload
+  +-> identityd.GetInvocationVerificationKeys
+  +-> policyd.CheckAccess
+
 tenantd
   +-> identityd.GetInvocationVerificationKeys
   +-> policyd.CheckAccess
@@ -41,6 +45,7 @@ policyd
   +-> identityd.GetInvocationVerificationKeys
   +-> identityd.ResolvePrincipal
   +-> identityd.ListPrincipalGroups
+  +-> execd.ResolveWorkloadOperationBinding   product operations only
 
 authd
   +-> identityd.CreateSession
@@ -92,8 +97,12 @@ not service-to-service RPCs and do not make either proxy an Execd record.
 - Only `tenantd` mutates Tenant or Workspace state.
 - Only `identityd` owns account, standing, Session, and delegated-principal
   facts or signs invocation JWTs.
-- Only `policyd` owns Roles, grants, operation ownership, and authoritative
-  access decisions.
+- Only `policyd` owns Roles, grants, and authoritative access decisions. Kernel
+  operation ownership is Policyd's checked deployment catalog; product operation
+  ownership is declared by `pkgd`, admitted by `execd`, and resolved by
+  `policyd` at decision time.
+- `execd.ResolveWorkloadOperationBinding` admits only `policyd` and never calls
+  `policyd`, so authorization cannot recurse.
 - Only `pkgd` owns Package and App installation intent.
 - Only `configd` owns configuration and secret material.
 - Only `execd` owns Placement and general workload realization intent.

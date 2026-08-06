@@ -16,6 +16,9 @@ public sealed class PackageDbContext(
     public DbSet<PackageDeclaration> PackageGenerations { get; private set; } =
         null!;
 
+    public DbSet<PackageComponentOperation> PackageComponentOperations
+        => Set<PackageComponentOperation>();
+
     public DbSet<PackageComponent> PackageComponents { get; private set; } =
         null!;
 
@@ -45,6 +48,7 @@ public sealed class PackageDbContext(
     {
         ConfigurePackageDeclaration(modelBuilder);
         ConfigurePackageComponent(modelBuilder);
+        ConfigurePackageComponentOperation(modelBuilder);
         ConfigurePackageInterface(modelBuilder);
         ConfigurePackageDependency(modelBuilder);
         ConfigureDependencyOptionsContent(modelBuilder);

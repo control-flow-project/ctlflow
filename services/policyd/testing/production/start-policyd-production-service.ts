@@ -70,7 +70,8 @@ export async function startPolicydProductionService(
       serviceName,
       workload,
       options.kubernetes,
-      options.identityd.certificateAuthorityPath);
+      options.identityd.certificateAuthorityPath,
+      options.execution?.certificateAuthorityPath);
     const migrationImage = await buildNodeTestImage({
       repositoryRoot: options.repositoryRoot,
       kubernetes: options.kubernetes,
@@ -80,6 +81,7 @@ export async function startPolicydProductionService(
         "migrations",
         "Containerfile"),
       sourcePaths: [
+        path.join(serviceRoot, "catalog"),
         path.join(serviceRoot, "knexfile.ts"),
         path.join(serviceRoot, "kubernetes", "base", "policy-seed.json"),
         path.join(serviceRoot, "migrations"),
@@ -175,6 +177,14 @@ function createEnvironment(
     CTLFLOW_CONFIGD_CALLER: caller("configd"),
     CTLFLOW_EXECD_CALLER: caller("execd"),
     CTLFLOW_OPERATION_CATALOG_PATH: "/app/operation-owners.tsv",
+    CTLFLOW_EXECUTION_URL:
+      options.execution?.endpoint
+        ?? `https://execd.${options.kubernetes.namespace}.svc:50051`,
+    CTLFLOW_EXECUTION_TLS_SERVER_NAME:
+      options.execution?.serverName
+        ?? `execd.${options.kubernetes.namespace}.svc`,
+    CTLFLOW_EXECUTION_TLS_CA_PATH:
+      "/var/run/ctlflow/trust/execd-ca.crt",
     OTEL_EXPORTER_OTLP_ENDPOINT: options.telemetryEndpoint
   };
 }

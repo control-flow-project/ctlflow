@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { status } from "@grpc/grpc-js";
 import {
   performance
 } from "node:perf_hooks";
@@ -21,7 +23,8 @@ import {
   principalFact
 } from "../support/principal-fact.js";
 import {
-  findSpansForTrace
+  findSpansForTrace,
+  type OtlpSpan
 } from "../support/telemetry/find-spans-for-trace.js";
 import {
   hasOperationLog
@@ -32,6 +35,9 @@ import {
 import {
   waitForExport
 } from "../support/telemetry/wait-for-export.js";
+import {
+  matchGrpcStatus
+} from "../support/match-grpc-status.js";
 import {
   workloadMetadata
 } from "../support/workload-metadata.js";
@@ -98,6 +104,60 @@ test("exports correlated, parented, redacted traces, metrics, and logs",
     }
   });
 
+test("records the Execd dependency span and its outcome", async () => {
+  // The product branch resolves authority through Execd. This suite deploys
+  // no Execd, so the call fails closed — and the dependency span must still
+  // name the Execd RPC and carry its canonical outcome.
+  const context = getPolicydTestContext();
+  const traceId = "abcdef01234567890abcdef012345678";
+  const invocation = context.invocation.sign({ tenantId: "acme" });
+  const metadata = workloadMetadata(
+    context.workloads.product.callerToken,
+    invocation);
+  metadata.set(
+    "traceparent",
+    `00-${traceId}-1234567890abcdef-01`);
+  await assert.rejects(
+    callCheckAccess(
+      {
+        operation: "messages.post",
+        resourcePath: "/tenants/acme/apps/app_chat/topics/general",
+        tenantId: "acme"
+      },
+      { metadata }),
+    matchGrpcStatus(status.UNAVAILABLE));
+
+  // The server span proves the trace correlated at all; the dependency span
+  // is then asserted from the same export.
+  await waitForExport(
+    context.collector.tracesPath,
+    (value) =>
+      findSpansForTrace(value, traceId).some(
+        (span) => span.name === "policyd.CheckAccess"));
+  const spans = findSpansForTrace(
+    await readFile(context.collector.tracesPath, "utf8"),
+    traceId);
+  const names = spans.map((span) => String(span.name)).join(", ");
+  const server = spans.find(
+    (span) => span.name === "policyd.CheckAccess");
+  const dependency = spans.find(
+    (span) =>
+      span.name === "policyd.execd.ResolveWorkloadOperationBinding");
+  assert.ok(dependency, `Execd dependency span among: ${names}`);
+  assert.equal(dependency.parentSpanId, server?.spanId);
+  assert.equal(
+    attributeValue(dependency, "rpc.service"),
+    "ctlflow.execution.v1.ExecutionService");
+  assert.equal(
+    attributeValue(dependency, "rpc.method"),
+    "ResolveWorkloadOperationBinding");
+  // The dependency was unreachable, so the recorded outcome is its canonical
+  // failure status, never OK and never absent.
+  const outcome = attributeValue(dependency, "ctlflow.outcome");
+  assert.ok(outcome, `ctlflow.outcome recorded among: ${names}`);
+  assert.notEqual(outcome, "OK");
+});
+
 test("Collector outage is bounded and does not change a decision", async () => {
   const context = await arrangeAllow();
   await context.collector.suspend();
@@ -119,7 +179,16 @@ async function arrangeAllow() {
   await context.policyd.setPrincipalFacts([principalFact()]);
   await context.policyd.replacePolicy({
     roles: [],
-    grants: [directGrant("tenants.read", "/tenants/acme")]
+    grants: [directGrant("svc_tenantd", "tenants.read", "/tenants/acme")]
   });
   return context;
+}
+
+function attributeValue(
+  span: OtlpSpan | undefined,
+  key: string
+): string | undefined {
+  const value = span?.attributes?.find(
+    (item) => item.key === key)?.value?.stringValue;
+  return typeof value === "string" ? value : undefined;
 }

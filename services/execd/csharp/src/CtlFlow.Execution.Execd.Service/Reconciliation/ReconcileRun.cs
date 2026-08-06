@@ -80,8 +80,13 @@ internal static partial class ExecutionReconciliation
                 namespaceName,
                 DateTimeOffset.UtcNow,
                 cancellation);
-            var accountName = NativeNames.WorkloadServiceAccount(
-                run.WorkloadId);
+            // The Run launches under the identity admission retained.
+            var runWorkload = await GetWorkload(
+                database,
+                run.WorkloadId,
+                cancellation);
+            var accountName = Domain.Naming.NativeNames.ParseServiceAccountSubject(
+                runWorkload.ServiceAccountSubject).Name;
             var document = await EnsureOwnedObject(
                 kubernetes,
                 jobPath,
@@ -96,7 +101,8 @@ internal static partial class ExecutionReconciliation
                     namespaceName,
                     accountName,
                     jobName,
-                    invocationSecret),
+                    invocationSecret,
+                    kubernetes.Settings.Bootstrap),
                 "run_job",
                 cancellation);
             var status = InspectJob(

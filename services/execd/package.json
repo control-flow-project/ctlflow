@@ -15,7 +15,7 @@
     "verify:kubernetes-contract": "node tooling/kubernetes/verify-dependency-claim.mjs",
     "build:application": "node ../../tooling/clean-directories.mjs .generated/testing/application/node && tsc --project testing/application/node/tsconfig.json",
     "build:tests": "node ../../tooling/clean-directories.mjs tests/dist && tsc --project tests/tsconfig.json",
-    "build": "npm run build:migrations && npm run verify:schema-manifest && npm run verify:api-manifest && npm run verify:architecture && npm run verify:kubernetes-contract && npm run build:application && npm run generate && npm run build:tests && npm run verify:evidence",
+    "build": "npm run build:migrations && npm run verify:schema-manifest && npm run verify:api-manifest && npm run verify:architecture && npm run verify:kubernetes-contract && npm run generate && npm run build:application && npm run build:tests && npm run verify:evidence",
     "migrate": "npm run build:migrations && node .generated/migrations/tooling/migrations/run.js",
     "test": "npm run test:compiled && npm run test:csharp",
     "test:compiled": "node --test --test-force-exit --test-isolation=none --test-concurrency=1 --test-global-setup=./tests/dist/suite/setup-execd-test-suite.js tests/dist/integration/execd.test.js",

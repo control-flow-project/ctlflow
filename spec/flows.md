@@ -270,6 +270,37 @@ The approved capability operations and canonical paths are listed in
 [tenantd](../tenantd/). The backend cannot supply its own Actor, operation
 owner, capability token, or canonical resource path.
 
+## Product operation authorization
+
+```text
+operator
+  -> pkgd.DeclarePackage        component declares its operations
+  -> pkgd.CreateApp
+  -> execd.DeclarePlacement
+  -> execd.DeclareWorkload      Execd snapshots the admitted operations and
+                                retains the Workload ServiceAccount subject
+  -> Execd realizes the workload with that bound identity and projects the
+     product runtime bootstrap: its rotating internal-audience token, trust
+     material, Identityd/Policyd endpoints, validation settings, and App ID
+
+product workload (from inside the realized container, using only its
+projected bootstrap)
+  -> identityd.GetInvocationVerificationKeys   validate the invocation
+  -> policyd.CheckAccess
+       -> classify caller: product workload, not a kernel owner
+       -> execd.ResolveWorkloadOperationBinding(subject, operation)
+          <- effective Placement target, App ID, Package ID
+       -> Placement fence and App anchor
+       -> evaluate (package, package_id, operation)
+  <- allow or deny
+```
+
+Authority is declared by Pkgd, admitted by Execd, and resolved at decision
+time. A caller never asserts it. An unknown subject, an inactive Workload or
+Placement ancestor, or an unadmitted operation is `NOT_FOUND` at Execd and a
+denial at Policyd. Policyd caches no mutable Workload eligibility, so
+suspension takes effect on the next request.
+
 ## Failure
 
 ```text

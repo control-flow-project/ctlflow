@@ -22,8 +22,12 @@ import {
   workloadMetadata
 } from "./workload-metadata.js";
 
+// A CheckAccess caller is a kernel operation owner or a product workload
+// whose authority is resolved through Execd at decision time.
+export type CheckAccessOwner = PolicyOwner | "product";
+
 export interface CheckAccessOptions {
-  readonly owner?: PolicyOwner;
+  readonly owner?: CheckAccessOwner;
   readonly invocation?: InvocationTokenOptions;
   readonly invocationToken?: string;
   readonly workloadToken?: string;

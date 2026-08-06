@@ -42,6 +42,9 @@ export interface TestKubernetes {
     arguments_: readonly string[],
     input?: string
   ) => Promise<CommandResult>;
+  readonly runNodeCommand: (
+    arguments_: readonly string[]
+  ) => Promise<CommandResult>;
   readonly startKubectl: (
     arguments_: readonly string[]
   ) => ManagedProcess;

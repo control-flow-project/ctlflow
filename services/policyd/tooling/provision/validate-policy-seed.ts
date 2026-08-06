@@ -1,5 +1,13 @@
+import {
+  readFileSync
+} from "node:fs";
+import path from "node:path";
+import {
+  fileURLToPath
+} from "node:url";
 import type {
   AccessGrantSeed,
+  OwnerSeed,
   PolicySeed,
   RoleBindingSeed,
   RoleSeed,
@@ -8,30 +16,70 @@ import type {
   TargetSeed
 } from "./policy-seed.js";
 
-const operations = new Set([
-  "tenants.read",
-  "tenants.update_display_name",
-  "workspaces.create",
-  "workspaces.read",
-  "workspaces.update_display_name",
-  "workspaces.suspend",
-  "workspaces.resume",
-  "workspaces.delete",
-  "apps.create",
-  "apps.read",
-  "apps.set_package_generation",
-  "configurations.publish",
-  "configurations.read",
-  "secrets.publish",
-  "secrets.read_metadata",
-  "placements.declare",
-  "placements.read",
-  "workloads.declare",
-  "workloads.read",
-  "runs.create",
-  "runs.read",
-  "runs.cancel"
-]);
+// The one checked catalog source. The same file is projected into the
+// Policyd runtime, which cross-checks it against the compiled catalog at
+// startup, so seed validation, readiness, and runtime cannot drift.
+const kernelOperationOwners = readOperationCatalog();
+
+function readOperationCatalog(): ReadonlyMap<string, string> {
+  const catalogPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../..",
+    "catalog",
+    "operation-owners.tsv");
+  const entries = new Map<string, string>();
+  for (const line of readFileSync(catalogPath, "utf8").split("\n")) {
+    const row = line.trim();
+    if (row.length === 0) {
+      continue;
+    }
+    const [operation, principal] = row.split("\t");
+    if (operation === undefined
+        || principal === undefined
+        || !principal.startsWith("SERVICE/")
+        || entries.has(operation)) {
+      throw new Error("The operation catalog is invalid");
+    }
+    entries.set(operation, principal.slice("SERVICE/".length));
+  }
+  if (entries.size === 0) {
+    throw new Error("The operation catalog is empty");
+  }
+  return entries;
+}
+
+const operationPattern = /^[a-z0-9_]+\.[a-z0-9_]+$/;
+const ownerIdPattern = /^[a-z0-9][a-z0-9_.-]{0,127}$/;
+
+// A kernel rule must name a catalog operation owned by the stated kernel
+// service. A package rule is namespaced by its Package ID; only structure is
+// validated here, because authority is resolved at decision time from Execd.
+function validateOwner(rule: {
+  readonly owner: OwnerSeed;
+  readonly operation: string;
+}): OwnerSeed {
+  const owner = object(rule.owner, ["kind", "id"]);
+  if (owner.kind !== "kernel" && owner.kind !== "package") {
+    throw new Error("A policy rule owner kind must be kernel or package");
+  }
+  if (typeof owner.id !== "string" || !ownerIdPattern.test(owner.id)) {
+    throw new Error("A policy rule owner ID is not canonical");
+  }
+  if (typeof rule.operation !== "string"
+      || rule.operation.length > 128
+      || !operationPattern.test(rule.operation)) {
+    throw new Error("A policy rule operation is not canonical");
+  }
+  if (owner.kind === "kernel") {
+    const expected = kernelOperationOwners.get(rule.operation);
+    if (expected === undefined || expected !== owner.id) {
+      throw new Error(
+        "A kernel policy rule must name a catalog operation and its owner");
+    }
+  }
+  return { kind: owner.kind, id: owner.id };
+}
+
 
 export function validatePolicySeed(value: unknown): PolicySeed {
   const root = object(value, ["roles", "roleBindings", "accessGrants"]);
@@ -93,24 +141,33 @@ function validateRoleBinding(value: unknown): RoleBindingSeed {
 function validateAccessGrant(value: unknown): AccessGrantSeed {
   const item = object(
     value,
-    ["target", "subject", "operation", "basePath", "match"]);
+    ["target", "subject", "owner", "operation", "basePath", "match"]);
   return {
     target: validateTarget(item.target),
     subject: validateSubject(item.subject),
-    ...validateRule(item)
+    ...validateRule({
+      owner: item.owner,
+      operation: item.operation,
+      basePath: item.basePath,
+      match: item.match
+    })
   };
 }
 
 function validateRule(value: unknown): RuleSeed {
-  const item = object(value, ["operation", "basePath", "match"]);
-  if (typeof item.operation !== "string"
-      || !operations.has(item.operation)) {
-    throw new Error("A policy rule names an unknown operation");
+  const item = object(value, ["owner", "operation", "basePath", "match"]);
+  if (typeof item.operation !== "string") {
+    throw new Error("A policy rule operation is required");
   }
+  const owner = validateOwner({
+    owner: item.owner as OwnerSeed,
+    operation: item.operation
+  });
   if (item.match !== "exact" && item.match !== "subtree") {
     throw new Error("A policy rule has an invalid match kind");
   }
   return {
+    owner,
     operation: item.operation,
     basePath: resourcePath(item.basePath),
     match: item.match
@@ -230,5 +287,7 @@ function targetKey(target: TargetSeed): string {
 }
 
 function ruleKey(rule: RuleSeed): string {
-  return `${rule.operation}\u0000${rule.basePath}\u0000${rule.match}`;
+  return `${rule.owner.kind}\u0000${rule.owner.id}`
+    + `\u0000${rule.operation}\u0000${rule.basePath}`
+    + `\u0000${rule.match}`;
 }

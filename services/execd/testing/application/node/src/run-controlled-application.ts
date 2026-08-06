@@ -4,6 +4,11 @@ import {
 import {
   createServer
 } from "node:http";
+import {
+  checkProductAccess,
+  readBootstrapSummary,
+  type ProductCheckRequest
+} from "./product-authorization.js";
 
 const maximumBodyBytes = 1_048_576;
 
@@ -23,6 +28,23 @@ const server = createServer(async (request, response) => {
     }
 
     response.setHeader("content-type", "application/json");
+    const requestPath = (request.url ?? "").split("?")[0];
+    if (request.method === "POST"
+        && requestPath === "/product-check") {
+      const body = JSON.parse(
+        Buffer.concat(chunks).toString("utf8")) as ProductCheckRequest;
+      const traceParent = typeof request.headers.traceparent === "string"
+        ? request.headers.traceparent
+        : undefined;
+      response.end(JSON.stringify(
+        await checkProductAccess(body, traceParent)));
+      return;
+    }
+    if (request.method === "GET" && requestPath === "/bootstrap") {
+      response.end(JSON.stringify(readBootstrapSummary()));
+      return;
+    }
+
     response.end(JSON.stringify({
       method: request.method,
       target: request.url,

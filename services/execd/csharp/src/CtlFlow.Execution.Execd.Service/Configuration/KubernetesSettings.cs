@@ -6,4 +6,5 @@ internal sealed record KubernetesSettings(
     string TokenFilePath,
     TimeSpan CallTimeout,
     TimeSpan ReconcileInterval,
-    EdgedSettings Edged);
+    EdgedSettings Edged,
+    ProductBootstrapSettings Bootstrap);

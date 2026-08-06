@@ -110,8 +110,8 @@ function signInvocationToken(
       sub: options.actorSubject
     };
   }
-  if (options.authorityClaim === true) {
-    payload.roles = "admin";
+  if (options.authorityClaim !== undefined) {
+    payload[options.authorityClaim] = true;
   }
 
   return signPayload(

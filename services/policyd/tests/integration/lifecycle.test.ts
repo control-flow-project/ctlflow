@@ -106,6 +106,8 @@ test("schema enforces exact policy representations and uniqueness", async () => 
     workspace_id: null,
     subject_kind: 1,
     subject_id: "user:alice",
+    operation_owner_kind: 1,
+    operation_owner_id: "svc_tenantd",
     operation: "tenants.read",
     base_path: "/tenants/acme",
     match_kind: 1
@@ -117,6 +119,9 @@ test("schema enforces exact policy representations and uniqueness", async () => 
     { ...valid, operation: "tenants.*" },
     { ...valid, base_path: "/tenants//acme" },
     { ...valid, subject_id: "user:Alice" },
+    { ...valid, operation_owner_kind: 3 },
+    { ...valid, operation_owner_id: "" },
+    { ...valid, operation_owner_id: "Svc_Tenantd" },
     {
       ...valid,
       target_kind: 2,
@@ -126,6 +131,14 @@ test("schema enforces exact policy representations and uniqueness", async () => 
     await assert.rejects(
       context.policyd.database("access_grants").insert(invalid));
   }
+
+  // The tagged identity participates in uniqueness: the same token under a
+  // different owner is a distinct grant.
+  await context.policyd.database("access_grants").insert({
+    ...valid,
+    operation_owner_kind: 2,
+    operation_owner_id: "package.chat"
+  });
 });
 
 test("owns no mutation journal, audit state, or decision cache tables",
@@ -155,7 +168,7 @@ async function arrangeAllow() {
   await context.policyd.setPrincipalFacts([principalFact()]);
   await context.policyd.replacePolicy({
     roles: [],
-    grants: [directGrant("tenants.read", "/tenants/acme")]
+    grants: [directGrant("svc_tenantd", "tenants.read", "/tenants/acme")]
   });
   return context;
 }

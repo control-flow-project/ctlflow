@@ -21,6 +21,13 @@ service ExecutionService {
   rpc GetRun(GetRunRequest) returns (Run);
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
   rpc CancelRun(CancelRunRequest) returns (Run);
+
+  // Confirms one admitted product operation for one authenticated Workload
+  // ServiceAccount subject. Admits only Policyd and never calls Policyd, so
+  // authorization cannot recurse.
+  rpc ResolveWorkloadOperationBinding(
+      ResolveWorkloadOperationBindingRequest)
+      returns (ResolveWorkloadOperationBindingResponse);
 }
 
 message DeclarePlacementRequest {
@@ -338,4 +345,20 @@ enum RunReason {
   RUN_REASON_OWNERSHIP_CONFLICT = 10;
   RUN_REASON_EXECUTION_FAILED = 11;
   RUN_REASON_DURATION_EXCEEDED = 12;
+}
+
+// Policyd supplies a subject it derived from a workload token it has already
+// validated. The operation is an untrusted selector: it grants nothing unless
+// Execd finds it in that Workload's admitted operation snapshot.
+message ResolveWorkloadOperationBindingRequest {
+  string service_account_subject = 1;
+  string operation = 2;
+}
+
+// Only the facts Policyd consumes. An unknown subject, an inactive Workload or
+// Placement ancestor, or an unadmitted operation is NOT_FOUND.
+message ResolveWorkloadOperationBindingResponse {
+  PlacementTarget effective_placement_target = 1;
+  string app_id = 2;
+  string package_id = 3;
 }

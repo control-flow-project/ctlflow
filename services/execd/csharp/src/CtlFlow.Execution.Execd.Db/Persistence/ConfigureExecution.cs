@@ -79,6 +79,13 @@ internal static class ExecutionSchema
         workload.Property(row => row.PackageId).HasColumnName("package_id").HasMaxLength(128).IsRequired();
         workload.Property(row => row.PackageGeneration).HasColumnName("package_generation").IsRequired();
         workload.Property(row => row.ComponentId).HasColumnName("component_id").HasMaxLength(64).IsRequired();
+        workload.Property(row => row.ServiceAccountSubject)
+            .HasColumnName("service_account_subject")
+            .HasMaxLength(512)
+            .IsRequired();
+        workload.HasIndex(row => row.ServiceAccountSubject)
+            .IsUnique()
+            .HasDatabaseName("workloads_service_account_subject_unique_idx");
         workload.Property(row => row.ArtifactRepository).HasColumnName("artifact_repository").HasMaxLength(255).IsRequired();
         workload.Property(row => row.ArtifactManifestDigest).HasColumnName("artifact_manifest_digest").HasMaxLength(71).IsRequired();
         workload.Property(row => row.CpuMillis).HasColumnName("cpu_millis").IsRequired();
@@ -122,6 +129,17 @@ internal static class ExecutionSchema
         ConfigureDependencyParameter(modelBuilder);
         ConfigureDependencyOutput(modelBuilder);
         ConfigureWorkloadStorage(modelBuilder);
+
+        var operation = modelBuilder.Entity<WorkloadOperation>();
+        operation.ToTable("workload_operations");
+        operation.HasKey(row => new { row.WorkloadId, row.Operation });
+        operation.Property(row => row.WorkloadId)
+            .HasColumnName("workload_id").HasMaxLength(64).IsRequired();
+        operation.Property(row => row.Operation)
+            .HasColumnName("operation").HasMaxLength(128).IsRequired();
+        operation.HasOne<Workload>().WithMany()
+            .HasForeignKey(row => row.WorkloadId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         var item = modelBuilder.Entity<WorkloadInterface>();
         item.ToTable("workload_interfaces");

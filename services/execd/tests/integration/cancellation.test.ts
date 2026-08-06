@@ -46,7 +46,7 @@ import {
   RunPhase
 } from "../generated/v1/execd.js";
 
-test("all ten RPCs honor in-flight cancellation", async () => {
+test("all ten resource RPCs honor in-flight cancellation", async () => {
   const state = await prepareBlockedCallState("cancel");
   let callsSettled = false;
   try {
@@ -66,7 +66,7 @@ test("all ten RPCs honor in-flight cancellation", async () => {
   }
 });
 
-test("all ten RPCs honor in-flight deadlines", async () => {
+test("all ten resource RPCs honor in-flight deadlines", async () => {
   const state = await prepareBlockedCallState("deadline");
   let callsSettled = false;
   try {
@@ -225,7 +225,7 @@ function calls(
         : client.listPlacements(
             {
               target: { tenant: { tenantId: "tenant-a" } },
-            pageSize: 100,
+              pageSize: 100,
               afterPlacementId: undefined
             },
             metadata,
@@ -270,9 +270,9 @@ function calls(
             options(),
             done)
         : client.listWorkloads(
-          {
-            placementId: state.placementId,
-            pageSize: 100,
+            {
+              placementId: state.placementId,
+              pageSize: 100,
               afterWorkloadId: undefined
             },
             metadata,
@@ -290,8 +290,8 @@ function calls(
             options(),
             done)
         : client.createRun(
-          {
-            runId: state.newRunId,
+            {
+              runId: state.newRunId,
               workloadId: state.workloadId
             },
             metadata,

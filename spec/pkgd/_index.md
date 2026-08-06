@@ -18,15 +18,28 @@ generations. A generation contains:
 ```text
 Package ID, generation, Semantic Version
 source URI and source digest
-components and digest-bound OCI artifacts
+components, digest-bound OCI artifacts, and declared operations
 provided interfaces
 open typed dependencies and bounded options
 named exposures
 declaration time
 ```
 
-Each component names one OCI repository and `sha256` manifest digest. An
-interface names its component, HTTP or gRPC protocol, contract ID, and port. A
+Each component names one OCI repository and `sha256` manifest digest, and may
+declare the product operations it implements. An operation token uses the
+canonical `<plural_resource>.<action>` grammar and is unique across the whole
+generation, so one component owns it. A component declares at most 64
+operations and a generation at most 512. Declarations are immutable with their
+generation; a later generation may drop a token or bind it to another
+component. The Package ID supplies the operation namespace, so two packages may
+declare the same token and a package may reuse a token that a kernel service
+also uses. Because the namespace is the Package ID, a token should not repeat
+the product or App name: prefer `messages.post` over `chat_messages.post` or
+`chat.messages.post`. Pkgd holds no copy of Policyd's kernel catalog, evaluates
+no policy, and gains no decision surface: a declaration states what a component
+implements, never who may invoke it.
+
+An interface names its component, HTTP or gRPC protocol, contract ID, and port. A
 dependency has a required stable human name, optional explicit ID, consuming
 component, open type, and bounded consumer-declared options. An exposure names
 one provided interface; it creates no route, listener, network grant, or
@@ -122,7 +135,8 @@ Every interface and dependency component reference and every exposure
 interface reference resolves inside the same generation, and an interface has
 at most one exposure. The encoded declaration is at most 1 MiB. Collection
 order is non-semantic. Responses order components, interfaces, and exposures
-by ordinal ID and dependencies by canonical dependency key.
+by ordinal ID, each component's declared operations ordinally, and dependencies
+by canonical dependency key.
 
 ## Contract
 
@@ -185,7 +199,10 @@ Pkgd validates invocation keys independently through
 Workspace fence rules, and forwards the unchanged invocation to
 `policyd.CheckAccess` as `SERVICE/svc_pkgd`. User scope additionally requires
 its account principal to equal the validated invocation subject account.
-Global Apps have no capability path. A request field never supplies identity
+Global Apps have no capability path. This concerns Pkgd's own App-management
+operations; it does not prevent a globally placed product workload from
+processing a Tenant-, Workspace-, or account-scoped invocation through that
+invocation's non-Global path. A request field never supplies identity
 or authority. Every capability call, including a retry or no-op, repeats
 invocation validation, scope fencing, and the Policyd decision.
 

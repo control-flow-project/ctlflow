@@ -6,6 +6,10 @@ export interface CapabilityGrant {
     readonly kind: "principal";
     readonly id: string;
   };
+  readonly owner: {
+    readonly kind: "kernel";
+    readonly id: string;
+  };
   readonly operation: string;
   readonly basePath: string;
   readonly match: "subtree";
@@ -22,6 +26,7 @@ readonly CapabilityGrant[] {
     "runs.read",
     "runs.cancel"
   ].map((operation) => ({
+    owner: { kind: "kernel" as const, id: "svc_execd" },
     target: { tenantId: "tenant-a" },
     subject: {
       kind: "principal" as const,

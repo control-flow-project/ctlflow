@@ -58,6 +58,21 @@ test("capability callers require a valid invocation token", async () => {
   }
 });
 
+test("capability callers accept a direct-account Run invocation", async () => {
+  const context = getConfigdTestContext();
+  await ensureInvocationState();
+  const invocation = context.invocation.sign({
+    tenantId,
+    sessionId: null,
+    runId: "configd-direct-run",
+    tokenId: "configd-direct-run-token"
+  });
+
+  assert.equal(
+    (await resolveWithInvocation(invocation)).configuration?.configurationId,
+    request.configurationId);
+});
+
 test("unknown invocation keys refresh through real Identityd and Policyd",
   async () => {
     const context = getConfigdTestContext();

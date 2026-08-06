@@ -60,6 +60,19 @@ test("capability callers require a valid invocation token", async () => {
   }
 });
 
+test("capability callers accept a direct-account Run invocation", async () => {
+  const context = getPkgdTestContext();
+  await ensureInvocationState();
+  const invocation = context.invocation.sign({
+    tenantId,
+    sessionId: null,
+    runId: "pkgd-direct-run",
+    tokenId: "pkgd-direct-run-token"
+  });
+
+  assert.equal((await resolveWithInvocation(invocation)).appId, appId);
+});
+
 test("unknown invocation keys refresh through real Identityd and Policyd",
   async () => {
     const context = getPkgdTestContext();

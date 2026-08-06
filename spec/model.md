@@ -14,7 +14,9 @@ checked versioned contracts.
 | --- | --- |
 | Tenant and Workspace | `tenantd` |
 | Account, Membership standing, Group, external identity link, Session, virtual principal, invocation identity | `identityd` |
-| Role, grant, operation ownership, access decision | `policyd` |
+| Role, grant, kernel operation catalog, access decision | `policyd` |
+| Package operation declaration | `pkgd` |
+| Admitted Workload operation authority | `execd` |
 | Package and installed App intent | `pkgd` |
 | Configuration and secret custody | `configd` |
 | Placement, Workload, Run, and realization intent | `execd` |
@@ -81,8 +83,11 @@ invocation-signing private keys are never persisted as domain records.
 
 ## Policy
 
-Policy is allow-only. One immutable operation token has one owner and one
-canonical resource-path grammar. A rule matches either one exact path or a
+Policy is allow-only. Every operation has one tagged identity
+`(owner kind, owner ID, operation)` and one canonical resource-path grammar. A
+kernel operation is owned by its fixed catalog service; a package operation is
+namespaced by the Package ID that declares it, so the same token under two
+Packages is two operations. A rule matches either one exact path or a
 delimiter-bounded subtree.
 
 No matching rule is deny. Missing current target standing is concealed as not
@@ -93,8 +98,9 @@ found rather than exposed as policy detail.
 A Package is an installation-global lineage of immutable positive
 generations. Each generation has one Semantic Version, source provenance,
 digest-bound OCI component artifacts, provided interfaces, named exposures,
-and open typed dependencies with stable names, optional explicit IDs, and
-bounded consumer options. Generations are sequential and permanently retained.
+component-owned product operation declarations, and open typed dependencies
+with stable names, optional explicit IDs, and bounded consumer options.
+Generations are sequential and permanently retained.
 A dependency is a provider-generic requirement rather than a binding or
 provisioning request, and an exposure is a declaration rather than a route or
 grant.

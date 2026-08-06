@@ -38,10 +38,11 @@ export function createInvalidInvocationTokens(
       issuer: "https://wrong-issuer.test"
     }),
     corruptSignature(authority.sign({ tenantId: "tenant_active" })),
-    authority.sign({
-      tenantId: "tenant_active",
-      authorityClaim: true
-    }),
+    ...forbiddenAuthorityClaims.map((authorityClaim) =>
+      authority.sign({
+        tenantId: "tenant_active",
+        authorityClaim
+      })),
     authority.sign({
       tenantId: "tenant_active",
       subject: "job:not-an-account"
@@ -65,28 +66,23 @@ export function createInvalidInvocationTokens(
     authority.sign({ sessionId: "session-global" }),
     authority.sign({
       tenantId: "tenant_active",
-      sessionId: null,
-      runId: "run-test"
-    }),
-    authority.sign({
-      tenantId: "tenant_active",
       subject: "service:automation",
       sessionId: null,
       runId: "run-test",
-      actorSubject: "service:automation"
+      actorSubject: "user:bob"
     }),
     authority.sign({
       workspaceId: "workspace_one",
       sessionId: null,
       runId: "run-test",
-      actorSubject: "job:reviewer"
+      actorSubject: "agent:reviewer"
     }),
     authority.sign({
       tenantId: "tenant_active",
       workspaceId: "Workspace",
       sessionId: null,
       runId: "run-test",
-      actorSubject: "job:reviewer"
+      actorSubject: "agent:reviewer"
     }),
     authority.sign({
       tenantId: "tenant_active",
@@ -95,6 +91,15 @@ export function createInvalidInvocationTokens(
     duplicateSubject
   ];
 }
+
+const forbiddenAuthorityClaims = [
+  "roles",
+  "capabilities",
+  "grants",
+  "kubernetes",
+  "kubernetes.io",
+  "kubernetes.io/serviceaccount/namespace"
+] as const;
 
 function corruptSignature(token: string): string {
   const segments = token.split(".");

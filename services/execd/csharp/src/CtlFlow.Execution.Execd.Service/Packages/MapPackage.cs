@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using CtlFlow.Execution.Execd.Domain.Errors;
 using CtlFlow.Execution.Execd.Domain.Identifiers;
+using CtlFlow.Execution.Execd.Domain.Operations;
 using CtlFlow.Execution.Execd.Domain.Resources;
 using CtlFlow.Execution.Execd.Domain.Workloads;
 using CtlFlow.Packages.V1;
@@ -17,9 +18,10 @@ namespace CtlFlow.Execution.Execd.Service.Packages;
 
 internal static partial class PackageAdmission
 {
-    internal static MappedPackageAdmission MapPackage(
+    internal static async Task<MappedPackageAdmission> MapPackage(
         PackageAppAdmission app,
-        Package package)
+        Package package,
+        CancellationToken cancellation)
     {
         try
         {
@@ -47,20 +49,26 @@ internal static partial class PackageAdmission
                         SHA256.HashData(content.Span))
                         .ToLowerInvariant());
             }).ToArray();
+            var components = new List<PackageComponentAdmission>(
+                package.Components.Count);
+            foreach (var item in package.Components)
+            {
+                var artifact = item.Artifact
+                    ?? throw InvalidPackage();
+                components.Add(new PackageComponentAdmission(
+                    ComponentId.Parse(item.ComponentId),
+                    ArtifactRepository.Parse(
+                        artifact.Repository),
+                    ManifestDigest.Parse(
+                        artifact.ManifestDigest),
+                    await MapDeclaredOperations(
+                        item.DeclaredOperations,
+                        cancellation)));
+            }
             return new MappedPackageAdmission(
                 new DomainPackageAdmission(
                     app,
-                    package.Components.Select(item =>
-                    {
-                        var artifact = item.Artifact
-                            ?? throw InvalidPackage();
-                        return new PackageComponentAdmission(
-                            ComponentId.Parse(item.ComponentId),
-                            ArtifactRepository.Parse(
-                                artifact.Repository),
-                            ManifestDigest.Parse(
-                                artifact.ManifestDigest));
-                    }).ToArray(),
+                    components,
                     dependencies,
                     package.Interfaces.Select(item =>
                         new PackageInterfaceAdmission(
@@ -90,6 +98,22 @@ internal static partial class PackageAdmission
         {
             throw InvalidPackage();
         }
+    }
+
+    private static async ValueTask<OperationToken[]>
+        MapDeclaredOperations(
+            IReadOnlyList<string> operations,
+            CancellationToken cancellation)
+    {
+        var parsed = new OperationToken[operations.Count];
+        for (var index = 0; index < operations.Count; index++)
+        {
+            parsed[index] = await OperationToken.Parse(
+                operations[index],
+                cancellation);
+        }
+
+        return parsed;
     }
 
     private static ExecutionException InvalidPackage() =>

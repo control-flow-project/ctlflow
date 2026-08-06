@@ -105,8 +105,6 @@ internal static partial class IdentitydConfiguration
                     DefaultSessionLifetimeSeconds))),
             TimeSpan.FromSeconds(keyCacheSeconds),
             ParseRequiredCallers(
-                "CTLFLOW_GET_INVOCATION_VERIFICATION_KEYS_CALLERS"),
-            ParseRequiredCallers(
                 "CTLFLOW_RESOLVE_PRINCIPAL_CALLERS"),
             ParseRequiredCallers(
                 "CTLFLOW_LIST_PRINCIPAL_GROUPS_CALLERS"),

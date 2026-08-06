@@ -18,6 +18,7 @@ internal static partial class ExecdConfiguration
     private const int DefaultReconcileIntervalMilliseconds = 250;
     private const int DefaultWorkloadTokenLifetimeSeconds = 3_600;
     private const int DefaultInvocationTokenLifetimeSeconds = 60;
+    private const int MinimumProjectedWorkloadTokenLifetimeSeconds = 600;
     private static readonly TimeSpan KeyCacheLifetime =
         TimeSpan.FromSeconds(30);
 
@@ -59,9 +60,47 @@ internal static partial class ExecdConfiguration
         var telemetry = TelemetrySettings.Parse(
             RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT"));
         var identityCertificateAuthority =
-            await ReadIdentityCertificateAuthority(
+            await ReadCertificateAuthority(
                 identity.Grpc.CertificateAuthorityPath,
+                "Identityd",
                 cancellation);
+        var policy = CreateDependencySettings(
+            "POLICY",
+            workloadTokenFile,
+            static (grpc, token, timeout) =>
+                new PolicySettings(grpc, token, timeout));
+        var workloadTokenValidation = CreateTokenSettings(
+            "CTLFLOW_WORKLOAD",
+            DefaultWorkloadTokenLifetimeSeconds);
+        if (workloadTokenValidation.MaximumLifetime
+            < TimeSpan.FromSeconds(
+                MinimumProjectedWorkloadTokenLifetimeSeconds))
+        {
+            throw new InvalidOperationException(
+                "Workload-token maximum lifetime cannot be less than "
+                + "600 seconds");
+        }
+        var invocationTokenValidation = CreateTokenSettings(
+            "CTLFLOW_INVOCATION",
+            DefaultInvocationTokenLifetimeSeconds);
+        var workloadJwksPath =
+            RequireAbsoluteFile("CTLFLOW_WORKLOAD_JWKS_PATH");
+        var bootstrap = new ProductBootstrapSettings(
+            identity.Grpc.Endpoint,
+            identityCertificateAuthority,
+            policy.Grpc.Endpoint,
+            await ReadCertificateAuthority(
+                policy.Grpc.CertificateAuthorityPath,
+                "Policyd",
+                cancellation),
+            await ReadWorkloadVerificationKeySet(
+                workloadJwksPath,
+                cancellation),
+            workloadTokenValidation.Issuer,
+            workloadTokenValidation.Audience,
+            (long)workloadTokenValidation.MaximumLifetime.TotalSeconds,
+            invocationTokenValidation.Issuer,
+            invocationTokenValidation.Audience);
 
         return new ServiceSettings(
             IPAddress.Parse(grpcUri.Host),
@@ -80,11 +119,7 @@ internal static partial class ExecdConfiguration
                 static (grpc, token, timeout) =>
                     new AuditSettings(grpc, token, timeout)),
             identity,
-            CreateDependencySettings(
-                "POLICY",
-                workloadTokenFile,
-                static (grpc, token, timeout) =>
-                    new PolicySettings(grpc, token, timeout)),
+            policy,
             CreateDependencySettings(
                 "PACKAGE",
                 workloadTokenFile,
@@ -113,28 +148,28 @@ internal static partial class ExecdConfiguration
                     identity.Grpc.ServerName,
                     identityCertificateAuthority,
                     identity.CallTimeout,
-                    telemetry.OtlpEndpoint)),
+                    telemetry.OtlpEndpoint),
+                bootstrap),
             new ProvisionerSettings(
                 await LoadProvisioners(
                     RequireAbsoluteFile(
                         "CTLFLOW_PROVISIONER_SUBJECTS_PATH"),
                     cancellation)),
             new WorkloadTokenSettings(
-                CreateTokenSettings(
-                    "CTLFLOW_WORKLOAD",
-                    DefaultWorkloadTokenLifetimeSeconds),
-                RequireAbsoluteFile("CTLFLOW_WORKLOAD_JWKS_PATH"),
+                workloadTokenValidation,
+                workloadJwksPath,
                 KeyCacheLifetime),
-            CreateTokenSettings(
-                "CTLFLOW_INVOCATION",
-                DefaultInvocationTokenLifetimeSeconds),
+            invocationTokenValidation,
             ParseOperatorSubjects("CTLFLOW_OPERATOR_SUBJECTS"),
             ParseCallers("CTLFLOW_CAPABILITY_CALLERS"),
+            KubernetesServiceAccountSubject.Parse(
+                RequireEnvironment("CTLFLOW_POLICYD_CALLER")),
             telemetry);
     }
 
-    private static async Task<string> ReadIdentityCertificateAuthority(
+    private static async Task<string> ReadCertificateAuthority(
         string path,
+        string owner,
         CancellationToken cancellation)
     {
         var value = await File.ReadAllTextAsync(path, cancellation);
@@ -147,7 +182,28 @@ internal static partial class ExecdConfiguration
                 StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                "Identityd certificate authority is invalid");
+                $"{owner} certificate authority is invalid");
+        }
+
+        return value;
+    }
+
+    private static async Task<string> ReadWorkloadVerificationKeySet(
+        string path,
+        CancellationToken cancellation)
+    {
+        var value = await File.ReadAllTextAsync(path, cancellation);
+        if (value.Length is 0 or > 262_144)
+        {
+            throw new InvalidOperationException(
+                "Workload verification key set is invalid");
+        }
+
+        using var document = JsonDocument.Parse(value);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException(
+                "Workload verification key set must be one JSON object");
         }
 
         return value;

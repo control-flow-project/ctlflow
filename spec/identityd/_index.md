@@ -245,10 +245,18 @@ ascending ordinal key-ID order. The set must contain one through eight keys;
 Identityd does not truncate an oversized set. The absolute cache expiry is
 strictly after response time and no more than five minutes later.
 
-The request requires only the admitted kernel workload. Callers do not carry
-an invocation JWT because this operation is the bootstrap path used to
-validate an unknown invocation key. Invocation metadata grants no authority
-to this operation.
+This operation admits any valid installation-issued bound Kubernetes workload
+token, and it is the only operation that does. Verification keys are public
+material, so a product workload realized by Execd uses the same bootstrap path
+as a kernel service instead of a second projection or refresh mechanism. Every
+other Identityd operation keeps its exact caller allowlist, so holding this
+token grants nothing else. Identityd does not resolve the caller through Execd:
+workload-token expiry bounds stale access, and no revocation check is required
+for public keys.
+
+Callers do not carry an invocation JWT because this operation is the bootstrap
+path used to validate an unknown invocation key. Invocation metadata grants no
+authority to this operation.
 
 Empty, duplicate, malformed, expired, or oversized source state is
 `UNAVAILABLE`. The operation never returns private or symmetric key material.
@@ -387,25 +395,28 @@ key-state failure is `UNAVAILABLE`.
 
 Every operation authenticates a bound Kubernetes ServiceAccount token.
 `ExchangeSession` admits only the purpose-bound `ctlflow-edged` audience.
-Every other operation uses the installation internal audience and an exact
-per-operation caller set.
+`GetInvocationVerificationKeys` uses the installation internal audience and
+admits any valid installation-issued bound workload token because it returns
+only public verification material. Every remaining operation uses the
+installation internal audience and an exact per-operation caller set.
 
 The approved callers are:
 
 | Operation | Caller |
 | --- | --- |
-| `GetInvocationVerificationKeys` | `SERVICE/svc_tenantd`, `SERVICE/svc_policyd`, `SERVICE/svc_pkgd`, `SERVICE/svc_configd`, `SERVICE/svc_execd` |
+| `GetInvocationVerificationKeys` | Any valid installation-issued bound workload token |
 | `ResolvePrincipal` | `SERVICE/svc_policyd` |
 | `ListPrincipalGroups` | `SERVICE/svc_policyd` |
 | `CreateSession` | `SERVICE/svc_authd` |
 | `RevokeSession` | `SERVICE/svc_authd` |
 | `IssueRunInvocation` | `SERVICE/svc_execd` |
 
-Installation configuration maps those canonical principals to exact
-Kubernetes ServiceAccount subjects. Startup fails when an operation has an
-empty caller set or a configured subject is malformed. This mapping does not
-apply to `ExchangeSession`; its fixed purpose audience is the complete caller
-admission rule.
+Installation configuration maps the canonical principals for exact-caller
+operations to Kubernetes ServiceAccount subjects. Startup fails when one of
+those operations has an empty caller set or a configured subject is malformed.
+This mapping applies to neither `ExchangeSession` nor
+`GetInvocationVerificationKeys`; their fixed admission rules above are
+complete.
 
 `GetInvocationVerificationKeys`, `CreateSession`, `ExchangeSession`,
 `RevokeSession`, and `IssueRunInvocation` require workload authentication but

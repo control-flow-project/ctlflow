@@ -70,7 +70,9 @@ test("enforces Package collection bounds", async () => {
     excessiveComponents(),
     excessiveInterfaces(),
     excessiveDependencies(),
-    excessiveExposures()
+    excessiveExposures(),
+    excessiveComponentOperations(),
+    excessiveGenerationOperations()
   ];
 
   for (const request of cases) {
@@ -130,7 +132,45 @@ function excessiveComponents(): DeclarePackageRequest {
       artifact: {
         repository: "registry.example.com/apps/component",
         manifestDigest: `sha256:${"a".repeat(64)}`
-      }
+      },
+      declaredOperations: []
+    }));
+  request.interfaces = [];
+  request.dependencies = [];
+  request.exposures = [];
+  return request;
+}
+
+function excessiveComponentOperations(): DeclarePackageRequest {
+  const request = createPackageRequest({
+    packageId: "too_many_component_operations"
+  });
+  request.components[0]!.declaredOperations = Array.from(
+    { length: 65 },
+    (_, index) =>
+      `resources_${String(index).padStart(2, "0")}.read`);
+  return request;
+}
+
+function excessiveGenerationOperations(): DeclarePackageRequest {
+  const request = createPackageRequest({
+    packageId: "too_many_generation_operations"
+  });
+  // Nine components, each within its own bound, exceed the generation bound.
+  request.components = Array.from(
+    { length: 9 },
+    (_, componentIndex) => ({
+      componentId:
+        `component_${String(componentIndex).padStart(2, "0")}`,
+      artifact: {
+        repository: "registry.example.com/apps/component",
+        manifestDigest: `sha256:${"a".repeat(64)}`
+      },
+      declaredOperations: Array.from(
+        { length: 57 },
+        (_, index) =>
+          `resources_${String(componentIndex).padStart(2, "0")}`
+          + `_${String(index).padStart(2, "0")}.read`)
     }));
   request.interfaces = [];
   request.dependencies = [];

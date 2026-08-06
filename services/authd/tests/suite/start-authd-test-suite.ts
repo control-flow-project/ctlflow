@@ -80,7 +80,6 @@ Promise<AuthdTestSuite> {
       invocationIssuer: "https://identityd.test",
       invocationAudience: "ctlflow-internal",
       invocationMaximumLifetimeSeconds: 60,
-      verificationKeyCallers: [policydSubject],
       principalFactCallers: [policydSubject]
     });
     identitySource = await identityd.createSource({

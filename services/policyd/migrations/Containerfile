@@ -8,6 +8,7 @@ RUN npm ci \
     --workspace @ctlflow/policyd \
     --include-workspace-root=false
 
+COPY services/policyd/catalog services/policyd/catalog
 COPY services/policyd/knexfile.ts services/policyd/knexfile.ts
 COPY services/policyd/migrations services/policyd/migrations
 COPY services/policyd/schema-manifest.txt \
@@ -30,6 +31,8 @@ COPY --from=build /workspace/services/policyd/package.json \
     /workspace/services/policyd/package.json
 COPY --from=build /workspace/services/policyd/.generated \
     /workspace/services/policyd/.generated
+COPY --from=build /workspace/services/policyd/catalog \
+    /workspace/services/policyd/catalog
 
 USER 65532:65532
 ENTRYPOINT ["node", "/workspace/services/policyd/.generated/migrations/tooling/migrations/run.js"]

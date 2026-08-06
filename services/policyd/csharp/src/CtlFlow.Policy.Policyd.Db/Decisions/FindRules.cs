@@ -21,7 +21,7 @@ public static partial class PolicyDecisions
         PolicyDatabase policyDatabase,
         PolicyTarget target,
         PolicySubjects subjects,
-        OperationToken operation,
+        OperationIdentity operation,
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
@@ -31,7 +31,9 @@ public static partial class PolicyDecisions
         var targetKind = TargetKinds.ToStorage(target.Kind);
         var tenantId = target.TenantId.Value;
         var workspaceId = target.WorkspaceId?.Value;
-        var operationValue = operation.Value;
+        var ownerKind = operation.OwnerKind;
+        var ownerId = operation.OwnerId;
+        var operationValue = operation.Operation.Value;
         var candidateLimit = MaximumCandidateRules + 1;
         var queryCancellation = cancellation;
 
@@ -43,6 +45,12 @@ public static partial class PolicyDecisions
                 && EF.Property<string?>(
                     grant,
                     "_workspaceId") == workspaceId
+                && EF.Property<int>(
+                    grant,
+                    "_operationOwnerKind") == ownerKind
+                && EF.Property<string>(
+                    grant,
+                    "_operationOwnerId") == ownerId
                 && EF.Property<string>(
                     grant,
                     "_operation") == operationValue)
@@ -89,6 +97,12 @@ public static partial class PolicyDecisions
                 && EF.Property<string?>(
                     candidate.Role,
                     "_workspaceId") == workspaceId
+                && EF.Property<int>(
+                    candidate.Rule,
+                    "_operationOwnerKind") == ownerKind
+                && EF.Property<string>(
+                    candidate.Rule,
+                    "_operationOwnerId") == ownerId
                 && EF.Property<string>(
                     candidate.Rule,
                     "_operation") == operationValue)

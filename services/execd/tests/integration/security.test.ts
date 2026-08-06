@@ -53,7 +53,16 @@ import {
   createWorkloadRequest
 } from "../support/workloads/create-workload-request.js";
 
-test("capability backend calls all ten RPCs in one Tenant fence",
+const forbiddenAuthorityClaims = [
+  "roles",
+  "capabilities",
+  "grants",
+  "kubernetes",
+  "kubernetes.io",
+  "kubernetes.io/serviceaccount/namespace"
+] as const;
+
+test("capability backend calls all ten resource RPCs in one Tenant fence",
   async () => {
     const context = getExecdTestContext();
     const root = await declarePlacement(
@@ -171,7 +180,7 @@ test("capability backend calls all ten RPCs in one Tenant fence",
       (value) => value.phase === RunPhase.RUN_PHASE_CANCELLED);
   });
 
-test("all ten RPCs reject absent and unadmitted caller identity",
+test("all ten resource RPCs reject absent and unadmitted caller identity",
   async () => {
     const fixture = await createSecurityFixture("security_callers");
     const context = getExecdTestContext();
@@ -232,23 +241,56 @@ test("capability access fails closed on invocation, target, and policy",
           }, current, done)),
       matchGrpcStatus(status.NOT_FOUND));
 
-    const invalidInvocation = workloadMetadata(
+    const directRun = workloadMetadata(
       context.capabilityWorkload.callerToken,
+      suite.invocation.sign({
+        tenantId: "tenant-a",
+        sessionId: null,
+        runId: "security-direct-run",
+        tokenId: "security-direct-run-token"
+      }));
+    assert.equal(
+      (await capabilityCall<Placement>(
+        context.capabilityClient,
+        directRun,
+        (client, current, done) =>
+          client.getPlacement({
+            placementId: fixture.placement.placementId
+          }, current, done))).placementId,
+      fixture.placement.placementId);
+
+    const invalidInvocations = [
       suite.invocation.sign({
         tenantId: "tenant-a",
         subject: "user:alice",
         sessionId: "session-invalid",
         audience: "wrong-audience"
-      }));
-    await assert.rejects(
-      capabilityCall(
-        context.capabilityClient,
-        invalidInvocation,
-        (client, current, done) =>
-          client.getPlacement({
-            placementId: fixture.placement.placementId
-          }, current, done)),
-      matchGrpcStatus(status.UNAUTHENTICATED));
+      }),
+      suite.invocation.sign({
+        tenantId: "tenant-a",
+        sessionId: null,
+        runId: "security-invalid-actor-run",
+        actorSubject: "user:bob"
+      }),
+      ...forbiddenAuthorityClaims.map((authorityClaim) =>
+        suite.invocation.sign({
+          tenantId: "tenant-a",
+          authorityClaim
+        }))
+    ];
+    for (const invocation of invalidInvocations) {
+      await assert.rejects(
+        capabilityCall(
+          context.capabilityClient,
+          workloadMetadata(
+            context.capabilityWorkload.callerToken,
+            invocation),
+          (client, current, done) =>
+            client.getPlacement({
+              placementId: fixture.placement.placementId
+            }, current, done)),
+        matchGrpcStatus(status.UNAUTHENTICATED));
+    }
 
     await suite.policyd.replacePolicy({ roles: [], grants: [] });
     try {

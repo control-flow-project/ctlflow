@@ -12,6 +12,8 @@ public static partial class Schemas
     private const int MaximumAccessGrants = 100_000;
     private const int MaximumRoleRules = 2_560_000;
     private const int MaximumCatalogOperations = 22;
+    // Closed union stored in policy: 1 = kernel, 2 = package.
+    private const int KernelOwnerKind = 1;
 
     private static async Task<bool> ValidateStoredPolicy(
         PolicyDatabase policyDatabase,
@@ -78,26 +80,52 @@ public static partial class Schemas
 
         var roleOperations = await database.RoleRules
             .AsNoTracking()
-            .Select(value => EF.Property<string>(value, "_operation"))
+            .Select(value => new
+            {
+                OwnerKind = EF.Property<int>(value, "_operationOwnerKind"),
+                OwnerId = EF.Property<string>(value, "_operationOwnerId"),
+                Operation = EF.Property<string>(value, "_operation")
+            })
             .Distinct()
-            .OrderBy(value => value)
+            .OrderBy(value => value.OwnerKind)
+            .ThenBy(value => value.Operation)
             .Take(operationLimit)
             .ToListAsync(queryCancellation);
         var grantOperations = await database.AccessGrants
             .AsNoTracking()
-            .Select(value => EF.Property<string>(value, "_operation"))
+            .Select(value => new
+            {
+                OwnerKind = EF.Property<int>(value, "_operationOwnerKind"),
+                OwnerId = EF.Property<string>(value, "_operationOwnerId"),
+                Operation = EF.Property<string>(value, "_operation")
+            })
             .Distinct()
-            .OrderBy(value => value)
+            .OrderBy(value => value.OwnerKind)
+            .ThenBy(value => value.Operation)
             .Take(operationLimit)
             .ToListAsync(queryCancellation);
         var storedOperations = roleOperations
             .Concat(grantOperations)
-            .Distinct(StringComparer.Ordinal)
+            .Distinct()
             .ToArray();
-        return storedOperations.Length <= MaximumCatalogOperations
-            && storedOperations
-            .All(operation =>
-                OperationCatalog.FindOperationOwner(
-                    OperationToken.FromStorage(operation)) is not null);
+        // A stored kernel operation must be the exact catalog operation of the
+        // exact kernel service named by its owner ID; a catalog token re-homed
+        // to another service is stale policy, not readable state. Package
+        // operations are validated structurally by migration and resolved at
+        // runtime, so readiness requires no active Workload for them.
+        return storedOperations.All(operation =>
+            operation.OwnerKind != KernelOwnerKind
+            || IsCatalogOwned(operation.OwnerId, operation.Operation));
+    }
+
+    private static bool IsCatalogOwned(string ownerId, string operation)
+    {
+        var owner = OperationCatalog.FindOperationOwner(
+            OperationToken.FromStorage(operation));
+        return owner is not null
+            && string.Equals(
+                OperationCatalog.GetKernelOwnerId(owner.Value),
+                ownerId,
+                StringComparison.Ordinal);
     }
 }

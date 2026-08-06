@@ -1,4 +1,5 @@
 using CtlFlow.Execution.Execd.Domain.Identifiers;
+using CtlFlow.Execution.Execd.Domain.Operations;
 using CtlFlow.Execution.Execd.Domain.Placements;
 using CtlFlow.Execution.Execd.Domain.Resources;
 
@@ -14,7 +15,8 @@ public sealed record PackageAppAdmission(
 public sealed record PackageComponentAdmission(
     ComponentId ComponentId,
     ArtifactRepository ArtifactRepository,
-    ManifestDigest ArtifactManifestDigest);
+    ManifestDigest ArtifactManifestDigest,
+    IReadOnlyList<OperationToken> DeclaredOperations);
 
 public sealed record PackageDependencyAdmission(
     ComponentId ComponentId,

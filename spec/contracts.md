@@ -100,6 +100,35 @@ Infrastructure owns the external authority. Tenantd owns the two address
 segments and parent relationship. A caller may cache a bounded projection, but
 Tenantd owns no cache controls, binding generation, route, or cursor state.
 
+## Product operation authorization
+
+A product workload authorizes its own operations through the same Policyd
+decision operation used by kernel services. Ownership is declared by Pkgd,
+admitted by Execd, and resolved at decision time; it is never asserted by a
+caller and never stored by Policyd.
+
+```text
+pkgd.DeclarePackage
+     component declares its operations, immutable with that generation
+  -> execd.DeclareWorkload
+     Execd snapshots the admitted operations and derives and retains the
+     Workload's unique ServiceAccount subject in the admission transaction
+  -> product workload
+       -> identityd.GetInvocationVerificationKeys   validate the invocation
+       -> policyd.CheckAccess
+            -> execd.ResolveWorkloadOperationBinding(subject, operation)
+               <- effective Placement target, App ID, Package ID
+            -> Placement fence, App anchor, tagged policy evaluation
+```
+
+Policyd classifies the authenticated caller before interpreting the token, so a
+kernel service and a package may use the same lexical token without crossing
+authority. `execd.ResolveWorkloadOperationBinding` admits only `policyd`, never
+calls `policyd`, and returns `NOT_FOUND` when the subject is unknown, the
+Workload or a Placement ancestor is inactive, or the operation is not admitted.
+Policyd caches no mutable Workload eligibility, and there is no Policyd-to-Pkgd
+runtime call.
+
 ## Package declarations and App intent
 
 Infrastructure operators call Pkgd directly through the certificate-backed
@@ -134,7 +163,9 @@ product backend
 Pkgd validates the invocation independently, derives the exact `apps.*`
 operation and scope path, forwards the unchanged invocation to Policyd, and
 applies an allow only to the current call. Global Apps have no capability
-path.
+path. This concerns Pkgd's own App-management operations; it does not prevent
+a globally placed product workload from processing a Tenant-, Workspace-, or
+account-scoped invocation through that invocation's non-Global path.
 
 Execd reads exact realization input over the production private gRPC path:
 
@@ -150,9 +181,10 @@ reading another owner's records.
 
 ## Invocation verification
 
-Tenantd, Pkgd, Configd, and Policyd load public invocation keys with
-`identityd.GetInvocationVerificationKeys`. They cache the exact bounded key set
-only until its supplied expiry and refresh on expiry or an unknown key ID.
+Tenantd, Pkgd, Configd, Execd, Policyd, and admitted product workloads load
+public invocation keys with `identityd.GetInvocationVerificationKeys`. They
+cache the exact bounded key set only until its supplied expiry and refresh on
+expiry or an unknown key ID.
 
 Policyd uses `ResolvePrincipal` and all pages of `ListPrincipalGroups` at the
 exact target. These operations return identity facts only. They never return a
@@ -489,6 +521,7 @@ by their owner contracts and the Auditd detail inventory.
 | `policyd` | `identityd.GetInvocationVerificationKeys` | Independently validate the invocation |
 | `policyd` | `identityd.ResolvePrincipal` | Obtain current exact-target identity and standing facts |
 | `policyd` | `identityd.ListPrincipalGroups` | Obtain bounded pages of direct Group IDs |
+| `policyd` | `execd.ResolveWorkloadOperationBinding` | Confirm one admitted product operation for one authenticated Workload subject |
 | `authd` | purpose-bound `egressd` HTTP binding | Reach the configured external identity provider without ambient egress |
 | `authd` | `identityd.CreateSession` | Resolve a validated external identity and create one Session |
 | `authd` | `identityd.RevokeSession` | Revoke one Session by opaque credential |

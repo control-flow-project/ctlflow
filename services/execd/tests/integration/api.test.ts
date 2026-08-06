@@ -23,7 +23,8 @@ test("execd exposes exactly the approved RPC inventory", () => {
       "createRun",
       "getRun",
       "listRuns",
-      "cancelRun"
+      "cancelRun",
+      "resolveWorkloadOperationBinding"
     ]);
 });
 

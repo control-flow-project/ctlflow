@@ -7,7 +7,6 @@ namespace CtlFlow.Policy.Policyd.Domain.Catalog;
 
 public sealed record CatalogRequest(
     OperationToken Operation,
-    OperationOwner Owner,
     ResourcePath ResourcePath,
     PolicyTarget Target,
     PrincipalId? AccountScope);

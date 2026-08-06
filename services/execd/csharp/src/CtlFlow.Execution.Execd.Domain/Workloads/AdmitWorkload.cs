@@ -8,7 +8,10 @@ namespace CtlFlow.Execution.Execd.Domain.Workloads;
 
 public static partial class Workloads
 {
-    public static ValueTask<WorkloadDraft> AdmitWorkload(
+    private const int MaximumOperationsPerComponent = 64;
+    private const int MaximumOperationsPerGeneration = 512;
+
+    public static async ValueTask<WorkloadDraft> AdmitWorkload(
         PlacementRecord placement,
         WorkloadRequest requested,
         PackageAdmission package,
@@ -16,6 +19,7 @@ public static partial class Workloads
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
+        await ValidatePackageOperations(package, cancellation);
         if (package.App.PlacementId != placement.Id
             || package.App.Scope != placement.Target)
         {
@@ -39,7 +43,7 @@ public static partial class Workloads
             placement.Target,
             requested,
             package);
-        return ValueTask.FromResult(new WorkloadDraft(
+        return new WorkloadDraft(
             requested.Id,
             requested.PlacementId,
             requested.DesiredState,
@@ -61,7 +65,37 @@ public static partial class Workloads
                 component.ComponentId,
                 component.ArtifactRepository,
                 component.ArtifactManifestDigest),
-            interfaces));
+            interfaces,
+            component.DeclaredOperations);
+    }
+
+    private static ValueTask ValidatePackageOperations(
+        PackageAdmission package,
+        CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        var seen = new HashSet<Operations.OperationToken>();
+        var total = 0;
+        foreach (var component in package.Components)
+        {
+            if (component.DeclaredOperations.Count
+                > MaximumOperationsPerComponent)
+            {
+                throw InvalidPackageAdmission();
+            }
+
+            foreach (var operation in component.DeclaredOperations)
+            {
+                total++;
+                if (total > MaximumOperationsPerGeneration
+                    || !seen.Add(operation))
+                {
+                    throw InvalidPackageAdmission();
+                }
+            }
+        }
+
+        return ValueTask.CompletedTask;
     }
 
     private static IReadOnlyList<AdmittedDependency>

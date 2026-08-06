@@ -16,6 +16,8 @@ internal static partial class AccessGrantSchema
         grant.Ignore(value => value.SubjectKind);
         grant.Ignore(value => value.SubjectId);
         grant.Ignore(value => value.Operation);
+        grant.Ignore(value => value.OperationOwnerKind);
+        grant.Ignore(value => value.OperationOwnerId);
         grant.Ignore(value => value.BasePath);
         grant.Ignore(value => value.MatchKind);
         grant.HasKey("_id");
@@ -39,6 +41,13 @@ internal static partial class AccessGrantSchema
             .HasColumnName("subject_id")
             .HasMaxLength(256)
             .IsRequired();
+        grant.Property<int>("_operationOwnerKind")
+            .HasColumnName("operation_owner_kind")
+            .IsRequired();
+        grant.Property<string>("_operationOwnerId")
+            .HasColumnName("operation_owner_id")
+            .HasMaxLength(128)
+            .IsRequired();
         grant.Property<string>("_operation")
             .HasColumnName("operation")
             .HasMaxLength(128)
@@ -54,6 +63,8 @@ internal static partial class AccessGrantSchema
                 "_targetKind",
                 "_tenantId",
                 "_workspaceId",
+                "_operationOwnerKind",
+                "_operationOwnerId",
                 "_operation",
                 "_subjectKind",
                 "_subjectId")
@@ -62,6 +73,8 @@ internal static partial class AccessGrantSchema
                 "_tenantId",
                 "_subjectKind",
                 "_subjectId",
+                "_operationOwnerKind",
+                "_operationOwnerId",
                 "_operation",
                 "_basePath",
                 "_matchKind")
@@ -73,6 +86,8 @@ internal static partial class AccessGrantSchema
                 "_workspaceId",
                 "_subjectKind",
                 "_subjectId",
+                "_operationOwnerKind",
+                "_operationOwnerId",
                 "_operation",
                 "_basePath",
                 "_matchKind")

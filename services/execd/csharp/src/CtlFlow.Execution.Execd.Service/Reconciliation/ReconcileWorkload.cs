@@ -34,8 +34,11 @@ internal static partial class ExecutionReconciliation
                 database,
                 workload.PlacementId,
                 cancellation);
-            var namespaceName = NativeNames.PlacementNamespace(
-                placement.Id);
+            // Admission derived and retained the subject; realization
+            // consumes it rather than re-deriving names.
+            var subject = Domain.Naming.NativeNames.ParseServiceAccountSubject(
+                workload.ServiceAccountSubject);
+            var namespaceName = subject.Namespace;
             if (workload.DesiredState == DesiredState.Retired)
             {
                 await DeleteWorkloadObjects(
@@ -163,8 +166,8 @@ internal static partial class ExecutionReconciliation
         UtcInstant now,
         CancellationToken cancellation)
     {
-        var accountName = NativeNames.WorkloadServiceAccount(
-            workload.Id);
+        var accountName = Domain.Naming.NativeNames.ParseServiceAccountSubject(
+            workload.ServiceAccountSubject).Name;
         await EnsureOwnedObject(
             kubernetes,
             KubernetesResourcePaths.ServiceAccount(
@@ -179,6 +182,12 @@ internal static partial class ExecutionReconciliation
                 namespaceName,
                 accountName),
             "workload_service_account",
+            cancellation);
+        await ReconcileWorkloadTrustConfigMap(
+            kubernetes,
+            placement,
+            workload,
+            namespaceName,
             cancellation);
         await ApplyWorkloadProjections(
             database,
@@ -279,6 +288,7 @@ internal static partial class ExecutionReconciliation
                 namespaceName,
                 accountName,
                 kubernetes.Settings.Edged,
+                kubernetes.Settings.Bootstrap,
                 continuous.Replicas),
             "workload_deployment",
             cancellation);

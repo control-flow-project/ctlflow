@@ -102,6 +102,7 @@ public static partial class Workloads
         {
             context.Workloads.Add(changed.Entity);
             AddChildren(context, changedDraft, content);
+            AddOperations(context, changedDraft);
         }
         else
         {
@@ -132,8 +133,20 @@ public static partial class Workloads
             CreateOutputRows(draft));
         context.WorkloadStorage.AddRange(
             CreateStorageRows(draft));
-        context.WorkloadInterfaces.AddRange(
-            CreateInterfaceRows(draft));
+        context.WorkloadInterfaces.AddRange(CreateInterfaceRows(draft));
+    }
+
+    private static void AddOperations(
+        ExecutionDbContext context,
+        WorkloadDraft draft)
+    {
+        context.WorkloadOperations.AddRange(
+            draft.AdmittedOperations.Select(operation =>
+                new WorkloadOperation
+                {
+                    WorkloadId = draft.Id.Value,
+                    Operation = operation.Value
+                }));
     }
 
     private static void RemoveChildren(
@@ -242,5 +255,6 @@ public static partial class Workloads
             workload.Storage,
             workload.Behavior,
             workload.AdmittedPackage,
-            workload.Interfaces);
+            workload.Interfaces,
+            workload.AdmittedOperations);
 }

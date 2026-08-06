@@ -238,3 +238,103 @@ function withRequest(
   change(request);
   return request;
 }
+
+test("declares, orders, retains, and freezes component operations",
+  async () => {
+    const context = getPkgdTestContext();
+    const request = createPackageRequest({
+      packageId: "package_operations"
+    });
+    // Request order is not canonical order; the retained declaration is.
+    request.components[0]!.declaredOperations = [
+      "chat_messages.post",
+      "chat_attachments.upload"
+    ];
+    request.components[1]!.declaredOperations = ["chat_topics.create"];
+    const declared = await declarePackage(context, request);
+    assert.deepEqual(
+      declared.components.map((value) => ({
+        componentId: value.componentId,
+        declaredOperations: value.declaredOperations
+      })),
+      [
+        {
+          componentId: "api",
+          declaredOperations: ["chat_topics.create"]
+        },
+        {
+          componentId: "worker",
+          declaredOperations: [
+            "chat_attachments.upload",
+            "chat_messages.post"
+          ]
+        }
+      ]);
+
+    const retried = await declarePackage(context, request);
+    assert.deepEqual(retried, declared);
+    assert.deepEqual(
+      await getPackage(
+        context.client,
+        request.packageId,
+        request.generation),
+      declared);
+
+    // Declarations are immutable with their generation.
+    request.components[1]!.declaredOperations = ["chat_topics.delete"];
+    await assert.rejects(
+      declarePackage(context, request),
+      matchGrpcStatus(status.ALREADY_EXISTS));
+
+    // A later generation may drop a token or bind it to another component.
+    const next = createPackageRequest({
+      packageId: "package_operations",
+      generation: 2n,
+      version: "1.1.0"
+    });
+    next.components[0]!.declaredOperations = ["chat_topics.create"];
+    const revised = await declarePackage(context, next);
+    assert.deepEqual(
+      revised.components.map((value) => value.declaredOperations),
+      [[], ["chat_topics.create"]]);
+  });
+
+test("rejects malformed and duplicated component operations", async () => {
+  const context = getPkgdTestContext();
+  const malformed = [
+    "",
+    "nodot",
+    "Chat_messages.post",
+    "chat_messages.post.extra",
+    "chat-messages.post",
+    "chat_messages.",
+    ".post"
+  ];
+  for (const operation of malformed) {
+    const request = withRequest("operations_malformed", (value) => {
+      value.components[0]!.declaredOperations = [operation];
+    });
+    await assert.rejects(
+      declarePackage(context, request),
+      matchGrpcStatus(status.INVALID_ARGUMENT),
+      operation);
+  }
+
+  // One component owns a token within a generation.
+  const duplicated = withRequest("operations_duplicated", (value) => {
+    value.components[0]!.declaredOperations = ["chat_messages.post"];
+    value.components[1]!.declaredOperations = ["chat_messages.post"];
+  });
+  await assert.rejects(
+    declarePackage(context, duplicated),
+    matchGrpcStatus(status.INVALID_ARGUMENT));
+  const repeated = withRequest("operations_repeated", (value) => {
+    value.components[0]!.declaredOperations = [
+      "chat_messages.post",
+      "chat_messages.post"
+    ];
+  });
+  await assert.rejects(
+    declarePackage(context, repeated),
+    matchGrpcStatus(status.INVALID_ARGUMENT));
+});

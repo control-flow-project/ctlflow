@@ -49,6 +49,24 @@ public static partial class Workloads
             throw Failed("Workload Placement is immutable");
         }
 
+        // The admitted package identity is immutable for a Workload ID, so the
+        // authority behind its derived ServiceAccount subject cannot change
+        // while a Pod realized under that subject is still running. Adopting a
+        // later generation is a new Workload ID and a new subject.
+        if (current.AdmittedPackage.AppId
+                != requested.AdmittedPackage.AppId
+            || current.AdmittedPackage.PackageId
+                != requested.AdmittedPackage.PackageId
+            || current.AdmittedPackage.PackageGeneration
+                != requested.AdmittedPackage.PackageGeneration
+            || current.AdmittedPackage.ComponentId
+                != requested.AdmittedPackage.ComponentId
+            || !current.AdmittedOperations.SequenceEqual(
+                requested.AdmittedOperations))
+        {
+            throw Failed("Workload package admission is immutable");
+        }
+
         var equal = HasSameDeclaration(current, requested);
         if (expectedRevision is null)
         {
@@ -130,6 +148,10 @@ public static partial class Workloads
             RetainInterfaceStatus(
                 requested.Interfaces,
                 current?.Interfaces ?? []),
+            requested.AdmittedOperations,
+            Naming.NativeNames.CreateServiceAccountSubject(
+                requested.PlacementId,
+                requested.Id),
             revision,
             realization,
             createdAt,

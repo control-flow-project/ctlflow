@@ -74,6 +74,7 @@ export async function configureCapabilityPolicy(
     roles: [],
     grants: options.grants.map((grant) => ({
       ...grant,
+      owner: { kind: "kernel" as const, id: "svc_pkgd" },
       target: {
         tenantId: options.tenantId,
         ...(options.workspaceId === undefined

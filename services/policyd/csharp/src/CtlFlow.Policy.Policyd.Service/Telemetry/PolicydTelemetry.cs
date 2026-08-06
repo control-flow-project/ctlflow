@@ -153,6 +153,32 @@ internal sealed class PolicydTelemetry : IDisposable
         return activity;
     }
 
+    internal Activity? StartExecutionCall(string method)
+    {
+        var activity = _activities.StartActivity(
+            $"policyd.execd.{method}",
+            ActivityKind.Client);
+        activity?.SetTag("rpc.system", "grpc");
+        activity?.SetTag(
+            "rpc.service",
+            "ctlflow.execution.v1.ExecutionService");
+        activity?.SetTag("rpc.method", method);
+        return activity;
+    }
+
+    // The canonical gRPC status name of the dependency call, recorded on the
+    // client span exactly as an inbound operation records its own outcome.
+    internal static void RecordDependencyOutcome(
+        Activity? activity,
+        string outcome)
+    {
+        activity?.SetTag("ctlflow.outcome", outcome);
+        activity?.SetStatus(
+            outcome == "OK"
+                ? ActivityStatusCode.Ok
+                : ActivityStatusCode.Error);
+    }
+
     internal static void AddTraceContext(
         Metadata headers,
         Activity? activity)

@@ -46,6 +46,9 @@ public sealed class ExecutionDbContext(DbContextOptions<ExecutionDbContext> opti
     public DbSet<WorkloadStorage> WorkloadStorage { get; private set; } =
         null!;
 
+    public DbSet<WorkloadOperation> WorkloadOperations { get; private set; } =
+        null!;
+
     public DbSet<WorkloadInterface> WorkloadInterfaces { get; private set; } =
         null!;
 

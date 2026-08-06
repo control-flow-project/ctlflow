@@ -31,14 +31,16 @@ export function createPackageRequest(
         artifact: {
           repository: "registry.example.com/apps/worker",
           manifestDigest: digestC
-        }
+        },
+        declaredOperations: []
       },
       {
         componentId: "api",
         artifact: {
           repository: "registry.example.com/apps/api",
           manifestDigest: digestB
-        }
+        },
+        declaredOperations: []
       }
     ],
     interfaces: [

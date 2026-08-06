@@ -149,7 +149,8 @@ assertSame(
     "CreateRun",
     "GetRun",
     "ListRuns",
-    "CancelRun"
+    "CancelRun",
+    "ResolveWorkloadOperationBinding"
   ],
   "Execd RPC inventory");
 assert(
@@ -171,7 +172,8 @@ assertSame(
     "GetWorkload",
     "ListPlacements",
     "ListRuns",
-    "ListWorkloads"
+    "ListWorkloads",
+    "ResolveWorkloadOperationBinding"
   ],
   "shipping gRPC operation inventory");
 

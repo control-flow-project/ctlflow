@@ -121,6 +121,8 @@ Promise<ExecdTestContext> {
       serviceName,
       workload: execdWorkload,
       kubernetes: suite.kubernetes,
+      // The suite-level TLS identity that policyd already trusts.
+      tls: suite.execdTls,
       trust: [
         {
           name: "kubernetes-api-ca.crt",
@@ -311,6 +313,8 @@ function createEnvironment(
     CTLFLOW_INVOCATION_TOKEN_MAX_LIFETIME_SECONDS: "60",
     CTLFLOW_OPERATOR_SUBJECTS: suite.kubernetes.api.clientSubject,
     CTLFLOW_CAPABILITY_CALLERS: capabilityCaller,
+    CTLFLOW_POLICYD_CALLER:
+      `system:serviceaccount:${suite.kubernetes.namespace}:policyd`,
     OTEL_EXPORTER_OTLP_ENDPOINT: suite.collector.endpoint
   };
 }

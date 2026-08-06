@@ -32,7 +32,10 @@ internal static partial class WorkloadAdmission
             appAdmission.PackageId,
             appAdmission.PackageGeneration,
             cancellation);
-        var mapped = MapPackage(appAdmission, package);
+        var mapped = await MapPackage(
+            appAdmission,
+            package,
+            cancellation);
         var admitted = await Domain.Workloads.Workloads.AdmitWorkload(
             placement,
             requested,

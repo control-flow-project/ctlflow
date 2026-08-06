@@ -42,13 +42,13 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "UNAVAILABLE": [
@@ -60,13 +60,13 @@
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -93,7 +93,7 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
@@ -111,13 +111,13 @@
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -140,25 +140,25 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -198,6 +198,10 @@
           {
             "file": "tests/integration/lifecycle.test.ts",
             "title": "propagates suspension and enforces retirement ordering"
+          },
+          {
+            "file": "tests/integration/product-fences.test.ts",
+            "title": "keeps a Workload's admitted authority fixed for its identity"
           }
         ],
         "ABORTED": [
@@ -215,13 +219,13 @@
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -244,13 +248,13 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "UNAVAILABLE": [
@@ -262,13 +266,13 @@
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -291,25 +295,25 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -320,6 +324,10 @@
         {
           "file": "tests/integration/runs.test.ts",
           "title": "creates, snapshots, lists, realizes, and cancels global runs"
+        },
+        {
+          "file": "tests/integration/product-authorization.test.ts",
+          "title": "authorizes a product operation from inside a finite Run Job"
         }
       ],
       "results": {
@@ -356,25 +364,25 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -397,13 +405,13 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "UNAVAILABLE": [
@@ -415,13 +423,13 @@
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -444,25 +452,25 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
           }
         ]
       }
@@ -491,25 +499,78 @@
         "UNAUTHENTICATED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "PERMISSION_DENIED": [
           {
             "file": "tests/integration/security.test.ts",
-            "title": "all ten RPCs reject absent and unadmitted caller identity"
+            "title": "all ten resource RPCs reject absent and unadmitted caller identity"
           }
         ],
         "CANCELLED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight cancellation"
+            "title": "all ten resource RPCs honor in-flight cancellation"
           }
         ],
         "DEADLINE_EXCEEDED": [
           {
             "file": "tests/integration/cancellation.test.ts",
-            "title": "all ten RPCs honor in-flight deadlines"
+            "title": "all ten resource RPCs honor in-flight deadlines"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ResolveWorkloadOperationBinding",
+      "success": [
+        {
+          "file": "tests/integration/product-fences.test.ts",
+          "title": "admits only Policyd to the resolver"
+        }
+      ],
+      "results": {
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/product-fences.test.ts",
+            "title": "admits only Policyd to the resolver"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/product-fences.test.ts",
+            "title": "admits only Policyd to the resolver"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/product-fences.test.ts",
+            "title": "admits only Policyd to the resolver"
+          }
+        ],
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/product-fences.test.ts",
+            "title": "rejects malformed resolver selectors as invalid arguments"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/product-fences.test.ts",
+            "title": "fails closed when the Execd dependency answer is corrupt"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/product-resolver-transport.test.ts",
+            "title": "resolver honors in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/product-resolver-transport.test.ts",
+            "title": "resolver honors in-flight deadlines"
           }
         ]
       }
@@ -521,12 +582,60 @@
       "title": "execd exposes exactly the approved RPC inventory"
     },
     {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "realizes the product fixtures with their runtime bootstrap"
+    },
+    {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "authorizes a product operation from inside the container"
+    },
+    {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "rejects a tampered invocation inside the container"
+    },
+    {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "validates the complete invocation contract inside the container"
+    },
+    {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "isolates the same token across Packages"
+    },
+    {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "keeps lexically kernel tokens in the package namespace"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "fences every Placement level from inside the containers"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "anchors paths to the admitted App instance"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "pins each Workload to its admitted generation snapshot"
+    },
+    {
+      "file": "tests/integration/product-token-failure.test.ts",
+      "title": "uses cached invocation keys and refreshes unknown keys"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "denies deactivated Workloads and ancestors on the next request"
+    },
+    {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "host-minted diagnostic token replicates the container decision"
+    },
+    {
       "file": "tests/integration/api.test.ts",
       "title": "execd health and readiness probes are available"
     },
     {
       "file": "tests/integration/security.test.ts",
-      "title": "capability backend calls all ten RPCs in one Tenant fence"
+      "title": "capability backend calls all ten resource RPCs in one Tenant fence"
     },
     {
       "file": "tests/integration/security.test.ts",
@@ -603,6 +712,54 @@
     {
       "file": "tests/integration/zz-persistence.test.ts",
       "title": "readiness and RPCs fail closed when a mapped table is missing"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "rejects malformed resolver selectors as invalid arguments"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "keeps a Workload's admitted authority fixed for its identity"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "fails closed when the Execd dependency answer is corrupt"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "fails closed when retained Placement ancestry is truncated"
+    },
+    {
+      "file": "tests/integration/product-state-integrity.test.ts",
+      "title": "fails closed when a retained Workload subject is remapped"
+    },
+    {
+      "file": "tests/integration/product-state-integrity.test.ts",
+      "title": "reports a structurally invalid retained Placement lineage as unavailable"
+    },
+    {
+      "file": "tests/integration/product-telemetry.test.ts",
+      "title": "propagates product trace context through authorization"
+    },
+    {
+      "file": "tests/integration/product-token-failure.test.ts",
+      "title": "fails closed and records telemetry when its Execd token is unreadable"
+    },
+    {
+      "file": "tests/integration/product-resolver-transport.test.ts",
+      "title": "preserves the Execd dependency deadline"
+    },
+    {
+      "file": "tests/integration/product-authorization.test.ts",
+      "title": "authorizes a product operation from inside a finite Run Job"
+    },
+    {
+      "file": "tests/integration/product-fences.test.ts",
+      "title": "conceals an out-of-Placement request before validating its path"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "startup rejects a workload-token lifetime Kubernetes cannot project"
     }
   ],
   "releaseGates": [

@@ -229,23 +229,35 @@ async function assertExposure(options: ExposureOptions): Promise<void> {
       path: "identityd-ca.crt"
     }]);
 
+  // One Edged trust ConfigMap and one product runtime trust ConfigMap.
   const configMaps = await listOwnedKubernetesObjects(
     suite.kubernetes,
     "configmaps",
     ownership,
     namespace);
-  assert.equal(configMaps.length, 1);
+  assert.equal(configMaps.length, 2);
+  const edgedTrust = configMaps.find(
+    (item) => item.metadata.name.startsWith("etr-"));
   const configMap = requireRecord(
-    configMaps[0],
+    edgedTrust,
     "Edged trust ConfigMap");
   const configMapData = requireRecord(
     configMap.data,
     "Edged trust data");
+  assert.deepEqual(Object.keys(configMapData), ["identityd-ca.crt"]);
   assert.match(
     requireString(
       configMapData["identityd-ca.crt"],
       "Identityd certificate authority"),
     /-----BEGIN CERTIFICATE-----/u);
+  const workloadTrust = configMaps.find(
+    (item) => item.metadata.name.startsWith("wtr-"));
+  const workloadTrustData = requireRecord(
+    requireRecord(workloadTrust, "workload trust ConfigMap").data,
+    "workload trust data");
+  assert.deepEqual(
+    Object.keys(workloadTrustData).sort(),
+    ["identityd-ca.crt", "policyd-ca.crt", "workload-jwks.json"]);
 
   const services = await listOwnedKubernetesObjects(
     suite.kubernetes,

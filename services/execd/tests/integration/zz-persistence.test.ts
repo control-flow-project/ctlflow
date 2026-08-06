@@ -120,6 +120,7 @@ test("SQLite contains only migration metadata and Execd domain tables",
         "workload_dependency_outputs",
         "workload_dependency_parameters",
         "workload_interfaces",
+        "workload_operations",
         "workload_storage",
         "workloads"
       ]);
@@ -194,6 +195,22 @@ test("readiness and RPCs fail closed when a mapped table is missing",
     assert.equal(
       (await getWorkload(workloadId)).workloadId,
       workloadId);
+  });
+
+test("startup rejects a workload-token lifetime Kubernetes cannot project",
+  async () => {
+    const context = getExecdTestContext();
+    const name = "CTLFLOW_WORKLOAD_TOKEN_MAX_LIFETIME_SECONDS";
+    try {
+      await assert.rejects(context.process.restart({
+        [name]: "599"
+      }));
+    } finally {
+      await context.process.restart({
+        [name]: context.environment[name]!
+      });
+    }
+    await waitForProbeStatus(context.probePort, 204);
   });
 
 async function declarePlacement(

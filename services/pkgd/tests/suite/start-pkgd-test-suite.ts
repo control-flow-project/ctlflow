@@ -68,10 +68,6 @@ Promise<PkgdTestSuite> {
       invocationIssuer,
       invocationAudience,
       invocationMaximumLifetimeSeconds,
-      verificationKeyCallers: [
-        `system:serviceaccount:${kubernetes.namespace}:pkgd`,
-        `system:serviceaccount:${kubernetes.namespace}:policyd`
-      ],
       principalFactCallers: [
         `system:serviceaccount:${kubernetes.namespace}:policyd`
       ]

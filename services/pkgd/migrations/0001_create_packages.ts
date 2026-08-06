@@ -33,6 +33,28 @@ export async function up(knex: Knex): Promise<void> {
     table.check("length(repository) BETWEEN 3 AND 255");
     table.check("length(manifest_digest) = 71");
   });
+  // Product operations a component implements. Unique across the whole
+  // generation, so exactly one component owns a token in that generation.
+  await knex.schema.createTable("package_component_operations", (table) => {
+    table.string("package_id", 128).notNullable();
+    table.bigInteger("generation").notNullable();
+    table.string("component_id", 64).notNullable();
+    table.string("operation", 128).notNullable();
+    table.primary(["package_id", "generation", "operation"]);
+    table.foreign(["package_id", "generation", "component_id"])
+      .references(["package_id", "generation", "component_id"])
+      .inTable("package_components")
+      .onDelete("RESTRICT");
+    table.index(
+      ["package_id", "generation", "component_id"],
+      "package_component_operations_component_idx");
+    table.check("length(operation) BETWEEN 3 AND 128");
+    table.check("operation NOT GLOB '*[^a-z0-9_.]*'");
+    table.check(
+      "length(operation) - length(replace(operation, '.', '')) = 1");
+    table.check("operation NOT GLOB '.*'");
+    table.check("operation NOT GLOB '*.'");
+  });
 
   await knex.schema.createTable("package_interfaces", (table) => {
     table.string("package_id", 128).notNullable();
@@ -178,6 +200,7 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTableIfExists("apps");
+  await knex.schema.dropTableIfExists("package_component_operations");
   await knex.schema.dropTableIfExists("package_exposures");
   await knex.schema.dropTableIfExists("package_dependency_options");
   await knex.schema.dropTableIfExists("package_dependencies");

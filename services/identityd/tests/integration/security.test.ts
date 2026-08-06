@@ -40,6 +40,11 @@ test("every RPC rejects an unadmitted workload", async () => {
     context.policydWorkload.unadmittedToken,
     directInvocation());
   for (const call of allCalls(metadata)) {
+    // Key bootstrap is the one open operation: any valid installation-issued
+    // bound workload token may fetch the public verification keys.
+    if (call.name === "GetInvocationVerificationKeys") {
+      continue;
+    }
     await assert.rejects(
       call.request(),
       matchGrpcStatus(
@@ -48,6 +53,19 @@ test("every RPC rejects an unadmitted workload", async () => {
           : status.PERMISSION_DENIED),
       call.name);
   }
+});
+
+test("any valid workload token can bootstrap verification keys", async () => {
+  // A newly admitted product workload appears in no caller set, yet it must
+  // fetch the public keys before it can verify any invocation. The material
+  // is public; possession of a valid bound workload token is the only gate.
+  const context = getIdentitydTestContext();
+  const keys = await callUnary<GetInvocationVerificationKeysResponse>(
+    (done) => context.client.getInvocationVerificationKeys(
+      {},
+      workloadMetadata(context.policydWorkload.unadmittedToken),
+      done));
+  assert.equal(keys.keys.length, 1);
 });
 
 test("operation caller sets are exact", async () => {
@@ -80,9 +98,15 @@ test("operation caller sets are exact", async () => {
     {
       name: "authd",
       token: context.authdWorkload.callerToken,
-      allowed: new Set(["CreateSession", "RevokeSession"])
+      allowed: new Set([
+        "GetInvocationVerificationKeys",
+        "CreateSession",
+        "RevokeSession"
+      ])
     },
     {
+      // Edged presents an edge credential, not an installation workload
+      // token, so the open key bootstrap does not apply to it.
       name: "edged",
       token: context.edgedWorkload.callerToken,
       allowed: new Set(["ExchangeSession"])
@@ -189,17 +213,26 @@ test("fact RPCs require a valid invocation identity", async () => {
   }
 });
 
-test("a supplied invocation on the key RPC is also validated", async () => {
+test("the key RPC admits no invocation credential at all", async () => {
+  // The contract defines this operation as workload authentication with no
+  // invocation JWT, so unexpected invocation metadata is a malformed request
+  // rather than something to validate and ignore. A valid invocation is
+  // refused exactly like a malformed one.
   const context = getIdentitydTestContext();
-  await assert.rejects(
-    callUnary<GetInvocationVerificationKeysResponse>((done) =>
-      context.client.getInvocationVerificationKeys(
-        {},
-        workloadMetadata(
-          context.policydWorkload.callerToken,
-          "invalid-invocation"),
-        done)),
-    matchGrpcStatus(status.UNAUTHENTICATED));
+  for (const invocation of [
+    "invalid-invocation",
+    directInvocation()
+  ]) {
+    await assert.rejects(
+      callUnary<GetInvocationVerificationKeysResponse>((done) =>
+        context.client.getInvocationVerificationKeys(
+          {},
+          workloadMetadata(
+            context.policydWorkload.callerToken,
+            invocation),
+          done)),
+      matchGrpcStatus(status.UNAUTHENTICATED));
+  }
 });
 
 test("duplicate invocation metadata is rejected", async () => {
@@ -379,10 +412,11 @@ function invalidInvocationTokens(): readonly string[] {
       sessionId: null,
       runId: "run-two"
     }),
-    context.invocation.sign({
-      tenantId: "acme",
-      authorityClaim: true
-    }),
+    ...forbiddenAuthorityClaims.map((authorityClaim) =>
+      context.invocation.sign({
+        tenantId: "acme",
+        authorityClaim
+      })),
     context.invocation.sign({
       tenantId: "ACME"
     }),
@@ -392,3 +426,12 @@ function invalidInvocationTokens(): readonly string[] {
     })
   ];
 }
+
+const forbiddenAuthorityClaims = [
+  "roles",
+  "capabilities",
+  "grants",
+  "kubernetes",
+  "kubernetes.io",
+  "kubernetes.io/serviceaccount/namespace"
+] as const;

@@ -114,6 +114,12 @@ internal static partial class InvocationTokens
             "scopes",
             "endpoint",
             "endpoints",
+            "capability",
+            "capabilities",
+            "grant",
+            "grants",
+            "kubernetes",
+            "kubernetes.io",
             "traceparent",
             "tracestate"
         })
@@ -122,6 +128,13 @@ internal static partial class InvocationTokens
             {
                 throw new TokenValidationException();
             }
+        }
+        if (payload.EnumerateObject().Any(
+            property => property.Name.StartsWith(
+                "kubernetes.io/",
+                StringComparison.Ordinal)))
+        {
+            throw new TokenValidationException();
         }
     }
 

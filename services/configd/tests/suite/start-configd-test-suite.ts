@@ -74,10 +74,6 @@ Promise<ConfigdTestSuite> {
       invocationIssuer,
       invocationAudience,
       invocationMaximumLifetimeSeconds,
-      verificationKeyCallers: [
-        `system:serviceaccount:${kubernetes.namespace}:configd`,
-        `system:serviceaccount:${kubernetes.namespace}:policyd`
-      ],
       principalFactCallers: [
         `system:serviceaccount:${kubernetes.namespace}:policyd`
       ]
