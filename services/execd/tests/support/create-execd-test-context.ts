@@ -94,6 +94,22 @@ Promise<ExecdTestContext> {
         expiresAt: new Date(
           Date.now() + 4 * 60_000).toISOString()
       },
+      loginProviders: [{
+        tenantId: "tenant-a",
+        providerId: "oidc",
+        displayName: "Tenant A workforce",
+        configurationId: "tenant-a-oidc",
+        configurationVersionId: "tenant-a-oidc-v1",
+        secretId: "tenant-a-oidc-secret",
+        secretVersionId: "tenant-a-oidc-secret-v1",
+        state: "active",
+        revision: 1
+      }],
+      workspaceLoginProviderAdmissions: [{
+        tenantId: "tenant-a",
+        workspaceId: "workspace-a",
+        providerId: "oidc"
+      }],
       externalIdentityLinks: [{
         tenantId: "tenant-a",
         providerId: "oidc",

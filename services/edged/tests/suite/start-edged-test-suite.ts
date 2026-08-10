@@ -111,6 +111,26 @@ Promise<EdgedTestSuite> {
         membershipRevision: 1,
         groupIds: []
       }],
+      loginProviders: [{
+        tenantId: "acme",
+        providerId: "oidc",
+        displayName: "Acme workforce",
+        configurationId: "acme-oidc",
+        configurationVersionId: "acme-oidc-v1",
+        secretId: "acme-oidc-secret",
+        secretVersionId: "acme-oidc-secret-v1",
+        state: "active",
+        revision: 1
+      }],
+      workspaceLoginProviderAdmissions: [{
+        tenantId: "acme",
+        workspaceId: "atlas",
+        providerId: "oidc"
+      }, {
+        tenantId: "acme",
+        workspaceId: "other",
+        providerId: "oidc"
+      }],
       externalIdentityLinks: [{
         tenantId: "acme",
         providerId: "oidc",
