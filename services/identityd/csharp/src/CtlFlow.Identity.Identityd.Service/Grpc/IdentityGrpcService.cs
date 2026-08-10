@@ -5,6 +5,7 @@ using CtlFlow.Identity.Identityd.Service.Security;
 using CtlFlow.Identity.Identityd.Service.Security.Signing;
 using CtlFlow.Identity.Identityd.Service.Telemetry;
 using CtlFlow.Identity.V1;
+using CtlFlow.Policy.V1;
 
 namespace CtlFlow.Identity.Identityd.Service.Grpc;
 
@@ -14,6 +15,7 @@ internal sealed partial class IdentityGrpcService(
     TokenAuthorities tokenAuthorities,
     InvocationSigningKey signingKey,
     AuditService.AuditServiceClient auditClient,
+    PolicyService.PolicyServiceClient policyClient,
     IdentitydTelemetry telemetry)
     : IdentityService.IdentityServiceBase
 {
@@ -23,5 +25,7 @@ internal sealed partial class IdentityGrpcService(
     private readonly InvocationSigningKey _signingKey = signingKey;
     private readonly AuditService.AuditServiceClient _auditClient =
         auditClient;
+    private readonly PolicyService.PolicyServiceClient _policyClient =
+        policyClient;
     private readonly IdentitydTelemetry _telemetry = telemetry;
 }

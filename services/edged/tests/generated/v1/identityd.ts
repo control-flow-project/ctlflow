@@ -100,6 +100,51 @@ export function principalKindToJSON(object: PrincipalKind): string {
   }
 }
 
+export enum LoginProviderState {
+  LOGIN_PROVIDER_STATE_UNSPECIFIED = 0,
+  LOGIN_PROVIDER_STATE_ACTIVE = 1,
+  LOGIN_PROVIDER_STATE_DISABLED = 2,
+  LOGIN_PROVIDER_STATE_DELETED = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function loginProviderStateFromJSON(object: any): LoginProviderState {
+  switch (object) {
+    case 0:
+    case "LOGIN_PROVIDER_STATE_UNSPECIFIED":
+      return LoginProviderState.LOGIN_PROVIDER_STATE_UNSPECIFIED;
+    case 1:
+    case "LOGIN_PROVIDER_STATE_ACTIVE":
+      return LoginProviderState.LOGIN_PROVIDER_STATE_ACTIVE;
+    case 2:
+    case "LOGIN_PROVIDER_STATE_DISABLED":
+      return LoginProviderState.LOGIN_PROVIDER_STATE_DISABLED;
+    case 3:
+    case "LOGIN_PROVIDER_STATE_DELETED":
+      return LoginProviderState.LOGIN_PROVIDER_STATE_DELETED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return LoginProviderState.UNRECOGNIZED;
+  }
+}
+
+export function loginProviderStateToJSON(object: LoginProviderState): string {
+  switch (object) {
+    case LoginProviderState.LOGIN_PROVIDER_STATE_UNSPECIFIED:
+      return "LOGIN_PROVIDER_STATE_UNSPECIFIED";
+    case LoginProviderState.LOGIN_PROVIDER_STATE_ACTIVE:
+      return "LOGIN_PROVIDER_STATE_ACTIVE";
+    case LoginProviderState.LOGIN_PROVIDER_STATE_DISABLED:
+      return "LOGIN_PROVIDER_STATE_DISABLED";
+    case LoginProviderState.LOGIN_PROVIDER_STATE_DELETED:
+      return "LOGIN_PROVIDER_STATE_DELETED";
+    case LoginProviderState.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface GetInvocationVerificationKeysRequest {
 }
 
@@ -143,6 +188,310 @@ export interface ListPrincipalGroupsRequest {
 export interface ListPrincipalGroupsResponse {
   groupIds: string[];
   nextAfterGroupId?: string | undefined;
+}
+
+export interface AddTenantMemberRequest {
+  tenantId: string;
+  accountId: string;
+}
+
+export interface RemoveTenantMemberRequest {
+  tenantId: string;
+  accountId: string;
+}
+
+export interface RemoveTenantMemberResponse {
+}
+
+export interface ListTenantMembersRequest {
+  tenantId: string;
+  pageSize: number;
+  afterAccountId?: string | undefined;
+}
+
+export interface ListTenantMembersResponse {
+  members: TenantMember[];
+  nextAfterAccountId?: string | undefined;
+}
+
+export interface TenantMember {
+  accountId: string;
+  accountKind: PrincipalKind;
+  accountEnabled: boolean;
+  accountRevision: bigint;
+  tenantId: string;
+  membershipRevision: bigint;
+}
+
+export interface AddWorkspaceMemberRequest {
+  tenantId: string;
+  workspaceId: string;
+  accountId: string;
+}
+
+export interface RemoveWorkspaceMemberRequest {
+  tenantId: string;
+  workspaceId: string;
+  accountId: string;
+}
+
+export interface RemoveWorkspaceMemberResponse {
+}
+
+export interface ListWorkspaceMembersRequest {
+  tenantId: string;
+  workspaceId: string;
+  pageSize: number;
+  afterAccountId?: string | undefined;
+}
+
+export interface ListWorkspaceMembersResponse {
+  members: WorkspaceMember[];
+  nextAfterAccountId?: string | undefined;
+}
+
+export interface WorkspaceMember {
+  accountId: string;
+  accountKind: PrincipalKind;
+  accountEnabled: boolean;
+  accountRevision: bigint;
+  tenantId: string;
+  workspaceId: string;
+  membershipRevision: bigint;
+}
+
+export interface CreateGroupRequest {
+  groupId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface DeleteGroupRequest {
+  groupId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface DeleteGroupResponse {
+}
+
+export interface ListGroupsRequest {
+  tenantId: string;
+  workspaceId?: string | undefined;
+  pageSize: number;
+  afterGroupId?: string | undefined;
+}
+
+export interface ListGroupsResponse {
+  groups: Group[];
+  nextAfterGroupId?: string | undefined;
+}
+
+export interface Group {
+  groupId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface AddGroupMemberRequest {
+  groupId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+  principalId: string;
+}
+
+export interface RemoveGroupMemberRequest {
+  groupId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+  principalId: string;
+}
+
+export interface RemoveGroupMemberResponse {
+}
+
+export interface ListGroupMembersRequest {
+  groupId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+  pageSize: number;
+  afterPrincipalId?: string | undefined;
+}
+
+export interface ListGroupMembersResponse {
+  members: GroupMember[];
+  nextAfterPrincipalId?: string | undefined;
+}
+
+export interface GroupMember {
+  groupId: string;
+  principalId: string;
+  principalKind: PrincipalKind;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface CreateVirtualPrincipalRequest {
+  principalId: string;
+  subjectAccountId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface GetVirtualPrincipalRequest {
+  principalId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface ListVirtualPrincipalsRequest {
+  tenantId: string;
+  workspaceId?: string | undefined;
+  pageSize: number;
+  afterPrincipalId?: string | undefined;
+}
+
+export interface ListVirtualPrincipalsResponse {
+  principals: VirtualPrincipal[];
+  nextAfterPrincipalId?: string | undefined;
+}
+
+export interface SetVirtualPrincipalEnabledRequest {
+  principalId: string;
+  tenantId: string;
+  workspaceId?: string | undefined;
+  expectedRevision: bigint;
+  enabled: boolean;
+}
+
+export interface VirtualPrincipal {
+  principalId: string;
+  subjectAccountId: string;
+  enabled: boolean;
+  revision: bigint;
+  tenantId: string;
+  workspaceId?: string | undefined;
+}
+
+export interface CreateExternalIdentityLinkRequest {
+  tenantId: string;
+  providerId: string;
+  providerSubject: string;
+  accountId: string;
+}
+
+export interface DeleteExternalIdentityLinkRequest {
+  tenantId: string;
+  providerId: string;
+  providerSubject: string;
+}
+
+export interface DeleteExternalIdentityLinkResponse {
+}
+
+export interface ListExternalIdentityLinksRequest {
+  tenantId: string;
+  providerId: string;
+  pageSize: number;
+  afterProviderSubject?: string | undefined;
+}
+
+export interface ListExternalIdentityLinksResponse {
+  links: ExternalIdentityLink[];
+  nextAfterProviderSubject?: string | undefined;
+}
+
+export interface ExternalIdentityLink {
+  tenantId: string;
+  providerId: string;
+  providerSubject: string;
+  accountId: string;
+  revision: bigint;
+}
+
+export interface CreateLoginProviderRequest {
+  tenantId: string;
+  providerId: string;
+  displayName: string;
+  configurationId: string;
+  configurationVersionId: string;
+  secretId: string;
+  secretVersionId: string;
+}
+
+export interface GetLoginProviderRequest {
+  tenantId: string;
+  providerId: string;
+}
+
+export interface ListLoginProvidersRequest {
+  tenantId: string;
+  pageSize: number;
+  afterProviderId?: string | undefined;
+}
+
+export interface ListLoginProvidersResponse {
+  providers: LoginProvider[];
+  nextAfterProviderId?: string | undefined;
+}
+
+export interface UpdateLoginProviderRequest {
+  tenantId: string;
+  providerId: string;
+  expectedRevision: bigint;
+  displayName: string;
+  configurationId: string;
+  configurationVersionId: string;
+  secretId: string;
+  secretVersionId: string;
+}
+
+export interface SetLoginProviderStateRequest {
+  tenantId: string;
+  providerId: string;
+  expectedRevision: bigint;
+  state: LoginProviderState;
+}
+
+export interface LoginProvider {
+  tenantId: string;
+  providerId: string;
+  displayName: string;
+  configurationId: string;
+  configurationVersionId: string;
+  secretId: string;
+  secretVersionId: string;
+  state: LoginProviderState;
+  revision: bigint;
+}
+
+export interface SetWorkspaceLoginProviderAdmissionRequest {
+  tenantId: string;
+  workspaceId: string;
+  providerId: string;
+  admitted: boolean;
+}
+
+export interface SetWorkspaceLoginProviderAdmissionResponse {
+  admission: WorkspaceLoginProviderAdmission | undefined;
+}
+
+export interface ListWorkspaceLoginProviderAdmissionsRequest {
+  tenantId: string;
+  workspaceId: string;
+  pageSize: number;
+  afterProviderId?: string | undefined;
+}
+
+export interface ListWorkspaceLoginProviderAdmissionsResponse {
+  admissions: WorkspaceLoginProviderAdmission[];
+  nextAfterProviderId?: string | undefined;
+}
+
+export interface WorkspaceLoginProviderAdmission {
+  tenantId: string;
+  workspaceId: string;
+  providerId: string;
 }
 
 export interface CreateSessionRequest {
@@ -895,6 +1244,4793 @@ export const ListPrincipalGroupsResponse: MessageFns<ListPrincipalGroupsResponse
   },
 };
 
+function createBaseAddTenantMemberRequest(): AddTenantMemberRequest {
+  return { tenantId: "", accountId: "" };
+}
+
+export const AddTenantMemberRequest: MessageFns<AddTenantMemberRequest> = {
+  encode(message: AddTenantMemberRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.accountId !== "") {
+      writer.uint32(18).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AddTenantMemberRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAddTenantMemberRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AddTenantMemberRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+    };
+  },
+
+  toJSON(message: AddTenantMemberRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AddTenantMemberRequest>): AddTenantMemberRequest {
+    return AddTenantMemberRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AddTenantMemberRequest>): AddTenantMemberRequest {
+    const message = createBaseAddTenantMemberRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseRemoveTenantMemberRequest(): RemoveTenantMemberRequest {
+  return { tenantId: "", accountId: "" };
+}
+
+export const RemoveTenantMemberRequest: MessageFns<RemoveTenantMemberRequest> = {
+  encode(message: RemoveTenantMemberRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.accountId !== "") {
+      writer.uint32(18).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RemoveTenantMemberRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRemoveTenantMemberRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RemoveTenantMemberRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+    };
+  },
+
+  toJSON(message: RemoveTenantMemberRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RemoveTenantMemberRequest>): RemoveTenantMemberRequest {
+    return RemoveTenantMemberRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RemoveTenantMemberRequest>): RemoveTenantMemberRequest {
+    const message = createBaseRemoveTenantMemberRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseRemoveTenantMemberResponse(): RemoveTenantMemberResponse {
+  return {};
+}
+
+export const RemoveTenantMemberResponse: MessageFns<RemoveTenantMemberResponse> = {
+  encode(_: RemoveTenantMemberResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RemoveTenantMemberResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRemoveTenantMemberResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): RemoveTenantMemberResponse {
+    return {};
+  },
+
+  toJSON(_: RemoveTenantMemberResponse): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<RemoveTenantMemberResponse>): RemoveTenantMemberResponse {
+    return RemoveTenantMemberResponse.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<RemoveTenantMemberResponse>): RemoveTenantMemberResponse {
+    const message = createBaseRemoveTenantMemberResponse();
+    return message;
+  },
+};
+
+function createBaseListTenantMembersRequest(): ListTenantMembersRequest {
+  return { tenantId: "", pageSize: 0, afterAccountId: undefined };
+}
+
+export const ListTenantMembersRequest: MessageFns<ListTenantMembersRequest> = {
+  encode(message: ListTenantMembersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(16).uint32(message.pageSize);
+    }
+    if (message.afterAccountId !== undefined) {
+      writer.uint32(26).string(message.afterAccountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListTenantMembersRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListTenantMembersRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.afterAccountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListTenantMembersRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterAccountId: isSet(object.afterAccountId) ? globalThis.String(object.afterAccountId) : undefined,
+    };
+  },
+
+  toJSON(message: ListTenantMembersRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterAccountId !== undefined) {
+      obj.afterAccountId = message.afterAccountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListTenantMembersRequest>): ListTenantMembersRequest {
+    return ListTenantMembersRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListTenantMembersRequest>): ListTenantMembersRequest {
+    const message = createBaseListTenantMembersRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.pageSize = object.pageSize ?? 0;
+    message.afterAccountId = object.afterAccountId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListTenantMembersResponse(): ListTenantMembersResponse {
+  return { members: [], nextAfterAccountId: undefined };
+}
+
+export const ListTenantMembersResponse: MessageFns<ListTenantMembersResponse> = {
+  encode(message: ListTenantMembersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.members) {
+      TenantMember.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterAccountId !== undefined) {
+      writer.uint32(18).string(message.nextAfterAccountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListTenantMembersResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListTenantMembersResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.members.push(TenantMember.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterAccountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListTenantMembersResponse {
+    return {
+      members: globalThis.Array.isArray(object?.members)
+        ? object.members.map((e: any) => TenantMember.fromJSON(e))
+        : [],
+      nextAfterAccountId: isSet(object.nextAfterAccountId) ? globalThis.String(object.nextAfterAccountId) : undefined,
+    };
+  },
+
+  toJSON(message: ListTenantMembersResponse): unknown {
+    const obj: any = {};
+    if (message.members?.length) {
+      obj.members = message.members.map((e) => TenantMember.toJSON(e));
+    }
+    if (message.nextAfterAccountId !== undefined) {
+      obj.nextAfterAccountId = message.nextAfterAccountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListTenantMembersResponse>): ListTenantMembersResponse {
+    return ListTenantMembersResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListTenantMembersResponse>): ListTenantMembersResponse {
+    const message = createBaseListTenantMembersResponse();
+    message.members = object.members?.map((e) => TenantMember.fromPartial(e)) || [];
+    message.nextAfterAccountId = object.nextAfterAccountId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseTenantMember(): TenantMember {
+  return {
+    accountId: "",
+    accountKind: 0,
+    accountEnabled: false,
+    accountRevision: 0n,
+    tenantId: "",
+    membershipRevision: 0n,
+  };
+}
+
+export const TenantMember: MessageFns<TenantMember> = {
+  encode(message: TenantMember, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.accountKind !== 0) {
+      writer.uint32(16).int32(message.accountKind);
+    }
+    if (message.accountEnabled !== false) {
+      writer.uint32(24).bool(message.accountEnabled);
+    }
+    if (message.accountRevision !== 0n) {
+      if (BigInt.asUintN(64, message.accountRevision) !== message.accountRevision) {
+        throw new globalThis.Error("value provided for field message.accountRevision of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.accountRevision);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(42).string(message.tenantId);
+    }
+    if (message.membershipRevision !== 0n) {
+      if (BigInt.asUintN(64, message.membershipRevision) !== message.membershipRevision) {
+        throw new globalThis.Error("value provided for field message.membershipRevision of type uint64 too large");
+      }
+      writer.uint32(48).uint64(message.membershipRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TenantMember {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTenantMember();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.accountKind = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.accountEnabled = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.accountRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.membershipRevision = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TenantMember {
+    return {
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+      accountKind: isSet(object.accountKind) ? principalKindFromJSON(object.accountKind) : 0,
+      accountEnabled: isSet(object.accountEnabled) ? globalThis.Boolean(object.accountEnabled) : false,
+      accountRevision: isSet(object.accountRevision) ? BigInt(object.accountRevision) : 0n,
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      membershipRevision: isSet(object.membershipRevision) ? BigInt(object.membershipRevision) : 0n,
+    };
+  },
+
+  toJSON(message: TenantMember): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.accountKind !== 0) {
+      obj.accountKind = principalKindToJSON(message.accountKind);
+    }
+    if (message.accountEnabled !== false) {
+      obj.accountEnabled = message.accountEnabled;
+    }
+    if (message.accountRevision !== 0n) {
+      obj.accountRevision = message.accountRevision.toString();
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.membershipRevision !== 0n) {
+      obj.membershipRevision = message.membershipRevision.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TenantMember>): TenantMember {
+    return TenantMember.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TenantMember>): TenantMember {
+    const message = createBaseTenantMember();
+    message.accountId = object.accountId ?? "";
+    message.accountKind = object.accountKind ?? 0;
+    message.accountEnabled = object.accountEnabled ?? false;
+    message.accountRevision = object.accountRevision ?? 0n;
+    message.tenantId = object.tenantId ?? "";
+    message.membershipRevision = object.membershipRevision ?? 0n;
+    return message;
+  },
+};
+
+function createBaseAddWorkspaceMemberRequest(): AddWorkspaceMemberRequest {
+  return { tenantId: "", workspaceId: "", accountId: "" };
+}
+
+export const AddWorkspaceMemberRequest: MessageFns<AddWorkspaceMemberRequest> = {
+  encode(message: AddWorkspaceMemberRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== "") {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.accountId !== "") {
+      writer.uint32(26).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AddWorkspaceMemberRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAddWorkspaceMemberRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AddWorkspaceMemberRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+    };
+  },
+
+  toJSON(message: AddWorkspaceMemberRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AddWorkspaceMemberRequest>): AddWorkspaceMemberRequest {
+    return AddWorkspaceMemberRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AddWorkspaceMemberRequest>): AddWorkspaceMemberRequest {
+    const message = createBaseAddWorkspaceMemberRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? "";
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseRemoveWorkspaceMemberRequest(): RemoveWorkspaceMemberRequest {
+  return { tenantId: "", workspaceId: "", accountId: "" };
+}
+
+export const RemoveWorkspaceMemberRequest: MessageFns<RemoveWorkspaceMemberRequest> = {
+  encode(message: RemoveWorkspaceMemberRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== "") {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.accountId !== "") {
+      writer.uint32(26).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RemoveWorkspaceMemberRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRemoveWorkspaceMemberRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RemoveWorkspaceMemberRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+    };
+  },
+
+  toJSON(message: RemoveWorkspaceMemberRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RemoveWorkspaceMemberRequest>): RemoveWorkspaceMemberRequest {
+    return RemoveWorkspaceMemberRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RemoveWorkspaceMemberRequest>): RemoveWorkspaceMemberRequest {
+    const message = createBaseRemoveWorkspaceMemberRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? "";
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseRemoveWorkspaceMemberResponse(): RemoveWorkspaceMemberResponse {
+  return {};
+}
+
+export const RemoveWorkspaceMemberResponse: MessageFns<RemoveWorkspaceMemberResponse> = {
+  encode(_: RemoveWorkspaceMemberResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RemoveWorkspaceMemberResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRemoveWorkspaceMemberResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): RemoveWorkspaceMemberResponse {
+    return {};
+  },
+
+  toJSON(_: RemoveWorkspaceMemberResponse): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<RemoveWorkspaceMemberResponse>): RemoveWorkspaceMemberResponse {
+    return RemoveWorkspaceMemberResponse.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<RemoveWorkspaceMemberResponse>): RemoveWorkspaceMemberResponse {
+    const message = createBaseRemoveWorkspaceMemberResponse();
+    return message;
+  },
+};
+
+function createBaseListWorkspaceMembersRequest(): ListWorkspaceMembersRequest {
+  return { tenantId: "", workspaceId: "", pageSize: 0, afterAccountId: undefined };
+}
+
+export const ListWorkspaceMembersRequest: MessageFns<ListWorkspaceMembersRequest> = {
+  encode(message: ListWorkspaceMembersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== "") {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(24).uint32(message.pageSize);
+    }
+    if (message.afterAccountId !== undefined) {
+      writer.uint32(34).string(message.afterAccountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkspaceMembersRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkspaceMembersRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.afterAccountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkspaceMembersRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterAccountId: isSet(object.afterAccountId) ? globalThis.String(object.afterAccountId) : undefined,
+    };
+  },
+
+  toJSON(message: ListWorkspaceMembersRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterAccountId !== undefined) {
+      obj.afterAccountId = message.afterAccountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListWorkspaceMembersRequest>): ListWorkspaceMembersRequest {
+    return ListWorkspaceMembersRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListWorkspaceMembersRequest>): ListWorkspaceMembersRequest {
+    const message = createBaseListWorkspaceMembersRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? "";
+    message.pageSize = object.pageSize ?? 0;
+    message.afterAccountId = object.afterAccountId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListWorkspaceMembersResponse(): ListWorkspaceMembersResponse {
+  return { members: [], nextAfterAccountId: undefined };
+}
+
+export const ListWorkspaceMembersResponse: MessageFns<ListWorkspaceMembersResponse> = {
+  encode(message: ListWorkspaceMembersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.members) {
+      WorkspaceMember.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterAccountId !== undefined) {
+      writer.uint32(18).string(message.nextAfterAccountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkspaceMembersResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkspaceMembersResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.members.push(WorkspaceMember.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterAccountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkspaceMembersResponse {
+    return {
+      members: globalThis.Array.isArray(object?.members)
+        ? object.members.map((e: any) => WorkspaceMember.fromJSON(e))
+        : [],
+      nextAfterAccountId: isSet(object.nextAfterAccountId) ? globalThis.String(object.nextAfterAccountId) : undefined,
+    };
+  },
+
+  toJSON(message: ListWorkspaceMembersResponse): unknown {
+    const obj: any = {};
+    if (message.members?.length) {
+      obj.members = message.members.map((e) => WorkspaceMember.toJSON(e));
+    }
+    if (message.nextAfterAccountId !== undefined) {
+      obj.nextAfterAccountId = message.nextAfterAccountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListWorkspaceMembersResponse>): ListWorkspaceMembersResponse {
+    return ListWorkspaceMembersResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListWorkspaceMembersResponse>): ListWorkspaceMembersResponse {
+    const message = createBaseListWorkspaceMembersResponse();
+    message.members = object.members?.map((e) => WorkspaceMember.fromPartial(e)) || [];
+    message.nextAfterAccountId = object.nextAfterAccountId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseWorkspaceMember(): WorkspaceMember {
+  return {
+    accountId: "",
+    accountKind: 0,
+    accountEnabled: false,
+    accountRevision: 0n,
+    tenantId: "",
+    workspaceId: "",
+    membershipRevision: 0n,
+  };
+}
+
+export const WorkspaceMember: MessageFns<WorkspaceMember> = {
+  encode(message: WorkspaceMember, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.accountKind !== 0) {
+      writer.uint32(16).int32(message.accountKind);
+    }
+    if (message.accountEnabled !== false) {
+      writer.uint32(24).bool(message.accountEnabled);
+    }
+    if (message.accountRevision !== 0n) {
+      if (BigInt.asUintN(64, message.accountRevision) !== message.accountRevision) {
+        throw new globalThis.Error("value provided for field message.accountRevision of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.accountRevision);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(42).string(message.tenantId);
+    }
+    if (message.workspaceId !== "") {
+      writer.uint32(50).string(message.workspaceId);
+    }
+    if (message.membershipRevision !== 0n) {
+      if (BigInt.asUintN(64, message.membershipRevision) !== message.membershipRevision) {
+        throw new globalThis.Error("value provided for field message.membershipRevision of type uint64 too large");
+      }
+      writer.uint32(56).uint64(message.membershipRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WorkspaceMember {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWorkspaceMember();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.accountKind = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.accountEnabled = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.accountRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.membershipRevision = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WorkspaceMember {
+    return {
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+      accountKind: isSet(object.accountKind) ? principalKindFromJSON(object.accountKind) : 0,
+      accountEnabled: isSet(object.accountEnabled) ? globalThis.Boolean(object.accountEnabled) : false,
+      accountRevision: isSet(object.accountRevision) ? BigInt(object.accountRevision) : 0n,
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      membershipRevision: isSet(object.membershipRevision) ? BigInt(object.membershipRevision) : 0n,
+    };
+  },
+
+  toJSON(message: WorkspaceMember): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.accountKind !== 0) {
+      obj.accountKind = principalKindToJSON(message.accountKind);
+    }
+    if (message.accountEnabled !== false) {
+      obj.accountEnabled = message.accountEnabled;
+    }
+    if (message.accountRevision !== 0n) {
+      obj.accountRevision = message.accountRevision.toString();
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.membershipRevision !== 0n) {
+      obj.membershipRevision = message.membershipRevision.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WorkspaceMember>): WorkspaceMember {
+    return WorkspaceMember.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WorkspaceMember>): WorkspaceMember {
+    const message = createBaseWorkspaceMember();
+    message.accountId = object.accountId ?? "";
+    message.accountKind = object.accountKind ?? 0;
+    message.accountEnabled = object.accountEnabled ?? false;
+    message.accountRevision = object.accountRevision ?? 0n;
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? "";
+    message.membershipRevision = object.membershipRevision ?? 0n;
+    return message;
+  },
+};
+
+function createBaseCreateGroupRequest(): CreateGroupRequest {
+  return { groupId: "", tenantId: "", workspaceId: undefined };
+}
+
+export const CreateGroupRequest: MessageFns<CreateGroupRequest> = {
+  encode(message: CreateGroupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateGroupRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateGroupRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateGroupRequest {
+    return {
+      groupId: isSet(object.groupId) ? globalThis.String(object.groupId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: CreateGroupRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateGroupRequest>): CreateGroupRequest {
+    return CreateGroupRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateGroupRequest>): CreateGroupRequest {
+    const message = createBaseCreateGroupRequest();
+    message.groupId = object.groupId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseDeleteGroupRequest(): DeleteGroupRequest {
+  return { groupId: "", tenantId: "", workspaceId: undefined };
+}
+
+export const DeleteGroupRequest: MessageFns<DeleteGroupRequest> = {
+  encode(message: DeleteGroupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteGroupRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteGroupRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteGroupRequest {
+    return {
+      groupId: isSet(object.groupId) ? globalThis.String(object.groupId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: DeleteGroupRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteGroupRequest>): DeleteGroupRequest {
+    return DeleteGroupRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteGroupRequest>): DeleteGroupRequest {
+    const message = createBaseDeleteGroupRequest();
+    message.groupId = object.groupId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseDeleteGroupResponse(): DeleteGroupResponse {
+  return {};
+}
+
+export const DeleteGroupResponse: MessageFns<DeleteGroupResponse> = {
+  encode(_: DeleteGroupResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteGroupResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteGroupResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): DeleteGroupResponse {
+    return {};
+  },
+
+  toJSON(_: DeleteGroupResponse): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteGroupResponse>): DeleteGroupResponse {
+    return DeleteGroupResponse.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<DeleteGroupResponse>): DeleteGroupResponse {
+    const message = createBaseDeleteGroupResponse();
+    return message;
+  },
+};
+
+function createBaseListGroupsRequest(): ListGroupsRequest {
+  return { tenantId: "", workspaceId: undefined, pageSize: 0, afterGroupId: undefined };
+}
+
+export const ListGroupsRequest: MessageFns<ListGroupsRequest> = {
+  encode(message: ListGroupsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(24).uint32(message.pageSize);
+    }
+    if (message.afterGroupId !== undefined) {
+      writer.uint32(34).string(message.afterGroupId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListGroupsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListGroupsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.afterGroupId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListGroupsRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterGroupId: isSet(object.afterGroupId) ? globalThis.String(object.afterGroupId) : undefined,
+    };
+  },
+
+  toJSON(message: ListGroupsRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterGroupId !== undefined) {
+      obj.afterGroupId = message.afterGroupId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListGroupsRequest>): ListGroupsRequest {
+    return ListGroupsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListGroupsRequest>): ListGroupsRequest {
+    const message = createBaseListGroupsRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.pageSize = object.pageSize ?? 0;
+    message.afterGroupId = object.afterGroupId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListGroupsResponse(): ListGroupsResponse {
+  return { groups: [], nextAfterGroupId: undefined };
+}
+
+export const ListGroupsResponse: MessageFns<ListGroupsResponse> = {
+  encode(message: ListGroupsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.groups) {
+      Group.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterGroupId !== undefined) {
+      writer.uint32(18).string(message.nextAfterGroupId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListGroupsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListGroupsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groups.push(Group.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterGroupId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListGroupsResponse {
+    return {
+      groups: globalThis.Array.isArray(object?.groups) ? object.groups.map((e: any) => Group.fromJSON(e)) : [],
+      nextAfterGroupId: isSet(object.nextAfterGroupId) ? globalThis.String(object.nextAfterGroupId) : undefined,
+    };
+  },
+
+  toJSON(message: ListGroupsResponse): unknown {
+    const obj: any = {};
+    if (message.groups?.length) {
+      obj.groups = message.groups.map((e) => Group.toJSON(e));
+    }
+    if (message.nextAfterGroupId !== undefined) {
+      obj.nextAfterGroupId = message.nextAfterGroupId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListGroupsResponse>): ListGroupsResponse {
+    return ListGroupsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListGroupsResponse>): ListGroupsResponse {
+    const message = createBaseListGroupsResponse();
+    message.groups = object.groups?.map((e) => Group.fromPartial(e)) || [];
+    message.nextAfterGroupId = object.nextAfterGroupId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGroup(): Group {
+  return { groupId: "", tenantId: "", workspaceId: undefined };
+}
+
+export const Group: MessageFns<Group> = {
+  encode(message: Group, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Group {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGroup();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Group {
+    return {
+      groupId: isSet(object.groupId) ? globalThis.String(object.groupId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: Group): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Group>): Group {
+    return Group.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Group>): Group {
+    const message = createBaseGroup();
+    message.groupId = object.groupId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseAddGroupMemberRequest(): AddGroupMemberRequest {
+  return { groupId: "", tenantId: "", workspaceId: undefined, principalId: "" };
+}
+
+export const AddGroupMemberRequest: MessageFns<AddGroupMemberRequest> = {
+  encode(message: AddGroupMemberRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    if (message.principalId !== "") {
+      writer.uint32(34).string(message.principalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AddGroupMemberRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAddGroupMemberRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AddGroupMemberRequest {
+    return {
+      groupId: isSet(object.groupId) ? globalThis.String(object.groupId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+    };
+  },
+
+  toJSON(message: AddGroupMemberRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AddGroupMemberRequest>): AddGroupMemberRequest {
+    return AddGroupMemberRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AddGroupMemberRequest>): AddGroupMemberRequest {
+    const message = createBaseAddGroupMemberRequest();
+    message.groupId = object.groupId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.principalId = object.principalId ?? "";
+    return message;
+  },
+};
+
+function createBaseRemoveGroupMemberRequest(): RemoveGroupMemberRequest {
+  return { groupId: "", tenantId: "", workspaceId: undefined, principalId: "" };
+}
+
+export const RemoveGroupMemberRequest: MessageFns<RemoveGroupMemberRequest> = {
+  encode(message: RemoveGroupMemberRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    if (message.principalId !== "") {
+      writer.uint32(34).string(message.principalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RemoveGroupMemberRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRemoveGroupMemberRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RemoveGroupMemberRequest {
+    return {
+      groupId: isSet(object.groupId) ? globalThis.String(object.groupId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+    };
+  },
+
+  toJSON(message: RemoveGroupMemberRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RemoveGroupMemberRequest>): RemoveGroupMemberRequest {
+    return RemoveGroupMemberRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RemoveGroupMemberRequest>): RemoveGroupMemberRequest {
+    const message = createBaseRemoveGroupMemberRequest();
+    message.groupId = object.groupId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.principalId = object.principalId ?? "";
+    return message;
+  },
+};
+
+function createBaseRemoveGroupMemberResponse(): RemoveGroupMemberResponse {
+  return {};
+}
+
+export const RemoveGroupMemberResponse: MessageFns<RemoveGroupMemberResponse> = {
+  encode(_: RemoveGroupMemberResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RemoveGroupMemberResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRemoveGroupMemberResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): RemoveGroupMemberResponse {
+    return {};
+  },
+
+  toJSON(_: RemoveGroupMemberResponse): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<RemoveGroupMemberResponse>): RemoveGroupMemberResponse {
+    return RemoveGroupMemberResponse.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<RemoveGroupMemberResponse>): RemoveGroupMemberResponse {
+    const message = createBaseRemoveGroupMemberResponse();
+    return message;
+  },
+};
+
+function createBaseListGroupMembersRequest(): ListGroupMembersRequest {
+  return { groupId: "", tenantId: "", workspaceId: undefined, pageSize: 0, afterPrincipalId: undefined };
+}
+
+export const ListGroupMembersRequest: MessageFns<ListGroupMembersRequest> = {
+  encode(message: ListGroupMembersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(32).uint32(message.pageSize);
+    }
+    if (message.afterPrincipalId !== undefined) {
+      writer.uint32(42).string(message.afterPrincipalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListGroupMembersRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListGroupMembersRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.afterPrincipalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListGroupMembersRequest {
+    return {
+      groupId: isSet(object.groupId) ? globalThis.String(object.groupId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterPrincipalId: isSet(object.afterPrincipalId) ? globalThis.String(object.afterPrincipalId) : undefined,
+    };
+  },
+
+  toJSON(message: ListGroupMembersRequest): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterPrincipalId !== undefined) {
+      obj.afterPrincipalId = message.afterPrincipalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListGroupMembersRequest>): ListGroupMembersRequest {
+    return ListGroupMembersRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListGroupMembersRequest>): ListGroupMembersRequest {
+    const message = createBaseListGroupMembersRequest();
+    message.groupId = object.groupId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.pageSize = object.pageSize ?? 0;
+    message.afterPrincipalId = object.afterPrincipalId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListGroupMembersResponse(): ListGroupMembersResponse {
+  return { members: [], nextAfterPrincipalId: undefined };
+}
+
+export const ListGroupMembersResponse: MessageFns<ListGroupMembersResponse> = {
+  encode(message: ListGroupMembersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.members) {
+      GroupMember.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterPrincipalId !== undefined) {
+      writer.uint32(18).string(message.nextAfterPrincipalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListGroupMembersResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListGroupMembersResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.members.push(GroupMember.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterPrincipalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListGroupMembersResponse {
+    return {
+      members: globalThis.Array.isArray(object?.members) ? object.members.map((e: any) => GroupMember.fromJSON(e)) : [],
+      nextAfterPrincipalId: isSet(object.nextAfterPrincipalId)
+        ? globalThis.String(object.nextAfterPrincipalId)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ListGroupMembersResponse): unknown {
+    const obj: any = {};
+    if (message.members?.length) {
+      obj.members = message.members.map((e) => GroupMember.toJSON(e));
+    }
+    if (message.nextAfterPrincipalId !== undefined) {
+      obj.nextAfterPrincipalId = message.nextAfterPrincipalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListGroupMembersResponse>): ListGroupMembersResponse {
+    return ListGroupMembersResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListGroupMembersResponse>): ListGroupMembersResponse {
+    const message = createBaseListGroupMembersResponse();
+    message.members = object.members?.map((e) => GroupMember.fromPartial(e)) || [];
+    message.nextAfterPrincipalId = object.nextAfterPrincipalId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGroupMember(): GroupMember {
+  return { groupId: "", principalId: "", principalKind: 0, tenantId: "", workspaceId: undefined };
+}
+
+export const GroupMember: MessageFns<GroupMember> = {
+  encode(message: GroupMember, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.principalId !== "") {
+      writer.uint32(18).string(message.principalId);
+    }
+    if (message.principalKind !== 0) {
+      writer.uint32(24).int32(message.principalKind);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(34).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(42).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GroupMember {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGroupMember();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.groupId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.principalKind = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GroupMember {
+    return {
+      groupId: isSet(object.groupId) ? globalThis.String(object.groupId) : "",
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      principalKind: isSet(object.principalKind) ? principalKindFromJSON(object.principalKind) : 0,
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: GroupMember): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.principalKind !== 0) {
+      obj.principalKind = principalKindToJSON(message.principalKind);
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GroupMember>): GroupMember {
+    return GroupMember.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GroupMember>): GroupMember {
+    const message = createBaseGroupMember();
+    message.groupId = object.groupId ?? "";
+    message.principalId = object.principalId ?? "";
+    message.principalKind = object.principalKind ?? 0;
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseCreateVirtualPrincipalRequest(): CreateVirtualPrincipalRequest {
+  return { principalId: "", subjectAccountId: "", tenantId: "", workspaceId: undefined };
+}
+
+export const CreateVirtualPrincipalRequest: MessageFns<CreateVirtualPrincipalRequest> = {
+  encode(message: CreateVirtualPrincipalRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.subjectAccountId !== "") {
+      writer.uint32(18).string(message.subjectAccountId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(26).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(34).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateVirtualPrincipalRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateVirtualPrincipalRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.subjectAccountId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateVirtualPrincipalRequest {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      subjectAccountId: isSet(object.subjectAccountId) ? globalThis.String(object.subjectAccountId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: CreateVirtualPrincipalRequest): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.subjectAccountId !== "") {
+      obj.subjectAccountId = message.subjectAccountId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateVirtualPrincipalRequest>): CreateVirtualPrincipalRequest {
+    return CreateVirtualPrincipalRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateVirtualPrincipalRequest>): CreateVirtualPrincipalRequest {
+    const message = createBaseCreateVirtualPrincipalRequest();
+    message.principalId = object.principalId ?? "";
+    message.subjectAccountId = object.subjectAccountId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGetVirtualPrincipalRequest(): GetVirtualPrincipalRequest {
+  return { principalId: "", tenantId: "", workspaceId: undefined };
+}
+
+export const GetVirtualPrincipalRequest: MessageFns<GetVirtualPrincipalRequest> = {
+  encode(message: GetVirtualPrincipalRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetVirtualPrincipalRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetVirtualPrincipalRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetVirtualPrincipalRequest {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: GetVirtualPrincipalRequest): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetVirtualPrincipalRequest>): GetVirtualPrincipalRequest {
+    return GetVirtualPrincipalRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetVirtualPrincipalRequest>): GetVirtualPrincipalRequest {
+    const message = createBaseGetVirtualPrincipalRequest();
+    message.principalId = object.principalId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListVirtualPrincipalsRequest(): ListVirtualPrincipalsRequest {
+  return { tenantId: "", workspaceId: undefined, pageSize: 0, afterPrincipalId: undefined };
+}
+
+export const ListVirtualPrincipalsRequest: MessageFns<ListVirtualPrincipalsRequest> = {
+  encode(message: ListVirtualPrincipalsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(24).uint32(message.pageSize);
+    }
+    if (message.afterPrincipalId !== undefined) {
+      writer.uint32(34).string(message.afterPrincipalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListVirtualPrincipalsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListVirtualPrincipalsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.afterPrincipalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListVirtualPrincipalsRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterPrincipalId: isSet(object.afterPrincipalId) ? globalThis.String(object.afterPrincipalId) : undefined,
+    };
+  },
+
+  toJSON(message: ListVirtualPrincipalsRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterPrincipalId !== undefined) {
+      obj.afterPrincipalId = message.afterPrincipalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListVirtualPrincipalsRequest>): ListVirtualPrincipalsRequest {
+    return ListVirtualPrincipalsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListVirtualPrincipalsRequest>): ListVirtualPrincipalsRequest {
+    const message = createBaseListVirtualPrincipalsRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.pageSize = object.pageSize ?? 0;
+    message.afterPrincipalId = object.afterPrincipalId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListVirtualPrincipalsResponse(): ListVirtualPrincipalsResponse {
+  return { principals: [], nextAfterPrincipalId: undefined };
+}
+
+export const ListVirtualPrincipalsResponse: MessageFns<ListVirtualPrincipalsResponse> = {
+  encode(message: ListVirtualPrincipalsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.principals) {
+      VirtualPrincipal.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterPrincipalId !== undefined) {
+      writer.uint32(18).string(message.nextAfterPrincipalId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListVirtualPrincipalsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListVirtualPrincipalsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principals.push(VirtualPrincipal.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterPrincipalId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListVirtualPrincipalsResponse {
+    return {
+      principals: globalThis.Array.isArray(object?.principals)
+        ? object.principals.map((e: any) => VirtualPrincipal.fromJSON(e))
+        : [],
+      nextAfterPrincipalId: isSet(object.nextAfterPrincipalId)
+        ? globalThis.String(object.nextAfterPrincipalId)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ListVirtualPrincipalsResponse): unknown {
+    const obj: any = {};
+    if (message.principals?.length) {
+      obj.principals = message.principals.map((e) => VirtualPrincipal.toJSON(e));
+    }
+    if (message.nextAfterPrincipalId !== undefined) {
+      obj.nextAfterPrincipalId = message.nextAfterPrincipalId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListVirtualPrincipalsResponse>): ListVirtualPrincipalsResponse {
+    return ListVirtualPrincipalsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListVirtualPrincipalsResponse>): ListVirtualPrincipalsResponse {
+    const message = createBaseListVirtualPrincipalsResponse();
+    message.principals = object.principals?.map((e) => VirtualPrincipal.fromPartial(e)) || [];
+    message.nextAfterPrincipalId = object.nextAfterPrincipalId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseSetVirtualPrincipalEnabledRequest(): SetVirtualPrincipalEnabledRequest {
+  return { principalId: "", tenantId: "", workspaceId: undefined, expectedRevision: 0n, enabled: false };
+}
+
+export const SetVirtualPrincipalEnabledRequest: MessageFns<SetVirtualPrincipalEnabledRequest> = {
+  encode(message: SetVirtualPrincipalEnabledRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(18).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(26).string(message.workspaceId);
+    }
+    if (message.expectedRevision !== 0n) {
+      if (BigInt.asUintN(64, message.expectedRevision) !== message.expectedRevision) {
+        throw new globalThis.Error("value provided for field message.expectedRevision of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.expectedRevision);
+    }
+    if (message.enabled !== false) {
+      writer.uint32(40).bool(message.enabled);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetVirtualPrincipalEnabledRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetVirtualPrincipalEnabledRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.expectedRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.enabled = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetVirtualPrincipalEnabledRequest {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+      expectedRevision: isSet(object.expectedRevision) ? BigInt(object.expectedRevision) : 0n,
+      enabled: isSet(object.enabled) ? globalThis.Boolean(object.enabled) : false,
+    };
+  },
+
+  toJSON(message: SetVirtualPrincipalEnabledRequest): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.expectedRevision !== 0n) {
+      obj.expectedRevision = message.expectedRevision.toString();
+    }
+    if (message.enabled !== false) {
+      obj.enabled = message.enabled;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetVirtualPrincipalEnabledRequest>): SetVirtualPrincipalEnabledRequest {
+    return SetVirtualPrincipalEnabledRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SetVirtualPrincipalEnabledRequest>): SetVirtualPrincipalEnabledRequest {
+    const message = createBaseSetVirtualPrincipalEnabledRequest();
+    message.principalId = object.principalId ?? "";
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    message.expectedRevision = object.expectedRevision ?? 0n;
+    message.enabled = object.enabled ?? false;
+    return message;
+  },
+};
+
+function createBaseVirtualPrincipal(): VirtualPrincipal {
+  return { principalId: "", subjectAccountId: "", enabled: false, revision: 0n, tenantId: "", workspaceId: undefined };
+}
+
+export const VirtualPrincipal: MessageFns<VirtualPrincipal> = {
+  encode(message: VirtualPrincipal, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.principalId !== "") {
+      writer.uint32(10).string(message.principalId);
+    }
+    if (message.subjectAccountId !== "") {
+      writer.uint32(18).string(message.subjectAccountId);
+    }
+    if (message.enabled !== false) {
+      writer.uint32(24).bool(message.enabled);
+    }
+    if (message.revision !== 0n) {
+      if (BigInt.asUintN(64, message.revision) !== message.revision) {
+        throw new globalThis.Error("value provided for field message.revision of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.revision);
+    }
+    if (message.tenantId !== "") {
+      writer.uint32(42).string(message.tenantId);
+    }
+    if (message.workspaceId !== undefined) {
+      writer.uint32(50).string(message.workspaceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): VirtualPrincipal {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseVirtualPrincipal();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.principalId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.subjectAccountId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.enabled = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.revision = reader.uint64() as bigint;
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): VirtualPrincipal {
+    return {
+      principalId: isSet(object.principalId) ? globalThis.String(object.principalId) : "",
+      subjectAccountId: isSet(object.subjectAccountId) ? globalThis.String(object.subjectAccountId) : "",
+      enabled: isSet(object.enabled) ? globalThis.Boolean(object.enabled) : false,
+      revision: isSet(object.revision) ? BigInt(object.revision) : 0n,
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : undefined,
+    };
+  },
+
+  toJSON(message: VirtualPrincipal): unknown {
+    const obj: any = {};
+    if (message.principalId !== "") {
+      obj.principalId = message.principalId;
+    }
+    if (message.subjectAccountId !== "") {
+      obj.subjectAccountId = message.subjectAccountId;
+    }
+    if (message.enabled !== false) {
+      obj.enabled = message.enabled;
+    }
+    if (message.revision !== 0n) {
+      obj.revision = message.revision.toString();
+    }
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== undefined) {
+      obj.workspaceId = message.workspaceId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<VirtualPrincipal>): VirtualPrincipal {
+    return VirtualPrincipal.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<VirtualPrincipal>): VirtualPrincipal {
+    const message = createBaseVirtualPrincipal();
+    message.principalId = object.principalId ?? "";
+    message.subjectAccountId = object.subjectAccountId ?? "";
+    message.enabled = object.enabled ?? false;
+    message.revision = object.revision ?? 0n;
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseCreateExternalIdentityLinkRequest(): CreateExternalIdentityLinkRequest {
+  return { tenantId: "", providerId: "", providerSubject: "", accountId: "" };
+}
+
+export const CreateExternalIdentityLinkRequest: MessageFns<CreateExternalIdentityLinkRequest> = {
+  encode(message: CreateExternalIdentityLinkRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.providerSubject !== "") {
+      writer.uint32(26).string(message.providerSubject);
+    }
+    if (message.accountId !== "") {
+      writer.uint32(34).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateExternalIdentityLinkRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateExternalIdentityLinkRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.providerSubject = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateExternalIdentityLinkRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      providerSubject: isSet(object.providerSubject) ? globalThis.String(object.providerSubject) : "",
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+    };
+  },
+
+  toJSON(message: CreateExternalIdentityLinkRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.providerSubject !== "") {
+      obj.providerSubject = message.providerSubject;
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateExternalIdentityLinkRequest>): CreateExternalIdentityLinkRequest {
+    return CreateExternalIdentityLinkRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateExternalIdentityLinkRequest>): CreateExternalIdentityLinkRequest {
+    const message = createBaseCreateExternalIdentityLinkRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.providerSubject = object.providerSubject ?? "";
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseDeleteExternalIdentityLinkRequest(): DeleteExternalIdentityLinkRequest {
+  return { tenantId: "", providerId: "", providerSubject: "" };
+}
+
+export const DeleteExternalIdentityLinkRequest: MessageFns<DeleteExternalIdentityLinkRequest> = {
+  encode(message: DeleteExternalIdentityLinkRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.providerSubject !== "") {
+      writer.uint32(26).string(message.providerSubject);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteExternalIdentityLinkRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteExternalIdentityLinkRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.providerSubject = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteExternalIdentityLinkRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      providerSubject: isSet(object.providerSubject) ? globalThis.String(object.providerSubject) : "",
+    };
+  },
+
+  toJSON(message: DeleteExternalIdentityLinkRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.providerSubject !== "") {
+      obj.providerSubject = message.providerSubject;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteExternalIdentityLinkRequest>): DeleteExternalIdentityLinkRequest {
+    return DeleteExternalIdentityLinkRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteExternalIdentityLinkRequest>): DeleteExternalIdentityLinkRequest {
+    const message = createBaseDeleteExternalIdentityLinkRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.providerSubject = object.providerSubject ?? "";
+    return message;
+  },
+};
+
+function createBaseDeleteExternalIdentityLinkResponse(): DeleteExternalIdentityLinkResponse {
+  return {};
+}
+
+export const DeleteExternalIdentityLinkResponse: MessageFns<DeleteExternalIdentityLinkResponse> = {
+  encode(_: DeleteExternalIdentityLinkResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteExternalIdentityLinkResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteExternalIdentityLinkResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): DeleteExternalIdentityLinkResponse {
+    return {};
+  },
+
+  toJSON(_: DeleteExternalIdentityLinkResponse): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteExternalIdentityLinkResponse>): DeleteExternalIdentityLinkResponse {
+    return DeleteExternalIdentityLinkResponse.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<DeleteExternalIdentityLinkResponse>): DeleteExternalIdentityLinkResponse {
+    const message = createBaseDeleteExternalIdentityLinkResponse();
+    return message;
+  },
+};
+
+function createBaseListExternalIdentityLinksRequest(): ListExternalIdentityLinksRequest {
+  return { tenantId: "", providerId: "", pageSize: 0, afterProviderSubject: undefined };
+}
+
+export const ListExternalIdentityLinksRequest: MessageFns<ListExternalIdentityLinksRequest> = {
+  encode(message: ListExternalIdentityLinksRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(24).uint32(message.pageSize);
+    }
+    if (message.afterProviderSubject !== undefined) {
+      writer.uint32(34).string(message.afterProviderSubject);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListExternalIdentityLinksRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListExternalIdentityLinksRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.afterProviderSubject = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListExternalIdentityLinksRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterProviderSubject: isSet(object.afterProviderSubject)
+        ? globalThis.String(object.afterProviderSubject)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ListExternalIdentityLinksRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterProviderSubject !== undefined) {
+      obj.afterProviderSubject = message.afterProviderSubject;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListExternalIdentityLinksRequest>): ListExternalIdentityLinksRequest {
+    return ListExternalIdentityLinksRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListExternalIdentityLinksRequest>): ListExternalIdentityLinksRequest {
+    const message = createBaseListExternalIdentityLinksRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.pageSize = object.pageSize ?? 0;
+    message.afterProviderSubject = object.afterProviderSubject ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListExternalIdentityLinksResponse(): ListExternalIdentityLinksResponse {
+  return { links: [], nextAfterProviderSubject: undefined };
+}
+
+export const ListExternalIdentityLinksResponse: MessageFns<ListExternalIdentityLinksResponse> = {
+  encode(message: ListExternalIdentityLinksResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.links) {
+      ExternalIdentityLink.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterProviderSubject !== undefined) {
+      writer.uint32(18).string(message.nextAfterProviderSubject);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListExternalIdentityLinksResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListExternalIdentityLinksResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.links.push(ExternalIdentityLink.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterProviderSubject = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListExternalIdentityLinksResponse {
+    return {
+      links: globalThis.Array.isArray(object?.links)
+        ? object.links.map((e: any) => ExternalIdentityLink.fromJSON(e))
+        : [],
+      nextAfterProviderSubject: isSet(object.nextAfterProviderSubject)
+        ? globalThis.String(object.nextAfterProviderSubject)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ListExternalIdentityLinksResponse): unknown {
+    const obj: any = {};
+    if (message.links?.length) {
+      obj.links = message.links.map((e) => ExternalIdentityLink.toJSON(e));
+    }
+    if (message.nextAfterProviderSubject !== undefined) {
+      obj.nextAfterProviderSubject = message.nextAfterProviderSubject;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListExternalIdentityLinksResponse>): ListExternalIdentityLinksResponse {
+    return ListExternalIdentityLinksResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListExternalIdentityLinksResponse>): ListExternalIdentityLinksResponse {
+    const message = createBaseListExternalIdentityLinksResponse();
+    message.links = object.links?.map((e) => ExternalIdentityLink.fromPartial(e)) || [];
+    message.nextAfterProviderSubject = object.nextAfterProviderSubject ?? undefined;
+    return message;
+  },
+};
+
+function createBaseExternalIdentityLink(): ExternalIdentityLink {
+  return { tenantId: "", providerId: "", providerSubject: "", accountId: "", revision: 0n };
+}
+
+export const ExternalIdentityLink: MessageFns<ExternalIdentityLink> = {
+  encode(message: ExternalIdentityLink, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.providerSubject !== "") {
+      writer.uint32(26).string(message.providerSubject);
+    }
+    if (message.accountId !== "") {
+      writer.uint32(34).string(message.accountId);
+    }
+    if (message.revision !== 0n) {
+      if (BigInt.asUintN(64, message.revision) !== message.revision) {
+        throw new globalThis.Error("value provided for field message.revision of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.revision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExternalIdentityLink {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExternalIdentityLink();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.providerSubject = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.accountId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.revision = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExternalIdentityLink {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      providerSubject: isSet(object.providerSubject) ? globalThis.String(object.providerSubject) : "",
+      accountId: isSet(object.accountId) ? globalThis.String(object.accountId) : "",
+      revision: isSet(object.revision) ? BigInt(object.revision) : 0n,
+    };
+  },
+
+  toJSON(message: ExternalIdentityLink): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.providerSubject !== "") {
+      obj.providerSubject = message.providerSubject;
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.revision !== 0n) {
+      obj.revision = message.revision.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExternalIdentityLink>): ExternalIdentityLink {
+    return ExternalIdentityLink.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExternalIdentityLink>): ExternalIdentityLink {
+    const message = createBaseExternalIdentityLink();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.providerSubject = object.providerSubject ?? "";
+    message.accountId = object.accountId ?? "";
+    message.revision = object.revision ?? 0n;
+    return message;
+  },
+};
+
+function createBaseCreateLoginProviderRequest(): CreateLoginProviderRequest {
+  return {
+    tenantId: "",
+    providerId: "",
+    displayName: "",
+    configurationId: "",
+    configurationVersionId: "",
+    secretId: "",
+    secretVersionId: "",
+  };
+}
+
+export const CreateLoginProviderRequest: MessageFns<CreateLoginProviderRequest> = {
+  encode(message: CreateLoginProviderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(26).string(message.displayName);
+    }
+    if (message.configurationId !== "") {
+      writer.uint32(34).string(message.configurationId);
+    }
+    if (message.configurationVersionId !== "") {
+      writer.uint32(42).string(message.configurationVersionId);
+    }
+    if (message.secretId !== "") {
+      writer.uint32(50).string(message.secretId);
+    }
+    if (message.secretVersionId !== "") {
+      writer.uint32(58).string(message.secretVersionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateLoginProviderRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateLoginProviderRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.configurationId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.configurationVersionId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.secretId = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.secretVersionId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateLoginProviderRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+      configurationId: isSet(object.configurationId) ? globalThis.String(object.configurationId) : "",
+      configurationVersionId: isSet(object.configurationVersionId)
+        ? globalThis.String(object.configurationVersionId)
+        : "",
+      secretId: isSet(object.secretId) ? globalThis.String(object.secretId) : "",
+      secretVersionId: isSet(object.secretVersionId) ? globalThis.String(object.secretVersionId) : "",
+    };
+  },
+
+  toJSON(message: CreateLoginProviderRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.configurationId !== "") {
+      obj.configurationId = message.configurationId;
+    }
+    if (message.configurationVersionId !== "") {
+      obj.configurationVersionId = message.configurationVersionId;
+    }
+    if (message.secretId !== "") {
+      obj.secretId = message.secretId;
+    }
+    if (message.secretVersionId !== "") {
+      obj.secretVersionId = message.secretVersionId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateLoginProviderRequest>): CreateLoginProviderRequest {
+    return CreateLoginProviderRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateLoginProviderRequest>): CreateLoginProviderRequest {
+    const message = createBaseCreateLoginProviderRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.displayName = object.displayName ?? "";
+    message.configurationId = object.configurationId ?? "";
+    message.configurationVersionId = object.configurationVersionId ?? "";
+    message.secretId = object.secretId ?? "";
+    message.secretVersionId = object.secretVersionId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetLoginProviderRequest(): GetLoginProviderRequest {
+  return { tenantId: "", providerId: "" };
+}
+
+export const GetLoginProviderRequest: MessageFns<GetLoginProviderRequest> = {
+  encode(message: GetLoginProviderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetLoginProviderRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetLoginProviderRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): GetLoginProviderRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+    };
+  },
+
+  toJSON(message: GetLoginProviderRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetLoginProviderRequest>): GetLoginProviderRequest {
+    return GetLoginProviderRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetLoginProviderRequest>): GetLoginProviderRequest {
+    const message = createBaseGetLoginProviderRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    return message;
+  },
+};
+
+function createBaseListLoginProvidersRequest(): ListLoginProvidersRequest {
+  return { tenantId: "", pageSize: 0, afterProviderId: undefined };
+}
+
+export const ListLoginProvidersRequest: MessageFns<ListLoginProvidersRequest> = {
+  encode(message: ListLoginProvidersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(16).uint32(message.pageSize);
+    }
+    if (message.afterProviderId !== undefined) {
+      writer.uint32(26).string(message.afterProviderId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListLoginProvidersRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListLoginProvidersRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.afterProviderId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListLoginProvidersRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterProviderId: isSet(object.afterProviderId) ? globalThis.String(object.afterProviderId) : undefined,
+    };
+  },
+
+  toJSON(message: ListLoginProvidersRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterProviderId !== undefined) {
+      obj.afterProviderId = message.afterProviderId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListLoginProvidersRequest>): ListLoginProvidersRequest {
+    return ListLoginProvidersRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListLoginProvidersRequest>): ListLoginProvidersRequest {
+    const message = createBaseListLoginProvidersRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.pageSize = object.pageSize ?? 0;
+    message.afterProviderId = object.afterProviderId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListLoginProvidersResponse(): ListLoginProvidersResponse {
+  return { providers: [], nextAfterProviderId: undefined };
+}
+
+export const ListLoginProvidersResponse: MessageFns<ListLoginProvidersResponse> = {
+  encode(message: ListLoginProvidersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.providers) {
+      LoginProvider.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterProviderId !== undefined) {
+      writer.uint32(18).string(message.nextAfterProviderId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListLoginProvidersResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListLoginProvidersResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.providers.push(LoginProvider.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterProviderId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListLoginProvidersResponse {
+    return {
+      providers: globalThis.Array.isArray(object?.providers)
+        ? object.providers.map((e: any) => LoginProvider.fromJSON(e))
+        : [],
+      nextAfterProviderId: isSet(object.nextAfterProviderId)
+        ? globalThis.String(object.nextAfterProviderId)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ListLoginProvidersResponse): unknown {
+    const obj: any = {};
+    if (message.providers?.length) {
+      obj.providers = message.providers.map((e) => LoginProvider.toJSON(e));
+    }
+    if (message.nextAfterProviderId !== undefined) {
+      obj.nextAfterProviderId = message.nextAfterProviderId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListLoginProvidersResponse>): ListLoginProvidersResponse {
+    return ListLoginProvidersResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ListLoginProvidersResponse>): ListLoginProvidersResponse {
+    const message = createBaseListLoginProvidersResponse();
+    message.providers = object.providers?.map((e) => LoginProvider.fromPartial(e)) || [];
+    message.nextAfterProviderId = object.nextAfterProviderId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateLoginProviderRequest(): UpdateLoginProviderRequest {
+  return {
+    tenantId: "",
+    providerId: "",
+    expectedRevision: 0n,
+    displayName: "",
+    configurationId: "",
+    configurationVersionId: "",
+    secretId: "",
+    secretVersionId: "",
+  };
+}
+
+export const UpdateLoginProviderRequest: MessageFns<UpdateLoginProviderRequest> = {
+  encode(message: UpdateLoginProviderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.expectedRevision !== 0n) {
+      if (BigInt.asUintN(64, message.expectedRevision) !== message.expectedRevision) {
+        throw new globalThis.Error("value provided for field message.expectedRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.expectedRevision);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(34).string(message.displayName);
+    }
+    if (message.configurationId !== "") {
+      writer.uint32(42).string(message.configurationId);
+    }
+    if (message.configurationVersionId !== "") {
+      writer.uint32(50).string(message.configurationVersionId);
+    }
+    if (message.secretId !== "") {
+      writer.uint32(58).string(message.secretId);
+    }
+    if (message.secretVersionId !== "") {
+      writer.uint32(66).string(message.secretVersionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateLoginProviderRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateLoginProviderRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.expectedRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.configurationId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.configurationVersionId = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.secretId = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.secretVersionId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateLoginProviderRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      expectedRevision: isSet(object.expectedRevision) ? BigInt(object.expectedRevision) : 0n,
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+      configurationId: isSet(object.configurationId) ? globalThis.String(object.configurationId) : "",
+      configurationVersionId: isSet(object.configurationVersionId)
+        ? globalThis.String(object.configurationVersionId)
+        : "",
+      secretId: isSet(object.secretId) ? globalThis.String(object.secretId) : "",
+      secretVersionId: isSet(object.secretVersionId) ? globalThis.String(object.secretVersionId) : "",
+    };
+  },
+
+  toJSON(message: UpdateLoginProviderRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.expectedRevision !== 0n) {
+      obj.expectedRevision = message.expectedRevision.toString();
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.configurationId !== "") {
+      obj.configurationId = message.configurationId;
+    }
+    if (message.configurationVersionId !== "") {
+      obj.configurationVersionId = message.configurationVersionId;
+    }
+    if (message.secretId !== "") {
+      obj.secretId = message.secretId;
+    }
+    if (message.secretVersionId !== "") {
+      obj.secretVersionId = message.secretVersionId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateLoginProviderRequest>): UpdateLoginProviderRequest {
+    return UpdateLoginProviderRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateLoginProviderRequest>): UpdateLoginProviderRequest {
+    const message = createBaseUpdateLoginProviderRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.expectedRevision = object.expectedRevision ?? 0n;
+    message.displayName = object.displayName ?? "";
+    message.configurationId = object.configurationId ?? "";
+    message.configurationVersionId = object.configurationVersionId ?? "";
+    message.secretId = object.secretId ?? "";
+    message.secretVersionId = object.secretVersionId ?? "";
+    return message;
+  },
+};
+
+function createBaseSetLoginProviderStateRequest(): SetLoginProviderStateRequest {
+  return { tenantId: "", providerId: "", expectedRevision: 0n, state: 0 };
+}
+
+export const SetLoginProviderStateRequest: MessageFns<SetLoginProviderStateRequest> = {
+  encode(message: SetLoginProviderStateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.expectedRevision !== 0n) {
+      if (BigInt.asUintN(64, message.expectedRevision) !== message.expectedRevision) {
+        throw new globalThis.Error("value provided for field message.expectedRevision of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.expectedRevision);
+    }
+    if (message.state !== 0) {
+      writer.uint32(32).int32(message.state);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetLoginProviderStateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetLoginProviderStateRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.expectedRevision = reader.uint64() as bigint;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.state = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetLoginProviderStateRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      expectedRevision: isSet(object.expectedRevision) ? BigInt(object.expectedRevision) : 0n,
+      state: isSet(object.state) ? loginProviderStateFromJSON(object.state) : 0,
+    };
+  },
+
+  toJSON(message: SetLoginProviderStateRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.expectedRevision !== 0n) {
+      obj.expectedRevision = message.expectedRevision.toString();
+    }
+    if (message.state !== 0) {
+      obj.state = loginProviderStateToJSON(message.state);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetLoginProviderStateRequest>): SetLoginProviderStateRequest {
+    return SetLoginProviderStateRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SetLoginProviderStateRequest>): SetLoginProviderStateRequest {
+    const message = createBaseSetLoginProviderStateRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.expectedRevision = object.expectedRevision ?? 0n;
+    message.state = object.state ?? 0;
+    return message;
+  },
+};
+
+function createBaseLoginProvider(): LoginProvider {
+  return {
+    tenantId: "",
+    providerId: "",
+    displayName: "",
+    configurationId: "",
+    configurationVersionId: "",
+    secretId: "",
+    secretVersionId: "",
+    state: 0,
+    revision: 0n,
+  };
+}
+
+export const LoginProvider: MessageFns<LoginProvider> = {
+  encode(message: LoginProvider, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(18).string(message.providerId);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(26).string(message.displayName);
+    }
+    if (message.configurationId !== "") {
+      writer.uint32(34).string(message.configurationId);
+    }
+    if (message.configurationVersionId !== "") {
+      writer.uint32(42).string(message.configurationVersionId);
+    }
+    if (message.secretId !== "") {
+      writer.uint32(50).string(message.secretId);
+    }
+    if (message.secretVersionId !== "") {
+      writer.uint32(58).string(message.secretVersionId);
+    }
+    if (message.state !== 0) {
+      writer.uint32(64).int32(message.state);
+    }
+    if (message.revision !== 0n) {
+      if (BigInt.asUintN(64, message.revision) !== message.revision) {
+        throw new globalThis.Error("value provided for field message.revision of type uint64 too large");
+      }
+      writer.uint32(72).uint64(message.revision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LoginProvider {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLoginProvider();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.configurationId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.configurationVersionId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.secretId = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.secretVersionId = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.state = reader.int32() as any;
+          continue;
+        }
+        case 9: {
+          if (tag !== 72) {
+            break;
+          }
+
+          message.revision = reader.uint64() as bigint;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LoginProvider {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      displayName: isSet(object.displayName) ? globalThis.String(object.displayName) : "",
+      configurationId: isSet(object.configurationId) ? globalThis.String(object.configurationId) : "",
+      configurationVersionId: isSet(object.configurationVersionId)
+        ? globalThis.String(object.configurationVersionId)
+        : "",
+      secretId: isSet(object.secretId) ? globalThis.String(object.secretId) : "",
+      secretVersionId: isSet(object.secretVersionId) ? globalThis.String(object.secretVersionId) : "",
+      state: isSet(object.state) ? loginProviderStateFromJSON(object.state) : 0,
+      revision: isSet(object.revision) ? BigInt(object.revision) : 0n,
+    };
+  },
+
+  toJSON(message: LoginProvider): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.configurationId !== "") {
+      obj.configurationId = message.configurationId;
+    }
+    if (message.configurationVersionId !== "") {
+      obj.configurationVersionId = message.configurationVersionId;
+    }
+    if (message.secretId !== "") {
+      obj.secretId = message.secretId;
+    }
+    if (message.secretVersionId !== "") {
+      obj.secretVersionId = message.secretVersionId;
+    }
+    if (message.state !== 0) {
+      obj.state = loginProviderStateToJSON(message.state);
+    }
+    if (message.revision !== 0n) {
+      obj.revision = message.revision.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<LoginProvider>): LoginProvider {
+    return LoginProvider.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<LoginProvider>): LoginProvider {
+    const message = createBaseLoginProvider();
+    message.tenantId = object.tenantId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.displayName = object.displayName ?? "";
+    message.configurationId = object.configurationId ?? "";
+    message.configurationVersionId = object.configurationVersionId ?? "";
+    message.secretId = object.secretId ?? "";
+    message.secretVersionId = object.secretVersionId ?? "";
+    message.state = object.state ?? 0;
+    message.revision = object.revision ?? 0n;
+    return message;
+  },
+};
+
+function createBaseSetWorkspaceLoginProviderAdmissionRequest(): SetWorkspaceLoginProviderAdmissionRequest {
+  return { tenantId: "", workspaceId: "", providerId: "", admitted: false };
+}
+
+export const SetWorkspaceLoginProviderAdmissionRequest: MessageFns<SetWorkspaceLoginProviderAdmissionRequest> = {
+  encode(message: SetWorkspaceLoginProviderAdmissionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== "") {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(26).string(message.providerId);
+    }
+    if (message.admitted !== false) {
+      writer.uint32(32).bool(message.admitted);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetWorkspaceLoginProviderAdmissionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetWorkspaceLoginProviderAdmissionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.admitted = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetWorkspaceLoginProviderAdmissionRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+      admitted: isSet(object.admitted) ? globalThis.Boolean(object.admitted) : false,
+    };
+  },
+
+  toJSON(message: SetWorkspaceLoginProviderAdmissionRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.admitted !== false) {
+      obj.admitted = message.admitted;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetWorkspaceLoginProviderAdmissionRequest>): SetWorkspaceLoginProviderAdmissionRequest {
+    return SetWorkspaceLoginProviderAdmissionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<SetWorkspaceLoginProviderAdmissionRequest>,
+  ): SetWorkspaceLoginProviderAdmissionRequest {
+    const message = createBaseSetWorkspaceLoginProviderAdmissionRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.admitted = object.admitted ?? false;
+    return message;
+  },
+};
+
+function createBaseSetWorkspaceLoginProviderAdmissionResponse(): SetWorkspaceLoginProviderAdmissionResponse {
+  return { admission: undefined };
+}
+
+export const SetWorkspaceLoginProviderAdmissionResponse: MessageFns<SetWorkspaceLoginProviderAdmissionResponse> = {
+  encode(message: SetWorkspaceLoginProviderAdmissionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.admission !== undefined) {
+      WorkspaceLoginProviderAdmission.encode(message.admission, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetWorkspaceLoginProviderAdmissionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetWorkspaceLoginProviderAdmissionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.admission = WorkspaceLoginProviderAdmission.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SetWorkspaceLoginProviderAdmissionResponse {
+    return {
+      admission: isSet(object.admission) ? WorkspaceLoginProviderAdmission.fromJSON(object.admission) : undefined,
+    };
+  },
+
+  toJSON(message: SetWorkspaceLoginProviderAdmissionResponse): unknown {
+    const obj: any = {};
+    if (message.admission !== undefined) {
+      obj.admission = WorkspaceLoginProviderAdmission.toJSON(message.admission);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SetWorkspaceLoginProviderAdmissionResponse>): SetWorkspaceLoginProviderAdmissionResponse {
+    return SetWorkspaceLoginProviderAdmissionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<SetWorkspaceLoginProviderAdmissionResponse>,
+  ): SetWorkspaceLoginProviderAdmissionResponse {
+    const message = createBaseSetWorkspaceLoginProviderAdmissionResponse();
+    message.admission = (object.admission !== undefined && object.admission !== null)
+      ? WorkspaceLoginProviderAdmission.fromPartial(object.admission)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListWorkspaceLoginProviderAdmissionsRequest(): ListWorkspaceLoginProviderAdmissionsRequest {
+  return { tenantId: "", workspaceId: "", pageSize: 0, afterProviderId: undefined };
+}
+
+export const ListWorkspaceLoginProviderAdmissionsRequest: MessageFns<ListWorkspaceLoginProviderAdmissionsRequest> = {
+  encode(
+    message: ListWorkspaceLoginProviderAdmissionsRequest,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== "") {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(24).uint32(message.pageSize);
+    }
+    if (message.afterProviderId !== undefined) {
+      writer.uint32(34).string(message.afterProviderId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkspaceLoginProviderAdmissionsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkspaceLoginProviderAdmissionsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.afterProviderId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkspaceLoginProviderAdmissionsRequest {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      afterProviderId: isSet(object.afterProviderId) ? globalThis.String(object.afterProviderId) : undefined,
+    };
+  },
+
+  toJSON(message: ListWorkspaceLoginProviderAdmissionsRequest): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.afterProviderId !== undefined) {
+      obj.afterProviderId = message.afterProviderId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ListWorkspaceLoginProviderAdmissionsRequest>): ListWorkspaceLoginProviderAdmissionsRequest {
+    return ListWorkspaceLoginProviderAdmissionsRequest.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ListWorkspaceLoginProviderAdmissionsRequest>,
+  ): ListWorkspaceLoginProviderAdmissionsRequest {
+    const message = createBaseListWorkspaceLoginProviderAdmissionsRequest();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? "";
+    message.pageSize = object.pageSize ?? 0;
+    message.afterProviderId = object.afterProviderId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseListWorkspaceLoginProviderAdmissionsResponse(): ListWorkspaceLoginProviderAdmissionsResponse {
+  return { admissions: [], nextAfterProviderId: undefined };
+}
+
+export const ListWorkspaceLoginProviderAdmissionsResponse: MessageFns<ListWorkspaceLoginProviderAdmissionsResponse> = {
+  encode(
+    message: ListWorkspaceLoginProviderAdmissionsResponse,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    for (const v of message.admissions) {
+      WorkspaceLoginProviderAdmission.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.nextAfterProviderId !== undefined) {
+      writer.uint32(18).string(message.nextAfterProviderId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListWorkspaceLoginProviderAdmissionsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListWorkspaceLoginProviderAdmissionsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.admissions.push(WorkspaceLoginProviderAdmission.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.nextAfterProviderId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ListWorkspaceLoginProviderAdmissionsResponse {
+    return {
+      admissions: globalThis.Array.isArray(object?.admissions)
+        ? object.admissions.map((e: any) => WorkspaceLoginProviderAdmission.fromJSON(e))
+        : [],
+      nextAfterProviderId: isSet(object.nextAfterProviderId)
+        ? globalThis.String(object.nextAfterProviderId)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ListWorkspaceLoginProviderAdmissionsResponse): unknown {
+    const obj: any = {};
+    if (message.admissions?.length) {
+      obj.admissions = message.admissions.map((e) => WorkspaceLoginProviderAdmission.toJSON(e));
+    }
+    if (message.nextAfterProviderId !== undefined) {
+      obj.nextAfterProviderId = message.nextAfterProviderId;
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<ListWorkspaceLoginProviderAdmissionsResponse>,
+  ): ListWorkspaceLoginProviderAdmissionsResponse {
+    return ListWorkspaceLoginProviderAdmissionsResponse.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<ListWorkspaceLoginProviderAdmissionsResponse>,
+  ): ListWorkspaceLoginProviderAdmissionsResponse {
+    const message = createBaseListWorkspaceLoginProviderAdmissionsResponse();
+    message.admissions = object.admissions?.map((e) => WorkspaceLoginProviderAdmission.fromPartial(e)) || [];
+    message.nextAfterProviderId = object.nextAfterProviderId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseWorkspaceLoginProviderAdmission(): WorkspaceLoginProviderAdmission {
+  return { tenantId: "", workspaceId: "", providerId: "" };
+}
+
+export const WorkspaceLoginProviderAdmission: MessageFns<WorkspaceLoginProviderAdmission> = {
+  encode(message: WorkspaceLoginProviderAdmission, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.tenantId !== "") {
+      writer.uint32(10).string(message.tenantId);
+    }
+    if (message.workspaceId !== "") {
+      writer.uint32(18).string(message.workspaceId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(26).string(message.providerId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WorkspaceLoginProviderAdmission {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWorkspaceLoginProviderAdmission();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tenantId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.workspaceId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.providerId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WorkspaceLoginProviderAdmission {
+    return {
+      tenantId: isSet(object.tenantId) ? globalThis.String(object.tenantId) : "",
+      workspaceId: isSet(object.workspaceId) ? globalThis.String(object.workspaceId) : "",
+      providerId: isSet(object.providerId) ? globalThis.String(object.providerId) : "",
+    };
+  },
+
+  toJSON(message: WorkspaceLoginProviderAdmission): unknown {
+    const obj: any = {};
+    if (message.tenantId !== "") {
+      obj.tenantId = message.tenantId;
+    }
+    if (message.workspaceId !== "") {
+      obj.workspaceId = message.workspaceId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WorkspaceLoginProviderAdmission>): WorkspaceLoginProviderAdmission {
+    return WorkspaceLoginProviderAdmission.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WorkspaceLoginProviderAdmission>): WorkspaceLoginProviderAdmission {
+    const message = createBaseWorkspaceLoginProviderAdmission();
+    message.tenantId = object.tenantId ?? "";
+    message.workspaceId = object.workspaceId ?? "";
+    message.providerId = object.providerId ?? "";
+    return message;
+  },
+};
+
 function createBaseCreateSessionRequest(): CreateSessionRequest {
   return { tenantId: "", providerId: "", providerSubject: "" };
 }
@@ -1501,6 +6637,286 @@ export const IdentityServiceService = {
       Buffer.from(ListPrincipalGroupsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ListPrincipalGroupsResponse => ListPrincipalGroupsResponse.decode(value),
   },
+  addTenantMember: {
+    path: "/ctlflow.identity.v1.IdentityService/AddTenantMember",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: AddTenantMemberRequest): Buffer =>
+      Buffer.from(AddTenantMemberRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): AddTenantMemberRequest => AddTenantMemberRequest.decode(value),
+    responseSerialize: (value: TenantMember): Buffer => Buffer.from(TenantMember.encode(value).finish()),
+    responseDeserialize: (value: Buffer): TenantMember => TenantMember.decode(value),
+  },
+  removeTenantMember: {
+    path: "/ctlflow.identity.v1.IdentityService/RemoveTenantMember",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: RemoveTenantMemberRequest): Buffer =>
+      Buffer.from(RemoveTenantMemberRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RemoveTenantMemberRequest => RemoveTenantMemberRequest.decode(value),
+    responseSerialize: (value: RemoveTenantMemberResponse): Buffer =>
+      Buffer.from(RemoveTenantMemberResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RemoveTenantMemberResponse => RemoveTenantMemberResponse.decode(value),
+  },
+  listTenantMembers: {
+    path: "/ctlflow.identity.v1.IdentityService/ListTenantMembers",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListTenantMembersRequest): Buffer =>
+      Buffer.from(ListTenantMembersRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListTenantMembersRequest => ListTenantMembersRequest.decode(value),
+    responseSerialize: (value: ListTenantMembersResponse): Buffer =>
+      Buffer.from(ListTenantMembersResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListTenantMembersResponse => ListTenantMembersResponse.decode(value),
+  },
+  addWorkspaceMember: {
+    path: "/ctlflow.identity.v1.IdentityService/AddWorkspaceMember",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: AddWorkspaceMemberRequest): Buffer =>
+      Buffer.from(AddWorkspaceMemberRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): AddWorkspaceMemberRequest => AddWorkspaceMemberRequest.decode(value),
+    responseSerialize: (value: WorkspaceMember): Buffer => Buffer.from(WorkspaceMember.encode(value).finish()),
+    responseDeserialize: (value: Buffer): WorkspaceMember => WorkspaceMember.decode(value),
+  },
+  removeWorkspaceMember: {
+    path: "/ctlflow.identity.v1.IdentityService/RemoveWorkspaceMember",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: RemoveWorkspaceMemberRequest): Buffer =>
+      Buffer.from(RemoveWorkspaceMemberRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RemoveWorkspaceMemberRequest => RemoveWorkspaceMemberRequest.decode(value),
+    responseSerialize: (value: RemoveWorkspaceMemberResponse): Buffer =>
+      Buffer.from(RemoveWorkspaceMemberResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RemoveWorkspaceMemberResponse => RemoveWorkspaceMemberResponse.decode(value),
+  },
+  listWorkspaceMembers: {
+    path: "/ctlflow.identity.v1.IdentityService/ListWorkspaceMembers",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListWorkspaceMembersRequest): Buffer =>
+      Buffer.from(ListWorkspaceMembersRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListWorkspaceMembersRequest => ListWorkspaceMembersRequest.decode(value),
+    responseSerialize: (value: ListWorkspaceMembersResponse): Buffer =>
+      Buffer.from(ListWorkspaceMembersResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListWorkspaceMembersResponse => ListWorkspaceMembersResponse.decode(value),
+  },
+  createGroup: {
+    path: "/ctlflow.identity.v1.IdentityService/CreateGroup",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: CreateGroupRequest): Buffer => Buffer.from(CreateGroupRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateGroupRequest => CreateGroupRequest.decode(value),
+    responseSerialize: (value: Group): Buffer => Buffer.from(Group.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Group => Group.decode(value),
+  },
+  deleteGroup: {
+    path: "/ctlflow.identity.v1.IdentityService/DeleteGroup",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: DeleteGroupRequest): Buffer => Buffer.from(DeleteGroupRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): DeleteGroupRequest => DeleteGroupRequest.decode(value),
+    responseSerialize: (value: DeleteGroupResponse): Buffer => Buffer.from(DeleteGroupResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): DeleteGroupResponse => DeleteGroupResponse.decode(value),
+  },
+  listGroups: {
+    path: "/ctlflow.identity.v1.IdentityService/ListGroups",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListGroupsRequest): Buffer => Buffer.from(ListGroupsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListGroupsRequest => ListGroupsRequest.decode(value),
+    responseSerialize: (value: ListGroupsResponse): Buffer => Buffer.from(ListGroupsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListGroupsResponse => ListGroupsResponse.decode(value),
+  },
+  addGroupMember: {
+    path: "/ctlflow.identity.v1.IdentityService/AddGroupMember",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: AddGroupMemberRequest): Buffer =>
+      Buffer.from(AddGroupMemberRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): AddGroupMemberRequest => AddGroupMemberRequest.decode(value),
+    responseSerialize: (value: GroupMember): Buffer => Buffer.from(GroupMember.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GroupMember => GroupMember.decode(value),
+  },
+  removeGroupMember: {
+    path: "/ctlflow.identity.v1.IdentityService/RemoveGroupMember",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: RemoveGroupMemberRequest): Buffer =>
+      Buffer.from(RemoveGroupMemberRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RemoveGroupMemberRequest => RemoveGroupMemberRequest.decode(value),
+    responseSerialize: (value: RemoveGroupMemberResponse): Buffer =>
+      Buffer.from(RemoveGroupMemberResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RemoveGroupMemberResponse => RemoveGroupMemberResponse.decode(value),
+  },
+  listGroupMembers: {
+    path: "/ctlflow.identity.v1.IdentityService/ListGroupMembers",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListGroupMembersRequest): Buffer =>
+      Buffer.from(ListGroupMembersRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListGroupMembersRequest => ListGroupMembersRequest.decode(value),
+    responseSerialize: (value: ListGroupMembersResponse): Buffer =>
+      Buffer.from(ListGroupMembersResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListGroupMembersResponse => ListGroupMembersResponse.decode(value),
+  },
+  createVirtualPrincipal: {
+    path: "/ctlflow.identity.v1.IdentityService/CreateVirtualPrincipal",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: CreateVirtualPrincipalRequest): Buffer =>
+      Buffer.from(CreateVirtualPrincipalRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateVirtualPrincipalRequest => CreateVirtualPrincipalRequest.decode(value),
+    responseSerialize: (value: VirtualPrincipal): Buffer => Buffer.from(VirtualPrincipal.encode(value).finish()),
+    responseDeserialize: (value: Buffer): VirtualPrincipal => VirtualPrincipal.decode(value),
+  },
+  getVirtualPrincipal: {
+    path: "/ctlflow.identity.v1.IdentityService/GetVirtualPrincipal",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetVirtualPrincipalRequest): Buffer =>
+      Buffer.from(GetVirtualPrincipalRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetVirtualPrincipalRequest => GetVirtualPrincipalRequest.decode(value),
+    responseSerialize: (value: VirtualPrincipal): Buffer => Buffer.from(VirtualPrincipal.encode(value).finish()),
+    responseDeserialize: (value: Buffer): VirtualPrincipal => VirtualPrincipal.decode(value),
+  },
+  listVirtualPrincipals: {
+    path: "/ctlflow.identity.v1.IdentityService/ListVirtualPrincipals",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListVirtualPrincipalsRequest): Buffer =>
+      Buffer.from(ListVirtualPrincipalsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListVirtualPrincipalsRequest => ListVirtualPrincipalsRequest.decode(value),
+    responseSerialize: (value: ListVirtualPrincipalsResponse): Buffer =>
+      Buffer.from(ListVirtualPrincipalsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListVirtualPrincipalsResponse => ListVirtualPrincipalsResponse.decode(value),
+  },
+  setVirtualPrincipalEnabled: {
+    path: "/ctlflow.identity.v1.IdentityService/SetVirtualPrincipalEnabled",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: SetVirtualPrincipalEnabledRequest): Buffer =>
+      Buffer.from(SetVirtualPrincipalEnabledRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetVirtualPrincipalEnabledRequest =>
+      SetVirtualPrincipalEnabledRequest.decode(value),
+    responseSerialize: (value: VirtualPrincipal): Buffer => Buffer.from(VirtualPrincipal.encode(value).finish()),
+    responseDeserialize: (value: Buffer): VirtualPrincipal => VirtualPrincipal.decode(value),
+  },
+  createExternalIdentityLink: {
+    path: "/ctlflow.identity.v1.IdentityService/CreateExternalIdentityLink",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: CreateExternalIdentityLinkRequest): Buffer =>
+      Buffer.from(CreateExternalIdentityLinkRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateExternalIdentityLinkRequest =>
+      CreateExternalIdentityLinkRequest.decode(value),
+    responseSerialize: (value: ExternalIdentityLink): Buffer =>
+      Buffer.from(ExternalIdentityLink.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ExternalIdentityLink => ExternalIdentityLink.decode(value),
+  },
+  deleteExternalIdentityLink: {
+    path: "/ctlflow.identity.v1.IdentityService/DeleteExternalIdentityLink",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: DeleteExternalIdentityLinkRequest): Buffer =>
+      Buffer.from(DeleteExternalIdentityLinkRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): DeleteExternalIdentityLinkRequest =>
+      DeleteExternalIdentityLinkRequest.decode(value),
+    responseSerialize: (value: DeleteExternalIdentityLinkResponse): Buffer =>
+      Buffer.from(DeleteExternalIdentityLinkResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): DeleteExternalIdentityLinkResponse =>
+      DeleteExternalIdentityLinkResponse.decode(value),
+  },
+  listExternalIdentityLinks: {
+    path: "/ctlflow.identity.v1.IdentityService/ListExternalIdentityLinks",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListExternalIdentityLinksRequest): Buffer =>
+      Buffer.from(ListExternalIdentityLinksRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListExternalIdentityLinksRequest =>
+      ListExternalIdentityLinksRequest.decode(value),
+    responseSerialize: (value: ListExternalIdentityLinksResponse): Buffer =>
+      Buffer.from(ListExternalIdentityLinksResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListExternalIdentityLinksResponse =>
+      ListExternalIdentityLinksResponse.decode(value),
+  },
+  createLoginProvider: {
+    path: "/ctlflow.identity.v1.IdentityService/CreateLoginProvider",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: CreateLoginProviderRequest): Buffer =>
+      Buffer.from(CreateLoginProviderRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateLoginProviderRequest => CreateLoginProviderRequest.decode(value),
+    responseSerialize: (value: LoginProvider): Buffer => Buffer.from(LoginProvider.encode(value).finish()),
+    responseDeserialize: (value: Buffer): LoginProvider => LoginProvider.decode(value),
+  },
+  getLoginProvider: {
+    path: "/ctlflow.identity.v1.IdentityService/GetLoginProvider",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: GetLoginProviderRequest): Buffer =>
+      Buffer.from(GetLoginProviderRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetLoginProviderRequest => GetLoginProviderRequest.decode(value),
+    responseSerialize: (value: LoginProvider): Buffer => Buffer.from(LoginProvider.encode(value).finish()),
+    responseDeserialize: (value: Buffer): LoginProvider => LoginProvider.decode(value),
+  },
+  listLoginProviders: {
+    path: "/ctlflow.identity.v1.IdentityService/ListLoginProviders",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListLoginProvidersRequest): Buffer =>
+      Buffer.from(ListLoginProvidersRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListLoginProvidersRequest => ListLoginProvidersRequest.decode(value),
+    responseSerialize: (value: ListLoginProvidersResponse): Buffer =>
+      Buffer.from(ListLoginProvidersResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListLoginProvidersResponse => ListLoginProvidersResponse.decode(value),
+  },
+  updateLoginProvider: {
+    path: "/ctlflow.identity.v1.IdentityService/UpdateLoginProvider",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: UpdateLoginProviderRequest): Buffer =>
+      Buffer.from(UpdateLoginProviderRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateLoginProviderRequest => UpdateLoginProviderRequest.decode(value),
+    responseSerialize: (value: LoginProvider): Buffer => Buffer.from(LoginProvider.encode(value).finish()),
+    responseDeserialize: (value: Buffer): LoginProvider => LoginProvider.decode(value),
+  },
+  setLoginProviderState: {
+    path: "/ctlflow.identity.v1.IdentityService/SetLoginProviderState",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: SetLoginProviderStateRequest): Buffer =>
+      Buffer.from(SetLoginProviderStateRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetLoginProviderStateRequest => SetLoginProviderStateRequest.decode(value),
+    responseSerialize: (value: LoginProvider): Buffer => Buffer.from(LoginProvider.encode(value).finish()),
+    responseDeserialize: (value: Buffer): LoginProvider => LoginProvider.decode(value),
+  },
+  setWorkspaceLoginProviderAdmission: {
+    path: "/ctlflow.identity.v1.IdentityService/SetWorkspaceLoginProviderAdmission",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: SetWorkspaceLoginProviderAdmissionRequest): Buffer =>
+      Buffer.from(SetWorkspaceLoginProviderAdmissionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetWorkspaceLoginProviderAdmissionRequest =>
+      SetWorkspaceLoginProviderAdmissionRequest.decode(value),
+    responseSerialize: (value: SetWorkspaceLoginProviderAdmissionResponse): Buffer =>
+      Buffer.from(SetWorkspaceLoginProviderAdmissionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SetWorkspaceLoginProviderAdmissionResponse =>
+      SetWorkspaceLoginProviderAdmissionResponse.decode(value),
+  },
+  listWorkspaceLoginProviderAdmissions: {
+    path: "/ctlflow.identity.v1.IdentityService/ListWorkspaceLoginProviderAdmissions",
+    requestStream: false,
+    responseStream: false,
+    requestSerialize: (value: ListWorkspaceLoginProviderAdmissionsRequest): Buffer =>
+      Buffer.from(ListWorkspaceLoginProviderAdmissionsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListWorkspaceLoginProviderAdmissionsRequest =>
+      ListWorkspaceLoginProviderAdmissionsRequest.decode(value),
+    responseSerialize: (value: ListWorkspaceLoginProviderAdmissionsResponse): Buffer =>
+      Buffer.from(ListWorkspaceLoginProviderAdmissionsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListWorkspaceLoginProviderAdmissionsResponse =>
+      ListWorkspaceLoginProviderAdmissionsResponse.decode(value),
+  },
   createSession: {
     path: "/ctlflow.identity.v1.IdentityService/CreateSession",
     requestStream: false,
@@ -1552,6 +6968,38 @@ export interface IdentityServiceServer extends UntypedServiceImplementation {
   >;
   resolvePrincipal: handleUnaryCall<ResolvePrincipalRequest, ResolvePrincipalResponse>;
   listPrincipalGroups: handleUnaryCall<ListPrincipalGroupsRequest, ListPrincipalGroupsResponse>;
+  addTenantMember: handleUnaryCall<AddTenantMemberRequest, TenantMember>;
+  removeTenantMember: handleUnaryCall<RemoveTenantMemberRequest, RemoveTenantMemberResponse>;
+  listTenantMembers: handleUnaryCall<ListTenantMembersRequest, ListTenantMembersResponse>;
+  addWorkspaceMember: handleUnaryCall<AddWorkspaceMemberRequest, WorkspaceMember>;
+  removeWorkspaceMember: handleUnaryCall<RemoveWorkspaceMemberRequest, RemoveWorkspaceMemberResponse>;
+  listWorkspaceMembers: handleUnaryCall<ListWorkspaceMembersRequest, ListWorkspaceMembersResponse>;
+  createGroup: handleUnaryCall<CreateGroupRequest, Group>;
+  deleteGroup: handleUnaryCall<DeleteGroupRequest, DeleteGroupResponse>;
+  listGroups: handleUnaryCall<ListGroupsRequest, ListGroupsResponse>;
+  addGroupMember: handleUnaryCall<AddGroupMemberRequest, GroupMember>;
+  removeGroupMember: handleUnaryCall<RemoveGroupMemberRequest, RemoveGroupMemberResponse>;
+  listGroupMembers: handleUnaryCall<ListGroupMembersRequest, ListGroupMembersResponse>;
+  createVirtualPrincipal: handleUnaryCall<CreateVirtualPrincipalRequest, VirtualPrincipal>;
+  getVirtualPrincipal: handleUnaryCall<GetVirtualPrincipalRequest, VirtualPrincipal>;
+  listVirtualPrincipals: handleUnaryCall<ListVirtualPrincipalsRequest, ListVirtualPrincipalsResponse>;
+  setVirtualPrincipalEnabled: handleUnaryCall<SetVirtualPrincipalEnabledRequest, VirtualPrincipal>;
+  createExternalIdentityLink: handleUnaryCall<CreateExternalIdentityLinkRequest, ExternalIdentityLink>;
+  deleteExternalIdentityLink: handleUnaryCall<DeleteExternalIdentityLinkRequest, DeleteExternalIdentityLinkResponse>;
+  listExternalIdentityLinks: handleUnaryCall<ListExternalIdentityLinksRequest, ListExternalIdentityLinksResponse>;
+  createLoginProvider: handleUnaryCall<CreateLoginProviderRequest, LoginProvider>;
+  getLoginProvider: handleUnaryCall<GetLoginProviderRequest, LoginProvider>;
+  listLoginProviders: handleUnaryCall<ListLoginProvidersRequest, ListLoginProvidersResponse>;
+  updateLoginProvider: handleUnaryCall<UpdateLoginProviderRequest, LoginProvider>;
+  setLoginProviderState: handleUnaryCall<SetLoginProviderStateRequest, LoginProvider>;
+  setWorkspaceLoginProviderAdmission: handleUnaryCall<
+    SetWorkspaceLoginProviderAdmissionRequest,
+    SetWorkspaceLoginProviderAdmissionResponse
+  >;
+  listWorkspaceLoginProviderAdmissions: handleUnaryCall<
+    ListWorkspaceLoginProviderAdmissionsRequest,
+    ListWorkspaceLoginProviderAdmissionsResponse
+  >;
   createSession: handleUnaryCall<CreateSessionRequest, CreateSessionResponse>;
   exchangeSession: handleUnaryCall<ExchangeSessionRequest, IssueInvocationResponse>;
   revokeSession: handleUnaryCall<RevokeSessionRequest, RevokeSessionResponse>;
@@ -1603,6 +7051,396 @@ export interface IdentityServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: ListPrincipalGroupsResponse) => void,
+  ): ClientUnaryCall;
+  addTenantMember(
+    request: AddTenantMemberRequest,
+    callback: (error: ServiceError | null, response: TenantMember) => void,
+  ): ClientUnaryCall;
+  addTenantMember(
+    request: AddTenantMemberRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: TenantMember) => void,
+  ): ClientUnaryCall;
+  addTenantMember(
+    request: AddTenantMemberRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: TenantMember) => void,
+  ): ClientUnaryCall;
+  removeTenantMember(
+    request: RemoveTenantMemberRequest,
+    callback: (error: ServiceError | null, response: RemoveTenantMemberResponse) => void,
+  ): ClientUnaryCall;
+  removeTenantMember(
+    request: RemoveTenantMemberRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RemoveTenantMemberResponse) => void,
+  ): ClientUnaryCall;
+  removeTenantMember(
+    request: RemoveTenantMemberRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RemoveTenantMemberResponse) => void,
+  ): ClientUnaryCall;
+  listTenantMembers(
+    request: ListTenantMembersRequest,
+    callback: (error: ServiceError | null, response: ListTenantMembersResponse) => void,
+  ): ClientUnaryCall;
+  listTenantMembers(
+    request: ListTenantMembersRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListTenantMembersResponse) => void,
+  ): ClientUnaryCall;
+  listTenantMembers(
+    request: ListTenantMembersRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListTenantMembersResponse) => void,
+  ): ClientUnaryCall;
+  addWorkspaceMember(
+    request: AddWorkspaceMemberRequest,
+    callback: (error: ServiceError | null, response: WorkspaceMember) => void,
+  ): ClientUnaryCall;
+  addWorkspaceMember(
+    request: AddWorkspaceMemberRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: WorkspaceMember) => void,
+  ): ClientUnaryCall;
+  addWorkspaceMember(
+    request: AddWorkspaceMemberRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: WorkspaceMember) => void,
+  ): ClientUnaryCall;
+  removeWorkspaceMember(
+    request: RemoveWorkspaceMemberRequest,
+    callback: (error: ServiceError | null, response: RemoveWorkspaceMemberResponse) => void,
+  ): ClientUnaryCall;
+  removeWorkspaceMember(
+    request: RemoveWorkspaceMemberRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RemoveWorkspaceMemberResponse) => void,
+  ): ClientUnaryCall;
+  removeWorkspaceMember(
+    request: RemoveWorkspaceMemberRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RemoveWorkspaceMemberResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaceMembers(
+    request: ListWorkspaceMembersRequest,
+    callback: (error: ServiceError | null, response: ListWorkspaceMembersResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaceMembers(
+    request: ListWorkspaceMembersRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListWorkspaceMembersResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaceMembers(
+    request: ListWorkspaceMembersRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListWorkspaceMembersResponse) => void,
+  ): ClientUnaryCall;
+  createGroup(
+    request: CreateGroupRequest,
+    callback: (error: ServiceError | null, response: Group) => void,
+  ): ClientUnaryCall;
+  createGroup(
+    request: CreateGroupRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: Group) => void,
+  ): ClientUnaryCall;
+  createGroup(
+    request: CreateGroupRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: Group) => void,
+  ): ClientUnaryCall;
+  deleteGroup(
+    request: DeleteGroupRequest,
+    callback: (error: ServiceError | null, response: DeleteGroupResponse) => void,
+  ): ClientUnaryCall;
+  deleteGroup(
+    request: DeleteGroupRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: DeleteGroupResponse) => void,
+  ): ClientUnaryCall;
+  deleteGroup(
+    request: DeleteGroupRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: DeleteGroupResponse) => void,
+  ): ClientUnaryCall;
+  listGroups(
+    request: ListGroupsRequest,
+    callback: (error: ServiceError | null, response: ListGroupsResponse) => void,
+  ): ClientUnaryCall;
+  listGroups(
+    request: ListGroupsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListGroupsResponse) => void,
+  ): ClientUnaryCall;
+  listGroups(
+    request: ListGroupsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListGroupsResponse) => void,
+  ): ClientUnaryCall;
+  addGroupMember(
+    request: AddGroupMemberRequest,
+    callback: (error: ServiceError | null, response: GroupMember) => void,
+  ): ClientUnaryCall;
+  addGroupMember(
+    request: AddGroupMemberRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GroupMember) => void,
+  ): ClientUnaryCall;
+  addGroupMember(
+    request: AddGroupMemberRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GroupMember) => void,
+  ): ClientUnaryCall;
+  removeGroupMember(
+    request: RemoveGroupMemberRequest,
+    callback: (error: ServiceError | null, response: RemoveGroupMemberResponse) => void,
+  ): ClientUnaryCall;
+  removeGroupMember(
+    request: RemoveGroupMemberRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RemoveGroupMemberResponse) => void,
+  ): ClientUnaryCall;
+  removeGroupMember(
+    request: RemoveGroupMemberRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RemoveGroupMemberResponse) => void,
+  ): ClientUnaryCall;
+  listGroupMembers(
+    request: ListGroupMembersRequest,
+    callback: (error: ServiceError | null, response: ListGroupMembersResponse) => void,
+  ): ClientUnaryCall;
+  listGroupMembers(
+    request: ListGroupMembersRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListGroupMembersResponse) => void,
+  ): ClientUnaryCall;
+  listGroupMembers(
+    request: ListGroupMembersRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListGroupMembersResponse) => void,
+  ): ClientUnaryCall;
+  createVirtualPrincipal(
+    request: CreateVirtualPrincipalRequest,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  createVirtualPrincipal(
+    request: CreateVirtualPrincipalRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  createVirtualPrincipal(
+    request: CreateVirtualPrincipalRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  getVirtualPrincipal(
+    request: GetVirtualPrincipalRequest,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  getVirtualPrincipal(
+    request: GetVirtualPrincipalRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  getVirtualPrincipal(
+    request: GetVirtualPrincipalRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  listVirtualPrincipals(
+    request: ListVirtualPrincipalsRequest,
+    callback: (error: ServiceError | null, response: ListVirtualPrincipalsResponse) => void,
+  ): ClientUnaryCall;
+  listVirtualPrincipals(
+    request: ListVirtualPrincipalsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListVirtualPrincipalsResponse) => void,
+  ): ClientUnaryCall;
+  listVirtualPrincipals(
+    request: ListVirtualPrincipalsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListVirtualPrincipalsResponse) => void,
+  ): ClientUnaryCall;
+  setVirtualPrincipalEnabled(
+    request: SetVirtualPrincipalEnabledRequest,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  setVirtualPrincipalEnabled(
+    request: SetVirtualPrincipalEnabledRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  setVirtualPrincipalEnabled(
+    request: SetVirtualPrincipalEnabledRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: VirtualPrincipal) => void,
+  ): ClientUnaryCall;
+  createExternalIdentityLink(
+    request: CreateExternalIdentityLinkRequest,
+    callback: (error: ServiceError | null, response: ExternalIdentityLink) => void,
+  ): ClientUnaryCall;
+  createExternalIdentityLink(
+    request: CreateExternalIdentityLinkRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ExternalIdentityLink) => void,
+  ): ClientUnaryCall;
+  createExternalIdentityLink(
+    request: CreateExternalIdentityLinkRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ExternalIdentityLink) => void,
+  ): ClientUnaryCall;
+  deleteExternalIdentityLink(
+    request: DeleteExternalIdentityLinkRequest,
+    callback: (error: ServiceError | null, response: DeleteExternalIdentityLinkResponse) => void,
+  ): ClientUnaryCall;
+  deleteExternalIdentityLink(
+    request: DeleteExternalIdentityLinkRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: DeleteExternalIdentityLinkResponse) => void,
+  ): ClientUnaryCall;
+  deleteExternalIdentityLink(
+    request: DeleteExternalIdentityLinkRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: DeleteExternalIdentityLinkResponse) => void,
+  ): ClientUnaryCall;
+  listExternalIdentityLinks(
+    request: ListExternalIdentityLinksRequest,
+    callback: (error: ServiceError | null, response: ListExternalIdentityLinksResponse) => void,
+  ): ClientUnaryCall;
+  listExternalIdentityLinks(
+    request: ListExternalIdentityLinksRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListExternalIdentityLinksResponse) => void,
+  ): ClientUnaryCall;
+  listExternalIdentityLinks(
+    request: ListExternalIdentityLinksRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListExternalIdentityLinksResponse) => void,
+  ): ClientUnaryCall;
+  createLoginProvider(
+    request: CreateLoginProviderRequest,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  createLoginProvider(
+    request: CreateLoginProviderRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  createLoginProvider(
+    request: CreateLoginProviderRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  getLoginProvider(
+    request: GetLoginProviderRequest,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  getLoginProvider(
+    request: GetLoginProviderRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  getLoginProvider(
+    request: GetLoginProviderRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  listLoginProviders(
+    request: ListLoginProvidersRequest,
+    callback: (error: ServiceError | null, response: ListLoginProvidersResponse) => void,
+  ): ClientUnaryCall;
+  listLoginProviders(
+    request: ListLoginProvidersRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListLoginProvidersResponse) => void,
+  ): ClientUnaryCall;
+  listLoginProviders(
+    request: ListLoginProvidersRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListLoginProvidersResponse) => void,
+  ): ClientUnaryCall;
+  updateLoginProvider(
+    request: UpdateLoginProviderRequest,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  updateLoginProvider(
+    request: UpdateLoginProviderRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  updateLoginProvider(
+    request: UpdateLoginProviderRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  setLoginProviderState(
+    request: SetLoginProviderStateRequest,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  setLoginProviderState(
+    request: SetLoginProviderStateRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  setLoginProviderState(
+    request: SetLoginProviderStateRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: LoginProvider) => void,
+  ): ClientUnaryCall;
+  setWorkspaceLoginProviderAdmission(
+    request: SetWorkspaceLoginProviderAdmissionRequest,
+    callback: (error: ServiceError | null, response: SetWorkspaceLoginProviderAdmissionResponse) => void,
+  ): ClientUnaryCall;
+  setWorkspaceLoginProviderAdmission(
+    request: SetWorkspaceLoginProviderAdmissionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: SetWorkspaceLoginProviderAdmissionResponse) => void,
+  ): ClientUnaryCall;
+  setWorkspaceLoginProviderAdmission(
+    request: SetWorkspaceLoginProviderAdmissionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: SetWorkspaceLoginProviderAdmissionResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaceLoginProviderAdmissions(
+    request: ListWorkspaceLoginProviderAdmissionsRequest,
+    callback: (error: ServiceError | null, response: ListWorkspaceLoginProviderAdmissionsResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaceLoginProviderAdmissions(
+    request: ListWorkspaceLoginProviderAdmissionsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListWorkspaceLoginProviderAdmissionsResponse) => void,
+  ): ClientUnaryCall;
+  listWorkspaceLoginProviderAdmissions(
+    request: ListWorkspaceLoginProviderAdmissionsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListWorkspaceLoginProviderAdmissionsResponse) => void,
   ): ClientUnaryCall;
   createSession(
     request: CreateSessionRequest,

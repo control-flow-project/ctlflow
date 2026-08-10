@@ -11,6 +11,14 @@ public class VirtualPrincipalGroupMembership
     {
     }
 
+    public VirtualPrincipalGroupMembership(
+        VirtualPrincipalId principalId,
+        GroupId groupId)
+    {
+        _principalId = principalId.Value;
+        _groupId = groupId.Value;
+    }
+
     public VirtualPrincipalId PrincipalId =>
         VirtualPrincipalId.FromStorage(_principalId);
 

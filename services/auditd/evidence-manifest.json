@@ -69,6 +69,30 @@
             "title": "validates Identity Session and Package details"
           },
           {
+            "file": "tests/integration/identity-detail-validation.test.ts",
+            "title": "validates Identity Membership details"
+          },
+          {
+            "file": "tests/integration/identity-detail-validation.test.ts",
+            "title": "validates Identity Group details"
+          },
+          {
+            "file": "tests/integration/identity-detail-validation.test.ts",
+            "title": "validates Identity virtual-principal details"
+          },
+          {
+            "file": "tests/integration/identity-detail-validation.test.ts",
+            "title": "validates Identity external-link details"
+          },
+          {
+            "file": "tests/integration/identity-detail-validation.test.ts",
+            "title": "validates Identity login-provider details"
+          },
+          {
+            "file": "tests/integration/identity-detail-validation.test.ts",
+            "title": "validates Identity Workspace-provider admission details"
+          },
+          {
             "file": "tests/integration/detail-validation.test.ts",
             "title": "validates App mutation details"
           },

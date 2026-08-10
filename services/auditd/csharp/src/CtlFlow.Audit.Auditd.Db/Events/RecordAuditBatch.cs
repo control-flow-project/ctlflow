@@ -167,6 +167,28 @@ public static partial class AuditEvents
             case IdentitySessionAuditDetail value:
                 database.IdentitySessionDetails.Add(value);
                 break;
+            case IdentityMembershipAuditDetail value:
+                database.IdentityMembershipDetails.Add(value);
+                break;
+            case IdentityGroupAuditDetail value:
+                database.IdentityGroupDetails.Add(value);
+                break;
+            case IdentityGroupMemberAuditDetail value:
+                database.IdentityGroupMemberDetails.Add(value);
+                break;
+            case IdentityVirtualPrincipalAuditDetail value:
+                database.IdentityVirtualPrincipalDetails.Add(value);
+                break;
+            case IdentityExternalLinkAuditDetail value:
+                database.IdentityExternalLinkDetails.Add(value);
+                break;
+            case IdentityLoginProviderAuditDetail value:
+                database.IdentityLoginProviderDetails.Add(value);
+                break;
+            case IdentityWorkspaceProviderAdmissionAuditDetail value:
+                database.IdentityWorkspaceProviderAdmissionDetails.Add(
+                    value);
+                break;
             case PackageDeclarationAuditDetail value:
                 database.PackageDeclarationDetails.Add(value);
                 break;

@@ -220,7 +220,7 @@ components:
       type: object
       additionalProperties: false
       minProperties: 2
-      maxProperties: 3
+      maxProperties: 4
       required:
         - tenant_id
         - provider_id
@@ -229,9 +229,13 @@ components:
           $ref: "#/components/schemas/Identifier"
         provider_id:
           $ref: "#/components/schemas/Identifier"
+        workspace_id:
+          $ref: "#/components/schemas/Identifier"
         return_to:
           $ref: "#/components/schemas/ReturnTarget"
-      description: Each admitted field occurs exactly once.
+      description: >-
+        Each admitted field occurs exactly once. workspace_id selects one
+        Workspace whose exact provider admission is required.
     LogoutForm:
       type: object
       additionalProperties: false

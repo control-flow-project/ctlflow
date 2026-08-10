@@ -39,6 +39,9 @@ import {
   type PreparedAuthdFiles
 } from "../support/prepare-authd-files.js";
 import {
+  providerRegistrationFixture
+} from "../support/provider-registration-fixture.js";
+import {
   repositoryRoot
 } from "../support/test-paths.js";
 import type {
@@ -100,6 +103,17 @@ Promise<AuthdTestSuite> {
         subjectAccountRevision: 1,
         membershipRevision: 1,
         groupIds: []
+      }],
+      loginProviders: [{
+        ...providerRegistrationFixture,
+        displayName: "Acme workforce",
+        state: "active",
+        revision: 1
+      }],
+      workspaceLoginProviderAdmissions: [{
+        tenantId: "acme",
+        workspaceId: "atlas",
+        providerId: "oidc"
       }],
       externalIdentityLinks: [{
         tenantId: "acme",

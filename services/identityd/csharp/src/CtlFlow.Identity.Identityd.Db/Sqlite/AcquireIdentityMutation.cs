@@ -1,17 +1,16 @@
-using CtlFlow.Identity.Identityd.Domain.Sessions;
-
 namespace CtlFlow.Identity.Identityd.Db.Sqlite;
 
-internal static partial class SqliteSessionMutations
+internal static partial class SqliteIdentityMutations
 {
     private const int LockCount = 64;
     private static readonly SemaphoreSlim[] MutationLocks = CreateLocks();
 
-    internal static async ValueTask<IAsyncDisposable> AcquireSessionMutation(
-        SessionCredentialDigest credentialDigest,
+    internal static async ValueTask<IAsyncDisposable> AcquireIdentityMutation(
+        string mutationKey,
         CancellationToken cancellation)
     {
-        var gate = MutationLocks[GetLockIndex(credentialDigest)];
+        ArgumentException.ThrowIfNullOrEmpty(mutationKey);
+        var gate = MutationLocks[GetLockIndex(mutationKey)];
         await gate.WaitAsync(cancellation);
         return new MutationLease(gate);
     }
@@ -27,13 +26,12 @@ internal static partial class SqliteSessionMutations
         return locks;
     }
 
-    private static int GetLockIndex(
-        SessionCredentialDigest credentialDigest)
+    private static int GetLockIndex(string mutationKey)
     {
         const uint offset = 2_166_136_261;
         const uint prime = 16_777_619;
         var hash = offset;
-        foreach (var character in credentialDigest.Value)
+        foreach (var character in mutationKey)
         {
             hash = unchecked((hash ^ character) * prime);
         }

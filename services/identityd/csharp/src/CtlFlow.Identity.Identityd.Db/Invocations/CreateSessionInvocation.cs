@@ -8,6 +8,8 @@ using IdentityPrincipals =
     CtlFlow.Identity.Identityd.Db.Principals.Principals;
 using IdentitySessions =
     CtlFlow.Identity.Identityd.Db.Sessions.Sessions;
+using IdentityLoginProviders =
+    CtlFlow.Identity.Identityd.Db.LoginProviders.LoginProviders;
 
 namespace CtlFlow.Identity.Identityd.Db.Invocations;
 
@@ -35,9 +37,19 @@ public static partial class Invocations
                     cancellation),
                 target,
                 cancellation);
+        var providerAdmitted = session is null
+            || target.WorkspaceId is null
+            || await IdentityLoginProviders
+                .HasWorkspaceLoginProviderAdmission(
+                    identityDatabase,
+                    target.TenantId,
+                    target.WorkspaceId,
+                    session.ProviderId,
+                    cancellation);
         return await Domain.Invocations.Invocations.CreateSessionInvocation(
             session,
             principal,
+            providerAdmitted,
             target,
             now,
             lifetime,

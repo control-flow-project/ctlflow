@@ -11,6 +11,21 @@ public sealed record Revision
 
     public static Revision Initial() => new(1);
 
+    public static ValueTask<Revision> Parse(
+        ulong value,
+        CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        if (value is 0 or > long.MaxValue)
+        {
+            throw new ArgumentException(
+                "Revision must be a positive signed 64-bit integer",
+                nameof(value));
+        }
+
+        return ValueTask.FromResult(new Revision((long)value));
+    }
+
     public static Revision FromStorage(long value)
     {
         if (value <= 0)

@@ -101,6 +101,22 @@ export async function seedIdentityDatabase(
       virtualGroup("agent:reviewer", "atlas_reviewers"),
       virtualGroup("agent:atlas", "atlas_editors")
     ]);
+    await transaction("login_providers").insert({
+      tenant_id: "acme",
+      provider_id: "oidc",
+      display_name: "Acme OIDC",
+      configuration_id: "oidc",
+      configuration_version_id: "oidc_1",
+      secret_id: "oidc_secret",
+      secret_version_id: "oidc_secret_1",
+      state: 1,
+      revision: 40
+    });
+    await transaction("workspace_login_provider_admissions").insert({
+      tenant_id: "acme",
+      workspace_id: "atlas",
+      provider_id: "oidc"
+    });
     await transaction("external_identity_links").insert([
       externalIdentity(
         "acme",

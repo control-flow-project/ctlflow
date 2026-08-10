@@ -82,6 +82,30 @@ The complete catalog is:
 | `workspaces.suspend` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
 | `workspaces.resume` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
 | `workspaces.delete` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
+| `tenant_memberships.add` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/members/<account_id>` |
+| `tenant_memberships.remove` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/members/<account_id>` |
+| `tenant_memberships.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/members` |
+| `workspace_memberships.add` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members/<account_id>` |
+| `workspace_memberships.remove` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members/<account_id>` |
+| `workspace_memberships.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members` |
+| `groups.create` | `SERVICE/svc_identityd` | Exact Tenant or Workspace target plus `/groups/<group_id>` |
+| `groups.delete` | `SERVICE/svc_identityd` | Exact Tenant or Workspace target plus `/groups/<group_id>` |
+| `groups.read` | `SERVICE/svc_identityd` | Exact Tenant or Workspace target plus `/groups` |
+| `group_memberships.add` | `SERVICE/svc_identityd` | Exact target plus `/groups/<group_id>/members/<principal_id>` |
+| `group_memberships.remove` | `SERVICE/svc_identityd` | Exact target plus `/groups/<group_id>/members/<principal_id>` |
+| `group_memberships.read` | `SERVICE/svc_identityd` | Exact target plus `/groups/<group_id>/members` |
+| `virtual_principals.create` | `SERVICE/svc_identityd` | Exact target plus `/virtual-principals/<principal_id>` |
+| `virtual_principals.read` | `SERVICE/svc_identityd` | Exact target plus `/virtual-principals` or one exact principal |
+| `virtual_principals.set_enabled` | `SERVICE/svc_identityd` | Exact target plus `/virtual-principals/<principal_id>` |
+| `external_identity_links.create` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `external_identity_links.delete` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `external_identity_links.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `login_providers.create` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `login_providers.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers` or one exact provider |
+| `login_providers.update` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `login_providers.set_state` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `workspace_login_provider_admissions.set` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
+| `workspace_login_provider_admissions.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers` |
 | `apps.create` | `SERVICE/svc_pkgd` | `<scope>/apps` |
 | `apps.read` | `SERVICE/svc_pkgd` | `<scope>/apps/<app_id>` |
 | `apps.set_package_generation` | `SERVICE/svc_pkgd` | `<scope>/apps/<app_id>` |
@@ -107,6 +131,10 @@ Global capability target for a product operation either; a globally placed
 workload acts through the non-Global invocation it is serving. Execd's list and
 exact read paths share their corresponding read operation. Every ID and purpose
 segment retains the canonical grammar and bound declared by its owning service.
+
+For Identityd rows, "exact target" is `/tenants/<tenant_id>` or
+`/tenants/<tenant_id>/workspaces/<workspace_id>`. Account and virtual-principal
+IDs remain one canonical path segment.
 
 `CreateTenant`, `ListTenants`, and `SetTenantState` remain operator operations.
 `ResolveTenant` and `ResolveWorkspace` remain autonomous-kernel operations.

@@ -237,12 +237,8 @@ function createSource(
     },
     readIdentitySessionEvents: async () => {
       const events = await readEvents();
-      if (events.some((event) =>
-        event.detailKind !== "identity_session")) {
-        throw new Error(
-          "Audit source contains non-identity-Session evidence");
-      }
-      return events;
+      return events.filter((event) =>
+        event.detailKind === "identity_session");
     },
     stop: async () => {
       if (stopped) {

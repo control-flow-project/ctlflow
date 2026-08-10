@@ -7,6 +7,7 @@ import {
   createTestServiceTls,
   type KustomizeServiceFiles,
   type TestKubernetes,
+  type TestServiceTls,
   type TestWorkloadCredentials
 } from "@ctlflow/test-mesh";
 
@@ -23,9 +24,10 @@ export async function preparePolicydFiles(
   workload: TestWorkloadCredentials,
   kubernetes: TestKubernetes,
   identityCertificateAuthorityPath: string,
-  executionCertificateAuthorityPath?: string
+  executionCertificateAuthorityPath?: string,
+  suppliedTls?: TestServiceTls
 ): Promise<PreparedPolicydFiles> {
-  const tls = await createTestServiceTls(
+  const tls = suppliedTls ?? await createTestServiceTls(
     repositoryRoot,
     directory,
     serviceName,

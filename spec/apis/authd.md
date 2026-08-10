@@ -38,6 +38,7 @@ Form fields:
 | --- | --- | --- |
 | `tenant_id` | yes | Selected Tenant |
 | `provider_id` | yes | Selected projected provider |
+| `workspace_id` | no | Workspace whose exact provider admission is required |
 | `return_to` | no | Same-origin path and optional query; defaults to `/` |
 
 Example:
@@ -47,7 +48,7 @@ curl -i \
   -X POST \
   -H 'Origin: https://northwind.example.com' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
-  --data 'tenant_id=northwind&provider_id=workforce&return_to=%2Fatlas%2F' \
+  --data 'tenant_id=northwind&workspace_id=atlas&provider_id=workforce&return_to=%2Fatlas%2F' \
   https://northwind.example.com/auth/v1/begin
 ```
 
@@ -63,10 +64,12 @@ X-Content-Type-Options: nosniff
 Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'
 ```
 
-Authd fixes the authorization endpoint and client configuration from its
-projected provider entry. It creates a PKCE S256 verifier and one
-browser-bound attempt. The request cannot supply an authorization endpoint,
-client ID, redirect URI, scope, or PKCE method.
+Authd requires an active matching Identityd provider registration and, when a
+Workspace is selected, an exact current admission for that provider. It fixes
+the authorization endpoint and client configuration from the matching
+projected provider entry. It creates a PKCE S256 verifier and one browser-bound
+attempt. The request cannot supply an authorization endpoint, client ID,
+redirect URI, scope, or PKCE method.
 
 ## Provider callback
 
@@ -95,6 +98,7 @@ On the code branch, Authd:
 
 ```text
 consume matching browser-bound attempt
+  -> revalidate Identityd provider and optional Workspace admission
   -> purpose-bound Egressd POST to exact token endpoint
   -> validate Bearer token response and RS256 ID token
   -> purpose-bound Egressd GET to exact UserInfo endpoint

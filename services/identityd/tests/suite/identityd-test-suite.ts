@@ -1,6 +1,7 @@
 import type {
   OpenTelemetryCollector,
-  TestKubernetes
+  TestKubernetes,
+  TestServiceTls
 } from "@ctlflow/test-mesh";
 import type {
   AuditdProductionService
@@ -14,6 +15,7 @@ export interface IdentitydTestSuite {
   readonly kubernetes: TestKubernetes;
   readonly collector: OpenTelemetryCollector;
   readonly auditd: AuditdProductionService;
+  readonly policydTls: TestServiceTls;
   readonly runtime: IdentitydTestRuntime;
   readonly stop: () => Promise<void>;
 }

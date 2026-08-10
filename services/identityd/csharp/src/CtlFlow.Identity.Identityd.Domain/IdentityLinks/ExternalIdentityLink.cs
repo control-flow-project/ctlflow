@@ -15,6 +15,20 @@ public class ExternalIdentityLink
     {
     }
 
+    public ExternalIdentityLink(
+        TenantId tenantId,
+        ProviderId providerId,
+        ProviderSubject providerSubject,
+        AccountId accountId,
+        Revision revision)
+    {
+        _tenantId = tenantId.Value;
+        _providerId = providerId.Value;
+        _providerSubject = providerSubject.Value;
+        _accountId = accountId.Value;
+        Revision = revision;
+    }
+
     public AccountId AccountId => AccountId.FromStorage(_accountId);
 
     public ProviderId ProviderId => ProviderId.FromStorage(_providerId);

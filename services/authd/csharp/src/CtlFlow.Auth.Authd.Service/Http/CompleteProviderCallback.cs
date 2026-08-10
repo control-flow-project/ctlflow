@@ -69,6 +69,14 @@ internal static partial class BrowserRoutes
                 attempt.TenantId,
                 attempt.ProviderId)
                 ?? throw new DependencyUnavailableException("projection");
+            dependency = "identityd";
+            await ValidateLoginProviderSelection(
+                identityClient,
+                settings.Workload,
+                telemetry,
+                provider,
+                attempt.WorkspaceId,
+                timeout.Token);
             dependency = "egressd";
             var subject = await CompleteOidcAuthentication(
                 egressClient,
@@ -154,6 +162,10 @@ internal static partial class BrowserRoutes
             HttpContractException contract =>
                 (contract.StatusCode, contract.Outcome, "none"),
             OidcRejectedException =>
+                (StatusCodes.Status401Unauthorized,
+                    "authentication_rejected",
+                    currentDependency),
+            LoginProviderRejectedException =>
                 (StatusCodes.Status401Unauthorized,
                     "authentication_rejected",
                     currentDependency),

@@ -47,7 +47,7 @@ contract.
 | Service | Responsibility | Contract |
 | --- | --- | --- |
 | `tenantd` | Tenants and Workspaces | [12 unary RPCs](spec/apis/tenantd.md) |
-| `identityd` | Principals, standing, Groups, Sessions, invocation identity | [7 unary RPCs](spec/apis/identityd.md) |
+| `identityd` | Principals, standing, Groups, login identity, Sessions, invocation identity | [33 unary RPCs](spec/apis/identityd.md) |
 | `policyd` | Capability grants and access decisions | [1 unary RPC](spec/apis/policyd.md) |
 | `pkgd` | Immutable Package generations and installed App intent | [5 unary RPCs](spec/apis/pkgd.md) |
 | `configd` | Configuration, secret custody, exact consumer projections | [5 unary RPCs](spec/apis/configd.md) |

@@ -14,7 +14,7 @@ internal static partial class AuditDelivery
         AuditService.AuditServiceClient auditClient,
         AuditSettings settings,
         IdentitydTelemetry telemetry,
-        SessionAuditIntent intent,
+        IdentityAuditIntent intent,
         CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();

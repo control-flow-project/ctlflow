@@ -1,5 +1,6 @@
 using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
 using CtlFlow.Identity.Identityd.Domain.Memberships;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Resources;
 using Microsoft.EntityFrameworkCore;
 
@@ -48,6 +49,11 @@ internal static partial class ExternalIdentityLinkSchema
             .WithMany()
             .HasForeignKey("_accountId", "_tenantId")
             .HasPrincipalKey("_accountId", "_tenantId")
+            .OnDelete(DeleteBehavior.Restrict);
+        link.HasOne<LoginProvider>()
+            .WithMany()
+            .HasForeignKey("_tenantId", "_providerId")
+            .HasPrincipalKey("_tenantId", "_providerId")
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

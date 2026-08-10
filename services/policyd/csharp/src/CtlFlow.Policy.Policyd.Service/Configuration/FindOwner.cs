@@ -13,6 +13,7 @@ internal sealed partial record OwnerCallerSettings
         if (caller == Pkgd) return OperationOwner.Pkgd;
         if (caller == Configd) return OperationOwner.Configd;
         if (caller == Execd) return OperationOwner.Execd;
+        if (caller == Identityd) return OperationOwner.Identityd;
         return null;
     }
 }

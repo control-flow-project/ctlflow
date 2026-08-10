@@ -13,7 +13,7 @@ checked versioned contracts.
 | Concept | Owner |
 | --- | --- |
 | Tenant and Workspace | `tenantd` |
-| Account, Membership standing, Group, external identity link, Session, virtual principal, invocation identity | `identityd` |
+| Account, Membership standing, Group, external identity link, login-provider registration, Workspace provider admission, Session, virtual principal, invocation identity | `identityd` |
 | Role, grant, kernel operation catalog, access decision | `policyd` |
 | Package operation declaration | `pkgd` |
 | Admitted Workload operation authority | `execd` |
@@ -75,11 +75,18 @@ Invocation tokens carry identity and target-fence facts, never permission
 snapshots.
 
 An external identity link maps one exact Tenant, provider ID, and provider
-subject to one human account. It is identity state, not provider protocol
-configuration. A browser Session contains an opaque generated ID, one human
-account, one Tenant fence, a digest of a one-time credential, finite lifetime,
-revocation state, and positive revision. Raw Session credentials and
-invocation-signing private keys are never persisted as domain records.
+subject to one human account. A Tenant login-provider registration stores
+non-secret display and state metadata plus exact Configd configuration and
+secret version references. A Workspace provider admission stores only the ID
+of one provider in its parent Tenant. Identityd never stores provider material
+or interprets OIDC.
+
+A browser Session contains an opaque generated ID, one human account, one
+Tenant fence, the immutable login provider used to create it, a digest of a
+one-time credential, finite lifetime, revocation state, and positive revision.
+Workspace exchange additionally requires a current admission for that
+provider. Raw Session credentials and invocation-signing private keys are
+never persisted as domain records.
 
 ## Policy
 

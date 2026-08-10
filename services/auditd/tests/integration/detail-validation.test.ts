@@ -1,8 +1,4 @@
-import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  status
-} from "@grpc/grpc-js";
 import {
   AppMutationAction,
   ExecutionDesiredState,
@@ -13,29 +9,20 @@ import {
   TenancyResourceState,
   TenantMutationAction,
   WorkloadMutationAction,
-  WorkspaceMutationAction,
-  type AuditEvent
+  WorkspaceMutationAction
 } from "../generated/v1/auditd.js";
 import {
   getAuditdTestContext
 } from "../suite/get-auditd-test-context.js";
 import {
-  findAdmittedAuditEvent,
-  type AdmittedAuditEvent,
-  type AuditDetailField
-} from "../support/audit-events/find-admitted-audit-event.js";
-import {
-  matchGrpcStatus
-} from "../support/match-grpc-status.js";
-import {
-  recordAuditBatch
-} from "../support/record-audit-batch.js";
-
-type Mutate = (event: AuditEvent) => void;
+  admittedAuditDetail,
+  rejectAuditDetailCases
+} from "../support/audit-events/reject-audit-detail-cases.js";
 
 test("validates Tenant and Workspace mutation details", async () => {
-  const tenant = admitted("tenantd", "tenantMutation");
-  await rejectCases(tenant, [
+  const tenant = admittedAuditDetail(
+    getAuditdTestContext(), "tenantd", "tenantMutation");
+  await rejectAuditDetailCases(getAuditdTestContext(), tenant, [
     ["tenant action unspecified", (event) => {
       event.tenantMutation!.action =
         TenantMutationAction.TENANT_MUTATION_ACTION_UNSPECIFIED;
@@ -60,8 +47,9 @@ test("validates Tenant and Workspace mutation details", async () => {
     }]
   ]);
 
-  const workspace = admitted("tenantd", "workspaceMutation");
-  await rejectCases(workspace, [
+  const workspace = admittedAuditDetail(
+    getAuditdTestContext(), "tenantd", "workspaceMutation");
+  await rejectAuditDetailCases(getAuditdTestContext(), workspace, [
     ["empty Workspace ID", (event) => {
       event.workspaceMutation!.workspaceId = "";
     }],
@@ -90,8 +78,9 @@ test("validates Tenant and Workspace mutation details", async () => {
 });
 
 test("validates Identity Session and Package details", async () => {
-  const identity = admitted("identityd", "identitySession");
-  await rejectCases(identity, [
+  const identity = admittedAuditDetail(
+    getAuditdTestContext(), "identityd", "identitySession");
+  await rejectAuditDetailCases(getAuditdTestContext(), identity, [
     ["empty Session ID", (event) => {
       event.identitySession!.sessionId = "";
     }],
@@ -120,8 +109,9 @@ test("validates Identity Session and Package details", async () => {
     }]
   ]);
 
-  const declaration = admitted("pkgd", "packageDeclaration");
-  await rejectCases(declaration, [
+  const declaration = admittedAuditDetail(
+    getAuditdTestContext(), "pkgd", "packageDeclaration");
+  await rejectAuditDetailCases(getAuditdTestContext(), declaration, [
     ["empty Package ID", (event) => {
       event.packageDeclaration!.packageId = "";
     }],
@@ -142,8 +132,9 @@ test("validates Identity Session and Package details", async () => {
 });
 
 test("validates App mutation details", async () => {
-  const app = admitted("pkgd", "appMutation");
-  await rejectCases(app, [
+  const app = admittedAuditDetail(
+    getAuditdTestContext(), "pkgd", "appMutation");
+  await rejectAuditDetailCases(getAuditdTestContext(), app, [
     ["empty App ID", (event) => {
       event.appMutation!.appId = "";
     }],
@@ -197,8 +188,10 @@ test("validates Configuration and Secret publication details", async () => {
     "configurationPublication",
     "secretPublication"
   ] as const) {
-    const publication = admitted("configd", detail);
-    await rejectCases(publication, [
+    const publication = admittedAuditDetail(
+      getAuditdTestContext(), "configd", detail);
+    await rejectAuditDetailCases(
+      getAuditdTestContext(), publication, [
       ["missing publication target", (event) => {
         event[detail]!.target = undefined;
       }],
@@ -263,8 +256,9 @@ test("validates Configuration and Secret publication details", async () => {
 });
 
 test("validates Projection mutation details", async () => {
-  const projection = admitted("configd", "projectionMutation");
-  await rejectCases(projection, [
+  const projection = admittedAuditDetail(
+    getAuditdTestContext(), "configd", "projectionMutation");
+  await rejectAuditDetailCases(getAuditdTestContext(), projection, [
     ["invalid Projection ID", (event) => {
       event.projectionMutation!.projectionId =
         `prj_${"1".repeat(52)}`;
@@ -304,8 +298,9 @@ test("validates Projection mutation details", async () => {
 });
 
 test("validates Placement, Workload, and Run mutation details", async () => {
-  const placement = admitted("execd", "placementMutation");
-  await rejectCases(placement, [
+  const placement = admittedAuditDetail(
+    getAuditdTestContext(), "execd", "placementMutation");
+  await rejectAuditDetailCases(getAuditdTestContext(), placement, [
     ["empty Placement ID", (event) => {
       event.placementMutation!.placementId = "";
     }],
@@ -334,8 +329,9 @@ test("validates Placement, Workload, and Run mutation details", async () => {
     }]
   ]);
 
-  const workload = admitted("execd", "workloadMutation");
-  await rejectCases(workload, [
+  const workload = admittedAuditDetail(
+    getAuditdTestContext(), "execd", "workloadMutation");
+  await rejectAuditDetailCases(getAuditdTestContext(), workload, [
     ["empty Workload ID", (event) => {
       event.workloadMutation!.workloadId = "";
     }],
@@ -369,8 +365,9 @@ test("validates Placement, Workload, and Run mutation details", async () => {
     }]
   ]);
 
-  const run = admitted("execd", "runMutation");
-  await rejectCases(run, [
+  const run = admittedAuditDetail(
+    getAuditdTestContext(), "execd", "runMutation");
+  await rejectAuditDetailCases(getAuditdTestContext(), run, [
     ["empty Run ID", (event) => {
       event.runMutation!.runId = "";
     }],
@@ -401,34 +398,3 @@ test("validates Placement, Workload, and Run mutation details", async () => {
     }]
   ]);
 });
-
-function admitted(
-  sourceName: string,
-  detail: AuditDetailField
-): AdmittedAuditEvent {
-  return findAdmittedAuditEvent(
-    getAuditdTestContext(),
-    sourceName,
-    detail);
-}
-
-async function rejectCases(
-  admittedEvent: AdmittedAuditEvent,
-  cases: readonly (readonly [string, Mutate])[]
-): Promise<void> {
-  for (const [name, mutate] of cases) {
-    const event = cloneEvent(admittedEvent.event);
-    mutate(event);
-    await assert.rejects(
-      recordAuditBatch(
-        getAuditdTestContext(),
-        admittedEvent.workload,
-        [event]),
-      matchGrpcStatus(status.INVALID_ARGUMENT),
-      name);
-  }
-}
-
-function cloneEvent(event: AuditEvent): AuditEvent {
-  return structuredClone(event);
-}

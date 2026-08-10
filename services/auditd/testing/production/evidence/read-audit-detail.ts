@@ -11,6 +11,9 @@ import {
 import {
   mapPlacementTarget
 } from "./map-placement-target.js";
+import {
+  readIdentityAuditDetail
+} from "./read-identity-audit-detail.js";
 
 type AuditEnvelopeKey =
   | "sourceEventId"
@@ -208,6 +211,17 @@ export async function readAuditDetail(
           database,
           "audit_run_mutations",
           eventKey));
+    case 12:
+    case 13:
+    case 14:
+    case 15:
+    case 16:
+    case 17:
+    case 18:
+      return await readIdentityAuditDetail(
+        database,
+        eventKey,
+        detailKind);
     default:
       throw new Error("Stored audit detail kind is invalid");
   }

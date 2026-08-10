@@ -7,5 +7,6 @@ public sealed record ExternalIdentityFacts(
     AccountId AccountId,
     AccountKind AccountKind,
     bool AccountEnabled,
+    bool ProviderActive,
     TenantId LinkTenantId,
     TenantId MembershipTenantId);

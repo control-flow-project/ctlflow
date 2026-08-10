@@ -9,10 +9,16 @@ namespace CtlFlow.Identity.Identityd.Domain.Auditing;
 public sealed record SessionAuditIntent(
     AuditEventId EventId,
     SessionAuditAction Action,
-    AuditCaller Caller,
+    AuditAttribution Attribution,
     SessionId SessionId,
     AccountId AccountId,
     TenantId TenantId,
     Revision SessionRevision,
     AuditCorrelation Correlation,
-    UtcInstant OccurredAt);
+    UtcInstant OccurredAt)
+    : IdentityAuditIntent(
+        EventId,
+        Attribution,
+        TenantId,
+        Correlation,
+        OccurredAt);

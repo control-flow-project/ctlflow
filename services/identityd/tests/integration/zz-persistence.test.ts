@@ -15,6 +15,16 @@ import {
   getIdentitydTestContext
 } from "../suite/get-identityd-test-context.js";
 import {
+  createAdministrationCalls,
+  type AdministrationCall
+} from "../support/administration/create-administration-calls.js";
+import {
+  createAdministrationCapabilities
+} from "../support/administration/create-administration-capabilities.js";
+import {
+  allowIdentityCapabilities
+} from "../support/authorization/allow-identity-capabilities.js";
+import {
   callUnary
 } from "../support/call-unary.js";
 import {
@@ -27,6 +37,9 @@ import {
   createSession
 } from "../support/sessions/create-session.js";
 import {
+  identityAdminMetadata
+} from "../support/identity-admin-metadata.js";
+import {
   waitForProbeStatus
 } from "../support/wait-for-probe-status.js";
 import {
@@ -37,8 +50,18 @@ test("every RPC maps required persistence failure to unavailable",
   async () => {
     const context = getIdentitydTestContext();
     const session = await createSession();
+    await allowIdentityCapabilities(
+      context,
+      createAdministrationCapabilities("persistence"));
+    const administration = createAdministrationCalls(
+      identityAdminMetadata(context, "acme"),
+      "persistence");
+    for (const call of administration.slice(0, 21)) {
+      await call.request();
+    }
     for (const persistenceCase of persistenceCases(
-      session.sessionCredential
+      session.sessionCredential,
+      administration
     )) {
       const unavailableTable =
         `${persistenceCase.table}_unavailable`;
@@ -63,20 +86,25 @@ test("every RPC maps required persistence failure to unavailable",
 
 test("readiness and RPCs fail closed when a mapped table is missing", async () => {
   const context = getIdentitydTestContext();
-  await context.database.connection.schema.renameTable(
-    "accounts",
-    "accounts_incompatible");
-  try {
-    await waitForProbeStatus(context.probePort, 503);
-    await assert.rejects(
-      resolveAlice(),
-      matchGrpcStatus(status.UNAVAILABLE));
-  } finally {
+  for (const table of identityDomainTables) {
+    const incompatible = `${table}_incompatible`;
     await context.database.connection.schema.renameTable(
-      "accounts_incompatible",
-      "accounts");
+      table,
+      incompatible);
+    try {
+      await waitForProbeStatus(context.probePort, 503);
+      if (table === "accounts") {
+        await assert.rejects(
+          resolveAlice(),
+          matchGrpcStatus(status.UNAVAILABLE));
+      }
+    } finally {
+      await context.database.connection.schema.renameTable(
+        incompatible,
+        table);
+    }
+    await waitForProbeStatus(context.probePort, 204);
   }
-  await waitForProbeStatus(context.probePort, 204);
   assert.equal((await resolveAlice()).principalId, "user:alice");
 });
 
@@ -118,6 +146,32 @@ test("startup rejects empty and malformed caller admission", async () => {
     await context.service.restart({
       [name]: context.environment[name]!
     });
+  }
+  await waitForProbeStatus(context.probePort, 204);
+});
+
+test("startup rejects overlapping Authd and capability callers", async () => {
+  const context = getIdentitydTestContext();
+  const pairs = [
+    [
+      "CTLFLOW_GET_LOGIN_PROVIDER_AUTHD_CALLERS",
+      "CTLFLOW_GET_LOGIN_PROVIDER_CALLERS"
+    ],
+    [
+      "CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_AUTHD_CALLERS",
+      "CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_CALLERS"
+    ]
+  ] as const;
+  for (const [autonomousName, capabilityName] of pairs) {
+    try {
+      await assert.rejects(context.service.restart({
+        [autonomousName]: context.environment[capabilityName]!
+      }));
+    } finally {
+      await context.service.restart({
+        [autonomousName]: context.environment[autonomousName]!
+      });
+    }
   }
   await waitForProbeStatus(context.probePort, 204);
 });
@@ -176,11 +230,13 @@ test("SQLite contains only migration metadata and identity domain tables",
         "invocation_verification_keys",
         "knex_migrations",
         "knex_migrations_lock",
+        "login_providers",
         "sessions",
         "sqlite_sequence",
         "tenant_memberships",
         "virtual_principal_group_memberships",
         "virtual_principals",
+        "workspace_login_provider_admissions",
         "workspace_memberships"
       ]);
     assert.deepEqual(
@@ -190,6 +246,22 @@ test("SQLite contains only migration metadata and identity domain tables",
       objects.filter((object) => object.type === "trigger"),
       []);
   });
+
+test("SQLite enforces the provider display-name bound", async () => {
+  const context = getIdentitydTestContext();
+  await assert.rejects(
+    context.database.connection("login_providers").insert({
+      tenant_id: "acme",
+      provider_id: "oversized_display_name",
+      display_name: "x".repeat(129),
+      configuration_id: "oversized_display_name",
+      configuration_version_id: "oversized_display_name_1",
+      secret_id: "oversized_display_name",
+      secret_version_id: "oversized_display_name_1",
+      state: 1,
+      revision: 1
+    }));
+});
 
 test("persists identity state across a production-process restart", async () => {
   const context = getIdentitydTestContext();
@@ -216,6 +288,21 @@ async function resolveAlice(): Promise<ResolvePrincipalResponse> {
       done));
 }
 
+const identityDomainTables = [
+  "account_group_memberships",
+  "accounts",
+  "external_identity_links",
+  "groups",
+  "invocation_verification_keys",
+  "login_providers",
+  "sessions",
+  "tenant_memberships",
+  "virtual_principal_group_memberships",
+  "virtual_principals",
+  "workspace_login_provider_admissions",
+  "workspace_memberships"
+] as const;
+
 async function exchangeSession(
   sessionCredential: Buffer
 ): Promise<IssueInvocationResponse> {
@@ -231,7 +318,8 @@ async function exchangeSession(
 }
 
 function persistenceCases(
-  sessionCredential: Buffer
+  sessionCredential: Buffer,
+  administration: readonly AdministrationCall[]
 ): readonly {
   readonly table: string;
   readonly calls: readonly {
@@ -241,6 +329,8 @@ function persistenceCases(
 }[] {
   const context = getIdentitydTestContext();
   const invocation = context.invocation.sign({ tenantId: "acme" });
+  const administrationByName = new Map(
+    administration.map((call) => [call.name, call]));
   return [
     {
       table: "invocation_verification_keys",
@@ -345,6 +435,64 @@ function persistenceCases(
                 done))
         }
       ]
-    }
+    },
+    administrationCase(
+      "tenant_memberships",
+      "AddTenantMember",
+      "RemoveTenantMember",
+      "ListTenantMembers"),
+    administrationCase(
+      "workspace_memberships",
+      "AddWorkspaceMember",
+      "RemoveWorkspaceMember",
+      "ListWorkspaceMembers"),
+    administrationCase(
+      "groups",
+      "CreateGroup",
+      "DeleteGroup",
+      "ListGroups"),
+    administrationCase(
+      "account_group_memberships",
+      "AddGroupMember",
+      "RemoveGroupMember",
+      "ListGroupMembers"),
+    administrationCase(
+      "virtual_principals",
+      "CreateVirtualPrincipal",
+      "GetVirtualPrincipal",
+      "ListVirtualPrincipals",
+      "SetVirtualPrincipalEnabled"),
+    administrationCase(
+      "external_identity_links",
+      "CreateExternalIdentityLink",
+      "DeleteExternalIdentityLink",
+      "ListExternalIdentityLinks"),
+    administrationCase(
+      "login_providers",
+      "CreateLoginProvider",
+      "GetLoginProvider",
+      "ListLoginProviders",
+      "UpdateLoginProvider",
+      "SetLoginProviderState"),
+    administrationCase(
+      "workspace_login_provider_admissions",
+      "SetWorkspaceLoginProviderAdmission",
+      "ListWorkspaceLoginProviderAdmissions")
   ];
+
+  function administrationCase(
+    table: string,
+    ...names: readonly string[]
+  ) {
+    return {
+      table,
+      calls: names.map((name) => {
+        const call = administrationByName.get(name);
+        if (call === undefined) {
+          throw new Error(`Administration call is missing: ${name}`);
+        }
+        return { name, request: call.request };
+      })
+    };
+  }
 }

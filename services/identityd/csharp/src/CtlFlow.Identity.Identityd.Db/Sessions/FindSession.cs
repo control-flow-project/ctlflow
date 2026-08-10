@@ -29,6 +29,7 @@ public static partial class Sessions
                 Id = EF.Property<string>(session, "_id"),
                 AccountId = EF.Property<string>(session, "_accountId"),
                 TenantId = EF.Property<string>(session, "_tenantId"),
+                ProviderId = EF.Property<string>(session, "_providerId"),
                 session.ExpiresAt,
                 session.RevokedAt,
                 session.Revision
@@ -40,6 +41,7 @@ public static partial class Sessions
                 SessionId.FromStorage(row.Id),
                 Domain.Accounts.AccountId.FromStorage(row.AccountId),
                 Domain.Tenants.TenantId.FromStorage(row.TenantId),
+                Domain.IdentityLinks.ProviderId.FromStorage(row.ProviderId),
                 row.ExpiresAt,
                 row.RevokedAt,
                 row.Revision);

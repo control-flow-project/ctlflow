@@ -42,5 +42,8 @@
     <Protobuf Include="../../../../auditd/api/proto/v1/auditd.proto"
               GrpcServices="Client"
               ProtoRoot="../../../../auditd/api/proto" />
+    <Protobuf Include="../../../../policyd/api/proto/v1/policyd.proto"
+              GrpcServices="Client"
+              ProtoRoot="../../../../policyd/api/proto" />
   </ItemGroup>
 </Project>

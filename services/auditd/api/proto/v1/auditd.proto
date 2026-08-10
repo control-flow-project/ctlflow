@@ -44,6 +44,14 @@ message AuditEvent {
     PlacementMutationAuditDetail placement_mutation = 15;
     WorkloadMutationAuditDetail workload_mutation = 16;
     RunMutationAuditDetail run_mutation = 17;
+    IdentityMembershipAuditDetail identity_membership = 18;
+    IdentityGroupAuditDetail identity_group = 19;
+    IdentityGroupMemberAuditDetail identity_group_member = 20;
+    IdentityVirtualPrincipalAuditDetail identity_virtual_principal = 21;
+    IdentityExternalLinkAuditDetail identity_external_link = 22;
+    IdentityLoginProviderAuditDetail identity_login_provider = 23;
+    IdentityWorkspaceProviderAdmissionAuditDetail
+        identity_workspace_provider_admission = 24;
   }
 }
 
@@ -134,6 +142,55 @@ message IdentitySessionAuditDetail {
   string human_account_principal_id = 2;
   uint64 session_revision = 3;
   IdentitySessionAction action = 4;
+}
+
+message IdentityMembershipAuditDetail {
+  string account_principal_id = 1;
+  optional string workspace_id = 2;
+  uint64 membership_revision = 3;
+  IdentityMembershipAction action = 4;
+  bool account_created = 5;
+}
+
+message IdentityGroupAuditDetail {
+  string group_id = 1;
+  optional string workspace_id = 2;
+  IdentityGroupAction action = 3;
+}
+
+message IdentityGroupMemberAuditDetail {
+  string group_id = 1;
+  string principal_id = 2;
+  optional string workspace_id = 3;
+  IdentityGroupMemberAction action = 4;
+}
+
+message IdentityVirtualPrincipalAuditDetail {
+  string principal_id = 1;
+  string attached_account_principal_id = 2;
+  optional string workspace_id = 3;
+  uint64 principal_revision = 4;
+  bool enabled = 5;
+  IdentityVirtualPrincipalAction action = 6;
+}
+
+message IdentityExternalLinkAuditDetail {
+  string provider_id = 1;
+  string human_account_principal_id = 2;
+  IdentityExternalLinkAction action = 3;
+}
+
+message IdentityLoginProviderAuditDetail {
+  string provider_id = 1;
+  uint64 provider_revision = 2;
+  IdentityLoginProviderState resulting_state = 3;
+  IdentityLoginProviderAction action = 4;
+}
+
+message IdentityWorkspaceProviderAdmissionAuditDetail {
+  string workspace_id = 1;
+  string provider_id = 2;
+  IdentityWorkspaceProviderAdmissionAction action = 3;
 }
 
 message PackageDeclarationAuditDetail {
@@ -237,6 +294,56 @@ enum IdentitySessionAction {
   IDENTITY_SESSION_ACTION_UNSPECIFIED = 0;
   IDENTITY_SESSION_ACTION_CREATED = 1;
   IDENTITY_SESSION_ACTION_REVOKED = 2;
+}
+
+enum IdentityMembershipAction {
+  IDENTITY_MEMBERSHIP_ACTION_UNSPECIFIED = 0;
+  IDENTITY_MEMBERSHIP_ACTION_ADDED = 1;
+  IDENTITY_MEMBERSHIP_ACTION_REMOVED = 2;
+}
+
+enum IdentityGroupAction {
+  IDENTITY_GROUP_ACTION_UNSPECIFIED = 0;
+  IDENTITY_GROUP_ACTION_CREATED = 1;
+  IDENTITY_GROUP_ACTION_DELETED = 2;
+}
+
+enum IdentityGroupMemberAction {
+  IDENTITY_GROUP_MEMBER_ACTION_UNSPECIFIED = 0;
+  IDENTITY_GROUP_MEMBER_ACTION_ADDED = 1;
+  IDENTITY_GROUP_MEMBER_ACTION_REMOVED = 2;
+}
+
+enum IdentityVirtualPrincipalAction {
+  IDENTITY_VIRTUAL_PRINCIPAL_ACTION_UNSPECIFIED = 0;
+  IDENTITY_VIRTUAL_PRINCIPAL_ACTION_CREATED = 1;
+  IDENTITY_VIRTUAL_PRINCIPAL_ACTION_ENABLED_STATE_CHANGED = 2;
+}
+
+enum IdentityExternalLinkAction {
+  IDENTITY_EXTERNAL_LINK_ACTION_UNSPECIFIED = 0;
+  IDENTITY_EXTERNAL_LINK_ACTION_CREATED = 1;
+  IDENTITY_EXTERNAL_LINK_ACTION_DELETED = 2;
+}
+
+enum IdentityLoginProviderAction {
+  IDENTITY_LOGIN_PROVIDER_ACTION_UNSPECIFIED = 0;
+  IDENTITY_LOGIN_PROVIDER_ACTION_CREATED = 1;
+  IDENTITY_LOGIN_PROVIDER_ACTION_UPDATED = 2;
+  IDENTITY_LOGIN_PROVIDER_ACTION_STATE_CHANGED = 3;
+}
+
+enum IdentityLoginProviderState {
+  IDENTITY_LOGIN_PROVIDER_STATE_UNSPECIFIED = 0;
+  IDENTITY_LOGIN_PROVIDER_STATE_ACTIVE = 1;
+  IDENTITY_LOGIN_PROVIDER_STATE_DISABLED = 2;
+  IDENTITY_LOGIN_PROVIDER_STATE_DELETED = 3;
+}
+
+enum IdentityWorkspaceProviderAdmissionAction {
+  IDENTITY_WORKSPACE_PROVIDER_ADMISSION_ACTION_UNSPECIFIED = 0;
+  IDENTITY_WORKSPACE_PROVIDER_ADMISSION_ACTION_ADMITTED = 1;
+  IDENTITY_WORKSPACE_PROVIDER_ADMISSION_ACTION_REMOVED = 2;
 }
 
 enum AppMutationAction {

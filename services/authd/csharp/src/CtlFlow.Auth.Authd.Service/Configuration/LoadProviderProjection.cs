@@ -52,6 +52,7 @@ internal static partial class ProviderProjections
                     new ProviderRegistration(
                         item.TenantId,
                         item.ProviderId,
+                        item.ProjectionReference,
                         item.Issuer,
                         item.AuthorizationEndpoint,
                         item.TokenEndpoint,
@@ -203,6 +204,10 @@ internal static partial class ProviderProjections
             [
                 "tenant_id",
                 "provider_id",
+                "configuration_id",
+                "configuration_version_id",
+                "secret_id",
+                "secret_version_id",
                 "issuer",
                 "authorization_endpoint",
                 "token_endpoint",
@@ -237,6 +242,19 @@ internal static partial class ProviderProjections
         return new PendingProvider(
             TenantId.Parse(RequireString(element, "tenant_id")),
             ProviderId.Parse(RequireString(element, "provider_id")),
+            new ProviderProjectionReference(
+                RequireIdentifier(
+                    RequireString(element, "configuration_id"),
+                    "configuration ID"),
+                RequireIdentifier(
+                    RequireString(element, "configuration_version_id"),
+                    "configuration version ID"),
+                RequireIdentifier(
+                    RequireString(element, "secret_id"),
+                    "secret ID"),
+                RequireIdentifier(
+                    RequireString(element, "secret_version_id"),
+                    "secret version ID")),
             ParseProviderUri(RequireString(element, "issuer")),
             ParseProviderUri(
                 RequireString(element, "authorization_endpoint")),
@@ -558,6 +576,7 @@ internal static partial class ProviderProjections
     private sealed record PendingProvider(
         TenantId TenantId,
         ProviderId ProviderId,
+        ProviderProjectionReference ProjectionReference,
         Uri Issuer,
         Uri AuthorizationEndpoint,
         Uri TokenEndpoint,

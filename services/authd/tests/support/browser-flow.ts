@@ -28,7 +28,8 @@ export interface CompletedAuthentication {
 
 export async function beginAuthentication(
   returnTo?: string,
-  stateCookie?: string
+  stateCookie?: string,
+  workspaceId?: string
 ): Promise<BegunAuthentication> {
   const parameters = new URLSearchParams({
     tenant_id: "acme",
@@ -36,6 +37,9 @@ export async function beginAuthentication(
   });
   if (returnTo !== undefined) {
     parameters.set("return_to", returnTo);
+  }
+  if (workspaceId !== undefined) {
+    parameters.set("workspace_id", workspaceId);
   }
   const body = parameters.toString();
   let response: AuthdHttpResponse;
@@ -79,10 +83,14 @@ export async function beginAuthentication(
 
 export async function completeAuthentication(
   returnTo?: string,
-  existingSessionCookie?: string
+  existingSessionCookie?: string,
+  workspaceId?: string
 ): Promise<CompletedAuthentication> {
   const suite = getAuthdTestSuite();
-  const begin = await beginAuthentication(returnTo);
+  const begin = await beginAuthentication(
+    returnTo,
+    undefined,
+    workspaceId);
   const authorization = await suite.provider.authorize(
     begin.authorizationLocation);
   if (authorization.statusCode !== 303

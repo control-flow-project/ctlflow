@@ -4,6 +4,7 @@ using CtlFlow.Identity.Identityd.Domain.Auditing;
 using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
 using CtlFlow.Identity.Identityd.Domain.Sessions;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using Microsoft.EntityFrameworkCore;
 
 namespace CtlFlow.Identity.Identityd.Db.Sessions;
@@ -52,6 +53,15 @@ public static partial class Sessions
         ExternalIdentityFacts? identity = null;
         if (link is not null)
         {
+            var provider = await database.LoginProviders
+                .AsNoTracking()
+                .Where(candidate =>
+                    EF.Property<string>(candidate, "_tenantId")
+                        == tenantIdValue
+                    && EF.Property<string>(candidate, "_providerId")
+                        == providerIdValue)
+                .Select(candidate => candidate.State)
+                .SingleOrDefaultAsync(queryCancellation);
             var accountIdValue = link.AccountId;
             var account = await database.Accounts
                 .AsNoTracking()
@@ -88,6 +98,7 @@ public static partial class Sessions
                     AccountId.FromStorage(account.Id),
                     account.Kind,
                     account.Enabled,
+                    provider == LoginProviderState.Active,
                     TenantId.FromStorage(link.TenantId),
                     TenantId.FromStorage(membership.TenantId));
             }
@@ -96,6 +107,7 @@ public static partial class Sessions
         var creationResult =
             await Domain.Sessions.Sessions.CreateSession(
             identity,
+            providerId,
             credentialDigest,
             lifetime,
             audit,

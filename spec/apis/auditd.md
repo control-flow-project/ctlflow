@@ -76,6 +76,13 @@ account. Both identities are retained.
 | `tenant_mutation` | Tenant action, revision, resulting state |
 | `workspace_mutation` | Workspace ID, action, revision, resulting state |
 | `identity_session` | Session ID, human account, revision, created or revoked |
+| `identity_membership` | Account, optional Workspace, revision, added/removed, and account-created fact |
+| `identity_group` | Group, optional Workspace, created/deleted |
+| `identity_group_member` | Group, principal, optional Workspace, added/removed |
+| `identity_virtual_principal` | Virtual principal, attached account, fence, revision, enabled state, action |
+| `identity_external_link` | Provider ID, human account, created/deleted; no provider subject |
+| `identity_login_provider` | Provider ID, revision, state, created/updated/state changed |
+| `identity_workspace_provider_admission` | Workspace, provider ID, admitted/removed |
 | `package_declaration` | Package ID and generation |
 | `app_mutation` | App scope, Placement, Package generation, revision, action |
 | `configuration_publication` | Exact version, binding, identity revision, optional claim pair |
@@ -86,9 +93,9 @@ account. Both identities are retained.
 | `run_mutation` | Run target, revision, optional Actor, create or cancellation request |
 
 The contract has no generic operation string, JSON payload, property bag, or
-opaque detail bytes. Credentials, content, provider options, Kubernetes
-coordinates, invocation JWTs, secrets, and signing material are not audit
-detail.
+opaque detail bytes. Credentials, provider subjects, Configd references,
+content, provider options, Kubernetes coordinates, invocation JWTs, secrets,
+and signing material are not audit detail.
 
 ## Tenant mutation example
 
@@ -180,7 +187,7 @@ queue, journal, or fallback record.
 | Authenticated source | Admitted detail families |
 | --- | --- |
 | `SERVICE/svc_tenantd` | Tenant and Workspace mutations |
-| `SERVICE/svc_identityd` | Identity Session mutations |
+| `SERVICE/svc_identityd` | Identity Session and administration mutations |
 | `SERVICE/svc_pkgd` | Package and App mutations |
 | `SERVICE/svc_configd` | Configuration, secret, and projection mutations |
 | `SERVICE/svc_execd` | Placement, Workload, and Run mutations |

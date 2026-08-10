@@ -17,7 +17,7 @@ public static partial class IdentityDatabaseProviders
                     sqlite.Path,
                     sqlite.PoolSize,
                     cancellation),
-                SqliteSessionMutations.AcquireSessionMutation),
+                SqliteIdentityMutations.AcquireIdentityMutation),
             _ => throw new InvalidOperationException(
                 "Database provider is not implemented")
         };

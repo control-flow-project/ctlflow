@@ -11,8 +11,14 @@ public sealed record ProviderId
 
     public string Value { get; }
 
-    public static ProviderId Parse(string value) =>
-        new(ValidateIdentifier(value, "Provider ID"));
+    public static ValueTask<ProviderId> Parse(
+        string value,
+        CancellationToken cancellation)
+    {
+        cancellation.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(
+            new ProviderId(ValidateIdentifier(value, "Provider ID")));
+    }
 
     public static ProviderId FromStorage(string value) =>
         new(ValidateStoredIdentifier(value, "provider ID"));

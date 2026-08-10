@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@ctlflow/auditd": "0.0.0",
+    "@ctlflow/policyd": "0.0.0",
     "@ctlflow/test-mesh": "0.0.0",
     "@types/node": "24.10.1",
     "grpc-tools": "1.13.0",

@@ -16,6 +16,22 @@ public class VirtualPrincipal
     {
     }
 
+    public VirtualPrincipal(
+        VirtualPrincipalId id,
+        AccountId subjectAccountId,
+        TenantId tenantFenceId,
+        WorkspaceId? workspaceFenceId,
+        bool enabled,
+        Revision revision)
+    {
+        _id = id.Value;
+        _subjectAccountId = subjectAccountId.Value;
+        _tenantFenceId = tenantFenceId.Value;
+        _workspaceFenceId = workspaceFenceId?.Value;
+        Enabled = enabled;
+        Revision = revision;
+    }
+
     public VirtualPrincipalId Id => VirtualPrincipalId.FromStorage(_id);
 
     public AccountId SubjectAccountId =>
@@ -32,4 +48,10 @@ public class VirtualPrincipal
         _workspaceFenceId is null
             ? null
             : WorkspaceId.FromStorage(_workspaceFenceId);
+
+    internal void SetEnabled(bool enabled)
+    {
+        Enabled = enabled;
+        Revision = Revision.Next();
+    }
 }

@@ -11,6 +11,14 @@ public class AccountGroupMembership
     {
     }
 
+    public AccountGroupMembership(
+        AccountId accountId,
+        GroupId groupId)
+    {
+        _accountId = accountId.Value;
+        _groupId = groupId.Value;
+    }
+
     public AccountId AccountId => AccountId.FromStorage(_accountId);
 
     public GroupId GroupId => GroupId.FromStorage(_groupId);

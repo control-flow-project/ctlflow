@@ -152,6 +152,72 @@ export async function up(knex: Knex): Promise<void> {
       table.check("revision > 0");
     });
 
+  await knex.schema.createTable("login_providers", (table) => {
+    table.string("tenant_id", 64).notNullable();
+    table.string("provider_id", 64).notNullable();
+    table.string("display_name", 128).notNullable();
+    table.string("configuration_id", 64).notNullable();
+    table.string("configuration_version_id", 64).notNullable();
+    table.string("secret_id", 64).notNullable();
+    table.string("secret_version_id", 64).notNullable();
+    table.integer("state").notNullable();
+    table.bigInteger("revision").notNullable();
+    table.primary(["tenant_id", "provider_id"]);
+    table.index(
+      ["tenant_id", "provider_id", "state"],
+      "login_providers_page_idx");
+    table.check("length(tenant_id) BETWEEN 1 AND 64");
+    table.check("tenant_id GLOB '[a-z0-9]*'");
+    table.check("tenant_id NOT GLOB '*[^a-z0-9_-]*'");
+    table.check("length(provider_id) BETWEEN 1 AND 64");
+    table.check("provider_id GLOB '[a-z0-9]*'");
+    table.check("provider_id NOT GLOB '*[^a-z0-9_-]*'");
+    table.check("length(display_name) BETWEEN 1 AND 128");
+    table.check("length(configuration_id) BETWEEN 1 AND 64");
+    table.check("configuration_id GLOB '[a-z0-9]*'");
+    table.check("configuration_id NOT GLOB '*[^a-z0-9_-]*'");
+    table.check("length(configuration_version_id) BETWEEN 1 AND 64");
+    table.check("configuration_version_id GLOB '[a-z0-9]*'");
+    table.check(
+      "configuration_version_id NOT GLOB '*[^a-z0-9_-]*'");
+    table.check("length(secret_id) BETWEEN 1 AND 64");
+    table.check("secret_id GLOB '[a-z0-9]*'");
+    table.check("secret_id NOT GLOB '*[^a-z0-9_-]*'");
+    table.check("length(secret_version_id) BETWEEN 1 AND 64");
+    table.check("secret_version_id GLOB '[a-z0-9]*'");
+    table.check("secret_version_id NOT GLOB '*[^a-z0-9_-]*'");
+    table.check("state IN (1, 2, 3)");
+    table.check("revision > 0");
+  });
+
+  await knex.schema.createTable(
+    "workspace_login_provider_admissions",
+    (table) => {
+      table.string("tenant_id", 64).notNullable();
+      table.string("workspace_id", 64).notNullable();
+      table.string("provider_id", 64).notNullable();
+      table.primary(["tenant_id", "workspace_id", "provider_id"]);
+      table.foreign(["tenant_id", "provider_id"])
+        .references(["tenant_id", "provider_id"])
+        .inTable("login_providers")
+        .onDelete("RESTRICT");
+      table.index(
+        ["tenant_id", "provider_id"],
+        "workspace_login_provider_admissions_provider_idx");
+      table.index(
+        ["tenant_id", "workspace_id", "provider_id"],
+        "workspace_login_provider_admissions_page_idx");
+      table.check("length(tenant_id) BETWEEN 1 AND 64");
+      table.check("tenant_id GLOB '[a-z0-9]*'");
+      table.check("tenant_id NOT GLOB '*[^a-z0-9_-]*'");
+      table.check("length(workspace_id) BETWEEN 1 AND 64");
+      table.check("workspace_id GLOB '[a-z0-9]*'");
+      table.check("workspace_id NOT GLOB '*[^a-z0-9_-]*'");
+      table.check("length(provider_id) BETWEEN 1 AND 64");
+      table.check("provider_id GLOB '[a-z0-9]*'");
+      table.check("provider_id NOT GLOB '*[^a-z0-9_-]*'");
+    });
+
   await knex.schema.createTable("external_identity_links", (table) => {
     table.string("tenant_id", 64).notNullable();
     table.string("provider_id", 64).notNullable();
@@ -162,6 +228,10 @@ export async function up(knex: Knex): Promise<void> {
     table.foreign(["account_id", "tenant_id"])
       .references(["account_id", "tenant_id"])
       .inTable("tenant_memberships")
+      .onDelete("RESTRICT");
+    table.foreign(["tenant_id", "provider_id"])
+      .references(["tenant_id", "provider_id"])
+      .inTable("login_providers")
       .onDelete("RESTRICT");
     table.index(
       ["account_id", "tenant_id"],
@@ -181,21 +251,35 @@ export async function up(knex: Knex): Promise<void> {
     table.string("credential_digest", 64).notNullable().unique();
     table.string("account_id", 256).notNullable();
     table.string("tenant_id", 64).notNullable();
+    table.string("provider_id", 64).notNullable();
     table.bigInteger("created_at_unix_ms").notNullable();
     table.bigInteger("expires_at_unix_ms").notNullable();
     table.bigInteger("revoked_at_unix_ms").nullable();
     table.bigInteger("revision").notNullable();
-    table.foreign(["account_id", "tenant_id"])
-      .references(["account_id", "tenant_id"])
-      .inTable("tenant_memberships")
+    table.foreign("account_id")
+      .references("account_id")
+      .inTable("accounts")
+      .onDelete("RESTRICT");
+    table.foreign(["tenant_id", "provider_id"])
+      .references(["tenant_id", "provider_id"])
+      .inTable("login_providers")
       .onDelete("RESTRICT");
     table.index(
       ["account_id", "tenant_id"],
       "sessions_account_idx");
+    table.index(
+      ["tenant_id", "provider_id"],
+      "sessions_provider_idx");
     table.check("length(session_id) = 32");
     table.check("session_id NOT GLOB '*[^a-f0-9]*'");
     table.check("length(credential_digest) = 64");
     table.check("credential_digest NOT GLOB '*[^a-f0-9]*'");
+    table.check("length(tenant_id) BETWEEN 1 AND 64");
+    table.check("tenant_id GLOB '[a-z0-9]*'");
+    table.check("tenant_id NOT GLOB '*[^a-z0-9_-]*'");
+    table.check("length(provider_id) BETWEEN 1 AND 64");
+    table.check("provider_id GLOB '[a-z0-9]*'");
+    table.check("provider_id NOT GLOB '*[^a-z0-9_-]*'");
     table.check("created_at_unix_ms > 0");
     table.check("expires_at_unix_ms > created_at_unix_ms");
     table.check(
@@ -208,6 +292,9 @@ export async function up(knex: Knex): Promise<void> {
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTableIfExists("sessions");
   await knex.schema.dropTableIfExists("external_identity_links");
+  await knex.schema.dropTableIfExists(
+    "workspace_login_provider_admissions");
+  await knex.schema.dropTableIfExists("login_providers");
   await knex.schema.dropTableIfExists(
     "invocation_verification_keys");
   await knex.schema.dropTableIfExists(

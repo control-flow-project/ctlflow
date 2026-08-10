@@ -10,6 +10,17 @@ public class Account
     {
     }
 
+    public Account(
+        AccountId id,
+        bool enabled,
+        Revision revision)
+    {
+        _id = id.Value;
+        Kind = id.Kind;
+        Enabled = enabled;
+        Revision = revision;
+    }
+
     public AccountId Id => AccountId.FromStorage(_id);
 
     public AccountKind Kind { get; private set; }

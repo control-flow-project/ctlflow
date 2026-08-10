@@ -14,6 +14,7 @@ internal static partial class ModelAudits
         "Account.Revision",
         "ExternalIdentityLink.Revision",
         "InvocationVerificationKey.Revision",
+        "LoginProvider.Revision",
         "Session.Revision",
         "TenantMembership.Revision",
         "VirtualPrincipal.Revision",

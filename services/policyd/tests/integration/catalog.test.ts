@@ -77,16 +77,20 @@ test("allows every catalog operation from its exact owner and target", async () 
 test("rejects each catalog partition from another authenticated owner", async () => {
   const owners: Readonly<Record<PolicyOwner, PolicyOwner>> = {
     tenantd: "pkgd",
+    identityd: "pkgd",
     pkgd: "configd",
     configd: "execd",
     execd: "tenantd"
   };
-  for (const entry of [
-    catalogCases[0]!,
-    catalogCases[8]!,
-    catalogCases[11]!,
-    catalogCases[15]!
-  ]) {
+  for (const owner of [
+    "tenantd",
+    "identityd",
+    "pkgd",
+    "configd",
+    "execd"
+  ] as const) {
+    const entry = catalogCases.find((candidate) => candidate.owner === owner);
+    assert.ok(entry);
     await assert.rejects(
       callCheckAccess(
         {
@@ -263,7 +267,13 @@ test("keeps a product workload out of the kernel branch", async () => {
 test("rejects a product operation from a kernel owner", async () => {
   // An exact kernel caller enforces only its own catalog operations; a
   // package token is not among them, whatever its spelling.
-  for (const owner of ["tenantd", "pkgd", "execd"] as const) {
+  for (const owner of [
+    "tenantd",
+    "identityd",
+    "pkgd",
+    "configd",
+    "execd"
+  ] as const) {
     await assert.rejects(
       callCheckAccess(
         {
@@ -280,6 +290,16 @@ test("rejects a product operation from a kernel owner", async () => {
 
 
 function ownerFor(operation: string): PolicyOwner {
+  if (operation.startsWith("tenant_memberships.")
+      || operation.startsWith("workspace_memberships.")
+      || operation.startsWith("groups.")
+      || operation.startsWith("group_memberships.")
+      || operation.startsWith("virtual_principals.")
+      || operation.startsWith("external_identity_links.")
+      || operation.startsWith("login_providers.")
+      || operation.startsWith("workspace_login_provider_admissions.")) {
+    return "identityd";
+  }
   if (operation.startsWith("apps.")) {
     return "pkgd";
   }

@@ -3,12 +3,16 @@ using CtlFlow.Auth.Authd.Domain.Identifiers;
 using CtlFlow.Auth.Authd.Domain.Oidc;
 using CtlFlow.Auth.Authd.Domain.State;
 using CtlFlow.Auth.Authd.Service.Configuration;
+using CtlFlow.Auth.Authd.Service.Dependencies;
+using CtlFlow.Auth.Authd.Service.Identity;
 using CtlFlow.Auth.Authd.Service.State;
 using CtlFlow.Auth.Authd.Service.Telemetry;
+using CtlFlow.Identity.V1;
 using Microsoft.Net.Http.Headers;
 using static CtlFlow.Auth.Authd.Service.Http.BrowserRequests;
 using static CtlFlow.Auth.Authd.Service.Http.FormEncoding;
 using static CtlFlow.Auth.Authd.Service.Http.HttpResponses;
+using static CtlFlow.Auth.Authd.Service.Identity.IdentityCalls;
 using static CtlFlow.Auth.Authd.Service.Oidc.OidcAuthorization;
 
 namespace CtlFlow.Auth.Authd.Service.Http;
@@ -19,6 +23,7 @@ internal static partial class BrowserRoutes
         HttpContext context,
         AuthdSettings settings,
         AuthenticationAttemptStore attempts,
+        IdentityService.IdentityServiceClient identityClient,
         AuthdTelemetry telemetry)
     {
         const string operation = "authd.http.begin";
@@ -35,6 +40,7 @@ internal static partial class BrowserRoutes
         timeout.CancelAfter(TimeSpan.FromSeconds(2));
         var status = StatusCodes.Status500InternalServerError;
         var outcome = "internal";
+        var dependency = "none";
         try
         {
             ValidateBrowserPost(
@@ -42,7 +48,7 @@ internal static partial class BrowserRoutes
                 settings.Projection);
             var fields = await ReadForm(
                 context.Request,
-                maximumFields: 3,
+                maximumFields: 4,
                 optional: false,
                 timeout.Token);
             if (!fields.Remove("tenant_id", out var tenantValue)
@@ -52,6 +58,7 @@ internal static partial class BrowserRoutes
             }
             ReturnTarget returnTarget;
             TenantId tenantId;
+            WorkspaceId? workspaceId;
             ProviderId providerId;
             try
             {
@@ -61,6 +68,11 @@ internal static partial class BrowserRoutes
                     ? ReturnTarget.Parse(returnValue)
                     : ReturnTarget.Default;
                 tenantId = TenantId.Parse(tenantValue);
+                workspaceId = fields.Remove(
+                        "workspace_id",
+                        out var workspaceValue)
+                    ? WorkspaceId.Parse(workspaceValue)
+                    : null;
                 providerId = ProviderId.Parse(providerValue);
             }
             catch (ArgumentException)
@@ -71,10 +83,6 @@ internal static partial class BrowserRoutes
             {
                 throw InvalidBegin();
             }
-            var provider = settings.Projection.Find(
-                tenantId,
-                providerId)
-                ?? throw InvalidBegin();
             var stateCookie = BrowserCookies.Read(
                 context.Request,
                 BrowserCookies.StateName);
@@ -82,11 +90,24 @@ internal static partial class BrowserRoutes
             {
                 throw InvalidBegin();
             }
+            var provider = settings.Projection.Find(
+                tenantId,
+                providerId)
+                ?? throw InvalidBegin();
+            dependency = "identityd";
+            await ValidateLoginProviderSelection(
+                identityClient,
+                settings.Workload,
+                telemetry,
+                provider,
+                workspaceId,
+                timeout.Token);
 
             var now = DateTimeOffset.UtcNow;
             var verifier = PkceVerifier.Generate();
             var attempt = new AuthenticationAttempt(
                 tenantId,
+                workspaceId,
                 providerId,
                 returnTarget,
                 verifier,
@@ -123,10 +144,12 @@ internal static partial class BrowserRoutes
                 authorization.AbsoluteUri);
             status = StatusCodes.Status303SeeOther;
             outcome = "redirect";
+            dependency = "none";
         }
         catch (Exception exception)
         {
-            (status, outcome) = MapBeginFailure(exception);
+            (status, outcome, dependency) =
+                MapBeginFailure(exception, dependency);
             if (exception is OperationCanceledException
                 && (context.RequestAborted.IsCancellationRequested
                     || stopping.IsCancellationRequested))
@@ -154,23 +177,40 @@ internal static partial class BrowserRoutes
                 context.Request.Method,
                 status,
                 outcome,
-                "none",
+                dependency,
                 started);
         }
     }
 
-    private static (int Status, string Outcome) MapBeginFailure(
-        Exception exception) =>
+    private static (
+        int Status,
+        string Outcome,
+        string Dependency) MapBeginFailure(
+            Exception exception,
+            string currentDependency) =>
         exception switch
         {
             HttpContractException contract =>
-                (contract.StatusCode, contract.Outcome),
+                (contract.StatusCode, contract.Outcome, "none"),
+            LoginProviderRejectedException =>
+                (StatusCodes.Status400BadRequest,
+                    "invalid_request",
+                    currentDependency),
+            DependencyUnavailableException unavailable =>
+                (StatusCodes.Status503ServiceUnavailable,
+                    "dependency_unavailable",
+                    unavailable.Dependency),
             InvalidDataException =>
                 (StatusCodes.Status503ServiceUnavailable,
-                    "projection_unavailable"),
+                    "projection_unavailable",
+                    currentDependency),
             OperationCanceledException =>
-                (StatusCodes.Status503ServiceUnavailable, "deadline"),
-            _ => (StatusCodes.Status500InternalServerError, "internal")
+                (StatusCodes.Status503ServiceUnavailable,
+                    "deadline",
+                    currentDependency),
+            _ => (StatusCodes.Status500InternalServerError,
+                "internal",
+                currentDependency)
         };
 
     private static HttpContractException InvalidBegin() =>

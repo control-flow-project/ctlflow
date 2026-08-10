@@ -1,5 +1,7 @@
 using System.Data.Common;
 using CtlFlow.Identity.Identityd.Service.Auditing;
+using CtlFlow.Identity.Identityd.Domain.Errors;
+using CtlFlow.Identity.Identityd.Service.Authorization;
 using CtlFlow.Identity.Identityd.Service.Security;
 using CtlFlow.Identity.Identityd.Service.Security.Tokens;
 using CtlFlow.Identity.Identityd.Service.Telemetry;
@@ -51,6 +53,35 @@ internal sealed class IdentitydInterceptor(IdentitydTelemetry telemetry)
             outcome = "PERMISSION_DENIED";
             throw CreateRpcException(StatusCode.PermissionDenied);
         }
+        catch (CapabilityDeniedException)
+        {
+            outcome = "PERMISSION_DENIED";
+            throw CreateRpcException(StatusCode.PermissionDenied);
+        }
+        catch (Exception exception) when (
+            exception is IdentityNotFoundException
+                or AuthorizationTargetNotFoundException)
+        {
+            outcome = "NOT_FOUND";
+            throw CreateRpcException(StatusCode.NotFound);
+        }
+        catch (IdentityAlreadyExistsException)
+        {
+            outcome = "ALREADY_EXISTS";
+            throw CreateRpcException(StatusCode.AlreadyExists);
+        }
+        catch (IdentityPreconditionException)
+        {
+            outcome = "FAILED_PRECONDITION";
+            throw CreateRpcException(StatusCode.FailedPrecondition);
+        }
+        catch (Exception exception) when (
+            exception is IdentityRevisionConflictException
+                or DbUpdateConcurrencyException)
+        {
+            outcome = "ABORTED";
+            throw CreateRpcException(StatusCode.Aborted);
+        }
         catch (ArgumentException)
         {
             outcome = "INVALID_ARGUMENT";
@@ -80,6 +111,7 @@ internal sealed class IdentitydInterceptor(IdentitydTelemetry telemetry)
         }
         catch (Exception exception) when (
             exception is AuditUnavailableException
+                or PolicyUnavailableException
                 or DbException
                 or DbUpdateException
                 or IOException

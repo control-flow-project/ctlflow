@@ -31,9 +31,12 @@ internal sealed partial class IdentityGrpcService
         var tenantId = await TenantId.Parse(
             request.TenantId,
             context.CancellationToken);
-        var providerId = ProviderId.Parse(request.ProviderId);
-        var providerSubject = ProviderSubject.Parse(
-            request.ProviderSubject);
+        var providerId = await ProviderId.Parse(
+            request.ProviderId,
+            context.CancellationToken);
+        var providerSubject = await ProviderSubject.Parse(
+            request.ProviderSubject,
+            context.CancellationToken);
         var audit = await CreateAuditContext(
             identity,
             Activity.Current,

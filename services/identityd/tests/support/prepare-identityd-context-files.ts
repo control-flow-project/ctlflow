@@ -27,6 +27,7 @@ export async function prepareIdentitydContextFiles(
   workload: TestWorkloadCredentials,
   kubernetes: TestKubernetes,
   auditCertificateAuthorityPath: string,
+  policyCertificateAuthorityPath: string,
   signing: InvocationAuthority
 ): Promise<IdentitydContextFiles> {
   const tls = await createTestServiceTls(
@@ -44,6 +45,9 @@ export async function prepareIdentitydContextFiles(
   const auditAuthorityPath = path.join(
     directory,
     "auditd-ca.crt");
+  const policyAuthorityPath = path.join(
+    directory,
+    "policyd-ca.crt");
   const signingKeyPath = path.join(
     directory,
     "invocation-signing.pem");
@@ -51,9 +55,13 @@ export async function prepareIdentitydContextFiles(
   await copyFile(
     auditCertificateAuthorityPath,
     auditAuthorityPath);
+  await copyFile(
+    policyCertificateAuthorityPath,
+    policyAuthorityPath);
   await signing.writePrivateKey(signingKeyPath);
   await chmod(workloadJwksPath, 0o644);
   await chmod(auditAuthorityPath, 0o644);
+  await chmod(policyAuthorityPath, 0o644);
   await chmod(signingKeyPath, 0o600);
 
   return {
@@ -68,7 +76,8 @@ export async function prepareIdentitydContextFiles(
       },
       trust: {
         "workload-jwks.json": workloadJwksPath,
-        "auditd-ca.crt": auditAuthorityPath
+        "auditd-ca.crt": auditAuthorityPath,
+        "policyd-ca.crt": policyAuthorityPath
       }
     }
   };

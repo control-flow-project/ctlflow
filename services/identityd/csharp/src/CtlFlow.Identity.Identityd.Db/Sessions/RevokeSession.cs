@@ -17,8 +17,8 @@ public static partial class Sessions
         using var activity =
             IdentityDbTelemetry.StartOperation("revoke_session");
         await using var mutation =
-            await identityDatabase.AcquireSessionMutation(
-                credentialDigest,
+            await identityDatabase.AcquireMutation(
+                $"session:{credentialDigest.Value}",
                 cancellation);
         await using var database =
             await identityDatabase.Contexts.CreateDbContextAsync(
@@ -42,6 +42,9 @@ public static partial class Sessions
                 TenantId = EF.Property<string>(
                     candidate,
                     "_tenantId"),
+                ProviderId = EF.Property<string>(
+                    candidate,
+                    "_providerId"),
                 candidate.CreatedAt,
                 candidate.ExpiresAt,
                 candidate.RevokedAt,
@@ -59,6 +62,7 @@ public static partial class Sessions
                 row.CredentialDigest),
             Domain.Accounts.AccountId.FromStorage(row.AccountId),
             Domain.Tenants.TenantId.FromStorage(row.TenantId),
+            Domain.IdentityLinks.ProviderId.FromStorage(row.ProviderId),
             row.CreatedAt,
             row.ExpiresAt,
             row.RevokedAt,
@@ -101,6 +105,9 @@ public static partial class Sessions
                     TenantId = EF.Property<string>(
                         candidate,
                         "_tenantId"),
+                    ProviderId = EF.Property<string>(
+                        candidate,
+                        "_providerId"),
                     candidate.CreatedAt,
                     candidate.ExpiresAt,
                     candidate.RevokedAt,
@@ -117,6 +124,8 @@ public static partial class Sessions
                     currentRow.AccountId),
                 Domain.Tenants.TenantId.FromStorage(
                     currentRow.TenantId),
+                Domain.IdentityLinks.ProviderId.FromStorage(
+                    currentRow.ProviderId),
                 currentRow.CreatedAt,
                 currentRow.ExpiresAt,
                 currentRow.RevokedAt,

@@ -153,6 +153,29 @@ internal sealed class IdentitydTelemetry : IDisposable
             outcome,
             startedTimestamp);
 
+    internal Activity? StartPolicyCheck()
+    {
+        var activity = _activitySource.StartActivity(
+            "identityd.CheckAccess",
+            ActivityKind.Client);
+        activity?.SetTag("rpc.system", "grpc");
+        activity?.SetTag(
+            "rpc.service",
+            "ctlflow.policy.v1.PolicyService");
+        activity?.SetTag("rpc.method", "CheckAccess");
+        return activity;
+    }
+
+    internal void RecordPolicyCheck(
+        Activity? activity,
+        string outcome,
+        long startedTimestamp) =>
+        RecordGrpcOperation(
+            activity,
+            "CheckAccess",
+            outcome,
+            startedTimestamp);
+
     public void Dispose()
     {
         _metrics.Dispose();

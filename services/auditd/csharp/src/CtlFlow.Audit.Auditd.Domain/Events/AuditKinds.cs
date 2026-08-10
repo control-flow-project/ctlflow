@@ -25,7 +25,14 @@ public enum AuditDetailKind
     ProjectionMutation = 8,
     PlacementMutation = 9,
     WorkloadMutation = 10,
-    RunMutation = 11
+    RunMutation = 11,
+    IdentityMembership = 12,
+    IdentityGroup = 13,
+    IdentityGroupMember = 14,
+    IdentityVirtualPrincipal = 15,
+    IdentityExternalLink = 16,
+    IdentityLoginProvider = 17,
+    IdentityWorkspaceProviderAdmission = 18
 }
 
 public enum PlacementTargetKind
@@ -67,6 +74,56 @@ public enum IdentitySessionAuditAction
 {
     Created = 1,
     Revoked = 2
+}
+
+public enum IdentityMembershipAuditAction
+{
+    Added = 1,
+    Removed = 2
+}
+
+public enum IdentityGroupAuditAction
+{
+    Created = 1,
+    Deleted = 2
+}
+
+public enum IdentityGroupMemberAuditAction
+{
+    Added = 1,
+    Removed = 2
+}
+
+public enum IdentityVirtualPrincipalAuditAction
+{
+    Created = 1,
+    EnabledStateChanged = 2
+}
+
+public enum IdentityExternalLinkAuditAction
+{
+    Created = 1,
+    Deleted = 2
+}
+
+public enum IdentityLoginProviderAuditAction
+{
+    Created = 1,
+    Updated = 2,
+    StateChanged = 3
+}
+
+public enum IdentityLoginProviderAuditState
+{
+    Active = 1,
+    Disabled = 2,
+    Deleted = 3
+}
+
+public enum IdentityWorkspaceProviderAdmissionAuditAction
+{
+    Admitted = 1,
+    Removed = 2
 }
 
 public enum AppAuditAction

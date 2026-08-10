@@ -13,6 +13,16 @@ public class TenantMembership
     {
     }
 
+    public TenantMembership(
+        AccountId accountId,
+        TenantId tenantId,
+        Revision revision)
+    {
+        _accountId = accountId.Value;
+        _tenantId = tenantId.Value;
+        Revision = revision;
+    }
+
     public AccountId AccountId => AccountId.FromStorage(_accountId);
 
     public TenantId TenantId => TenantId.FromStorage(_tenantId);

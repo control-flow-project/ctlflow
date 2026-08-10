@@ -11,6 +11,7 @@ public static partial class OperationCatalog
             OperationOwner.Pkgd => "svc_pkgd",
             OperationOwner.Configd => "svc_configd",
             OperationOwner.Execd => "svc_execd",
+            OperationOwner.Identityd => "svc_identityd",
             _ => throw new InvalidOperationException(
                 "Operation owner is invalid")
         };

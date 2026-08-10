@@ -7,6 +7,7 @@ using CtlFlow.Identity.Identityd.Service.Security;
 using CtlFlow.Identity.Identityd.Service.Security.Tokens;
 using CtlFlow.Identity.Identityd.Service.Security.Signing;
 using CtlFlow.Identity.Identityd.Service.Telemetry;
+using CtlFlow.Policy.V1;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using static CtlFlow.Identity.Identityd.Db.Providers.IdentityDatabaseProviders;
 using static CtlFlow.Identity.Identityd.Db.Schema.Schemas;
@@ -34,6 +35,8 @@ internal static partial class IdentitydProcess
             CancellationToken.None);
         using var auditChannel = CreatePrivateGrpcChannel(
             settings.Audit.Grpc);
+        using var policyChannel = CreatePrivateGrpcChannel(
+            settings.Policy.Grpc);
         var tokenAuthorities = new TokenAuthorities(
             settings.WorkloadTokens.Validation,
             new VerificationKeys(cancellation =>
@@ -82,6 +85,8 @@ internal static partial class IdentitydProcess
         builder.Services.AddSingleton(signingKey);
         builder.Services.AddSingleton(
             new AuditService.AuditServiceClient(auditChannel));
+        builder.Services.AddSingleton(
+            new PolicyService.PolicyServiceClient(policyChannel));
 
         await using var application = builder.Build();
         application.Use(async (context, next) =>

@@ -111,6 +111,63 @@ public static partial class Schemas
             })
             .Take(1)
             .ToListAsync(queryCancellation);
+        await database.LoginProviders.AsNoTracking()
+            .Select(value => new
+            {
+                Tenant = EF.Property<string>(value, "_tenantId"),
+                Provider = EF.Property<string>(value, "_providerId"),
+                DisplayName = EF.Property<string>(value, "_displayName"),
+                Configuration = EF.Property<string>(
+                    value,
+                    "_configurationId"),
+                ConfigurationVersion = EF.Property<string>(
+                    value,
+                    "_configurationVersionId"),
+                Secret = EF.Property<string>(value, "_secretId"),
+                SecretVersion = EF.Property<string>(
+                    value,
+                    "_secretVersionId"),
+                value.State,
+                value.Revision
+            })
+            .Take(1)
+            .ToListAsync(queryCancellation);
+        await database.WorkspaceLoginProviderAdmissions.AsNoTracking()
+            .Select(value => new
+            {
+                Tenant = EF.Property<string>(value, "_tenantId"),
+                Workspace = EF.Property<string>(value, "_workspaceId"),
+                Provider = EF.Property<string>(value, "_providerId")
+            })
+            .Take(1)
+            .ToListAsync(queryCancellation);
+        await database.ExternalIdentityLinks.AsNoTracking()
+            .Select(value => new
+            {
+                Tenant = EF.Property<string>(value, "_tenantId"),
+                Provider = EF.Property<string>(value, "_providerId"),
+                Subject = EF.Property<string>(value, "_providerSubject"),
+                Account = EF.Property<string>(value, "_accountId"),
+                value.Revision
+            })
+            .Take(1)
+            .ToListAsync(queryCancellation);
+        await database.Sessions.AsNoTracking()
+            .Select(value => new
+            {
+                Id = EF.Property<string>(value, "_id"),
+                Credential = EF.Property<string>(
+                    value,
+                    "_credentialDigest"),
+                Account = EF.Property<string>(value, "_accountId"),
+                Tenant = EF.Property<string>(value, "_tenantId"),
+                value.CreatedAt,
+                value.ExpiresAt,
+                value.RevokedAt,
+                value.Revision
+            })
+            .Take(1)
+            .ToListAsync(queryCancellation);
         return SchemaCompatibility.Compatible;
     }
 }

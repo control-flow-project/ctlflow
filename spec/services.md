@@ -10,7 +10,7 @@ CtlFlow has ten kernel ownership boundaries.
 | --- | --- | --- |
 | [`tenantd`](../tenantd/) | Tenants and Workspaces | [gRPC](../apis/tenantd/) |
 | [`authd`](../authd/) | Public authentication protocol; no durable records | [HTTP](../apis/authd/) |
-| [`identityd`](../identityd/) | Accounts, standing, Groups, identity links, Sessions, and invocation identity | [gRPC](../apis/identityd/) |
+| [`identityd`](../identityd/) | Accounts, standing, Groups, login identity, Sessions, and invocation identity | [gRPC](../apis/identityd/) |
 | [`policyd`](../policyd/) | Roles, grants, the fixed kernel operation catalog, and access decisions | [gRPC](../apis/policyd/) |
 | [`pkgd`](../pkgd/) | Packages and installed application intent | [gRPC](../apis/pkgd/) |
 | [`configd`](../configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections | [gRPC](../apis/configd/) |
@@ -34,6 +34,7 @@ The approved private call graph is:
 ```text
 admitted product workload
   +-> identityd.GetInvocationVerificationKeys
+  +-> admitted identityd administration operations
   +-> policyd.CheckAccess
 
 tenantd
@@ -48,6 +49,8 @@ policyd
   +-> execd.ResolveWorkloadOperationBinding   product operations only
 
 authd
+  +-> identityd.GetLoginProvider
+  +-> identityd.ListWorkspaceLoginProviderAdmissions
   +-> identityd.CreateSession
   +-> identityd.RevokeSession
   +-> purpose-bound egressd HTTP binding
@@ -68,6 +71,7 @@ egressd
   +-> no kernel RPC; consumes process-private projected binding material
 
 identityd
+  +-> policyd.CheckAccess                  administration operations only
   +-> auditd.RecordAuditBatch
 
 pkgd
@@ -95,8 +99,9 @@ not service-to-service RPCs and do not make either proxy an Execd record.
 ## Ownership rules
 
 - Only `tenantd` mutates Tenant or Workspace state.
-- Only `identityd` owns account, standing, Session, and delegated-principal
-  facts or signs invocation JWTs.
+- Only `identityd` owns account, standing, login-provider registration,
+  Workspace provider admission, Session, and delegated-principal facts or
+  signs invocation JWTs.
 - Only `policyd` owns Roles, grants, and authoritative access decisions. Kernel
   operation ownership is Policyd's checked deployment catalog; product operation
   ownership is declared by `pkgd`, admitted by `execd`, and resolved by

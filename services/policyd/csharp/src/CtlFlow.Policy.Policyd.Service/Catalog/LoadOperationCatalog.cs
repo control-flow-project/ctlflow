@@ -59,6 +59,7 @@ internal static partial class Catalogs
             OperationOwner.Pkgd => "SERVICE/svc_pkgd",
             OperationOwner.Configd => "SERVICE/svc_configd",
             OperationOwner.Execd => "SERVICE/svc_execd",
+            OperationOwner.Identityd => "SERVICE/svc_identityd",
             _ => throw new InvalidOperationException(
                 "Operation owner is invalid")
         };

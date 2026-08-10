@@ -25,6 +25,11 @@ test("revokes a usable Session and clears both cookies on success",
     const suite = getAuthdTestSuite();
     await suite.provider.setMode("available");
     const authentication = await completeAuthentication();
+    assert.equal(
+      authentication.callback.statusCode,
+      303,
+      [suite.authd.diagnostics(), suite.egressd.diagnostics()]
+        .join("\n"));
     const session = sessionCookie(authentication.callback);
     assert.ok(session);
     const body = "return_to=%2Fsigned-out%3Ffrom%3Dlogout";

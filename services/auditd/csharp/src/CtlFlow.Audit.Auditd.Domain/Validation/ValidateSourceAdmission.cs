@@ -28,6 +28,20 @@ internal static partial class AuditValidation
                     envelope.Attribution,
                     AuditAttributionKind.Workload);
                 return;
+            case (AuditSource.Identityd, IdentityMembershipAuditDetail):
+            case (AuditSource.Identityd, IdentityGroupAuditDetail):
+            case (AuditSource.Identityd, IdentityGroupMemberAuditDetail):
+            case (AuditSource.Identityd, IdentityVirtualPrincipalAuditDetail):
+            case (AuditSource.Identityd, IdentityExternalLinkAuditDetail):
+            case (AuditSource.Identityd, IdentityLoginProviderAuditDetail):
+            case (
+                AuditSource.Identityd,
+                IdentityWorkspaceProviderAdmissionAuditDetail):
+                RequireTenantPartition(envelope.Partition);
+                RequireAttribution(
+                    envelope.Attribution,
+                    AuditAttributionKind.Invocation);
+                return;
             case (AuditSource.Pkgd, PackageDeclarationAuditDetail):
                 RequireGlobalPartition(envelope.Partition);
                 RequireAttribution(

@@ -18,6 +18,27 @@ internal static partial class AuditValidation
             case IdentitySessionAuditDetail value:
                 ValidateIdentitySession(value);
                 break;
+            case IdentityMembershipAuditDetail value:
+                ValidateIdentityMembership(value);
+                break;
+            case IdentityGroupAuditDetail value:
+                ValidateIdentityGroup(value);
+                break;
+            case IdentityGroupMemberAuditDetail value:
+                ValidateIdentityGroupMember(value);
+                break;
+            case IdentityVirtualPrincipalAuditDetail value:
+                ValidateIdentityVirtualPrincipal(value);
+                break;
+            case IdentityExternalLinkAuditDetail value:
+                ValidateIdentityExternalLink(value);
+                break;
+            case IdentityLoginProviderAuditDetail value:
+                ValidateIdentityLoginProvider(value);
+                break;
+            case IdentityWorkspaceProviderAdmissionAuditDetail value:
+                ValidateIdentityWorkspaceProviderAdmission(value);
+                break;
             case PackageDeclarationAuditDetail value:
                 ValidatePackageDeclaration(value);
                 break;

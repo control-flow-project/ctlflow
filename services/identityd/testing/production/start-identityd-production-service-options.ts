@@ -13,6 +13,12 @@ export interface InvocationSigningProvision {
   readonly writePrivateKey: (path: string) => Promise<void>;
 }
 
+export interface PolicyServiceProvision {
+  readonly endpoint: string;
+  readonly serverName: string;
+  readonly certificateAuthorityPath: string;
+}
+
 export interface StartIdentitydProductionServiceOptions {
   readonly repositoryRoot: string;
   readonly kubernetes: TestKubernetes;
@@ -23,4 +29,6 @@ export interface StartIdentitydProductionServiceOptions {
   readonly invocationAudience: string;
   readonly invocationMaximumLifetimeSeconds: number;
   readonly principalFactCallers: readonly string[];
+  readonly policy?: PolicyServiceProvision;
+  readonly administrationCallers?: readonly string[];
 }

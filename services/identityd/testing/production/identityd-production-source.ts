@@ -7,6 +7,12 @@ import type {
 import type {
   PrincipalAuthorizationFacts
 } from "./principal-authorization-facts.js";
+import type {
+  LoginProvider
+} from "./login-provider.js";
+import type {
+  WorkspaceLoginProviderAdmission
+} from "./workspace-login-provider-admission.js";
 
 export interface IdentitydProductionSource {
   readonly corruptPrincipalKind: (
@@ -22,6 +28,12 @@ export interface IdentitydProductionSource {
   ) => Promise<void>;
   readonly setPrincipalFacts: (
     facts: readonly PrincipalAuthorizationFacts[]
+  ) => Promise<void>;
+  readonly setLoginProviders: (
+    providers: readonly LoginProvider[]
+  ) => Promise<void>;
+  readonly setWorkspaceLoginProviderAdmissions: (
+    admissions: readonly WorkspaceLoginProviderAdmission[]
   ) => Promise<void>;
   readonly stop: () => Promise<void>;
 }

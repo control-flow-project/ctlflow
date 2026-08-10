@@ -13,6 +13,16 @@ public class Group
     {
     }
 
+    public Group(
+        GroupId id,
+        TenantId tenantId,
+        WorkspaceId? workspaceId)
+    {
+        _id = id.Value;
+        _tenantId = tenantId.Value;
+        _workspaceId = workspaceId?.Value;
+    }
+
     public GroupId Id => GroupId.FromStorage(_id);
 
     public TenantId TenantId => TenantId.FromStorage(_tenantId);

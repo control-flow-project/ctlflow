@@ -90,6 +90,78 @@ extends AuditEventEvidenceBase {
   readonly action: "created" | "revoked";
 }
 
+export interface IdentityMembershipAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly detailKind: "identity_membership";
+  readonly accountPrincipalId: string;
+  readonly workspaceId?: string;
+  readonly membershipRevision: bigint;
+  readonly action: "added" | "removed";
+  readonly accountCreated: boolean;
+}
+
+export interface IdentityGroupAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly detailKind: "identity_group";
+  readonly groupId: string;
+  readonly workspaceId?: string;
+  readonly action: "created" | "deleted";
+}
+
+export interface IdentityGroupMemberAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly detailKind: "identity_group_member";
+  readonly groupId: string;
+  readonly principalId: string;
+  readonly workspaceId?: string;
+  readonly action: "added" | "removed";
+}
+
+export interface IdentityVirtualPrincipalAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly detailKind: "identity_virtual_principal";
+  readonly principalId: string;
+  readonly attachedAccountPrincipalId: string;
+  readonly workspaceId?: string;
+  readonly principalRevision: bigint;
+  readonly enabled: boolean;
+  readonly action: "created" | "enabled_state_changed";
+}
+
+export interface IdentityExternalLinkAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly detailKind: "identity_external_link";
+  readonly providerId: string;
+  readonly humanAccountPrincipalId: string;
+  readonly action: "created" | "deleted";
+}
+
+export interface IdentityLoginProviderAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly detailKind: "identity_login_provider";
+  readonly providerId: string;
+  readonly providerRevision: bigint;
+  readonly resultingState: "active" | "disabled" | "deleted";
+  readonly action: "created" | "updated" | "state_changed";
+}
+
+export interface IdentityWorkspaceProviderAdmissionAuditEventEvidence
+extends AuditEventEvidenceBase {
+  readonly detailKind: "identity_workspace_provider_admission";
+  readonly workspaceId: string;
+  readonly providerId: string;
+  readonly action: "admitted" | "removed";
+}
+
+export type IdentityAdministrationAuditEventEvidence =
+  | IdentityMembershipAuditEventEvidence
+  | IdentityGroupAuditEventEvidence
+  | IdentityGroupMemberAuditEventEvidence
+  | IdentityVirtualPrincipalAuditEventEvidence
+  | IdentityExternalLinkAuditEventEvidence
+  | IdentityLoginProviderAuditEventEvidence
+  | IdentityWorkspaceProviderAdmissionAuditEventEvidence;
+
 export interface PackageDeclarationAuditEventEvidence
 extends AuditEventEvidenceBase {
   readonly detailKind: "package_declaration";
@@ -192,6 +264,7 @@ extends AuditEventEvidenceBase {
 export type AuditEventEvidence =
   | TenancyAuditEventEvidence
   | IdentitySessionAuditEventEvidence
+  | IdentityAdministrationAuditEventEvidence
   | PackageDeclarationAuditEventEvidence
   | AppMutationAuditEventEvidence
   | ConfigurationPublicationAuditEventEvidence

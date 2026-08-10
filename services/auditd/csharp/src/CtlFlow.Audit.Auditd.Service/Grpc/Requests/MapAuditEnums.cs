@@ -4,6 +4,16 @@ using DesiredState = CtlFlow.Audit.V1.ExecutionDesiredState;
 using ProjectionAction = CtlFlow.Audit.V1.ProjectionMutationAction;
 using RunAction = CtlFlow.Audit.V1.RunMutationAction;
 using SessionAction = CtlFlow.Audit.V1.IdentitySessionAction;
+using MembershipAction = CtlFlow.Audit.V1.IdentityMembershipAction;
+using GroupAction = CtlFlow.Audit.V1.IdentityGroupAction;
+using GroupMemberAction = CtlFlow.Audit.V1.IdentityGroupMemberAction;
+using VirtualPrincipalAction =
+    CtlFlow.Audit.V1.IdentityVirtualPrincipalAction;
+using ExternalLinkAction = CtlFlow.Audit.V1.IdentityExternalLinkAction;
+using LoginProviderAction = CtlFlow.Audit.V1.IdentityLoginProviderAction;
+using LoginProviderState = CtlFlow.Audit.V1.IdentityLoginProviderState;
+using WorkspaceProviderAdmissionAction =
+    CtlFlow.Audit.V1.IdentityWorkspaceProviderAdmissionAction;
 using TenantAction = CtlFlow.Audit.V1.TenantMutationAction;
 using TenancyState = CtlFlow.Audit.V1.TenancyResourceState;
 using PlacementAction = CtlFlow.Audit.V1.PlacementMutationAction;
@@ -54,6 +64,104 @@ internal static partial class AuditRequests
             SessionAction.Revoked => IdentitySessionAuditAction.Revoked,
             _ => throw new ArgumentException(
                 "Identity Session action is invalid")
+        };
+
+    private static IdentityMembershipAuditAction MapMembershipAction(
+        MembershipAction value) =>
+        value switch
+        {
+            MembershipAction.Added => IdentityMembershipAuditAction.Added,
+            MembershipAction.Removed =>
+                IdentityMembershipAuditAction.Removed,
+            _ => throw new ArgumentException(
+                "Identity Membership action is invalid")
+        };
+
+    private static IdentityGroupAuditAction MapGroupAction(
+        GroupAction value) =>
+        value switch
+        {
+            GroupAction.Created => IdentityGroupAuditAction.Created,
+            GroupAction.Deleted => IdentityGroupAuditAction.Deleted,
+            _ => throw new ArgumentException(
+                "Identity Group action is invalid")
+        };
+
+    private static IdentityGroupMemberAuditAction MapGroupMemberAction(
+        GroupMemberAction value) =>
+        value switch
+        {
+            GroupMemberAction.Added =>
+                IdentityGroupMemberAuditAction.Added,
+            GroupMemberAction.Removed =>
+                IdentityGroupMemberAuditAction.Removed,
+            _ => throw new ArgumentException(
+                "Identity Group member action is invalid")
+        };
+
+    private static IdentityVirtualPrincipalAuditAction
+        MapVirtualPrincipalAction(VirtualPrincipalAction value) =>
+        value switch
+        {
+            VirtualPrincipalAction.Created =>
+                IdentityVirtualPrincipalAuditAction.Created,
+            VirtualPrincipalAction.EnabledStateChanged =>
+                IdentityVirtualPrincipalAuditAction.EnabledStateChanged,
+            _ => throw new ArgumentException(
+                "Identity virtual-principal action is invalid")
+        };
+
+    private static IdentityExternalLinkAuditAction MapExternalLinkAction(
+        ExternalLinkAction value) =>
+        value switch
+        {
+            ExternalLinkAction.Created =>
+                IdentityExternalLinkAuditAction.Created,
+            ExternalLinkAction.Deleted =>
+                IdentityExternalLinkAuditAction.Deleted,
+            _ => throw new ArgumentException(
+                "Identity external-link action is invalid")
+        };
+
+    private static IdentityLoginProviderAuditAction MapLoginProviderAction(
+        LoginProviderAction value) =>
+        value switch
+        {
+            LoginProviderAction.Created =>
+                IdentityLoginProviderAuditAction.Created,
+            LoginProviderAction.Updated =>
+                IdentityLoginProviderAuditAction.Updated,
+            LoginProviderAction.StateChanged =>
+                IdentityLoginProviderAuditAction.StateChanged,
+            _ => throw new ArgumentException(
+                "Identity login-provider action is invalid")
+        };
+
+    private static IdentityLoginProviderAuditState MapLoginProviderState(
+        LoginProviderState value) =>
+        value switch
+        {
+            LoginProviderState.Active =>
+                IdentityLoginProviderAuditState.Active,
+            LoginProviderState.Disabled =>
+                IdentityLoginProviderAuditState.Disabled,
+            LoginProviderState.Deleted =>
+                IdentityLoginProviderAuditState.Deleted,
+            _ => throw new ArgumentException(
+                "Identity login-provider state is invalid")
+        };
+
+    private static IdentityWorkspaceProviderAdmissionAuditAction
+        MapWorkspaceProviderAdmissionAction(
+            WorkspaceProviderAdmissionAction value) =>
+        value switch
+        {
+            WorkspaceProviderAdmissionAction.Admitted =>
+                IdentityWorkspaceProviderAdmissionAuditAction.Admitted,
+            WorkspaceProviderAdmissionAction.Removed =>
+                IdentityWorkspaceProviderAdmissionAuditAction.Removed,
+            _ => throw new ArgumentException(
+                "Identity Workspace provider admission action is invalid")
         };
 
     private static AppAuditAction MapAppAction(AppAction value) =>

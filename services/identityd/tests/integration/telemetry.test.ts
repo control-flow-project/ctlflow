@@ -110,7 +110,7 @@ test("exports correlated and redacted traces, metrics, and logs", async () => {
   assert.equal(malformedResult.principalId, "user:alice");
 });
 
-test("every operation emits correlated telemetry and Session audit",
+test("every non-administration operation emits telemetry and Session audit",
   async () => {
     const context = getIdentitydTestContext();
     const traceId = "0123456789abcdef0123456789abcdef";
@@ -291,13 +291,14 @@ test("records cancellation for an in-flight database query", async () => {
   });
   try {
     await assert.rejects(
-      callUnary<ResolvePrincipalResponse>((done) =>
-        context.client.resolvePrincipal(
+      callUnary<CreateSessionResponse>((done) =>
+        context.client.createSession(
           {
-            principalId: "",
-            tenantId: "acme"
+            tenantId: "",
+            providerId: "oidc",
+            providerSubject: "cancellation-barrier"
           },
-          metadata,
+          workloadMetadata(context.authdWorkload.callerToken),
           done)),
       matchGrpcStatus(status.INVALID_ARGUMENT));
     assert.ok(cancelCall);
