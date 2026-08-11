@@ -49,15 +49,13 @@ test("every administration list uses bounded keyset pagination", async () => {
       resourcePath:
         `/tenants/acme/workspaces/atlas/groups/${groupId}`
         + "/members/service:automation",
-      tenantId: "acme",
-      workspaceId: "atlas"
+      tenantId: "acme"
     },
     {
       operation: "workspace_login_provider_admissions.set",
       resourcePath:
         "/tenants/acme/workspaces/atlas/login-providers/oidc",
-      tenantId: "acme",
-      workspaceId: "atlas"
+      tenantId: "acme"
     }
   ]);
   const metadata = identityAdminMetadata(context, "acme");

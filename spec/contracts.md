@@ -542,7 +542,7 @@ and Execd are closed by their owner contracts and the Auditd detail inventory.
 | `configd` | `identityd.GetInvocationVerificationKeys` | Validate invocation JWTs |
 | `configd` | `policyd.CheckAccess` | Authorize one scoped configuration or secret capability |
 | `policyd` | `identityd.GetInvocationVerificationKeys` | Independently validate the invocation |
-| `policyd` | `identityd.ResolvePrincipal` | Obtain current exact-target identity and standing facts |
+| `policyd` | `identityd.ResolvePrincipal` | Obtain current policy-target identity and standing facts |
 | `policyd` | `identityd.ListPrincipalGroups` | Obtain bounded pages of direct Group IDs |
 | `policyd` | `execd.ResolveWorkloadOperationBinding` | Confirm one admitted product operation for one authenticated Workload subject |
 | `authd` | purpose-bound `egressd` HTTP binding | Reach the configured external identity provider without ambient egress |

@@ -595,6 +595,16 @@ path from validated values, and calls `policyd.CheckAccess` as
 never accepts a caller-supplied capability, resource path, Role, Group set,
 Actor, or attached account.
 
+The requested domain target and the Policyd target are identical except when a
+Tenant-scoped invocation administers one of that Tenant's Workspaces. In that
+case Identityd sends the Tenant as the Policyd target while the canonical
+resource path retains the exact descendant Workspace. Policyd therefore
+re-establishes Tenant standing and evaluates only an explicit Tenant-target
+grant for that descendant path. This permits first-member and first-provider
+admission bootstrap without treating Tenant policy as inherited Workspace
+policy. A Workspace-scoped invocation sends its exact Workspace as the Policyd
+target and requires current standing and authority there.
+
 For each provider-read operation, the autonomous Authd caller set and the
 capability-caller set are disjoint. Identityd fails startup on an overlap;
 caller configuration cannot make one ServiceAccount ambiguously autonomous
@@ -633,11 +643,12 @@ The complete Identityd capability catalog is:
 | `SetWorkspaceLoginProviderAdmission` | `workspace_login_provider_admissions.set` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
 | `ListWorkspaceLoginProviderAdmissions` | `workspace_login_provider_admissions.read` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers` |
 
-"Exact target" is either `/tenants/<tenant_id>` or
+The requested domain target is either `/tenants/<tenant_id>` or
 `/tenants/<tenant_id>/workspaces/<workspace_id>`. An account or virtual
 principal ID is one canonical path segment. A Workspace-scoped invocation
 cannot administer its parent Tenant or a sibling Workspace. A Tenant-scoped
-invocation may administer that Tenant and its Workspaces. A target outside the
+invocation may administer that Tenant and its Workspaces through explicit
+Tenant-target grants over the canonical descendant paths. A target outside the
 invocation fence is concealed as `NOT_FOUND` before Policyd is called.
 
 `GetInvocationVerificationKeys`, `CreateSession`, `ExchangeSession`,
@@ -659,7 +670,7 @@ deadline, cancellation, and W3C trace context.
 | gRPC status | Meaning |
 | --- | --- |
 | `INVALID_ARGUMENT` | A non-credential request field or bound is malformed |
-| `NOT_FOUND` | Current exact-target identity, attachment, standing, or fence cannot be established |
+| `NOT_FOUND` | Current policy-target identity, attachment, standing, or invocation fence cannot be established |
 | `ALREADY_EXISTS` | An immutable principal, Group, provider, or external identity mapping conflicts |
 | `FAILED_PRECONDITION` | Current standing, child records, provider state, or target relationship forbids the mutation |
 | `ABORTED` | A required expected revision is not current |

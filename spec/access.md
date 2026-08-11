@@ -126,6 +126,14 @@ Membership proves standing only. It contains no Role or administrator flag.
 A virtual Actor is allowed only when both the virtual principal and its one
 immutable attached account have matching authority.
 
+The policy target normally equals the protected resource target. Identityd
+Workspace administration has one service-specific descendant form: for a
+Tenant-scoped invocation, the policy target remains the Tenant while the
+canonical resource path names one descendant Workspace. That form requires an
+explicit Tenant-target grant and never inherits Workspace policy. A
+Workspace-scoped invocation still uses its exact Workspace as the policy
+target.
+
 ## Autonomous path
 
 An explicitly admitted kernel lookup may omit the invocation JWT. It acts only

@@ -100,7 +100,7 @@ public static partial class OperationCatalog
     {
         var segments = path.Segments;
         var next = RequireIdentityTargetPrefix(segments, target);
-        if (target.WorkspaceId is null)
+        if (next != 4)
         {
             throw InvalidPath();
         }
@@ -214,6 +214,10 @@ public static partial class OperationCatalog
         IReadOnlyList<string> segments,
         int next)
     {
+        if (next != 4)
+        {
+            throw InvalidPath();
+        }
         RequireFixed(segments, next, "login-providers");
         if (operation.Value == "workspace_login_provider_admissions.read")
         {
@@ -234,18 +238,19 @@ public static partial class OperationCatalog
         PolicyTarget target)
     {
         RequireTenantPrefix(segments, target);
-        if (target.WorkspaceId is null)
+        if (segments.Count > 2 && segments[2] == "workspaces")
         {
-            return 2;
+            var workspace = WorkspaceId.Parse(ReadSegment(segments, 3));
+            if (target.WorkspaceId is not null
+                && workspace != target.WorkspaceId)
+            {
+                throw InvalidPath();
+            }
+            return 4;
         }
 
-        RequireFixed(segments, 2, "workspaces");
-        var workspace = WorkspaceId.Parse(ReadSegment(segments, 3));
-        if (workspace != target.WorkspaceId)
-        {
-            throw InvalidPath();
-        }
-        return 4;
+        RequireTenantTarget(target);
+        return 2;
     }
 
     private static void RequireAccountPrincipal(string value)

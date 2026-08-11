@@ -35,15 +35,14 @@ test("administers exact-target Groups and direct members", async () => {
     `/tenants/acme/workspaces/atlas/groups/${groupId}`;
   const memberPath = `${groupPath}/members/user:alice`;
   await allowIdentityCapabilities(context, [
-    capability("groups.create", groupPath, "atlas"),
+    capability("groups.create", groupPath),
     capability(
       "groups.read",
-      "/tenants/acme/workspaces/atlas/groups",
-      "atlas"),
-    capability("groups.delete", groupPath, "atlas"),
-    capability("group_memberships.add", memberPath, "atlas"),
-    capability("group_memberships.remove", memberPath, "atlas"),
-    capability("group_memberships.read", `${groupPath}/members`, "atlas")
+      "/tenants/acme/workspaces/atlas/groups"),
+    capability("groups.delete", groupPath),
+    capability("group_memberships.add", memberPath),
+    capability("group_memberships.remove", memberPath),
+    capability("group_memberships.read", `${groupPath}/members`)
   ]);
   const metadata = identityAdminMetadata(context, "acme");
   const selector = {
@@ -115,7 +114,7 @@ test("a Group ID cannot be rebound to another target", async () => {
     `/tenants/acme/workspaces/atlas/groups/${groupId}`;
   await allowIdentityCapabilities(context, [
     capability("groups.create", tenantPath),
-    capability("groups.create", workspacePath, "atlas")
+    capability("groups.create", workspacePath)
   ]);
   const metadata = identityAdminMetadata(context, "acme");
   await callUnary<Group>((callback) =>
@@ -142,18 +141,16 @@ test("virtual Group members must have standing inside their fence", async () => 
   const betaPath =
     `/tenants/acme/workspaces/beta/groups/${betaGroup}`;
   await allowIdentityCapabilities(context, [
-    capability("groups.create", atlasPath, "atlas"),
-    capability("groups.delete", atlasPath, "atlas"),
+    capability("groups.create", atlasPath),
+    capability("groups.delete", atlasPath),
     capability(
       "group_memberships.add",
-      `${atlasPath}/members/agent:reviewer`,
-      "atlas"),
-    capability("groups.create", betaPath, "beta"),
-    capability("groups.delete", betaPath, "beta"),
+      `${atlasPath}/members/agent:reviewer`),
+    capability("groups.create", betaPath),
+    capability("groups.delete", betaPath),
     capability(
       "group_memberships.add",
-      `${betaPath}/members/agent:atlas`,
-      "beta")
+      `${betaPath}/members/agent:atlas`)
   ]);
   const metadata = identityAdminMetadata(context, "acme");
   await callUnary((done) => context.client.createGroup(
@@ -200,13 +197,11 @@ test("virtual Group members must have standing inside their fence", async () => 
 
 function capability(
   operation: string,
-  resourcePath: string,
-  workspaceId?: string
+  resourcePath: string
 ) {
   return {
     operation,
     resourcePath,
-    tenantId: "acme",
-    ...(workspaceId === undefined ? {} : { workspaceId })
+    tenantId: "acme"
   };
 }

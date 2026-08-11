@@ -74,6 +74,55 @@ test("allows every catalog operation from its exact owner and target", async () 
   }
 });
 
+test("allows Identityd Workspace operations at either approved policy target",
+  async () => {
+    const context = getPolicydTestContext();
+    await context.reset();
+    await context.policyd.setPrincipalFacts([
+      principalFact(),
+      principalFact({
+        workspaceId: "atlas",
+        membershipRevision: 2
+      })
+    ]);
+    await context.policyd.replacePolicy({
+      roles: [],
+      grants: identitydWorkspaceCases.flatMap((entry) => [
+        directGrant(
+          "svc_identityd",
+          entry.operation,
+          entry.resourcePath),
+        directGrant(
+          "svc_identityd",
+          entry.operation,
+          entry.resourcePath,
+          { target: { tenantId: "acme", workspaceId: "atlas" } })
+      ])
+    });
+
+    for (const entry of identitydWorkspaceCases) {
+      for (const workspaceId of [undefined, "atlas"] as const) {
+        const target = workspaceId === undefined
+          ? { tenantId: "acme" }
+          : { tenantId: "acme", workspaceId };
+        const response = await callCheckAccess(
+          {
+            operation: entry.operation,
+            resourcePath: entry.resourcePath,
+            ...target
+          },
+          {
+            owner: "identityd",
+            invocation: target
+          });
+        assert.equal(
+          response.decision,
+          AccessDecision.ACCESS_DECISION_ALLOW,
+          `${entry.operation}:${workspaceId ?? "tenant"}`);
+      }
+    }
+  });
+
 test("rejects each catalog partition from another authenticated owner", async () => {
   const owners: Readonly<Record<PolicyOwner, PolicyOwner>> = {
     tenantd: "pkgd",
@@ -176,6 +225,22 @@ test("distinguishes malformed operations from invalid known targets", async () =
     {
       operation: "placements.read",
       resourcePath: "/tenants/acme/placements/",
+      tenantId: "acme"
+    },
+    {
+      operation: "workspace_memberships.add",
+      resourcePath: "/tenants/other/workspaces/atlas/members/user:bob",
+      tenantId: "acme"
+    },
+    {
+      operation: "workspace_memberships.add",
+      resourcePath: "/tenants/acme/workspaces/beta/members/user:bob",
+      tenantId: "acme",
+      workspaceId: "atlas"
+    },
+    {
+      operation: "workspace_memberships.add",
+      resourcePath: "/tenants/acme/members/user:bob",
       tenantId: "acme"
     }
   ]) {
@@ -314,3 +379,23 @@ function ownerFor(operation: string): PolicyOwner {
   }
   return "tenantd";
 }
+
+const identitydWorkspaceCases = ([
+  ["workspace_memberships.add", "members/user:bob"],
+  ["workspace_memberships.remove", "members/user:bob"],
+  ["workspace_memberships.read", "members"],
+  ["groups.create", "groups/reviewers"],
+  ["groups.delete", "groups/reviewers"],
+  ["groups.read", "groups"],
+  ["group_memberships.add", "groups/reviewers/members/user:bob"],
+  ["group_memberships.remove", "groups/reviewers/members/user:bob"],
+  ["group_memberships.read", "groups/reviewers/members"],
+  ["virtual_principals.create", "virtual-principals/agent:reviewer"],
+  ["virtual_principals.read", "virtual-principals"],
+  ["virtual_principals.set_enabled", "virtual-principals/agent:reviewer"],
+  ["workspace_login_provider_admissions.set", "login-providers/workforce"],
+  ["workspace_login_provider_admissions.read", "login-providers"]
+] as const).map(([operation, suffix]) => ({
+  operation,
+  resourcePath: `/tenants/acme/workspaces/atlas/${suffix}`
+}));

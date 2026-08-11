@@ -25,13 +25,12 @@ internal static partial class IdentityAuthorization
     {
         var invocation = identity.Invocation
             ?? throw new TokenValidationException();
-        if (!await Invocations.ContainsAdminTarget(
+        var policyTarget =
+            await Invocations.ResolveAdministrationPolicyTarget(
                 invocation,
                 target,
-                cancellation))
-        {
-            throw new AuthorizationTargetNotFoundException();
-        }
+                cancellation)
+            ?? throw new AuthorizationTargetNotFoundException();
 
         var invocationToken = identity.InvocationToken
             ?? throw new TokenValidationException();
@@ -39,11 +38,11 @@ internal static partial class IdentityAuthorization
         {
             Operation = GetIdentityOperation(operation),
             ResourcePath = resourcePath,
-            TenantId = target.TenantId.Value
+            TenantId = policyTarget.TenantId.Value
         };
-        if (target.WorkspaceId is not null)
+        if (policyTarget.WorkspaceId is not null)
         {
-            request.WorkspaceId = target.WorkspaceId.Value;
+            request.WorkspaceId = policyTarget.WorkspaceId.Value;
         }
 
         var token = (await File.ReadAllTextAsync(

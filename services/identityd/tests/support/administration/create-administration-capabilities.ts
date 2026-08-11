@@ -29,28 +29,28 @@ readonly IdentityCapability[] {
     tenant("tenant_memberships.add", memberPath),
     tenant("tenant_memberships.read", `${tenantRoot}/members`),
     tenant("tenant_memberships.remove", memberPath),
-    workspace("workspace_memberships.add", workspaceMemberPath),
-    workspace("workspace_memberships.read", `${workspaceRoot}/members`),
-    workspace("workspace_memberships.remove", workspaceMemberPath),
-    workspace("groups.create", groupPath),
-    workspace("groups.read", `${workspaceRoot}/groups`),
-    workspace("groups.delete", groupPath),
-    workspace("group_memberships.add", groupMemberPath),
-    workspace("group_memberships.read", `${groupPath}/members`),
-    workspace("group_memberships.remove", groupMemberPath),
-    workspace("virtual_principals.create", principalPath),
-    workspace("virtual_principals.read", principalPath),
-    workspace(
+    tenant("workspace_memberships.add", workspaceMemberPath),
+    tenant("workspace_memberships.read", `${workspaceRoot}/members`),
+    tenant("workspace_memberships.remove", workspaceMemberPath),
+    tenant("groups.create", groupPath),
+    tenant("groups.read", `${workspaceRoot}/groups`),
+    tenant("groups.delete", groupPath),
+    tenant("group_memberships.add", groupMemberPath),
+    tenant("group_memberships.read", `${groupPath}/members`),
+    tenant("group_memberships.remove", groupMemberPath),
+    tenant("virtual_principals.create", principalPath),
+    tenant("virtual_principals.read", principalPath),
+    tenant(
       "virtual_principals.read",
       `${workspaceRoot}/virtual-principals`),
-    workspace("virtual_principals.set_enabled", principalPath),
+    tenant("virtual_principals.set_enabled", principalPath),
     tenant("login_providers.create", providerPath),
     tenant("login_providers.read", providerPath),
     tenant("login_providers.read", `${tenantRoot}/login-providers`),
     tenant("login_providers.update", providerPath),
     tenant("login_providers.set_state", providerPath),
-    workspace("workspace_login_provider_admissions.set", admissionPath),
-    workspace(
+    tenant("workspace_login_provider_admissions.set", admissionPath),
+    tenant(
       "workspace_login_provider_admissions.read",
       `${workspaceRoot}/login-providers`),
     tenant("external_identity_links.create", identityLinksPath),
@@ -63,12 +63,5 @@ readonly IdentityCapability[] {
     resourcePath: string
   ): IdentityCapability {
     return { operation, resourcePath, tenantId };
-  }
-
-  function workspace(
-    operation: string,
-    resourcePath: string
-  ): IdentityCapability {
-    return { operation, resourcePath, tenantId, workspaceId };
   }
 }

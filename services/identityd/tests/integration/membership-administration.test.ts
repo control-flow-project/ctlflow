@@ -39,12 +39,11 @@ test("administers Tenant and Workspace standing over the real policy path",
       capability("tenant_memberships.add", tenantPath),
       capability("tenant_memberships.read", "/tenants/acme/members"),
       capability("tenant_memberships.remove", tenantPath),
-      capability("workspace_memberships.add", workspacePath, "atlas"),
+      capability("workspace_memberships.add", workspacePath),
       capability(
         "workspace_memberships.read",
-        "/tenants/acme/workspaces/atlas/members",
-        "atlas"),
-      capability("workspace_memberships.remove", workspacePath, "atlas")
+        "/tenants/acme/workspaces/atlas/members"),
+      capability("workspace_memberships.remove", workspacePath)
     ]);
     const metadata = identityAdminMetadata(context, "acme");
 
@@ -109,6 +108,94 @@ test("administers Tenant and Workspace standing over the real policy path",
         callback));
   });
 
+test("bootstraps first Workspace standing from Tenant authority", async () => {
+  const context = getIdentitydTestContext();
+  const workspaceId = "first_workspace";
+  const accountId = "user:first_workspace_member";
+  const tenantPath = `/tenants/acme/members/${accountId}`;
+  const workspacePath =
+    `/tenants/acme/workspaces/${workspaceId}/members/${accountId}`;
+  await allowIdentityCapabilities(context, [
+    capability("tenant_memberships.add", tenantPath),
+    capability("tenant_memberships.remove", tenantPath),
+    capability("workspace_memberships.add", workspacePath),
+    capability("workspace_memberships.remove", workspacePath)
+  ]);
+  const metadata = identityAdminMetadata(context, "acme");
+  await callUnary((done) => context.client.addTenantMember(
+    { tenantId: "acme", accountId },
+    metadata,
+    done));
+
+  const member = await callUnary<WorkspaceMember>((done) =>
+    context.client.addWorkspaceMember(
+      { tenantId: "acme", workspaceId, accountId },
+      metadata,
+      done));
+  assert.equal(member.workspaceId, workspaceId);
+  assert.equal(member.accountId, accountId);
+
+  await callUnary((done) => context.client.removeWorkspaceMember(
+    { tenantId: "acme", workspaceId, accountId },
+    metadata,
+    done));
+  await callUnary((done) => context.client.removeTenantMember(
+    { tenantId: "acme", accountId },
+    metadata,
+    done));
+});
+
+test("Workspace authority remains exact to its standing and policy", async () => {
+  const context = getIdentitydTestContext();
+  const workspaceId = "atlas";
+  const accountId = "user:workspace_policy_member";
+  const tenantPath = `/tenants/acme/members/${accountId}`;
+  const workspacePath =
+    `/tenants/acme/workspaces/${workspaceId}/members/${accountId}`;
+  await allowIdentityCapabilities(context, [
+    capability("tenant_memberships.add", tenantPath),
+    capability("tenant_memberships.remove", tenantPath),
+    workspaceCapability(
+      "workspace_memberships.add",
+      workspacePath,
+      workspaceId),
+    workspaceCapability(
+      "workspace_memberships.remove",
+      workspacePath,
+      workspaceId)
+  ]);
+  const tenantAdmin = identityAdminMetadata(context, "acme");
+  const workspaceAdmin = identityAdminMetadata(context, "acme", workspaceId);
+  await callUnary((done) => context.client.addTenantMember(
+    { tenantId: "acme", accountId },
+    tenantAdmin,
+    done));
+
+  await assert.rejects(
+    callUnary<WorkspaceMember>((done) =>
+      context.client.addWorkspaceMember(
+        { tenantId: "acme", workspaceId, accountId },
+        tenantAdmin,
+        done)),
+    matchGrpcStatus(status.PERMISSION_DENIED));
+
+  const member = await callUnary<WorkspaceMember>((done) =>
+    context.client.addWorkspaceMember(
+      { tenantId: "acme", workspaceId, accountId },
+      workspaceAdmin,
+      done));
+  assert.equal(member.workspaceId, workspaceId);
+
+  await callUnary((done) => context.client.removeWorkspaceMember(
+    { tenantId: "acme", workspaceId, accountId },
+    workspaceAdmin,
+    done));
+  await callUnary((done) => context.client.removeTenantMember(
+    { tenantId: "acme", accountId },
+    tenantAdmin,
+    done));
+});
+
 test("Tenant removal is blocked while Workspace standing remains", async () => {
   const context = getIdentitydTestContext();
   const accountId = "service:membership_guard";
@@ -118,8 +205,8 @@ test("Tenant removal is blocked while Workspace standing remains", async () => {
   await allowIdentityCapabilities(context, [
     capability("tenant_memberships.add", tenantPath),
     capability("tenant_memberships.remove", tenantPath),
-    capability("workspace_memberships.add", workspacePath, "atlas"),
-    capability("workspace_memberships.remove", workspacePath, "atlas")
+    capability("workspace_memberships.add", workspacePath),
+    capability("workspace_memberships.remove", workspacePath)
   ]);
   const metadata = identityAdminMetadata(context, "acme");
   await callUnary((callback) =>
@@ -169,12 +256,12 @@ test("standing removal honors Group and external-link guards", async () => {
   await allowIdentityCapabilities(context, [
     capability("tenant_memberships.add", tenantPath),
     capability("tenant_memberships.remove", tenantPath),
-    capability("workspace_memberships.add", workspacePath, "atlas"),
-    capability("workspace_memberships.remove", workspacePath, "atlas"),
-    capability("groups.create", groupPath, "atlas"),
-    capability("groups.delete", groupPath, "atlas"),
-    capability("group_memberships.add", groupMemberPath, "atlas"),
-    capability("group_memberships.read", `${groupPath}/members`, "atlas"),
+    capability("workspace_memberships.add", workspacePath),
+    capability("workspace_memberships.remove", workspacePath),
+    capability("groups.create", groupPath),
+    capability("groups.delete", groupPath),
+    capability("group_memberships.add", groupMemberPath),
+    capability("group_memberships.read", `${groupPath}/members`),
     capability("external_identity_links.create", identityLinksPath),
     capability("external_identity_links.delete", identityLinksPath)
   ]);
@@ -248,13 +335,19 @@ test("standing removal honors Group and external-link guards", async () => {
 
 function capability(
   operation: string,
-  resourcePath: string,
-  workspaceId?: string
+  resourcePath: string
 ) {
   return {
     operation,
     resourcePath,
-    tenantId: "acme",
-    ...(workspaceId === undefined ? {} : { workspaceId })
+    tenantId: "acme"
   };
+}
+
+function workspaceCapability(
+  operation: string,
+  resourcePath: string,
+  workspaceId: string
+) {
+  return { operation, resourcePath, tenantId: "acme", workspaceId };
 }

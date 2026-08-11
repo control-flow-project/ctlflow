@@ -115,6 +115,13 @@ Identityd does not expose a generic token mint, token introspection, Session
 list, Session administration, Role/grant/decision method, provider secret,
 automatic admission rule, watch, or stream.
 
+Administration always mutates or reads the exact requested domain target. A
+Tenant-scoped invocation authorizing a descendant Workspace operation uses the
+Tenant as the Policyd target and keeps the Workspace in the canonical resource
+path. A Workspace-scoped invocation uses that exact Workspace as the Policyd
+target. The first form requires an explicit Tenant-target grant and current
+Tenant standing; it does not inherit Workspace policy.
+
 ## Verification keys
 
 `GetInvocationVerificationKeys` takes an empty message and returns a bounded

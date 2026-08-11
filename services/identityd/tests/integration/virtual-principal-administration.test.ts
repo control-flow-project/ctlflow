@@ -31,15 +31,14 @@ test("administers one immutable virtual principal fence", async () => {
   const atlasRoot = "/tenants/acme/workspaces/atlas/virtual-principals";
   const betaRoot = "/tenants/acme/workspaces/beta/virtual-principals";
   await allowIdentityCapabilities(context, [
-    capability("virtual_principals.create", `${atlasRoot}/${principalId}`, "atlas"),
-    capability("virtual_principals.read", `${atlasRoot}/${principalId}`, "atlas"),
-    capability("virtual_principals.read", atlasRoot, "atlas"),
+    capability("virtual_principals.create", `${atlasRoot}/${principalId}`),
+    capability("virtual_principals.read", `${atlasRoot}/${principalId}`),
+    capability("virtual_principals.read", atlasRoot),
     capability(
       "virtual_principals.set_enabled",
-      `${atlasRoot}/${principalId}`,
-      "atlas"),
-    capability("virtual_principals.read", `${betaRoot}/${principalId}`, "beta"),
-    capability("virtual_principals.create", `${betaRoot}/${principalId}`, "beta")
+      `${atlasRoot}/${principalId}`),
+    capability("virtual_principals.read", `${betaRoot}/${principalId}`),
+    capability("virtual_principals.create", `${betaRoot}/${principalId}`)
   ]);
   const metadata = identityAdminMetadata(context, "acme");
   const selector = {
@@ -125,7 +124,7 @@ test("virtual principal creation requires attached-account standing",
       "/tenants/acme/workspaces/atlas/virtual-principals/"
       + principalId;
     await allowIdentityCapabilities(context, [
-      capability("virtual_principals.create", resourcePath, "atlas")
+      capability("virtual_principals.create", resourcePath)
     ]);
 
     await assert.rejects(
@@ -144,8 +143,7 @@ test("virtual principal creation requires attached-account standing",
 
 function capability(
   operation: string,
-  resourcePath: string,
-  workspaceId: string
+  resourcePath: string
 ) {
-  return { operation, resourcePath, tenantId: "acme", workspaceId };
+  return { operation, resourcePath, tenantId: "acme" };
 }

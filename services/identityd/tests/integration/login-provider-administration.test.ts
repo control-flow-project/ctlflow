@@ -34,22 +34,23 @@ import {
 test("administers provider metadata, state, and Workspace admission", async () => {
   const context = getIdentitydTestContext();
   const providerId = "admin_oidc";
+  const workspaceId = "provider_bootstrap";
   const providerPath = `/tenants/acme/login-providers/${providerId}`;
   const providerCollection = "/tenants/acme/login-providers";
   const admissionPath =
-    `/tenants/acme/workspaces/atlas/login-providers/${providerId}`;
+    `/tenants/acme/workspaces/${workspaceId}/login-providers/${providerId}`;
   const admissionCollection =
-    "/tenants/acme/workspaces/atlas/login-providers";
+    `/tenants/acme/workspaces/${workspaceId}/login-providers`;
   await allowIdentityCapabilities(context, [
     tenantCapability("login_providers.create", providerPath),
     tenantCapability("login_providers.read", providerPath),
     tenantCapability("login_providers.read", providerCollection),
     tenantCapability("login_providers.update", providerPath),
     tenantCapability("login_providers.set_state", providerPath),
-    workspaceCapability(
+    tenantCapability(
       "workspace_login_provider_admissions.set",
       admissionPath),
-    workspaceCapability(
+    tenantCapability(
       "workspace_login_provider_admissions.read",
       admissionCollection)
   ]);
@@ -159,19 +160,19 @@ test("administers provider metadata, state, and Workspace admission", async () =
       context.client.setWorkspaceLoginProviderAdmission(
         {
           ...selector,
-          workspaceId: "atlas",
+          workspaceId,
           admitted: true
         },
         admin,
         callback));
   assert.deepEqual(admitted.admission, {
     ...selector,
-    workspaceId: "atlas"
+    workspaceId
   });
   const admissions =
     await callUnary<ListWorkspaceLoginProviderAdmissionsResponse>((callback) =>
       context.client.listWorkspaceLoginProviderAdmissions(
-        { tenantId: "acme", workspaceId: "atlas", pageSize: 100 },
+        { tenantId: "acme", workspaceId, pageSize: 100 },
         authd,
         callback));
   assert.equal(
@@ -183,7 +184,7 @@ test("administers provider metadata, state, and Workspace admission", async () =
       context.client.setWorkspaceLoginProviderAdmission(
         {
           ...selector,
-          workspaceId: "atlas",
+          workspaceId,
           admitted: false
         },
         admin,
@@ -192,7 +193,7 @@ test("administers provider metadata, state, and Workspace admission", async () =
   assert.equal(
     (await callUnary<ListWorkspaceLoginProviderAdmissionsResponse>(
       (callback) => context.client.listWorkspaceLoginProviderAdmissions(
-        { tenantId: "acme", workspaceId: "atlas", pageSize: 100 },
+        { tenantId: "acme", workspaceId, pageSize: 100 },
         authd,
         callback))).admissions.some((entry) =>
           entry.providerId === providerId),
@@ -201,7 +202,7 @@ test("administers provider metadata, state, and Workspace admission", async () =
     context.client.setWorkspaceLoginProviderAdmission(
       {
         ...selector,
-        workspaceId: "atlas",
+        workspaceId,
         admitted: false
       },
       admin,
@@ -210,7 +211,7 @@ test("administers provider metadata, state, and Workspace admission", async () =
     context.client.setWorkspaceLoginProviderAdmission(
       {
         ...selector,
-        workspaceId: "atlas",
+        workspaceId,
         admitted: true
       },
       admin,
@@ -269,13 +270,48 @@ test("administers provider metadata, state, and Workspace admission", async () =
   const afterDeletion =
     await callUnary<ListWorkspaceLoginProviderAdmissionsResponse>((callback) =>
       context.client.listWorkspaceLoginProviderAdmissions(
-        { tenantId: "acme", workspaceId: "atlas", pageSize: 100 },
+        { tenantId: "acme", workspaceId, pageSize: 100 },
         authd,
         callback));
   assert.equal(
     afterDeletion.admissions.some((entry) => entry.providerId === providerId),
     false);
 });
+
+test("Workspace authority administers only its exact provider admission",
+  async () => {
+    const context = getIdentitydTestContext();
+    const providerId = "oidc";
+    const workspaceId = "atlas";
+    const path =
+      `/tenants/acme/workspaces/${workspaceId}/login-providers/${providerId}`;
+    await allowIdentityCapabilities(context, [
+      workspaceCapability(
+        "workspace_login_provider_admissions.set",
+        path,
+        workspaceId)
+    ]);
+    const metadata = identityAdminMetadata(context, "acme", workspaceId);
+
+    const removed =
+      await callUnary<SetWorkspaceLoginProviderAdmissionResponse>((done) =>
+        context.client.setWorkspaceLoginProviderAdmission(
+          { tenantId: "acme", workspaceId, providerId, admitted: false },
+          metadata,
+          done));
+    assert.equal(removed.admission, undefined);
+    const restored =
+      await callUnary<SetWorkspaceLoginProviderAdmissionResponse>((done) =>
+        context.client.setWorkspaceLoginProviderAdmission(
+          { tenantId: "acme", workspaceId, providerId, admitted: true },
+          metadata,
+          done));
+    assert.deepEqual(restored.admission, {
+      tenantId: "acme",
+      workspaceId,
+      providerId
+    });
+  });
 
 test("non-canonical stored provider metadata fails unavailable", async () => {
   const context = getIdentitydTestContext();
@@ -383,6 +419,10 @@ function tenantCapability(operation: string, resourcePath: string) {
   return { operation, resourcePath, tenantId: "acme" };
 }
 
-function workspaceCapability(operation: string, resourcePath: string) {
-  return { operation, resourcePath, tenantId: "acme", workspaceId: "atlas" };
+function workspaceCapability(
+  operation: string,
+  resourcePath: string,
+  workspaceId: string
+) {
+  return { operation, resourcePath, tenantId: "acme", workspaceId };
 }

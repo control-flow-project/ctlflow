@@ -207,6 +207,14 @@
           "title": "administers Tenant and Workspace standing over the real policy path"
         },
         {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "bootstraps first Workspace standing from Tenant authority"
+        },
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "Workspace authority remains exact to its standing and policy"
+        },
+        {
           "file": "tests/integration/administration-observability.test.ts",
           "title": "every administration operation emits telemetry and typed audit"
         }
@@ -1276,6 +1284,10 @@
         {
           "file": "tests/integration/login-provider-administration.test.ts",
           "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "Workspace authority administers only its exact provider admission"
         },
         {
           "file": "tests/integration/administration-observability.test.ts",

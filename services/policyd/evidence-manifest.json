@@ -10,6 +10,10 @@
           "title": "allows every catalog operation from its exact owner and target"
         },
         {
+          "file": "tests/integration/catalog.test.ts",
+          "title": "allows Identityd Workspace operations at either approved policy target"
+        },
+        {
           "file": "tests/integration/rules.test.ts",
           "title": "allows direct Group and Role-bound principal authority"
         },
