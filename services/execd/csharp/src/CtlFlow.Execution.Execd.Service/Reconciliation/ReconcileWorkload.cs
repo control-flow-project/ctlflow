@@ -294,7 +294,9 @@ internal static partial class ExecutionReconciliation
             cancellation);
         var status = InspectDeployment(deployment);
         var ready = status.ObservedGeneration >= status.Generation
-            && status.AvailableReplicas >= continuous.Replicas;
+            && status.AvailableReplicas >= continuous.Replicas
+            && status.Replicas == continuous.Replicas
+            && status.UpdatedReplicas == continuous.Replicas;
         await EnsureWorkloadServices(
             database,
             kubernetes,

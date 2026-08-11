@@ -46,6 +46,12 @@ internal static partial class KubernetesBodies
             writer.WriteEndObject();
             writer.WriteStartObject("template");
             writer.WriteStartObject("metadata");
+            writer.WriteStartObject("annotations");
+            writer.WriteString(
+                "execution.ctlflow.io/workload-revision",
+                workload.Revision.Value.ToString(
+                    CultureInfo.InvariantCulture));
+            writer.WriteEndObject();
             WriteLabels(writer, "labels", labels);
             writer.WriteEndObject();
             writer.WriteStartObject("spec");

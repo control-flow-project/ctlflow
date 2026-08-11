@@ -16,7 +16,7 @@ internal static partial class KubernetesApis
             || status.ValueKind is JsonValueKind.Null
                 or JsonValueKind.Undefined)
         {
-            return new DeploymentStatus(0, generation, 0);
+            return new DeploymentStatus(0, 0, 0, generation, 0);
         }
 
         if (status.ValueKind != JsonValueKind.Object)
@@ -28,6 +28,12 @@ internal static partial class KubernetesApis
         var available = ReadOptionalNonnegativeInt64(
             status,
             "availableReplicas");
+        var replicas = ReadOptionalNonnegativeInt64(
+            status,
+            "replicas");
+        var updated = ReadOptionalNonnegativeInt64(
+            status,
+            "updatedReplicas");
         var observed = ReadOptionalNonnegativeInt64(
             status,
             "observedGeneration");
@@ -39,6 +45,8 @@ internal static partial class KubernetesApis
 
         return new DeploymentStatus(
             checked((int)available),
+            checked((int)replicas),
+            checked((int)updated),
             generation,
             observed);
     }

@@ -108,6 +108,11 @@ Configuration targets name an exact Configd configuration or secret version
 and one purpose. Execd passes the stored Placement target, Workload as
 consumer, and purpose to `configd.ApplyProjection`; it never receives content
 or a native coordinate. Direct targets are unique by data kind and purpose.
+For a continuous Workload, a declaration revision that changes any running
+input, including a selected configuration or secret version, rolls every
+replica onto that revision after its exact projections are established. Execd
+does not report the new Workload revision `READY` while replicas from the prior
+revision remain active.
 
 Every Package dependency has exactly one selection. Execd chooses only the
 provisioner fixed by the effective Placement constraints, applies any

@@ -15,6 +15,7 @@ await import("./lifecycle.test.js");
 await import("./placements.test.js");
 await import("./workloads.test.js");
 await import("./reconciliation.test.js");
+await import("./configuration-rollout.test.js");
 await import("./realization.test.js");
 await import("./realization-failures.test.js");
 await import("./runs.test.js");
