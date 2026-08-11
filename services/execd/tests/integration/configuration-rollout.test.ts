@@ -64,7 +64,7 @@ test("rolls continuous workloads onto changed configuration versions",
         scope: { global: {} },
         artifact: getExecdTestSuite().applicationArtifact
       });
-      const initial = await declareWorkload(createWorkloadRequest({
+      const initialRequest = createWorkloadRequest({
         workloadId,
         placementId: placement.placementId,
         appId,
@@ -72,7 +72,8 @@ test("rolls continuous workloads onto changed configuration versions",
         configdTargets: [configurationTarget(
           configurationId,
           requireVersionId(firstVersion))]
-      }));
+      });
+      const initial = await declareWorkload(initialRequest);
       declared = true;
       await waitForWorkloadReady(workloadId, initial.revision);
       const namespace = await getPlacementNamespace(
@@ -82,6 +83,16 @@ test("rolls continuous workloads onto changed configuration versions",
         namespace,
         workloadId,
         '{"version":1}');
+      const replay = await declareWorkload({
+        ...initialRequest,
+        expectedRevision: initial.revision
+      });
+      assert.equal(replay.revision, initial.revision);
+      const replayPod = await waitForMountedConfiguration(
+        namespace,
+        workloadId,
+        '{"version":1}');
+      assert.equal(replayPod.uid, firstPod.uid);
 
       const secondVersion = await publishConfiguration({
         configurationId,

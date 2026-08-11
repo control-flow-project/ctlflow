@@ -262,6 +262,9 @@ returns the retained record; conflicting identity reuse is `ALREADY_EXISTS`.
 An update requires the current positive revision. An identical update is a
 no-op. A retry one revision behind succeeds only when the complete retained
 result equals the requested result; another mismatch is `ABORTED`.
+Resolved projection IDs and projection revisions are observed runtime state,
+not part of a Workload declaration. Resolving a direct target or dependency
+parameter therefore cannot make an otherwise identical declaration differ.
 
 A Run ID is its retry identity. Reuse for the same Workload returns the
 retained Run; reuse for another Workload is `ALREADY_EXISTS`.
