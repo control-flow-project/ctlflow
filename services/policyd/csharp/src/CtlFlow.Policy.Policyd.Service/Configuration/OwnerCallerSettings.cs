@@ -7,7 +7,8 @@ internal sealed partial record OwnerCallerSettings(
     KubernetesServiceAccountSubject Tenantd,
     KubernetesServiceAccountSubject Pkgd,
     KubernetesServiceAccountSubject Configd,
-    KubernetesServiceAccountSubject Execd)
+    KubernetesServiceAccountSubject Execd,
+    KubernetesServiceAccountSubject Identityd)
 {
     internal KubernetesServiceAccountSubject GetCaller(
         OperationOwner owner) =>
@@ -17,6 +18,7 @@ internal sealed partial record OwnerCallerSettings(
             OperationOwner.Pkgd => Pkgd,
             OperationOwner.Configd => Configd,
             OperationOwner.Execd => Execd,
+            OperationOwner.Identityd => Identityd,
             _ => throw new InvalidOperationException(
                 "Operation owner is invalid")
         };

@@ -1,5 +1,7 @@
 using CtlFlow.Identity.Identityd.Domain.Accounts;
 using CtlFlow.Identity.Identityd.Domain.Resources;
+using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
 using CtlFlow.Identity.Identityd.Domain.Time;
 
@@ -10,6 +12,7 @@ public class Session
     private string _accountId = null!;
     private string _credentialDigest = null!;
     private string _id = null!;
+    private string _providerId = null!;
     private string _tenantId = null!;
 
     private Session()
@@ -21,6 +24,7 @@ public class Session
         SessionCredentialDigest credentialDigest,
         AccountId accountId,
         TenantId tenantId,
+        ProviderId providerId,
         UtcInstant createdAt,
         UtcInstant expiresAt,
         UtcInstant? revokedAt,
@@ -38,6 +42,7 @@ public class Session
         _credentialDigest = credentialDigest.Value;
         _accountId = accountId.Value;
         _tenantId = tenantId.Value;
+        _providerId = providerId.Value;
         CreatedAt = createdAt;
         ExpiresAt = expiresAt;
         RevokedAt = revokedAt;
@@ -52,6 +57,8 @@ public class Session
     public AccountId AccountId => AccountId.FromStorage(_accountId);
 
     public TenantId TenantId => TenantId.FromStorage(_tenantId);
+
+    public ProviderId ProviderId => ProviderId.FromStorage(_providerId);
 
     public UtcInstant CreatedAt { get; private set; } = null!;
 

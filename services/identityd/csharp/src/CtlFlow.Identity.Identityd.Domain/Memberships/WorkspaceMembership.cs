@@ -15,6 +15,18 @@ public class WorkspaceMembership
     {
     }
 
+    public WorkspaceMembership(
+        AccountId accountId,
+        TenantId tenantId,
+        WorkspaceId workspaceId,
+        Revision revision)
+    {
+        _accountId = accountId.Value;
+        _tenantId = tenantId.Value;
+        _workspaceId = workspaceId.Value;
+        Revision = revision;
+    }
+
     public AccountId AccountId => AccountId.FromStorage(_accountId);
 
     public TenantId TenantId => TenantId.FromStorage(_tenantId);

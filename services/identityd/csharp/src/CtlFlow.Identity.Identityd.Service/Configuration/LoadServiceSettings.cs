@@ -14,6 +14,7 @@ internal static partial class IdentitydConfiguration
 {
     private const int DefaultDatabasePoolSize = 16;
     private const int DefaultAuditCallTimeoutMilliseconds = 2_000;
+    private const int DefaultPolicyCallTimeoutMilliseconds = 2_000;
     private const int DefaultWorkloadTokenLifetimeSeconds = 3_600;
     private const int DefaultInvocationTokenLifetimeSeconds = 60;
     private const int DefaultKeyCacheSeconds = 30;
@@ -55,6 +56,9 @@ internal static partial class IdentitydConfiguration
         var auditEndpoint = ParsePrivateOrigin(
             "CTLFLOW_AUDIT_URL",
             RequireEnvironment("CTLFLOW_AUDIT_URL"));
+        var policyEndpoint = ParsePrivateOrigin(
+            "CTLFLOW_POLICY_URL",
+            RequireEnvironment("CTLFLOW_POLICY_URL"));
         var workloadTokenFile =
             RequireAbsoluteFile("CTLFLOW_WORKLOAD_TOKEN_FILE");
         var invocationTokens = CreateTokenSettings(
@@ -63,6 +67,15 @@ internal static partial class IdentitydConfiguration
         var workloadTokens = CreateTokenSettings(
             "CTLFLOW_WORKLOAD",
             DefaultWorkloadTokenLifetimeSeconds);
+        var getLoginProviderAuthdCallers = ParseRequiredCallers(
+            "CTLFLOW_GET_LOGIN_PROVIDER_AUTHD_CALLERS");
+        var getWorkspaceAdmissionAuthdCallers = ParseRequiredCallers(
+            "CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_AUTHD_CALLERS");
+        var administration = LoadIdentityAdminSettings();
+        ValidateProviderReadCallers(
+            administration,
+            getLoginProviderAuthdCallers,
+            getWorkspaceAdmissionAuthdCallers);
 
         return new ServiceSettings(
             IPAddress.Parse(grpcUri.Host),
@@ -82,6 +95,15 @@ internal static partial class IdentitydConfiguration
                 TimeSpan.FromMilliseconds(ReadPositiveInteger(
                     "CTLFLOW_AUDIT_CALL_TIMEOUT_MILLISECONDS",
                     DefaultAuditCallTimeoutMilliseconds))),
+            new PolicySettings(
+                new PrivateGrpcSettings(
+                    policyEndpoint,
+                    RequireDnsName("CTLFLOW_POLICY_TLS_SERVER_NAME"),
+                    RequireAbsoluteFile("CTLFLOW_POLICY_TLS_CA_PATH")),
+                workloadTokenFile,
+                TimeSpan.FromMilliseconds(ReadPositiveInteger(
+                    "CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS",
+                    DefaultPolicyCallTimeoutMilliseconds))),
             new WorkloadTokenSettings(
                 workloadTokens,
                 RequireAbsoluteFile("CTLFLOW_WORKLOAD_JWKS_PATH"),
@@ -112,8 +134,27 @@ internal static partial class IdentitydConfiguration
             ParseRequiredCallers("CTLFLOW_REVOKE_SESSION_CALLERS"),
             ParseRequiredCallers(
                 "CTLFLOW_ISSUE_RUN_INVOCATION_CALLERS"),
+            getLoginProviderAuthdCallers,
+            getWorkspaceAdmissionAuthdCallers,
+            administration,
             TelemetrySettings.Parse(
                 RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT")));
+    }
+
+    private static void ValidateProviderReadCallers(
+        IdentityAdminSettings administration,
+        IReadOnlySet<KubernetesServiceAccountSubject> getProviderAuthd,
+        IReadOnlySet<KubernetesServiceAccountSubject> getAdmissionAuthd)
+    {
+        if (getProviderAuthd.Overlaps(administration.GetCallers(
+                IdentityAdminOperation.GetLoginProvider))
+            || getAdmissionAuthd.Overlaps(administration.GetCallers(
+                IdentityAdminOperation
+                    .GetWorkspaceLoginProviderAdmission)))
+        {
+            throw new InvalidOperationException(
+                "Autonomous Authd and capability callers must be disjoint");
+        }
     }
 
     private static Uri ParseListenUri(

@@ -1,5 +1,6 @@
 using CtlFlow.Identity.Identityd.Domain.Auditing;
 using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Resources;
 using CtlFlow.Identity.Identityd.Domain.Accounts;
 
@@ -9,6 +10,7 @@ public static partial class Sessions
 {
     public static ValueTask<SessionCreationResult> CreateSession(
         ExternalIdentityFacts? identity,
+        ProviderId providerId,
         SessionCredentialDigest credentialDigest,
         SessionLifetime lifetime,
         AuditContext audit,
@@ -18,6 +20,7 @@ public static partial class Sessions
         if (identity is null
             || identity.AccountKind != AccountKind.Human
             || !identity.AccountEnabled
+            || !identity.ProviderActive
             || identity.LinkTenantId != identity.MembershipTenantId)
         {
             return ValueTask.FromResult<SessionCreationResult>(
@@ -29,6 +32,7 @@ public static partial class Sessions
             credentialDigest,
             identity.AccountId,
             identity.LinkTenantId,
+            providerId,
             audit.OccurredAt,
             audit.OccurredAt.Add(lifetime.Value),
             null,
@@ -39,7 +43,7 @@ public static partial class Sessions
                 new SessionAuditIntent(
                     AuditEventId.Generate(),
                     SessionAuditAction.Created,
-                    audit.Caller,
+                    audit.Attribution,
                     session.Id,
                     session.AccountId,
                     session.TenantId,

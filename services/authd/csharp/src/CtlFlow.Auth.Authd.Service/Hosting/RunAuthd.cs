@@ -3,6 +3,7 @@ using CtlFlow.Auth.Authd.Service.Configuration;
 using CtlFlow.Auth.Authd.Service.State;
 using CtlFlow.Auth.Authd.Service.Telemetry;
 using CtlFlow.Identity.V1;
+using CtlFlow.Tenancy.V1;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using static CtlFlow.Auth.Authd.Service.Configuration.AuthdConfiguration;
@@ -36,6 +37,7 @@ internal static partial class AuthdProcess
     {
         var settings = await LoadServiceSettings(CancellationToken.None);
         var identityChannel = CreatePrivateGrpcChannel(settings.Identity);
+        var tenantChannel = CreatePrivateGrpcChannel(settings.Tenant);
         var egressClient = CreateEgressClient();
         var builder = WebApplication.CreateSlimBuilder(args);
         builder.WebHost.ConfigureKestrel(options =>
@@ -66,8 +68,11 @@ internal static partial class AuthdProcess
         builder.Services.AddSingleton<PublicAdmission>();
         builder.Services.AddSingleton(egressClient);
         builder.Services.AddSingleton(identityChannel);
+        builder.Services.AddSingleton(tenantChannel);
         builder.Services.AddSingleton(
             new IdentityService.IdentityServiceClient(identityChannel));
+        builder.Services.AddSingleton(
+            new TenantService.TenantServiceClient(tenantChannel));
 
         await using var application = builder.Build();
         application.Use(async (context, next) =>

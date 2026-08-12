@@ -101,20 +101,39 @@ export async function seedIdentityDatabase(
       virtualGroup("agent:reviewer", "atlas_reviewers"),
       virtualGroup("agent:atlas", "atlas_editors")
     ]);
+    await transaction("login_providers").insert({
+      tenant_id: "acme",
+      provider_id: "oidc",
+      display_name: "Acme OIDC",
+      configuration_id: "oidc",
+      configuration_version_id: "oidc_1",
+      secret_id: "oidc_secret",
+      secret_version_id: "oidc_secret_1",
+      state: 1,
+      revision: 40
+    });
+    await transaction("workspace_login_provider_admissions").insert({
+      tenant_id: "acme",
+      workspace_id: "atlas",
+      provider_id: "oidc"
+    });
     await transaction("external_identity_links").insert([
       externalIdentity(
+        "eil_00000000000000000000000000000001",
         "acme",
         "oidc",
         "alice@example.com",
         "user:alice",
         41),
       externalIdentity(
+        "eil_00000000000000000000000000000002",
         "acme",
         "oidc",
         "disabled@example.com",
         "user:disabled",
         42),
       externalIdentity(
+        "eil_00000000000000000000000000000003",
         "acme",
         "oidc",
         "automation@example.com",
@@ -222,6 +241,7 @@ function virtualGroup(
 }
 
 function externalIdentity(
+  externalLinkId: string,
   tenantId: string,
   providerId: string,
   providerSubject: string,
@@ -229,6 +249,7 @@ function externalIdentity(
   revision: number
 ): Record<string, unknown> {
   return {
+    external_link_id: externalLinkId,
     tenant_id: tenantId,
     provider_id: providerId,
     provider_subject: providerSubject,

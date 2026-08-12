@@ -200,6 +200,1573 @@
       }
     },
     {
+      "name": "AddTenantMember",
+      "success": [
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "administers Tenant and Workspace standing over the real policy path"
+        },
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "bootstraps first Workspace standing from Tenant authority"
+        },
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "Workspace authority remains exact to its standing and policy"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoveTenantMember",
+      "success": [
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "administers Tenant and Workspace standing over the real policy path"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/membership-administration.test.ts",
+            "title": "standing removal honors Group and external-link guards"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListTenantMembers",
+      "success": [
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "administers Tenant and Workspace standing over the real policy path"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AddWorkspaceMember",
+      "success": [
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "administers Tenant and Workspace standing over the real policy path"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoveWorkspaceMember",
+      "success": [
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "administers Tenant and Workspace standing over the real policy path"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/membership-administration.test.ts",
+            "title": "standing removal honors Group and external-link guards"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListWorkspaceMembers",
+      "success": [
+        {
+          "file": "tests/integration/membership-administration.test.ts",
+          "title": "administers Tenant and Workspace standing over the real policy path"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateGroup",
+      "success": [
+        {
+          "file": "tests/integration/group-administration.test.ts",
+          "title": "administers exact-target Groups and direct members"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/group-administration.test.ts",
+            "title": "a Group ID cannot be rebound to another target"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeleteGroup",
+      "success": [
+        {
+          "file": "tests/integration/group-administration.test.ts",
+          "title": "administers exact-target Groups and direct members"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListGroups",
+      "success": [
+        {
+          "file": "tests/integration/group-administration.test.ts",
+          "title": "administers exact-target Groups and direct members"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AddGroupMember",
+      "success": [
+        {
+          "file": "tests/integration/group-administration.test.ts",
+          "title": "administers exact-target Groups and direct members"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoveGroupMember",
+      "success": [
+        {
+          "file": "tests/integration/group-administration.test.ts",
+          "title": "administers exact-target Groups and direct members"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListGroupMembers",
+      "success": [
+        {
+          "file": "tests/integration/group-administration.test.ts",
+          "title": "administers exact-target Groups and direct members"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateVirtualPrincipal",
+      "success": [
+        {
+          "file": "tests/integration/virtual-principal-administration.test.ts",
+          "title": "administers one immutable virtual principal fence"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/virtual-principal-administration.test.ts",
+            "title": "administers one immutable virtual principal fence"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetVirtualPrincipal",
+      "success": [
+        {
+          "file": "tests/integration/virtual-principal-administration.test.ts",
+          "title": "administers one immutable virtual principal fence"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListVirtualPrincipals",
+      "success": [
+        {
+          "file": "tests/integration/virtual-principal-administration.test.ts",
+          "title": "administers one immutable virtual principal fence"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetVirtualPrincipalEnabled",
+      "success": [
+        {
+          "file": "tests/integration/virtual-principal-administration.test.ts",
+          "title": "administers one immutable virtual principal fence"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "ABORTED": [
+          {
+            "file": "tests/integration/virtual-principal-administration.test.ts",
+            "title": "administers one immutable virtual principal fence"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateExternalIdentityLink",
+      "success": [
+        {
+          "file": "tests/integration/external-link-administration.test.ts",
+          "title": "administers exact external identity mappings"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/external-link-administration.test.ts",
+            "title": "administers exact external identity mappings"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/external-link-administration.test.ts",
+            "title": "external links require an enabled human member and non-deleted provider"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DeleteExternalIdentityLink",
+      "success": [
+        {
+          "file": "tests/integration/external-link-administration.test.ts",
+          "title": "administers exact external identity mappings"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListExternalIdentityLinks",
+      "success": [
+        {
+          "file": "tests/integration/external-link-administration.test.ts",
+          "title": "administers exact external identity mappings"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateLoginProvider",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "Workspace authority administers only its exact provider admission"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "provider metadata enforces its canonical wire bounds"
+          }
+        ],
+        "ALREADY_EXISTS": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "administers provider metadata, state, and Workspace admission"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetLoginProvider",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListLoginProviders",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateLoginProvider",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "provider metadata enforces its canonical wire bounds"
+          }
+        ],
+        "ABORTED": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "administers provider metadata, state, and Workspace admission"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "administers provider metadata, state, and Workspace admission"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetLoginProviderState",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "ABORTED": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "administers provider metadata, state, and Workspace admission"
+          }
+        ],
+        "FAILED_PRECONDITION": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "administers provider metadata, state, and Workspace admission"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetWorkspaceLoginProviderAdmission",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GetWorkspaceLoginProviderAdmission",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-security.test.ts",
+          "title": "Authd exact provider reads are autonomous and least-privileged"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Authd exact provider reads are autonomous and least-privileged"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "administers provider metadata, state, and Workspace admission"
+          },
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Authd exact provider reads are autonomous and least-privileged"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListWorkspaceLoginProviderAdmissions",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        },
+        {
+          "file": "tests/integration/administration-pagination.test.ts",
+          "title": "every administration list uses bounded keyset pagination"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-pagination.test.ts",
+            "title": "every administration list rejects an oversized page"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
       "name": "CreateSession",
       "success": [
         {
@@ -431,7 +1998,11 @@
     },
     {
       "file": "tests/integration/telemetry.test.ts",
-      "title": "every operation emits correlated telemetry and Session audit"
+      "title": "every non-administration operation emits telemetry and Session audit"
+    },
+    {
+      "file": "tests/integration/administration-observability.test.ts",
+      "title": "every administration operation emits telemetry and typed audit"
     },
     {
       "file": "tests/integration/telemetry.test.ts",
@@ -448,6 +2019,10 @@
     {
       "file": "tests/integration/zz-persistence.test.ts",
       "title": "startup rejects empty and malformed caller admission"
+    },
+    {
+      "file": "tests/integration/zz-persistence.test.ts",
+      "title": "startup rejects overlapping Authd and capability callers"
     },
     {
       "file": "tests/integration/zz-persistence.test.ts",

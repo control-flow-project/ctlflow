@@ -8,7 +8,7 @@ namespace CtlFlow.Auth.Authd.Service.Transport;
 internal static partial class PrivateGrpcChannels
 {
     internal static GrpcChannel CreatePrivateGrpcChannel(
-        IdentitySettings settings)
+        PrivateGrpcSettings settings)
     {
         var authority = X509CertificateLoader.LoadCertificateFromFile(
             settings.CertificateAuthorityPath);

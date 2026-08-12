@@ -22,6 +22,34 @@ internal static partial class AuditRequests
                 await MapIdentitySession(
                     value.IdentitySession,
                     cancellation),
+            AuditEvent.DetailOneofCase.IdentityMembership =>
+                await MapIdentityMembership(
+                    value.IdentityMembership,
+                    cancellation),
+            AuditEvent.DetailOneofCase.IdentityGroup =>
+                await MapIdentityGroup(
+                    value.IdentityGroup,
+                    cancellation),
+            AuditEvent.DetailOneofCase.IdentityGroupMember =>
+                await MapIdentityGroupMember(
+                    value.IdentityGroupMember,
+                    cancellation),
+            AuditEvent.DetailOneofCase.IdentityVirtualPrincipal =>
+                await MapIdentityVirtualPrincipal(
+                    value.IdentityVirtualPrincipal,
+                    cancellation),
+            AuditEvent.DetailOneofCase.IdentityExternalLink =>
+                await MapIdentityExternalLink(
+                    value.IdentityExternalLink,
+                    cancellation),
+            AuditEvent.DetailOneofCase.IdentityLoginProvider =>
+                await MapIdentityLoginProvider(
+                    value.IdentityLoginProvider,
+                    cancellation),
+            AuditEvent.DetailOneofCase.IdentityWorkspaceProviderAdmission =>
+                await MapIdentityWorkspaceProviderAdmission(
+                    value.IdentityWorkspaceProviderAdmission,
+                    cancellation),
             AuditEvent.DetailOneofCase.PackageDeclaration =>
                 await MapPackageDeclaration(
                     value.PackageDeclaration,

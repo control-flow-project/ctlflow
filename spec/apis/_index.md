@@ -14,17 +14,17 @@ protobuf and OpenAPI files remain the wire authority.
 | Service | Protocol | Operations | Contract |
 | --- | --- | ---: | --- |
 | [`tenantd`](tenantd/) | private unary gRPC | 12 | [`tenantd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/tenantd/api/proto/v1/tenantd.proto) |
-| [`identityd`](identityd/) | private unary gRPC | 7 | [`identityd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/identityd/api/proto/v1/identityd.proto) |
+| [`identityd`](identityd/) | private unary gRPC | 34 | [`identityd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/identityd/api/proto/v1/identityd.proto) |
 | [`policyd`](policyd/) | private unary gRPC | 1 | [`policyd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/policyd/api/proto/v1/policyd.proto) |
 | [`pkgd`](pkgd/) | private unary gRPC | 5 | [`pkgd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/pkgd/api/proto/v1/pkgd.proto) |
 | [`configd`](configd/) | private unary gRPC | 5 | [`configd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/configd/api/proto/v1/configd.proto) |
 | [`execd`](execd/) | private unary gRPC | 11 | [`execd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/execd/api/proto/v1/execd.proto) |
 | [`auditd`](auditd/) | private unary gRPC | 1 | [`auditd.proto`](https://github.com/control-flow-project/ctlflow/blob/main/services/auditd/api/proto/v1/auditd.proto) |
-| [`authd`](authd/) | public HTTP | 3 | [`openapi.yaml`](https://github.com/control-flow-project/ctlflow/blob/main/services/authd/api/http/v1/openapi.yaml) |
+| [`authd`](authd/) | public HTTP | 3 routes | [`openapi.yaml`](https://github.com/control-flow-project/ctlflow/blob/main/services/authd/api/http/v1/openapi.yaml) |
 | [`edged`](edged/) | public bound HTTP proxy | 7 methods | [`openapi.yaml`](https://github.com/control-flow-project/ctlflow/blob/main/services/edged/api/http/v1/openapi.yaml) |
 | [`egressd`](egressd/) | private bound HTTP proxy | 7 methods | [`openapi.yaml`](https://github.com/control-flow-project/ctlflow/blob/main/services/egressd/api/http/v1/openapi.yaml) |
 
-The approved surface is 42 unary RPCs and 17 HTTP method/route combinations.
+The approved surface is 69 unary RPCs and 17 HTTP method/route combinations.
 There are no gRPC streams, watch APIs, generic command endpoints, or
 caller-defined response shapes.
 

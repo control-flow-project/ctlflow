@@ -1,12 +1,12 @@
 ---
 title: identityd
-description: Principal facts, standing, Groups, Sessions, and invocation identity.
+description: Principals, standing, Groups, login identity, Sessions, and invocation identity.
 weight: 46
 ---
 
 `identityd` is the private authority for current principal, attached-account,
-Membership, direct-Group, external-identity-link, Session, and invocation
-identity. It exposes only the gRPC contract in
+Membership, direct-Group, external-identity-link, login-provider, Session, and
+invocation identity. It exposes only the gRPC contract in
 `services/identityd/api/proto/v1/identityd.proto` and has no public listener.
 
 **Wire reference:** [identityd gRPC API](../apis/identityd/)
@@ -20,6 +20,7 @@ The implemented contract owns:
 - exact Tenant and Workspace Membership standing;
 - non-nested Groups and direct principal-to-Group membership; and
 - Tenant-scoped external identity links;
+- Tenant login-provider registrations and Workspace provider admissions;
 - opaque browser Sessions;
 - invocation-signing custody; and
 - active and retiring invocation public verification keys.
@@ -28,11 +29,12 @@ A Membership establishes standing only. A Group is a direct audience only.
 Neither contains a Role, grant, capability, administrator flag, operation, or
 access decision. `policyd` alone owns those policy concepts.
 
-Account, Membership, Group, virtual-principal, external-identity-link, and key
-lifecycle are installation-provisioned domain state in this contract. The only
-domain mutations are Session creation and revocation. No account, Membership,
-Group, principal, identity-link, provider-configuration, credential-management,
-or key-lifecycle operation exists in the approved API.
+Identityd exposes explicit administration operations for account standing,
+Groups, virtual principals, external identity links, login-provider
+registrations, and Workspace provider admissions. These operations never
+create a Role, grant, capability, Tenant, Workspace, provider secret, or OIDC
+protocol result. Key lifecycle remains installation-provisioned; Session
+creation and revocation remain protocol-facing mutations.
 
 ## Records
 
@@ -149,6 +151,7 @@ placed in an environment value, or exposed to another process.
 An external identity link contains:
 
 ```text
+opaque external-link ID
 Tenant ID
 provider ID
 provider subject
@@ -159,12 +162,64 @@ positive revision
 Provider IDs use the canonical one-to-64-character identifier shape. Provider
 subjects are exact, case-sensitive, non-empty values of at most 512
 characters. A provider identity maps to at most one human account inside one
-Tenant. Service and virtual principals cannot be login targets.
+Tenant. Service and virtual principals cannot be login targets. The account
+must have current Tenant standing and the provider must be current and not
+deleted when the link is created.
+
+The external-link ID is `eil_` followed by 32 lower-case hexadecimal
+characters. Identityd generates it once, persists it with the mapping, and
+never exposes it through the identity API. It exists to correlate typed create
+and delete audit evidence without disclosing the provider subject. Distinct
+links always have distinct IDs.
 
 Identityd owns the identity mapping. Authd owns public protocol validation and
 supplies only a provider ID and provider subject that it has established from
-that protocol. It never supplies an account ID. Provider protocol
-configuration and secret custody are outside this contract.
+that protocol. It never supplies an account ID.
+
+### Login providers
+
+A login-provider registration contains:
+
+```text
+Tenant ID
+provider ID
+display name
+Configd configuration ID and exact version ID
+Configd secret ID and exact version ID
+active, disabled, or deleted state
+positive revision
+```
+
+The current protocol is OIDC. Identityd stores only registration metadata and
+exact references. Configd owns the referenced bytes, and Authd alone interprets
+and validates their OIDC meaning. Configuration or secret material never
+enters an Identityd request, response, database, log, metric, trace, or audit
+event.
+
+Provider IDs are permanent inside a Tenant. `active` and `disabled` may
+transition to each other or to `deleted`; `deleted` is terminal. Deleted
+records remain reserved and are hidden from reads. Deletion removes every
+Workspace admission for the provider in the same Identityd transaction but
+does not silently remove external identity links.
+
+Display names are one through 128 UTF-8 characters after trimming and contain
+no control character. Configd identity and version IDs use Configd's canonical
+one-to-64-character identifier shape.
+
+### Workspace login-provider admissions
+
+A Workspace admission contains exactly:
+
+```text
+Tenant ID
+Workspace ID
+Tenant provider ID
+```
+
+An admitted provider belongs to the same Tenant and is not deleted. A
+Workspace login accepts only a provider in this exact set. The record copies no
+provider configuration or secret material and carries no Role, domain rule,
+email rule, or automatic-Membership behavior.
 
 ### Sessions
 
@@ -174,6 +229,7 @@ A Session contains:
 opaque Session ID
 human account ID
 Tenant ID
+login provider ID
 SHA-256 credential digest
 creation and finite expiry times
 optional revocation time
@@ -182,9 +238,12 @@ positive revision
 
 Identityd generates each Session ID and 256-bit credential using a
 cryptographically secure random source. The raw credential is returned only
-by `CreateSession`; Identityd persists only its digest. A Session is
-Tenant-scoped. A later Workspace target is admitted only through the account's
-current Workspace standing.
+by `CreateSession`; Identityd persists only its digest. The provider ID is the
+immutable Tenant provider through which the Session was created; the provider
+subject and protocol material are not Session state. A Session is
+Tenant-scoped. A later Workspace target requires both the account's current
+Workspace standing and an exact current Workspace admission for the Session's
+provider. Tenant exchange does not consult Workspace admissions.
 
 Revocation is terminal. Expiry is evaluated from the current time and does not
 mutate the record. A configured Session lifetime is finite and no greater than
@@ -215,28 +274,61 @@ Workspace target:
   AND virtual Workspace fence is absent or equals requested Workspace
 ```
 
-An invocation Workspace fence permits its parent Tenant target and only that
-Workspace as a Workspace target. An invocation Tenant fence permits that
-Tenant and any Workspace target inside it.
+For the existing principal-fact operations, an invocation Workspace fence
+permits its parent Tenant target and only that Workspace as a Workspace target;
+this lets Policyd resolve the caller's required parent standing. An invocation
+Tenant fence permits that Tenant and any Workspace target inside it.
+Administration is deliberately narrower: a Workspace-scoped invocation may
+administer only that exact Workspace and never its parent Tenant, while a
+Tenant-scoped invocation may administer the Tenant and its Workspaces.
 
 Unknown records, missing standing, a mismatched parent, or a target outside
 either fence are concealed as `NOT_FOUND`.
 
 ## API
 
-The service has exactly these operations:
+The service has exactly 34 unary operations:
 
 | Operation | Input | Result |
 | --- | --- | --- |
 | `GetInvocationVerificationKeys` | Empty request | Bounded current public key set and cache expiry |
 | `ResolvePrincipal` | Principal ID, Tenant ID, optional Workspace ID | Current principal, account, and Membership facts |
 | `ListPrincipalGroups` | Same selector, page size, optional last Group ID | Bounded direct-Group ID page |
+| `AddTenantMember` | Tenant ID and account principal ID | Current account and Tenant Membership facts |
+| `RemoveTenantMember` | Tenant ID and account principal ID | Empty success |
+| `ListTenantMembers` | Tenant ID, page size, optional last account ID | Bounded Tenant-member page |
+| `AddWorkspaceMember` | Tenant ID, Workspace ID, and account principal ID | Current account and Workspace Membership facts |
+| `RemoveWorkspaceMember` | Same exact selector | Empty success |
+| `ListWorkspaceMembers` | Tenant ID, Workspace ID, page size, optional last account ID | Bounded Workspace-member page |
+| `CreateGroup` | Group ID and exact Tenant or Workspace target | Group |
+| `DeleteGroup` | Group ID and exact target | Empty success |
+| `ListGroups` | Exact target, page size, optional last Group ID | Bounded Group page |
+| `AddGroupMember` | Group ID, exact target, and principal ID | Group member |
+| `RemoveGroupMember` | Same exact selector | Empty success |
+| `ListGroupMembers` | Group ID, exact target, page size, optional last principal ID | Bounded direct-member page |
+| `CreateVirtualPrincipal` | Principal ID, attached account ID, and immutable target fence | Virtual principal |
+| `GetVirtualPrincipal` | Principal ID and exact fence | Virtual principal |
+| `ListVirtualPrincipals` | Exact fence, page size, optional last principal ID | Bounded virtual-principal page |
+| `SetVirtualPrincipalEnabled` | Principal ID, exact fence, expected revision, enabled value | Virtual principal |
+| `CreateExternalIdentityLink` | Tenant, provider, subject, and human account | External identity link |
+| `DeleteExternalIdentityLink` | Tenant, provider, and subject | Empty success |
+| `ListExternalIdentityLinks` | Tenant, provider, page size, optional last subject | Bounded external-link page |
+| `CreateLoginProvider` | Tenant, provider ID, display name, and exact Configd references | Login provider |
+| `GetLoginProvider` | Tenant and provider ID | Login provider |
+| `ListLoginProviders` | Tenant, page size, optional last provider ID | Bounded login-provider page |
+| `UpdateLoginProvider` | Tenant, provider ID, expected revision, display name, and exact Configd references | Login provider |
+| `SetLoginProviderState` | Tenant, provider ID, expected revision, state | Login provider |
+| `SetWorkspaceLoginProviderAdmission` | Tenant, Workspace, provider ID, admitted value | Workspace admission or empty removal |
+| `GetWorkspaceLoginProviderAdmission` | Tenant, Workspace, and provider ID | Exact Workspace admission |
+| `ListWorkspaceLoginProviderAdmissions` | Tenant, Workspace, page size, optional last provider ID | Bounded admission page |
 | `CreateSession` | Tenant ID, provider ID, provider subject | New Session ID, one-time opaque credential, and expiry |
 | `ExchangeSession` | Opaque Session credential and exact target | Short-lived invocation JWT and expiry |
 | `RevokeSession` | Opaque Session credential | Empty success |
 | `IssueRunInvocation` | Actor principal ID, exact target, Run ID | Short-lived invocation JWT and expiry |
 
-No other Identityd domain operation exists.
+There is no account-update, account-delete, nested-Group, Session-list,
+Session-administration, provider-secret, automatic-admission, Role, grant,
+decision, watch, stream, bulk, restore, or key-lifecycle operation.
 
 ### GetInvocationVerificationKeys
 
@@ -314,17 +406,96 @@ last emitted Group ID as `next_after_group_id` only when another page exists.
 The continuation is untrusted input, not stored state. Pagination has no
 cursor table, snapshot journal, expiry, or mutation invalidation.
 
+All administration lists use the same page-size bounds and read-one-extra
+keyset shape over the immutable ID named by their `after_*` field. External
+identity links are ordered by the unsigned UTF-8 bytes of the exact provider
+subject. Database comparison, continuation selection, and returned-page
+validation use that same order for every admitted Unicode scalar sequence. No
+list stores a cursor or promises a snapshot across calls.
+
+### Membership administration
+
+`AddTenantMember` accepts only a canonical `user:` or `service:` account ID.
+When the account is absent, Identityd creates the matching enabled human or
+service account at revision one before creating Tenant standing. Repeating the
+same add returns the current facts without another mutation. It never creates a
+Role, Group membership, Workspace standing, external link, or Session.
+
+`AddWorkspaceMember` requires current Tenant standing for the account and
+creates only the exact Workspace standing. Repeating it returns the current
+facts. The two list operations return account ID, kind, enabled state, account
+revision, and Membership revision in ascending account-ID order.
+
+Removal is idempotent. Removing Workspace standing fails while the principal
+has a direct Group membership at that Workspace. Removing Tenant standing
+fails while any Workspace standing, direct Group membership in the Tenant or
+one of its Workspaces, or external identity link remains. Existing Sessions
+are retained but cannot exchange after standing disappears because every
+exchange re-establishes current standing.
+
+### Group administration
+
+`CreateGroup` binds one globally unique Group ID to one exact target. An exact
+replay is a no-op; reuse at another target is `ALREADY_EXISTS`. `DeleteGroup`
+removes its direct member relationships and then the Group in one transaction;
+repeating deletion is a no-op.
+
+Adding a member requires an existing exact-target Group and current standing
+for the named human, service, or virtual principal at that target. For a
+virtual principal, Identityd also checks its immutable attachment and fence.
+Groups cannot be members. Add and remove are idempotent. Member lists contain
+principal ID and kind in ascending principal-ID order.
+
+### Virtual-principal administration
+
+Creation requires an absent canonical `agent:` ID, an existing human or service
+account with current standing at the immutable fence, and an optional Workspace
+inside the named Tenant. The principal starts enabled at revision one. ID,
+attached account, Tenant fence, and optional Workspace fence never change.
+
+Get, list, and enable-state mutation use the exact immutable fence. A target
+mismatch is concealed as `NOT_FOUND`. Enable-state mutation requires the
+current positive revision; a mismatch is `ABORTED`, and an unchanged value is
+a no-op.
+
+### External-identity-link administration
+
+Creation requires an existing non-deleted provider and an enabled human account
+with current Tenant standing. An exact replay is a no-op; the same
+Tenant/provider/subject mapped to another account is `ALREADY_EXISTS`.
+Deletion is idempotent. Lists are bounded to one exact Tenant and provider and
+ordered by the case-sensitive provider subject. Provider subjects and
+configuration material are excluded from telemetry and audit.
+
+### Login-provider administration
+
+Creation starts the provider in `active` state at revision one. ID reuse is
+`ALREADY_EXISTS`, including a deleted record. Update changes only display name
+and exact Configd references and requires the current positive revision.
+State mutation requires the current positive revision, permits
+`active <-> disabled` and either current state to `deleted`, and rejects every
+transition out of `deleted`. An unchanged update is a no-op.
+
+Get and list hide deleted providers. Lists use ascending provider-ID order.
+`SetWorkspaceLoginProviderAdmission` adds or removes one exact provider ID.
+Add requires a current non-deleted provider in the same Tenant; add and remove
+are idempotent. `GetWorkspaceLoginProviderAdmission` returns only the exact
+current admission and otherwise returns `NOT_FOUND`. Admission lists use
+ascending provider-ID order and never return a deleted provider. Authd must
+additionally require `active` state before beginning login.
+
 ### CreateSession
 
 Authd calls `CreateSession` only after it has validated one external
-authentication protocol result. Identityd resolves the exact Tenant, provider
-ID, and provider subject through its current external identity link. It then
-requires an enabled human account and current Tenant Membership.
+authentication protocol result. Identityd requires the exact provider to be
+active, resolves the Tenant, provider ID, and provider subject through its
+current external identity link, and then requires an enabled human account and
+current Tenant Membership.
 
-Success creates one Session, returns its generated ID, returns the raw
-32-byte credential exactly once, and returns the absolute expiry. The
-credential, provider subject, and protocol material never appear in telemetry
-or audit.
+Success creates one Session with the selected provider ID, returns its
+generated ID, returns the raw 32-byte credential exactly once, and returns the
+absolute expiry. The credential, provider subject, and protocol material never
+appear in telemetry or audit.
 
 Unknown identity links, disabled accounts, and missing Tenant standing are
 `UNAUTHENTICATED`. Identityd never accepts an account ID from Authd.
@@ -341,8 +512,13 @@ dynamic Execd-created sidecars without granting the colocated application
 access to the credential.
 Identityd hashes the credential, requires one unexpired and unrevoked Session,
 requires its enabled human account, and re-establishes current standing at the
-exact target. Session expiry is evaluated against the full current instant;
-whole-second normalization applies only to the issued invocation timestamps.
+exact target. For a Workspace target, it also requires the Session's immutable
+provider ID in that Workspace's exact current admission set. Removing an
+admission therefore prevents later Workspace exchange without revoking the
+Tenant Session. Disabling a provider prevents new login but does not invalidate
+an existing Session. Session expiry is evaluated against the full current
+instant; whole-second normalization applies only to the issued invocation
+timestamps.
 
 Success returns an RS256 invocation JWT whose `sub` is the Session account,
 whose target fence is the request target, and whose origin is the Session ID.
@@ -350,7 +526,8 @@ It has no `act.sub` or `run_id`. The absolute token expiry is returned
 separately.
 
 An unknown, malformed, expired, or revoked credential is `UNAUTHENTICATED`.
-Missing target standing is concealed as `NOT_FOUND`.
+Missing target standing or Workspace provider admission is concealed as
+`NOT_FOUND`.
 
 ### RevokeSession
 
@@ -398,9 +575,9 @@ Every operation authenticates a bound Kubernetes ServiceAccount token.
 `GetInvocationVerificationKeys` uses the installation internal audience and
 admits any valid installation-issued bound workload token because it returns
 only public verification material. Every remaining operation uses the
-installation internal audience and an exact per-operation caller set.
+installation internal audience.
 
-The approved callers are:
+Autonomous kernel callers use an exact per-operation ServiceAccount allowlist:
 
 | Operation | Caller |
 | --- | --- |
@@ -410,6 +587,10 @@ The approved callers are:
 | `CreateSession` | `SERVICE/svc_authd` |
 | `RevokeSession` | `SERVICE/svc_authd` |
 | `IssueRunInvocation` | `SERVICE/svc_execd` |
+| `GetLoginProvider` | `SERVICE/svc_authd` or an admitted capability caller |
+| `ListLoginProviders` | admitted capability caller |
+| `GetWorkspaceLoginProviderAdmission` | `SERVICE/svc_authd` or an admitted capability caller |
+| `ListWorkspaceLoginProviderAdmissions` | admitted capability caller |
 
 Installation configuration maps the canonical principals for exact-caller
 operations to Kubernetes ServiceAccount subjects. Startup fails when one of
@@ -418,11 +599,76 @@ This mapping applies to neither `ExchangeSession` nor
 `GetInvocationVerificationKeys`; their fixed admission rules above are
 complete.
 
+Every administration operation admits only a finite per-operation set of
+product-backend ServiceAccount subjects. It requires a valid invocation JWT,
+applies its target fence before authorization, constructs the operation and
+path from validated values, and calls `policyd.CheckAccess` as
+`SERVICE/svc_identityd`. The unchanged invocation JWT is forwarded. Identityd
+never accepts a caller-supplied capability, resource path, Role, Group set,
+Actor, or attached account.
+
+The requested domain target and the Policyd target are identical except when a
+Tenant-scoped invocation administers one of that Tenant's Workspaces. In that
+case Identityd sends the Tenant as the Policyd target while the canonical
+resource path retains the exact descendant Workspace. Policyd therefore
+re-establishes Tenant standing and evaluates only an explicit Tenant-target
+grant for that descendant path. This permits first-member and first-provider
+admission bootstrap without treating Tenant policy as inherited Workspace
+policy. A Workspace-scoped invocation sends its exact Workspace as the Policyd
+target and requires current standing and authority there.
+
+For each provider-read operation, the autonomous Authd caller set and the
+capability-caller set are disjoint. Identityd fails startup on an overlap;
+caller configuration cannot make one ServiceAccount ambiguously autonomous
+and invocation-authorized for the same operation.
+
+Policyd may re-enter only `ResolvePrincipal` and `ListPrincipalGroups` while
+deciding an Identityd administration call. Those two fact operations admit
+only Policyd and never call Policyd, so this call graph cannot recurse.
+
+The complete Identityd capability catalog is:
+
+| Identityd operation | Required capability | Canonical resource path |
+| --- | --- | --- |
+| `AddTenantMember` | `tenant_memberships.add` | `/tenants/<tenant_id>/members/<account_id>` |
+| `RemoveTenantMember` | `tenant_memberships.remove` | `/tenants/<tenant_id>/members/<account_id>` |
+| `ListTenantMembers` | `tenant_memberships.read` | `/tenants/<tenant_id>/members` |
+| `AddWorkspaceMember` | `workspace_memberships.add` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members/<account_id>` |
+| `RemoveWorkspaceMember` | `workspace_memberships.remove` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members/<account_id>` |
+| `ListWorkspaceMembers` | `workspace_memberships.read` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members` |
+| `CreateGroup` | `groups.create` | Exact target plus `/groups/<group_id>` |
+| `DeleteGroup` | `groups.delete` | Exact target plus `/groups/<group_id>` |
+| `ListGroups` | `groups.read` | Exact target plus `/groups` |
+| `AddGroupMember` | `group_memberships.add` | Exact target plus `/groups/<group_id>/members/<principal_id>` |
+| `RemoveGroupMember` | `group_memberships.remove` | Exact target plus `/groups/<group_id>/members/<principal_id>` |
+| `ListGroupMembers` | `group_memberships.read` | Exact target plus `/groups/<group_id>/members` |
+| `CreateVirtualPrincipal` | `virtual_principals.create` | Exact target plus `/virtual-principals/<principal_id>` |
+| `GetVirtualPrincipal`, `ListVirtualPrincipals` | `virtual_principals.read` | Exact target plus `/virtual-principals` and optional principal ID |
+| `SetVirtualPrincipalEnabled` | `virtual_principals.set_enabled` | Exact target plus `/virtual-principals/<principal_id>` |
+| `CreateExternalIdentityLink` | `external_identity_links.create` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `DeleteExternalIdentityLink` | `external_identity_links.delete` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `ListExternalIdentityLinks` | `external_identity_links.read` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `CreateLoginProvider` | `login_providers.create` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `GetLoginProvider`, `ListLoginProviders` | `login_providers.read` | Provider collection and optional exact provider path |
+| `UpdateLoginProvider` | `login_providers.update` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `SetLoginProviderState` | `login_providers.set_state` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `SetWorkspaceLoginProviderAdmission` | `workspace_login_provider_admissions.set` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
+| `GetWorkspaceLoginProviderAdmission` | `workspace_login_provider_admissions.read` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
+| `ListWorkspaceLoginProviderAdmissions` | `workspace_login_provider_admissions.read` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers` |
+
+The requested domain target is either `/tenants/<tenant_id>` or
+`/tenants/<tenant_id>/workspaces/<workspace_id>`. An account or virtual
+principal ID is one canonical path segment. A Workspace-scoped invocation
+cannot administer its parent Tenant or a sibling Workspace. A Tenant-scoped
+invocation may administer that Tenant and its Workspaces through explicit
+Tenant-target grants over the canonical descendant paths. A target outside the
+invocation fence is concealed as `NOT_FOUND` before Policyd is called.
+
 `GetInvocationVerificationKeys`, `CreateSession`, `ExchangeSession`,
-`RevokeSession`, and `IssueRunInvocation` require workload authentication but
-no existing invocation JWT.
-`ResolvePrincipal` and `ListPrincipalGroups` additionally require the unchanged
-invocation JWT being evaluated. Identityd validates its RS256
+`RevokeSession`, `IssueRunInvocation`, and Authd's login-provider reads require
+workload authentication but no existing invocation JWT. `ResolvePrincipal`,
+`ListPrincipalGroups`, and every capability call additionally require the
+unchanged invocation JWT being evaluated. Identityd validates its RS256
 signature against current local active or retiring keys, issuer, internal
 audience, subject, optional single Actor, Tenant and optional Workspace fence,
 origin, unique token ID, and bounded times. Its maximum lifetime is 60
@@ -437,10 +683,13 @@ deadline, cancellation, and W3C trace context.
 | gRPC status | Meaning |
 | --- | --- |
 | `INVALID_ARGUMENT` | A non-credential request field or bound is malformed |
-| `NOT_FOUND` | Current exact-target identity, attachment, standing, or fence cannot be established |
+| `NOT_FOUND` | Current policy-target identity, attachment, standing, or invocation fence cannot be established |
+| `ALREADY_EXISTS` | An immutable principal, Group, provider, or external identity mapping conflicts |
+| `FAILED_PRECONDITION` | Current standing, child records, provider state, or target relationship forbids the mutation |
+| `ABORTED` | A required expected revision is not current |
 | `UNAUTHENTICATED` | Workload, required invocation identity, external login identity, or Session credential is missing or invalid |
 | `PERMISSION_DENIED` | The authenticated workload is not admitted for the operation |
-| `UNAVAILABLE` | Persistence, signing, required key state, or obligatory audit delivery is unavailable, incompatible, or malformed |
+| `UNAVAILABLE` | Persistence, signing, required key state, Policyd, or obligatory audit delivery is unavailable, incompatible, or malformed |
 | `CANCELLED` / `DEADLINE_EXCEEDED` | The operation did not complete |
 
 Raw storage, token, key, and stack diagnostics never cross the boundary.
@@ -450,7 +699,17 @@ Raw storage, token, key, and stack diagnostics never cross the boundary.
 Identityd is durable. Its implementation reads only its own Knex-migrated
 database. The logical schema contains principals, Tenant Memberships,
 Workspace Memberships, Groups, direct Group memberships, and invocation
-verification keys, external identity links, and Sessions.
+verification keys, external identity links, login providers, Workspace
+login-provider admissions, and Sessions.
+
+The shipping SQLite deployment has one Identityd replica. Every operation
+that can change Identityd state enters one cancellation-aware mutation
+boundary before reading decision inputs and holds it through commit. This
+makes dependent decisions linearizable across operation types, not merely
+within one record key. A competing operation therefore observes either the
+complete state before a mutation or the complete state after it. Reads remain
+concurrent. A future database implementation may replace the mechanism, but
+must preserve the same observable ordering and invariants.
 
 Migrations contain structural tables, keys, foreign keys, uniqueness, bounds,
 indexes, and representation checks only. No trigger, stored procedure,
@@ -458,22 +717,34 @@ database function, computed side effect, or SQL-resident behavior implements
 attachment, standing, fencing, pagination, key admission, or identity rules.
 Every decision is explicit implementation-language Domain code.
 
-Successful `CreateSession` and an actual `RevokeSession` mutation create typed
-Identityd Session audit evidence. Identityd calls
-`auditd.RecordAuditBatch` directly after committing the Session mutation and
-before returning success. It holds no database transaction during the call and
-has no audit table, outbox, queue, retry journal, or fallback. Audit failure is
-`UNAVAILABLE` and does not roll back the committed Session state.
+Every actual administration mutation, successful `CreateSession`, and actual
+`RevokeSession` mutation creates typed Identityd audit evidence. Identityd calls
+`auditd.RecordAuditBatch` directly after committing the Identityd mutation and
+before returning success. It holds no database transaction during Policyd or
+Auditd calls and has no audit table, outbox, queue, retry journal, or fallback.
+Audit failure is `UNAVAILABLE` and does not roll back committed Identityd
+state.
 
-The exact typed Session actions are `CREATED` and `REVOKED`. The event is
-Tenant-partitioned and contains a canonical `evt_<32 lower-hex>` source event
-ID, Session ID, human account principal ID, resulting positive Session
-revision, action, authenticated Authd workload, occurrence time, and trace correlation. It
-contains no credential, digest, provider identity, invocation token, signing
-material, or generic operation string.
+The administration audit contract distinguishes Membership, Group,
+Group-member, virtual-principal, external-link, login-provider, and Workspace
+provider-admission mutations. It records the typed action, exact Tenant and
+optional Workspace target, non-secret resource IDs, resulting revision when a
+record has one, authenticated invocation attribution, occurrence time, and
+trace correlation. External-link events carry the persisted opaque
+external-link ID so create and delete correlate and distinct links remain
+distinguishable. External provider subjects, configuration/secret
+references, credentials, and request bodies are never audit fields.
+
+The exact typed Session actions remain `CREATED` and `REVOKED`. A Session event
+is Tenant-partitioned and contains a canonical `evt_<32 lower-hex>` source
+event ID, Session ID, human account principal ID, resulting positive Session
+revision, action, authenticated Authd workload, occurrence time, and trace
+correlation. It contains no credential, digest, provider identity, invocation
+token, signing material, or generic operation string.
 
 Session exchange, invocation issuance, fact reads, no-op revocation,
-rejections, and dependency failures create no audit event.
+administration reads and no-ops, rejections, and dependency failures create no
+audit event.
 
 Every operation emits bounded OpenTelemetry traces, metrics, and structured
 logs. Telemetry excludes principal, account, Tenant, Workspace, Group, key,
@@ -491,7 +762,7 @@ identity. Operational endpoints are not Identityd domain operations.
 
 Canonical integration evidence covers:
 
-- the exact seven-method descriptor and every documented status;
+- the exact 34-method descriptor and every documented status;
 - exact per-operation workload admission;
 - exactly one active and up to seven retiring keys, deterministic order,
   bounded expiry, private/public mismatch, malformed key state, and source
@@ -502,14 +773,33 @@ Canonical integration evidence covers:
 - Tenant standing and Workspace standing with required parent Membership;
 - enabled and disabled principal and account facts;
 - exact-scope direct Groups, keyset pagination, and concurrent inserts;
+- account creation through Tenant standing, required parent standing,
+  idempotent add/remove, and child-record removal guards;
+- Group creation, exact-target direct membership, virtual-principal standing,
+  member pagination, and transactional Group deletion;
+- virtual-principal creation, immutable attachment/fences, optimistic enable
+  changes, and exact-fence reads;
+- external-link create/replay/conflict/delete/list behavior, UTF-8 keyset
+  ordering, and opaque audit correlation without provider-subject leakage;
+- login-provider immutable IDs, optimistic metadata/state changes, terminal
+  deletion, permanent reservation, and Configd-reference bounds;
+- exact and paginated Workspace provider admission, same-Tenant fencing,
+  provider-state filtering, and provider-deletion cleanup;
+- forced cross-operation mutation interleavings for Workspace standing versus
+  Group membership, provider deletion versus Workspace admission, and Tenant
+  standing versus external-link creation;
+- real capability authorization through Policyd and non-recursive Policyd
+  re-entry through the existing fact operations;
 - external-identity resolution without caller-supplied account identity;
-- one-time credential return, digest-only persistence, finite Session expiry,
+- one-time credential return, digest-only persistence, immutable provider
+  retention, finite Session expiry, Workspace provider-admission enforcement,
   idempotent revocation, and restart persistence;
 - Session-origin and Run-origin token claims, target fencing, distinct virtual
   Actor attachment, signing failure, and signature verification through the
   public-key operation;
-- direct typed Auditd delivery for Session creation and actual revocation,
-  no-op behavior, and Auditd failure;
+- direct typed Auditd delivery for every actual administration mutation,
+  Session creation, and actual revocation, plus no-op behavior and Auditd
+  failure;
 - malformed selectors, hidden cross-target data, and corrupt stored facts;
 - cancellation, deadline, restart, and incompatible schema;
 - redacted correlated traces, metrics, logs, and database spans;
@@ -518,6 +808,6 @@ Canonical integration evidence covers:
   migration-image execution, and shipping Kubernetes assets.
 
 There is no public listener, HTTP API, operator API, Role or grant API,
-decision API, provider-protocol API, identity-management API, principal
-mutation API, Group mutation API, key mutation API, watch, stream, cursor
-table, audit outbox, or test-only production path in Identityd.
+decision API, provider-protocol API, account update/delete API, key mutation
+API, watch, stream, cursor table, audit outbox, or test-only production path in
+Identityd.

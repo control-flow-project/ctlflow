@@ -86,6 +86,12 @@ test("source-specific attribution admission is exact", async () => {
         operatorAttribution())
     },
     {
+      workload: identityd.workload,
+      event: withAttribution(
+        identityd.events[2]!,
+        workloadAttribution(identityd.sourceSubject))
+    },
+    {
       workload: pkgd.workload,
       event: withAttribution(
         pkgd.events[0]!,
@@ -201,6 +207,9 @@ test("detail and target partitions must be coherent", async () => {
     [identityd.workload, withPartition(
       identityd.events[0]!,
       globalPartition())],
+    [identityd.workload, withPartition(
+      identityd.events[2]!,
+      globalPartition())],
     [pkgd.workload, withPartition(
       pkgd.events[0]!,
       tenantPartition("wrong"))],
@@ -263,6 +272,13 @@ function detailName(event: AuditEvent): string {
     "tenantMutation",
     "workspaceMutation",
     "identitySession",
+    "identityMembership",
+    "identityGroup",
+    "identityGroupMember",
+    "identityVirtualPrincipal",
+    "identityExternalLink",
+    "identityLoginProvider",
+    "identityWorkspaceProviderAdmission",
     "packageDeclaration",
     "appMutation",
     "configurationPublication",

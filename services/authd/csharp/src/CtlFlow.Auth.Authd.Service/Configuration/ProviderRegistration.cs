@@ -5,6 +5,7 @@ namespace CtlFlow.Auth.Authd.Service.Configuration;
 internal sealed record ProviderRegistration(
     TenantId TenantId,
     ProviderId ProviderId,
+    ProviderProjectionReference ProjectionReference,
     Uri Issuer,
     Uri AuthorizationEndpoint,
     Uri TokenEndpoint,

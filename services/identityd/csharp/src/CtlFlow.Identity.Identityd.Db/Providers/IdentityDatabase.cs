@@ -4,4 +4,4 @@ namespace CtlFlow.Identity.Identityd.Db.Providers;
 
 public sealed record IdentityDatabase(
     IDbContextFactory<IdentityDbContext> Contexts,
-    SessionMutationCoordinator AcquireSessionMutation);
+    IdentityMutationCoordinator AcquireMutation);

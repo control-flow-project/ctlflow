@@ -40,14 +40,21 @@ internal static partial class AuthdConfiguration
         var identityEndpoint = ParsePrivateOrigin(
             "CTLFLOW_IDENTITY_URL",
             RequireEnvironment("CTLFLOW_IDENTITY_URL"));
+        var tenantEndpoint = ParsePrivateOrigin(
+            "CTLFLOW_TENANT_URL",
+            RequireEnvironment("CTLFLOW_TENANT_URL"));
         return new AuthdSettings(
             publicListen,
             probeListen,
             projection,
-            new IdentitySettings(
+            new PrivateGrpcSettings(
                 identityEndpoint,
                 RequireDnsName("CTLFLOW_IDENTITY_TLS_SERVER_NAME"),
                 RequireAbsoluteFile("CTLFLOW_IDENTITY_TLS_CA_PATH")),
+            new PrivateGrpcSettings(
+                tenantEndpoint,
+                RequireDnsName("CTLFLOW_TENANT_TLS_SERVER_NAME"),
+                RequireAbsoluteFile("CTLFLOW_TENANT_TLS_CA_PATH")),
             new WorkloadSettings(
                 RequireAbsoluteFile("CTLFLOW_WORKLOAD_TOKEN_FILE")),
             Telemetry.TelemetrySettings.Parse(

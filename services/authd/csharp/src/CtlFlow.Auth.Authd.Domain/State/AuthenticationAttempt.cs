@@ -8,6 +8,7 @@ public sealed class AuthenticationAttempt : IDisposable
 {
     public AuthenticationAttempt(
         TenantId tenantId,
+        WorkspaceId? workspaceId,
         ProviderId providerId,
         ReturnTarget returnTarget,
         PkceVerifier verifier,
@@ -20,6 +21,7 @@ public sealed class AuthenticationAttempt : IDisposable
         }
 
         TenantId = tenantId;
+        WorkspaceId = workspaceId;
         ProviderId = providerId;
         ReturnTarget = returnTarget;
         Verifier = verifier;
@@ -28,6 +30,8 @@ public sealed class AuthenticationAttempt : IDisposable
     }
 
     public TenantId TenantId { get; }
+
+    public WorkspaceId? WorkspaceId { get; }
 
     public ProviderId ProviderId { get; }
 

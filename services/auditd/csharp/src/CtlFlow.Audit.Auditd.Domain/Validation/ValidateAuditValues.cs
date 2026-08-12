@@ -73,6 +73,17 @@ internal static partial class AuditValidation
         }
     }
 
+    internal static void ValidateExternalLinkId(string value)
+    {
+        if (value.Length != 36
+            || !value.StartsWith("eil_", StringComparison.Ordinal)
+            || !IsLowerHex(value.AsSpan(4)))
+        {
+            throw new ArgumentException(
+                "External-link identifier is invalid");
+        }
+    }
+
     internal static void ValidateProjectionId(string value)
     {
         if (value.Length != 56

@@ -14,6 +14,7 @@ await import("./security.test.js");
 await import("./admission.test.js");
 await import("./envelope-validation.test.js");
 await import("./detail-validation.test.js");
+await import("./identity-detail-validation.test.js");
 await import("./batch-semantics.test.js");
 await import("./cancellation.test.js");
 await import("./telemetry.test.js");

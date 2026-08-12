@@ -10,6 +10,7 @@ public static partial class Invocations
     public static ValueTask<InvocationIssueResult> CreateSessionInvocation(
         SessionFacts? session,
         PrincipalLookupResult principal,
+        bool workspaceProviderAdmitted,
         IdentityTarget target,
         UtcInstant now,
         InvocationLifetime lifetime,
@@ -25,6 +26,13 @@ public static partial class Invocations
         }
 
         if (session.TenantId != target.TenantId)
+        {
+            return ValueTask.FromResult<InvocationIssueResult>(
+                new InvocationIssueResult.NotFound());
+        }
+
+        if (target.WorkspaceId is not null
+            && !workspaceProviderAdmitted)
         {
             return ValueTask.FromResult<InvocationIssueResult>(
                 new InvocationIssueResult.NotFound());

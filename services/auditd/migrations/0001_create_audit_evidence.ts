@@ -5,6 +5,13 @@ const immutableTables = [
   "audit_tenant_mutations",
   "audit_workspace_mutations",
   "audit_identity_sessions",
+  "audit_identity_memberships",
+  "audit_identity_groups",
+  "audit_identity_group_members",
+  "audit_identity_virtual_principals",
+  "audit_identity_external_links",
+  "audit_identity_login_providers",
+  "audit_identity_workspace_provider_admissions",
   "audit_package_declarations",
   "audit_app_mutations",
   "audit_configuration_publications",
@@ -86,7 +93,7 @@ async function createEvents(knex: Knex): Promise<void> {
     table.check(
       `${hexCheck("span_id", 16)} `
       + `AND span_id <> '${"0".repeat(16)}'`);
-    table.check("detail_kind BETWEEN 1 AND 11");
+    table.check("detail_kind BETWEEN 1 AND 18");
     table.check(hexCheck("content_hash", 64));
     table.check("accepted_at_seconds > 0");
     table.check("accepted_at_nanoseconds BETWEEN 0 AND 999999999");
@@ -149,6 +156,115 @@ async function createIdentityDetails(knex: Knex): Promise<void> {
       "(action = 1 AND session_revision = 1) "
       + "OR (action = 2 AND session_revision = 2)");
   });
+  await createDetailTable(knex, "audit_identity_memberships", (table) => {
+    table.string("account_principal_id", 256).notNullable();
+    table.string("workspace_id", 64).nullable();
+    table.bigInteger("membership_revision").notNullable();
+    table.integer("action").notNullable();
+    table.integer("account_created").notNullable();
+    table.check(accountPrincipalCheck("account_principal_id", false));
+    table.check(
+      "workspace_id IS NULL OR "
+      + canonicalIdCheck("workspace_id", 64));
+    table.check("membership_revision > 0");
+    table.check("action BETWEEN 1 AND 2");
+    table.check("account_created IN (0, 1)");
+    table.check(
+      "account_created = 0 OR "
+      + "(action = 1 AND workspace_id IS NULL "
+      + "AND membership_revision = 1)");
+  });
+  await createDetailTable(knex, "audit_identity_groups", (table) => {
+    table.string("group_id", 64).notNullable();
+    table.string("workspace_id", 64).nullable();
+    table.integer("action").notNullable();
+    table.check(canonicalIdCheck("group_id", 64));
+    table.check(
+      "workspace_id IS NULL OR "
+      + canonicalIdCheck("workspace_id", 64));
+    table.check("action BETWEEN 1 AND 2");
+  });
+  await createDetailTable(
+    knex,
+    "audit_identity_group_members",
+    (table) => {
+      table.string("group_id", 64).notNullable();
+      table.string("principal_id", 256).notNullable();
+      table.string("workspace_id", 64).nullable();
+      table.integer("action").notNullable();
+      table.check(canonicalIdCheck("group_id", 64));
+      table.check(principalCheck("principal_id"));
+      table.check(
+        "workspace_id IS NULL OR "
+        + canonicalIdCheck("workspace_id", 64));
+      table.check("action BETWEEN 1 AND 2");
+    });
+  await createDetailTable(
+    knex,
+    "audit_identity_virtual_principals",
+    (table) => {
+      table.string("principal_id", 256).notNullable();
+      table.string("attached_account_principal_id", 256).notNullable();
+      table.string("workspace_id", 64).nullable();
+      table.bigInteger("principal_revision").notNullable();
+      table.integer("enabled").notNullable();
+      table.integer("action").notNullable();
+      table.check(principalCheck("principal_id"));
+      table.check("principal_id LIKE 'agent:%'");
+      table.check(
+        accountPrincipalCheck("attached_account_principal_id", false));
+      table.check(
+        "workspace_id IS NULL OR "
+        + canonicalIdCheck("workspace_id", 64));
+      table.check("enabled IN (0, 1)");
+      table.check(
+        "(action = 1 AND principal_revision = 1 AND enabled = 1) "
+        + "OR (action = 2 AND principal_revision >= 2)");
+    });
+  await createDetailTable(
+    knex,
+    "audit_identity_external_links",
+    (table) => {
+      table.string("external_link_id", 36).notNullable();
+      table.string("provider_id", 64).notNullable();
+      table.string("human_account_principal_id", 256).notNullable();
+      table.integer("action").notNullable();
+      table.check("length(external_link_id) = 36");
+      table.check("substr(external_link_id, 1, 4) = 'eil_'");
+      table.check(
+        "substr(external_link_id, 5) NOT GLOB '*[^a-f0-9]*'");
+      table.check(canonicalIdCheck("provider_id", 64));
+      table.check(accountPrincipalCheck(
+        "human_account_principal_id",
+        true));
+      table.check("action BETWEEN 1 AND 2");
+    });
+  await createDetailTable(
+    knex,
+    "audit_identity_login_providers",
+    (table) => {
+      table.string("provider_id", 64).notNullable();
+      table.bigInteger("provider_revision").notNullable();
+      table.integer("resulting_state").notNullable();
+      table.integer("action").notNullable();
+      table.check(canonicalIdCheck("provider_id", 64));
+      table.check("resulting_state BETWEEN 1 AND 3");
+      table.check(
+        "(action = 1 AND provider_revision = 1 "
+        + "AND resulting_state = 1) OR "
+        + "(action IN (2, 3) AND provider_revision >= 2)");
+    });
+  await createDetailTable(
+    knex,
+    "audit_identity_workspace_provider_admissions",
+    (table) => {
+      table.string("workspace_id", 64).notNullable();
+      table.string("provider_id", 64).notNullable();
+      table.integer("action").notNullable();
+      table.check(canonicalIdCheck("workspace_id", 64));
+      table.check(canonicalIdCheck("provider_id", 64));
+      table.check("action BETWEEN 1 AND 2");
+    });
 }
 
 async function createPackageDetails(knex: Knex): Promise<void> {

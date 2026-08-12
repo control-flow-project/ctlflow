@@ -13,6 +13,10 @@ import type {
   AuditdProductionSource
 } from "@ctlflow/auditd/testing/production";
 import {
+  startPolicydProductionService,
+  type PolicydProductionService
+} from "@ctlflow/policyd/testing/production";
+import {
   IdentityServiceClient
 } from "../generated/v1/identityd.js";
 import type {
@@ -24,6 +28,12 @@ import {
 import {
   createInvocationAuthority
 } from "./create-invocation-authority.js";
+import {
+  createIdentitydProductionAdapter
+} from "./dependencies/create-identityd-production-adapter.js";
+import {
+  waitForPolicyReadiness
+} from "./dependencies/wait-for-policy-readiness.js";
 import {
   createTestDatabase
 } from "./create-test-database.js";
@@ -43,6 +53,7 @@ import type {
 const serviceName = "identityd";
 
 export interface IdentitydTestContext {
+  readonly adminWorkload: TestWorkloadCredentials;
   readonly authdWorkload: TestWorkloadCredentials;
   readonly configdWorkload: TestWorkloadCredentials;
   readonly edgedWorkload: TestWorkloadCredentials;
@@ -51,6 +62,7 @@ export interface IdentitydTestContext {
   readonly policydWorkload: TestWorkloadCredentials;
   readonly tenantdWorkload: TestWorkloadCredentials;
   readonly auditd: AuditdProductionSource;
+  readonly policyd: PolicydProductionService;
   readonly collector: OpenTelemetryCollector;
   readonly invocation: InvocationAuthority;
   readonly database: TestDatabase;
@@ -69,10 +81,13 @@ Promise<IdentitydTestContext> {
   let service: IdentitydRunningService | undefined;
   let client: IdentityServiceClient | undefined;
   let auditd: AuditdProductionSource | undefined;
+  let policyd: PolicydProductionService | undefined;
 
   try {
     await suite.collector.resume();
     await suite.collector.clearExports();
+    const adminWorkload =
+      await suite.kubernetes.createWorkloadCredentials("admin-backend");
     const authdWorkload =
       await suite.kubernetes.createWorkloadCredentials("authd");
     const configdWorkload =
@@ -103,13 +118,17 @@ Promise<IdentitydTestContext> {
       policydWorkload,
       suite.kubernetes,
       suite.auditd.certificateAuthorityPath,
+      suite.policydTls.certificateAuthorityPath,
       invocation);
     const environment = createEnvironment(
       suite.collector,
       database,
       suite.auditd.endpoint,
       suite.auditd.serverName,
+      `https://policyd.${suite.kubernetes.namespace}.svc:50051`,
+      suite.policydTls.serverName,
       invocation.verificationKey.keyId,
+      adminWorkload,
       authdWorkload,
       execdWorkload,
       policydWorkload,
@@ -125,6 +144,37 @@ Promise<IdentitydTestContext> {
         await seedIdentityDatabase(provisionDatabase, invocation);
       }
     });
+    const identityd = createIdentitydProductionAdapter({
+      kubernetes: suite.kubernetes,
+      database,
+      service,
+      environment,
+      certificateAuthorityPath: files.serverCertificateAuthorityPath,
+      serverName: files.serverName
+    });
+    policyd = await startPolicydProductionService({
+      repositoryRoot: suite.repositoryRoot,
+      kubernetes: suite.kubernetes,
+      identityd,
+      telemetryEndpoint: suite.collector.endpoint,
+      invocationIssuer: invocation.issuer,
+      invocationAudience: invocation.audience,
+      invocationMaximumLifetimeSeconds: 60,
+      verificationKeys: {
+        keys: [{
+          keyId: invocation.verificationKey.keyId,
+          algorithm: "RS256",
+          modulusBase64url:
+            invocation.verificationKey.modulusBase64url,
+          exponentBase64url:
+            invocation.verificationKey.exponentBase64url
+        }],
+        expiresAt: new Date(Date.now() + 4 * 60_000).toISOString()
+      },
+      policy: { roles: [], grants: [] },
+      tls: suite.policydTls
+    });
+    await service.restart();
     const endpoint = `127.0.0.1:${String(service.grpcPort)}`;
     const serverAuthority = await readFile(
       files.serverCertificateAuthorityPath);
@@ -132,9 +182,15 @@ Promise<IdentitydTestContext> {
       endpoint,
       credentials.createSsl(serverAuthority),
       createClientOptions(files.serverName));
+    await waitForPolicyReadiness(
+      client,
+      adminWorkload,
+      invocation,
+      false);
 
     let stopped = false;
     return {
+      adminWorkload,
       authdWorkload,
       configdWorkload,
       edgedWorkload,
@@ -143,6 +199,7 @@ Promise<IdentitydTestContext> {
       policydWorkload,
       tenantdWorkload,
       auditd,
+      policyd,
       collector: suite.collector,
       invocation,
       database,
@@ -158,12 +215,12 @@ Promise<IdentitydTestContext> {
 
         stopped = true;
         client?.close();
-        await stopResources(service, database, auditd);
+        await stopResources(service, database, auditd, policyd);
       }
     };
   } catch (error) {
     client?.close();
-    await stopResources(service, database, auditd)
+    await stopResources(service, database, auditd, policyd)
       .catch(() => undefined);
     throw error;
   }
@@ -174,7 +231,10 @@ function createEnvironment(
   database: TestDatabase,
   auditEndpoint: string,
   auditServerName: string,
+  policyEndpoint: string,
+  policyServerName: string,
   signingKeyId: string,
+  adminWorkload: TestWorkloadCredentials,
   authdWorkload: TestWorkloadCredentials,
   execdWorkload: TestWorkloadCredentials,
   policydWorkload: TestWorkloadCredentials,
@@ -194,6 +254,11 @@ function createEnvironment(
     CTLFLOW_AUDIT_TLS_CA_PATH:
       "/var/run/ctlflow/trust/auditd-ca.crt",
     CTLFLOW_AUDIT_CALL_TIMEOUT_MILLISECONDS: "500",
+    CTLFLOW_POLICY_URL: policyEndpoint,
+    CTLFLOW_POLICY_TLS_SERVER_NAME: policyServerName,
+    CTLFLOW_POLICY_TLS_CA_PATH:
+      "/var/run/ctlflow/trust/policyd-ca.crt",
+    CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS: "500",
     CTLFLOW_DATABASE_PROVIDER: "sqlite",
     CTLFLOW_DATABASE_PATH: database.containerPath,
     CTLFLOW_DATABASE_POOL_SIZE: "8",
@@ -220,6 +285,49 @@ function createEnvironment(
       authdWorkload.callerSubject,
     CTLFLOW_ISSUE_RUN_INVOCATION_CALLERS:
       execdWorkload.callerSubject,
+    CTLFLOW_GET_LOGIN_PROVIDER_AUTHD_CALLERS:
+      authdWorkload.callerSubject,
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_AUTHD_CALLERS:
+      authdWorkload.callerSubject,
+    CTLFLOW_ADD_TENANT_MEMBER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_REMOVE_TENANT_MEMBER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_LIST_TENANT_MEMBERS_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_ADD_WORKSPACE_MEMBER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_REMOVE_WORKSPACE_MEMBER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_LIST_WORKSPACE_MEMBERS_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_CREATE_GROUP_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_DELETE_GROUP_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_LIST_GROUPS_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_ADD_GROUP_MEMBER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_REMOVE_GROUP_MEMBER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_LIST_GROUP_MEMBERS_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_CREATE_VIRTUAL_PRINCIPAL_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_GET_VIRTUAL_PRINCIPAL_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_LIST_VIRTUAL_PRINCIPALS_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_SET_VIRTUAL_PRINCIPAL_ENABLED_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_CREATE_EXTERNAL_IDENTITY_LINK_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_DELETE_EXTERNAL_IDENTITY_LINK_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_LIST_EXTERNAL_IDENTITY_LINKS_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_CREATE_LOGIN_PROVIDER_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_GET_LOGIN_PROVIDER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_LIST_LOGIN_PROVIDERS_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_UPDATE_LOGIN_PROVIDER_CALLERS: adminWorkload.callerSubject,
+    CTLFLOW_SET_LOGIN_PROVIDER_STATE_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_SET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_CALLERS:
+      adminWorkload.callerSubject,
     OTEL_EXPORTER_OTLP_ENDPOINT: collector.endpoint
   };
 }
@@ -234,13 +342,19 @@ function createClientOptions(serverName: string): ClientOptions {
 async function stopResources(
   service: IdentitydRunningService | undefined,
   database: TestDatabase | undefined,
-  auditd: AuditdProductionSource | undefined
+  auditd: AuditdProductionSource | undefined,
+  policyd: PolicydProductionService | undefined
 ): Promise<void> {
   let failure: unknown;
   try {
-    await service?.stop();
+    await policyd?.stop();
   } catch (error) {
     failure = error;
+  }
+  try {
+    await service?.stop();
+  } catch (error) {
+    failure ??= error;
   }
   try {
     await auditd?.stop();

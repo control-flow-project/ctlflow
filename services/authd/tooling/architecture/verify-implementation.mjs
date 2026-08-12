@@ -128,12 +128,25 @@ assert(
   (allServiceSource.match(/\.SendAsync\(/gu) ?? []).length === 1
     && await hasPurposeBoundEgress(),
   "Provider HTTP must use only the purpose-bound Egressd hop");
+const dependencyRpcNames = await readDependencyRpcNames();
 assertSame(
-  [...allServiceSource.matchAll(
-    /\bclient\.(CreateSession|RevokeSession)Async\(/gu)]
-    .map((match) => match[1]),
-  ["CreateSession", "RevokeSession"],
-  "Authd Identityd call inventory");
+  dependencyRpcNames
+    .filter((name) => new RegExp(
+      `\\.${name}Async\\s*\\(`,
+      "u").test(allServiceSource))
+    .sort(),
+  [
+    "CreateSession",
+    "GetLoginProvider",
+    "GetTenant",
+    "GetWorkspace",
+    "GetWorkspaceLoginProviderAdmission",
+    "RevokeSession"
+  ],
+  "Authd private dependency call inventory");
+assert(
+  !allServiceSource.includes("ListWorkspaceLoginProviderAdmissionsAsync"),
+  "Authd must use the exact provider-admission read");
 const telemetryConfiguration = await read(path.join(
   serviceSource,
   "Telemetry/ConfigureTelemetry.cs"));
@@ -194,6 +207,21 @@ async function hasPurposeBoundEgress() {
     && !request.includes("request.Headers.Host")
     && provider.includes(
       'new($"http://{EgressBinding}:8081/", UriKind.Absolute)');
+}
+
+async function readDependencyRpcNames() {
+  const files = [
+    "services/identityd/api/proto/v1/identityd.proto",
+    "services/tenantd/api/proto/v1/tenantd.proto"
+  ];
+  const names = [];
+  for (const file of files) {
+    const source = await read(path.join(repositoryRoot, file));
+    names.push(...[...source.matchAll(
+      /^\s*rpc\s+([A-Z][A-Za-z0-9]+)\s*\(/gmu)]
+      .map((match) => match[1]));
+  }
+  return [...new Set(names)];
 }
 
 async function hasBoundedState() {
@@ -284,7 +312,7 @@ async function verifyLineLimits() {
   for (const root of roots) {
     for (const file of await walk(root)) {
       if (!/\.(?:cs|mjs|ts)$/u.test(file)
-          || /[/\\](?:bin|dist|obj|\.generated)[/\\]/u.test(file)) {
+          || /[/\\](?:bin|dist|generated|obj|\.generated)[/\\]/u.test(file)) {
         continue;
       }
       const lines = (await read(file)).split("\n").length - 1;
@@ -302,7 +330,13 @@ async function walk(directory) {
   })) {
     const item = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      if (!["bin", "dist", "obj", ".generated"].includes(entry.name)) {
+      if (![
+        "bin",
+        "dist",
+        "generated",
+        "obj",
+        ".generated"
+      ].includes(entry.name)) {
         files.push(...await walk(item));
       }
     } else if (entry.isFile()) {

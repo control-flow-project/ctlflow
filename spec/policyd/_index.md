@@ -70,9 +70,17 @@ validated invocation `sub`. There is no `/users/` scope. Tenant and account
 scopes use the Tenant policy target; Workspace scope uses the exact Workspace
 policy target.
 
+Identityd Workspace-administration paths have one additional, explicit shape:
+a Tenant policy target may carry a canonical descendant Workspace path. This
+is used only when a Tenant-scoped invocation administers that Tenant's
+Workspace. It evaluates Tenant standing, Tenant Groups, and an explicit
+Tenant-target grant matching the descendant path. It does not read or inherit
+the Workspace's grants or Groups. A Workspace-scoped invocation continues to
+use the exact Workspace policy target.
+
 The complete catalog is:
 
-| Operation | Owner | Canonical target |
+| Operation | Owner | Canonical resource path |
 | --- | --- | --- |
 | `tenants.read` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>` |
 | `tenants.update_display_name` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>` |
@@ -82,6 +90,30 @@ The complete catalog is:
 | `workspaces.suspend` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
 | `workspaces.resume` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
 | `workspaces.delete` | `SERVICE/svc_tenantd` | `/tenants/<tenant_id>/workspaces/<workspace_id>` |
+| `tenant_memberships.add` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/members/<account_id>` |
+| `tenant_memberships.remove` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/members/<account_id>` |
+| `tenant_memberships.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/members` |
+| `workspace_memberships.add` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members/<account_id>` |
+| `workspace_memberships.remove` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members/<account_id>` |
+| `workspace_memberships.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/members` |
+| `groups.create` | `SERVICE/svc_identityd` | Tenant or Workspace domain path plus `/groups/<group_id>` |
+| `groups.delete` | `SERVICE/svc_identityd` | Tenant or Workspace domain path plus `/groups/<group_id>` |
+| `groups.read` | `SERVICE/svc_identityd` | Tenant or Workspace domain path plus `/groups` |
+| `group_memberships.add` | `SERVICE/svc_identityd` | Domain path plus `/groups/<group_id>/members/<principal_id>` |
+| `group_memberships.remove` | `SERVICE/svc_identityd` | Domain path plus `/groups/<group_id>/members/<principal_id>` |
+| `group_memberships.read` | `SERVICE/svc_identityd` | Domain path plus `/groups/<group_id>/members` |
+| `virtual_principals.create` | `SERVICE/svc_identityd` | Domain path plus `/virtual-principals/<principal_id>` |
+| `virtual_principals.read` | `SERVICE/svc_identityd` | Domain path plus `/virtual-principals` or one exact principal |
+| `virtual_principals.set_enabled` | `SERVICE/svc_identityd` | Domain path plus `/virtual-principals/<principal_id>` |
+| `external_identity_links.create` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `external_identity_links.delete` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `external_identity_links.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>/identity-links` |
+| `login_providers.create` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `login_providers.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers` or one exact provider |
+| `login_providers.update` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `login_providers.set_state` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
+| `workspace_login_provider_admissions.set` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
+| `workspace_login_provider_admissions.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers` or one exact provider |
 | `apps.create` | `SERVICE/svc_pkgd` | `<scope>/apps` |
 | `apps.read` | `SERVICE/svc_pkgd` | `<scope>/apps/<app_id>` |
 | `apps.set_package_generation` | `SERVICE/svc_pkgd` | `<scope>/apps/<app_id>` |
@@ -107,6 +139,12 @@ Global capability target for a product operation either; a globally placed
 workload acts through the non-Global invocation it is serving. Execd's list and
 exact read paths share their corresponding read operation. Every ID and purpose
 segment retains the canonical grammar and bound declared by its owning service.
+
+For Identityd rows, the policy target is `/tenants/<tenant_id>` or
+`/tenants/<tenant_id>/workspaces/<workspace_id>`. Account and virtual-principal
+IDs remain one canonical path segment. A Tenant target accepts a descendant
+Workspace path only for the existing Workspace-administration operations in
+the Identityd catalog.
 
 `CreateTenant`, `ListTenants`, and `SetTenantState` remain operator operations.
 `ResolveTenant` and `ResolveWorkspace` remain autonomous-kernel operations.
@@ -255,10 +293,10 @@ For every call, Policyd:
    [Access](../access/) and [Contracts](../contracts/);
 4. requires the request target and path to match the catalog fence, or, for a
    product operation, the returned Placement fence and App anchor;
-5. calls `identityd.ResolvePrincipal` for the invocation Actor and exact target;
+5. calls `identityd.ResolvePrincipal` for the invocation Actor and policy target;
 6. consumes every `identityd.ListPrincipalGroups` page for that Actor and, for
    a virtual Actor, its resolved attached account; and
-7. evaluates exact-target direct grants and Role bindings for the tagged
+7. evaluates policy-target direct grants and Role bindings for the tagged
    operation identity and path.
 
 Policyd obtains invocation verification keys through

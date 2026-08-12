@@ -14,6 +14,63 @@ service IdentityService {
       returns (ResolvePrincipalResponse);
   rpc ListPrincipalGroups(ListPrincipalGroupsRequest)
       returns (ListPrincipalGroupsResponse);
+
+  rpc AddTenantMember(AddTenantMemberRequest) returns (TenantMember);
+  rpc RemoveTenantMember(RemoveTenantMemberRequest)
+      returns (RemoveTenantMemberResponse);
+  rpc ListTenantMembers(ListTenantMembersRequest)
+      returns (ListTenantMembersResponse);
+  rpc AddWorkspaceMember(AddWorkspaceMemberRequest)
+      returns (WorkspaceMember);
+  rpc RemoveWorkspaceMember(RemoveWorkspaceMemberRequest)
+      returns (RemoveWorkspaceMemberResponse);
+  rpc ListWorkspaceMembers(ListWorkspaceMembersRequest)
+      returns (ListWorkspaceMembersResponse);
+
+  rpc CreateGroup(CreateGroupRequest) returns (Group);
+  rpc DeleteGroup(DeleteGroupRequest) returns (DeleteGroupResponse);
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse);
+  rpc AddGroupMember(AddGroupMemberRequest) returns (GroupMember);
+  rpc RemoveGroupMember(RemoveGroupMemberRequest)
+      returns (RemoveGroupMemberResponse);
+  rpc ListGroupMembers(ListGroupMembersRequest)
+      returns (ListGroupMembersResponse);
+
+  rpc CreateVirtualPrincipal(CreateVirtualPrincipalRequest)
+      returns (VirtualPrincipal);
+  rpc GetVirtualPrincipal(GetVirtualPrincipalRequest)
+      returns (VirtualPrincipal);
+  rpc ListVirtualPrincipals(ListVirtualPrincipalsRequest)
+      returns (ListVirtualPrincipalsResponse);
+  rpc SetVirtualPrincipalEnabled(SetVirtualPrincipalEnabledRequest)
+      returns (VirtualPrincipal);
+
+  rpc CreateExternalIdentityLink(CreateExternalIdentityLinkRequest)
+      returns (ExternalIdentityLink);
+  rpc DeleteExternalIdentityLink(DeleteExternalIdentityLinkRequest)
+      returns (DeleteExternalIdentityLinkResponse);
+  rpc ListExternalIdentityLinks(ListExternalIdentityLinksRequest)
+      returns (ListExternalIdentityLinksResponse);
+
+  rpc CreateLoginProvider(CreateLoginProviderRequest)
+      returns (LoginProvider);
+  rpc GetLoginProvider(GetLoginProviderRequest) returns (LoginProvider);
+  rpc ListLoginProviders(ListLoginProvidersRequest)
+      returns (ListLoginProvidersResponse);
+  rpc UpdateLoginProvider(UpdateLoginProviderRequest)
+      returns (LoginProvider);
+  rpc SetLoginProviderState(SetLoginProviderStateRequest)
+      returns (LoginProvider);
+  rpc SetWorkspaceLoginProviderAdmission(
+      SetWorkspaceLoginProviderAdmissionRequest)
+      returns (SetWorkspaceLoginProviderAdmissionResponse);
+  rpc GetWorkspaceLoginProviderAdmission(
+      GetWorkspaceLoginProviderAdmissionRequest)
+      returns (WorkspaceLoginProviderAdmission);
+  rpc ListWorkspaceLoginProviderAdmissions(
+      ListWorkspaceLoginProviderAdmissionsRequest)
+      returns (ListWorkspaceLoginProviderAdmissionsResponse);
+
   rpc CreateSession(CreateSessionRequest)
       returns (CreateSessionResponse);
   rpc ExchangeSession(ExchangeSessionRequest)
@@ -73,6 +130,311 @@ message ListPrincipalGroupsResponse {
   optional string next_after_group_id = 2;
 }
 
+message AddTenantMemberRequest {
+  string tenant_id = 1;
+  string account_id = 2;
+}
+
+message RemoveTenantMemberRequest {
+  string tenant_id = 1;
+  string account_id = 2;
+}
+
+message RemoveTenantMemberResponse {}
+
+message ListTenantMembersRequest {
+  string tenant_id = 1;
+  uint32 page_size = 2;
+  optional string after_account_id = 3;
+}
+
+message ListTenantMembersResponse {
+  repeated TenantMember members = 1;
+  optional string next_after_account_id = 2;
+}
+
+message TenantMember {
+  string account_id = 1;
+  PrincipalKind account_kind = 2;
+  bool account_enabled = 3;
+  uint64 account_revision = 4;
+  string tenant_id = 5;
+  uint64 membership_revision = 6;
+}
+
+message AddWorkspaceMemberRequest {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  string account_id = 3;
+}
+
+message RemoveWorkspaceMemberRequest {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  string account_id = 3;
+}
+
+message RemoveWorkspaceMemberResponse {}
+
+message ListWorkspaceMembersRequest {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  uint32 page_size = 3;
+  optional string after_account_id = 4;
+}
+
+message ListWorkspaceMembersResponse {
+  repeated WorkspaceMember members = 1;
+  optional string next_after_account_id = 2;
+}
+
+message WorkspaceMember {
+  string account_id = 1;
+  PrincipalKind account_kind = 2;
+  bool account_enabled = 3;
+  uint64 account_revision = 4;
+  string tenant_id = 5;
+  string workspace_id = 6;
+  uint64 membership_revision = 7;
+}
+
+message CreateGroupRequest {
+  string group_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+}
+
+message DeleteGroupRequest {
+  string group_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+}
+
+message DeleteGroupResponse {}
+
+message ListGroupsRequest {
+  string tenant_id = 1;
+  optional string workspace_id = 2;
+  uint32 page_size = 3;
+  optional string after_group_id = 4;
+}
+
+message ListGroupsResponse {
+  repeated Group groups = 1;
+  optional string next_after_group_id = 2;
+}
+
+message Group {
+  string group_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+}
+
+message AddGroupMemberRequest {
+  string group_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+  string principal_id = 4;
+}
+
+message RemoveGroupMemberRequest {
+  string group_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+  string principal_id = 4;
+}
+
+message RemoveGroupMemberResponse {}
+
+message ListGroupMembersRequest {
+  string group_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+  uint32 page_size = 4;
+  optional string after_principal_id = 5;
+}
+
+message ListGroupMembersResponse {
+  repeated GroupMember members = 1;
+  optional string next_after_principal_id = 2;
+}
+
+message GroupMember {
+  string group_id = 1;
+  string principal_id = 2;
+  PrincipalKind principal_kind = 3;
+  string tenant_id = 4;
+  optional string workspace_id = 5;
+}
+
+message CreateVirtualPrincipalRequest {
+  string principal_id = 1;
+  string subject_account_id = 2;
+  string tenant_id = 3;
+  optional string workspace_id = 4;
+}
+
+message GetVirtualPrincipalRequest {
+  string principal_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+}
+
+message ListVirtualPrincipalsRequest {
+  string tenant_id = 1;
+  optional string workspace_id = 2;
+  uint32 page_size = 3;
+  optional string after_principal_id = 4;
+}
+
+message ListVirtualPrincipalsResponse {
+  repeated VirtualPrincipal principals = 1;
+  optional string next_after_principal_id = 2;
+}
+
+message SetVirtualPrincipalEnabledRequest {
+  string principal_id = 1;
+  string tenant_id = 2;
+  optional string workspace_id = 3;
+  uint64 expected_revision = 4;
+  bool enabled = 5;
+}
+
+message VirtualPrincipal {
+  string principal_id = 1;
+  string subject_account_id = 2;
+  bool enabled = 3;
+  uint64 revision = 4;
+  string tenant_id = 5;
+  optional string workspace_id = 6;
+}
+
+message CreateExternalIdentityLinkRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+  string provider_subject = 3;
+  string account_id = 4;
+}
+
+message DeleteExternalIdentityLinkRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+  string provider_subject = 3;
+}
+
+message DeleteExternalIdentityLinkResponse {}
+
+message ListExternalIdentityLinksRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+  uint32 page_size = 3;
+  optional string after_provider_subject = 4;
+}
+
+message ListExternalIdentityLinksResponse {
+  repeated ExternalIdentityLink links = 1;
+  optional string next_after_provider_subject = 2;
+}
+
+message ExternalIdentityLink {
+  string tenant_id = 1;
+  string provider_id = 2;
+  string provider_subject = 3;
+  string account_id = 4;
+  uint64 revision = 5;
+}
+
+message CreateLoginProviderRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+  string display_name = 3;
+  string configuration_id = 4;
+  string configuration_version_id = 5;
+  string secret_id = 6;
+  string secret_version_id = 7;
+}
+
+message GetLoginProviderRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+}
+
+message ListLoginProvidersRequest {
+  string tenant_id = 1;
+  uint32 page_size = 2;
+  optional string after_provider_id = 3;
+}
+
+message ListLoginProvidersResponse {
+  repeated LoginProvider providers = 1;
+  optional string next_after_provider_id = 2;
+}
+
+message UpdateLoginProviderRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+  uint64 expected_revision = 3;
+  string display_name = 4;
+  string configuration_id = 5;
+  string configuration_version_id = 6;
+  string secret_id = 7;
+  string secret_version_id = 8;
+}
+
+message SetLoginProviderStateRequest {
+  string tenant_id = 1;
+  string provider_id = 2;
+  uint64 expected_revision = 3;
+  LoginProviderState state = 4;
+}
+
+message LoginProvider {
+  string tenant_id = 1;
+  string provider_id = 2;
+  string display_name = 3;
+  string configuration_id = 4;
+  string configuration_version_id = 5;
+  string secret_id = 6;
+  string secret_version_id = 7;
+  LoginProviderState state = 8;
+  uint64 revision = 9;
+}
+
+message SetWorkspaceLoginProviderAdmissionRequest {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  string provider_id = 3;
+  bool admitted = 4;
+}
+
+message SetWorkspaceLoginProviderAdmissionResponse {
+  WorkspaceLoginProviderAdmission admission = 1;
+}
+
+message GetWorkspaceLoginProviderAdmissionRequest {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  string provider_id = 3;
+}
+
+message ListWorkspaceLoginProviderAdmissionsRequest {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  uint32 page_size = 3;
+  optional string after_provider_id = 4;
+}
+
+message ListWorkspaceLoginProviderAdmissionsResponse {
+  repeated WorkspaceLoginProviderAdmission admissions = 1;
+  optional string next_after_provider_id = 2;
+}
+
+message WorkspaceLoginProviderAdmission {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  string provider_id = 3;
+}
+
 message CreateSessionRequest {
   string tenant_id = 1;
   string provider_id = 2;
@@ -114,4 +476,11 @@ enum PrincipalKind {
   PRINCIPAL_KIND_HUMAN = 1;
   PRINCIPAL_KIND_SERVICE = 2;
   PRINCIPAL_KIND_VIRTUAL = 3;
+}
+
+enum LoginProviderState {
+  LOGIN_PROVIDER_STATE_UNSPECIFIED = 0;
+  LOGIN_PROVIDER_STATE_ACTIVE = 1;
+  LOGIN_PROVIDER_STATE_DISABLED = 2;
+  LOGIN_PROVIDER_STATE_DELETED = 3;
 }

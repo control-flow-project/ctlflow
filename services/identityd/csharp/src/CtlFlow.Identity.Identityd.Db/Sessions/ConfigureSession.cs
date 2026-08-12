@@ -1,4 +1,5 @@
-using CtlFlow.Identity.Identityd.Domain.Memberships;
+using CtlFlow.Identity.Identityd.Domain.Accounts;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Resources;
 using CtlFlow.Identity.Identityd.Domain.Sessions;
 using CtlFlow.Identity.Identityd.Domain.Time;
@@ -16,6 +17,7 @@ internal static partial class SessionSchema
         session.Ignore(value => value.CredentialDigest);
         session.Ignore(value => value.AccountId);
         session.Ignore(value => value.TenantId);
+        session.Ignore(value => value.ProviderId);
         session.HasKey("_id");
 
         session.Property<string>("_id")
@@ -32,6 +34,10 @@ internal static partial class SessionSchema
             .IsRequired();
         session.Property<string>("_tenantId")
             .HasColumnName("tenant_id")
+            .HasMaxLength(64)
+            .IsRequired();
+        session.Property<string>("_providerId")
+            .HasColumnName("provider_id")
             .HasMaxLength(64)
             .IsRequired();
         session.Property(value => value.CreatedAt)
@@ -67,10 +73,15 @@ internal static partial class SessionSchema
         session.HasIndex("_credentialDigest").IsUnique();
         session.HasIndex("_accountId", "_tenantId")
             .HasDatabaseName("sessions_account_idx");
-        session.HasOne<TenantMembership>()
+        session.HasOne<Account>()
             .WithMany()
-            .HasForeignKey("_accountId", "_tenantId")
-            .HasPrincipalKey("_accountId", "_tenantId")
+            .HasForeignKey("_accountId")
+            .HasPrincipalKey("_id")
+            .OnDelete(DeleteBehavior.Restrict);
+        session.HasOne<LoginProvider>()
+            .WithMany()
+            .HasForeignKey("_tenantId", "_providerId")
+            .HasPrincipalKey("_tenantId", "_providerId")
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

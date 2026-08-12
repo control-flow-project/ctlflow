@@ -16,7 +16,6 @@ internal static partial class IdentityCalls
 {
     internal static async Task<CreatedSession> CreateSession(
         IdentityService.IdentityServiceClient client,
-        IdentitySettings settings,
         WorkloadSettings workload,
         AuthdTelemetry telemetry,
         AuthenticationAttempt attempt,

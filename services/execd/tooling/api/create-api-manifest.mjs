@@ -1,65 +1,9 @@
-import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
-import path from "node:path";
+import { createApiManifest as createServiceApiManifest } from "../../../../tooling/protobuf/create-api-manifest.mjs";
 
-export async function createApiManifest(
-  repositoryRoot,
-  serviceRoot
-) {
-  const descriptorDirectory = path.join(
-    repositoryRoot,
-    ".temp/api-descriptors/execd");
-  const descriptorPath = path.join(
-    descriptorDirectory,
-    "execd.pb");
-  const protoc = path.join(
-    repositoryRoot,
-    "node_modules/.bin/grpc_tools_node_protoc");
-
-  await mkdir(descriptorDirectory, { recursive: true });
-  await runProtoc(
-    protoc,
+export async function createApiManifest(repositoryRoot, serviceRoot) {
+  return await createServiceApiManifest({
     repositoryRoot,
     serviceRoot,
-    descriptorPath);
-
-  const digest = createHash("sha256")
-    .update(await readFile(descriptorPath))
-    .digest("hex");
-  return `v1/execd.proto\t${digest}\n`;
-}
-
-async function runProtoc(
-  protoc,
-  repositoryRoot,
-  serviceRoot,
-  descriptorPath
-) {
-  await new Promise((resolve, reject) => {
-    const child = spawn(
-      protoc,
-      [
-        "--include_imports",
-        `--descriptor_set_out=${descriptorPath}`,
-        `--proto_path=${path.join(serviceRoot, "api/proto")}`,
-        "v1/execd.proto"
-      ],
-      {
-        cwd: repositoryRoot,
-        stdio: "inherit"
-      });
-
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(new Error(
-        `Protobuf descriptor generation failed with code ${String(code)} `
-        + `and signal ${String(signal)}`));
-    });
+    serviceName: "execd"
   });
 }

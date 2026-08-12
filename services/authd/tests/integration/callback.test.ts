@@ -293,21 +293,29 @@ test("maps Egressd workload authentication rejection to unavailable",
     const suite = getAuthdTestSuite();
     await suite.provider.setMode("available");
     await suite.provider.clearEvidence();
-    await suite.authd.restart({
-      CTLFLOW_WORKLOAD_TOKEN_FILE:
-        "/var/run/ctlflow/secrets/unadmitted-workload-token"
-    });
+    const begun = await beginAuthentication();
+    const authorization = await suite.provider.authorize(
+      begun.authorizationLocation);
+    const callback = new URL(authorization.location);
+    await suite.egressd.setWorkloadAdmission("rejected");
     try {
-      const completed = await completeAuthentication();
-      assertNonDisclosingError(completed.callback, 503);
-      assertClearsConsumedState(completed.callback);
+      const rejected = await requestAuthd({
+        method: "GET",
+        path: `${callback.pathname}${callback.search}`,
+        headers: [
+          ["Host", "auth.example.test"],
+          ["Cookie", begun.stateCookie]
+        ]
+      });
+      assertNonDisclosingError(rejected, 503);
+      assertClearsConsumedState(rejected);
       const evidence = await suite.provider.readEvidence();
       assert.equal(evidence.tokens.length, 0);
+      assert.equal(evidence.userInfo.length, 0);
     } finally {
-      await suite.authd.restart({
-        CTLFLOW_WORKLOAD_TOKEN_FILE:
-          "/var/run/secrets/ctlflow-workload/token"
-      });
+      await suite.egressd.setWorkloadAdmission("admitted");
+      const recovered = await completeAfterEgressRecovery();
+      assert.ok(sessionCookie(recovered.callback));
     }
   });
 
@@ -316,6 +324,11 @@ test("replaces the browser cookie without revoking the previous Session",
     const suite = getAuthdTestSuite();
     await suite.provider.setMode("available");
     const first = await completeAuthentication();
+    assert.equal(
+      first.callback.statusCode,
+      303,
+      [suite.authd.diagnostics(), suite.egressd.diagnostics()]
+        .join("\n"));
     const firstCookie = sessionCookie(first.callback);
     assert.ok(firstCookie);
     const second = await completeAuthentication(undefined, firstCookie);

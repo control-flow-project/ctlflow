@@ -37,6 +37,13 @@ export async function startEgressdProductionService(
   });
   let service: CSharpStatelessService | undefined;
   try {
+    const environment = {
+      CTLFLOW_WORKLOAD_TOKEN_ISSUER: options.workload.issuer,
+      CTLFLOW_WORKLOAD_TOKEN_AUDIENCE: options.workload.audience,
+      CTLFLOW_WORKLOAD_TOKEN_MAX_LIFETIME_SECONDS: "600",
+      CTLFLOW_UPSTREAM_TIMEOUT_MILLISECONDS: "5000",
+      OTEL_EXPORTER_OTLP_ENDPOINT: options.telemetryEndpoint
+    };
     service = await startCSharpStatelessService({
       repositoryRoot: options.repositoryRoot,
       publication,
@@ -48,16 +55,14 @@ export async function startEgressdProductionService(
         serviceRoot,
         "kubernetes",
         "base"),
-      environment: {
-        CTLFLOW_WORKLOAD_TOKEN_ISSUER: options.workload.issuer,
-        CTLFLOW_WORKLOAD_TOKEN_AUDIENCE: options.workload.audience,
-        CTLFLOW_WORKLOAD_TOKEN_MAX_LIFETIME_SECONDS: "600",
-        CTLFLOW_UPSTREAM_TIMEOUT_MILLISECONDS: "5000",
-        OTEL_EXPORTER_OTLP_ENDPOINT: options.telemetryEndpoint
-      },
+      environment,
       files: options.files
     });
-    return createService(options, service, publication.stop);
+    return createService(
+      options,
+      service,
+      publication.stop,
+      environment);
   } catch (error) {
     await service?.stop().catch(() => undefined);
     await publication.stop().catch(() => undefined);
@@ -68,36 +73,42 @@ export async function startEgressdProductionService(
 function createService(
   options: StartEgressdProductionServiceOptions,
   service: CSharpStatelessService,
-  stopPublication: () => Promise<void>
+  stopPublication: () => Promise<void>,
+  environment: Readonly<Record<string, string>>
 ): EgressdProductionService {
   let suspended = false;
+  let admission: "admitted" | "rejected" = "admitted";
   let stopped = false;
   return {
     bindingName: serviceName,
     endpoint:
       `http://${serviceName}.${options.kubernetes.namespace}.svc:8081`,
     diagnostics: service.diagnostics,
+    setWorkloadAdmission: async (next) => {
+      requireRunning(stopped);
+      if (suspended) {
+        throw new Error(
+          "Egressd workload admission cannot change while suspended");
+      }
+      if (admission === next) {
+        return;
+      }
+      await stopDeployment(options);
+      await service.restart({
+        ...environment,
+        CTLFLOW_WORKLOAD_TOKEN_AUDIENCE:
+          next === "admitted"
+            ? options.workload.audience
+            : "ctlflow-rejected-workload"
+      });
+      admission = next;
+    },
     suspend: async () => {
       requireRunning(stopped);
       if (suspended) {
         return;
       }
-      await options.kubernetes.runKubectl([
-        "scale",
-        `deployment/${serviceName}`,
-        "--namespace",
-        options.kubernetes.namespace,
-        "--replicas=0"
-      ]);
-      await options.kubernetes.runKubectl([
-        "wait",
-        "--for=delete",
-        "pod",
-        `--selector=app.kubernetes.io/name=${serviceName}`,
-        "--namespace",
-        options.kubernetes.namespace,
-        "--timeout=30s"
-      ]);
+      await stopDeployment(options);
       suspended = true;
     },
     resume: async () => {
@@ -132,6 +143,27 @@ function createService(
       await stopResources(service, stopPublication);
     }
   };
+}
+
+async function stopDeployment(
+  options: StartEgressdProductionServiceOptions
+): Promise<void> {
+  await options.kubernetes.runKubectl([
+    "scale",
+    `deployment/${serviceName}`,
+    "--namespace",
+    options.kubernetes.namespace,
+    "--replicas=0"
+  ]);
+  await options.kubernetes.runKubectl([
+    "wait",
+    "--for=delete",
+    "pod",
+    `--selector=app.kubernetes.io/name=${serviceName}`,
+    "--namespace",
+    options.kubernetes.namespace,
+    "--timeout=30s"
+  ]);
 }
 
 function requireRunning(stopped: boolean): void {

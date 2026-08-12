@@ -82,7 +82,6 @@ internal static partial class BrowserRoutes
                     dependency = "identityd";
                     await RevokeSession(
                         identityClient,
-                        settings.Identity,
                         settings.Workload,
                         telemetry,
                         credential,

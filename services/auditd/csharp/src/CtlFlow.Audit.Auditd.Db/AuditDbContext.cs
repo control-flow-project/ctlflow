@@ -34,6 +34,42 @@ public sealed class AuditDbContext(DbContextOptions<AuditDbContext> options)
         private set;
     } = null!;
 
+    public DbSet<IdentityMembershipAuditDetail> IdentityMembershipDetails
+    {
+        get;
+        private set;
+    } = null!;
+
+    public DbSet<IdentityGroupAuditDetail> IdentityGroupDetails
+    {
+        get;
+        private set;
+    } = null!;
+
+    public DbSet<IdentityGroupMemberAuditDetail> IdentityGroupMemberDetails
+    {
+        get;
+        private set;
+    } = null!;
+
+    public DbSet<IdentityVirtualPrincipalAuditDetail>
+        IdentityVirtualPrincipalDetails
+    { get; private set; } = null!;
+
+    public DbSet<IdentityExternalLinkAuditDetail> IdentityExternalLinkDetails
+    {
+        get;
+        private set;
+    } = null!;
+
+    public DbSet<IdentityLoginProviderAuditDetail>
+        IdentityLoginProviderDetails
+    { get; private set; } = null!;
+
+    public DbSet<IdentityWorkspaceProviderAdmissionAuditDetail>
+        IdentityWorkspaceProviderAdmissionDetails
+    { get; private set; } = null!;
+
     public DbSet<PackageDeclarationAuditDetail> PackageDeclarationDetails
     {
         get;
@@ -92,6 +128,13 @@ public sealed class AuditDbContext(DbContextOptions<AuditDbContext> options)
         ConfigureTenantMutation(modelBuilder);
         ConfigureWorkspaceMutation(modelBuilder);
         ConfigureIdentitySession(modelBuilder);
+        ConfigureIdentityMembership(modelBuilder);
+        ConfigureIdentityGroup(modelBuilder);
+        ConfigureIdentityGroupMember(modelBuilder);
+        ConfigureIdentityVirtualPrincipal(modelBuilder);
+        ConfigureIdentityExternalLink(modelBuilder);
+        ConfigureIdentityLoginProvider(modelBuilder);
+        ConfigureIdentityWorkspaceProviderAdmission(modelBuilder);
         ConfigurePackageDeclaration(modelBuilder);
         ConfigureAppMutation(modelBuilder);
         ConfigureConfigurationPublication(modelBuilder);

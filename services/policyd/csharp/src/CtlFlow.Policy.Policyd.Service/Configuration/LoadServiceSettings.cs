@@ -52,7 +52,8 @@ internal static partial class PolicydConfiguration
             ParseCaller("CTLFLOW_TENANTD_CALLER"),
             ParseCaller("CTLFLOW_PKGD_CALLER"),
             ParseCaller("CTLFLOW_CONFIGD_CALLER"),
-            ParseCaller("CTLFLOW_EXECD_CALLER"));
+            ParseCaller("CTLFLOW_EXECD_CALLER"),
+            ParseCaller("CTLFLOW_IDENTITYD_CALLER"));
         EnsureDistinctOwnerCallers(ownerCallers);
 
         return new ServiceSettings(
@@ -165,7 +166,8 @@ internal static partial class PolicydConfiguration
             callers.Tenantd,
             callers.Pkgd,
             callers.Configd,
-            callers.Execd
+            callers.Execd,
+            callers.Identityd
         };
         if (values.Distinct().Count() != values.Length)
         {

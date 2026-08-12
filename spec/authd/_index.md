@@ -51,10 +51,19 @@ body.
 
 ## Selection and browser protections
 
-Begin selects one explicit `tenant_id` and `provider_id`. Both use Identityd's
-one-to-64-character lower-case identifier shape. Authd selects only the exact
-configured pair; there is no default, host inference, remembered selection, or
-fallback.
+Begin selects one explicit `tenant_id` and `provider_id` and may select one
+explicit `workspace_id`. All three use Identityd's one-to-64-character
+lower-case identifier shape. Authd selects only the exact configured pair;
+there is no default, host inference, remembered selection, or fallback.
+
+Authd reads the provider's current Identityd registration before redirecting.
+The provider must be active, and its exact configuration and secret identity
+and version references must match the mounted projection. Authd also reads the
+selected Tenant from Tenantd and requires it to be active. If `workspace_id` is
+present, Authd reads that exact Workspace from Tenantd, requires it to belong
+to the selected Tenant and to be active, and requires the exact provider
+admission from Identityd. Tenant login has no Workspace-admission check. There
+is no list scan, inferred parent, or cached lifecycle decision.
 
 `return_to` defaults to `/`. A supplied value is an ASCII same-origin
 origin-form path and optional query of at most 2,048 bytes. It begins with one
@@ -88,14 +97,16 @@ optional UTF-8 charset.
 ```text
 tenant_id    required once
 provider_id  required once
+workspace_id optional once
 return_to    optional once
 ```
 
-After validation, Authd replaces any live attempt bound to the existing state
-cookie, creates one random state handle, independent browser-binding nonce, and
-independent 32-byte PKCE verifier, and sets the state cookie. The verifier is
-encoded as 43-character unpadded base64url and stored with the two digests,
-selected pair, return target, and ten-minute expiry.
+After selection validation, Authd replaces any live attempt bound to the
+existing state cookie, creates one random state handle, independent
+browser-binding nonce, and independent 32-byte PKCE verifier, and sets the
+state cookie. The verifier is encoded as 43-character unpadded base64url and
+stored with the two digests, selected pair, optional selected Workspace,
+return target, and ten-minute expiry.
 
 The sole production adapter is OIDC Authorization Code with PKCE S256. The
 projected authorization endpoint has no query or fragment. Authd appends
@@ -112,9 +123,10 @@ code_challenge_method=S256
 ```
 
 There is no other authorization parameter and no `plain` PKCE fallback. Authd
-makes no provider request during Begin. It returns `303` to the resulting
-HTTPS URL, which is at most 4,096 bytes. Unknown selection is `400`; an invalid
-selected configuration is `503`.
+makes no external-provider request during Begin. It returns `303` to the
+resulting HTTPS URL, which is at most 4,096 bytes. An unknown, disabled, or
+Workspace-unadmitted selection is `400`; unavailable Identityd or a stale,
+mismatched, or invalid selected projection is `503`.
 
 ## Callback
 
@@ -138,9 +150,14 @@ attempt before provider validation. Missing, malformed, expired, replayed, or
 mismatched state is the same `400`.
 
 A valid provider `error` is `401`, clears the consumed state cookie, and makes
-no Egressd or Identityd call. For `code`, Authd makes at most two back-channel
-calls through the selected purpose-bound Egressd binding and never opens a
-direct provider connection; the successful path makes exactly two.
+no dependency call. For `code`, Authd revalidates the current Tenant and
+Workspace lifecycle, Identityd provider state, exact projection references,
+and any selected Workspace admission before contacting the provider. A
+selection that is missing, no longer active, cross-Tenant, or no longer
+admitted is `401`; unavailable Tenantd or Identityd and projection drift are
+`503`. Authd then makes at most two back-channel calls through the selected
+purpose-bound Egressd binding and never opens a direct provider connection;
+the successful path makes exactly two.
 
 The first call is `POST` to the projected token endpoint. It uses
 `application/x-www-form-urlencoded`, `Accept: application/json`, and
@@ -248,7 +265,8 @@ attributes with `Max-Age=0` and the Unix-epoch HTTP date.
 
 In-flight state is process-local, at most 16 KiB per attempt, at most 4,096
 live attempts per process, one-time, and exactly ten minutes. It contains only
-the two digests, selected pair, return target, PKCE verifier, and times. It is
+the two digests, selected Tenant/provider pair, optional Workspace, return
+target, PKCE verifier, and times. It is
 never durable or placed in a cookie, log, telemetry, or audit payload. The
 shipping deployment has one replica. Restart loses its in-flight state and
 callbacks fail closed; there is no shared-state or affinity path.
@@ -272,6 +290,10 @@ exactly:
 ```text
 tenant_id
 provider_id
+configuration_id
+configuration_version_id
+secret_id
+secret_version_id
 issuer
 authorization_endpoint
 token_endpoint
@@ -294,9 +316,11 @@ visible-ASCII bytes, `kty` is `RSA`, `use` is `sig`, `alg` is `RS256`, and
 unpadded-base64url `n` and `e` decode to a 2,048-to-4,096-bit modulus and an
 odd exponent from 3 through 4,294,967,295.
 
-Each entry asserts one static provider registration for the exact callback
-URI, Authorization Code response type, `openid` scope, PKCE S256,
-`client_secret_basic`, RS256 ID tokens, and plain JSON UserInfo response.
+The four Configd references contain no material. They bind each projected
+provider to Identityd's current authoritative registration, and all four must
+match before use. Each entry asserts one static provider registration for the
+exact callback URI, Authorization Code response type, `openid` scope, PKCE
+S256, `client_secret_basic`, RS256 ID tokens, and plain JSON UserInfo response.
 
 The disjoint secret document contains exactly `schema_version` and
 `credentials`. `credentials` is an array with exactly one entry per provider;
@@ -325,23 +349,27 @@ Each request authenticates Authd to the binding with
 `Proxy-Authorization: Bearer <bound Authd workload token>`. Egressd consumes
 that header. The OIDC `Authorization` header remains independent upstream
 protocol data. The same process-private workload-token projection authenticates
-Authd's Egressd and Identityd calls; it is not provider configuration and never
-crosses either dependency boundary. Authd cannot name or override an Egressd
+Authd's Egressd, Tenantd, and Identityd calls; it is not provider configuration
+and never crosses a dependency boundary. Authd cannot name or override an Egressd
 origin or rule. Egressd workload-authentication rejection (`407`) or admission
 exhaustion (`429`) is dependency unavailability and maps to public `503`, never
 to provider rejection.
 
-Authd's only kernel RPCs are `Identityd.CreateSession` and
-`Identityd.RevokeSession`. They use the established [private
+Authd's only kernel RPCs are `Tenantd.GetTenant`, `Tenantd.GetWorkspace`,
+`Identityd.GetLoginProvider`,
+`Identityd.GetWorkspaceLoginProviderAdmission`, `Identityd.CreateSession`, and
+`Identityd.RevokeSession`. Tenant and provider reads use Authd's autonomous
+admission and carry no invocation. They use the established [private
 transport](../contracts/#private-transport): private TLS, Authd's bound
 Kubernetes workload bearer, finite deadline and cancellation, and W3C trace
-context. They carry no invocation JWT. Authd uses one pooled Identityd channel,
-a three-second per-call deadline bounded by the public request, and no
-automatic retry.
+context. All six carry no invocation JWT. Authd uses one pooled channel per
+dependency, a three-second per-call deadline bounded by the public request,
+and no automatic retry. Exact Workspace and provider-admission reads are
+constant in request count.
 
 Begin has a two-second deadline, Callback 15 seconds, and Logout five seconds.
-Browser disconnect, deadline, and shutdown cancellation propagate to Egressd
-and Identityd.
+Browser disconnect, deadline, and shutdown cancellation propagate to Egressd,
+Tenantd, and Identityd.
 
 ## Bounds and errors
 
@@ -360,7 +388,7 @@ queue, buffer, state collection, retry, or task.
 | Origin or authority failure | `403` |
 | Body; target; media type; headers or cookies | `413`; `414`; `415`; `431` |
 | Rate, concurrency, or state capacity | `429` with bounded `Retry-After` |
-| Egressd, provider, projection, Identityd, or deadline unavailable | `503` |
+| Egressd, provider, projection, Tenantd, Identityd, or deadline unavailable | `503` |
 | Unexpected invariant failure | `500` |
 
 Raw provider, proxy, certificate, token, gRPC, network, parser, configuration,
@@ -371,8 +399,8 @@ RevokeSession `UNAUTHENTICATED` to successful already-logged-out behavior.
 
 The stable operations are `authd.http.begin`, `authd.http.callback`, and
 `authd.http.logout`. Routes extract W3C trace context only for correlation and
-inject it into Egressd and Identityd calls. Egressd controls any external trace
-propagation under the shared telemetry contract.
+inject it into Egressd, Tenantd, and Identityd calls. Egressd controls any
+external trace propagation under the shared telemetry contract.
 
 Bounded traces, metrics, and logs contain only route, method, status, closed
 outcome, dependency class, latency, and saturation. They exclude selected IDs,
@@ -382,16 +410,18 @@ provider error detail, provider payloads, and raw exceptions. Collector
 failure is bounded and does not change behavior. Authd has no Auditd call;
 Identityd audits actual Session creation and revocation.
 
-Canonical evidence uses the shipping public listener, real Identityd over the
-production bearer-authenticated private channel, the mounted Configd-shaped
-files, a real purpose-bound Egressd endpoint, and a separately controlled
-OIDC process. It proves the exact three-route inventory, strict projection,
+Canonical evidence uses the shipping public listener, real Tenantd and
+Identityd over production bearer-authenticated private channels, the mounted
+Configd-shaped files, a real purpose-bound Egressd endpoint, and a separately
+controlled OIDC process. It proves the exact three-route inventory, strict
+projection, Identityd provider/reference matching, exact Workspace admission,
 authorization URL and PKCE, both callback branches, token and UserInfo
 requests, RS256 and claim validation, exact subject match, the zero-to-two
-provider-call bound and exact two-call success path, selection, return targets,
-Origin and callback CSRF defenses, state lifecycle, cookies, mediation without
-direct egress, both Identityd mappings, all errors and bounds, deadlines and
-cancellation, telemetry redaction and Collector outage, invalid projection
-readiness, and restart with no durable Authd state. Test controls are
-separately bound and create no production route, discovery, provider catalog,
-adapter framework, Egressd API, or weaker transport.
+external-provider-call bound and exact two-call success path, selection,
+return targets, Origin and callback CSRF defenses, state lifecycle, cookies,
+mediation without direct egress, Session creation and revocation mappings, all
+errors and bounds, deadlines and cancellation, telemetry redaction and
+Collector outage, invalid projection readiness, and restart with no durable
+Authd state. Test controls are separately bound and create no production
+route, discovery, provider catalog, adapter framework, Egressd API, or weaker
+transport.

@@ -47,7 +47,10 @@ public static partial class Workloads
         IReadOnlyList<ResolvedConfigTarget> right) =>
         left.Count == right.Count
         && left.OrderBy(TargetKey)
-            .SequenceEqual(right.OrderBy(TargetKey));
+            .Select(item => item.Target)
+            .SequenceEqual(
+                right.OrderBy(TargetKey)
+                    .Select(item => item.Target));
 
     private static bool SameDependencies(
         IReadOnlyList<AdmittedDependency> left,
@@ -75,10 +78,27 @@ public static partial class Workloads
 
     private static bool SameParameters(
         IReadOnlyList<ProvisioningParameter> left,
-        IReadOnlyList<ProvisioningParameter> right) =>
-        left.Count == right.Count
-        && left.OrderBy(item => item.Name.Value)
-            .SequenceEqual(right.OrderBy(item => item.Name.Value));
+        IReadOnlyList<ProvisioningParameter> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        var orderedLeft = left.OrderBy(item => item.Name.Value).ToArray();
+        var orderedRight = right.OrderBy(item => item.Name.Value).ToArray();
+        for (var index = 0; index < orderedLeft.Length; index++)
+        {
+            if (orderedLeft[index].Name != orderedRight[index].Name
+                || orderedLeft[index].Target.Target
+                    != orderedRight[index].Target.Target)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static bool SameBehavior(
         WorkloadBehavior left,

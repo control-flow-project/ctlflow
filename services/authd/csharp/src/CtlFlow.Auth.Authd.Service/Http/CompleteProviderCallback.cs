@@ -4,13 +4,16 @@ using CtlFlow.Auth.Authd.Service.Dependencies;
 using CtlFlow.Auth.Authd.Service.Identity;
 using CtlFlow.Auth.Authd.Service.Oidc;
 using CtlFlow.Auth.Authd.Service.State;
+using CtlFlow.Auth.Authd.Service.Tenancy;
 using CtlFlow.Auth.Authd.Service.Telemetry;
 using CtlFlow.Identity.V1;
+using CtlFlow.Tenancy.V1;
 using Microsoft.Net.Http.Headers;
 using static CtlFlow.Auth.Authd.Service.Http.CallbackQueries;
 using static CtlFlow.Auth.Authd.Service.Http.HttpResponses;
 using static CtlFlow.Auth.Authd.Service.Identity.IdentityCalls;
 using static CtlFlow.Auth.Authd.Service.Oidc.OidcProtocol;
+using static CtlFlow.Auth.Authd.Service.Tenancy.TenantCalls;
 
 namespace CtlFlow.Auth.Authd.Service.Http;
 
@@ -22,6 +25,7 @@ internal static partial class BrowserRoutes
         AuthenticationAttemptStore attempts,
         HttpClient egressClient,
         IdentityService.IdentityServiceClient identityClient,
+        TenantService.TenantServiceClient tenantClient,
         AuthdTelemetry telemetry)
     {
         const string operation = "authd.http.callback";
@@ -69,6 +73,22 @@ internal static partial class BrowserRoutes
                 attempt.TenantId,
                 attempt.ProviderId)
                 ?? throw new DependencyUnavailableException("projection");
+            dependency = "tenantd";
+            await ValidateLoginTarget(
+                tenantClient,
+                settings.Workload,
+                telemetry,
+                attempt.TenantId,
+                attempt.WorkspaceId,
+                timeout.Token);
+            dependency = "identityd";
+            await ValidateLoginProviderSelection(
+                identityClient,
+                settings.Workload,
+                telemetry,
+                provider,
+                attempt.WorkspaceId,
+                timeout.Token);
             dependency = "egressd";
             var subject = await CompleteOidcAuthentication(
                 egressClient,
@@ -82,7 +102,6 @@ internal static partial class BrowserRoutes
             dependency = "identityd";
             using var session = await CreateSession(
                 identityClient,
-                settings.Identity,
                 settings.Workload,
                 telemetry,
                 attempt,
@@ -154,6 +173,10 @@ internal static partial class BrowserRoutes
             HttpContractException contract =>
                 (contract.StatusCode, contract.Outcome, "none"),
             OidcRejectedException =>
+                (StatusCodes.Status401Unauthorized,
+                    "authentication_rejected",
+                    currentDependency),
+            LoginProviderRejectedException =>
                 (StatusCodes.Status401Unauthorized,
                     "authentication_rejected",
                     currentDependency),

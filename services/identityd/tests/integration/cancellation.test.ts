@@ -18,8 +18,20 @@ import {
   getIdentitydTestContext
 } from "../suite/get-identityd-test-context.js";
 import {
+  createAdministrationCalls
+} from "../support/administration/create-administration-calls.js";
+import {
+  createAdministrationCapabilities
+} from "../support/administration/create-administration-capabilities.js";
+import {
+  allowIdentityCapabilities
+} from "../support/authorization/allow-identity-capabilities.js";
+import {
   callUnary
 } from "../support/call-unary.js";
+import {
+  identityAdminMetadata
+} from "../support/identity-admin-metadata.js";
 import {
   matchGrpcStatus
 } from "../support/match-grpc-status.js";
@@ -38,6 +50,9 @@ interface BlockedOperation {
 
 test("every RPC observes in-flight cancellation", async () => {
   const context = getIdentitydTestContext();
+  await allowIdentityCapabilities(
+    context,
+    createAdministrationCapabilities("cancellation"));
   for (const operation of blockedOperations()) {
     await context.database.connection.raw("BEGIN EXCLUSIVE");
     const call = operation.start();
@@ -58,6 +73,9 @@ test("every RPC observes in-flight cancellation", async () => {
 
 test("every RPC observes an in-flight deadline", async () => {
   const context = getIdentitydTestContext();
+  await allowIdentityCapabilities(
+    context,
+    createAdministrationCapabilities("cancellation"));
   for (const operation of blockedOperations()) {
     await context.database.connection.raw("BEGIN EXCLUSIVE");
     const call = operation.deadline(Date.now() + 250);
@@ -91,7 +109,7 @@ function blockedOperations(): readonly BlockedOperation[] {
   const execd = workloadMetadata(
     context.execdWorkload.callerToken);
 
-  return [
+  const operations: BlockedOperation[] = [
     operation<GetInvocationVerificationKeysResponse>(
       "GetInvocationVerificationKeys",
       (done) => context.client.getInvocationVerificationKeys(
@@ -206,6 +224,16 @@ function blockedOperations(): readonly BlockedOperation[] {
         execd,
         { deadline },
         done))
+  ];
+  const administration = createAdministrationCalls(
+    identityAdminMetadata(context, "acme"),
+    "cancellation");
+  return [
+    ...operations,
+    ...administration.map((call) => operation<unknown>(
+      call.name,
+      (done) => call.start({}, done),
+      (deadline, done) => call.start({ deadline }, done)))
   ];
 }
 

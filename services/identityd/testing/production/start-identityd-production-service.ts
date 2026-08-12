@@ -39,6 +39,12 @@ import {
 import {
   replaceVerificationKeys
 } from "./replace-verification-keys.js";
+import {
+  upsertLoginProviders
+} from "./upsert-login-providers.js";
+import {
+  replaceWorkspaceLoginProviderAdmissions
+} from "./replace-workspace-login-provider-admissions.js";
 
 const serviceName = "identityd";
 const executableName = "CtlFlow.Identity.Identityd.Service";
@@ -86,6 +92,7 @@ export async function startIdentitydProductionService(
       workload,
       options.kubernetes,
       options.auditd.certificateAuthorityPath,
+      options.policy?.certificateAuthorityPath,
       options.signing);
     const migrationImage = await buildNodeTestImage({
       repositoryRoot: options.repositoryRoot,
@@ -164,6 +171,10 @@ function createEnvironment(
   workloadIssuer: string,
   workloadAudience: string
 ): Readonly<Record<string, string>> {
+  const administrationCallers =
+    options.administrationCallers
+      ?? [caller(options, "admin-backend")];
+  const administrationCallerList = administrationCallers.join(",");
   return {
     CTLFLOW_GRPC_URL: "https://0.0.0.0:50051",
     CTLFLOW_PROBE_URL: "http://0.0.0.0:8080",
@@ -178,6 +189,15 @@ function createEnvironment(
     CTLFLOW_AUDIT_TLS_CA_PATH:
       "/var/run/ctlflow/trust/auditd-ca.crt",
     CTLFLOW_AUDIT_CALL_TIMEOUT_MILLISECONDS: "500",
+    CTLFLOW_POLICY_URL:
+      options.policy?.endpoint
+        ?? `https://policyd.${options.kubernetes.namespace}.svc:50051`,
+    CTLFLOW_POLICY_TLS_SERVER_NAME:
+      options.policy?.serverName
+        ?? `policyd.${options.kubernetes.namespace}.svc`,
+    CTLFLOW_POLICY_TLS_CA_PATH:
+      "/var/run/ctlflow/trust/policyd-ca.crt",
+    CTLFLOW_POLICY_CALL_TIMEOUT_MILLISECONDS: "500",
     CTLFLOW_DATABASE_PROVIDER: "sqlite",
     CTLFLOW_DATABASE_PATH: "/var/lib/ctlflow/identityd.sqlite",
     CTLFLOW_DATABASE_POOL_SIZE: "8",
@@ -206,6 +226,44 @@ function createEnvironment(
       caller(options, "authd"),
     CTLFLOW_ISSUE_RUN_INVOCATION_CALLERS:
       caller(options, "execd"),
+    CTLFLOW_GET_LOGIN_PROVIDER_AUTHD_CALLERS:
+      caller(options, "authd"),
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_AUTHD_CALLERS:
+      caller(options, "authd"),
+    CTLFLOW_ADD_TENANT_MEMBER_CALLERS: administrationCallerList,
+    CTLFLOW_REMOVE_TENANT_MEMBER_CALLERS: administrationCallerList,
+    CTLFLOW_LIST_TENANT_MEMBERS_CALLERS: administrationCallerList,
+    CTLFLOW_ADD_WORKSPACE_MEMBER_CALLERS: administrationCallerList,
+    CTLFLOW_REMOVE_WORKSPACE_MEMBER_CALLERS: administrationCallerList,
+    CTLFLOW_LIST_WORKSPACE_MEMBERS_CALLERS: administrationCallerList,
+    CTLFLOW_CREATE_GROUP_CALLERS: administrationCallerList,
+    CTLFLOW_DELETE_GROUP_CALLERS: administrationCallerList,
+    CTLFLOW_LIST_GROUPS_CALLERS: administrationCallerList,
+    CTLFLOW_ADD_GROUP_MEMBER_CALLERS: administrationCallerList,
+    CTLFLOW_REMOVE_GROUP_MEMBER_CALLERS: administrationCallerList,
+    CTLFLOW_LIST_GROUP_MEMBERS_CALLERS: administrationCallerList,
+    CTLFLOW_CREATE_VIRTUAL_PRINCIPAL_CALLERS: administrationCallerList,
+    CTLFLOW_GET_VIRTUAL_PRINCIPAL_CALLERS: administrationCallerList,
+    CTLFLOW_LIST_VIRTUAL_PRINCIPALS_CALLERS: administrationCallerList,
+    CTLFLOW_SET_VIRTUAL_PRINCIPAL_ENABLED_CALLERS:
+      administrationCallerList,
+    CTLFLOW_CREATE_EXTERNAL_IDENTITY_LINK_CALLERS:
+      administrationCallerList,
+    CTLFLOW_DELETE_EXTERNAL_IDENTITY_LINK_CALLERS:
+      administrationCallerList,
+    CTLFLOW_LIST_EXTERNAL_IDENTITY_LINKS_CALLERS:
+      administrationCallerList,
+    CTLFLOW_CREATE_LOGIN_PROVIDER_CALLERS: administrationCallerList,
+    CTLFLOW_GET_LOGIN_PROVIDER_CALLERS: administrationCallerList,
+    CTLFLOW_LIST_LOGIN_PROVIDERS_CALLERS: administrationCallerList,
+    CTLFLOW_UPDATE_LOGIN_PROVIDER_CALLERS: administrationCallerList,
+    CTLFLOW_SET_LOGIN_PROVIDER_STATE_CALLERS: administrationCallerList,
+    CTLFLOW_SET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
+      administrationCallerList,
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
+      administrationCallerList,
+    CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_CALLERS:
+      administrationCallerList,
     OTEL_EXPORTER_OTLP_ENDPOINT: options.telemetryEndpoint
   };
 }
@@ -246,6 +304,16 @@ function createService(
           database.connection,
           configuration.principalFacts);
       }
+      if (configuration.loginProviders !== undefined) {
+        await upsertLoginProviders(
+          database.connection,
+          configuration.loginProviders);
+      }
+      if (configuration.workspaceLoginProviderAdmissions !== undefined) {
+        await replaceWorkspaceLoginProviderAdmissions(
+          database.connection,
+          configuration.workspaceLoginProviderAdmissions);
+      }
       if (configuration.externalIdentityLinks !== undefined) {
         await replaceExternalIdentityLinks(
           database.connection,
@@ -270,6 +338,14 @@ function createService(
         },
         setPrincipalFacts: async (facts) => {
           await replacePrincipalFacts(database.connection, facts);
+        },
+        setLoginProviders: async (providers) => {
+          await upsertLoginProviders(database.connection, providers);
+        },
+        setWorkspaceLoginProviderAdmissions: async (admissions) => {
+          await replaceWorkspaceLoginProviderAdmissions(
+            database.connection,
+            admissions);
         },
         stop: async () => {
           modes.delete(configuration.callerSubject);

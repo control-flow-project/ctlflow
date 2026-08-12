@@ -4,7 +4,6 @@ import type {
 import {
   AppMutationAction,
   ExecutionDesiredState,
-  IdentitySessionAction,
   PlacementMutationAction,
   ProjectionMutationAction,
   RunMutationAction,
@@ -21,6 +20,9 @@ import type {
 import {
   createAuditEvent
 } from "./create-audit-event.js";
+import {
+  createIdentityAuditEvents
+} from "./create-identity-audit-events.js";
 import {
   globalPartition
 } from "./global-partition.js";
@@ -73,7 +75,8 @@ export function createAdmittedAuditBatches(
       sourcePrincipal: "SERVICE/svc_identityd",
       sourceSubject: context.workloads.identityd.callerSubject,
       workload: context.workloads.identityd,
-      events: identityEvents(context.workloads.identityd.callerSubject)
+      events: createIdentityAuditEvents(
+        context.workloads.identityd.callerSubject)
     },
     {
       name: "pkgd",
@@ -171,33 +174,6 @@ function tenantEvents(subject: string): readonly AuditEvent[] {
       }
     }, {
       partition: tenantPartition("matrix_workspace_parent_c")
-    })
-  ];
-}
-
-function identityEvents(subject: string): readonly AuditEvent[] {
-  return [
-    createAuditEvent({
-      identitySession: {
-        sessionId: "a".repeat(32),
-        humanAccountPrincipalId: "user:matrix_a",
-        sessionRevision: 1n,
-        action: IdentitySessionAction.IDENTITY_SESSION_ACTION_CREATED
-      }
-    }, {
-      attribution: workloadAttribution(subject),
-      partition: tenantPartition("matrix_identity_a")
-    }),
-    createAuditEvent({
-      identitySession: {
-        sessionId: "b".repeat(32),
-        humanAccountPrincipalId: "user:matrix_b",
-        sessionRevision: 2n,
-        action: IdentitySessionAction.IDENTITY_SESSION_ACTION_REVOKED
-      }
-    }, {
-      attribution: workloadAttribution(subject),
-      partition: tenantPartition("matrix_identity_b")
     })
   ];
 }

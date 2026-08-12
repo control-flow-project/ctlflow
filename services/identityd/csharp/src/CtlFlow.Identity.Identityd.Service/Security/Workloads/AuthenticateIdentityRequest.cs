@@ -46,6 +46,11 @@ internal static partial class WorkloadAuthentication
                 authorities.InvocationKeys,
                 currentTime,
                 cancellation);
-        return new IdentityRequestIdentity(caller, invocation);
+        return new IdentityRequestIdentity(
+            caller,
+            invocation,
+            invocationToken is null
+                ? null
+                : new InvocationToken(invocationToken));
     }
 }

@@ -62,7 +62,9 @@ export async function startPolicydProductionService(
     identitySource = await options.identityd.createSource({
       callerSubject: workload.callerSubject,
       verificationKeys: options.verificationKeys,
-      principalFacts: options.principalFacts
+      ...(options.principalFacts === undefined
+        ? {}
+        : { principalFacts: options.principalFacts })
     });
     const files = await preparePolicydFiles(
       options.repositoryRoot,
@@ -71,7 +73,8 @@ export async function startPolicydProductionService(
       workload,
       options.kubernetes,
       options.identityd.certificateAuthorityPath,
-      options.execution?.certificateAuthorityPath);
+      options.execution?.certificateAuthorityPath,
+      options.tls);
     const migrationImage = await buildNodeTestImage({
       repositoryRoot: options.repositoryRoot,
       kubernetes: options.kubernetes,
@@ -176,6 +179,7 @@ function createEnvironment(
     CTLFLOW_PKGD_CALLER: caller("pkgd"),
     CTLFLOW_CONFIGD_CALLER: caller("configd"),
     CTLFLOW_EXECD_CALLER: caller("execd"),
+    CTLFLOW_IDENTITYD_CALLER: caller("identityd"),
     CTLFLOW_OPERATION_CATALOG_PATH: "/app/operation-owners.tsv",
     CTLFLOW_EXECUTION_URL:
       options.execution?.endpoint

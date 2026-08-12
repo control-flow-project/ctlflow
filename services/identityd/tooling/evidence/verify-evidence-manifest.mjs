@@ -9,8 +9,11 @@ import {
 
 const manifestService = "ctlflow.identity.v1.IdentityService";
 const allowedStatuses = new Set([
+  "ABORTED",
+  "ALREADY_EXISTS",
   "CANCELLED",
   "DEADLINE_EXCEEDED",
+  "FAILED_PRECONDITION",
   "INVALID_ARGUMENT",
   "NOT_FOUND",
   "PERMISSION_DENIED",
@@ -46,8 +49,11 @@ assertSameValues(
   "documented gRPC status evidence",
   [...statuses],
   [
+    "ABORTED",
+    "ALREADY_EXISTS",
     "CANCELLED",
     "DEADLINE_EXCEEDED",
+    "FAILED_PRECONDITION",
     "INVALID_ARGUMENT",
     "NOT_FOUND",
     "PERMISSION_DENIED",

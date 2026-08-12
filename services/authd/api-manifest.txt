@@ -1,4 +1,4 @@
-http/v1/openapi.yaml	746a0d8b801ce836ce0bd5c428103d9f23056e8090e483efadf411149f11ac3c
+http/v1/openapi.yaml	1c43fa5ad6b73334a86d4b581833db25ee86d4ee36ab0fb5c58c70fbd1317313
 POST	/auth/v1/begin	beginAuthentication
 GET	/auth/v1/callback	completeProviderCallback
 POST	/auth/v1/logout	logout

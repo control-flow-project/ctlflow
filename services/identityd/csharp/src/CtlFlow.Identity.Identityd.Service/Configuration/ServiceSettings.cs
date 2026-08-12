@@ -15,6 +15,7 @@ internal sealed record ServiceSettings(
     TlsSettings Tls,
     DatabaseConfiguration Database,
     AuditSettings Audit,
+    PolicySettings Policy,
     WorkloadTokenSettings WorkloadTokens,
     TokenValidationSettings EdgedTokens,
     TokenValidationSettings InvocationTokens,
@@ -31,4 +32,9 @@ internal sealed record ServiceSettings(
         RevokeSessionCallers,
     IReadOnlySet<KubernetesServiceAccountSubject>
         IssueRunInvocationCallers,
+    IReadOnlySet<KubernetesServiceAccountSubject>
+        GetLoginProviderAuthdCallers,
+    IReadOnlySet<KubernetesServiceAccountSubject>
+        GetWorkspaceLoginProviderAdmissionAuthdCallers,
+    IdentityAdminSettings Administration,
     TelemetrySettings Telemetry);

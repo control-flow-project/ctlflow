@@ -1,5 +1,6 @@
 import type {
-  TestKubernetes
+  TestKubernetes,
+  TestServiceTls
 } from "@ctlflow/test-mesh";
 import type {
   IdentitydProductionService,
@@ -22,8 +23,9 @@ export interface StartPolicydProductionServiceOptions {
     readonly keys: readonly InvocationVerificationKey[];
     readonly expiresAt: string;
   };
-  readonly principalFacts: readonly PrincipalAuthorizationFacts[];
+  readonly principalFacts?: readonly PrincipalAuthorizationFacts[];
   readonly policy?: PolicyState;
+  readonly tls?: TestServiceTls;
   // The Execd dependency for product-operation resolution. Absent in the
   // policyd-only suite, where the endpoint names the (undeployed) execd
   // Service and the product branch fails closed as UNAVAILABLE.

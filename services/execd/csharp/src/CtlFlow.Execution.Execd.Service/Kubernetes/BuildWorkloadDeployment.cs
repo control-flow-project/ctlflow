@@ -40,12 +40,21 @@ internal static partial class KubernetesBodies
                 WorkloadAnnotations(placement.Id, workload.Id),
                 labels);
             writer.WriteStartObject("spec");
+            writer.WriteStartObject("strategy");
+            writer.WriteString("type", "Recreate");
+            writer.WriteEndObject();
             writer.WriteNumber("replicas", replicas);
             writer.WriteStartObject("selector");
             WriteLabels(writer, "matchLabels", labels);
             writer.WriteEndObject();
             writer.WriteStartObject("template");
             writer.WriteStartObject("metadata");
+            writer.WriteStartObject("annotations");
+            writer.WriteString(
+                "execution.ctlflow.io/workload-revision",
+                workload.Revision.Value.ToString(
+                    CultureInfo.InvariantCulture));
+            writer.WriteEndObject();
             WriteLabels(writer, "labels", labels);
             writer.WriteEndObject();
             writer.WriteStartObject("spec");

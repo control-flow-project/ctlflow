@@ -1,5 +1,7 @@
 using CtlFlow.Identity.Identityd.Domain.Accounts;
 using CtlFlow.Identity.Identityd.Domain.Resources;
+using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
 using CtlFlow.Identity.Identityd.Domain.Time;
 
@@ -9,6 +11,7 @@ public sealed record SessionFacts(
     SessionId Id,
     AccountId AccountId,
     TenantId TenantId,
+    ProviderId ProviderId,
     UtcInstant ExpiresAt,
     UtcInstant? RevokedAt,
     Revision Revision);

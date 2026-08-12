@@ -80,6 +80,29 @@ Identity or policy dependency failure is `UNAVAILABLE`.
 Operator-only and autonomous-kernel Tenantd operations remain separate
 admission paths and do not manufacture a capability Actor.
 
+## Identity administration authorization
+
+An admitted product backend calls one approved Identityd administration
+operation with its workload token and the unchanged invocation JWT.
+
+```text
+product backend
+  -> identityd administration operation
+       -> policyd.CheckAccess
+            -> identityd.ResolvePrincipal
+            -> identityd.ListPrincipalGroups
+       -> identityd Domain operation
+       -> auditd.RecordAuditBatch   actual mutation only
+```
+
+Identityd authenticates the exact per-operation backend, validates the
+invocation, applies its Tenant/Workspace fence, and constructs the fixed
+Identityd-owned operation and resource path. Policyd's re-entry is limited to
+the existing fact operations. Those operations never call Policyd, so the
+graph does not recurse. Denial is `PERMISSION_DENIED`, hidden standing or a
+target outside the invocation fence is `NOT_FOUND`, and dependency failure is
+`UNAVAILABLE`.
+
 ## Tenant and Workspace resolution
 
 `ResolveTenant` receives one Tenant address and returns canonical Tenant ID,
@@ -502,10 +525,10 @@ delivery worker, or fallback copy.
 
 Reads, rejected calls, and no-op mutations create no successful mutation
 event. A contract-defined retry may redeliver the exact same source event; an
-idempotent Auditd acceptance is not a new event. Identityd audits only
-successful Session creation and an actual Session revocation. The exact
-audited mutations for Tenantd, Identityd, Pkgd, Configd, and Execd are closed
-by their owner contracts and the Auditd detail inventory.
+idempotent Auditd acceptance is not a new event. Identityd audits every actual
+administration mutation, successful Session creation, and actual Session
+revocation. The exact audited mutations for Tenantd, Identityd, Pkgd, Configd,
+and Execd are closed by their owner contracts and the Auditd detail inventory.
 
 ## Complete call inventory
 
@@ -519,10 +542,14 @@ by their owner contracts and the Auditd detail inventory.
 | `configd` | `identityd.GetInvocationVerificationKeys` | Validate invocation JWTs |
 | `configd` | `policyd.CheckAccess` | Authorize one scoped configuration or secret capability |
 | `policyd` | `identityd.GetInvocationVerificationKeys` | Independently validate the invocation |
-| `policyd` | `identityd.ResolvePrincipal` | Obtain current exact-target identity and standing facts |
+| `policyd` | `identityd.ResolvePrincipal` | Obtain current policy-target identity and standing facts |
 | `policyd` | `identityd.ListPrincipalGroups` | Obtain bounded pages of direct Group IDs |
 | `policyd` | `execd.ResolveWorkloadOperationBinding` | Confirm one admitted product operation for one authenticated Workload subject |
 | `authd` | purpose-bound `egressd` HTTP binding | Reach the configured external identity provider without ambient egress |
+| `authd` | `tenantd.GetTenant` | Require the selected Tenant to be active |
+| `authd` | `tenantd.GetWorkspace` | Require the selected Workspace to belong to the Tenant and be active |
+| `authd` | `identityd.GetLoginProvider` | Read one exact provider registration |
+| `authd` | `identityd.GetWorkspaceLoginProviderAdmission` | Require one exact Workspace/provider admission |
 | `authd` | `identityd.CreateSession` | Resolve a validated external identity and create one Session |
 | `authd` | `identityd.RevokeSession` | Revoke one Session by opaque credential |
 | `edged` | `identityd.ExchangeSession` | Exchange one current Session for an exact-target invocation |
@@ -534,7 +561,8 @@ by their owner contracts and the Auditd detail inventory.
 | `execd` | `configd.ApplyProjection` | Ensure one exact version for a bound consumer |
 | Provisioner controller | `configd.PublishConfiguration` | Publish one exact claim-bound configuration output |
 | Provisioner controller | `configd.PublishSecret` | Publish one exact claim-bound secret output |
-| `identityd` | `auditd.RecordAuditBatch` | Record one committed Session creation or actual revocation |
+| `identityd` | `policyd.CheckAccess` | Authorize one admitted identity administration capability |
+| `identityd` | `auditd.RecordAuditBatch` | Record one committed administration or Session mutation |
 | `pkgd` | `auditd.RecordAuditBatch` | Record one committed Package or App mutation |
 | `configd` | `auditd.RecordAuditBatch` | Record one committed publication or Projection mutation |
 | `execd` | `auditd.RecordAuditBatch` | Record one committed Placement, Workload, or Run mutation |

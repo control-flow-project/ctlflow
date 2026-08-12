@@ -181,7 +181,7 @@ test("realizes a provisioner-owned dependency claim and output",
       placementId: placement.placementId,
       scope: { tenant: { tenantId: "tenant-a" } }
     });
-    await declareWorkload(createWorkloadRequest({
+    const workloadRequest = createWorkloadRequest({
       workloadId,
       placementId: placement.placementId,
       appId: "realization_dependency_app",
@@ -205,7 +205,8 @@ test("realizes a provisioner-owned dependency claim and output",
           }
         }]
       }]
-    }));
+    });
+    const initialWorkload = await declareWorkload(workloadRequest);
 
     const suite = getExecdTestSuite();
     const namespace = await getPlacementNamespace(
@@ -301,6 +302,11 @@ test("realizes a provisioner-owned dependency claim and output",
       namespace,
       "configd");
     assert.equal(outputs.length, 2);
+    const replay = await declareWorkload({
+      ...workloadRequest,
+      expectedRevision: initialWorkload.revision
+    });
+    assert.equal(replay.revision, initialWorkload.revision);
   });
 
 interface PublishConfigurationOptions {

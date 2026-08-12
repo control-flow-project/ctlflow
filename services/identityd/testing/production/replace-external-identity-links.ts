@@ -16,6 +16,7 @@ export async function replaceExternalIdentityLinks(
     }
     await transaction("external_identity_links").insert(
       links.map((link) => ({
+        external_link_id: link.externalLinkId,
         tenant_id: link.tenantId,
         provider_id: link.providerId,
         provider_subject: link.providerSubject,

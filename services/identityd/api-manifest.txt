@@ -1,1 +1,1 @@
-v1/identityd.proto	65a08e21ad4278eb8ebfa1ca7f9c22a311b5c6eef4eb335164b3e47da9d90593
+v1/identityd.proto	39d81b9c96fb2577dc75726a53c0045a54ce148eaae7950ab46b01fcd8a584df

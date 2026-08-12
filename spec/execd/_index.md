@@ -108,6 +108,11 @@ Configuration targets name an exact Configd configuration or secret version
 and one purpose. Execd passes the stored Placement target, Workload as
 consumer, and purpose to `configd.ApplyProjection`; it never receives content
 or a native coordinate. Direct targets are unique by data kind and purpose.
+For a continuous Workload, a declaration revision that changes any running
+input, including a selected configuration or secret version, rolls every
+replica onto that revision after its exact projections are established. Execd
+does not report the new Workload revision `READY` while replicas from the prior
+revision remain active.
 
 Every Package dependency has exactly one selection. Execd chooses only the
 provisioner fixed by the effective Placement constraints, applies any
@@ -257,6 +262,9 @@ returns the retained record; conflicting identity reuse is `ALREADY_EXISTS`.
 An update requires the current positive revision. An identical update is a
 no-op. A retry one revision behind succeeds only when the complete retained
 result equals the requested result; another mismatch is `ABORTED`.
+Resolved projection IDs and projection revisions are observed runtime state,
+not part of a Workload declaration. Resolving a direct target or dependency
+parameter therefore cannot make an otherwise identical declaration differ.
 
 A Run ID is its retry identity. Reuse for the same Workload returns the
 retained Run; reuse for another Workload is `ALREADY_EXISTS`.

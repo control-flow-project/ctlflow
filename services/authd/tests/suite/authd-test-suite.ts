@@ -12,9 +12,16 @@ import type {
   IdentitydProductionSource
 } from "@ctlflow/identityd/testing/production";
 import type {
+  PolicydProductionService
+} from "@ctlflow/policyd/testing/production";
+import type {
+  TenantdProductionService
+} from "@ctlflow/tenantd/testing/production";
+import type {
   CSharpStatelessService,
   OpenTelemetryCollector,
-  TestKubernetes
+  TestKubernetes,
+  TestWorkloadCredentials
 } from "@ctlflow/test-mesh";
 import type {
   AuthdTestRuntime
@@ -31,6 +38,9 @@ export interface AuthdTestSuite {
   readonly auditd: AuditdProductionService;
   readonly identityd: IdentitydProductionService;
   readonly identitySource: IdentitydProductionSource;
+  readonly policyd: PolicydProductionService;
+  readonly tenantd: TenantdProductionService;
+  readonly authdWorkload: TestWorkloadCredentials;
   readonly provider: ControlledOidcProvider;
   readonly egressd: EgressdProductionService;
   readonly authd: CSharpStatelessService;

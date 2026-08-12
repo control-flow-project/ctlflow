@@ -14,6 +14,16 @@
     <ProjectReference Include="../CtlFlow.Identity.Identityd.Domain/CtlFlow.Identity.Identityd.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Using Include="CtlFlow.Identity.Identityd.Domain.Accounts" />
+    <Using Include="CtlFlow.Identity.Identityd.Domain.Groups" />
+    <Using Include="CtlFlow.Identity.Identityd.Domain.IdentityLinks" />
+    <Using Include="CtlFlow.Identity.Identityd.Domain.Memberships" />
+    <Using Include="CtlFlow.Identity.Identityd.Domain.Principals" />
+    <Using Include="CtlFlow.Identity.Identityd.Domain.Providers" />
+    <Using Include="CtlFlow.Identity.Identityd.Domain.Resources" />
+    <Using Include="CtlFlow.Identity.Identityd.Domain.Sessions" />
+  </ItemGroup>
+  <ItemGroup>
     <EmbeddedResource Include="../../../schema-manifest.txt"
                       LogicalName="CtlFlow.Identity.Identityd.SchemaManifest" />
   </ItemGroup>

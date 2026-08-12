@@ -16,6 +16,9 @@ import {
   getIdentitydTestContext
 } from "../suite/get-identityd-test-context.js";
 import {
+  createAdministrationCalls
+} from "../support/administration/create-administration-calls.js";
+import {
   callUnary
 } from "../support/call-unary.js";
 import {
@@ -72,6 +75,15 @@ test("operation caller sets are exact", async () => {
   const context = getIdentitydTestContext();
   const callers = [
     {
+      name: "admin-backend",
+      token: context.adminWorkload.callerToken,
+      allowed: new Set([
+        "GetInvocationVerificationKeys",
+        ...createAdministrationCalls(new Metadata())
+          .map(({ name }) => name)
+      ])
+    },
+    {
       name: "tenantd",
       token: context.tenantdWorkload.callerToken,
       allowed: new Set(["GetInvocationVerificationKeys"])
@@ -101,7 +113,9 @@ test("operation caller sets are exact", async () => {
       allowed: new Set([
         "GetInvocationVerificationKeys",
         "CreateSession",
-        "RevokeSession"
+        "RevokeSession",
+        "GetLoginProvider",
+        "GetWorkspaceLoginProviderAdmission"
       ])
     },
     {
@@ -266,6 +280,7 @@ function allCalls(metadata: Metadata): readonly {
             done))
     },
     ...factCalls(metadata),
+    ...createAdministrationCalls(metadata),
     {
       name: "CreateSession",
       request: () =>

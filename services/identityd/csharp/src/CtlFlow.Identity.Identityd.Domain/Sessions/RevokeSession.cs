@@ -22,7 +22,7 @@ public static partial class Sessions
             new SessionAuditIntent(
                 AuditEventId.Generate(),
                 SessionAuditAction.Revoked,
-                audit.Caller,
+                audit.Attribution,
                 session.Id,
                 session.AccountId,
                 session.TenantId,

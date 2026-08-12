@@ -34,6 +34,10 @@ public static partial class OperationCatalog
                 operation,
                 resourcePath,
                 target),
+            OperationOwner.Identityd => ValidateIdentityd(
+                operation,
+                resourcePath,
+                target),
             _ => throw new InvalidOperationException(
                 "Operation owner is invalid")
         };

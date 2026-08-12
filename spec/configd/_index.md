@@ -37,6 +37,11 @@ the exact versioned JSON fields and consumer bounds in its [HTTP
 contract](../authd/#deployed-dependencies); Configd materializes that
 projection without interpreting OIDC.
 
+Each projected provider carries the exact configuration and secret identity
+and version references selected from Configd. Authd compares those non-secret
+references with Identityd's current provider registration before using the
+material. Configd remains unaware of providers and performs no Identityd call.
+
 Operators manage every scope. An exact product-backend ServiceAccount may use
 its admitted RPC only at Tenant, Workspace, or User scope under invocation and
 policy. Execd may call only `ApplyProjection`. No generic key/value, list,

@@ -30,8 +30,8 @@ Request fields:
 | --- | --- | --- |
 | `operation` | string | Immutable operation token. Policyd classifies the authenticated caller first, so a kernel service and a package may use the same lexical token without crossing authority |
 | `resource_path` | string | Canonical operation-specific path built by that owner |
-| `tenant_id` | string | Exact Tenant target for standing and policy evaluation |
-| `workspace_id` | optional string | Present only when the exact target is one Workspace |
+| `tenant_id` | string | Exact Tenant policy target for standing and policy evaluation |
+| `workspace_id` | optional string | Present only when the policy target is one exact Workspace |
 
 Response:
 
@@ -134,7 +134,7 @@ Another Package may declare `messages.post` without sharing its grants.
 The decision is allow only when all required conditions hold:
 
 1. the immediate workload owns the declared operation;
-2. the invocation Actor and attached account have current target standing;
+2. the invocation Actor and attached account have current policy-target standing;
 3. the canonical operation and resource path are valid for that owner;
 4. a current direct principal, attached-account, or Group grant matches; and
 5. no target or revision fence fails.
@@ -150,7 +150,7 @@ There are no deny rules. Absence of a current matching allow produces
 | `INVALID_ARGUMENT` | Operation, path, or target shape is malformed |
 | `UNAUTHENTICATED` | Workload or invocation identity is invalid |
 | `PERMISSION_DENIED` | The immediate workload does not own the operation |
-| `NOT_FOUND` | The invocation target lies outside visible standing |
+| `NOT_FOUND` | The policy target lies outside visible standing |
 | `UNAVAILABLE` | Policy persistence, Execd authority, or required Identityd facts are unavailable |
 | `CANCELLED`, `DEADLINE_EXCEEDED` | The unary call did not complete |
 

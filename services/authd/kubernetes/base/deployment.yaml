@@ -38,6 +38,8 @@ spec:
               value: /var/run/ctlflow/secrets/provider-credentials.json
             - name: CTLFLOW_IDENTITY_TLS_CA_PATH
               value: /var/run/ctlflow/trust/identityd-ca.crt
+            - name: CTLFLOW_TENANT_TLS_CA_PATH
+              value: /var/run/ctlflow/trust/tenantd-ca.crt
             - name: CTLFLOW_WORKLOAD_TOKEN_FILE
               value: /var/run/secrets/ctlflow-workload/token
           ports:

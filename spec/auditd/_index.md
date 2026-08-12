@@ -59,6 +59,13 @@ The complete detail inventory is:
 | `TenantMutationAuditDetail` | Tenant action, resulting revision, and resulting state |
 | `WorkspaceMutationAuditDetail` | Workspace ID, Workspace action, resulting revision, and resulting state |
 | `IdentitySessionAuditDetail` | Session ID, human account principal, resulting revision, and action |
+| `IdentityMembershipAuditDetail` | Account principal, optional Workspace, add/remove action, removed or resulting Membership revision, and whether Tenant add created the account |
+| `IdentityGroupAuditDetail` | Group ID, optional Workspace, and create/delete action |
+| `IdentityGroupMemberAuditDetail` | Group ID, optional Workspace, principal ID, and add/remove action |
+| `IdentityVirtualPrincipalAuditDetail` | Virtual principal, attached account, optional Workspace fence, resulting revision/enabled state, and create/set-enabled action |
+| `IdentityExternalLinkAuditDetail` | Provider ID, human account, and create/delete action; never provider subject |
+| `IdentityLoginProviderAuditDetail` | Provider ID, resulting state/revision, and create/update/set-state action |
+| `IdentityWorkspaceProviderAdmissionAuditDetail` | Workspace ID, provider ID, and admit/remove action |
 | `PackageDeclarationAuditDetail` | Package ID and declared generation |
 | `AppMutationAuditDetail` | Complete App scope, App/Placement/Package IDs, resulting Package generation and App revision, and action |
 | `ConfigurationPublicationAuditDetail` | Configuration and version IDs, complete consumer binding, resulting identity revision, and optional dependency claim ID/revision pair |
@@ -79,6 +86,14 @@ The finite action and state sets are:
 - Workspace: `CREATE_WORKSPACE`, `UPDATE_WORKSPACE`,
   `SET_WORKSPACE_STATE`;
 - Identity Session: `CREATED`, `REVOKED`;
+- Identity Membership: `ADDED`, `REMOVED`;
+- Identity Group: `CREATED`, `DELETED`;
+- Identity Group member: `ADDED`, `REMOVED`;
+- Identity virtual principal: `CREATED`, `ENABLED_STATE_CHANGED`;
+- Identity external link: `CREATED`, `DELETED`;
+- Identity login provider: `CREATED`, `UPDATED`, `STATE_CHANGED`;
+- Identity Workspace provider admission: `ADMITTED`, `REMOVED`;
+- Identity login-provider state: `ACTIVE`, `DISABLED`, `DELETED`;
 - App: `CREATED`, `PACKAGE_GENERATION_CHANGED`;
 - Projection: `CREATED`, `VERSION_CHANGED`;
 - Placement: `DECLARED`, `UPDATED`;
@@ -90,6 +105,15 @@ The finite action and state sets are:
 Create Tenant and Workspace evidence requires revision 1 and `ACTIVE`. Their
 updates require revision at least 2 and an owner-admitted resulting state.
 Session `CREATED` requires revision 1; `REVOKED` requires revision 2.
+Membership add/remove carries the resulting or removed positive Membership
+revision. `account_created` is true only when a Tenant Membership add also
+created its account at revision one. Virtual-principal and login-provider
+creation require revision one; their later actions require revision at least
+two. A virtual-principal event carries its immutable attached account and
+fence. An external-link event carries the persisted opaque external-link ID,
+provider ID, human account, and action. It never carries the provider subject
+or Configd reference. Group deletion and provider deletion represent their normative
+same-transaction child cleanup and do not emit separate child-removal events.
 Package generation is positive. App `CREATED` requires revision 1;
 `PACKAGE_GENERATION_CHANGED` requires revision at least 2.
 
@@ -107,8 +131,9 @@ cancellation carries the resulting positive revision.
 Package declarations use Global. Every other detail uses Global exactly when
 its complete App scope, consumer binding, or Placement target is Global;
 otherwise it uses the Tenant partition whose Tenant ID equals that target.
-Tenant, Workspace, and Identity Session details always use their exact Tenant
-partition. A detail cannot name or imply another Tenant.
+Tenant, Workspace, Identity Session, and every Identity administration detail
+always use their exact Tenant partition. Optional Workspace values must belong
+to that Tenant target. A detail cannot name or imply another Tenant.
 
 Only successful actual mutations are admitted. Reads, lists, rejected calls,
 idempotent create retries, no-op declarations or updates, repeated Session
@@ -144,6 +169,7 @@ subject to one canonical source principal.
 | `SERVICE/svc_tenantd` | Tenant mutation | Operator; invocation only for `UPDATE_TENANT` |
 | `SERVICE/svc_tenantd` | Workspace mutation | Operator or invocation |
 | `SERVICE/svc_identityd` | Identity Session mutation | Workload |
+| `SERVICE/svc_identityd` | Identity administration mutation | Invocation |
 | `SERVICE/svc_pkgd` | Package declaration | Operator |
 | `SERVICE/svc_pkgd` | App mutation | Operator or invocation |
 | `SERVICE/svc_configd` | Configuration or secret publication | Operator, invocation, or workload |

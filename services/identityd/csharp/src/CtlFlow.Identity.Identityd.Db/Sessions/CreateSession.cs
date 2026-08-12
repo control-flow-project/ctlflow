@@ -2,6 +2,7 @@ using CtlFlow.Identity.Identityd.Db.Providers;
 using CtlFlow.Identity.Identityd.Domain.Accounts;
 using CtlFlow.Identity.Identityd.Domain.Auditing;
 using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Sessions;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,8 @@ public static partial class Sessions
         AuditContext audit,
         CancellationToken cancellation)
     {
-        cancellation.ThrowIfCancellationRequested();
+        await using var mutation =
+            await identityDatabase.AcquireMutation(cancellation);
         using var activity =
             IdentityDbTelemetry.StartOperation("create_session");
         await using var database =
@@ -52,6 +54,15 @@ public static partial class Sessions
         ExternalIdentityFacts? identity = null;
         if (link is not null)
         {
+            var provider = await database.LoginProviders
+                .AsNoTracking()
+                .Where(candidate =>
+                    EF.Property<string>(candidate, "_tenantId")
+                        == tenantIdValue
+                    && EF.Property<string>(candidate, "_providerId")
+                        == providerIdValue)
+                .Select(candidate => candidate.State)
+                .SingleOrDefaultAsync(queryCancellation);
             var accountIdValue = link.AccountId;
             var account = await database.Accounts
                 .AsNoTracking()
@@ -88,6 +99,7 @@ public static partial class Sessions
                     AccountId.FromStorage(account.Id),
                     account.Kind,
                     account.Enabled,
+                    provider == LoginProviderState.Active,
                     TenantId.FromStorage(link.TenantId),
                     TenantId.FromStorage(membership.TenantId));
             }
@@ -96,6 +108,7 @@ public static partial class Sessions
         var creationResult =
             await Domain.Sessions.Sessions.CreateSession(
             identity,
+            providerId,
             credentialDigest,
             lifetime,
             audit,

@@ -1,8 +1,11 @@
+import path from "node:path";
 import {
+  createTestServiceTls,
   startOpenTelemetryCollector,
   startTestKubernetes,
   type OpenTelemetryCollector,
-  type TestKubernetes
+  type TestKubernetes,
+  type TestServiceTls
 } from "@ctlflow/test-mesh";
 import {
   startAuditdProductionService,
@@ -27,6 +30,7 @@ Promise<IdentitydTestSuite> {
   let kubernetes: TestKubernetes | undefined;
   let collector: OpenTelemetryCollector | undefined;
   let auditd: AuditdProductionService | undefined;
+  let policydTls: TestServiceTls | undefined;
 
   try {
     runtime = await loadIdentitydTestRuntime();
@@ -39,6 +43,15 @@ Promise<IdentitydTestSuite> {
       kubernetes,
       telemetryEndpoint: collector.endpoint
     });
+    policydTls = await createTestServiceTls(
+      repositoryRoot,
+      path.join(repositoryRoot, ".temp", "identityd-policyd-tls"),
+      "policyd",
+      [
+        "policyd",
+        `policyd.${kubernetes.namespace}`,
+        `policyd.${kubernetes.namespace}.svc`
+      ]);
     let stopped = false;
     return {
       repositoryRoot,
@@ -46,6 +59,7 @@ Promise<IdentitydTestSuite> {
       kubernetes,
       collector,
       auditd,
+      policydTls,
       stop: async () => {
         if (stopped) {
           return;

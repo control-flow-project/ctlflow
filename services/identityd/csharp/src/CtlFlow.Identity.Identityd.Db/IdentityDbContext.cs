@@ -4,12 +4,14 @@ using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
 using CtlFlow.Identity.Identityd.Domain.Keys;
 using CtlFlow.Identity.Identityd.Domain.Memberships;
 using CtlFlow.Identity.Identityd.Domain.Principals;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Sessions;
 using Microsoft.EntityFrameworkCore;
 using static CtlFlow.Identity.Identityd.Db.Accounts.AccountSchema;
 using static CtlFlow.Identity.Identityd.Db.Groups.GroupSchema;
 using static CtlFlow.Identity.Identityd.Db.IdentityLinks.ExternalIdentityLinkSchema;
 using static CtlFlow.Identity.Identityd.Db.Keys.VerificationKeySchema;
+using static CtlFlow.Identity.Identityd.Db.LoginProviders.LoginProviderSchema;
 using static CtlFlow.Identity.Identityd.Db.Memberships.MembershipSchema;
 using static CtlFlow.Identity.Identityd.Db.Principals.VirtualPrincipalSchema;
 using static CtlFlow.Identity.Identityd.Db.Schema.AppliedMigrationSchema;
@@ -54,6 +56,11 @@ public sealed class IdentityDbContext(
         private set;
     } = null!;
 
+    public DbSet<LoginProvider> LoginProviders { get; private set; } = null!;
+
+    public DbSet<WorkspaceLoginProviderAdmission>
+        WorkspaceLoginProviderAdmissions { get; private set; } = null!;
+
     public DbSet<Session> Sessions { get; private set; } = null!;
 
     public DbSet<AppliedMigration> AppliedMigrations { get; private set; } =
@@ -71,6 +78,8 @@ public sealed class IdentityDbContext(
         ConfigureAccountGroupMembership(modelBuilder);
         ConfigureVirtualPrincipalGroupMembership(modelBuilder);
         ConfigureInvocationVerificationKey(modelBuilder);
+        ConfigureLoginProvider(modelBuilder);
+        ConfigureWorkspaceLoginProviderAdmission(modelBuilder);
         ConfigureExternalIdentityLink(modelBuilder);
         ConfigureSession(modelBuilder);
         ConfigureAppliedMigration(modelBuilder);

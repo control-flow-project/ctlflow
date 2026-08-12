@@ -8,20 +8,16 @@ internal static partial class AuditDelivery
 {
     internal static ValueTask<RecordAuditBatchRequest>
         CreateRecordAuditBatchRequest(
-            SessionAuditIntent intent,
+            IdentityAuditIntent intent,
             CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
-        var request = new RecordAuditBatchRequest();
-        request.Events.Add(new AuditEvent
+        var auditEvent = new AuditEvent
         {
             SourceEventId = intent.EventId.Value,
             OccurredAt = Timestamp.FromDateTimeOffset(
                 intent.OccurredAt.Value),
-            Attribution = new CtlFlow.Audit.V1.AuditAttribution
-            {
-                WorkloadSubject = intent.Caller.Value
-            },
+            Attribution = CreateAuditAttribution(intent.Attribution),
             Partition = new AuditPartition
             {
                 Tenant = new TenantAuditPartition
@@ -30,24 +26,11 @@ internal static partial class AuditDelivery
                 }
             },
             TraceId = intent.Correlation.TraceId,
-            SpanId = intent.Correlation.SpanId,
-            IdentitySession = new IdentitySessionAuditDetail
-            {
-                SessionId = intent.SessionId.Value,
-                HumanAccountPrincipalId = intent.AccountId.Value,
-                SessionRevision = checked(
-                    (ulong)intent.SessionRevision.Value),
-                Action = intent.Action switch
-                {
-                    SessionAuditAction.Created =>
-                        IdentitySessionAction.Created,
-                    SessionAuditAction.Revoked =>
-                        IdentitySessionAction.Revoked,
-                    _ => throw new InvalidOperationException(
-                        "Session audit action is invalid")
-                }
-            }
-        });
+            SpanId = intent.Correlation.SpanId
+        };
+        SetAuditDetail(auditEvent, intent);
+        var request = new RecordAuditBatchRequest();
+        request.Events.Add(auditEvent);
         return ValueTask.FromResult(request);
     }
 }

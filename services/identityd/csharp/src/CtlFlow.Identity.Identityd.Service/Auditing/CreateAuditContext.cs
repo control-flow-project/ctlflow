@@ -22,8 +22,16 @@ internal static partial class AuditDelivery
                 "An audited operation requires trace correlation");
         }
 
+        var immediateCaller = AuditCaller.Parse(
+            identity.ImmediateCaller.Value);
+        AuditAttribution attribution = identity.Invocation is null
+            ? new AuditAttribution.Workload(immediateCaller)
+            : new AuditAttribution.Invocation(
+                identity.Invocation.Actor,
+                identity.Invocation.SubjectAccount,
+                immediateCaller);
         return ValueTask.FromResult(new AuditContext(
-            AuditCaller.Parse(identity.ImmediateCaller.Value),
+            attribution,
             new AuditCorrelation(
                 activity.TraceId.ToHexString(),
                 activity.SpanId.ToHexString()),

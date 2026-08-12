@@ -235,7 +235,8 @@ export async function startTestKubernetes(
             "namespace",
             namespaceName,
             "--ignore-not-found=true",
-            "--wait=false"
+            "--wait=true",
+            "--timeout=60s"
           ]);
       }
     };

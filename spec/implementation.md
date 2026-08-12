@@ -326,6 +326,16 @@ authorization, dependency, concurrency, cancellation, lifecycle, and failure res
 test. Descriptor, migration, HTTP-surface, and evidence inventories fail when an operation lacks
 coverage.
 
+Cross-operation invariants whose correctness depends on application-layer
+serialization rather than structural database constraints have explicit
+production-RPC interleaving evidence selected by the owning service spec. That
+evidence forces the relevant competing orders against the real database and
+asserts the final invariant, not only individual status codes. A static gate
+proves every mutation path named by that invariant uses the service's mutation
+coordinator. Per-record optimistic concurrency may instead be proved by
+ordinary concurrent calls. Every implementation also runs a static layer and
+ownership verifier for rules that cannot be observed at the wire boundary.
+
 Each service checks in one service-root evidence manifest. It maps every
 generated RPC or public route and every documented result to an exact ordinary
 test file and test title, and lists the exact repository commands for every

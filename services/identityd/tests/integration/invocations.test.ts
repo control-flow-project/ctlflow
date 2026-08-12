@@ -99,6 +99,84 @@ test("Session exchange re-establishes exact target standing", async () => {
   }
 });
 
+test("Session exchange enforces its current Workspace provider admission",
+  async () => {
+    const context = getIdentitydTestContext();
+    const created = await createSession();
+    const stored = await context.database.connection<{
+      readonly provider_id: string;
+    }>("sessions")
+      .select("provider_id")
+      .where("session_id", created.sessionId)
+      .first();
+    assert.equal(stored?.provider_id, "oidc");
+
+    const admission = {
+      tenant_id: "acme",
+      workspace_id: "atlas",
+      provider_id: "oidc"
+    };
+    await context.database.connection("workspace_login_provider_admissions")
+      .where(admission)
+      .delete();
+    try {
+      await exchangeSession({
+        sessionCredential: created.sessionCredential,
+        tenantId: "acme"
+      });
+      await assert.rejects(
+        exchangeSession({
+          sessionCredential: created.sessionCredential,
+          tenantId: "acme",
+          workspaceId: "atlas"
+        }),
+        matchGrpcStatus(status.NOT_FOUND));
+
+      await context.database.connection(
+        "workspace_login_provider_admissions"
+      ).insert(admission);
+      await exchangeSession({
+        sessionCredential: created.sessionCredential,
+        tenantId: "acme",
+        workspaceId: "atlas"
+      });
+      await context.database.connection(
+        "workspace_login_provider_admissions"
+      ).where(admission).delete();
+      await assert.rejects(
+        exchangeSession({
+          sessionCredential: created.sessionCredential,
+          tenantId: "acme",
+          workspaceId: "atlas"
+        }),
+        matchGrpcStatus(status.NOT_FOUND));
+    } finally {
+      await context.database.connection(
+        "workspace_login_provider_admissions"
+      ).insert(admission).onConflict().ignore();
+    }
+  });
+
+test("disabling a provider does not revoke its existing Session", async () => {
+  const context = getIdentitydTestContext();
+  const created = await createSession();
+  const selector = { tenant_id: "acme", provider_id: "oidc" };
+  await context.database.connection("login_providers")
+    .where(selector)
+    .update({ state: 2 });
+  try {
+    await exchangeSession({
+      sessionCredential: created.sessionCredential,
+      tenantId: "acme",
+      workspaceId: "atlas"
+    });
+  } finally {
+    await context.database.connection("login_providers")
+      .where(selector)
+      .update({ state: 1 });
+  }
+});
+
 test("Session exchange rejects invalid, expired, and revoked credentials",
   async () => {
     for (const sessionCredential of [
