@@ -132,12 +132,14 @@ Promise<EdgedTestSuite> {
         providerId: "oidc"
       }],
       externalIdentityLinks: [{
+        externalLinkId: "eil_00000000000000000000000000000001",
         tenantId: "acme",
         providerId: "oidc",
         providerSubject: "alice@example.com",
         accountId: "user:alice",
         revision: 1
       }, {
+        externalLinkId: "eil_00000000000000000000000000000002",
         tenantId: "acme",
         providerId: "oidc",
         providerSubject: "bob@example.com",

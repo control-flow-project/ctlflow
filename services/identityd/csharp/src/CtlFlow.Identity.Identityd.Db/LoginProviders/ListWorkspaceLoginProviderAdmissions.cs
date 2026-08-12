@@ -1,6 +1,5 @@
 using CtlFlow.Identity.Identityd.Db.Providers;
 using CtlFlow.Identity.Identityd.Domain.Collections;
-using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
 using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
 using CtlFlow.Identity.Identityd.Domain.Workspaces;
@@ -78,7 +77,7 @@ public static partial class LoginProviders
                 Domain.Tenants.TenantId.FromStorage(admission.TenantId),
                 Domain.Workspaces.WorkspaceId.FromStorage(
                     admission.WorkspaceId),
-                Domain.IdentityLinks.ProviderId.FromStorage(
+                Domain.Providers.ProviderId.FromStorage(
                     admission.ProviderId)))
             .ToArray();
         return await CreatePage(

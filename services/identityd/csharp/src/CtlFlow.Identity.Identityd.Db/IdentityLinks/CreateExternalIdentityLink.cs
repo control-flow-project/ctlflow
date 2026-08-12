@@ -3,6 +3,7 @@ using CtlFlow.Identity.Identityd.Db.Providers;
 using CtlFlow.Identity.Identityd.Domain.Accounts;
 using CtlFlow.Identity.Identityd.Domain.Auditing;
 using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Mutations;
 using CtlFlow.Identity.Identityd.Domain.Targets;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
@@ -22,9 +23,8 @@ public static partial class IdentityLinks
             AuditContext audit,
             CancellationToken cancellation)
     {
-        await using var mutation = await identityDatabase.AcquireMutation(
-            $"external-link:{tenantId.Value}:{providerId.Value}:{providerSubject.Value}",
-            cancellation);
+        await using var mutation =
+            await identityDatabase.AcquireMutation(cancellation);
         using var activity = IdentityDbTelemetry.StartOperation(
             "create_external_identity_link");
         await using var database =

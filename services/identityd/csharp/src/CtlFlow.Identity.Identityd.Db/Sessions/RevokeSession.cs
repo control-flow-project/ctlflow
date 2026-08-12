@@ -17,9 +17,7 @@ public static partial class Sessions
         using var activity =
             IdentityDbTelemetry.StartOperation("revoke_session");
         await using var mutation =
-            await identityDatabase.AcquireMutation(
-                $"session:{credentialDigest.Value}",
-                cancellation);
+            await identityDatabase.AcquireMutation(cancellation);
         await using var database =
             await identityDatabase.Contexts.CreateDbContextAsync(
                 cancellation);
@@ -62,7 +60,7 @@ public static partial class Sessions
                 row.CredentialDigest),
             Domain.Accounts.AccountId.FromStorage(row.AccountId),
             Domain.Tenants.TenantId.FromStorage(row.TenantId),
-            Domain.IdentityLinks.ProviderId.FromStorage(row.ProviderId),
+            Domain.Providers.ProviderId.FromStorage(row.ProviderId),
             row.CreatedAt,
             row.ExpiresAt,
             row.RevokedAt,
@@ -124,7 +122,7 @@ public static partial class Sessions
                     currentRow.AccountId),
                 Domain.Tenants.TenantId.FromStorage(
                     currentRow.TenantId),
-                Domain.IdentityLinks.ProviderId.FromStorage(
+                Domain.Providers.ProviderId.FromStorage(
                     currentRow.ProviderId),
                 currentRow.CreatedAt,
                 currentRow.ExpiresAt,

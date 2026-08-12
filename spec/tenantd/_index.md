@@ -180,6 +180,11 @@ specific, and disjoint. Startup fails when a subject overlaps them. Caller
 identity cannot be supplied or replaced by a request field or
 caller-asserted metadata.
 
+The installation admits `SERVICE/svc_authd` autonomously only to `GetTenant`
+and `GetWorkspace`. Authd uses those retained-record reads to require an active
+Tenant and, when selected, an active Workspace with that exact parent. It
+carries no invocation JWT and receives no mutation authority.
+
 The operator certificate must chain to the installation's Kubernetes client
 CA and contain exactly one common name. That common name has one to 253
 characters and contains no Unicode whitespace or control character, so it is

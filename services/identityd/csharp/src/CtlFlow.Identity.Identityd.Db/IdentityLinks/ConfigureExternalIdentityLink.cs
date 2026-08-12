@@ -14,11 +14,16 @@ internal static partial class ExternalIdentityLinkSchema
         var link = modelBuilder.Entity<ExternalIdentityLink>();
         link.ToTable("external_identity_links");
         link.Ignore(value => value.AccountId);
+        link.Ignore(value => value.ExternalLinkId);
         link.Ignore(value => value.ProviderId);
         link.Ignore(value => value.ProviderSubject);
         link.Ignore(value => value.TenantId);
         link.HasKey("_tenantId", "_providerId", "_providerSubject");
 
+        link.Property<string>("_externalLinkId")
+            .HasColumnName("external_link_id")
+            .HasMaxLength(36)
+            .IsRequired();
         link.Property<string>("_tenantId")
             .HasColumnName("tenant_id")
             .HasMaxLength(64)
@@ -45,6 +50,9 @@ internal static partial class ExternalIdentityLinkSchema
 
         link.HasIndex("_accountId", "_tenantId")
             .HasDatabaseName("external_identity_links_account_idx");
+        link.HasIndex("_externalLinkId")
+            .IsUnique()
+            .HasDatabaseName("external_identity_links_id_unique");
         link.HasOne<TenantMembership>()
             .WithMany()
             .HasForeignKey("_accountId", "_tenantId")

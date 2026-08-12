@@ -6,14 +6,17 @@ using CtlFlow.Auth.Authd.Service.Configuration;
 using CtlFlow.Auth.Authd.Service.Dependencies;
 using CtlFlow.Auth.Authd.Service.Identity;
 using CtlFlow.Auth.Authd.Service.State;
+using CtlFlow.Auth.Authd.Service.Tenancy;
 using CtlFlow.Auth.Authd.Service.Telemetry;
 using CtlFlow.Identity.V1;
+using CtlFlow.Tenancy.V1;
 using Microsoft.Net.Http.Headers;
 using static CtlFlow.Auth.Authd.Service.Http.BrowserRequests;
 using static CtlFlow.Auth.Authd.Service.Http.FormEncoding;
 using static CtlFlow.Auth.Authd.Service.Http.HttpResponses;
 using static CtlFlow.Auth.Authd.Service.Identity.IdentityCalls;
 using static CtlFlow.Auth.Authd.Service.Oidc.OidcAuthorization;
+using static CtlFlow.Auth.Authd.Service.Tenancy.TenantCalls;
 
 namespace CtlFlow.Auth.Authd.Service.Http;
 
@@ -24,6 +27,7 @@ internal static partial class BrowserRoutes
         AuthdSettings settings,
         AuthenticationAttemptStore attempts,
         IdentityService.IdentityServiceClient identityClient,
+        TenantService.TenantServiceClient tenantClient,
         AuthdTelemetry telemetry)
     {
         const string operation = "authd.http.begin";
@@ -94,6 +98,14 @@ internal static partial class BrowserRoutes
                 tenantId,
                 providerId)
                 ?? throw InvalidBegin();
+            dependency = "tenantd";
+            await ValidateLoginTarget(
+                tenantClient,
+                settings.Workload,
+                telemetry,
+                tenantId,
+                workspaceId,
+                timeout.Token);
             dependency = "identityd";
             await ValidateLoginProviderSelection(
                 identityClient,

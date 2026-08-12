@@ -118,6 +118,7 @@ test("external login identity is exact and must resolve to standing human",
         revision: 90
       });
       await context.database.connection("external_identity_links").insert({
+        external_link_id: "eil_00000000000000000000000000000090",
         tenant_id: "acme",
         provider_id: "oidc",
         provider_subject: "nomembership@example.com",

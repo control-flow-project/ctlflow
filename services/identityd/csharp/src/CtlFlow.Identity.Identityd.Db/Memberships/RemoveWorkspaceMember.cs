@@ -18,9 +18,8 @@ public static partial class Memberships
         AuditContext audit,
         CancellationToken cancellation)
     {
-        await using var mutation = await identityDatabase.AcquireMutation(
-            $"workspace-member:{tenantId.Value}:{workspaceId.Value}:{accountId.Value}",
-            cancellation);
+        await using var mutation =
+            await identityDatabase.AcquireMutation(cancellation);
         using var activity =
             IdentityDbTelemetry.StartOperation("remove_workspace_member");
         await using var database =

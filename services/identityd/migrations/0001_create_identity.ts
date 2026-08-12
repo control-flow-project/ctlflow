@@ -219,6 +219,7 @@ export async function up(knex: Knex): Promise<void> {
     });
 
   await knex.schema.createTable("external_identity_links", (table) => {
+    table.string("external_link_id", 36).notNullable().unique();
     table.string("tenant_id", 64).notNullable();
     table.string("provider_id", 64).notNullable();
     table.string("provider_subject", 512).notNullable();
@@ -236,6 +237,10 @@ export async function up(knex: Knex): Promise<void> {
     table.index(
       ["account_id", "tenant_id"],
       "external_identity_links_account_idx");
+    table.check("length(external_link_id) = 36");
+    table.check("substr(external_link_id, 1, 4) = 'eil_'");
+    table.check(
+      "substr(external_link_id, 5) NOT GLOB '*[^a-f0-9]*'");
     table.check("length(tenant_id) BETWEEN 1 AND 64");
     table.check("tenant_id GLOB '[a-z0-9]*'");
     table.check("tenant_id NOT GLOB '*[^a-z0-9_-]*'");

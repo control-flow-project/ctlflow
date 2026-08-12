@@ -1,6 +1,6 @@
 using static CtlFlow.Identity.Identityd.Domain.Identifiers.Identifiers;
 
-namespace CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+namespace CtlFlow.Identity.Identityd.Domain.Providers;
 
 public sealed record ProviderId
 {

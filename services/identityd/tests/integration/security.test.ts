@@ -115,7 +115,7 @@ test("operation caller sets are exact", async () => {
         "CreateSession",
         "RevokeSession",
         "GetLoginProvider",
-        "ListWorkspaceLoginProviderAdmissions"
+        "GetWorkspaceLoginProviderAdmission"
       ])
     },
     {

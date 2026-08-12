@@ -25,6 +25,10 @@
           {
             "file": "tests/integration/workspace-sso.test.ts",
             "title": "Begin rejects inactive providers and stale projected references"
+          },
+          {
+            "file": "tests/integration/workspace-sso.test.ts",
+            "title": "Begin requires active Tenant and Workspace lifecycle"
           }
         ],
         "403": [
@@ -80,6 +84,10 @@
           {
             "file": "tests/integration/workspace-sso.test.ts",
             "title": "Begin fails closed while Identityd is unavailable"
+          },
+          {
+            "file": "tests/integration/workspace-sso.test.ts",
+            "title": "Begin fails closed while Tenantd is unavailable"
           }
         ]
       }
@@ -112,7 +120,15 @@
           },
           {
             "file": "tests/integration/workspace-sso.test.ts",
+            "title": "Callback revalidates Tenantd lifecycle before Egressd"
+          },
+          {
+            "file": "tests/integration/workspace-sso.test.ts",
             "title": "Callback revalidates provider state and projection references"
+          },
+          {
+            "file": "tests/integration/workspace-sso.test.ts",
+            "title": "Callback fails closed while Tenantd is unavailable before Egressd"
           }
         ],
         "413": [
@@ -233,6 +249,10 @@
   ],
   "crossCutting": [
     {
+      "file": "tests/integration/workspace-sso.test.ts",
+      "title": "does not admit Authd to Tenantd address resolution"
+    },
+    {
       "file": "tests/integration/api.test.ts",
       "title": "serves exactly the three declared routes and isolates probes"
     },
@@ -243,10 +263,6 @@
     {
       "file": "tests/integration/begin.test.ts",
       "title": "binds one-time state to the browser and loses it on restart"
-    },
-    {
-      "file": "tests/integration/workspace-sso.test.ts",
-      "title": "consumes every bounded Workspace admission page"
     },
     {
       "file": "tests/integration/callback.test.ts",

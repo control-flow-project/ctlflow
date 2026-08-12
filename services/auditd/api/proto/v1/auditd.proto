@@ -175,9 +175,10 @@ message IdentityVirtualPrincipalAuditDetail {
 }
 
 message IdentityExternalLinkAuditDetail {
-  string provider_id = 1;
-  string human_account_principal_id = 2;
-  IdentityExternalLinkAction action = 3;
+  string external_link_id = 1;
+  string provider_id = 2;
+  string human_account_principal_id = 3;
+  IdentityExternalLinkAction action = 4;
 }
 
 message IdentityLoginProviderAuditDetail {

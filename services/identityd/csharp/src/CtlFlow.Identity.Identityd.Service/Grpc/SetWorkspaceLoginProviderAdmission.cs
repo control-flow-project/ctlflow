@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Service.Configuration;
 using CtlFlow.Identity.V1;
 using Grpc.Core;

@@ -8,7 +8,7 @@ weight: 20
 invocation identity. Its
 checked contract is
 [`ctlflow.identity.v1.IdentityService`](https://github.com/control-flow-project/ctlflow/blob/main/services/identityd/api/proto/v1/identityd.proto).
-All 33 methods are unary gRPC. See the
+All 34 methods are unary gRPC. See the
 [identityd service specification](../../identityd/) for standing, fence,
 signing, and persistence rules.
 
@@ -72,6 +72,9 @@ service IdentityService {
   rpc SetWorkspaceLoginProviderAdmission(
       SetWorkspaceLoginProviderAdmissionRequest)
       returns (SetWorkspaceLoginProviderAdmissionResponse);
+  rpc GetWorkspaceLoginProviderAdmission(
+      GetWorkspaceLoginProviderAdmissionRequest)
+      returns (WorkspaceLoginProviderAdmission);
   rpc ListWorkspaceLoginProviderAdmissions(
       ListWorkspaceLoginProviderAdmissionsRequest)
       returns (ListWorkspaceLoginProviderAdmissionsResponse);
@@ -105,7 +108,9 @@ service IdentityService {
 | `CreateLoginProvider`, `ListLoginProviders` | exact Tenant/provider metadata and Configd refs for create, or a keyset page for list | login provider or page | admitted admin backend |
 | `GetLoginProvider` | exact Tenant and provider ID | login provider | admitted admin backend; also admits `authd` |
 | `UpdateLoginProvider`, `SetLoginProviderState` | exact Tenant/provider, expected revision, replacement metadata or state | login provider | admitted admin backend |
-| `SetWorkspaceLoginProviderAdmission`, `ListWorkspaceLoginProviderAdmissions` | exact Tenant/Workspace/provider and admitted value, or keyset page | admission state or page | admitted admin backend; list also admits `authd` |
+| `SetWorkspaceLoginProviderAdmission` | exact Tenant/Workspace/provider and admitted value | admission state | admitted admin backend |
+| `GetWorkspaceLoginProviderAdmission` | exact Tenant/Workspace/provider | exact admission | admitted admin backend; also admits `authd` |
+| `ListWorkspaceLoginProviderAdmissions` | exact Tenant/Workspace and keyset page | admission page | admitted admin backend |
 | `CreateSession` | `tenant_id`, `provider_id`, `provider_subject` | opaque Session ID, credential, expiry | `authd` |
 | `ExchangeSession` | Session credential and exact target | invocation JWT and expiry | `edged` |
 | `RevokeSession` | Session credential | empty success | `authd` |
@@ -377,8 +382,20 @@ Workspace SSO is an explicit allowlist:
 ```
 
 The response contains the admission when `admitted` is true and omits it after
-removal. The list returns provider IDs in ascending order. It does not create a
-member, Role, domain rule, or account.
+removal. Authd verifies a Workspace selection with one exact request:
+
+```json
+{
+  "tenantId": "northwind",
+  "workspaceId": "atlas",
+  "providerId": "workforce"
+}
+```
+
+`GetWorkspaceLoginProviderAdmission` returns the exact admission or
+`NOT_FOUND`; it never scans or returns a collection. The list remains the
+bounded administration surface and returns provider IDs in ascending order.
+Neither operation creates a member, Role, domain rule, or account.
 
 An external identity link is a separate exact mapping:
 

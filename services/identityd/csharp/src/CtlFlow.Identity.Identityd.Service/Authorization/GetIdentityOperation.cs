@@ -52,8 +52,8 @@ internal static partial class IdentityAuthorization
                 "login_providers.set_state",
             IdentityAdminOperation.SetWorkspaceLoginProviderAdmission =>
                 "workspace_login_provider_admissions.set",
-            IdentityAdminOperation
-                .ListWorkspaceLoginProviderAdmissions =>
+            IdentityAdminOperation.GetWorkspaceLoginProviderAdmission or
+                IdentityAdminOperation.ListWorkspaceLoginProviderAdmissions =>
                 "workspace_login_provider_admissions.read",
             _ => throw new InvalidOperationException(
                 "Identity administration operation is invalid")

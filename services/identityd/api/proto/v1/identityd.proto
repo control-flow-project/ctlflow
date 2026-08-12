@@ -64,6 +64,9 @@ service IdentityService {
   rpc SetWorkspaceLoginProviderAdmission(
       SetWorkspaceLoginProviderAdmissionRequest)
       returns (SetWorkspaceLoginProviderAdmissionResponse);
+  rpc GetWorkspaceLoginProviderAdmission(
+      GetWorkspaceLoginProviderAdmissionRequest)
+      returns (WorkspaceLoginProviderAdmission);
   rpc ListWorkspaceLoginProviderAdmissions(
       ListWorkspaceLoginProviderAdmissionsRequest)
       returns (ListWorkspaceLoginProviderAdmissionsResponse);
@@ -406,6 +409,12 @@ message SetWorkspaceLoginProviderAdmissionRequest {
 
 message SetWorkspaceLoginProviderAdmissionResponse {
   WorkspaceLoginProviderAdmission admission = 1;
+}
+
+message GetWorkspaceLoginProviderAdmissionRequest {
+  string tenant_id = 1;
+  string workspace_id = 2;
+  string provider_id = 3;
 }
 
 message ListWorkspaceLoginProviderAdmissionsRequest {

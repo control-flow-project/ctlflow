@@ -167,6 +167,7 @@ internal static partial class AuditDelivery
     private static IdentityExternalLinkAuditDetail CreateExternalLinkDetail(
         ExternalLinkAuditIntent intent) => new()
         {
+            ExternalLinkId = intent.ExternalLinkId.Value,
             ProviderId = intent.ProviderId.Value,
             HumanAccountPrincipalId = intent.AccountId.Value,
             Action = intent.Action switch

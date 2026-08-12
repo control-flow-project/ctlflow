@@ -158,6 +158,12 @@ export function createAdministrationCalls(
         metadata,
         options,
         done)),
+    call("GetWorkspaceLoginProviderAdmission", (options, done) =>
+      context.client.getWorkspaceLoginProviderAdmission(
+        { tenantId, workspaceId, providerId },
+        metadata,
+        options,
+        done)),
     call("ListWorkspaceLoginProviderAdmissions", (options, done) =>
       context.client.listWorkspaceLoginProviderAdmissions(
         { tenantId, workspaceId, pageSize: 50 },

@@ -35,6 +35,6 @@ internal sealed record ServiceSettings(
     IReadOnlySet<KubernetesServiceAccountSubject>
         GetLoginProviderAuthdCallers,
     IReadOnlySet<KubernetesServiceAccountSubject>
-        ListWorkspaceLoginProviderAdmissionsAuthdCallers,
+        GetWorkspaceLoginProviderAdmissionAuthdCallers,
     IdentityAdminSettings Administration,
     TelemetrySettings Telemetry);

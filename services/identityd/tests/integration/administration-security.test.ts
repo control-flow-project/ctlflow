@@ -10,7 +10,8 @@ import type {
   LoginProvider,
   ListLoginProvidersResponse,
   ListTenantMembersResponse,
-  ListWorkspaceLoginProviderAdmissionsResponse
+  ListWorkspaceLoginProviderAdmissionsResponse,
+  WorkspaceLoginProviderAdmission
 } from "../generated/v1/identityd.js";
 import {
   getIdentitydTestContext
@@ -134,23 +135,40 @@ test("Authd exact provider reads are autonomous and least-privileged",
         authd,
         callback));
     assert.equal(provider.providerId, "oidc");
-    const admissions = await callUnary<
-      ListWorkspaceLoginProviderAdmissionsResponse
-    >((callback) => context.client.listWorkspaceLoginProviderAdmissions(
-      { tenantId: "acme", workspaceId: "atlas", pageSize: 50 },
-      authd,
-      callback));
-    assert.deepEqual(
-      admissions.admissions.map((admission) => admission.providerId),
-      ["oidc"]);
-
+    const admission = await callUnary<WorkspaceLoginProviderAdmission>(
+      (callback) => context.client.getWorkspaceLoginProviderAdmission(
+        { tenantId: "acme", workspaceId: "atlas", providerId: "oidc" },
+        authd,
+        callback));
+    assert.equal(admission.providerId, "oidc");
     await assert.rejects(
-      callUnary<ListLoginProvidersResponse>((callback) =>
+      callUnary<WorkspaceLoginProviderAdmission>((callback) =>
+        context.client.getWorkspaceLoginProviderAdmission(
+          {
+            tenantId: "acme",
+            workspaceId: "atlas",
+            providerId: "INVALID"
+          },
+          authd,
+          callback)),
+      matchGrpcStatus(status.INVALID_ARGUMENT));
+
+    for (const request of [
+      () => callUnary<ListLoginProvidersResponse>((callback) =>
         context.client.listLoginProviders(
           { tenantId: "acme", pageSize: 50 },
           authd,
           callback)),
-      matchGrpcStatus(status.PERMISSION_DENIED));
+      () => callUnary<ListWorkspaceLoginProviderAdmissionsResponse>(
+        (callback) => context.client.listWorkspaceLoginProviderAdmissions(
+          { tenantId: "acme", workspaceId: "atlas", pageSize: 50 },
+          authd,
+          callback))
+    ]) {
+      await assert.rejects(
+        request(),
+        matchGrpcStatus(status.PERMISSION_DENIED));
+    }
 
     const withInvocation = workloadMetadata(
       context.authdWorkload.callerToken,
@@ -161,10 +179,14 @@ test("Authd exact provider reads are autonomous and least-privileged",
           { tenantId: "acme", providerId: "oidc" },
           withInvocation,
           callback)),
-      () => callUnary<ListWorkspaceLoginProviderAdmissionsResponse>(
+      () => callUnary<WorkspaceLoginProviderAdmission>(
         (callback) => context.client
-          .listWorkspaceLoginProviderAdmissions(
-            { tenantId: "acme", workspaceId: "atlas", pageSize: 50 },
+          .getWorkspaceLoginProviderAdmission(
+            {
+              tenantId: "acme",
+              workspaceId: "atlas",
+              providerId: "oidc"
+            },
             withInvocation,
             callback))
     ]) {

@@ -2,41 +2,13 @@ namespace CtlFlow.Identity.Identityd.Db.Sqlite;
 
 internal static partial class SqliteIdentityMutations
 {
-    private const int LockCount = 64;
-    private static readonly SemaphoreSlim[] MutationLocks = CreateLocks();
+    private static readonly SemaphoreSlim MutationLock = new(1, 1);
 
     internal static async ValueTask<IAsyncDisposable> AcquireIdentityMutation(
-        string mutationKey,
         CancellationToken cancellation)
     {
-        ArgumentException.ThrowIfNullOrEmpty(mutationKey);
-        var gate = MutationLocks[GetLockIndex(mutationKey)];
-        await gate.WaitAsync(cancellation);
-        return new MutationLease(gate);
-    }
-
-    private static SemaphoreSlim[] CreateLocks()
-    {
-        var locks = new SemaphoreSlim[LockCount];
-        for (var index = 0; index < locks.Length; index++)
-        {
-            locks[index] = new SemaphoreSlim(1, 1);
-        }
-
-        return locks;
-    }
-
-    private static int GetLockIndex(string mutationKey)
-    {
-        const uint offset = 2_166_136_261;
-        const uint prime = 16_777_619;
-        var hash = offset;
-        foreach (var character in mutationKey)
-        {
-            hash = unchecked((hash ^ character) * prime);
-        }
-
-        return (int)(hash & (LockCount - 1));
+        await MutationLock.WaitAsync(cancellation);
+        return new MutationLease(MutationLock);
     }
 
     private sealed class MutationLease(SemaphoreSlim gate) : IAsyncDisposable

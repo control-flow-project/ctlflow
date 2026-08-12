@@ -19,6 +19,7 @@ public static partial class ExternalIdentityLinks
                         AuditEventId.Generate(),
                         audit.Attribution,
                         existing.TenantId,
+                        existing.ExternalLinkId,
                         existing.ProviderId,
                         existing.AccountId,
                         ExternalLinkAuditAction.Deleted,

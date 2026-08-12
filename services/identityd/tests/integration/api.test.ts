@@ -42,6 +42,7 @@ test("identityd exposes exactly the approved RPC inventory", () => {
       "updateLoginProvider",
       "setLoginProviderState",
       "setWorkspaceLoginProviderAdmission",
+      "getWorkspaceLoginProviderAdmission",
       "listWorkspaceLoginProviderAdmissions",
       "createSession",
       "exchangeSession",

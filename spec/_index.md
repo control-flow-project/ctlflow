@@ -53,7 +53,7 @@ without exposing their material to `execd`.
 | --- | --- | --- |
 | [`tenantd`](tenantd/) | Tenants and Workspaces | [12 gRPC methods](apis/tenantd/) |
 | [`authd`](authd/) | Public authentication protocol mediation; no durable domain records | [3 HTTP routes](apis/authd/) |
-| [`identityd`](identityd/) | Accounts, groups, memberships, login identity, Sessions, virtual principals, and invocation identity | [33 gRPC methods](apis/identityd/) |
+| [`identityd`](identityd/) | Accounts, groups, memberships, login identity, Sessions, virtual principals, and invocation identity | [34 gRPC methods](apis/identityd/) |
 | [`policyd`](policyd/) | Path-and-operation grants and authorization decisions | [1 gRPC method](apis/policyd/) |
 | [`pkgd`](pkgd/) | Immutable Package generations and installed App intent | [5 gRPC methods](apis/pkgd/) |
 | [`configd`](configd/) | Scoped configuration, encrypted secret custody, and exact consumer projections | [5 gRPC methods](apis/configd/) |

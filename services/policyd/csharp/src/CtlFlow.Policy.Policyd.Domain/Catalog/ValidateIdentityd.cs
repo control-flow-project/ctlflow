@@ -219,9 +219,9 @@ public static partial class OperationCatalog
             throw InvalidPath();
         }
         RequireFixed(segments, next, "login-providers");
-        if (operation.Value == "workspace_login_provider_admissions.read")
+        if (operation.Value == "workspace_login_provider_admissions.read"
+            && segments.Count == next + 1)
         {
-            RequireCount(segments, next + 1);
             return;
         }
 

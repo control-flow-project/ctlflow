@@ -1,5 +1,5 @@
 using CtlFlow.Identity.Identityd.Domain.Collections;
-using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Service.Configuration;
 using CtlFlow.Identity.V1;
 using Grpc.Core;
@@ -18,9 +18,8 @@ internal sealed partial class IdentityGrpcService
             ServerCallContext context)
     {
         var now = DateTimeOffset.UtcNow;
-        var identity = await AuthenticateProviderRead(
+        var identity = await AuthenticateAdmin(
             context,
-            _settings.ListWorkspaceLoginProviderAdmissionsAuthdCallers,
             IdentityAdminOperation.ListWorkspaceLoginProviderAdmissions,
             now);
         var target = await ParseIdentityTarget(
@@ -35,9 +34,8 @@ internal sealed partial class IdentityGrpcService
                 request.AfterProviderId,
                 context.CancellationToken)
             : null;
-        await AuthorizeProviderRead(
+        await AuthorizeAdmin(
             identity,
-            _settings.ListWorkspaceLoginProviderAdmissionsAuthdCallers,
             IdentityAdminOperation.ListWorkspaceLoginProviderAdmissions,
             target,
             $"/tenants/{target.TenantId.Value}/workspaces/{target.WorkspaceId!.Value}/login-providers",

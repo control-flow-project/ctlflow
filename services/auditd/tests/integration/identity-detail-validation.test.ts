@@ -130,6 +130,10 @@ test("validates Identity external-link details", async () => {
     "identityd",
     "identityExternalLink");
   await rejectAuditDetailCases(context, detail, [
+    ["invalid external-link ID", (event) => {
+      event.identityExternalLink!.externalLinkId =
+        "eil_0000000000000000000000000000000g";
+    }],
     ["invalid external-link provider", (event) => {
       event.identityExternalLink!.providerId = "bad.provider";
     }],

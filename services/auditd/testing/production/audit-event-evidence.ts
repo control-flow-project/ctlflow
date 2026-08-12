@@ -131,6 +131,7 @@ extends AuditEventEvidenceBase {
 export interface IdentityExternalLinkAuditEventEvidence
 extends AuditEventEvidenceBase {
   readonly detailKind: "identity_external_link";
+  readonly externalLinkId: string;
   readonly providerId: string;
   readonly humanAccountPrincipalId: string;
   readonly action: "created" | "deleted";

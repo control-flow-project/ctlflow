@@ -158,8 +158,8 @@ test("startup rejects overlapping Authd and capability callers", async () => {
       "CTLFLOW_GET_LOGIN_PROVIDER_CALLERS"
     ],
     [
-      "CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_AUTHD_CALLERS",
-      "CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_CALLERS"
+      "CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_AUTHD_CALLERS",
+      "CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS"
     ]
   ] as const;
   for (const [autonomousName, capabilityName] of pairs) {
@@ -477,6 +477,7 @@ function persistenceCases(
     administrationCase(
       "workspace_login_provider_admissions",
       "SetWorkspaceLoginProviderAdmission",
+      "GetWorkspaceLoginProviderAdmission",
       "ListWorkspaceLoginProviderAdmissions")
   ];
 

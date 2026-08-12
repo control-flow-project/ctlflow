@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 
-export interface TestDatabase {
+export interface TenantdTestDatabase {
   readonly path: string;
   readonly containerPath: string;
   readonly directory: string;

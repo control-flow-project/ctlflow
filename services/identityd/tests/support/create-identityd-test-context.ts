@@ -174,6 +174,7 @@ Promise<IdentitydTestContext> {
       policy: { roles: [], grants: [] },
       tls: suite.policydTls
     });
+    await service.restart();
     const endpoint = `127.0.0.1:${String(service.grpcPort)}`;
     const serverAuthority = await readFile(
       files.serverCertificateAuthorityPath);
@@ -286,7 +287,7 @@ function createEnvironment(
       execdWorkload.callerSubject,
     CTLFLOW_GET_LOGIN_PROVIDER_AUTHD_CALLERS:
       authdWorkload.callerSubject,
-    CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_AUTHD_CALLERS:
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_AUTHD_CALLERS:
       authdWorkload.callerSubject,
     CTLFLOW_ADD_TENANT_MEMBER_CALLERS: adminWorkload.callerSubject,
     CTLFLOW_REMOVE_TENANT_MEMBER_CALLERS: adminWorkload.callerSubject,
@@ -322,6 +323,8 @@ function createEnvironment(
     CTLFLOW_SET_LOGIN_PROVIDER_STATE_CALLERS:
       adminWorkload.callerSubject,
     CTLFLOW_SET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
+      adminWorkload.callerSubject,
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
       adminWorkload.callerSubject,
     CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_CALLERS:
       adminWorkload.callerSubject,

@@ -86,6 +86,7 @@ test("exports correlated route and dependency telemetry without secrets",
           return false;
         }
         return [
+          "authd.tenant.validate_login_target",
           "authd.identity.validate_login_provider",
           "authd.egress.token",
           "authd.egress.userinfo",

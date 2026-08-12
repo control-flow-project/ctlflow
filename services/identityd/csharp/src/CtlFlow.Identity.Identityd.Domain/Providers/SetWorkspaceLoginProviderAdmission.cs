@@ -1,6 +1,5 @@
 using CtlFlow.Identity.Identityd.Domain.Auditing;
 using CtlFlow.Identity.Identityd.Domain.Errors;
-using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
 using CtlFlow.Identity.Identityd.Domain.Mutations;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
 using CtlFlow.Identity.Identityd.Domain.Workspaces;

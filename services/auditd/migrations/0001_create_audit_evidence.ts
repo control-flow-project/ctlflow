@@ -225,9 +225,14 @@ async function createIdentityDetails(knex: Knex): Promise<void> {
     knex,
     "audit_identity_external_links",
     (table) => {
+      table.string("external_link_id", 36).notNullable();
       table.string("provider_id", 64).notNullable();
       table.string("human_account_principal_id", 256).notNullable();
       table.integer("action").notNullable();
+      table.check("length(external_link_id) = 36");
+      table.check("substr(external_link_id, 1, 4) = 'eil_'");
+      table.check(
+        "substr(external_link_id, 5) NOT GLOB '*[^a-f0-9]*'");
       table.check(canonicalIdCheck("provider_id", 64));
       table.check(accountPrincipalCheck(
         "human_account_principal_id",

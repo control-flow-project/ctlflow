@@ -3,13 +3,10 @@ import {
   copyFile
 } from "node:fs/promises";
 import path from "node:path";
-import type {
-  KustomizeServiceFiles,
-  TestKubernetes,
-  TestWorkloadCredentials
-} from "@ctlflow/test-mesh";
 import {
-  createTestServiceTls
+  createTestServiceTls,
+  type TestKubernetes,
+  type TestWorkloadCredentials
 } from "@ctlflow/test-mesh";
 import type {
   AuditdProductionService
@@ -20,21 +17,11 @@ import type {
 import type {
   PolicydProductionService
 } from "@ctlflow/policyd/testing/production";
+import type {
+  TenantdFiles
+} from "./tenantd-files.js";
 
-export interface TenantdContextFiles {
-  readonly workloadJwks: string;
-  readonly serverCertificate: string;
-  readonly serverPrivateKey: string;
-  readonly serverCertificateAuthorityPath: string;
-  readonly serverName: string;
-  readonly kubernetesClientCertificateAuthority: string;
-  readonly auditCertificateAuthority: string;
-  readonly identityCertificateAuthority: string;
-  readonly policyCertificateAuthority: string;
-  readonly deployment: KustomizeServiceFiles;
-}
-
-export interface PrepareTenantdContextFilesOptions {
+export interface PrepareTenantdFilesOptions {
   readonly repositoryRoot: string;
   readonly directory: string;
   readonly serviceName: string;
@@ -45,9 +32,9 @@ export interface PrepareTenantdContextFilesOptions {
   readonly policyd: PolicydProductionService;
 }
 
-export async function prepareTenantdContextFiles(
-  options: PrepareTenantdContextFilesOptions
-): Promise<TenantdContextFiles> {
+export async function prepareTenantdFiles(
+  options: PrepareTenantdFilesOptions
+): Promise<TenantdFiles> {
   const tls = await createTestServiceTls(
     options.repositoryRoot,
     options.directory,
@@ -58,13 +45,9 @@ export async function prepareTenantdContextFiles(
       `${options.serviceName}.${options.kubernetes.namespace}.svc`
     ]);
   const copies = [
+    { source: options.workload.jwksPath, name: "workload-jwks.json" },
     {
-      source: options.workload.jwksPath,
-      name: "workload-jwks.json"
-    },
-    {
-      source:
-        options.kubernetes.api.certificateAuthorityPath,
+      source: options.kubernetes.api.certificateAuthorityPath,
       name: "kubernetes-client-ca.crt"
     },
     {
@@ -81,22 +64,16 @@ export async function prepareTenantdContextFiles(
     }
   ] as const;
   for (const file of copies) {
-    const destination = path.join(
-      options.directory,
-      file.name);
+    const destination = path.join(options.directory, file.name);
     await copyFile(file.source, destination);
     await chmod(destination, 0o644);
   }
 
   return {
-    workloadJwks:
-      "/var/run/ctlflow/trust/workload-jwks.json",
-    serverCertificate:
-      "/var/run/ctlflow/tls/tls.crt",
-    serverPrivateKey:
-      "/var/run/ctlflow/tls/tls.key",
-    serverCertificateAuthorityPath:
-      tls.certificateAuthorityPath,
+    workloadJwks: "/var/run/ctlflow/trust/workload-jwks.json",
+    serverCertificate: "/var/run/ctlflow/tls/tls.crt",
+    serverPrivateKey: "/var/run/ctlflow/tls/tls.key",
+    serverCertificateAuthorityPath: tls.certificateAuthorityPath,
     serverName: tls.serverName,
     kubernetesClientCertificateAuthority:
       "/var/run/ctlflow/trust/kubernetes-client-ca.crt",
@@ -111,23 +88,10 @@ export async function prepareTenantdContextFiles(
         "tls.crt": tls.certificatePath,
         "tls.key": tls.privateKeyPath
       },
-      trust: {
-        "workload-jwks.json": path.join(
-          options.directory,
-          "workload-jwks.json"),
-        "kubernetes-client-ca.crt": path.join(
-          options.directory,
-          "kubernetes-client-ca.crt"),
-        "auditd-ca.crt": path.join(
-          options.directory,
-          "auditd-ca.crt"),
-        "identityd-ca.crt": path.join(
-          options.directory,
-          "identityd-ca.crt"),
-        "policyd-ca.crt": path.join(
-          options.directory,
-          "policyd-ca.crt")
-      }
+      trust: Object.fromEntries(copies.map((file) => [
+        file.name,
+        path.join(options.directory, file.name)
+      ]))
     }
   };
 }

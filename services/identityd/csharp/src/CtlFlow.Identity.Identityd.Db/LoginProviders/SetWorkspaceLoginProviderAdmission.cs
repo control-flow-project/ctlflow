@@ -1,6 +1,5 @@
 using CtlFlow.Identity.Identityd.Db.Providers;
 using CtlFlow.Identity.Identityd.Domain.Auditing;
-using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
 using CtlFlow.Identity.Identityd.Domain.Mutations;
 using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
@@ -22,9 +21,8 @@ public static partial class LoginProviders
             AuditContext audit,
             CancellationToken cancellation)
     {
-        await using var mutation = await identityDatabase.AcquireMutation(
-            $"workspace-provider:{tenantId.Value}:{workspaceId.Value}:{providerId.Value}",
-            cancellation);
+        await using var mutation =
+            await identityDatabase.AcquireMutation(cancellation);
         using var activity = IdentityDbTelemetry.StartOperation(
             "set_workspace_login_provider_admission");
         await using var database =

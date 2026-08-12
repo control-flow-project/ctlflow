@@ -14,7 +14,6 @@ internal static partial class IdentityCalls
 {
     internal static async Task RevokeSession(
         IdentityService.IdentityServiceClient client,
-        IdentitySettings settings,
         WorkloadSettings workload,
         AuthdTelemetry telemetry,
         SessionCredential credential,

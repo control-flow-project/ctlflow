@@ -6,9 +6,11 @@ public static partial class Pages
         IReadOnlyList<T> candidates,
         PageSize pageSize,
         Func<T, string> keyOf,
-        CancellationToken cancellation)
+        CancellationToken cancellation,
+        Comparison<string>? compare = null)
     {
         cancellation.ThrowIfCancellationRequested();
+        Comparison<string> compareKeys = compare ?? string.CompareOrdinal;
         if (candidates.Count > pageSize.Value + 1)
         {
             throw new InvalidOperationException(
@@ -17,7 +19,7 @@ public static partial class Pages
 
         for (var index = 1; index < candidates.Count; index++)
         {
-            if (string.CompareOrdinal(
+            if (compareKeys(
                     keyOf(candidates[index - 1]),
                     keyOf(candidates[index])) >= 0)
             {

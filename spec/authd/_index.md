@@ -58,10 +58,12 @@ there is no default, host inference, remembered selection, or fallback.
 
 Authd reads the provider's current Identityd registration before redirecting.
 The provider must be active, and its exact configuration and secret identity
-and version references must match the mounted projection. If `workspace_id` is
-present, Authd consumes the bounded Workspace-admission pages and requires the
-provider in that exact Workspace set. Tenant login has no Workspace-admission
-check.
+and version references must match the mounted projection. Authd also reads the
+selected Tenant from Tenantd and requires it to be active. If `workspace_id` is
+present, Authd reads that exact Workspace from Tenantd, requires it to belong
+to the selected Tenant and to be active, and requires the exact provider
+admission from Identityd. Tenant login has no Workspace-admission check. There
+is no list scan, inferred parent, or cached lifecycle decision.
 
 `return_to` defaults to `/`. A supplied value is an ASCII same-origin
 origin-form path and optional query of at most 2,048 bytes. It begins with one
@@ -148,11 +150,12 @@ attempt before provider validation. Missing, malformed, expired, replayed, or
 mismatched state is the same `400`.
 
 A valid provider `error` is `401`, clears the consumed state cookie, and makes
-no Egressd or Identityd call. For `code`, Authd revalidates the current
-Identityd provider state, exact projection references, and any selected
-Workspace admission before contacting the provider. A selection that is no
-longer active or admitted is `401`; unavailable Identityd or projection drift
-is `503`. Authd then makes at most two back-channel calls through the selected
+no dependency call. For `code`, Authd revalidates the current Tenant and
+Workspace lifecycle, Identityd provider state, exact projection references,
+and any selected Workspace admission before contacting the provider. A
+selection that is missing, no longer active, cross-Tenant, or no longer
+admitted is `401`; unavailable Tenantd or Identityd and projection drift are
+`503`. Authd then makes at most two back-channel calls through the selected
 purpose-bound Egressd binding and never opens a direct provider connection;
 the successful path makes exactly two.
 
@@ -346,26 +349,27 @@ Each request authenticates Authd to the binding with
 `Proxy-Authorization: Bearer <bound Authd workload token>`. Egressd consumes
 that header. The OIDC `Authorization` header remains independent upstream
 protocol data. The same process-private workload-token projection authenticates
-Authd's Egressd and Identityd calls; it is not provider configuration and never
-crosses either dependency boundary. Authd cannot name or override an Egressd
+Authd's Egressd, Tenantd, and Identityd calls; it is not provider configuration
+and never crosses a dependency boundary. Authd cannot name or override an Egressd
 origin or rule. Egressd workload-authentication rejection (`407`) or admission
 exhaustion (`429`) is dependency unavailability and maps to public `503`, never
 to provider rejection.
 
-Authd's only kernel RPCs are `Identityd.GetLoginProvider`,
-`Identityd.ListWorkspaceLoginProviderAdmissions`, `Identityd.CreateSession`,
-and `Identityd.RevokeSession`. Provider reads use Authd's autonomous admission
-and carry no invocation. They use the established [private
+Authd's only kernel RPCs are `Tenantd.GetTenant`, `Tenantd.GetWorkspace`,
+`Identityd.GetLoginProvider`,
+`Identityd.GetWorkspaceLoginProviderAdmission`, `Identityd.CreateSession`, and
+`Identityd.RevokeSession`. Tenant and provider reads use Authd's autonomous
+admission and carry no invocation. They use the established [private
 transport](../contracts/#private-transport): private TLS, Authd's bound
 Kubernetes workload bearer, finite deadline and cancellation, and W3C trace
-context. All four carry no invocation JWT. Authd uses one pooled Identityd
-channel, a three-second per-call deadline bounded by the public request, and no
-automatic retry. Workspace-admission listing consumes every bounded page and
-rejects malformed or non-advancing continuations.
+context. All six carry no invocation JWT. Authd uses one pooled channel per
+dependency, a three-second per-call deadline bounded by the public request,
+and no automatic retry. Exact Workspace and provider-admission reads are
+constant in request count.
 
 Begin has a two-second deadline, Callback 15 seconds, and Logout five seconds.
-Browser disconnect, deadline, and shutdown cancellation propagate to Egressd
-and Identityd.
+Browser disconnect, deadline, and shutdown cancellation propagate to Egressd,
+Tenantd, and Identityd.
 
 ## Bounds and errors
 
@@ -384,7 +388,7 @@ queue, buffer, state collection, retry, or task.
 | Origin or authority failure | `403` |
 | Body; target; media type; headers or cookies | `413`; `414`; `415`; `431` |
 | Rate, concurrency, or state capacity | `429` with bounded `Retry-After` |
-| Egressd, provider, projection, Identityd, or deadline unavailable | `503` |
+| Egressd, provider, projection, Tenantd, Identityd, or deadline unavailable | `503` |
 | Unexpected invariant failure | `500` |
 
 Raw provider, proxy, certificate, token, gRPC, network, parser, configuration,
@@ -395,8 +399,8 @@ RevokeSession `UNAUTHENTICATED` to successful already-logged-out behavior.
 
 The stable operations are `authd.http.begin`, `authd.http.callback`, and
 `authd.http.logout`. Routes extract W3C trace context only for correlation and
-inject it into Egressd and Identityd calls. Egressd controls any external trace
-propagation under the shared telemetry contract.
+inject it into Egressd, Tenantd, and Identityd calls. Egressd controls any
+external trace propagation under the shared telemetry contract.
 
 Bounded traces, metrics, and logs contain only route, method, status, closed
 outcome, dependency class, latency, and saturation. They exclude selected IDs,
@@ -406,11 +410,11 @@ provider error detail, provider payloads, and raw exceptions. Collector
 failure is bounded and does not change behavior. Authd has no Auditd call;
 Identityd audits actual Session creation and revocation.
 
-Canonical evidence uses the shipping public listener, real Identityd over the
-production bearer-authenticated private channel, the mounted Configd-shaped
-files, a real purpose-bound Egressd endpoint, and a separately controlled
-OIDC process. It proves the exact three-route inventory, strict projection,
-Identityd provider/reference matching, Workspace admission and pagination,
+Canonical evidence uses the shipping public listener, real Tenantd and
+Identityd over production bearer-authenticated private channels, the mounted
+Configd-shaped files, a real purpose-bound Egressd endpoint, and a separately
+controlled OIDC process. It proves the exact three-route inventory, strict
+projection, Identityd provider/reference matching, exact Workspace admission,
 authorization URL and PKCE, both callback branches, token and UserInfo
 requests, RS256 and claim validation, exact subject match, the zero-to-two
 external-provider-call bound and exact two-call success path, selection,

@@ -10,7 +10,8 @@ import {
   type ListLoginProvidersResponse,
   type ListWorkspaceLoginProviderAdmissionsResponse,
   type LoginProvider,
-  type SetWorkspaceLoginProviderAdmissionResponse
+  type SetWorkspaceLoginProviderAdmissionResponse,
+  type WorkspaceLoginProviderAdmission
 } from "../generated/v1/identityd.js";
 import {
   getIdentitydTestContext
@@ -52,7 +53,10 @@ test("administers provider metadata, state, and Workspace admission", async () =
       admissionPath),
     tenantCapability(
       "workspace_login_provider_admissions.read",
-      admissionCollection)
+      admissionCollection),
+    tenantCapability(
+      "workspace_login_provider_admissions.read",
+      admissionPath)
   ]);
   const admin = identityAdminMetadata(context, "acme");
   const authd = workloadMetadata(context.authdWorkload.callerToken);
@@ -173,11 +177,18 @@ test("administers provider metadata, state, and Workspace admission", async () =
     await callUnary<ListWorkspaceLoginProviderAdmissionsResponse>((callback) =>
       context.client.listWorkspaceLoginProviderAdmissions(
         { tenantId: "acme", workspaceId, pageSize: 100 },
-        authd,
+        admin,
         callback));
   assert.equal(
     admissions.admissions.some((entry) => entry.providerId === providerId),
     true);
+  assert.deepEqual(
+    await callUnary<WorkspaceLoginProviderAdmission>((callback) =>
+      context.client.getWorkspaceLoginProviderAdmission(
+        { tenantId: "acme", workspaceId, providerId },
+        authd,
+        callback)),
+    { tenantId: "acme", workspaceId, providerId });
 
   const removed =
     await callUnary<SetWorkspaceLoginProviderAdmissionResponse>((callback) =>
@@ -190,14 +201,13 @@ test("administers provider metadata, state, and Workspace admission", async () =
         admin,
         callback));
   assert.equal(removed.admission, undefined);
-  assert.equal(
-    (await callUnary<ListWorkspaceLoginProviderAdmissionsResponse>(
-      (callback) => context.client.listWorkspaceLoginProviderAdmissions(
-        { tenantId: "acme", workspaceId, pageSize: 100 },
+  await assert.rejects(
+    callUnary<WorkspaceLoginProviderAdmission>((callback) =>
+      context.client.getWorkspaceLoginProviderAdmission(
+        { tenantId: "acme", workspaceId, providerId },
         authd,
-        callback))).admissions.some((entry) =>
-          entry.providerId === providerId),
-    false);
+        callback)),
+    matchGrpcStatus(status.NOT_FOUND));
   await callUnary<SetWorkspaceLoginProviderAdmissionResponse>((callback) =>
     context.client.setWorkspaceLoginProviderAdmission(
       {
@@ -271,11 +281,18 @@ test("administers provider metadata, state, and Workspace admission", async () =
     await callUnary<ListWorkspaceLoginProviderAdmissionsResponse>((callback) =>
       context.client.listWorkspaceLoginProviderAdmissions(
         { tenantId: "acme", workspaceId, pageSize: 100 },
-        authd,
+        admin,
         callback));
   assert.equal(
     afterDeletion.admissions.some((entry) => entry.providerId === providerId),
     false);
+  await assert.rejects(
+    callUnary<WorkspaceLoginProviderAdmission>((callback) =>
+      context.client.getWorkspaceLoginProviderAdmission(
+        { tenantId: "acme", workspaceId, providerId },
+        authd,
+        callback)),
+    matchGrpcStatus(status.NOT_FOUND));
 });
 
 test("Workspace authority administers only its exact provider admission",

@@ -1,5 +1,4 @@
 using CtlFlow.Identity.Identityd.Db.Providers;
-using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
 using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -50,7 +49,7 @@ public static partial class LoginProviders
             ? null
             : new LoginProvider(
                 Domain.Tenants.TenantId.FromStorage(provider.TenantId),
-                Domain.IdentityLinks.ProviderId.FromStorage(
+                Domain.Providers.ProviderId.FromStorage(
                     provider.ProviderId),
                 ProviderDisplayName.FromStorage(provider.DisplayName),
                 ConfigurationId.FromStorage(provider.ConfigurationId),

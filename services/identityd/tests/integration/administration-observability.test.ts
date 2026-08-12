@@ -62,7 +62,7 @@ test("every administration operation emits telemetry and typed audit",
     }
 
     const operationNames = calls.map(({ name }) => name);
-    assert.equal(new Set(operationNames).size, 26);
+    assert.equal(new Set(operationNames).size, 27);
     await waitForExport(
       context.collector.logsPath,
       (value) => operationNames.every((operation) =>
@@ -79,7 +79,7 @@ test("every administration operation emits telemetry and typed audit",
         return operationNames.every((operation) =>
           names.has(`identityd.${operation}`))
           && spans.filter(({ name }) =>
-            name === "identityd.CheckAccess").length >= 26
+            name === "identityd.CheckAccess").length >= 27
           && spans.filter(({ name }) =>
             name === "identityd.RecordAuditBatch").length >= 16;
       });
@@ -143,7 +143,7 @@ test("administration no-ops create no audit evidence", async () => {
   }
   let auditCount = (await context.auditd.readEvents()).length;
 
-  for (const index of [0, 2, 4, 6, 17, 19]) {
+  for (const index of [0, 2, 4, 6, 17, 20]) {
     await calls[index]!.request();
   }
   await callUnary((done) => context.client.setVirtualPrincipalEnabled(
@@ -180,7 +180,7 @@ test("administration no-ops create no audit evidence", async () => {
     done));
   assert.equal((await context.auditd.readEvents()).length, auditCount);
 
-  for (const index of [21, 22, 23, 24, 25]) {
+  for (const index of [22, 23, 24, 25, 26]) {
     await calls[index]!.request();
     auditCount++;
     assert.equal((await context.auditd.readEvents()).length, auditCount);

@@ -1,9 +1,9 @@
 using CtlFlow.Identity.Identityd.Domain.Accounts;
 using CtlFlow.Identity.Identityd.Domain.Auditing;
 using CtlFlow.Identity.Identityd.Domain.Errors;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Mutations;
 using CtlFlow.Identity.Identityd.Domain.Principals;
-using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Resources;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
 
@@ -51,6 +51,7 @@ public static partial class ExternalIdentityLinks
         }
 
         var link = new ExternalIdentityLink(
+            ExternalLinkId.Generate(),
             tenantId,
             providerId,
             providerSubject,
@@ -63,6 +64,7 @@ public static partial class ExternalIdentityLinks
                     AuditEventId.Generate(),
                     audit.Attribution,
                     tenantId,
+                    link.ExternalLinkId,
                     providerId,
                     accountId,
                     ExternalLinkAuditAction.Created,

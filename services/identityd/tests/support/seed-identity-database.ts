@@ -119,18 +119,21 @@ export async function seedIdentityDatabase(
     });
     await transaction("external_identity_links").insert([
       externalIdentity(
+        "eil_00000000000000000000000000000001",
         "acme",
         "oidc",
         "alice@example.com",
         "user:alice",
         41),
       externalIdentity(
+        "eil_00000000000000000000000000000002",
         "acme",
         "oidc",
         "disabled@example.com",
         "user:disabled",
         42),
       externalIdentity(
+        "eil_00000000000000000000000000000003",
         "acme",
         "oidc",
         "automation@example.com",
@@ -238,6 +241,7 @@ function virtualGroup(
 }
 
 function externalIdentity(
+  externalLinkId: string,
   tenantId: string,
   providerId: string,
   providerSubject: string,
@@ -245,6 +249,7 @@ function externalIdentity(
   revision: number
 ): Record<string, unknown> {
   return {
+    external_link_id: externalLinkId,
     tenant_id: tenantId,
     provider_id: providerId,
     provider_subject: providerSubject,

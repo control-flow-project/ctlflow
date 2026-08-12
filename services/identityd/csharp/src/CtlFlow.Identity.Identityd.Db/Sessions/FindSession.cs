@@ -41,7 +41,7 @@ public static partial class Sessions
                 SessionId.FromStorage(row.Id),
                 Domain.Accounts.AccountId.FromStorage(row.AccountId),
                 Domain.Tenants.TenantId.FromStorage(row.TenantId),
-                Domain.IdentityLinks.ProviderId.FromStorage(row.ProviderId),
+                Domain.Providers.ProviderId.FromStorage(row.ProviderId),
                 row.ExpiresAt,
                 row.RevokedAt,
                 row.Revision);

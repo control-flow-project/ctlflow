@@ -110,8 +110,9 @@ revision. `account_created` is true only when a Tenant Membership add also
 created its account at revision one. Virtual-principal and login-provider
 creation require revision one; their later actions require revision at least
 two. A virtual-principal event carries its immutable attached account and
-fence. An external-link event never carries the provider subject or Configd
-reference. Group deletion and provider deletion represent their normative
+fence. An external-link event carries the persisted opaque external-link ID,
+provider ID, human account, and action. It never carries the provider subject
+or Configd reference. Group deletion and provider deletion represent their normative
 same-transaction child cleanup and do not emit separate child-removal events.
 Package generation is positive. App `CREATED` requires revision 1;
 `PACKAGE_GENERATION_CHANGED` requires revision at least 2.

@@ -27,6 +27,7 @@ export async function prepareAuthdFiles(
   provider: ControlledOidcProvider,
   egressBinding: string,
   identityCertificateAuthorityPath: string,
+  tenantCertificateAuthorityPath: string,
   unadmittedWorkloadToken: string
 ): Promise<PreparedAuthdFiles> {
   const directory = path.join(
@@ -41,6 +42,9 @@ export async function prepareAuthdFiles(
   const identityAuthorityPath = path.join(
     directory,
     "identityd-ca.crt");
+  const tenantAuthorityPath = path.join(
+    directory,
+    "tenantd-ca.crt");
   const unadmittedWorkloadTokenPath = path.join(
     directory,
     "unadmitted-workload-token");
@@ -95,6 +99,9 @@ export async function prepareAuthdFiles(
   await copyFile(
     identityCertificateAuthorityPath,
     identityAuthorityPath);
+  await copyFile(
+    tenantCertificateAuthorityPath,
+    tenantAuthorityPath);
   await writeFile(
     unadmittedWorkloadTokenPath,
     unadmittedWorkloadToken,
@@ -110,7 +117,10 @@ export async function prepareAuthdFiles(
         "unadmitted-workload-token":
           unadmittedWorkloadTokenPath
       },
-      trust: { "identityd-ca.crt": identityAuthorityPath }
+      trust: {
+        "identityd-ca.crt": identityAuthorityPath,
+        "tenantd-ca.crt": tenantAuthorityPath
+      }
     }
   };
 }

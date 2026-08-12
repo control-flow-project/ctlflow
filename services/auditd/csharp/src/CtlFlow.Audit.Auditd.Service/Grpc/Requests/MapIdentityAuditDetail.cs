@@ -1,4 +1,5 @@
 using CtlFlow.Audit.Auditd.Domain.Groups;
+using CtlFlow.Audit.Auditd.Domain.IdentityLinks;
 using CtlFlow.Audit.Auditd.Domain.Principals;
 using CtlFlow.Audit.Auditd.Domain.Providers;
 using CtlFlow.Audit.Auditd.Domain.Resources;
@@ -115,6 +116,9 @@ internal static partial class AuditRequests
             WireIdentityExternalLink value,
             CancellationToken cancellation) =>
         new(
+            await ExternalLinkId.Parse(
+                value.ExternalLinkId,
+                cancellation),
             await ProviderId.Parse(value.ProviderId, cancellation),
             await HumanAccountId.Parse(
                 value.HumanAccountPrincipalId,

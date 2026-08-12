@@ -228,7 +228,7 @@ function createEnvironment(
       caller(options, "execd"),
     CTLFLOW_GET_LOGIN_PROVIDER_AUTHD_CALLERS:
       caller(options, "authd"),
-    CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_AUTHD_CALLERS:
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_AUTHD_CALLERS:
       caller(options, "authd"),
     CTLFLOW_ADD_TENANT_MEMBER_CALLERS: administrationCallerList,
     CTLFLOW_REMOVE_TENANT_MEMBER_CALLERS: administrationCallerList,
@@ -259,6 +259,8 @@ function createEnvironment(
     CTLFLOW_UPDATE_LOGIN_PROVIDER_CALLERS: administrationCallerList,
     CTLFLOW_SET_LOGIN_PROVIDER_STATE_CALLERS: administrationCallerList,
     CTLFLOW_SET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
+      administrationCallerList,
+    CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS:
       administrationCallerList,
     CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_CALLERS:
       administrationCallerList,

@@ -40,6 +40,9 @@ internal static partial class KubernetesBodies
                 WorkloadAnnotations(placement.Id, workload.Id),
                 labels);
             writer.WriteStartObject("spec");
+            writer.WriteStartObject("strategy");
+            writer.WriteString("type", "Recreate");
+            writer.WriteEndObject();
             writer.WriteNumber("replicas", replicas);
             writer.WriteStartObject("selector");
             WriteLabels(writer, "matchLabels", labels);

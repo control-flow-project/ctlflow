@@ -111,6 +111,7 @@ Promise<ExecdTestContext> {
         providerId: "oidc"
       }],
       externalIdentityLinks: [{
+        externalLinkId: "eil_00000000000000000000000000000001",
         tenantId: "tenant-a",
         providerId: "oidc",
         providerSubject: "alice@example.com",

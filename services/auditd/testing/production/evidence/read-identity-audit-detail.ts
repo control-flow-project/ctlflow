@@ -55,6 +55,7 @@ interface IdentityVirtualPrincipalRow extends EventDetailRow {
 }
 
 interface IdentityExternalLinkRow extends EventDetailRow {
+  readonly external_link_id: string;
   readonly provider_id: string;
   readonly human_account_principal_id: string;
   readonly action: number;
@@ -197,6 +198,7 @@ function mapIdentityExternalLink(
 ): IdentityAuditDetailEvidence {
   return {
     detailKind: "identity_external_link",
+    externalLinkId: row.external_link_id,
     providerId: row.provider_id,
     humanAccountPrincipalId: row.human_account_principal_id,
     action: mapCreatedDeleted(row.action, "external-link")

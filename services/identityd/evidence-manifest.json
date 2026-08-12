@@ -1641,6 +1641,71 @@
       }
     },
     {
+      "name": "GetWorkspaceLoginProviderAdmission",
+      "success": [
+        {
+          "file": "tests/integration/login-provider-administration.test.ts",
+          "title": "administers provider metadata, state, and Workspace admission"
+        },
+        {
+          "file": "tests/integration/administration-security.test.ts",
+          "title": "Authd exact provider reads are autonomous and least-privileged"
+        },
+        {
+          "file": "tests/integration/administration-observability.test.ts",
+          "title": "every administration operation emits telemetry and typed audit"
+        }
+      ],
+      "results": {
+        "INVALID_ARGUMENT": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Authd exact provider reads are autonomous and least-privileged"
+          }
+        ],
+        "NOT_FOUND": [
+          {
+            "file": "tests/integration/login-provider-administration.test.ts",
+            "title": "administers provider metadata, state, and Workspace admission"
+          },
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Workspace invocation fences are applied before policy"
+          }
+        ],
+        "UNAUTHENTICATED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "Authd exact provider reads are autonomous and least-privileged"
+          }
+        ],
+        "PERMISSION_DENIED": [
+          {
+            "file": "tests/integration/administration-security.test.ts",
+            "title": "administration requires invocation identity and capability"
+          }
+        ],
+        "UNAVAILABLE": [
+          {
+            "file": "tests/integration/zz-persistence.test.ts",
+            "title": "every RPC maps required persistence failure to unavailable"
+          }
+        ],
+        "CANCELLED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes in-flight cancellation"
+          }
+        ],
+        "DEADLINE_EXCEEDED": [
+          {
+            "file": "tests/integration/cancellation.test.ts",
+            "title": "every RPC observes an in-flight deadline"
+          }
+        ]
+      }
+    },
+    {
       "name": "ListWorkspaceLoginProviderAdmissions",
       "success": [
         {

@@ -394,7 +394,11 @@ const identitydWorkspaceCases = ([
   ["virtual_principals.read", "virtual-principals"],
   ["virtual_principals.set_enabled", "virtual-principals/agent:reviewer"],
   ["workspace_login_provider_admissions.set", "login-providers/workforce"],
-  ["workspace_login_provider_admissions.read", "login-providers"]
+  ["workspace_login_provider_admissions.read", "login-providers"],
+  [
+    "workspace_login_provider_admissions.read",
+    "login-providers/workforce"
+  ]
 ] as const).map(([operation, suffix]) => ({
   operation,
   resourcePath: `/tenants/acme/workspaces/atlas/${suffix}`

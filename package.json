@@ -1,7 +1,7 @@
 {
   "name": "ctlflow",
   "private": true,
-  "packageManager": "npm@11.13.0",
+  "packageManager": "npm@11.14.1",
   "engines": {
     "node": "26.x",
     "npm": "11.x"
@@ -11,7 +11,7 @@
     "testing/*"
   ],
   "scripts": {
-    "build": "hugo --gc --minify --cleanDestinationDir",
+    "build": "npm run verify:spec-inventory && hugo --gc --minify --cleanDestinationDir",
     "dev": "hugo server --bind 0.0.0.0 --port 7780 --disableFastRender",
     "setup:minikube": "node tooling/minikube/install-minikube.mjs",
     "build:auditd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/auditd",
@@ -32,9 +32,10 @@
     "test:edged": "npm run build:edged && npm run test:compiled --workspace @ctlflow/edged",
     "build:egressd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/egressd",
     "test:egressd": "npm run build:egressd && npm run test:compiled --workspace @ctlflow/egressd",
-    "build:authd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/auditd && npm run build --workspace @ctlflow/identityd && npm run build --workspace @ctlflow/egressd && npm run build --workspace @ctlflow/authd",
+    "build:authd": "npm run build --workspace @ctlflow/test-mesh && npm run build --workspace @ctlflow/auditd && npm run build --workspace @ctlflow/identityd && npm run build --workspace @ctlflow/policyd && npm run build --workspace @ctlflow/tenantd && npm run build --workspace @ctlflow/egressd && npm run build --workspace @ctlflow/authd",
     "test:authd": "npm run build:authd && npm run test:compiled --workspace @ctlflow/authd",
-    "test:tooling": "node --test tooling/native/*.test.mjs",
+    "test:tooling": "node --test tooling/native/*.test.mjs tooling/architecture/*.test.mjs tooling/protobuf/*.test.mjs tooling/spec/*.test.mjs",
+    "verify:spec-inventory": "node tooling/spec/verify-service-inventory.mjs",
     "verify:container:auditd": "docker build --network=host -f services/auditd/csharp/Containerfile -t ctlflow-auditd:verify .",
     "verify:container:identityd": "docker build --network=host -f services/identityd/csharp/Containerfile -t ctlflow-identityd:verify .",
     "verify:container:policyd": "docker build --network=host -f services/policyd/csharp/Containerfile -t ctlflow-policyd:verify .",
@@ -64,6 +65,8 @@
     "update:diagnostics:authd": "node tooling/native/gated-publish.mjs services/authd/csharp/src/CtlFlow.Auth.Authd.Service/CtlFlow.Auth.Authd.Service.csproj services/authd/csharp/nativeaot-diagnostics.json .temp/nativeaot-diagnostics/authd --write"
   },
   "devDependencies": {
-    "hugo-bin": "0.149.2"
+    "@bufbuild/buf": "1.72.0",
+    "hugo-bin": "0.161.0",
+    "ts-proto": "2.8.3"
   }
 }

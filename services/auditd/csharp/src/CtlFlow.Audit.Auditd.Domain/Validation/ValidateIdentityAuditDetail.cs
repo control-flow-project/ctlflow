@@ -85,6 +85,7 @@ internal static partial class AuditValidation
     private static void ValidateIdentityExternalLink(
         IdentityExternalLinkAuditDetail detail)
     {
+        ValidateExternalLinkId(detail.ExternalLinkId);
         ValidateCanonicalId(detail.ProviderId, 64, "providerId");
         ValidatePrincipal(
             detail.HumanAccountPrincipalId,

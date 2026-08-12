@@ -22,6 +22,10 @@ internal static partial class AuditEventSchema
             .HasForeignKey<IdentityExternalLinkAuditDetail>(
                 value => value.EventKey)
             .OnDelete(DeleteBehavior.Restrict);
+        detail.Property(value => value.ExternalLinkId)
+            .HasColumnName("external_link_id")
+            .HasMaxLength(36)
+            .IsRequired();
         detail.Property(value => value.ProviderId)
             .HasColumnName("provider_id")
             .HasMaxLength(64)

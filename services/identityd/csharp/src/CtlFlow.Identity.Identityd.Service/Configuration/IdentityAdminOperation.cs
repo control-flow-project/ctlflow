@@ -27,5 +27,6 @@ internal enum IdentityAdminOperation
     UpdateLoginProvider,
     SetLoginProviderState,
     SetWorkspaceLoginProviderAdmission,
+    GetWorkspaceLoginProviderAdmission,
     ListWorkspaceLoginProviderAdmissions
 }

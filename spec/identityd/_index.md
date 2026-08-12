@@ -151,6 +151,7 @@ placed in an environment value, or exposed to another process.
 An external identity link contains:
 
 ```text
+opaque external-link ID
 Tenant ID
 provider ID
 provider subject
@@ -164,6 +165,12 @@ characters. A provider identity maps to at most one human account inside one
 Tenant. Service and virtual principals cannot be login targets. The account
 must have current Tenant standing and the provider must be current and not
 deleted when the link is created.
+
+The external-link ID is `eil_` followed by 32 lower-case hexadecimal
+characters. Identityd generates it once, persists it with the mapping, and
+never exposes it through the identity API. It exists to correlate typed create
+and delete audit evidence without disclosing the provider subject. Distinct
+links always have distinct IDs.
 
 Identityd owns the identity mapping. Authd owns public protocol validation and
 supplies only a provider ID and provider subject that it has established from
@@ -280,7 +287,7 @@ either fence are concealed as `NOT_FOUND`.
 
 ## API
 
-The service has exactly 33 unary operations:
+The service has exactly 34 unary operations:
 
 | Operation | Input | Result |
 | --- | --- | --- |
@@ -312,6 +319,7 @@ The service has exactly 33 unary operations:
 | `UpdateLoginProvider` | Tenant, provider ID, expected revision, display name, and exact Configd references | Login provider |
 | `SetLoginProviderState` | Tenant, provider ID, expected revision, state | Login provider |
 | `SetWorkspaceLoginProviderAdmission` | Tenant, Workspace, provider ID, admitted value | Workspace admission or empty removal |
+| `GetWorkspaceLoginProviderAdmission` | Tenant, Workspace, and provider ID | Exact Workspace admission |
 | `ListWorkspaceLoginProviderAdmissions` | Tenant, Workspace, page size, optional last provider ID | Bounded admission page |
 | `CreateSession` | Tenant ID, provider ID, provider subject | New Session ID, one-time opaque credential, and expiry |
 | `ExchangeSession` | Opaque Session credential and exact target | Short-lived invocation JWT and expiry |
@@ -400,8 +408,10 @@ cursor table, snapshot journal, expiry, or mutation invalidation.
 
 All administration lists use the same page-size bounds and read-one-extra
 keyset shape over the immutable ID named by their `after_*` field. External
-identity links are ordered by exact provider subject. No list stores a cursor
-or promises a snapshot across calls.
+identity links are ordered by the unsigned UTF-8 bytes of the exact provider
+subject. Database comparison, continuation selection, and returned-page
+validation use that same order for every admitted Unicode scalar sequence. No
+list stores a cursor or promises a snapshot across calls.
 
 ### Membership administration
 
@@ -469,9 +479,10 @@ transition out of `deleted`. An unchanged update is a no-op.
 Get and list hide deleted providers. Lists use ascending provider-ID order.
 `SetWorkspaceLoginProviderAdmission` adds or removes one exact provider ID.
 Add requires a current non-deleted provider in the same Tenant; add and remove
-are idempotent. Admission lists use ascending provider-ID order and never
-return a deleted provider. Authd must additionally require `active` state
-before beginning login.
+are idempotent. `GetWorkspaceLoginProviderAdmission` returns only the exact
+current admission and otherwise returns `NOT_FOUND`. Admission lists use
+ascending provider-ID order and never return a deleted provider. Authd must
+additionally require `active` state before beginning login.
 
 ### CreateSession
 
@@ -578,7 +589,8 @@ Autonomous kernel callers use an exact per-operation ServiceAccount allowlist:
 | `IssueRunInvocation` | `SERVICE/svc_execd` |
 | `GetLoginProvider` | `SERVICE/svc_authd` or an admitted capability caller |
 | `ListLoginProviders` | admitted capability caller |
-| `ListWorkspaceLoginProviderAdmissions` | `SERVICE/svc_authd` or an admitted capability caller |
+| `GetWorkspaceLoginProviderAdmission` | `SERVICE/svc_authd` or an admitted capability caller |
+| `ListWorkspaceLoginProviderAdmissions` | admitted capability caller |
 
 Installation configuration maps the canonical principals for exact-caller
 operations to Kubernetes ServiceAccount subjects. Startup fails when one of
@@ -641,6 +653,7 @@ The complete Identityd capability catalog is:
 | `UpdateLoginProvider` | `login_providers.update` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
 | `SetLoginProviderState` | `login_providers.set_state` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
 | `SetWorkspaceLoginProviderAdmission` | `workspace_login_provider_admissions.set` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
+| `GetWorkspaceLoginProviderAdmission` | `workspace_login_provider_admissions.read` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
 | `ListWorkspaceLoginProviderAdmissions` | `workspace_login_provider_admissions.read` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers` |
 
 The requested domain target is either `/tenants/<tenant_id>` or
@@ -689,6 +702,15 @@ Workspace Memberships, Groups, direct Group memberships, and invocation
 verification keys, external identity links, login providers, Workspace
 login-provider admissions, and Sessions.
 
+The shipping SQLite deployment has one Identityd replica. Every operation
+that can change Identityd state enters one cancellation-aware mutation
+boundary before reading decision inputs and holds it through commit. This
+makes dependent decisions linearizable across operation types, not merely
+within one record key. A competing operation therefore observes either the
+complete state before a mutation or the complete state after it. Reads remain
+concurrent. A future database implementation may replace the mechanism, but
+must preserve the same observable ordering and invariants.
+
 Migrations contain structural tables, keys, foreign keys, uniqueness, bounds,
 indexes, and representation checks only. No trigger, stored procedure,
 database function, computed side effect, or SQL-resident behavior implements
@@ -708,7 +730,9 @@ Group-member, virtual-principal, external-link, login-provider, and Workspace
 provider-admission mutations. It records the typed action, exact Tenant and
 optional Workspace target, non-secret resource IDs, resulting revision when a
 record has one, authenticated invocation attribution, occurrence time, and
-trace correlation. External provider subjects, configuration/secret
+trace correlation. External-link events carry the persisted opaque
+external-link ID so create and delete correlate and distinct links remain
+distinguishable. External provider subjects, configuration/secret
 references, credentials, and request bodies are never audit fields.
 
 The exact typed Session actions remain `CREATED` and `REVOKED`. A Session event
@@ -738,7 +762,7 @@ identity. Operational endpoints are not Identityd domain operations.
 
 Canonical integration evidence covers:
 
-- the exact 33-method descriptor and every documented status;
+- the exact 34-method descriptor and every documented status;
 - exact per-operation workload admission;
 - exactly one active and up to seven retiring keys, deterministic order,
   bounded expiry, private/public mismatch, malformed key state, and source
@@ -755,12 +779,15 @@ Canonical integration evidence covers:
   member pagination, and transactional Group deletion;
 - virtual-principal creation, immutable attachment/fences, optimistic enable
   changes, and exact-fence reads;
-- external-link create/replay/conflict/delete/list behavior without provider
-  subject leakage;
+- external-link create/replay/conflict/delete/list behavior, UTF-8 keyset
+  ordering, and opaque audit correlation without provider-subject leakage;
 - login-provider immutable IDs, optimistic metadata/state changes, terminal
   deletion, permanent reservation, and Configd-reference bounds;
-- Workspace provider admission, same-Tenant fencing, provider-state filtering,
-  pagination, and provider-deletion cleanup;
+- exact and paginated Workspace provider admission, same-Tenant fencing,
+  provider-state filtering, and provider-deletion cleanup;
+- forced cross-operation mutation interleavings for Workspace standing versus
+  Group membership, provider deletion versus Workspace admission, and Tenant
+  standing versus external-link creation;
 - real capability authorization through Policyd and non-recursive Policyd
   re-entry through the existing fact operations;
 - external-identity resolution without caller-supplied account identity;

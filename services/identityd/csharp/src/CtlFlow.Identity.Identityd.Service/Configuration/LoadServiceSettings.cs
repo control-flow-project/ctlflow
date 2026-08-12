@@ -69,13 +69,13 @@ internal static partial class IdentitydConfiguration
             DefaultWorkloadTokenLifetimeSeconds);
         var getLoginProviderAuthdCallers = ParseRequiredCallers(
             "CTLFLOW_GET_LOGIN_PROVIDER_AUTHD_CALLERS");
-        var listWorkspaceAdmissionsAuthdCallers = ParseRequiredCallers(
-            "CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_AUTHD_CALLERS");
+        var getWorkspaceAdmissionAuthdCallers = ParseRequiredCallers(
+            "CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_AUTHD_CALLERS");
         var administration = LoadIdentityAdminSettings();
         ValidateProviderReadCallers(
             administration,
             getLoginProviderAuthdCallers,
-            listWorkspaceAdmissionsAuthdCallers);
+            getWorkspaceAdmissionAuthdCallers);
 
         return new ServiceSettings(
             IPAddress.Parse(grpcUri.Host),
@@ -135,7 +135,7 @@ internal static partial class IdentitydConfiguration
             ParseRequiredCallers(
                 "CTLFLOW_ISSUE_RUN_INVOCATION_CALLERS"),
             getLoginProviderAuthdCallers,
-            listWorkspaceAdmissionsAuthdCallers,
+            getWorkspaceAdmissionAuthdCallers,
             administration,
             TelemetrySettings.Parse(
                 RequireEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT")));
@@ -144,13 +144,13 @@ internal static partial class IdentitydConfiguration
     private static void ValidateProviderReadCallers(
         IdentityAdminSettings administration,
         IReadOnlySet<KubernetesServiceAccountSubject> getProviderAuthd,
-        IReadOnlySet<KubernetesServiceAccountSubject> listAdmissionsAuthd)
+        IReadOnlySet<KubernetesServiceAccountSubject> getAdmissionAuthd)
     {
         if (getProviderAuthd.Overlaps(administration.GetCallers(
                 IdentityAdminOperation.GetLoginProvider))
-            || listAdmissionsAuthd.Overlaps(administration.GetCallers(
+            || getAdmissionAuthd.Overlaps(administration.GetCallers(
                 IdentityAdminOperation
-                    .ListWorkspaceLoginProviderAdmissions)))
+                    .GetWorkspaceLoginProviderAdmission)))
         {
             throw new InvalidOperationException(
                 "Autonomous Authd and capability callers must be disjoint");

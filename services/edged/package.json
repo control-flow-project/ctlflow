@@ -22,10 +22,8 @@
     "@ctlflow/identityd": "0.0.0",
     "@ctlflow/test-mesh": "0.0.0",
     "@types/node": "24.10.1",
-    "grpc-tools": "1.13.0",
     "long": "5.3.2",
-    "protobufjs": "7.6.4",
-    "ts-proto": "2.8.3",
+    "protobufjs": "7.6.5",
     "typescript": "5.9.3",
     "yaml": "2.9.0"
   }

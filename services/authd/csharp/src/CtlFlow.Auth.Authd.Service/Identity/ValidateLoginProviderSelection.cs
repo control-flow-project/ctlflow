@@ -12,8 +12,6 @@ namespace CtlFlow.Auth.Authd.Service.Identity;
 
 internal static partial class IdentityCalls
 {
-    private const uint ProviderAdmissionPageSize = 100;
-
     internal static async Task ValidateLoginProviderSelection(
         IdentityService.IdentityServiceClient client,
         WorkloadSettings workload,
@@ -164,81 +162,32 @@ internal static partial class IdentityCalls
         WorkspaceId workspaceId,
         CancellationToken cancellation)
     {
-        string? after = null;
-        string? previous = null;
-        var admitted = false;
-        do
-        {
-            var request = new ListWorkspaceLoginProviderAdmissionsRequest
-            {
-                TenantId = provider.TenantId.Value,
-                WorkspaceId = workspaceId.Value,
-                PageSize = ProviderAdmissionPageSize
-            };
-            if (after is not null)
-            {
-                request.AfterProviderId = after;
-            }
-            var response =
-                await client.ListWorkspaceLoginProviderAdmissionsAsync(
-                    request,
-                    headers,
-                    DateTime.UtcNow.AddSeconds(3),
-                    cancellation);
-            if (response.Admissions.Count > ProviderAdmissionPageSize)
-            {
-                throw new InvalidDataException(
-                    "Identityd returned an oversized provider-admission page");
-            }
-            foreach (var admission in response.Admissions)
-            {
-                if (!string.Equals(
-                        admission.TenantId,
-                        provider.TenantId.Value,
-                        StringComparison.Ordinal)
-                    || !string.Equals(
-                        admission.WorkspaceId,
-                        workspaceId.Value,
-                        StringComparison.Ordinal))
+        var admission =
+            await client.GetWorkspaceLoginProviderAdmissionAsync(
+                new GetWorkspaceLoginProviderAdmissionRequest
                 {
-                    throw new InvalidDataException(
-                        "Identityd returned a foreign provider admission");
-                }
-                var providerId = ProviderId.Parse(admission.ProviderId).Value;
-                if (previous is not null
-                    && string.CompareOrdinal(previous, providerId) >= 0)
-                {
-                    throw new InvalidDataException(
-                        "Identityd returned an unordered provider-admission page");
-                }
-                previous = providerId;
-                admitted |= string.Equals(
-                    providerId,
-                    provider.ProviderId.Value,
-                    StringComparison.Ordinal);
-            }
-
-            if (!response.HasNextAfterProviderId)
-            {
-                after = null;
-                continue;
-            }
-            var next = ProviderId.Parse(
-                response.NextAfterProviderId).Value;
-            if (previous is null
-                || !string.Equals(next, previous, StringComparison.Ordinal)
-                || after is not null
-                    && string.CompareOrdinal(after, next) >= 0)
-            {
-                throw new InvalidDataException(
-                    "Identityd returned an invalid provider continuation");
-            }
-            after = next;
-        } while (after is not null);
-
-        if (!admitted)
+                    TenantId = provider.TenantId.Value,
+                    WorkspaceId = workspaceId.Value,
+                    ProviderId = provider.ProviderId.Value
+                },
+                headers,
+                DateTime.UtcNow.AddSeconds(3),
+                cancellation);
+        if (!string.Equals(
+                admission.TenantId,
+                provider.TenantId.Value,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                admission.WorkspaceId,
+                workspaceId.Value,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                admission.ProviderId,
+                provider.ProviderId.Value,
+                StringComparison.Ordinal))
         {
-            throw new LoginProviderRejectedException();
+            throw new InvalidDataException(
+                "Identityd returned a foreign provider admission");
         }
     }
 }

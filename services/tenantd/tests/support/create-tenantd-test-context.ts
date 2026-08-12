@@ -19,27 +19,23 @@ import type {
   PolicydProductionService
 } from "@ctlflow/policyd/testing/production";
 import {
+  createTenantdDatabase,
+  prepareTenantdFiles,
+  type TenantdFiles,
+  type TenantdTestDatabase
+} from "@ctlflow/tenantd/testing/production";
+import {
   TenantServiceClient
 } from "../generated/v1/tenantd.js";
 import {
   getTenantdTestSuite
 } from "../suite/get-tenantd-test-suite.js";
 import {
-  createTestDatabase
-} from "./create-test-database.js";
-import {
-  prepareTenantdContextFiles,
-  type TenantdContextFiles
-} from "./prepare-tenantd-context-files.js";
-import {
   type TenantdRunningService
 } from "../runtime/tenantd-test-runtime.js";
 import type {
   InvocationAuthority
 } from "./invocation-authority.js";
-import type {
-  TestDatabase
-} from "./test-database.js";
 
 const serviceName = "tenantd";
 
@@ -54,7 +50,7 @@ export interface TenantdTestContext {
   readonly identityd: IdentitydProductionSource;
   readonly policyd: PolicydProductionService;
   readonly reconnectPolicyIdentity: () => Promise<void>;
-  readonly database: TestDatabase;
+  readonly database: TenantdTestDatabase;
   readonly service: TenantdRunningService;
   readonly client: TenantServiceClient;
   readonly workloadClient: TenantServiceClient;
@@ -69,7 +65,7 @@ export interface TenantdTestContext {
 export async function createTenantdTestContext():
 Promise<TenantdTestContext> {
   const suite = getTenantdTestSuite();
-  let database: TestDatabase | undefined;
+  let database: TenantdTestDatabase | undefined;
   let auditd: AuditdProductionSource | undefined;
   let identityd: IdentitydProductionSource | undefined;
   let service: TenantdRunningService | undefined;
@@ -87,7 +83,7 @@ Promise<TenantdTestContext> {
       await suite.kubernetes.createWorkloadCredentials(
         "tenant-reader-backend");
     const invocation = suite.invocation;
-    database = await createTestDatabase(
+    database = await createTenantdDatabase(
       suite.kubernetes.storage);
     const serviceAccountSubject =
       `system:serviceaccount:${suite.kubernetes.namespace}:`
@@ -104,7 +100,7 @@ Promise<TenantdTestContext> {
       verificationKeys,
       principalFacts: []
     });
-    const files = await prepareTenantdContextFiles({
+    const files = await prepareTenantdFiles({
       repositoryRoot: suite.repositoryRoot,
       directory: database.directory,
       serviceName,
@@ -226,13 +222,13 @@ function createEnvironment(
   auditEndpoint: string,
   identityEndpoint: string,
   policyEndpoint: string,
-  database: TestDatabase,
+  database: TenantdTestDatabase,
   workload: TestWorkloadCredentials,
   capabilityWorkload: TestWorkloadCredentials,
   readOnlyCapabilityWorkload:
     TestWorkloadCredentials,
   invocation: InvocationAuthority,
-  files: TenantdContextFiles,
+  files: TenantdFiles,
   auditServerName: string,
   identityServerName: string,
   policyServerName: string,
@@ -315,7 +311,7 @@ function createClientOptions(serverName: string): ClientOptions {
 
 async function stopResources(
   service: TenantdRunningService | undefined,
-  database: TestDatabase | undefined,
+  database: TenantdTestDatabase | undefined,
   auditd: AuditdProductionSource | undefined,
   identityd: IdentitydProductionSource | undefined
 ): Promise<void> {

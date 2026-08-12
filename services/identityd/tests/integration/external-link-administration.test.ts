@@ -168,6 +168,122 @@ test("external links require an enabled human member and non-deleted provider",
       matchGrpcStatus(status.FAILED_PRECONDITION));
   });
 
+test("external-link audit uses opaque per-link correlation IDs", async () => {
+  const context = getIdentitydTestContext();
+  const resourcePath =
+    "/tenants/acme/login-providers/oidc/identity-links";
+  await allowIdentityCapabilities(context, [
+    capability("external_identity_links.create", resourcePath),
+    capability("external_identity_links.delete", resourcePath)
+  ]);
+  const metadata = identityAdminMetadata(context, "acme");
+  const subjects = [
+    "audit-correlation-one@example.com",
+    "audit-correlation-two@example.com"
+  ] as const;
+  const before = new Set(
+    (await context.auditd.readEvents()).map((event) => event.sourceEventId));
+  for (const providerSubject of subjects) {
+    await callUnary((done) => context.client.createExternalIdentityLink(
+      {
+        tenantId: "acme",
+        providerId: "oidc",
+        providerSubject,
+        accountId: "user:alice"
+      },
+      metadata,
+      done));
+    await callUnary((done) => context.client.deleteExternalIdentityLink(
+      { tenantId: "acme", providerId: "oidc", providerSubject },
+      metadata,
+      done));
+  }
+
+  const evidence = (await context.auditd.readEvents())
+    .filter((event) => !before.has(event.sourceEventId));
+  const external = evidence.filter((event) =>
+    event.detailKind === "identity_external_link");
+  assert.equal(external.length, 4);
+  const actions = new Map<string, string[]>();
+  for (const event of external) {
+    assert.match(event.externalLinkId, /^eil_[a-f0-9]{32}$/u);
+    assert.equal(event.providerId, "oidc");
+    assert.equal(event.humanAccountPrincipalId, "user:alice");
+    const current = actions.get(event.externalLinkId) ?? [];
+    current.push(event.action);
+    actions.set(event.externalLinkId, current);
+  }
+  assert.equal(actions.size, 2);
+  for (const linkActions of actions.values()) {
+    assert.deepEqual(linkActions.sort(), ["created", "deleted"]);
+  }
+  const serialized = JSON.stringify(evidence);
+  for (const subject of subjects) {
+    assert.equal(serialized.includes(subject), false);
+  }
+});
+
+test("external-link pagination follows SQLite UTF-8 byte order", async () => {
+  const context = getIdentitydTestContext();
+  const resourcePath =
+    "/tenants/acme/login-providers/oidc/identity-links";
+  await allowIdentityCapabilities(context, [
+    capability("external_identity_links.create", resourcePath),
+    capability("external_identity_links.read", resourcePath),
+    capability("external_identity_links.delete", resourcePath)
+  ]);
+  const metadata = identityAdminMetadata(context, "acme");
+  const subjects = ["unicode-\uE000", "unicode-\u{1F642}"] as const;
+  try {
+    for (const providerSubject of subjects) {
+      await callUnary<ExternalIdentityLink>((done) =>
+        context.client.createExternalIdentityLink(
+          {
+            tenantId: "acme",
+            providerId: "oidc",
+            providerSubject,
+            accountId: "user:alice"
+          },
+          metadata,
+          done));
+    }
+
+    const returned: string[] = [];
+    let afterProviderSubject: string | undefined;
+    do {
+      const page = await callUnary<ListExternalIdentityLinksResponse>(
+        (done) => context.client.listExternalIdentityLinks(
+          {
+            tenantId: "acme",
+            providerId: "oidc",
+            pageSize: 1,
+            ...(afterProviderSubject === undefined
+              ? {}
+              : { afterProviderSubject })
+          },
+          metadata,
+          done));
+      assert.equal(page.links.length, 1);
+      returned.push(page.links[0]!.providerSubject);
+      afterProviderSubject = page.nextAfterProviderSubject;
+    } while (afterProviderSubject !== undefined);
+
+    assert.deepEqual(
+      returned,
+      [...returned].sort((left, right) => Buffer.compare(
+        Buffer.from(left, "utf8"),
+        Buffer.from(right, "utf8"))));
+    assert.ok(returned.indexOf(subjects[0]) < returned.indexOf(subjects[1]));
+  } finally {
+    for (const providerSubject of subjects) {
+      await callUnary((done) => context.client.deleteExternalIdentityLink(
+        { tenantId: "acme", providerId: "oidc", providerSubject },
+        metadata,
+        done));
+    }
+  }
+});
+
 function capability(operation: string, resourcePath: string) {
   return { operation, resourcePath, tenantId: "acme" };
 }

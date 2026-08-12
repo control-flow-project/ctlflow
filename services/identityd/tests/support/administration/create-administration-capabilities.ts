@@ -53,6 +53,9 @@ readonly IdentityCapability[] {
     tenant(
       "workspace_login_provider_admissions.read",
       `${workspaceRoot}/login-providers`),
+    tenant(
+      "workspace_login_provider_admissions.read",
+      admissionPath),
     tenant("external_identity_links.create", identityLinksPath),
     tenant("external_identity_links.read", identityLinksPath),
     tenant("external_identity_links.delete", identityLinksPath)

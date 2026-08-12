@@ -60,6 +60,9 @@ export type {
 export {
   startOpenTelemetryCollector
 } from "./telemetry/start-open-telemetry-collector.js";
+export {
+  waitForTelemetryExport
+} from "./telemetry/wait-for-telemetry-export.js";
 export { findAvailablePort } from "./ports/find-available-port.js";
 export { runCommand } from "./processes/run-command.js";
 export type { ManagedProcess } from "./processes/managed-process.js";

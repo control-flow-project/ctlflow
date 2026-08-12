@@ -49,8 +49,10 @@ policyd
   +-> execd.ResolveWorkloadOperationBinding   product operations only
 
 authd
+  +-> tenantd.GetTenant
+  +-> tenantd.GetWorkspace                    Workspace login only
   +-> identityd.GetLoginProvider
-  +-> identityd.ListWorkspaceLoginProviderAdmissions
+  +-> identityd.GetWorkspaceLoginProviderAdmission   Workspace login only
   +-> identityd.CreateSession
   +-> identityd.RevokeSession
   +-> purpose-bound egressd HTTP binding

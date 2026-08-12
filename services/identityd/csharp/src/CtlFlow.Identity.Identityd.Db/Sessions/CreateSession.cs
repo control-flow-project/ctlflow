@@ -2,9 +2,9 @@ using CtlFlow.Identity.Identityd.Db.Providers;
 using CtlFlow.Identity.Identityd.Domain.Accounts;
 using CtlFlow.Identity.Identityd.Domain.Auditing;
 using CtlFlow.Identity.Identityd.Domain.IdentityLinks;
+using CtlFlow.Identity.Identityd.Domain.Providers;
 using CtlFlow.Identity.Identityd.Domain.Sessions;
 using CtlFlow.Identity.Identityd.Domain.Tenants;
-using CtlFlow.Identity.Identityd.Domain.Providers;
 using Microsoft.EntityFrameworkCore;
 
 namespace CtlFlow.Identity.Identityd.Db.Sessions;
@@ -21,7 +21,8 @@ public static partial class Sessions
         AuditContext audit,
         CancellationToken cancellation)
     {
-        cancellation.ThrowIfCancellationRequested();
+        await using var mutation =
+            await identityDatabase.AcquireMutation(cancellation);
         using var activity =
             IdentityDbTelemetry.StartOperation("create_session");
         await using var database =

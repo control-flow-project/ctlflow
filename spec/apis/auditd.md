@@ -80,7 +80,7 @@ account. Both identities are retained.
 | `identity_group` | Group, optional Workspace, created/deleted |
 | `identity_group_member` | Group, principal, optional Workspace, added/removed |
 | `identity_virtual_principal` | Virtual principal, attached account, fence, revision, enabled state, action |
-| `identity_external_link` | Provider ID, human account, created/deleted; no provider subject |
+| `identity_external_link` | Opaque external-link ID, provider ID, human account, created/deleted; no provider subject |
 | `identity_login_provider` | Provider ID, revision, state, created/updated/state changed |
 | `identity_workspace_provider_admission` | Workspace, provider ID, admitted/removed |
 | `package_declaration` | Package ID and generation |

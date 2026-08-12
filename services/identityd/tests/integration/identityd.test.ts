@@ -18,6 +18,7 @@ await import("./group-administration.test.js");
 await import("./virtual-principal-administration.test.js");
 await import("./login-provider-administration.test.js");
 await import("./external-link-administration.test.js");
+await import("./mutation-serialization.test.js");
 await import("./administration-observability.test.js");
 await import("./administration-pagination.test.js");
 await import("./sessions.test.js");

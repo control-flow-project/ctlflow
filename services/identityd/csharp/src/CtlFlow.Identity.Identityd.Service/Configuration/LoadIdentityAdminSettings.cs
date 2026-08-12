@@ -56,6 +56,8 @@ internal static partial class IdentitydConfiguration
                 ParseRequiredCallers("CTLFLOW_SET_LOGIN_PROVIDER_STATE_CALLERS"),
             [IdentityAdminOperation.SetWorkspaceLoginProviderAdmission] =
                 ParseRequiredCallers("CTLFLOW_SET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS"),
+            [IdentityAdminOperation.GetWorkspaceLoginProviderAdmission] =
+                ParseRequiredCallers("CTLFLOW_GET_WORKSPACE_LOGIN_PROVIDER_ADMISSION_CALLERS"),
             [IdentityAdminOperation.ListWorkspaceLoginProviderAdmissions] =
                 ParseRequiredCallers("CTLFLOW_LIST_WORKSPACE_LOGIN_PROVIDER_ADMISSIONS_CALLERS")
         });

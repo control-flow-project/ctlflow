@@ -20,9 +20,8 @@ public static partial class Principals
             AuditContext audit,
             CancellationToken cancellation)
     {
-        await using var mutation = await identityDatabase.AcquireMutation(
-            $"virtual-principal:{principalId.Value}",
-            cancellation);
+        await using var mutation =
+            await identityDatabase.AcquireMutation(cancellation);
         using var activity = IdentityDbTelemetry.StartOperation(
             "set_virtual_principal_enabled");
         await using var database =

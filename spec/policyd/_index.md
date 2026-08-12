@@ -113,7 +113,7 @@ The complete catalog is:
 | `login_providers.update` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
 | `login_providers.set_state` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/login-providers/<provider_id>` |
 | `workspace_login_provider_admissions.set` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers/<provider_id>` |
-| `workspace_login_provider_admissions.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers` |
+| `workspace_login_provider_admissions.read` | `SERVICE/svc_identityd` | `/tenants/<tenant_id>/workspaces/<workspace_id>/login-providers` or one exact provider |
 | `apps.create` | `SERVICE/svc_pkgd` | `<scope>/apps` |
 | `apps.read` | `SERVICE/svc_pkgd` | `<scope>/apps/<app_id>` |
 | `apps.set_package_generation` | `SERVICE/svc_pkgd` | `<scope>/apps/<app_id>` |

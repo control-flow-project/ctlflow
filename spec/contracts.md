@@ -546,8 +546,10 @@ and Execd are closed by their owner contracts and the Auditd detail inventory.
 | `policyd` | `identityd.ListPrincipalGroups` | Obtain bounded pages of direct Group IDs |
 | `policyd` | `execd.ResolveWorkloadOperationBinding` | Confirm one admitted product operation for one authenticated Workload subject |
 | `authd` | purpose-bound `egressd` HTTP binding | Reach the configured external identity provider without ambient egress |
+| `authd` | `tenantd.GetTenant` | Require the selected Tenant to be active |
+| `authd` | `tenantd.GetWorkspace` | Require the selected Workspace to belong to the Tenant and be active |
 | `authd` | `identityd.GetLoginProvider` | Read one exact provider registration |
-| `authd` | `identityd.ListWorkspaceLoginProviderAdmissions` | Read one Workspace provider allowlist |
+| `authd` | `identityd.GetWorkspaceLoginProviderAdmission` | Require one exact Workspace/provider admission |
 | `authd` | `identityd.CreateSession` | Resolve a validated external identity and create one Session |
 | `authd` | `identityd.RevokeSession` | Revoke one Session by opaque credential |
 | `edged` | `identityd.ExchangeSession` | Exchange one current Session for an exact-target invocation |

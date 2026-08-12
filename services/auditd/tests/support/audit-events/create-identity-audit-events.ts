@@ -145,6 +145,7 @@ export function createIdentityAuditEvents(
     }),
     createAuditEvent({
       identityExternalLink: {
+        externalLinkId: "eil_00000000000000000000000000000001",
         providerId: "matrix_provider_a",
         humanAccountPrincipalId: "user:matrix_link_a",
         action: IdentityExternalLinkAction
@@ -156,6 +157,7 @@ export function createIdentityAuditEvents(
     }),
     createAuditEvent({
       identityExternalLink: {
+        externalLinkId: "eil_00000000000000000000000000000002",
         providerId: "matrix_provider_b",
         humanAccountPrincipalId: "user:matrix_link_b",
         action: IdentityExternalLinkAction

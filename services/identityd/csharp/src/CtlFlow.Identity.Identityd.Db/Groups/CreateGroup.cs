@@ -16,9 +16,8 @@ public static partial class Groups
         AuditContext audit,
         CancellationToken cancellation)
     {
-        await using var mutation = await identityDatabase.AcquireMutation(
-            $"group:{groupId.Value}",
-            cancellation);
+        await using var mutation =
+            await identityDatabase.AcquireMutation(cancellation);
         using var activity = IdentityDbTelemetry.StartOperation("create_group");
         await using var database =
             await identityDatabase.Contexts.CreateDbContextAsync(cancellation);

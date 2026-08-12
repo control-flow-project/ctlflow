@@ -16,6 +16,14 @@ import {
   type IdentitydProductionSource
 } from "@ctlflow/identityd/testing/production";
 import {
+  startPolicydProductionService,
+  type PolicydProductionService
+} from "@ctlflow/policyd/testing/production";
+import {
+  startTenantdProductionService,
+  type TenantdProductionService
+} from "@ctlflow/tenantd/testing/production";
+import {
   startOpenTelemetryCollector,
   startTestKubernetes,
   type CSharpStatelessService,
@@ -56,6 +64,8 @@ Promise<AuthdTestSuite> {
   let auditd: AuditdProductionService | undefined;
   let identityd: IdentitydProductionService | undefined;
   let identitySource: IdentitydProductionSource | undefined;
+  let policyd: PolicydProductionService | undefined;
+  let tenantd: TenantdProductionService | undefined;
   let provider: ControlledOidcProvider | undefined;
   let egressd: EgressdProductionService | undefined;
   let authd: CSharpStatelessService | undefined;
@@ -66,6 +76,8 @@ Promise<AuthdTestSuite> {
     collector = await startOpenTelemetryCollector(
       repositoryRoot,
       kubernetes);
+    const authdWorkload =
+      await kubernetes.createWorkloadCredentials("authd");
     auditd = await startAuditdProductionService({
       repositoryRoot,
       kubernetes,
@@ -84,6 +96,53 @@ Promise<AuthdTestSuite> {
       invocationAudience: "ctlflow-internal",
       invocationMaximumLifetimeSeconds: 60,
       principalFactCallers: [policydSubject]
+    });
+    policyd = await startPolicydProductionService({
+      repositoryRoot,
+      kubernetes,
+      identityd,
+      telemetryEndpoint: collector.endpoint,
+      invocationIssuer: "https://identityd.test",
+      invocationAudience: "ctlflow-internal",
+      invocationMaximumLifetimeSeconds: 60,
+      verificationKeys: {
+        keys: [signing.verificationKey],
+        expiresAt: new Date(Date.now() + 300_000).toISOString()
+      },
+      principalFacts: [],
+      policy: { roles: [], grants: [] }
+    });
+    tenantd = await startTenantdProductionService({
+      repositoryRoot,
+      kubernetes,
+      auditd,
+      identityd,
+      policyd,
+      telemetryEndpoint: collector.endpoint,
+      invocationIssuer: "https://identityd.test",
+      invocationAudience: "ctlflow-internal",
+      invocationMaximumLifetimeSeconds: 60,
+      retainedRecordCallers: [authdWorkload.callerSubject],
+      addressResolutionCallers: [
+        `system:serviceaccount:${kubernetes.namespace}:tenantd-resolver`
+      ]
+    });
+    await tenantd.replaceTenancy({
+      tenants: [{
+        tenantId: "acme",
+        address: "acme",
+        displayName: "Acme",
+        state: "active",
+        revision: 1
+      }],
+      workspaces: [{
+        workspaceId: "atlas",
+        tenantId: "acme",
+        address: "atlas",
+        displayName: "Atlas",
+        state: "active",
+        revision: 1
+      }]
     });
     identitySource = await identityd.createSource({
       callerSubject:
@@ -116,6 +175,7 @@ Promise<AuthdTestSuite> {
         providerId: "oidc"
       }],
       externalIdentityLinks: [{
+        externalLinkId: "eil_00000000000000000000000000000001",
         tenantId: "acme",
         providerId: "oidc",
         providerSubject: "alice@example.com",
@@ -129,8 +189,6 @@ Promise<AuthdTestSuite> {
       callbackUri:
         "https://auth.example.test/auth/v1/callback"
     });
-    const authdWorkload =
-      await kubernetes.createWorkloadCredentials("authd");
     const unadmittedWorkload =
       await kubernetes.createWorkloadCredentials(
         "authd-unadmitted");
@@ -150,12 +208,15 @@ Promise<AuthdTestSuite> {
       provider,
       egressd.bindingName,
       identityd.certificateAuthorityPath,
+      tenantd.certificateAuthorityPath,
       unadmittedWorkload.callerToken);
     authd = await runtime.start({
       kubernetes,
       environment: {
         CTLFLOW_IDENTITY_URL: identityd.endpoint,
         CTLFLOW_IDENTITY_TLS_SERVER_NAME: identityd.serverName,
+        CTLFLOW_TENANT_URL: tenantd.endpoint,
+        CTLFLOW_TENANT_TLS_SERVER_NAME: tenantd.serverName,
         OTEL_EXPORTER_OTLP_ENDPOINT: collector.endpoint
       },
       files: files.deployment
@@ -169,6 +230,9 @@ Promise<AuthdTestSuite> {
       auditd,
       identityd,
       identitySource,
+      policyd,
+      tenantd,
+      authdWorkload,
       provider,
       egressd,
       authd,
@@ -182,6 +246,8 @@ Promise<AuthdTestSuite> {
           authd,
           egressd,
           provider,
+          tenantd,
+          policyd,
           identitySource,
           identityd,
           auditd,
@@ -195,6 +261,8 @@ Promise<AuthdTestSuite> {
       authd,
       egressd,
       provider,
+      tenantd,
+      policyd,
       identitySource,
       identityd,
       auditd,

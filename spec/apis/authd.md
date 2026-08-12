@@ -64,8 +64,9 @@ X-Content-Type-Options: nosniff
 Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'
 ```
 
-Authd requires an active matching Identityd provider registration and, when a
-Workspace is selected, an exact current admission for that provider. It fixes
+Authd requires an active Tenant and matching Identityd provider registration.
+When a Workspace is selected, it also requires an active same-Tenant Workspace
+and an exact current admission for that provider. It fixes
 the authorization endpoint and client configuration from the matching
 projected provider entry. It creates a PKCE S256 verifier and one browser-bound
 attempt. The request cannot supply an authorization endpoint, client ID,
@@ -98,6 +99,7 @@ On the code branch, Authd:
 
 ```text
 consume matching browser-bound attempt
+  -> revalidate Tenantd Tenant and optional Workspace lifecycle
   -> revalidate Identityd provider and optional Workspace admission
   -> purpose-bound Egressd POST to exact token endpoint
   -> validate Bearer token response and RS256 ID token
