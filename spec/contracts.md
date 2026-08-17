@@ -395,6 +395,8 @@ placement_namespace = "plc-" || native_token(
   "ctlflow.execution.v1.PlacementNamespace", placement_id)
 workload_service_account = "wld-" || native_token(
   "ctlflow.execution.v1.WorkloadServiceAccount", workload_id)
+app_selector = native_token(
+  "ctlflow.execution.v1.AppSelector", app_id)
 ```
 
 Both objects carry
@@ -402,6 +404,9 @@ Both objects carry
 `execution.ctlflow.io/placement-id=<placement_id>`. The ServiceAccount also
 carries `execution.ctlflow.io/workload-id=<workload_id>`. Configd requires
 those exact annotations and names; absence or disagreement is not ownership.
+Every continuous Workload Pod and each of its interface Services carry
+`execution.ctlflow.io/app-selector=<app_selector>`. This is an opaque routing
+selector, not an App identity or authorization claim.
 
 Execd dependency claims use namespaced
 `execution.ctlflow.io/v1`, kind `DependencyClaim`, plural

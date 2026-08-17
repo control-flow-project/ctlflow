@@ -10,7 +10,7 @@ namespace CtlFlow.Execution.Execd.Service.Reconciliation;
 
 internal static partial class ExecutionReconciliation
 {
-    internal static async Task DeleteWorkloadObjects(
+    internal static async Task<bool> DeleteWorkloadObjects(
         ExecutionDatabase database,
         KubernetesApi kubernetes,
         PlacementRecord placement,
@@ -25,16 +25,26 @@ internal static partial class ExecutionReconciliation
             workload.ServiceAccountSubject).Name;
         if (workload.Behavior is WorkloadBehavior.Continuous)
         {
-            await DeleteOwnedObject(
+            var deploymentPath = KubernetesResourcePaths.Deployment(
+                namespaceName,
+                accountName);
+            var deployment = await GetObject(
                 kubernetes,
-                KubernetesResourcePaths.Deployment(
-                    namespaceName,
-                    accountName),
-                "Deployment",
-                accountName,
-                annotations,
-                "workload_deployment",
+                deploymentPath,
+                "get_workload_deployment",
                 cancellation);
+            if (deployment.Document is not null)
+            {
+                await DeleteOwnedObject(
+                    kubernetes,
+                    deploymentPath,
+                    "Deployment",
+                    accountName,
+                    annotations,
+                    "workload_deployment",
+                    cancellation);
+                return false;
+            }
         }
 
         foreach (var item in workload.Interfaces)
@@ -76,23 +86,6 @@ internal static partial class ExecutionReconciliation
                 cancellation);
         }
 
-        foreach (var storage in workload.Storage)
-        {
-            var claimName = NativeNames.StorageClaim(
-                workload.Id,
-                storage.StorageId);
-            await DeleteOwnedObject(
-                kubernetes,
-                KubernetesResourcePaths.PersistentVolumeClaim(
-                    namespaceName,
-                    claimName),
-                "PersistentVolumeClaim",
-                claimName,
-                annotations,
-                "persistent_volume_claim",
-                cancellation);
-        }
-
         var trustName = NativeNames.EdgedTrustConfigMap(workload.Id);
         await DeleteOwnedObject(
             kubernetes,
@@ -128,5 +121,6 @@ internal static partial class ExecutionReconciliation
             annotations,
             "workload_service_account",
             cancellation);
+        return true;
     }
 }

@@ -1,5 +1,6 @@
 using CtlFlow.Execution.Execd.Domain.Placements;
 using CtlFlow.Execution.Execd.Domain.Runs;
+using CtlFlow.Execution.Execd.Domain.Storage;
 using CtlFlow.Execution.Execd.Domain.Workloads;
 using Microsoft.EntityFrameworkCore;
 
@@ -128,6 +129,7 @@ internal static class ExecutionSchema
 
         ConfigureDependencyParameter(modelBuilder);
         ConfigureDependencyOutput(modelBuilder);
+        ConfigureAppStorageBinding(modelBuilder);
         ConfigureWorkloadStorage(modelBuilder);
 
         var operation = modelBuilder.Entity<WorkloadOperation>();
@@ -421,12 +423,53 @@ internal static class ExecutionSchema
         item.ToTable("workload_storage");
         item.HasKey(row => new { row.WorkloadId, row.StorageId });
         item.Property(row => row.WorkloadId).HasColumnName("workload_id").HasMaxLength(64).IsRequired();
+        item.Property(row => row.PlacementId).HasColumnName("placement_id").HasMaxLength(64).IsRequired();
+        item.Property(row => row.AppId).HasColumnName("app_id").HasMaxLength(64).IsRequired();
         item.Property(row => row.StorageId).HasColumnName("storage_id").HasMaxLength(64).IsRequired();
         item.Property(row => row.MountPath).HasColumnName("mount_path").HasMaxLength(256).IsRequired();
-        item.Property(row => row.CapacityBytes).HasColumnName("capacity_bytes").IsRequired();
+        item.HasIndex(row => new
+        {
+            row.PlacementId,
+            row.AppId,
+            row.StorageId
+        });
         item.HasIndex(row => new { row.WorkloadId, row.MountPath }).IsUnique();
         item.HasOne<Workload>().WithMany()
-            .HasForeignKey(row => row.WorkloadId).OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(row => row.WorkloadId)
+            .OnDelete(DeleteBehavior.Cascade);
+        item.HasOne<AppStorageBinding>().WithMany()
+            .HasForeignKey(row => new
+            {
+                row.PlacementId,
+                row.AppId,
+                row.StorageId
+            })
+            .HasPrincipalKey(row => new
+            {
+                row.PlacementId,
+                row.AppId,
+                row.StorageId
+            })
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+
+    private static void ConfigureAppStorageBinding(ModelBuilder modelBuilder)
+    {
+        var item = modelBuilder.Entity<AppStorageBinding>();
+        item.ToTable("app_storage_bindings");
+        item.HasKey(row => new
+        {
+            row.PlacementId,
+            row.AppId,
+            row.StorageId
+        });
+        item.Property(row => row.PlacementId).HasColumnName("placement_id").HasMaxLength(64).IsRequired();
+        item.Property(row => row.AppId).HasColumnName("app_id").HasMaxLength(64).IsRequired();
+        item.Property(row => row.StorageId).HasColumnName("storage_id").HasMaxLength(64).IsRequired();
+        item.Property(row => row.CapacityBytes).HasColumnName("capacity_bytes").IsRequired();
+        item.HasOne<Placement>().WithMany()
+            .HasForeignKey(row => row.PlacementId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureRunStorage(ModelBuilder modelBuilder)
@@ -435,11 +478,33 @@ internal static class ExecutionSchema
         item.ToTable("run_storage");
         item.HasKey(row => new { row.RunId, row.StorageId });
         item.Property(row => row.RunId).HasColumnName("run_id").HasMaxLength(128).IsRequired();
+        item.Property(row => row.PlacementId).HasColumnName("placement_id").HasMaxLength(64).IsRequired();
+        item.Property(row => row.AppId).HasColumnName("app_id").HasMaxLength(64).IsRequired();
         item.Property(row => row.StorageId).HasColumnName("storage_id").HasMaxLength(64).IsRequired();
         item.Property(row => row.MountPath).HasColumnName("mount_path").HasMaxLength(256).IsRequired();
-        item.Property(row => row.CapacityBytes).HasColumnName("capacity_bytes").IsRequired();
+        item.HasIndex(row => new
+        {
+            row.PlacementId,
+            row.AppId,
+            row.StorageId
+        });
         item.HasIndex(row => new { row.RunId, row.MountPath }).IsUnique();
         item.HasOne<Run>().WithMany()
-            .HasForeignKey(row => row.RunId).OnDelete(DeleteBehavior.Cascade);
+            .HasForeignKey(row => row.RunId)
+            .OnDelete(DeleteBehavior.Cascade);
+        item.HasOne<AppStorageBinding>().WithMany()
+            .HasForeignKey(row => new
+            {
+                row.PlacementId,
+                row.AppId,
+                row.StorageId
+            })
+            .HasPrincipalKey(row => new
+            {
+                row.PlacementId,
+                row.AppId,
+                row.StorageId
+            })
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -22,6 +22,7 @@ internal static partial class KubernetesApis
             writer.WriteStartObject();
             writer.WriteString("apiVersion", "v1");
             writer.WriteString("kind", "DeleteOptions");
+            writer.WriteString("propagationPolicy", "Foreground");
             writer.WriteStartObject("preconditions");
             writer.WriteString("uid", uid);
             writer.WriteString("resourceVersion", resourceVersion);

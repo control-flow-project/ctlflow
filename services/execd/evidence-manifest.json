@@ -169,6 +169,10 @@
         {
           "file": "tests/integration/workloads.test.ts",
           "title": "declares, realizes, reads, and lists both workload modes"
+        },
+        {
+          "file": "tests/integration/storage.test.ts",
+          "title": "keeps one App volume through a generation migration rollout"
         }
       ],
       "results": {
@@ -202,6 +206,10 @@
           {
             "file": "tests/integration/product-fences.test.ts",
             "title": "keeps a Workload's admitted authority fixed for its identity"
+          },
+          {
+            "file": "tests/integration/storage.test.ts",
+            "title": "isolates App bindings and rejects drift or corrupt ownership"
           }
         ],
         "ABORTED": [
@@ -214,6 +222,12 @@
           {
             "file": "tests/integration/realization-failures.test.ts",
             "title": "fails synchronously when Pkgd is unavailable"
+          }
+        ],
+        "RESOURCE_EXHAUSTED": [
+          {
+            "file": "tests/integration/storage.test.ts",
+            "title": "keeps one App volume through a generation migration rollout"
           }
         ],
         "CANCELLED": [
@@ -261,6 +275,10 @@
           {
             "file": "tests/integration/zz-persistence.test.ts",
             "title": "readiness and RPCs fail closed when a mapped table is missing"
+          },
+          {
+            "file": "tests/integration/storage.test.ts",
+            "title": "isolates App bindings and rejects drift or corrupt ownership"
           }
         ],
         "CANCELLED": [
@@ -328,6 +346,10 @@
         {
           "file": "tests/integration/product-authorization.test.ts",
           "title": "authorizes a product operation from inside a finite Run Job"
+        },
+        {
+          "file": "tests/integration/storage.test.ts",
+          "title": "keeps one App volume through a generation migration rollout"
         }
       ],
       "results": {
@@ -358,7 +380,7 @@
         "RESOURCE_EXHAUSTED": [
           {
             "file": "tests/integration/runs.test.ts",
-            "title": "rejects a second run while workload-private storage is occupied"
+            "title": "rejects a second run while App storage is occupied"
           }
         ],
         "UNAUTHENTICATED": [
@@ -632,6 +654,14 @@
     {
       "file": "tests/integration/api.test.ts",
       "title": "execd health and readiness probes are available"
+    },
+    {
+      "file": "tests/integration/storage.test.ts",
+      "title": "keeps one App volume through a generation migration rollout"
+    },
+    {
+      "file": "tests/integration/storage.test.ts",
+      "title": "isolates App bindings and rejects drift or corrupt ownership"
     },
     {
       "file": "tests/integration/security.test.ts",

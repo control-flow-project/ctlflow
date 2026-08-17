@@ -41,7 +41,27 @@ internal static partial class ExecutionReconciliation
             var namespaceName = subject.Namespace;
             if (workload.DesiredState == DesiredState.Retired)
             {
-                await DeleteWorkloadObjects(
+                var quiesced = await SuspendWorkload(
+                    database,
+                    kubernetes,
+                    placement,
+                    workload,
+                    namespaceName,
+                    cancellation);
+                if (!quiesced)
+                {
+                    await UpdateWorkloadRealization(
+                        database,
+                        workload.Id,
+                        workload.Revision,
+                        RealizationPhase.Degraded,
+                        RealizationReason.ExecutionUnready,
+                        now,
+                        cancellation);
+                    return;
+                }
+
+                var stopped = await DeleteWorkloadObjects(
                     database,
                     kubernetes,
                     placement,
@@ -52,8 +72,12 @@ internal static partial class ExecutionReconciliation
                     database,
                     workload.Id,
                     workload.Revision,
-                    RealizationPhase.Retired,
-                    RealizationReason.None,
+                    stopped
+                        ? RealizationPhase.Retired
+                        : RealizationPhase.Degraded,
+                    stopped
+                        ? RealizationReason.None
+                        : RealizationReason.ExecutionUnready,
                     now,
                     cancellation);
                 return;
@@ -65,7 +89,7 @@ internal static partial class ExecutionReconciliation
                     cancellation)
                 || workload.DesiredState == DesiredState.Suspended)
             {
-                await SuspendWorkload(
+                var stopped = await SuspendWorkload(
                     database,
                     kubernetes,
                     placement,
@@ -76,8 +100,12 @@ internal static partial class ExecutionReconciliation
                     database,
                     workload.Id,
                     workload.Revision,
-                    RealizationPhase.Suspended,
-                    RealizationReason.None,
+                    stopped
+                        ? RealizationPhase.Suspended
+                        : RealizationPhase.Degraded,
+                    stopped
+                        ? RealizationReason.None
+                        : RealizationReason.ExecutionUnready,
                     now,
                     cancellation);
                 return;

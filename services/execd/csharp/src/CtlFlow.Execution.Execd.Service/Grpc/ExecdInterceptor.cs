@@ -9,6 +9,7 @@ using CtlFlow.Execution.Execd.Service.Telemetry;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using Microsoft.EntityFrameworkCore;
+using static CtlFlow.Execution.Execd.Db.Providers.ExecutionDatabaseProviders;
 using static CtlFlow.Execution.Execd.Service.Grpc.GrpcStatuses;
 
 namespace CtlFlow.Execution.Execd.Service.Grpc;
@@ -126,7 +127,7 @@ internal sealed class ExecdInterceptor(
                 operation,
                 exception.GetType().Name,
                 cause?.GetType().Name ?? "none",
-                cause?.ErrorCode ?? 0,
+                cause is null ? 0 : GetDatabaseFailureCode(cause),
                 null);
             throw CreateRpcException(StatusCode.Unavailable);
         }

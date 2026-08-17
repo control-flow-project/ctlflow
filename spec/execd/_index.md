@@ -19,8 +19,9 @@ Execd owns:
   realization status;
 - reusable continuous or finite Workload intent and its admitted Package
   snapshot;
-- Workload-private storage, configuration targets, dependency selections,
-  interfaces, and endpoint status;
+- App-owned persistent-storage bindings plus Workload mount declarations,
+  configuration targets, dependency selections, interfaces, and endpoint
+  status;
 - one immutable Run admission for one finite Workload revision; and
 - the mapping from those records to Execd-owned Kubernetes resources.
 
@@ -63,7 +64,7 @@ controller. This mapping is process configuration, not an Execd record or
 caller operation. A Placement cannot declare an unknown provisioner.
 
 Desired state is `ACTIVE`, `SUSPENDED`, or terminal `RETIRED`. Suspension
-stops continuous execution and rejects new Runs while preserving storage.
+stops continuous execution and rejects new Runs while preserving App storage.
 A Placement is effectively active only while it and every ancestor are
 active; ancestor suspension suspends descendant realization without changing
 their stored desired state. Retirement requires child Workloads and
@@ -103,6 +104,16 @@ life of its identity: the derived ServiceAccount subject is stable, so an
 already realized Pod can never acquire a later generation's operations while
 it is still running. Adopting a new generation is a new Workload ID, and
 therefore a new subject, a new admission, and a new operation snapshot.
+After an App advances, mutations to an existing Workload remain pinned to that
+Workload's retained Package snapshot so it can be suspended or retired; only a
+new Workload ID adopts the App's current desired generation.
+
+Every continuous Workload Pod and each of its interface Services carry the
+kernel-owned `execution.ctlflow.io/app-selector` label. Its value is the
+deterministic native token for domain `ctlflow.execution.v1.AppSelector` and
+the admitted App ID. The value is stable across generation-specific Workload
+IDs and may be selected by an App-scoped internal Service. Workloads cannot
+set or override it.
 
 Configuration targets name an exact Configd configuration or secret version
 and one purpose. Execd passes the stored Placement target, Workload as
@@ -121,11 +132,21 @@ purpose-bound parameter projections, and creates one deterministic
 outputs make realization `BINDING_UNAVAILABLE`; they do not create another
 caller-visible operation.
 
-Persistent storage slots have stable IDs, positive capacity, and unique,
-normalized absolute POSIX mount paths. `/`, `/dev`, `/proc`, `/sys`,
-`/run/ctlflow`, and descendants of those reserved roots are invalid. Slots
-cannot shrink or disappear before Workload retirement. Storage admits one
-continuous replica or one nonterminal Run at a time.
+Persistent storage is bound to one exact Placement, admitted App, and stable
+storage ID. A Workload declares only the mount path and capacity with which it
+selects that binding. The first selector fixes a positive capacity; every
+later Workload for that App and Placement must request the same capacity.
+Package generation and Workload identity are not storage identity.
+
+Mount paths are unique, normalized absolute POSIX paths. `/`, `/dev`,
+`/proc`, `/sys`, `/run/ctlflow`, and descendants of those reserved roots are
+invalid. A binding admits one realized continuous Workload or one nonterminal
+Run at a time across every Workload ID that selects it. A continuous Workload
+is not observed `SUSPENDED` or `RETIRED` until its execution has stopped.
+A cancelling Run remains nonterminal until foreground Kubernetes deletion has
+removed its Job and dependent Pods.
+Workload suspension and retirement preserve the binding and native volume;
+Placement retirement remains the terminal namespace cleanup boundary.
 
 Only selected HTTP Package exposures on a Tenant or Workspace continuous
 Workload receive an Edged sidecar. Global and User Workloads and every finite
@@ -144,8 +165,10 @@ nor substitute the Edged credential, target, or trust anchor.
 
 `CreateRun` accepts one globally unique Run ID and one finite Workload ID. It
 snapshots Placement target, Workload revision, configured Actor, admitted
-Package component, resources, projections, dependencies, storage, duration,
-and attempts. Later App or Workload changes do not mutate the snapshot.
+Package component, resources, projections, dependencies, storage selections,
+duration, and attempts. Later App or Workload changes do not mutate the
+snapshot. Admission fails while another continuous Workload or nonterminal Run
+uses any selected App-storage binding.
 
 For a non-Global Run, the reconciler calls `identityd.IssueRunInvocation` with
 the stored Actor, Run ID, Tenant, and optional Workspace immediately before
@@ -160,7 +183,10 @@ Run status. A Global Run has neither Actor nor invocation JWT.
 Run phase is `PENDING`, `STARTING`, `RUNNING`, `CANCELLING`, `SUCCEEDED`,
 `FAILED`, or `CANCELLED`. Terminal Runs are immutable. The first valid
 `CancelRun` advances revision once; a retry while cancelling or cancelled is
-idempotent, while a succeeded or failed Run is `FAILED_PRECONDITION`.
+idempotent, while a succeeded or failed Run is `FAILED_PRECONDITION`. Once
+`CANCELLING` is committed, reconciliation cannot return the Run to an
+executable phase; it may advance only to `CANCELLED` after foreground native
+deletion completes.
 Lifecycle timestamps sourced from Kubernetes are normalized to the Run's
 timeline: start is never earlier than creation, and completion is never
 earlier than start. This accounts for native timestamp precision without
@@ -435,7 +461,7 @@ revision.
 | `ALREADY_EXISTS` | Conflicting Placement, Workload, or Run identity |
 | `FAILED_PRECONDITION` | Lifecycle, parent, constraint, Package, storage, interface, Actor, or terminal state forbids the request |
 | `ABORTED` | Expected revision or post-dependency recheck changed |
-| `RESOURCE_EXHAUSTED` | A declared finite resource or concurrency ceiling is reached |
+| `RESOURCE_EXHAUSTED` | A declared finite resource or concurrency ceiling, including App-storage exclusivity, is reached |
 | `UNAUTHENTICATED` | Required operator, workload, or invocation identity is invalid |
 | `PERMISSION_DENIED` | Authenticated caller is not admitted or policy denies |
 | `UNAVAILABLE` | Persistence or an obligatory synchronous dependency is unavailable or malformed |

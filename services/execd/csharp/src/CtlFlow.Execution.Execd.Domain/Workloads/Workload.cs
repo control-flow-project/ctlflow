@@ -214,9 +214,10 @@ public class WorkloadDependencyOutput
 public class WorkloadStorage
 {
     internal string WorkloadId { get; set; } = null!;
+    internal string PlacementId { get; set; } = null!;
+    internal string AppId { get; set; } = null!;
     internal string StorageId { get; set; } = null!;
     internal string MountPath { get; set; } = null!;
-    internal long CapacityBytes { get; set; }
 }
 
 public class WorkloadInterface

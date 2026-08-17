@@ -128,11 +128,15 @@ test("realizes exact configuration, secret, and persistent storage",
         namespace,
         "configd")).length,
       1);
-    const claims = await ownedObjects(
+    const claims = await listOwnedKubernetesObjects(
+      getExecdTestSuite().kubernetes,
       "persistentvolumeclaims",
-      workloadId,
-      namespace,
-      "execd");
+      {
+        "execution.ctlflow.io/owner-service": "execd",
+        "execution.ctlflow.io/app-id": "realization_direct_app",
+        "execution.ctlflow.io/storage-id": "data"
+      },
+      namespace);
     assert.equal(claims.length, 1);
     const claimSpec = requireRecord(
       claims[0]!.spec,

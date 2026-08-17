@@ -17,7 +17,7 @@ internal static partial class WorkloadRows
         IReadOnlyList<WorkloadDependency> dependencies,
         IReadOnlyList<WorkloadDependencyParameter> parameters,
         IReadOnlyList<WorkloadDependencyOutput> outputs,
-        IReadOnlyList<WorkloadStorage> storage,
+        IReadOnlyList<PersistentStorage> storage,
         IReadOnlyList<WorkloadInterface> interfaces,
         IReadOnlyList<WorkloadOperation> operations)
     {
@@ -61,11 +61,9 @@ internal static partial class WorkloadRows
                         outputs))
                     .ToArray(),
                 storage
-                    .OrderBy(item => item.StorageId)
-                    .Select(item => new PersistentStorage(
-                        StorageId.Parse(item.StorageId),
-                        MountPath.Parse(item.MountPath),
-                        item.CapacityBytes))
+                    .OrderBy(
+                        item => item.StorageId.Value,
+                        StringComparer.Ordinal)
                     .ToArray(),
                 MapBehavior(row, interfaces),
                 new AdmittedPackageComponent(

@@ -19,7 +19,8 @@ function normalize(value) {
 }
 
 export function extractDiagnostics(output, roots) {
-  const packageRoot = path.join(homedir(), ".nuget", "packages");
+  const packageRoot = roots.packages
+    ?? path.join(homedir(), ".nuget", "packages");
   const counts = new Map();
 
   for (const line of output.split(/\r?\n/u)) {
@@ -29,8 +30,8 @@ export function extractDiagnostics(output, roots) {
 
     const fingerprint = line
       .replaceAll("\\", "/")
-      .replaceAll(normalize(roots.repository), "<repository>")
       .replaceAll(normalize(packageRoot), "<packages>")
+      .replaceAll(normalize(roots.repository), "<repository>")
       .replaceAll(normalize(roots.publication), "<publication>")
       .trim();
     counts.set(fingerprint, (counts.get(fingerprint) ?? 0) + 1);

@@ -3,9 +3,11 @@ using CtlFlow.Execution.Execd.Db.Providers;
 using CtlFlow.Execution.Execd.Domain.Errors;
 using CtlFlow.Execution.Execd.Domain.Identifiers;
 using CtlFlow.Execution.Execd.Domain.Resources;
+using CtlFlow.Execution.Execd.Domain.Storage;
 using CtlFlow.Execution.Execd.Domain.Workloads;
 using Microsoft.EntityFrameworkCore;
 using static CtlFlow.Execution.Execd.Db.Placements.Placements;
+using static CtlFlow.Execution.Execd.Db.Storage.StorageBindings;
 using static CtlFlow.Execution.Execd.Db.Workloads.WorkloadRows;
 
 namespace CtlFlow.Execution.Execd.Db.Workloads;
@@ -60,6 +62,27 @@ public static partial class Workloads
         {
             Dependencies = dependencies
         };
+        var storageBindings = await LoadAppStorageBindings(
+            database,
+            admitted.PlacementId,
+            admitted.AdmittedPackage.AppId,
+            admitted.Storage
+                .Select(item => item.StorageId)
+                .ToArray(),
+            cancellation);
+        await Domain.Storage.StorageBindings.ValidateAppStorageBindings(
+            admitted.Storage,
+            storageBindings,
+            cancellation);
+        var storageBusy = admitted.DesiredState == DesiredState.Active
+            && admitted.Behavior is WorkloadBehavior.Continuous
+            && await HasConflictingStorageConsumer(
+                database,
+                admitted.PlacementId,
+                admitted.AdmittedPackage.AppId,
+                admitted.Storage,
+                current?.Id,
+                cancellation);
         var hasNonterminalRun = current is not null
             && await HasNonterminalRun(
                 database,
@@ -83,6 +106,7 @@ public static partial class Workloads
                 placement.Constraints,
                 expectedRevision,
                 hasNonterminalRun,
+                storageBusy,
                 audit,
                 cancellation);
         if (decision is WorkloadDeclarationDecision.Current retained)
@@ -98,6 +122,8 @@ public static partial class Workloads
         var changedDraft = CreateWorkloadDraft(changed.Workload);
         await using var transaction =
             await context.Database.BeginTransactionAsync(cancellation);
+        context.AppStorageBindings.AddRange(
+            CreateAppStorageBindingRows(changedDraft, storageBindings));
         if (changed.IsCreate)
         {
             context.Workloads.Add(changed.Entity);

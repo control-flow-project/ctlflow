@@ -1,8 +1,10 @@
 using CtlFlow.Execution.Execd.Db.Providers;
 using CtlFlow.Execution.Execd.Domain.Errors;
 using CtlFlow.Execution.Execd.Domain.Identifiers;
+using CtlFlow.Execution.Execd.Domain.Storage;
 using CtlFlow.Execution.Execd.Domain.Workloads;
 using Microsoft.EntityFrameworkCore;
+using static CtlFlow.Execution.Execd.Db.Storage.StorageBindings;
 
 namespace CtlFlow.Execution.Execd.Db.Workloads;
 
@@ -211,14 +213,51 @@ public static partial class Workloads
             {
                 WorkloadId =
                     EF.Property<string>(item, "WorkloadId"),
+                PlacementId =
+                    EF.Property<string>(item, "PlacementId"),
+                AppId = EF.Property<string>(item, "AppId"),
                 StorageId =
                     EF.Property<string>(item, "StorageId"),
                 MountPath =
-                    EF.Property<string>(item, "MountPath"),
-                CapacityBytes =
-                    EF.Property<long>(item, "CapacityBytes")
+                    EF.Property<string>(item, "MountPath")
             })
             .ToListAsync(queryCancellation);
+        IReadOnlyList<PersistentStorage> restoredStorage;
+        try
+        {
+            var placementId = PlacementId.Parse(row.PlacementId);
+            var appId = AppId.Parse(row.AppId);
+            var facts = storage.Select(item => new AppStorageConsumerFact(
+                PlacementId.Parse(item.PlacementId),
+                AppId.Parse(item.AppId),
+                StorageId.Parse(item.StorageId),
+                MountPath.Parse(item.MountPath))).ToArray();
+            var bindings = await LoadAppStorageBindings(
+                database,
+                placementId,
+                appId,
+                facts.Select(item => item.StorageId).ToArray(),
+                cancellation);
+            restoredStorage = await Domain.Storage.StorageBindings
+                .RestorePersistentStorage(
+                    placementId,
+                    appId,
+                    facts,
+                    bindings,
+                    cancellation);
+        }
+        catch (ExecutionException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidOperationException
+                or OverflowException)
+        {
+            throw new ExecutionException(
+                ExecutionError.Unavailable,
+                "Stored Workload storage is invalid");
+        }
         var interfaces = await context.WorkloadInterfaces
             .AsNoTracking()
             .Where(item =>
@@ -332,13 +371,7 @@ public static partial class Workloads
                 ProjectionId = item.ProjectionId,
                 ProjectionRevision = item.ProjectionRevision
             }).ToArray(),
-            storage.Select(item => new WorkloadStorage
-            {
-                WorkloadId = item.WorkloadId,
-                StorageId = item.StorageId,
-                MountPath = item.MountPath,
-                CapacityBytes = item.CapacityBytes
-            }).ToArray(),
+            restoredStorage,
             interfaces.Select(item => new WorkloadInterface
             {
                 WorkloadId = item.WorkloadId,

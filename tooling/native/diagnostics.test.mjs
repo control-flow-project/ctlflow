@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { homedir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import {
   diagnosticsMatch,
@@ -36,6 +38,33 @@ test("extractDiagnostics ordering is locale-independent byte order", () => {
     extractDiagnostics(output, { repository: "/repo", publication: "/out" })
       .map((entry) => entry.fingerprint),
     ["<repository>/Z.cs: warning X1: m", "<repository>/a.cs: warning X1: m"]);
+});
+
+test("extractDiagnostics prefers the package root within a repository", () => {
+  const packageRoot = path.join(
+    homedir(),
+    "repository",
+    ".temp",
+    "nuget",
+    "nativeaot");
+  const packagePath = path.join(
+    packageRoot,
+    "example",
+    "1.0.0",
+    "example.dll");
+
+  assert.deepEqual(
+    extractDiagnostics(
+      `${packagePath}: warning IL2104: message`,
+      {
+        packages: packageRoot,
+        repository: path.join(homedir(), "repository"),
+        publication: path.join(homedir(), "repository", "out")
+      }),
+    [{
+      fingerprint: "<packages>/example/1.0.0/example.dll: warning IL2104: message",
+      count: 1
+    }]);
 });
 
 test("parseManifest accepts a well-formed manifest", () => {

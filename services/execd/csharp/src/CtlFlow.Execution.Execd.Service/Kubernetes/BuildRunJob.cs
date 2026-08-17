@@ -203,7 +203,8 @@ internal static partial class KubernetesBodies
             writer.WriteString(
                 "claimName",
                 NativeNames.StorageClaim(
-                    run.WorkloadId,
+                    run.PlacementId,
+                    run.Execution.AdmittedPackage.AppId,
                     storage.StorageId));
             writer.WriteEndObject();
             writer.WriteEndObject();

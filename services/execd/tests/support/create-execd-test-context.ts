@@ -94,6 +94,7 @@ Promise<ExecdTestContext> {
         expiresAt: new Date(
           Date.now() + 4 * 60_000).toISOString()
       },
+      principalFacts,
       loginProviders: [{
         tenantId: "tenant-a",
         providerId: "oidc",
@@ -363,6 +364,19 @@ readonly PrincipalAuthorizationFacts[] {
       subjectAccountEnabled: true,
       subjectAccountRevision: 1,
       membershipRevision: 1,
+      groupIds: []
+    },
+    {
+      principalId: "service:automation",
+      tenantId: "tenant-a",
+      workspaceId: "workspace-a",
+      principalKind: "service",
+      principalEnabled: true,
+      principalRevision: 2,
+      subjectAccountId: "service:automation",
+      subjectAccountEnabled: true,
+      subjectAccountRevision: 2,
+      membershipRevision: 2,
       groupIds: []
     }
   ];

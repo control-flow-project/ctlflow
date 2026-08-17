@@ -1,4 +1,5 @@
 using CtlFlow.Execution.Execd.Db.Workloads;
+using CtlFlow.Execution.Execd.Domain.Errors;
 using CtlFlow.Execution.Execd.Domain.Placements;
 using CtlFlow.Execution.Execd.Domain.Workloads;
 using CtlFlow.Execution.Execd.Service.Configuration;
@@ -16,6 +17,7 @@ internal static partial class WorkloadAdmission
         ExecdTelemetry telemetry,
         PlacementRecord placement,
         WorkloadRequest requested,
+        AdmittedPackageComponent? retainedPackage,
         CancellationToken cancellation)
     {
         var app = await GetApp(
@@ -25,6 +27,22 @@ internal static partial class WorkloadAdmission
             requested.PackageComponent.AppId,
             cancellation);
         var appAdmission = MapPackageApp(app);
+        if (retainedPackage is not null)
+        {
+            if (appAdmission.PackageId != retainedPackage.PackageId)
+            {
+                throw new ExecutionException(
+                    ExecutionError.Unavailable,
+                    "Pkgd returned an invalid App");
+            }
+
+            appAdmission = appAdmission with
+            {
+                AppRevision = retainedPackage.AppRevision,
+                PackageGeneration = retainedPackage.PackageGeneration
+            };
+        }
+
         var package = await GetPackage(
             packageClient,
             settings.Package,

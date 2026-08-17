@@ -19,6 +19,7 @@ await import("./configuration-rollout.test.js");
 await import("./realization.test.js");
 await import("./realization-failures.test.js");
 await import("./runs.test.js");
+await import("./storage.test.js");
 await import("./security.test.js");
 await import("./product-authorization.test.js");
 await import("./product-telemetry.test.js");

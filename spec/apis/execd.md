@@ -192,7 +192,7 @@ A Workload selects one App component and one behavior:
 | `resources` | CPU millis and memory bytes |
 | `configd_targets` | Exact configuration or secret versions by purpose |
 | `dependencies` | Package dependency selections and provisioning-parameter references |
-| `persistent_storage` | Named mount paths and capacities |
+| `persistent_storage` | App-storage IDs with Workload mount paths and fixed capacities |
 | `continuous` | Replica count and selected interface IDs |
 | `finite` | Optional Actor principal, Run duration, and max attempts |
 
@@ -269,6 +269,12 @@ ServiceAccount, projections, claims, storage, Kubernetes workload resources,
 and private Services. Admitted public HTTP interfaces receive an Edged
 sidecar only for Tenant or Workspace continuous Workloads.
 
+A persistent-storage selection resolves by the Workload's exact Placement,
+admitted App, and `storage_id`. A successor Workload for a later Package
+generation selects the same binding by declaring the same ID and capacity.
+Suspending or retiring either Workload does not delete that App-owned volume.
+Only one continuous execution or nonterminal Run may use the binding at once.
+
 ## Finite Workload and Run
 
 A finite Workload is reusable execution intent. It is not itself one
@@ -343,7 +349,9 @@ invocation into the Run. It then realizes one Kubernetes Job.
 
 The first nonterminal cancellation request is committed and audited. Repeating
 the request while cancellation is already requested is idempotent. A
-succeeded or failed Run returns `FAILED_PRECONDITION`.
+succeeded or failed Run returns `FAILED_PRECONDITION`. The committed
+`CANCELLING` phase is monotonic and advances only to `CANCELLED` after the
+native Job and its dependent Pods are gone.
 
 ## Pagination
 
@@ -370,7 +378,7 @@ Execd stores no cursor.
 | `ALREADY_EXISTS` | Placement, Workload, or Run identity conflicts |
 | `FAILED_PRECONDITION` | Lifecycle, constraint, Package, storage, interface, Actor, or terminal state forbids the request |
 | `ABORTED` | Expected revision or post-dependency recheck changed |
-| `RESOURCE_EXHAUSTED` | A declared finite resource or concurrency ceiling is reached |
+| `RESOURCE_EXHAUSTED` | A declared finite resource or concurrency ceiling, including App-storage exclusivity, is reached |
 | `UNAUTHENTICATED` | Required operator, workload, or invocation identity is invalid |
 | `PERMISSION_DENIED` | Caller admission or capability check failed |
 | `UNAVAILABLE` | Persistence or an obligatory synchronous dependency is unavailable |

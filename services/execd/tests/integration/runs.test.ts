@@ -257,7 +257,7 @@ test("enforces run identity, readiness, pagination, and immutable snapshots",
     await cancelAndWait(run.runId);
   });
 
-test("rejects a second run while workload-private storage is occupied",
+test("rejects a second run while App storage is occupied",
   async () => {
     const placement = await declarePlacement(
       createPlacementRequest({
@@ -339,13 +339,14 @@ async function waitForWorkloadReady(
 
 async function waitForRunPhase(
   runId: string,
-  phase: RunPhase
+  phase: RunPhase,
+  timeoutMilliseconds = 10_000
 ): Promise<Run> {
   try {
     return await waitFor(
       async () => await getRun(runId),
       (value) => value.phase === phase,
-      10_000);
+      timeoutMilliseconds);
   } catch (error) {
     const current = await getRun(runId);
     const suite = getExecdTestSuite();
@@ -388,7 +389,8 @@ async function cancelAndWait(runId: string): Promise<Run> {
     runId);
   const cancelled = await waitForRunPhase(
     runId,
-    RunPhase.RUN_PHASE_CANCELLED);
+    RunPhase.RUN_PHASE_CANCELLED,
+    40_000);
   assert.equal(
     cancelled.reason,
     RunReason.RUN_REASON_CANCEL_REQUESTED);

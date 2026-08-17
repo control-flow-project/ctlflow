@@ -9,7 +9,7 @@ internal static partial class KubernetesBodies
 {
     internal static byte[] BuildPersistentVolumeClaim(
         PlacementId placementId,
-        WorkloadId workloadId,
+        AppId appId,
         PersistentStorage storage,
         string namespaceName,
         string claimName) =>
@@ -22,7 +22,10 @@ internal static partial class KubernetesBodies
                 writer,
                 claimName,
                 namespaceName,
-                WorkloadAnnotations(placementId, workloadId));
+                AppStorageAnnotations(
+                    placementId,
+                    appId,
+                    storage.StorageId));
             writer.WriteStartObject("spec");
             writer.WriteStartArray("accessModes");
             writer.WriteStringValue("ReadWriteOnce");

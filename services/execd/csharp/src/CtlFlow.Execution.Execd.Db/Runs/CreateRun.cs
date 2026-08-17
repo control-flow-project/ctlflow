@@ -5,10 +5,10 @@ using CtlFlow.Execution.Execd.Domain.Identifiers;
 using CtlFlow.Execution.Execd.Domain.Resources;
 using CtlFlow.Execution.Execd.Domain.Runs;
 using CtlFlow.Execution.Execd.Domain.Workloads;
-using Microsoft.EntityFrameworkCore;
 using static CtlFlow.Execution.Execd.Db.Reconciliation.ReconciliationState;
 using static CtlFlow.Execution.Execd.Db.Placements.Placements;
 using static CtlFlow.Execution.Execd.Db.Runs.RunRows;
+using static CtlFlow.Execution.Execd.Db.Storage.StorageBindings;
 using static CtlFlow.Execution.Execd.Db.Workloads.Workloads;
 
 namespace CtlFlow.Execution.Execd.Db.Runs;
@@ -60,14 +60,13 @@ public static partial class Runs
             database,
             placement,
             cancellation);
-        var storageBusy = false;
-        if (workload.Storage.Count > 0)
-        {
-            storageBusy = await HasNonterminalRun(
-                database,
-                workloadId,
-                cancellation);
-        }
+        var storageBusy = await HasConflictingStorageConsumer(
+            database,
+            workload.PlacementId,
+            workload.AdmittedPackage.AppId,
+            workload.Storage,
+            null,
+            cancellation);
 
         await Domain.Runs.Runs.ValidateRunAdmission(
             workload,
@@ -103,35 +102,6 @@ public static partial class Runs
         return new MutationResult<RunRecord>(
             created.Run,
             created.Audit);
-    }
-
-    private static async Task<bool> HasNonterminalRun(
-        ExecutionDatabase database,
-        WorkloadId workloadId,
-        CancellationToken cancellation)
-    {
-        await using var context =
-            await database.Contexts.CreateDbContextAsync(cancellation);
-        var workloadIdValue = workloadId.Value;
-        var succeeded = (int)RunPhase.Succeeded;
-        var failed = (int)RunPhase.Failed;
-        var cancelled = (int)RunPhase.Cancelled;
-        var queryCancellation = cancellation;
-        var rows = await context.Runs
-            .AsNoTracking()
-            .Where(item =>
-                    EF.Property<string>(item, "WorkloadId")
-                        == workloadIdValue
-                    && EF.Property<int>(item, "Phase") != succeeded
-                    && EF.Property<int>(item, "Phase") != failed
-                    && EF.Property<int>(item, "Phase") != cancelled)
-            .Select(item => new
-            {
-                RunId = EF.Property<string>(item, "RunId")
-            })
-            .Take(1)
-            .ToListAsync(queryCancellation);
-        return rows.Count != 0;
     }
 
     private static async Task<IReadOnlyDictionary<
