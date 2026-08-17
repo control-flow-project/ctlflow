@@ -19,7 +19,7 @@ export function findSpansForTrace(
 ): OtlpSpan[] {
   const spans: OtlpSpan[] = [];
   for (const line of content.split("\n")) {
-    if (line.trim() === "") {
+    if (line.trim() === "" || !line.includes(traceId)) {
       continue;
     }
 

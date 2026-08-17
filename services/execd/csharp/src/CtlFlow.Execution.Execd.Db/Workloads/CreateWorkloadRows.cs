@@ -112,9 +112,10 @@ internal static partial class WorkloadRows
         draft.Storage.Select(item => new WorkloadStorage
         {
             WorkloadId = draft.Id.Value,
+            PlacementId = draft.PlacementId.Value,
+            AppId = draft.AdmittedPackage.AppId.Value,
             StorageId = item.StorageId.Value,
-            MountPath = item.MountPath.Value,
-            CapacityBytes = item.CapacityBytes
+            MountPath = item.MountPath.Value
         }).ToArray();
 
     internal static WorkloadInterface[] CreateInterfaceRows(

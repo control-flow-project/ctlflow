@@ -9,5 +9,6 @@ if (args.Length != 1)
 await ModelAudits.AuditExecutionModel(
     args[0],
     CancellationToken.None);
+ModelAudits.AuditDatabaseFailureCode();
 Console.WriteLine("execd EF compiled-model audit passed");
 return 0;

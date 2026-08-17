@@ -23,6 +23,17 @@ public static partial class Runs
             return ValueTask.FromResult(false);
         }
 
+        // Cancellation is a committed user intent. A reconciler observation
+        // that was collected before that intent must never move the Run back
+        // into an executable phase.
+        if ((current.Phase == RunPhase.Cancelling
+                && phase != RunPhase.Cancelled)
+            || (current.Phase != RunPhase.Cancelling
+                && phase == RunPhase.Cancelled))
+        {
+            return ValueTask.FromResult(false);
+        }
+
         if (attemptCount < 0
             || attemptCount > current.Execution.MaxAttempts)
         {

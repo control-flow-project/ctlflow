@@ -190,6 +190,17 @@ export async function up(knex: Knex): Promise<void> {
     knex,
     "workload_dependency_outputs",
     "workload_dependencies");
+  await knex.schema.createTable("app_storage_bindings", (table) => {
+    table.string("placement_id", 64).notNullable()
+      .references("placement_id").inTable("placements").onDelete("RESTRICT");
+    table.string("app_id", 64).notNullable();
+    table.string("storage_id", 64).notNullable();
+    table.bigInteger("capacity_bytes").notNullable();
+    table.primary(["placement_id", "app_id", "storage_id"]);
+    table.check(executionIdCheck, ["app_id", "app_id", "app_id"]);
+    table.check(executionIdCheck, ["storage_id", "storage_id", "storage_id"]);
+    table.check("capacity_bytes BETWEEN 1 AND 1125899906842624");
+  });
   await createStorage(knex, "workload_storage", "workload_id", "workloads");
 
   // Operations admitted for this Workload, snapshotted from the admitted
@@ -403,14 +414,24 @@ async function createStorage(
   await knex.schema.createTable(tableName, (table) => {
     table.string(ownerColumn, ownerLength).notNullable()
       .references(ownerColumn).inTable(ownerTable).onDelete("CASCADE");
+    table.string("placement_id", 64).notNullable();
+    table.string("app_id", 64).notNullable();
     table.string("storage_id", 64).notNullable();
     table.string("mount_path", 256).notNullable();
-    table.bigInteger("capacity_bytes").notNullable();
     table.primary([ownerColumn, "storage_id"]);
     table.unique([ownerColumn, "mount_path"]);
+    table.index(
+      ["placement_id", "app_id", "storage_id"],
+      `${tableName}_app_storage_binding_idx`);
+    table.foreign(
+      ["placement_id", "app_id", "storage_id"],
+      `${tableName}_app_storage_binding_fk`)
+      .references(["placement_id", "app_id", "storage_id"])
+      .inTable("app_storage_bindings").onDelete("RESTRICT");
+    table.check(executionIdCheck, ["placement_id", "placement_id", "placement_id"]);
+    table.check(executionIdCheck, ["app_id", "app_id", "app_id"]);
     table.check(executionIdCheck, ["storage_id", "storage_id", "storage_id"]);
     table.check("length(mount_path) BETWEEN 2 AND 256 AND substr(mount_path, 1, 1) = '/'");
-    table.check("capacity_bytes BETWEEN 1 AND 1125899906842624");
   });
 }
 
@@ -465,6 +486,7 @@ export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTableIfExists("workload_operations");
   await knex.schema.dropTableIfExists("workload_interfaces");
   await knex.schema.dropTableIfExists("workload_storage");
+  await knex.schema.dropTableIfExists("app_storage_bindings");
   await knex.schema.dropTableIfExists("workload_dependency_outputs");
   await knex.schema.dropTableIfExists("workload_dependency_parameters");
   await knex.schema.dropTableIfExists("workload_dependencies");

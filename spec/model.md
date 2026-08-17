@@ -19,7 +19,7 @@ checked versioned contracts.
 | Admitted Workload operation authority | `execd` |
 | Package and installed App intent | `pkgd` |
 | Configuration and secret custody | `configd` |
-| Placement, Workload, Run, and realization intent | `execd` |
+| Placement, Workload, Run, App-storage binding, and realization intent | `execd` |
 | Bound external HTTP admission and mediation | `egressd` |
 | Required kernel audit evidence | `auditd` |
 

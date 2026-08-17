@@ -28,8 +28,9 @@ internal static partial class RunRows
         workload.Storage.Select(item => new RunStorage
         {
             RunId = runId.Value,
+            PlacementId = workload.PlacementId.Value,
+            AppId = workload.AdmittedPackage.AppId.Value,
             StorageId = item.StorageId.Value,
-            MountPath = item.MountPath.Value,
-            CapacityBytes = item.CapacityBytes
+            MountPath = item.MountPath.Value
         }).ToArray();
 }

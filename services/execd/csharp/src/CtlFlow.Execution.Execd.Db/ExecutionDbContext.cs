@@ -1,5 +1,6 @@
 using CtlFlow.Execution.Execd.Domain.Placements;
 using CtlFlow.Execution.Execd.Domain.Runs;
+using CtlFlow.Execution.Execd.Domain.Storage;
 using CtlFlow.Execution.Execd.Domain.Workloads;
 using CtlFlow.Execution.Execd.Db.Schema;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,9 @@ public sealed class ExecutionDbContext(DbContextOptions<ExecutionDbContext> opti
     } = null!;
 
     public DbSet<WorkloadStorage> WorkloadStorage { get; private set; } =
+        null!;
+
+    public DbSet<AppStorageBinding> AppStorageBindings { get; private set; } =
         null!;
 
     public DbSet<WorkloadOperation> WorkloadOperations { get; private set; } =

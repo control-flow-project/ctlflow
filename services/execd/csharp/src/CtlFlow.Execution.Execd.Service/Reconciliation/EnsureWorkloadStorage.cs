@@ -20,7 +20,12 @@ internal static partial class ExecutionReconciliation
         foreach (var storage in workload.Storage)
         {
             var name = NativeNames.StorageClaim(
-                workload.Id,
+                placement.Id,
+                workload.AdmittedPackage.AppId,
+                storage.StorageId);
+            var annotations = AppStorageAnnotations(
+                placement.Id,
+                workload.AdmittedPackage.AppId,
                 storage.StorageId);
             var document = await EnsureOwnedObject(
                 kubernetes,
@@ -29,10 +34,10 @@ internal static partial class ExecutionReconciliation
                     name),
                 "PersistentVolumeClaim",
                 name,
-                WorkloadAnnotations(placement.Id, workload.Id),
+                annotations,
                 BuildPersistentVolumeClaim(
                     placement.Id,
-                    workload.Id,
+                    workload.AdmittedPackage.AppId,
                     storage,
                     namespaceName,
                     name),

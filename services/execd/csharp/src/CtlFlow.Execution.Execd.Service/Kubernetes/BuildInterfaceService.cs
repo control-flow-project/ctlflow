@@ -13,8 +13,14 @@ internal static partial class KubernetesBodies
         string namespaceName,
         string serviceName,
         string selector,
-        int edgeIndex) =>
-        BuildJsonBody(writer =>
+        int edgeIndex)
+    {
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["execution.ctlflow.io/app-selector"] =
+                NativeNames.AppSelector(workload.AdmittedPackage.AppId)
+        };
+        return BuildJsonBody(writer =>
         {
             writer.WriteStartObject();
             writer.WriteString("apiVersion", "v1");
@@ -23,7 +29,8 @@ internal static partial class KubernetesBodies
                 writer,
                 serviceName,
                 namespaceName,
-                WorkloadAnnotations(placementId, workload.Id));
+                WorkloadAnnotations(placementId, workload.Id),
+                labels);
             writer.WriteStartObject("spec");
             writer.WriteStartObject("selector");
             writer.WriteString(
@@ -44,4 +51,5 @@ internal static partial class KubernetesBodies
             writer.WriteEndObject();
             writer.WriteEndObject();
         });
+    }
 }

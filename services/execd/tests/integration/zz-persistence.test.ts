@@ -104,6 +104,7 @@ test("SQLite contains only migration metadata and Execd domain tables",
       objects.filter((object) => object.type === "table")
         .map((object) => object.name),
       [
+        "app_storage_bindings",
         "knex_migrations",
         "knex_migrations_lock",
         "placement_provisioners",

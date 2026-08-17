@@ -16,6 +16,7 @@ import {
   rmSync,
   writeFileSync
 } from "node:fs";
+import path from "node:path";
 import {
   diagnosticsMatch,
   extractDiagnostics,
@@ -33,13 +34,23 @@ if (!project || !manifestPath || !outputDir) {
 }
 
 const repositoryRoot = process.cwd();
+const packageCache = path.join(
+  repositoryRoot,
+  ".temp",
+  "nuget",
+  "nativeaot");
 rmSync(outputDir, { recursive: true, force: true });
 mkdirSync(outputDir, { recursive: true });
+mkdirSync(packageCache, { recursive: true });
 
 function dotnet(args) {
   const result = spawnSync("dotnet", args, {
     cwd: repositoryRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      NUGET_PACKAGES: packageCache
+    },
     maxBuffer: 512 * 1024 * 1024
   });
   return {
@@ -69,7 +80,8 @@ require("dotnet Release clean", dotnet([
 
 require("locked restore", dotnet([
   "restore", project, "--runtime", "linux-x64",
-  "--disable-build-servers", "--locked-mode"
+  "--disable-build-servers", "--locked-mode",
+  "-p:DisableImplicitLibraryPacksFolder=true"
 ]));
 
 const publish = require("NativeAOT publish", dotnet([
@@ -83,6 +95,7 @@ const publish = require("NativeAOT publish", dotnet([
 ]));
 
 const actual = extractDiagnostics(publish.output, {
+  packages: packageCache,
   repository: repositoryRoot,
   publication: outputDir
 });

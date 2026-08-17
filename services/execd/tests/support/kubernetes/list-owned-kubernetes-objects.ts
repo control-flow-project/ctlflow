@@ -7,6 +7,7 @@ export interface KubernetesObject {
     readonly name: string;
     readonly namespace?: string;
     readonly annotations: Readonly<Record<string, string>>;
+    readonly labels?: Readonly<Record<string, string>>;
   };
   readonly spec?: unknown;
   readonly status?: unknown;
@@ -57,6 +58,10 @@ function isKubernetesObject(
   }
   if (metadata.annotations !== undefined
       && !isStringRecord(metadata.annotations)) {
+    return false;
+  }
+  if (metadata.labels !== undefined
+      && !isStringRecord(metadata.labels)) {
     return false;
   }
   if (metadata.annotations === undefined) {

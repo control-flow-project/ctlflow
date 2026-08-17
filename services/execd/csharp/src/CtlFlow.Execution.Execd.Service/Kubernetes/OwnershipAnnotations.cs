@@ -28,6 +28,22 @@ internal static partial class ExecutionOwnership
         return annotations;
     }
 
+    internal static IReadOnlyDictionary<string, string>
+        AppStorageAnnotations(
+            PlacementId placementId,
+            AppId appId,
+            StorageId storageId)
+    {
+        var annotations = new Dictionary<string, string>(
+            PlacementAnnotations(placementId),
+            StringComparer.Ordinal)
+        {
+            ["execution.ctlflow.io/app-id"] = appId.Value,
+            ["execution.ctlflow.io/storage-id"] = storageId.Value
+        };
+        return annotations;
+    }
+
     internal static IReadOnlyDictionary<string, string> RunAnnotations(
         PlacementId placementId,
         WorkloadId workloadId,

@@ -34,11 +34,17 @@ public static class NativeNames
             workloadId.Value)}";
 
     public static string StorageClaim(
-        WorkloadId workloadId,
+        PlacementId placementId,
+        AppId appId,
         StorageId storageId) =>
         $"vol-{CreateNativeToken(
             "ctlflow.execution.v1.StorageClaim",
-            $"{workloadId.Value}/{storageId.Value}")}";
+            $"{placementId.Value}/{appId.Value}/{storageId.Value}")}";
+
+    public static string AppSelector(AppId appId) =>
+        CreateNativeToken(
+            "ctlflow.execution.v1.AppSelector",
+            appId.Value);
 
     public static string InterfaceService(
         WorkloadId workloadId,

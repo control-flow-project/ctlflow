@@ -5,6 +5,7 @@ import {
 } from "@grpc/grpc-js";
 import {
   DesiredState,
+  RealizationPhase,
   type ResolveWorkloadOperationBindingResponse
 } from "../generated/v1/execd.js";
 import {
@@ -40,6 +41,7 @@ import {
   declareWorkload,
   fixture,
   getPlacement,
+  getWorkload,
   grantedOperation,
   productCheck,
   resumePlacement,
@@ -50,6 +52,9 @@ import {
   workspaceId,
   workspacePath
 } from "../support/product/product-fixtures.js";
+import {
+  waitFor
+} from "../support/wait-for.js";
 
 // Placement containment, App anchoring, generation pinning, lifecycle
 // concealment, and the resolver admission boundary for product operations.
@@ -304,7 +309,6 @@ test("admits only Policyd to the resolver", async () => {
   resolverMetadata.set(
     "traceparent",
     `00-${traceId}-0123456789abcdef-01`);
-  await suite.collector.clearExports();
   const binding = await callUnary<ResolveWorkloadOperationBindingResponse>(
     (done) => context.capabilityClient.resolveWorkloadOperationBinding(
       request,
@@ -406,9 +410,9 @@ test("rejects malformed resolver selectors as invalid arguments", async () => {
 test("keeps a Workload's admitted authority fixed for its identity",
   async () => {
     // The derived ServiceAccount subject is stable for a Workload ID, so its
-    // authority must be too. Moving the App to a later generation and
-    // redeclaring the same Workload ID is refused: adopting the generation
-    // requires a new Workload ID, and therefore a new subject and admission.
+    // authority must be too. Moving the App to a later generation does not
+    // change that Workload's retained Package snapshot. Lifecycle mutations
+    // remain possible, while adopting the generation requires a new ID.
     const context = getExecdTestContext();
     const upgraded = fixture("roll_old");
     const app = await callUnary<{ readonly revision: bigint }>((done) =>
@@ -420,19 +424,43 @@ test("keeps a Workload's admitted authority fixed for its identity",
         },
         done));
     assert.ok(app.revision > 1n);
-    await assert.rejects(
-      callUnary((done) => context.client.declareWorkload(
-        {
-          ...createWorkloadRequest({
-            workloadId: "wld_roll_old",
-            placementId: "product_workspace",
-            appId: upgraded.appId,
-            mode: "continuous"
-          }),
-          expectedRevision: 1n
-        },
-        done)),
-      matchGrpcStatus(status.FAILED_PRECONDITION));
+    const current = await getWorkload("wld_roll_old");
+    const request = createWorkloadRequest({
+      workloadId: current.workloadId,
+      placementId: current.placementId,
+      appId: upgraded.appId,
+      mode: "continuous",
+      resources: {
+        cpuMillis: 25,
+        memoryBytes: 32n * 1_024n * 1_024n
+      }
+    });
+    const suspended = await declareWorkload({
+      ...request,
+      expectedRevision: current.revision,
+      declaration: {
+        ...request.declaration!,
+        desiredState: DesiredState.DESIRED_STATE_SUSPENDED
+      }
+    });
+    await waitFor(
+      async () => await getWorkload(current.workloadId),
+      (value) => value.realization?.phase
+        === RealizationPhase.REALIZATION_PHASE_SUSPENDED,
+      60_000);
+    const resumed = await declareWorkload({
+      ...request,
+      expectedRevision: suspended.revision
+    });
+    const retained = await waitFor(
+      async () => await getWorkload(current.workloadId),
+      (value) => value.revision === resumed.revision
+        && value.realization?.phase
+          === RealizationPhase.REALIZATION_PHASE_READY,
+      60_000);
+    assert.equal(
+      retained.admittedPackageComponent?.packageGeneration,
+      1n);
 
     // The already admitted Workload keeps the authority it was admitted with.
     assert.deepEqual(
@@ -502,6 +530,10 @@ test("fails closed when the Execd dependency answer is corrupt", async () => {
       .raw("PRAGMA ignore_check_constraints = OFF");
   }
 
+  // Minikube can close the host-only tunnel when the corrupt-state RPC
+  // terminates its active stream. Reconnect only that test transport and
+  // require both real service endpoints to be healthy before continuing.
+  await context.process.reconnect();
   assert.deepEqual(
     await productCheck(chat, request),
     { decision: "allow" });

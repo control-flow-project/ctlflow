@@ -34,11 +34,15 @@ internal static partial class ExecutionReconciliation
         {
             if (run.Phase == RunPhase.Cancelling)
             {
-                await CancelKubernetesRun(
-                    kubernetes,
-                    run,
-                    namespaceName,
-                    cancellation);
+                if (!await CancelKubernetesRun(
+                        kubernetes,
+                        run,
+                        namespaceName,
+                        cancellation))
+                {
+                    return;
+                }
+
                 await UpdateRunState(
                     database,
                     run.Id,
@@ -245,29 +249,41 @@ internal static partial class ExecutionReconciliation
         return true;
     }
 
-    private static async Task CancelKubernetesRun(
+    private static async Task<bool> CancelKubernetesRun(
         KubernetesApi kubernetes,
         RunRecord run,
         string namespaceName,
         CancellationToken cancellation)
     {
         var jobName = NativeNames.RunJob(run.Id);
-        await DeleteOwnedObject(
+        var path = KubernetesResourcePaths.Job(namespaceName, jobName);
+        var job = await GetObject(
             kubernetes,
-            KubernetesResourcePaths.Job(namespaceName, jobName),
-            "Job",
-            jobName,
-            RunAnnotations(
-                run.PlacementId,
-                run.WorkloadId,
-                run.Id),
-            "run_job",
+            path,
+            "get_run_job",
             cancellation);
+        if (job.Document is not null)
+        {
+            await DeleteOwnedObject(
+                kubernetes,
+                path,
+                "Job",
+                jobName,
+                RunAnnotations(
+                    run.PlacementId,
+                    run.WorkloadId,
+                    run.Id),
+                "run_job",
+                cancellation);
+            return false;
+        }
+
         await DeleteRunInvocation(
             kubernetes,
             run,
             namespaceName,
             cancellation);
+        return true;
     }
 
     private static async Task RecordRunFailure(

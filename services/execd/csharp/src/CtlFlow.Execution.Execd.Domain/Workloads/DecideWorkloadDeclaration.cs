@@ -16,6 +16,7 @@ public static partial class Workloads
             PlacementConstraints constraints,
             Revision? expectedRevision,
             bool hasNonterminalRun,
+            bool persistentStorageIsBusy,
             AuditContext audit,
             CancellationToken cancellation)
     {
@@ -28,6 +29,7 @@ public static partial class Workloads
                 throw Aborted();
             }
 
+            EnsureStorageAvailable(requested, persistentStorageIsBusy);
             var created = CreateRecord(
                 requested,
                 Revision.Initial(),
@@ -104,6 +106,7 @@ public static partial class Workloads
         }
 
         EnsureStorageTransition(current, requested);
+        EnsureStorageAvailable(requested, persistentStorageIsBusy);
         if (requested.DesiredState == DesiredState.Retired
             && hasNonterminalRun)
         {
@@ -254,11 +257,26 @@ public static partial class Workloads
                     out var replacement)
                 || replacement.MountPath != retained.MountPath
                 || replacement.CapacityBytes
-                    < retained.CapacityBytes)
+                    != retained.CapacityBytes)
             {
                 throw Failed(
-                    "Storage cannot move, shrink, or disappear");
+                    "Storage cannot move, resize, or disappear");
             }
+        }
+    }
+
+    private static void EnsureStorageAvailable(
+        WorkloadDraft requested,
+        bool persistentStorageIsBusy)
+    {
+        if (requested.DesiredState == DesiredState.Active
+            && requested.Behavior is WorkloadBehavior.Continuous
+            && requested.Storage.Count > 0
+            && persistentStorageIsBusy)
+        {
+            throw new ExecutionException(
+                ExecutionError.ResourceExhausted,
+                "Persistent storage is in use");
         }
     }
 

@@ -59,7 +59,18 @@ export async function startOpenTelemetryCollector(
     logsPath,
     clearExports: async () => {
       requireRunning(stopped);
-      await initializeOutputs(tracesPath, metricsPath, logsPath);
+      if (suspended) {
+        throw new Error("Cannot clear exports while the OpenTelemetry Collector is suspended");
+      }
+
+      await scale(kubernetes, 0);
+      try {
+        await waitForCollector(kubernetes);
+        await initializeOutputs(tracesPath, metricsPath, logsPath);
+      } finally {
+        await scale(kubernetes, 1);
+        await waitForCollector(kubernetes);
+      }
     },
     suspend: async () => {
       requireRunning(stopped);

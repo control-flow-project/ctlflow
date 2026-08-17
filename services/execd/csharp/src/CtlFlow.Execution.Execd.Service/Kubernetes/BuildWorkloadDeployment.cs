@@ -26,7 +26,9 @@ internal static partial class KubernetesBodies
         var labels = new Dictionary<string, string>(
             StringComparer.Ordinal)
         {
-            ["execution.ctlflow.io/workload"] = accountName
+            ["execution.ctlflow.io/workload"] = accountName,
+            ["execution.ctlflow.io/app-selector"] =
+                NativeNames.AppSelector(workload.AdmittedPackage.AppId)
         };
         return BuildJsonBody(writer =>
         {
@@ -394,7 +396,8 @@ internal static partial class KubernetesBodies
             writer.WriteString(
                 "claimName",
                 NativeNames.StorageClaim(
-                    workload.Id,
+                    workload.PlacementId,
+                    workload.AdmittedPackage.AppId,
                     storage.StorageId));
             writer.WriteEndObject();
             writer.WriteEndObject();

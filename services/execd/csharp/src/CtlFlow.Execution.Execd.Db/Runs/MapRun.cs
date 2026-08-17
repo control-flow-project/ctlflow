@@ -17,7 +17,7 @@ internal static partial class RunRows
         IReadOnlyList<RunDependency> dependencies,
         IReadOnlyList<RunDependencyParameter> parameters,
         IReadOnlyList<RunDependencyOutput> outputs,
-        IReadOnlyList<RunStorage> storage)
+        IReadOnlyList<PersistentStorage> storage)
     {
         try
         {
@@ -63,11 +63,9 @@ internal static partial class RunRows
                             outputs))
                         .ToArray(),
                     storage
-                        .OrderBy(item => item.StorageId)
-                        .Select(item => new PersistentStorage(
-                            StorageId.Parse(item.StorageId),
-                            MountPath.Parse(item.MountPath),
-                            item.CapacityBytes))
+                        .OrderBy(
+                            item => item.StorageId.Value,
+                            StringComparer.Ordinal)
                         .ToArray(),
                     row.RunDurationSeconds,
                     row.MaxAttempts),

@@ -5,13 +5,12 @@ using CtlFlow.Execution.Execd.Service.Kubernetes;
 using static CtlFlow.Execution.Execd.Db.Reconciliation.ReconciliationState;
 using static CtlFlow.Execution.Execd.Service.Kubernetes.ExecutionOwnership;
 using static CtlFlow.Execution.Execd.Service.Kubernetes.KubernetesApis;
-using static CtlFlow.Execution.Execd.Service.Kubernetes.KubernetesBodies;
 
 namespace CtlFlow.Execution.Execd.Service.Reconciliation;
 
 internal static partial class ExecutionReconciliation
 {
-    internal static async Task SuspendWorkload(
+    internal static async Task<bool> SuspendWorkload(
         ExecutionDatabase database,
         KubernetesApi kubernetes,
         PlacementRecord placement,
@@ -31,10 +30,9 @@ internal static partial class ExecutionReconciliation
                 cancellation);
         }
 
-        if (workload.Behavior is not WorkloadBehavior.Continuous
-            || !AllProjectionsAreResolved(workload))
+        if (workload.Behavior is not WorkloadBehavior.Continuous)
         {
-            return;
+            return true;
         }
 
         var accountName = Domain.Naming.NativeNames.ParseServiceAccountSubject(
@@ -42,30 +40,21 @@ internal static partial class ExecutionReconciliation
         var path = KubernetesResourcePaths.Deployment(
             namespaceName,
             accountName);
-        if ((await GetObject(
+        var deployment = await ScaleOwnedDeploymentToZero(
                 kubernetes,
                 path,
-                "get_workload_deployment",
-                cancellation)).Document is null)
+                accountName,
+                WorkloadAnnotations(placement.Id, workload.Id),
+                cancellation);
+        if (deployment is null)
         {
-            return;
+            return true;
         }
 
-        await EnsureOwnedObject(
-            kubernetes,
-            path,
-            "Deployment",
-            accountName,
-            WorkloadAnnotations(placement.Id, workload.Id),
-            BuildWorkloadDeployment(
-                placement,
-                workload,
-                namespaceName,
-                accountName,
-                kubernetes.Settings.Edged,
-                kubernetes.Settings.Bootstrap,
-                0),
-            "workload_deployment",
-            cancellation);
+        var status = InspectDeployment(deployment.Value);
+        return status.ObservedGeneration >= status.Generation
+            && status.AvailableReplicas == 0
+            && status.Replicas == 0
+            && status.UpdatedReplicas == 0;
     }
 }

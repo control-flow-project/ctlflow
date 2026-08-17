@@ -54,7 +54,6 @@ test("resolver honors in-flight cancellation", async () => {
   const traceId = "41000000000000000000000000000001";
   const metadata = workloadMetadata(policyd.callerToken);
   metadata.set("traceparent", `00-${traceId}-0000000000000001-01`);
-  await suite.collector.clearExports();
 
   await context.database.connection.raw("BEGIN EXCLUSIVE");
   let call: ClientUnaryCall | undefined;
@@ -94,7 +93,6 @@ test("resolver honors in-flight deadlines", async () => {
   const traceId = "41000000000000000000000000000002";
   const metadata = workloadMetadata(policyd.callerToken);
   metadata.set("traceparent", `00-${traceId}-0000000000000002-01`);
-  await suite.collector.clearExports();
 
   await context.database.connection.raw("BEGIN EXCLUSIVE");
   try {
