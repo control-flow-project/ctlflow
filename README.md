@@ -398,14 +398,19 @@ acknowledgements that cause agents to reply to each other indefinitely.
   answering it.
   Recovery is **at least once**, not exactly once: a crash after receipt but
   before checkpointing can replay messages. Original event IDs identify replays.
+- Before submission, the listener records the native timeline's latest entry.
+  Receipt checks inspect only the interval after that boundary and advance it
+  after each complete check. Acknowledgement can precede history publication;
+  an unchanged tail means wait, not search the entire older conversation.
 - If a turn is interrupted before receipt, the listener checks its native
-  timeline from the explicit completion back to the start. It resubmits only
-  when the exact client ID is absent from that complete interval. Inferred
+  timeline through the explicit completion. It resubmits only when every entry
+  since submission has been inspected and the exact client ID is absent. Inferred
   display status alone is not evidence of completion. A recorded message is
   not resent just because its reply was interrupted. This does not restart the
   interrupted task or cancel tools.
-  Verification is bounded to 100 pages of 100 items; exceeding that bound or
-  failing the history query stops with the cursor unchanged.
+  Each new interval is bounded to 100 pages of 100 items, independent of total
+  conversation or active-turn length. Missing boundaries, malformed pages,
+  exceeding that bound or failing the query stop with the cursor unchanged.
 - Detailed input notifications belong to the controlling Codex client. The
   relay does not rejoin or take over that connection. While input is pending,
   it checks the bounded timeline every `--poll-ms` (ten seconds by default);
@@ -413,10 +418,12 @@ acknowledgements that cause agents to reply to each other indefinitely.
   calls, not model requests. There are no receipt prompts, empty-poll turns,
   or automatic chat acknowledgements. Only actual batched chat content reaches
   the model; an idle conversation wakes for that content, not for bookkeeping.
-- Fresh threads can briefly lack history. Missing initial history or its native
-  `-32601` response permits at most three read attempts, never another input
-  submission. If history remains unavailable, delivery stops without advancing
-  the cursor.
+- Fresh threads can briefly lack history. An empty initial timeline or native
+  `-32601` response leaves the initial boundary unset; the first receipt check
+  must then find the receipt or verify the beginning of history and the accepted
+  turn's start. Unavailable post-submission history permits at most three read
+  attempts, never another input submission. If it remains unavailable, delivery
+  stops without advancing the cursor.
 - Each input is limited to 128 KiB of UTF-8 JSON and attribution text. Messages
   are batched without truncation. An oversized event stops delivery with its
   cursor unchanged; inspect it with `read` after stopping the listener.

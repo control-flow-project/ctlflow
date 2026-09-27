@@ -12,8 +12,8 @@ test('native delivery verifies the selected workspace and uses only start-or-ste
   fixture.update({ status: 'active' });
   await connection.deliver('active input', 'second');
   assert.deepEqual(fixture.requests().map(request => request.method),
-    ['initialize', 'initialized', 'thread/read', 'thread/read', 'turn/start', 'thread/timeline/list',
-      'thread/read', 'turn/start', 'thread/timeline/list']);
+    ['initialize', 'initialized', 'thread/read', 'thread/read', 'thread/timeline/list', 'turn/start', 'thread/timeline/list',
+      'thread/read', 'thread/timeline/list', 'turn/start', 'thread/timeline/list']);
   const starts = fixture.requests().filter(request => request.method === 'turn/start');
   assert.deepEqual(starts.map(request => request.params), ['idle input', 'active input'].map((text, index) => ({
     threadId: THREAD, clientUserMessageId: index === 0 ? 'first' : 'second',
@@ -125,7 +125,7 @@ test('busy receipt checks are bounded polls, not additional model turns or turn-
   context.after(connection.close);
   const delivery = connection.deliver('input', 'waiting');
   await until(() => fixture.requests().some(request => request.method === 'turn/start'));
-  await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list'));
+  await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
   const count = fixture.requests().length;
   await delay(150);
   assert(fixture.requests().length > count && fixture.requests().length <= count + 2);
@@ -140,7 +140,7 @@ test('interrupted input is retried only after complete bounded history proves it
   const connection = await connectCodex(fixture.options, new AbortController().signal);
   context.after(connection.close);
   const delivery = connection.deliver('input', 'interrupted');
-  await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list'));
+  await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
   fixture.update({ mode: 'normal', turnId: 'replacement-turn', historyPages: [
     { data: [{ type: 'item', turnId: 'existing-turn', position: 2, item: inputReceipt('other') },
       { type: 'turnCompleted', turnId: 'existing-turn', position: 3, status: 'interrupted' }], nextCursor: 'next' },
@@ -191,7 +191,7 @@ test('uncertain, malformed, foreign, cyclic, or excessive history cannot authori
     const fixture = await fakeCodex(context, { mode: 'accepted' });
     const connection = await connectCodex(fixture.options, new AbortController().signal);
     const rejection = assert.rejects(connection.deliver('input', 'input'));
-    await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list'));
+    await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
     fixture.update(configuration);
     fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
     await rejection;
@@ -249,7 +249,7 @@ test('new-thread history initialization permits only bounded read-only retries, 
     context.after(connection.close);
     if (count === 2) await connection.deliver('input', 'input');
     else await assert.rejects(connection.deliver('input', 'input'), /not supported yet/);
-    assert.equal(fixture.requests().filter(request => request.method === 'thread/timeline/list').length, 3);
+    assert.equal(fixture.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length, 3);
     assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
   }
 });

@@ -35,10 +35,11 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   const address = server.address(); assert(address && typeof address === 'object');
   const configuration: Record<string, unknown> = { thread: THREAD, workspace: directory, port: address.port, ...config };
   const requests: { id?: number | string; method?: string; params?: Record<string, unknown> }[] = [];
-  const history: Record<string, unknown>[] = [];
-  const turns = new Set<string>();
+  const history = structuredClone(config.initialHistory ?? []) as Record<string, unknown>[];
+  const turns = new Set(history.filter(entry => entry.type === 'turnStarted').map(entry => String(entry.turnId)));
+  const publications: (() => void)[] = [];
   let activeTurnId: string | undefined;
-  const append = (entry: Record<string, unknown>) => history.push({ ...entry, position: history.length + 1 });
+  const append = (entry: Record<string, unknown>) => history.push({ ...entry, position: Number(history.at(-1)?.position ?? 0) + 1 });
   const notify = (method: string, params: unknown) => {
     for (const client of server.clients) client.send(JSON.stringify({ method, params }));
     const event = params as Record<string, unknown>;
@@ -79,28 +80,30 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       }
       const turnId = configuration.turnId ?? activeTurnId ?? (turns.size ? 'turn-' + (turns.size + 1) : 'existing-turn');
       activeTurnId = String(turnId);
-      if (!turns.has(String(turnId))) {
-        turns.add(String(turnId));
-        append({ type: 'turnStarted', turnId });
-      }
-      const receipt = () => {
-        if (mode === 'accepted') return;
-        const item = inputReceipt(request.params.clientUserMessageId, request.params.input);
-        append({ type: 'item', turnId: String(turnId), item });
+      const publish = () => {
+        if (!turns.has(String(turnId))) {
+          turns.add(String(turnId));
+          append({ type: 'turnStarted', turnId });
+        }
+        if (mode !== 'accepted') {
+          const item = inputReceipt(request.params.clientUserMessageId, request.params.input);
+          append({ type: 'item', turnId: String(turnId), item });
+        }
+        if (configuration.completionFirst) {
+          append({ type: 'turnCompleted', turnId, status: 'interrupted' });
+          activeTurnId = undefined;
+        }
       };
-      if (configuration.receiptFirst) receipt();
-      if (configuration.completionFirst) {
-        append({ type: 'turnCompleted', turnId, status: 'interrupted' });
-        activeTurnId = undefined;
-      }
+      if (configuration.receiptFirst || configuration.completionFirst) publish();
       send({ id: request.id, result: { turn: { id: turnId } } });
-      if (!configuration.receiptFirst) receipt();
+      if (configuration.deferHistory) publications.push(publish);
+      else if (!configuration.receiptFirst && !configuration.completionFirst) publish();
     } else if (request.method === 'thread/timeline/list') {
-      const failures = configuration.historyUnavailable as number[] | undefined;
+      const failures = (request.params.limit === 1 ? configuration.boundaryUnavailable : configuration.historyUnavailable) as number[] | undefined;
       const code = failures?.shift();
       if (code) { send({ id: request.id, error: { code, message: 'history is not supported yet' } }); return; }
       if (configuration.historyError) { send({ id: request.id, error: { code: -32603, message: 'history unavailable' } }); return; }
-      const pages = configuration.historyPages as unknown[] | undefined;
+      const pages = (request.params.limit === 1 ? configuration.boundaryPages : configuration.historyPages) as unknown[] | undefined;
       const end = request.params.cursor ? Number(request.params.cursor) : history.length;
       const start = Math.max(0, end - Number(request.params.limit));
       send({ id: request.id, result: pages?.shift() ?? { data: history.slice(start, end), nextCursor: start ? String(start) : null } });
@@ -112,7 +115,8 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   };
   update({});
   return {
-    directory, update, notify, disconnect: () => { for (const client of server.clients) client.terminate(); },
+    directory, update, notify, publish: () => { for (const publish of publications.splice(0)) publish(); },
+    disconnect: () => { for (const client of server.clients) client.terminate(); },
     options: { thread: THREAD, workspace: directory, binary, timeoutMs: 2000, pollMs: 100 } satisfies CodexOptions,
     requests: () => requests,
   };

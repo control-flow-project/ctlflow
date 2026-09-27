@@ -6,6 +6,7 @@ import type { Socket } from 'node:net';
 import WebSocket from 'ws';
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout };
+type HistoryBoundary = { position: number; key: string };
 export type CodexOptions = { thread: string; workspace: string; binary?: string; socket?: string; timeoutMs?: number; pollMs?: number };
 export type CodexConnection = {
   signal: AbortSignal;
@@ -127,36 +128,86 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
     return true;
   }
 
-  async function receipt(turnId: string, text: string, messageId: string): Promise<'received' | 'pending' | 'interrupted' | 'missing' | 'unavailable'> {
+  async function historyPage(limit: number, cursor?: string) {
+    const result = object(await request('thread/timeline/list', {
+      threadId: options.thread, limit, ...(cursor ? { cursor } : {}),
+    }));
+    if (!Array.isArray(result.data) || result.data.length > limit) throw new Error('Invalid Codex input history page');
+    if (result.nextCursor !== null && (typeof result.nextCursor !== 'string' || !result.nextCursor || !result.data.length)) {
+      throw new Error('Invalid Codex input history cursor');
+    }
+    const entries = result.data.toReversed().map(value => {
+      const entry = object(value);
+      if (typeof entry.position !== 'number' || !Number.isSafeInteger(entry.position) || entry.position < 0) {
+        throw new Error('Invalid Codex input history position');
+      }
+      if (!['item', 'realtime', 'turnStarted', 'turnCompleted'].includes(String(entry.type))) {
+        throw new Error('Invalid Codex turn history entry');
+      }
+      if (entry.type !== 'realtime' && (typeof entry.turnId !== 'string' || !entry.turnId)) {
+        throw new Error('Invalid Codex turn history identity');
+      }
+      let itemId: string | undefined;
+      if (entry.type === 'item' || entry.type === 'realtime') {
+        const item = object(entry.item);
+        if (typeof item.id !== 'string' || !item.id || typeof item.type !== 'string') throw new Error('Invalid Codex history item');
+        itemId = item.id;
+      }
+      if (entry.type === 'turnCompleted' && !['completed', 'interrupted', 'failed'].includes(String(entry.status))) {
+        throw new Error('Invalid Codex turn completion');
+      }
+      return { entry, boundary: { position: entry.position, key: JSON.stringify([entry.position, entry.type, entry.turnId, itemId]) } };
+    });
+    return { entries, nextCursor: result.nextCursor as string | null };
+  }
+
+  async function historyBoundary(): Promise<HistoryBoundary | null> {
+    try { return (await historyPage(1)).entries[0]?.boundary ?? null; }
+    catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === -32601) return null;
+      throw error;
+    }
+  }
+
+  async function receipt(turnId: string, text: string, messageId: string, boundary: HistoryBoundary | null): Promise<{
+    status: 'received' | 'pending' | 'interrupted' | 'missing' | 'unavailable'; boundary: HistoryBoundary | null;
+  }> {
     let cursor: string | undefined;
     const visited = new Set<string>();
+    const seen = new Set<string>();
     let completion: 'interrupted' | 'missing' | undefined;
+    let started = false;
+    let newest = boundary;
     let position = Infinity;
     for (let page = 0; page < 100; page++) {
-      const result = object(await request('thread/timeline/list', {
-        threadId: options.thread, limit: 100, ...(cursor ? { cursor } : {}),
-      }));
-      if (!Array.isArray(result.data) || result.data.length > 100) throw new Error('Invalid Codex input history page');
-      const entries = result.data.toReversed().map(object);
-      for (const entry of entries) {
-        if (typeof entry.position !== 'number' || !Number.isSafeInteger(entry.position) || entry.position < 0 || entry.position > position) {
+      const result = await historyPage(100, cursor);
+      if (page === 0) newest = result.entries[0]?.boundary ?? null;
+      for (const value of result.entries) {
+        if (value.boundary.position > position || seen.has(value.boundary.key)) {
           throw new Error('Invalid Codex input history order');
         }
-        position = entry.position;
+        position = value.boundary.position;
+        seen.add(value.boundary.key);
       }
-      for (const entry of entries) {
+      for (const value of result.entries) {
+        const { entry } = value;
+        if (boundary && value.boundary.key === boundary.key) return { status: completion ?? 'pending', boundary: newest };
+        if (boundary && value.boundary.position < boundary.position) throw new Error('Codex input history lost its verification boundary');
+        if (entry.type === 'item' && isReceipt(entry.item, text, messageId)) {
+          if (entry.turnId !== turnId) throw new Error('Codex input receipt belongs to a different turn');
+          return { status: 'received', boundary: newest };
+        }
         if (entry.turnId !== turnId) continue;
-        if (entry.type === 'item' && isReceipt(entry.item, text, messageId)) return 'received';
         if (entry.type === 'turnCompleted') {
-          if (!['completed', 'interrupted', 'failed'].includes(String(entry.status))) throw new Error('Invalid Codex turn completion');
           completion = entry.status === 'interrupted' ? 'interrupted' : 'missing';
-        } else if (entry.type === 'turnStarted') return completion ?? 'pending';
-        else if (entry.type !== 'item') throw new Error('Invalid Codex turn history entry');
+        } else if (entry.type === 'turnStarted') started = true;
       }
-      if (result.nextCursor === null) return 'unavailable';
-      if (typeof result.nextCursor !== 'string' || !result.nextCursor || visited.has(result.nextCursor)) {
-        throw new Error('Invalid Codex input history cursor');
+      if (result.nextCursor === null) {
+        if (boundary) throw new Error('Codex input history lost its verification boundary');
+        if (!started) return { status: 'unavailable', boundary: null };
+        return { status: completion ?? 'pending', boundary: newest };
       }
+      if (visited.has(result.nextCursor)) throw new Error('Invalid Codex input history cursor');
       cursor = result.nextCursor;
       visited.add(cursor);
     }
@@ -196,6 +247,7 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
     try {
       for (;;) {
         await verify();
+        let boundary = await historyBoundary();
         const result = object(await request('turn/start', {
           threadId: options.thread, clientUserMessageId: messageId,
           input: [{ type: 'text', text, text_elements: [] }],
@@ -206,10 +258,12 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
         for (;;) {
           failure.signal.throwIfAborted();
           const previousRevision = revision;
-          let status: Awaited<ReturnType<typeof receipt>>;
+          let status: Awaited<ReturnType<typeof receipt>>['status'];
           try {
-            status = await receipt(turn.id, text, messageId);
+            const checked = await receipt(turn.id, text, messageId, boundary);
+            status = checked.status;
             if (status === 'received') return;
+            boundary = checked.boundary;
           } catch (error) {
             if (!(error instanceof Error) || !('code' in error) || error.code !== -32601 || ++unavailable >= 3) throw error;
             await wait(revision);
