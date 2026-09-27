@@ -138,14 +138,22 @@ assignment. SIGINT and SIGHUP also release its lock; abrupt termination may
 require about 30 seconds for stale-lock recovery.
 
 Delivery checkpoints require the exact user-message receipt in native history,
-not submission acceptance or a completed assistant reply. After interruption,
-the listener checks the timeline from explicit completion back to the turn's
-start, resubmitting only when that complete interval proves the input absent.
+not submission acceptance or a completed assistant reply. Before submission,
+the listener records the native timeline's latest entry. Subsequent checks
+inspect only newer entries and advance this in-memory boundary after a complete
+check. Acknowledgement may precede history publication; an unchanged tail means
+wait, not scan the older conversation. After interruption, the listener requires
+explicit native completion and a fully inspected interval since submission
+proving the input absent before resubmitting.
 Inferred display status is insufficient. It never restarts a cancelled reply
-to an already recorded message. Verification is bounded to 100 pages of 100 items;
-incomplete or failed queries cannot authorize replay.
-Initial history can briefly be unavailable on fresh threads; at most three
-read attempts are allowed for that condition, never duplicate input submission.
+to an already recorded message. Each new interval is bounded to 100 pages of
+100 items, independent of total conversation or active-turn length. Missing
+boundaries, incomplete or failed queries cannot authorize replay.
+Initial history can briefly be unavailable on fresh threads. An empty timeline
+or native `-32601` leaves the initial boundary unset; the first check must find
+the receipt or verify the history beginning and accepted turn's start. At most
+three post-submission read attempts are allowed for unavailable history, never
+duplicate input submission.
 A crash between receipt and checkpoint can replay events; compare event IDs,
 not body text. Uncertain native failures stop without automatically retrying
 input. Inspect the session and retained history before restarting. Matrix

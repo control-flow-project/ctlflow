@@ -93,3 +93,34 @@ test('installed Codex receipts, interruption recovery, original controller, and 
   assert(native.notifications.every(event => !JSON.stringify(event).includes('api.openai.com')));
   console.log('PASS native receipts, busy delivery, interrupted input, already-recorded cancellation, original tool control, relay disconnect, and Matrix burst recovery.');
 });
+
+test('installed Codex verifies new input independently of previous turn history', { timeout: 60_000 }, async context => {
+  const native = await nativeCodex(context);
+  const threadId = native.thread.id;
+  await native.call('turn/start', { threadId, input: [{ type: 'text', text: 'initial history', text_elements: [] }] });
+  await until(() => native.held() !== undefined);
+  native.finish();
+  await until(() => native.completed() === 1);
+  for (let index = 0; index < 30; index++) {
+    await native.call('turn/start', { threadId, input: [{ type: 'text', text: 'historical input ' + index, text_elements: [] }] });
+    await until(() => native.completed() === index + 2);
+  }
+  const old = await native.call('thread/timeline/list', { threadId, limit: 100 });
+  assert.equal((old.data as unknown[]).length, 100);
+  assert.equal(typeof old.nextCursor, 'string');
+  const connection = await connectCodex(native.options, new AbortController().signal);
+  context.after(connection.close);
+  for (let index = 0; index < 60; index++) {
+    const before = native.historyQueries.length;
+    await connection.deliver('new input ' + index, 'native-history-' + index);
+    await until(() => native.completed() === index + 32);
+    const reads = native.historyQueries.slice(before);
+    assert(reads.length >= 2 && reads.length <= 5, JSON.stringify(reads));
+    assert(reads.every(read => !(read.params as { cursor?: string }).cursor));
+    assert.equal(native.acknowledgements().filter(value => value.params.clientUserMessageId === 'native-history-' + index).length, 1);
+    assert.equal(native.notifications.filter(event => event.method === 'item/completed'
+      && (event.params.item as { clientId?: string }).clientId === 'native-history-' + index).length, 1);
+  }
+  assert(!native.relayRequests.some(request => ['turn/interrupt', 'thread/start', 'thread/resume', 'thread/fork'].includes(request.method ?? '')));
+  console.log('PASS 60 native deliveries over paginated prior history with bounded, non-historical receipt queries.');
+});
