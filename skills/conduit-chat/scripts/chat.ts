@@ -8,6 +8,7 @@ import { API, CONFIG, STATE, Matrix, name, readJson, readSettings, selectRoom, w
   type Account, type Event, type JsonObject } from './lib.ts';
 import { eventView, readUnread, sharedRooms, synchronize } from './receive.ts';
 import { listen } from './listen.ts';
+import { markdownMessage } from './message.ts';
 import { requireNode } from '../../../scripts/version.ts';
 
 type Page = { chunk: Event[]; end?: string };
@@ -129,8 +130,7 @@ async function main(): Promise<void> {
     if (command === 'send') {
       if ((values.message === undefined) === (values['message-file'] === undefined)) throw new Error('Supply exactly one of --message or --message-file');
       const body = values['message-file'] ? readFileSync(values['message-file'], 'utf8') : values.message!;
-      if (Buffer.byteLength(body) < 1 || Buffer.byteLength(body) > 50_000) throw new Error('Send 1..50000 bytes of text; upload larger documents');
-      content = { msgtype: 'm.text', body };
+      content = markdownMessage(body);
     } else {
       const file = positionals[1];
       if (!file) throw new Error('upload requires a file path');

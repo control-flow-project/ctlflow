@@ -359,19 +359,31 @@ paginated history as `read`, unless you select one with `--room`. Empty polls,
 membership-only updates and echoes of that identity's own messages produce no
 Codex input and no console output.
 
-The first nonempty collection goes through immediately. Further messages stay
-unread in Matrix for a fixed ten-second batching window starting with that
-submission, then the listener collects all rooms again. New messages do not
-reset that deadline. `--debounce-ms 5000` selects five seconds; the default is
-`10000`, the accepted range is `0..60000`, and `0` adds no batching delay.
-This is independent of the idle long-poll timeout configured by `--poll-ms`.
-There is no extra local queue, model turn, or receipt notice for buffering.
+Within a burst, the first three messages from other agents and the first five
+from the configured human observer have no batching delay. The human allowance
+uses the exact Matrix sender ID, not a display name, message body or room name.
+Both counts span all selected rooms and count forwarded events, not polls or
+Codex submissions. A collection that contains a message with remaining allowance
+goes through together; existing cross-room batches are never split to consume
+the allowance one message at a time.
+
+After the applicable allowance is used, further messages stay unread in Matrix
+until ten seconds after the last submission. New buffered messages do not reset
+that deadline. The listener still long-polls: a human message with allowance
+remaining can wake an agent-only batching window and flush the current collection.
+An empty collection after the deadline resets both counts for the next burst.
+Self echoes and membership updates neither consume allowance nor extend windows.
+`--debounce-ms 5000` selects five seconds; the default is `10000`, the accepted
+range is `0..60000`, and `0` adds no batching delay. This is independent of the
+idle long-poll timeout configured by `--poll-ms`. There is no extra local queue,
+model turn, or receipt notice for buffering.
 
 Each collection keeps the existing per-room page limit (`--limit`, default 50)
-and splits inputs at 128 KiB. Larger backlogs continue in subsequent windows;
+and splits inputs at 128 KiB. Larger backlogs continue in subsequent collections;
 nothing is truncated. Waiting for native receipt overlaps the window, rather
 than adding another ten seconds afterward. Native backpressure and network
-failures can still delay delivery. Stopping during a window leaves pending
+failures can still delay delivery, and later messages behind a full page must
+wait until that page is consumed. Stopping during a window leaves pending
 messages unread for the next listener or manual read.
 
 For actual messages, the adapter verifies the selected thread and workspace,
@@ -693,7 +705,7 @@ node /path/to/chat.mjs --help
 | `chat history --room '!room-id' --limit 50` | Replay recent messages from a selected room |
 | `chat send --message 'Task started.'` | Send text to the configured default room |
 | `chat send --room planning --message 'Proposed design.'` | Send text to a configured room by its alias |
-| `chat send --message-file ./update.md` | Send a file's contents as text, up to 50,000 bytes |
+| `chat send --message-file ./update.md` | Send a file's Markdown as a formatted message, within the encoded size limit |
 | `chat send --to worker-b --message 'Please confirm the interface.'` | Send to a conversation containing both agents and the human |
 | `chat send --to admin --message 'I need a decision.'` | Send to a conversation containing the sender and human |
 | `chat send --room '!room-id' --message 'Confirmed.'` | Reply to an existing room containing the human |
@@ -730,6 +742,39 @@ Each identity has independent cursors. `history` leaves those cursors unchanged.
 A crash after output but before checkpointing may replay events; callers can
 deduplicate by `event_id`. Concurrent cursor consumers fail rather than block
 an agent behind a long-running listener.
+
+### Message formatting
+
+Agents write Markdown, not HTML. Both `--message` and `--message-file` use the
+same formatter. Crossfire sends the unchanged Markdown in Matrix's `body` and
+sanitized HTML in `formatted_body`, with `format: "org.matrix.custom.html"`.
+Element renders that HTML; readers still have the original Markdown. Existing
+messages are not rewritten.
+
+Supported formatting includes headings, paragraphs, emphasis, strikethrough,
+ordered and unordered lists, nested lists, blockquotes, links, tables, task
+lists, inline code, and fenced or indented code blocks. Task lists use readable
+checkbox symbols, not interactive form controls. Single line breaks are
+preserved. Raw HTML displays as text; unsafe link schemes are removed.
+Inline images use Matrix `mxc://` media. Other Markdown images become links,
+so viewing an agent message does not automatically load an external image.
+
+Use a language label on code fences, such as `typescript`, `rust`, `csharp`,
+`bash`, or `json`. Element provides syntax colouring, a copy button, and
+optional line numbers. The pinned Element version stops syntax colouring for
+blocks over 4,096 characters; it still displays their code. Extensions such as
+Mermaid diagrams, mathematical notation, and footnotes are not interpreted by
+this formatter.
+
+Prefer `--message-file` for multiline Markdown and code. This avoids shell
+expansion of backticks and `$` inside double-quoted command arguments. The
+complete JSON message content, including both Markdown and HTML, must fit
+50,000 UTF-8 bytes. An oversized message fails without truncation or sending;
+use `upload` for larger documents.
+
+After updating Crossfire, rebuild and export or reinstall the client so agents
+use the new formatter. Updating the server alone does not replace installed
+agent clients. The Element client needs no fork or custom renderer.
 
 ## Architecture, skills, and human visibility
 
