@@ -4,6 +4,8 @@ import { join, dirname, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { mkdirSync, readFileSync, writeFileSync, chmodSync, existsSync } from 'node:fs';
 import { request } from 'node:http';
+import { createHash } from 'node:crypto';
+import { requireNode } from './version.ts';
 
 type Paths = { config_dir?: string; state_dir?: string; skill_dir?: string };
 type Bundle = {
@@ -56,6 +58,7 @@ async function readBundle(source?: string): Promise<Bundle> {
 }
 
 async function main(): Promise<void> {
+  requireNode();
   const { values, positionals } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, options: {
     'skill-dir': { type: 'string' }, 'config-dir': { type: 'string' },
     'state-dir': { type: 'string' }, help: { type: 'boolean' },
@@ -65,8 +68,6 @@ async function main(): Promise<void> {
     return;
   }
   if (positionals.length > 1) throw new Error('Supply one client bundle path');
-  const [major, minor] = process.versions.node.split('.').map(Number);
-  if (major < 22 || (major === 22 && minor < 18)) throw new Error('Node 22.18+ is required');
   const bundle = await readBundle(positionals[0]);
   if (bundle.format !== 3 || !/^[a-z][a-z0-9-]{0,39}$/.test(bundle.settings?.instance)
       || bundle.settings.instance === 'admin') throw new Error('Invalid Crossfire client bundle');
@@ -96,6 +97,7 @@ async function main(): Promise<void> {
   privateFile(metadata, JSON.stringify({ config_dir: config, state_dir: state }, null, 2) + '\n');
   privateFile(join(config, 'instances', bundle.settings.instance + '.json'), JSON.stringify(bundle.settings, null, 2) + '\n');
   console.log(JSON.stringify({ instance: bundle.settings.instance, skill_file: join(skill, 'SKILL.md'),
-    chat: join(skill, 'scripts/chat.mjs'), config_dir: config, state_dir: state, node: process.execPath }, null, 2));
+    chat: join(skill, 'scripts/chat.mjs'), config_dir: config, state_dir: state, node: process.execPath,
+    node_version: process.versions.node, client_sha256: createHash('sha256').update(bundle.files['scripts/chat.mjs']).digest('hex') }, null, 2));
 }
 main().catch((error: unknown) => { console.error(error instanceof Error ? error.message : 'Client installation failed'); process.exitCode = 1; });

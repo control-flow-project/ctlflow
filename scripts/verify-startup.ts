@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ROOT, type InstanceConfig } from './instance.ts';
 import { bootstrapArguments } from './onboarding.ts';
+import type { RuntimeInfo } from './version.ts';
 import { API, Matrix, MatrixError, readJson, segment, type Account, type Settings, type JsonObject } from '../skills/conduit-chat/scripts/lib.ts';
 
 const execute = promisify(execFile);
@@ -19,6 +20,7 @@ const clientConfig = join(directory, 'client config'), state = join(directory, '
 const env = { ...process.env, CROSSFIRE_DATA_DIR: data, CROSSFIRE_CONFIG_DIR: join(directory, 'config'),
   CROSSFIRE_SKILL_DIR: skill, CROSSFIRE_CLIENT_CONFIG_DIR: clientConfig, CROSSFIRE_CLIENT_STATE_DIR: state };
 const processes = new Map<string, { child: ChildProcess; done: Promise<unknown>; output: string }>();
+const starts = new Map<string, string>();
 const privatePath = (id: string) => join(data, 'instances', id, 'private');
 const settings = (id: string) => readJson<Settings>(join(privatePath(id), 'settings.json'));
 const control = (id: string) => readJson<Account>(join(privatePath(id), 'control-session.json'));
@@ -34,10 +36,11 @@ async function ports(): Promise<[number, number]> {
     return servers.map(server => { const a = server.address(); assert(a && typeof a === 'object'); return a.port; }) as [number, number];
   } finally { await Promise.all(servers.map(server => new Promise<void>(resolve => server.close(() => resolve())))); }
 }
-async function start(config: InstanceConfig): Promise<string> {
+async function start(config: InstanceConfig, compile = false): Promise<string> {
+  const beforeStart = Date.now();
   const path = join(directory, config.id + '.json');
   writeFileSync(path, JSON.stringify(config), { mode: 0o600 });
-  const child = spawn(process.execPath, [join(ROOT, 'crossfire'), 'start', path], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(ROOT, 'crossfire'), 'start', path, ...(compile ? ['--compile'] : [])], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const running = { child, done: new Promise(resolve => child.once('exit', resolve)), output: '' };
   processes.set(config.id, running);
   for (const stream of [child.stdout, child.stderr]) stream!.on('data', bytes => { running.output = (running.output + String(bytes)).slice(-100_000); });
@@ -46,8 +49,19 @@ async function start(config: InstanceConfig): Promise<string> {
     if (child.exitCode !== null || child.signalCode !== null) throw new Error('Test instance stopped before readiness');
     if (running.output.includes('CLIENT ONBOARDING')) {
       const response = await fetch(`http://127.0.0.1:${config.web_port}/_coord/health`);
-      const health = await response.json() as { instance: string; status: string };
+      const health = await response.json() as RuntimeInfo & { instance: string; status: string };
       assert.equal(health.instance, config.id); assert.equal(health.status, 'ready');
+      assert.match(health.node, /^26\./);
+      assert.match(health.build.revision, /^[a-f0-9]{40,64}$/);
+      assert.match(health.client_sha256, /^[a-f0-9]{64}$/);
+      assert(Number.isFinite(Date.parse(health.started_at)) && Date.parse(health.started_at) >= beforeStart
+        && Date.parse(health.started_at) <= Date.now());
+      assert.notEqual(health.started_at, starts.get(config.id));
+      starts.set(config.id, health.started_at);
+      assert(running.output.includes('Started: ' + health.started_at));
+      assert(running.output.includes('Version: ' + health.build.version));
+      assert(running.output.includes('Client SHA-256: ' + health.client_sha256));
+      if (compile) assert(running.output.includes('Rebuilding runtime image ' + health.build.image));
       return running.output;
     }
     await delay(100);
@@ -88,10 +102,13 @@ try {
     const [matrix_port, web_port] = await ports();
     const config = { ...example, id, server_name: id + '.localhost', matrix_port, web_port };
     configs.push(config);
-    const output = await start(config);
+    const output = await start(config, configs.length === 1);
     assert(output.includes('crossfire-install'));
     const installation = await execute(process.execPath, bootstrapArguments(settings(id)), { env, cwd: directory });
-    assert.equal(JSON.parse(installation.stdout).instance, id);
+    const installed = JSON.parse(installation.stdout);
+    assert.equal(installed.instance, id);
+    const health = await (await fetch(settings(id).room_service + '/_coord/health')).json() as RuntimeInfo;
+    assert.equal(installed.client_sha256, health.client_sha256);
   }
   console.log('PASS startup prints working HTTP onboarding for two independent instances.');
   const [first, second] = configs;

@@ -6,8 +6,11 @@ import { INSTANCES, load } from './instance.ts';
 import { accounts } from './bootstrap.ts';
 import { serve } from './room-service.ts';
 import { Lease, type Heartbeat } from './lease.ts';
+import { requireNode, type BuildInfo } from './version.ts';
 import { Matrix, name, readJson, type Settings } from '../skills/conduit-chat/scripts/lib.ts';
 
+requireNode();
+const startedAt = new Date().toISOString();
 process.umask(0o077);
 const { values } = parseArgs({ options: { instance: { type: 'string' } } });
 const instance = name(values.instance ?? '');
@@ -43,5 +46,7 @@ try {
     catch (error) { if (attempt >= 149) throw error; await delay(200); }
   }
   const control = await accounts(config, privatePath, settings);
-  serve(config, settings, control, privatePath);
+  serve(config, settings, control, privatePath, {
+    build: readJson<BuildInfo>(join(privatePath, 'build.json')), started_at: startedAt, node: process.versions.node,
+  });
 } catch (error) { console.error(error instanceof Error ? error.message : 'Instance startup failed'); shutdown(1); }

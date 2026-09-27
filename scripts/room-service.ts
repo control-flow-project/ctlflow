@@ -6,13 +6,16 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { ROOT, elementConfig, type InstanceConfig } from './instance.ts';
 import { CLIENT_PATH, INSTALLER_PATH, type ClientFiles } from './onboarding.ts';
+import type { RuntimeInfo } from './version.ts';
 import { API, Matrix, MatrixError, readJson, segment, localUser, powerLevels, collect, ensureObserver,
   type Settings, type Members, type Event } from '../skills/conduit-chat/scripts/lib.ts';
 
-export function serve(config: InstanceConfig, settings: Settings, matrix: Matrix, privatePath: string): ReturnType<typeof createServer> {
+export function serve(config: InstanceConfig, settings: Settings, matrix: Matrix, privatePath: string,
+  startup: Omit<RuntimeInfo, 'client_sha256'>): ReturnType<typeof createServer> {
   const instance = config.id;
   const clientFiles = readJson<ClientFiles>(join(privatePath, 'client-files.json'));
   const installer = readFileSync(join(privatePath, 'install.mjs'));
+  const runtime: RuntimeInfo = { ...startup, client_sha256: createHash('sha256').update(clientFiles['scripts/chat.mjs']).digest('hex') };
   const webRoot = resolve(process.env.CROSSFIRE_WEB_ROOT ?? join(ROOT, 'web'));
   let roomQueue: Promise<void> = Promise.resolve();
 
@@ -79,7 +82,7 @@ export function serve(config: InstanceConfig, settings: Settings, matrix: Matrix
     response.setHeader('X-Frame-Options', 'DENY');
     const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
     if (request.method === 'GET' && pathname === '/_coord/health') {
-      json(response, 200, { instance, status: 'ready', run_id: process.env.CROSSFIRE_RUN_ID });
+      json(response, 200, { instance, status: 'ready', run_id: process.env.CROSSFIRE_RUN_ID, ...runtime });
       return;
     }
     if (request.method === 'GET' && pathname === INSTALLER_PATH) {
@@ -149,6 +152,11 @@ export function serve(config: InstanceConfig, settings: Settings, matrix: Matrix
     });
   });
   server.requestTimeout = 60_000;
-  server.listen(config.web_port, '0.0.0.0', () => console.log(`Crossfire ${instance}: http://127.0.0.1:${config.web_port}`));
+  server.listen(config.web_port, '0.0.0.0', () => {
+    console.log(`Crossfire ${instance}: http://127.0.0.1:${config.web_port}`);
+    console.log(`Version: ${runtime.build.version} | Revision: ${runtime.build.revision.slice(0, 12)}${runtime.build.modified ? ' (modified)' : ''}`);
+    console.log(`Started: ${runtime.started_at} | Node: ${runtime.node}`);
+    console.log(`Client SHA-256: ${runtime.client_sha256}`);
+  });
   return server;
 }

@@ -5,7 +5,7 @@ description: Communicate with manually started agent sessions through a configur
 
 # Conduit coordination
 
-Run the bundled `scripts/chat.mjs` with Node 22.18+ (24+ recommended). Its
+Run the bundled `scripts/chat.mjs` with Node 26+. Its
 dependencies are bundled; agents do not install packages in their project.
 Each configured instance has its own homeserver, UI, room names, accounts, files,
 and human observer. The client settings live in
@@ -14,6 +14,12 @@ and human observer. The client settings live in
 `scripts/.client-paths.json`; commands load them automatically. Do not display
 configuration or account tokens.
 This skill does not depend on a repository, language, or project workflow.
+
+The installer prints `node_version` and `client_sha256`. Compare that fingerprint
+with the server's startup output or public `/_coord/health` response when checking
+whether this client is current. Reinstalling preserves accounts and read positions;
+restart an existing listener to load the new bundle. Restarting only the server
+does not update the client process already running.
 
 The assignment must identify an **instance** and a unique **agent name** within
 that instance. Retain both for this session. Every command requires them
@@ -65,7 +71,9 @@ sessions are currently running.
 When the human requests automatic receiving, use `listen` for this exact Codex
 session. Crossfire remains independent of the project and does not start agents.
 The adapter uses Codex's experimental local app-server interface, verified with
-CLI 0.156.1 on Linux. The human opens each agent with
+CLI 0.156.1 and 0.157.1 on Linux. It requires `thread/timeline/list` with
+user-message client IDs and explicit turn boundaries, not only submission
+acceptance. The human opens each agent with
 `codex --enable daemon_auto_start`. This exposes Codex's own engine, not another
 Crossfire server, and keeps separate conversations in separate terminals.
 Some Codex overrides force embedded mode; the adapter refuses that connection.
@@ -77,29 +85,42 @@ the TUI uses `--remote unix:///absolute/path/codex.sock` and the listener uses
 `--codex-socket /absolute/path/codex.sock`.
 
 After initializing from the intended project directory, start one listener as
-a background OS process, not a blocking model/tool wait:
+a detached OS process, not a blocking model/tool wait. On Linux use `setsid`;
+`nohup` alone does not isolate the listener from its launching tool's process group:
 
 ```sh
 umask 077
 CONDUIT_CHAT="${CODEX_HOME:-$HOME/.codex}/skills/conduit-chat/scripts/chat.mjs"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/conduit-chat/listeners"
 mkdir -p "$LOG_DIR"
-nohup node "$CONDUIT_CHAT" --instance project-a --agent worker-a listen \
+setsid --fork sh -c 'printf "%s\n" "$$" > "$1"; shift; exec "$@"' \
+  crossfire-listener "$LOG_DIR/project-a-worker-a.pid" \
+  node "$CONDUIT_CHAT" --instance project-a --agent worker-a listen \
   --thread "${CODEX_THREAD_ID:?Exact current Codex thread is required}" \
-  >"$LOG_DIR/project-a-worker-a.log" 2>&1 < /dev/null &
-echo "Listener PID: $!"
+  >"$LOG_DIR/project-a-worker-a.log" 2>&1 < /dev/null
 ```
 
 Replace names and installed paths with the assigned values. Use the same local
-user and Codex home as the session. Retain its PID and log path; check for startup
-errors once, then continue working. Do not consume model turns repeatedly polling
-the listener. If the environment does not identify this session, ask for its
+user and Codex home as the session. Read and retain its PID from the `.pid` file
+after startup, and check that process and its log once. Do not launch a second
+listener for this identity. Continue working; do not consume model turns
+repeatedly polling the listener. If the environment does not identify this session, ask for its
 exact UUID; never select `latest` or guess another thread. The adapter checks
 both the UUID's loaded/direct-input state and the enrolled working directory.
 
-Matrix long polls wait up to ten seconds and wake when messages arrive. Empty
-polls and self-message echoes generate no model input or console output. Real
-messages enter the same thread using native start-or-steer behavior: an idle
+While idle, Matrix long polls wait up to ten seconds and wake when messages
+arrive. The first nonempty collection is immediate. Further messages remain
+unread in Matrix during a fixed ten-second window starting with that submission;
+the next collection combines all joined rooms, unless `--room` selects one.
+New traffic does not extend the window. Configure it with `--debounce-ms`
+(default 10000, range 0..60000; 0 adds no delay). Native receipt waiting overlaps
+the window; it can delay delivery but does not add another window afterward.
+Each collection retains the per-room `--limit` and 128 KiB input bounds. Larger
+backlogs drain in subsequent windows. Stopping the listener leaves buffered
+messages unread; Matrix is the buffer, not a second local queue.
+Empty polls and self-message echoes generate no model input or console output
+and start no batching window. Real messages enter the same thread using native
+start-or-steer behavior: an idle
 thread wakes; an active thread consumes input at its normal boundaries. Running
 tools are not forcibly cancelled. Human approvals remain with the original TUI;
 the listener never answers them or changes sandbox/model settings.
@@ -116,18 +137,34 @@ with `kill -TERM PID` before switching back to manual reads or ending the
 assignment. SIGINT and SIGHUP also release its lock; abrupt termination may
 require about 30 seconds for stale-lock recovery.
 
-Delivery checkpoints follow native acknowledgements. A crash between acceptance
-and checkpoint can replay events; compare event IDs, not body text. Uncertain
-native failures stop without automatically retrying input. Inspect the session
-and retained history before restarting. Matrix transient errors get at most
-three retries; authorization/observer errors fail immediately. Batches are
+Delivery checkpoints require the exact user-message receipt in native history,
+not submission acceptance or a completed assistant reply. After interruption,
+the listener checks the timeline from explicit completion back to the turn's
+start, resubmitting only when that complete interval proves the input absent.
+Inferred display status is insufficient. It never restarts a cancelled reply
+to an already recorded message. Verification is bounded to 100 pages of 100 items;
+incomplete or failed queries cannot authorize replay.
+Initial history can briefly be unavailable on fresh threads; at most three
+read attempts are allowed for that condition, never duplicate input submission.
+A crash between receipt and checkpoint can replay events; compare event IDs,
+not body text. Uncertain native failures stop without automatically retrying
+input. Inspect the session and retained history before restarting. Matrix
+transient errors get at most three retries; authorization/observer errors fail immediately. Batches are
 bounded to 128 KiB without truncation. An oversized event stops with its cursor
 unchanged; use a manual read after stopping the listener.
 
 `listen` accepts `--room`, `--limit 1..100` (default 50), `--poll-ms 100..30000`
-(default 10000), `--request-timeout-ms 100..300000` (default 30000),
-`--codex-binary PATH` and `--codex-socket ABSOLUTE_PATH`. Other agent applications
-can continue to use ordinary reads; no Codex-specific behavior enters the server.
+(default 10000), `--debounce-ms 0..60000` (default 10000),
+`--request-timeout-ms 100..300000` (default 30000),
+`--codex-binary PATH` and `--codex-socket ABSOLUTE_PATH`. The request timeout
+bounds native RPCs, not how long an active turn may take to consume input.
+While input is pending, bounded native-history queries run at `--poll-ms` or
+sooner on thread-status changes. Detailed message notifications stay with the
+original controlling client; Crossfire does not rejoin that conversation.
+These checks make no model calls and never send receipt/status prompts or
+automatic chat acknowledgements. Only actual batched messages enter the model.
+Other agent applications can continue to use ordinary reads; no Codex-specific
+behavior enters the server.
 
 Use `rooms` to discover each configured room's alias, name, purpose, members,
 and whether it is the default. Choose a room whose purpose fits the update.

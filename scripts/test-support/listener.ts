@@ -35,6 +35,23 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   const address = server.address(); assert(address && typeof address === 'object');
   const configuration: Record<string, unknown> = { thread: THREAD, workspace: directory, port: address.port, ...config };
   const requests: { id?: number | string; method?: string; params?: Record<string, unknown> }[] = [];
+  const history: Record<string, unknown>[] = [];
+  const turns = new Set<string>();
+  let activeTurnId: string | undefined;
+  const append = (entry: Record<string, unknown>) => history.push({ ...entry, position: history.length + 1 });
+  const notify = (method: string, params: unknown) => {
+    for (const client of server.clients) client.send(JSON.stringify({ method, params }));
+    const event = params as Record<string, unknown>;
+    if (event.threadId !== THREAD) return;
+    if (method === 'item/completed') {
+      append({ type: 'item', turnId: String(event.turnId ?? activeTurnId ?? configuration.turnId ?? 'existing-turn'), item: event.item });
+    } else if (method === 'turn/completed') {
+      const turn = event.turn as { id: string; status: string };
+      append({ type: 'turnCompleted', turnId: turn.id, status: turn.status });
+      if (activeTurnId === turn.id) activeTurnId = undefined;
+      notify('thread/status/changed', { threadId: THREAD, status: { type: 'idle' } });
+    }
+  };
   server.on('connection', socket => socket.on('message', data => {
     const request = JSON.parse(data.toString());
     requests.push(request);
@@ -60,7 +77,33 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
         send({ method: 'turn/started', params: {} });
         send({ id: 'approval', method: 'item/commandExecution/requestApproval', params: {} });
       }
-      send({ id: request.id, result: { turn: { id: 'existing-turn' } } });
+      const turnId = configuration.turnId ?? activeTurnId ?? (turns.size ? 'turn-' + (turns.size + 1) : 'existing-turn');
+      activeTurnId = String(turnId);
+      if (!turns.has(String(turnId))) {
+        turns.add(String(turnId));
+        append({ type: 'turnStarted', turnId });
+      }
+      const receipt = () => {
+        if (mode === 'accepted') return;
+        const item = inputReceipt(request.params.clientUserMessageId, request.params.input);
+        append({ type: 'item', turnId: String(turnId), item });
+      };
+      if (configuration.receiptFirst) receipt();
+      if (configuration.completionFirst) {
+        append({ type: 'turnCompleted', turnId, status: 'interrupted' });
+        activeTurnId = undefined;
+      }
+      send({ id: request.id, result: { turn: { id: turnId } } });
+      if (!configuration.receiptFirst) receipt();
+    } else if (request.method === 'thread/timeline/list') {
+      const failures = configuration.historyUnavailable as number[] | undefined;
+      const code = failures?.shift();
+      if (code) { send({ id: request.id, error: { code, message: 'history is not supported yet' } }); return; }
+      if (configuration.historyError) { send({ id: request.id, error: { code: -32603, message: 'history unavailable' } }); return; }
+      const pages = configuration.historyPages as unknown[] | undefined;
+      const end = request.params.cursor ? Number(request.params.cursor) : history.length;
+      const start = Math.max(0, end - Number(request.params.limit));
+      send({ id: request.id, result: pages?.shift() ?? { data: history.slice(start, end), nextCursor: start ? String(start) : null } });
     } else send({ id: request.id, error: { code: -32601, message: 'Forbidden method in fixture' } });
   }));
   const update = (changes: Record<string, unknown>) => {
@@ -69,10 +112,14 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   };
   update({});
   return {
-    directory, update,
-    options: { thread: THREAD, workspace: directory, binary, timeoutMs: 2000 } satisfies CodexOptions,
+    directory, update, notify, disconnect: () => { for (const client of server.clients) client.terminate(); },
+    options: { thread: THREAD, workspace: directory, binary, timeoutMs: 2000, pollMs: 100 } satisfies CodexOptions,
     requests: () => requests,
   };
+}
+
+export function inputReceipt(clientId: string, content: unknown = [{ type: 'text', text: 'input', text_elements: [] }]) {
+  return { type: 'userMessage', id: 'item-' + clientId, clientId, content };
 }
 
 export function message(id: string, sender = '@agent-holmes:test.localhost', body = id): Event {

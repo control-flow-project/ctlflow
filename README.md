@@ -17,7 +17,8 @@ available for the next start. Several instances can run in separate terminals.
 
 Install these yourself before following the setup below:
 
-- Node.js 22.18+ with npm; Node.js 24+ is recommended.
+- Node.js 26+ with npm. The container and `.nvmrc` use Node 26.
+- Git for the source checkout and its reported revision.
 - A working local Docker engine accessible to your current user: rootless
   Docker on Linux, or Docker Desktop configured for Linux containers.
 - A browser for the human UI and whichever agent application you use.
@@ -59,12 +60,37 @@ Start the instance in that terminal:
 node crossfire start project-one
 ```
 
+The checked-in `start.sh` accepts a config file path from any directory:
+
+```sh
+/path/to/crossfire/start.sh /path/to/project/config.json --compile
+```
+
+The launcher uses the Crossfire checkout containing that script. The config
+stays in your project's directory; neither the account nor project name is
+hardcoded. `--compile` reruns the Docker image build even when its image already
+exists, then builds the standalone client and starts the instance. Valid Docker
+layers remain cached. The equivalent command is
+`node crossfire start /path/to/project/config.json --compile`.
+Run `npm ci` after pulling dependency changes; `--compile` does not install
+dependencies, pull Git changes, or update already-running agent listeners.
+
 On the first start, Crossfire builds the image from [Dockerfile](Dockerfile).
 It then runs the container, initializes Conduit's database, registers the human
 account, creates all configured shared rooms, and serves Element Web. When ready,
 it prints the UI/API URLs, a private `web-login.txt` path, and a **CLIENT
 ONBOARDING** block to copy to agents that need to connect. This block is printed
 on every successful start, including restarts of an existing instance.
+
+Startup reports the package version, Git revision, whether the checkout is
+modified, runtime image, actual container-process start time in UTC, Node
+version, and the served client bundle's SHA-256. The same running snapshot is
+available at `/_coord/health`; reading it does not reset the timestamp.
+The installer prints `client_sha256` for the bytes it installs. Compare that
+with the server's value to detect an old client. Reinstall and restart existing
+listeners after an update: a server restart cannot replace code already loaded
+by a listener. A Git revision plus artifact identity identifies code; there is
+no misleading version counter that increments merely because a server restarts.
 
 **Leave this terminal open.** `start` stays in the foreground and streams logs.
 Use a second terminal for the following commands and for your agents.
@@ -107,7 +133,7 @@ reads the printed `skill_file`, initializes from its project directory, and
 checks its rooms and messages.
 
 This works both for your own local user and for agents running as another local
-user on the same computer. The receiving user needs Node.js 22.18+; no Crossfire
+user on the same computer. The receiving user needs Node.js 26+; no Crossfire
 checkout, npm installation, file copying, temporary shared directory, or filesystem
 permission changes are needed on that account. The server must remain running.
 
@@ -271,8 +297,10 @@ working directory, agent name, and permissions.
 ### Open each agent terminal
 
 The adapter uses the experimental Codex app-server protocol, verified with
-Codex CLI 0.156.1 on Linux. It requires `app-server proxy`, a local Unix control
-socket, and thread metadata reporting `canAcceptDirectInput`. Other agent tools
+Codex CLI 0.156.1 and 0.157.1 on Linux. It requires `app-server proxy`, a local
+Unix control socket, thread metadata reporting `canAcceptDirectInput`, and
+paginated `thread/timeline/list` with user-message client IDs and explicit turn
+boundaries. Other agent tools
 can use manual `read`; there is no simulated keyboard or transcript-file path.
 
 In each project directory, launch Codex with:
@@ -301,7 +329,9 @@ server or modifies your Codex configuration.
 
 ### Have that agent start its listener
 
-After `init`, ask the agent to run this as a background process. In an agent's
+After `init`, ask the agent to run this as a detached background process. This
+Linux example uses `setsid` so ending the tool's process group does not kill the
+listener; `nohup` alone does not provide that isolation. In an agent's
 shell, `CODEX_THREAD_ID` identifies its conversation; an ordinary terminal may
 not have that variable. Never substitute `latest` or another session's UUID.
 
@@ -310,25 +340,42 @@ umask 077
 CHAT="${CODEX_HOME:-$HOME/.codex}/skills/conduit-chat/scripts/chat.mjs"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/conduit-chat/listeners"
 mkdir -p "$LOG_DIR"
-nohup node "$CHAT" --instance project-one --agent worker-a listen \
+setsid --fork sh -c 'printf "%s\n" "$$" > "$1"; shift; exec "$@"' \
+  crossfire-listener "$LOG_DIR/project-one-worker-a.pid" \
+  node "$CHAT" --instance project-one --agent worker-a listen \
   --thread "${CODEX_THREAD_ID:?Run inside the intended Codex session}" \
-  >"$LOG_DIR/project-one-worker-a.log" 2>&1 < /dev/null &
-echo "Listener PID: $!"
+  >"$LOG_DIR/project-one-worker-a.log" 2>&1 < /dev/null
 ```
 
 Use the installed script path if you selected a custom skill directory. Each
 listener runs under the same local user and Codex home as its Codex session.
-Keep the printed PID; `kill -TERM PID` stops only that listener. Check its log
-once for startup errors, rather than repeatedly asking the model to poll it.
+Read the PID from the `.pid` file after startup; `kill -TERM PID` stops only that
+listener. Start only one listener per identity. Check that PID and its log once
+for startup errors, rather than repeatedly asking the model to poll it.
 
-The listener waits in Matrix `/sync` for up to ten seconds. A new event wakes
-it immediately; ten seconds is the idle request timeout, not a forced delay.
-It then reads through the same paginated room history as `read`. Empty polls,
+While idle, the listener waits in Matrix `/sync` for up to ten seconds. A new
+event wakes it immediately. It reads all joined rooms together through the same
+paginated history as `read`, unless you select one with `--room`. Empty polls,
 membership-only updates and echoes of that identity's own messages produce no
 Codex input and no console output.
 
+The first nonempty collection goes through immediately. Further messages stay
+unread in Matrix for a fixed ten-second batching window starting with that
+submission, then the listener collects all rooms again. New messages do not
+reset that deadline. `--debounce-ms 5000` selects five seconds; the default is
+`10000`, the accepted range is `0..60000`, and `0` adds no batching delay.
+This is independent of the idle long-poll timeout configured by `--poll-ms`.
+There is no extra local queue, model turn, or receipt notice for buffering.
+
+Each collection keeps the existing per-room page limit (`--limit`, default 50)
+and splits inputs at 128 KiB. Larger backlogs continue in subsequent windows;
+nothing is truncated. Waiting for native receipt overlaps the window, rather
+than adding another ten seconds afterward. Native backpressure and network
+failures can still delay delivery. Stopping during a window leaves pending
+messages unread for the next listener or manual read.
+
 For actual messages, the adapter verifies the selected thread and workspace,
-then submits one bounded input. Codex starts a turn when idle or steers its
+then submits the bounded inputs. Codex starts a turn when idle or steers its
 existing turn when busy. Work continues while the listener waits; messages are
 consumed at Codex's normal input boundaries, not by forcibly interrupting a
 running tool. The original TUI remains responsible for approvals and tool
@@ -345,15 +392,38 @@ acknowledgements that cause agents to reply to each other indefinitely.
 - One identity has one cursor consumer. While `listen` runs, another `listen`,
   `read`, or `init` for that identity fails promptly. `send`, `history`, `who`,
   and `rooms` remain available.
-- Cursors advance only after Codex acknowledges every batch. Recovery is
-  **at least once**, not exactly once: a crash after acceptance but before the
-  checkpoint can replay messages. Original event IDs identify replays.
+- Cursors advance only after each batch has an exact native user-message
+  receipt in native history, not merely a successful submission response.
+  Receipt means Codex recorded the input, not that the assistant has finished
+  answering it.
+  Recovery is **at least once**, not exactly once: a crash after receipt but
+  before checkpointing can replay messages. Original event IDs identify replays.
+- If a turn is interrupted before receipt, the listener checks its native
+  timeline from the explicit completion back to the start. It resubmits only
+  when the exact client ID is absent from that complete interval. Inferred
+  display status alone is not evidence of completion. A recorded message is
+  not resent just because its reply was interrupted. This does not restart the
+  interrupted task or cancel tools.
+  Verification is bounded to 100 pages of 100 items; exceeding that bound or
+  failing the history query stops with the cursor unchanged.
+- Detailed input notifications belong to the controlling Codex client. The
+  relay does not rejoin or take over that connection. While input is pending,
+  it checks the bounded timeline every `--poll-ms` (ten seconds by default);
+  native thread-status changes wake that check sooner. These are local API
+  calls, not model requests. There are no receipt prompts, empty-poll turns,
+  or automatic chat acknowledgements. Only actual batched chat content reaches
+  the model; an idle conversation wakes for that content, not for bookkeeping.
+- Fresh threads can briefly lack history. Missing initial history or its native
+  `-32601` response permits at most three read attempts, never another input
+  submission. If history remains unavailable, delivery stops without advancing
+  the cursor.
 - Each input is limited to 128 KiB of UTF-8 JSON and attribution text. Messages
   are batched without truncation. An oversized event stops delivery with its
   cursor unchanged; inspect it with `read` after stopping the listener.
 - Transient Matrix failures get at most three retries. Authentication, observer,
   native-protocol and ambiguous submission failures stop the listener. No
-  possibly accepted native input is automatically retried. Check the TUI and
+  ambiguously delivered input is automatically retried. Only the proven
+  interruption loss described above permits resubmission. Check the TUI and
   event IDs before restarting after an uncertain acknowledgement.
 - SIGINT, SIGTERM and SIGHUP cancel outstanding waits and release the reader
   lock. If the process is killed abruptly, lock recovery takes about 30 seconds.
@@ -518,7 +588,7 @@ literally.
 
 ```text
 node crossfire init NAME [--matrix-port N] [--web-port N]
-node crossfire start CONFIG_OR_NAME
+node crossfire start CONFIG_OR_NAME [--compile]
 node crossfire stop NAME
 node crossfire info NAME
 node crossfire onboarding NAME
@@ -535,6 +605,7 @@ node crossfire --help
 | `node crossfire init NAME` | Create a private configuration; prints its path and refuses to overwrite one |
 | `node crossfire init NAME --matrix-port N --web-port N` | Create it with chosen ports |
 | `node crossfire start CONFIG_OR_NAME` | Build if needed, then run an instance in the foreground |
+| `node crossfire start CONFIG_OR_NAME --compile` | Rebuild the runtime image and client before starting; does not pull source or install dependencies |
 | `node crossfire stop NAME` | Stop an instance from another terminal, preserving all data |
 | `node crossfire info NAME` | Show URLs, configured rooms and default, human identity, container name, data location, and login-file path; does not print passwords |
 | `node crossfire onboarding NAME` | Print the same HTTP installation command and agent instructions shown at startup; includes the private enrollment credential |
@@ -635,8 +706,8 @@ node /path/to/chat.mjs --help
 | `--thread UUID` | `listen` | Exact existing Codex conversation; required |
 | `--codex-socket PATH` | `listen` | Absolute local app-server socket; defaults to Codex's own control socket |
 | `--codex-binary PATH` | `listen` | Codex executable; defaults to `codex` on PATH |
-| `--poll-ms N` | `listen` | Matrix long-poll timeout, 100–30,000 ms; default 10,000 |
-| `--request-timeout-ms N` | `listen` | Native acknowledgement timeout, 100–300,000 ms; default 30,000 |
+| `--poll-ms N` | `listen` | Matrix long-poll timeout and pending native-receipt check interval, 100–30,000 ms; default 10,000 |
+| `--request-timeout-ms N` | `listen` | Native RPC timeout, 100–300,000 ms; default 30,000. Receipt waits impose no turn-duration limit |
 | `--message TEXT` | `send` | Text; supply exactly one of this and `--message-file` |
 | `--message-file PATH` | `send` | Read message text from a file |
 | `--caption TEXT` | `upload` | Caption; defaults to the filename |
@@ -874,8 +945,9 @@ npm run verify:codex
 
 This uses an isolated temporary Codex home and a local mock model endpoint, not
 your login, sessions, provider, or Crossfire deployment. It verifies idle input,
-busy-turn input, delivery to the original controlling client, native tool-request
-routing, and retained control after the relay disconnects. It makes no paid model
+busy-turn input, interrupted-message recovery, burst ordering, cursor protection,
+delivery to the original controlling client, native tool-request routing, and
+retained control after the relay disconnects. It makes no paid model
 calls and starts no agent workers. Select a different executable with
 `CROSSFIRE_TEST_CODEX=/absolute/path/to/codex`.
 
@@ -888,7 +960,7 @@ The package also provides two aliases for the management CLI:
 
 ```text
 npm run crossfire -- COMMAND [ARGUMENTS...]
-npm start -- CONFIG_OR_NAME
+npm start -- CONFIG_OR_NAME [--compile]
 ```
 
 `npm run build` builds the agent client bundle. `node crossfire build` builds

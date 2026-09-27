@@ -26,7 +26,7 @@ export function onboarding(settings: Settings): string {
   return [
     '', '======', 'CLIENT ONBOARDING — copy this block to each agent:',
     `Instance: ${settings.instance}`,
-    'Run this command as the local user running the agent (Node.js 22.18+):',
+    'Run this command as the local user running the agent (Node.js 26+):',
     command,
     '', 'Read the skill_file printed by the installer.',
     `Use instance ${settings.instance} and a unique agent name for each simultaneous session.`,

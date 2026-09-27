@@ -10,6 +10,7 @@
 !scripts/lease.ts
 !scripts/control-auth.ts
 !scripts/onboarding.ts
+!scripts/version.ts
 !skills/
 !skills/conduit-chat/
 !skills/conduit-chat/scripts/
