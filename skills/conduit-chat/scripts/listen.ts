@@ -43,6 +43,7 @@ export type ListenerOptions = {
   room?: string;
   limit: number;
   pollMs: number;
+  debounceMs: number;
   codex: CodexOptions;
 };
 
@@ -54,8 +55,8 @@ function retryable(error: unknown): boolean {
 
 export async function listen(options: ListenerOptions, stop: AbortSignal): Promise<void> {
   const destination = await connectCodex({ ...options.codex, pollMs: options.pollMs }, stop);
+  const signal = AbortSignal.any([stop, destination.signal]);
   try {
-    const signal = AbortSignal.any([stop, destination.signal]);
     const client = new Matrix(options.settings.homeserver, options.account.access_token, signal);
     let since: string | undefined;
     let drain = true;
@@ -76,6 +77,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     while (!signal.aborted) {
       const batch = await receive();
       const deliveries = deliveryBatches(batch.events, options.settings, options.account.user_id);
+      const windowEnd = performance.now() + options.debounceMs;
       for (const delivery of deliveries) await destination.deliver(delivery.text, delivery.messageId);
       const cursors = JSON.stringify(batch.cursors);
       if (cursors !== savedCursors) {
@@ -83,7 +85,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         savedCursors = cursors;
       }
       drain = batch.more_rooms.length > 0;
+      const remaining = windowEnd - performance.now();
+      if (deliveries.length > 0 && remaining > 0) await delay(Math.ceil(remaining), undefined, { signal });
     }
     signal.throwIfAborted();
+  } catch (error) {
+    signal.throwIfAborted();
+    throw error;
   } finally { destination.close(); }
 }

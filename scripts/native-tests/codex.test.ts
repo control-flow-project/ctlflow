@@ -70,7 +70,7 @@ test('installed Codex receipts, interruption recovery, original controller, and 
   await until(() => native.completed() > beforeManual);
   const matrix = await matrixFixture(context, native.workspace);
   const stop = new AbortController();
-  const receiving = listen({ ...matrix, limit: 2, pollMs: 100, codex: native.options }, stop.signal).catch(error => error);
+  const receiving = listen({ ...matrix, limit: 2, pollMs: 100, debounceMs: 100, codex: native.options }, stop.signal).catch(error => error);
   context.after(async () => { stop.abort(new Error('verification complete')); await receiving; });
   await until(() => matrix.waiting() === 1);
   native.hold();

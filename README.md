@@ -353,14 +353,29 @@ Read the PID from the `.pid` file after startup; `kill -TERM PID` stops only tha
 listener. Start only one listener per identity. Check that PID and its log once
 for startup errors, rather than repeatedly asking the model to poll it.
 
-The listener waits in Matrix `/sync` for up to ten seconds. A new event wakes
-it immediately; ten seconds is the idle request timeout, not a forced delay.
-It then reads through the same paginated room history as `read`. Empty polls,
+While idle, the listener waits in Matrix `/sync` for up to ten seconds. A new
+event wakes it immediately. It reads all joined rooms together through the same
+paginated history as `read`, unless you select one with `--room`. Empty polls,
 membership-only updates and echoes of that identity's own messages produce no
 Codex input and no console output.
 
+The first nonempty collection goes through immediately. Further messages stay
+unread in Matrix for a fixed ten-second batching window starting with that
+submission, then the listener collects all rooms again. New messages do not
+reset that deadline. `--debounce-ms 5000` selects five seconds; the default is
+`10000`, the accepted range is `0..60000`, and `0` adds no batching delay.
+This is independent of the idle long-poll timeout configured by `--poll-ms`.
+There is no extra local queue, model turn, or receipt notice for buffering.
+
+Each collection keeps the existing per-room page limit (`--limit`, default 50)
+and splits inputs at 128 KiB. Larger backlogs continue in subsequent windows;
+nothing is truncated. Waiting for native receipt overlaps the window, rather
+than adding another ten seconds afterward. Native backpressure and network
+failures can still delay delivery. Stopping during a window leaves pending
+messages unread for the next listener or manual read.
+
 For actual messages, the adapter verifies the selected thread and workspace,
-then submits one bounded input. Codex starts a turn when idle or steers its
+then submits the bounded inputs. Codex starts a turn when idle or steers its
 existing turn when busy. Work continues while the listener waits; messages are
 consumed at Codex's normal input boundaries, not by forcibly interrupting a
 running tool. The original TUI remains responsible for approvals and tool

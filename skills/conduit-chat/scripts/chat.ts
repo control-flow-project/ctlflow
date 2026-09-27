@@ -18,7 +18,7 @@ async function main(): Promise<void> {
     to: { type: 'string' }, message: { type: 'string' }, 'message-file': { type: 'string' },
     caption: { type: 'string' }, txn: { type: 'string' }, limit: { type: 'string' }, help: { type: 'boolean' },
     thread: { type: 'string' }, 'codex-socket': { type: 'string' }, 'codex-binary': { type: 'string' },
-    'poll-ms': { type: 'string' }, 'request-timeout-ms': { type: 'string' },
+    'poll-ms': { type: 'string' }, 'request-timeout-ms': { type: 'string' }, 'debounce-ms': { type: 'string' },
   } });
   if (values.help) {
     console.log('chat --instance NAME --agent NAME COMMAND\n'
@@ -26,7 +26,7 @@ async function main(): Promise<void> {
       + 'read [--room ROOM] [--limit 1..100]    Read unread events and save cursors\n'
       + 'listen --thread UUID                Relay chat into a loaded Codex thread without blocking it\n'
       + '  [--codex-socket ABSOLUTE_PATH] [--codex-binary PATH] [--poll-ms 10000]\n'
-      + '  [--request-timeout-ms 30000] [--room ROOM] [--limit 1..100]\n'
+      + '  [--request-timeout-ms 30000] [--debounce-ms 10000] [--room ROOM] [--limit 1..100]\n'
       + 'history [--room ROOM] [--limit 1..100] Read recent messages without moving cursors\n'
       + 'send --message TEXT [--to PEER|--room ROOM] [--txn ID]\n'
       + 'send --message-file FILE [--to PEER|--room ROOM] [--txn ID]\n'
@@ -47,13 +47,18 @@ async function main(): Promise<void> {
   if (values.to && values.room) throw new Error('Choose --to or --room, not both');
   const limit = Number(values.limit ?? '50');
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('--limit must be 1..100');
-  if (command !== 'listen' && [values.thread, values['codex-socket'], values['codex-binary'], values['poll-ms'], values['request-timeout-ms']]
+  if (command !== 'listen' && [values.thread, values['codex-socket'], values['codex-binary'], values['poll-ms'],
+    values['request-timeout-ms'], values['debounce-ms']]
       .some(value => value !== undefined)) throw new Error('Listener options require the listen command');
   const pollMs = Number(values['poll-ms'] ?? '10000');
   const requestTimeoutMs = Number(values['request-timeout-ms'] ?? '30000');
+  const debounceMs = Number(values['debounce-ms'] ?? '10000');
   if (!Number.isInteger(pollMs) || pollMs < 100 || pollMs > 30000) throw new Error('--poll-ms must be 100..30000');
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 100 || requestTimeoutMs > 300000) {
     throw new Error('--request-timeout-ms must be 100..300000');
+  }
+  if (values['debounce-ms']?.trim() === '' || !Number.isInteger(debounceMs) || debounceMs < 0 || debounceMs > 60000) {
+    throw new Error('--debounce-ms must be 0..60000');
   }
   if (command === 'listen' && !values.thread) throw new Error('listen requires --thread with the existing Codex thread UUID');
   const settings = readSettings(join(CONFIG, 'instances', instance + '.json'));
@@ -92,7 +97,7 @@ async function main(): Promise<void> {
     const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
     for (const signal of signals) process.on(signal, cancel);
     try {
-      await listen({ settings, account, cursorFile: join(state, 'cursors.json'), limit, room: values.room, pollMs,
+      await listen({ settings, account, cursorFile: join(state, 'cursors.json'), limit, room: values.room, pollMs, debounceMs,
         codex: { thread: values.thread!, workspace: account.workspace, binary: values['codex-binary'],
           socket: values['codex-socket'], timeoutMs: requestTimeoutMs } }, controller.signal);
     } catch (error) { if (!controller.signal.aborted) throw error; }

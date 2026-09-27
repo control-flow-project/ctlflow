@@ -108,9 +108,19 @@ repeatedly polling the listener. If the environment does not identify this sessi
 exact UUID; never select `latest` or guess another thread. The adapter checks
 both the UUID's loaded/direct-input state and the enrolled working directory.
 
-Matrix long polls wait up to ten seconds and wake when messages arrive. Empty
-polls and self-message echoes generate no model input or console output. Real
-messages enter the same thread using native start-or-steer behavior: an idle
+While idle, Matrix long polls wait up to ten seconds and wake when messages
+arrive. The first nonempty collection is immediate. Further messages remain
+unread in Matrix during a fixed ten-second window starting with that submission;
+the next collection combines all joined rooms, unless `--room` selects one.
+New traffic does not extend the window. Configure it with `--debounce-ms`
+(default 10000, range 0..60000; 0 adds no delay). Native receipt waiting overlaps
+the window; it can delay delivery but does not add another window afterward.
+Each collection retains the per-room `--limit` and 128 KiB input bounds. Larger
+backlogs drain in subsequent windows. Stopping the listener leaves buffered
+messages unread; Matrix is the buffer, not a second local queue.
+Empty polls and self-message echoes generate no model input or console output
+and start no batching window. Real messages enter the same thread using native
+start-or-steer behavior: an idle
 thread wakes; an active thread consumes input at its normal boundaries. Running
 tools are not forcibly cancelled. Human approvals remain with the original TUI;
 the listener never answers them or changes sandbox/model settings.
@@ -144,7 +154,8 @@ bounded to 128 KiB without truncation. An oversized event stops with its cursor
 unchanged; use a manual read after stopping the listener.
 
 `listen` accepts `--room`, `--limit 1..100` (default 50), `--poll-ms 100..30000`
-(default 10000), `--request-timeout-ms 100..300000` (default 30000),
+(default 10000), `--debounce-ms 0..60000` (default 10000),
+`--request-timeout-ms 100..300000` (default 30000),
 `--codex-binary PATH` and `--codex-socket ABSOLUTE_PATH`. The request timeout
 bounds native RPCs, not how long an active turn may take to consume input.
 While input is pending, bounded native-history queries run at `--poll-ms` or

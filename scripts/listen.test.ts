@@ -17,7 +17,7 @@ test('listener long-polls silently, wakes promptly, drains backlog, and checkpoi
   const native = await fakeCodex(t);
   const matrix = await matrixFixture(t, native.directory);
   const controller = new AbortController();
-  const options: ListenerOptions = { ...matrix, limit: 2, pollMs: 100, codex: native.options };
+  const options: ListenerOptions = { ...matrix, limit: 2, pollMs: 100, debounceMs: 0, codex: native.options };
   const result = listen(options, controller.signal).catch(error => error);
   t.after(async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
@@ -48,7 +48,7 @@ test('failed and uncertain native deliveries leave cursors untouched and are nev
     const matrix = await matrixFixture(t, native.directory);
     matrix.add(ROOM, message('$one'));
     writeJson(matrix.cursorFile, { [ROOM]: '0' });
-    await assert.rejects(listen({ ...matrix, limit: 50, pollMs: 100,
+    await assert.rejects(listen({ ...matrix, limit: 50, pollMs: 100, debounceMs: 0,
       codex: { ...native.options, timeoutMs: 500 } }, new AbortController().signal));
     assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: '0' });
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
@@ -59,7 +59,7 @@ test('an incoming message wakes a ten-second long poll without waiting for its t
   const native = await fakeCodex(t);
   const matrix = await matrixFixture(t, native.directory);
   const controller = new AbortController();
-  const result = listen({ ...matrix, limit: 50, pollMs: 10_000, codex: native.options }, controller.signal).catch(error => error);
+  const result = listen({ ...matrix, limit: 50, pollMs: 10_000, debounceMs: 10_000, codex: native.options }, controller.signal).catch(error => error);
   t.after(async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1);
   assert.equal(matrix.requests.filter(request => request.path === API + '/sync').at(-1)!.query.get('timeout'), '10000');
@@ -72,7 +72,7 @@ test('active-turn acceptance leaves messages unread until native receipt, includ
   const native = await fakeCodex(context, { mode: 'accepted' });
   const matrix = await matrixFixture(context, native.directory);
   const controller = new AbortController();
-  const result = listen({ ...matrix, limit: 1, pollMs: 100, codex: native.options }, controller.signal).catch(error => error);
+  const result = listen({ ...matrix, limit: 1, pollMs: 100, debounceMs: 0, codex: native.options }, controller.signal).catch(error => error);
   context.after(async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1);
   matrix.add(ROOM, message('$first'), message('$second'));
@@ -97,7 +97,7 @@ test('transient Matrix errors retry bounded reads, never replaying acknowledged 
   matrix.failures.set(API + '/sync', [503, 429]);
   matrix.add(ROOM, message('$one'));
   const controller = new AbortController();
-  const result = listen({ ...matrix, limit: 50, pollMs: 100, codex: native.options }, controller.signal).catch(error => error);
+  const result = listen({ ...matrix, limit: 50, pollMs: 100, debounceMs: 0, codex: native.options }, controller.signal).catch(error => error);
   t.after(async () => { controller.abort(); await result; });
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
@@ -114,7 +114,7 @@ test('permanent Matrix errors, observer failures, and oversized messages stop wi
     if (kind === 'authentication') matrix.failures.set(API + '/sync', [401]);
     if (kind === 'observer') matrix.missingObserver.add(ROOM);
     matrix.add(ROOM, message('$one', undefined, kind === 'oversized' ? 'x'.repeat(128 * 1024) : 'normal'));
-    await assert.rejects(listen({ ...matrix, limit: 50, pollMs: 100, codex: native.options }, new AbortController().signal),
+    await assert.rejects(listen({ ...matrix, limit: 50, pollMs: 100, debounceMs: 0, codex: native.options }, new AbortController().signal),
       kind === 'authentication' ? /HTTP 401/ : kind === 'observer' ? /observer/ : /exceeds the 128 KiB/);
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
     assert.equal(existsSync(matrix.cursorFile), false);
@@ -153,7 +153,8 @@ test('CLI validates listener-only controls before network use', async () => {
   const base = [join(ROOT, 'skills/conduit-chat/scripts/chat.ts'), '--instance', 'test', '--agent', 'watson'];
   for (const args of [['read', '--thread', THREAD], ['listen'], ['listen', '--thread', THREAD, '--poll-ms', 'NaN'],
     ['listen', '--thread', THREAD, '--poll-ms', '0'], ['listen', '--thread', THREAD, '--poll-ms', '30001'],
-    ['listen', '--thread', THREAD, '--request-timeout-ms', 'Infinity']]) {
+    ['listen', '--thread', THREAD, '--request-timeout-ms', 'Infinity'], ['read', '--debounce-ms', '10000'],
+    ...['', ' ', 'NaN', 'Infinity', '-1', '0.5', '60001'].map(value => ['listen', '--thread', THREAD, '--debounce-ms=' + value])]) {
     await assert.rejects(execute(process.execPath, [...base, ...args]), /Listener options|listen requires|must be/);
   }
 });
@@ -193,7 +194,8 @@ test('the standalone bundle relays from a foreign project without node_modules',
   writeFileSync(join(native.directory, 'package.json'), '{"type":"commonjs"}');
   matrix.add(ROOM, message('$standalone'));
   const child = spawn(process.execPath, [script, '--instance', 'test', '--agent', 'watson', 'listen', '--thread', THREAD,
-    '--codex-binary', native.options.binary], { env: matrix.env, cwd: native.directory, stdio: ['ignore', 'pipe', 'pipe'] });
+    '--codex-binary', native.options.binary, '--debounce-ms', '60000'],
+    { env: matrix.env, cwd: native.directory, stdio: ['ignore', 'pipe', 'pipe'] });
   const stopped = once(child, 'close');
   let errors = '', output = '';
   child.stderr.on('data', chunk => { errors += String(chunk); });
