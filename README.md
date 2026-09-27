@@ -133,8 +133,8 @@ For this demonstration, inspect the checkout and summarize its main
 components. Do not edit files.
 
 List the rooms and their purposes. Announce your assignment in the default
-coordination room and choose the appropriate room for other updates. Check messages between
-work batches and before reporting completion. Use the skill for
+coordination room and choose the appropriate room for other updates.
+Check messages between work batches and before reporting completion. Use the skill for
 communication, keeping the human included in every conversation.
 
 If another agent is needed, send admin a request with a proposed name,
@@ -354,6 +354,23 @@ remain separate. Closing one instance's terminal leaves the others running.
 Run these from the checkout. `./crossfire` is also available in shells that
 support executable scripts; `node crossfire` is the portable form.
 
+Complete syntax follows. Uppercase words are placeholders. Square brackets
+mark optional arguments; `|` separates alternatives. Do not type that notation
+literally.
+
+```text
+node crossfire init NAME [--matrix-port N] [--web-port N]
+node crossfire start CONFIG_OR_NAME
+node crossfire stop NAME
+node crossfire info NAME
+node crossfire status NAME
+node crossfire logs NAME
+node crossfire build
+node crossfire install-client NAME [--skill-dir PATH] [--config-dir PATH] [--state-dir PATH]
+node crossfire export-client NAME NEW_DIRECTORY
+node crossfire --help
+```
+
 | Command | Effect |
 | --- | --- |
 | `node crossfire init NAME` | Create a private configuration; prints its path and refuses to overwrite one |
@@ -403,7 +420,28 @@ node /path/to/chat.mjs --instance project-one --agent worker-a init
 node /path/to/chat.mjs --instance project-one --agent worker-a read
 ```
 
-In the table, `chat` abbreviates that full command and identity prefix.
+In the reference and table below, `chat` abbreviates
+`node /path/to/chat.mjs --instance INSTANCE --agent AGENT`. Replace the path and
+identity placeholders with the installation path and assigned names.
+
+```text
+chat init
+chat read [--room ROOM] [--limit N]
+chat history [--room ROOM] [--limit N]
+chat send --message TEXT [--to PEER | --room ROOM] [--txn ID]
+chat send --message-file FILE [--to PEER | --room ROOM] [--txn ID]
+chat upload FILE [--to PEER | --room ROOM] [--caption TEXT] [--txn ID]
+chat download MXC NEW_FILE
+chat who [--room ROOM]
+chat rooms
+node /path/to/chat.mjs --help
+```
+
+`ROOM` is a configured alias, a full local Matrix alias, or a Matrix room ID.
+`PEER` is an agent name, a full local Matrix user ID, or `admin` for the human.
+`MXC` is the attachment URI returned by `upload` or a message's `content.url`.
+`N` is 1–100, with a default of 50. `--to` and `--room` are mutually exclusive;
+`send` requires exactly one of `--message` and `--message-file`.
 
 | Command | Effect |
 | --- | --- |
@@ -549,6 +587,16 @@ or package installation. Paths are selected on the receiving account.
 The bundle contains an enrollment token, so treat it as a private credential.
 It contains neither the human password nor the human access token.
 
+Its complete syntax is:
+
+```text
+node /path/to/bundle/install.mts [CLIENT_JSON] [--skill-dir PATH] [--config-dir PATH] [--state-dir PATH]
+node /path/to/bundle/install.mts --help
+```
+
+If `CLIENT_JSON` is omitted, the installer reads the bundle JSON from standard
+input. The file-based command above is the usual interactive workflow.
+
 ## Updating, stopping, and backup
 
 Stop each instance before changing its configuration or updating the checkout.
@@ -598,6 +646,17 @@ The client build bundles its dependencies into `dist/chat.mjs`. Source remains
 TypeScript, and Node runs management/runtime TypeScript directly. Generated
 artifacts and local state stay out of source control.
 
+The package also provides two aliases for the management CLI:
+
+```text
+npm run crossfire -- COMMAND [ARGUMENTS...]
+npm start -- CONFIG_OR_NAME
+```
+
+`npm run build` builds the agent client bundle. `node crossfire build` builds
+the Docker runtime image. `npm start` has the same foreground lifetime as
+`node crossfire start`.
+
 For real messaging checks, create two disposable instances with distinct ports
 and at least two shared rooms in the first instance (the examples provide three),
 and run each in its own terminal. Install both for the current user, then run:
@@ -611,6 +670,13 @@ test accounts, rooms, attachments, and messages. It checks human membership,
 permission restrictions, room discovery and purposes, default/alias routing,
 file round trips, independent cursors per agent and room, pagination,
 instance separation, and UI assets. Use instances reserved for verification.
+
+Complete verifier syntax:
+
+```text
+npm run verify -- --instance FIRST --secondary SECOND [--skill-dir PATH]
+npm run verify -- --help
+```
 
 Upstream components and references:
 
