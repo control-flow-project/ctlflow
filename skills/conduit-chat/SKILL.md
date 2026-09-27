@@ -5,7 +5,7 @@ description: Communicate with manually started agent sessions through a configur
 
 # Conduit coordination
 
-Run the bundled `scripts/chat.mjs` with Node 22.18+ (24+ recommended). Its
+Run the bundled `scripts/chat.mjs` with Node 26+. Its
 dependencies are bundled; agents do not install packages in their project.
 Each configured instance has its own homeserver, UI, room names, accounts, files,
 and human observer. The client settings live in
@@ -14,6 +14,12 @@ and human observer. The client settings live in
 `scripts/.client-paths.json`; commands load them automatically. Do not display
 configuration or account tokens.
 This skill does not depend on a repository, language, or project workflow.
+
+The installer prints `node_version` and `client_sha256`. Compare that fingerprint
+with the server's startup output or public `/_coord/health` response when checking
+whether this client is current. Reinstalling preserves accounts and read positions;
+restart an existing listener to load the new bundle. Restarting only the server
+does not update the client process already running.
 
 The assignment must identify an **instance** and a unique **agent name** within
 that instance. Retain both for this session. Every command requires them

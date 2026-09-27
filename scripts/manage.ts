@@ -8,11 +8,12 @@ import { ROOT, DATA, INSTANCES, CONFIGURATIONS, validate, type InstanceConfig } 
 import { configure } from './bootstrap.ts';
 import { HEARTBEAT_INTERVAL_MS } from './lease.ts';
 import { onboarding, type ClientFiles } from './onboarding.ts';
+import { buildInfo, requireNode, type RuntimeInfo } from './version.ts';
 import { name, readJson, readSettings, roomCatalog, writeJson, emit, acquireProcessLock } from '../skills/conduit-chat/scripts/lib.ts';
 
 const runtimeFiles = ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json',
   'scripts/bootstrap.ts', 'scripts/container.ts', 'scripts/instance.ts', 'scripts/room-service.ts',
-  'scripts/lease.ts', 'scripts/control-auth.ts', 'scripts/onboarding.ts', 'skills/conduit-chat/scripts/lib.ts'];
+  'scripts/lease.ts', 'scripts/control-auth.ts', 'scripts/onboarding.ts', 'scripts/version.ts', 'skills/conduit-chat/scripts/lib.ts'];
 const storeId = createHash('sha256').update(DATA).digest('hex').slice(0, 12);
 export const containerName = (instance: string) => `crossfire-${name(instance)}-${storeId}`;
 
@@ -47,12 +48,13 @@ export function imageName(): string {
   for (const file of runtimeFiles) hash.update(file).update(readFileSync(join(ROOT, file)));
   return 'crossfire-runtime:' + hash.digest('hex').slice(0, 20);
 }
-async function buildImage(): Promise<string> {
+async function buildImage(compile = false): Promise<string> {
   requireDocker();
   const image = imageName();
   const release = await acquireProcessLock(join(DATA, 'image-build'));
   try {
-    if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) {
+    if (compile || spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) {
+      if (compile) console.log('Rebuilding runtime image ' + image);
       await new Promise<void>((resolveBuild, reject) => {
         const child = spawn('docker', ['build', '--tag', image, '--file', join(ROOT, 'Dockerfile'), ROOT], { stdio: 'inherit' });
         child.once('error', reject);
@@ -81,23 +83,26 @@ function details(instance: string) {
     default_room: settings.default_room, rooms: settings.rooms, container: containerName(instance), data_directory: join(INSTANCES, instance),
     login_file: join(INSTANCES, instance, 'private/web-login.txt') };
 }
-async function waitReady(config: InstanceConfig, runId: string, signal: AbortSignal): Promise<void> {
+async function waitReady(config: InstanceConfig, runId: string, signal: AbortSignal): Promise<RuntimeInfo> {
   for (let attempt = 0; attempt < 150; attempt++) {
     signal.throwIfAborted();
     try {
       const response = await fetch(`http://127.0.0.1:${config.web_port}/_coord/health`, { signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]) });
-      const health = await response.json() as { instance?: string; run_id?: string; status?: string };
-      if (response.ok && health.instance === config.id && health.run_id === runId && health.status === 'ready') return;
+      const health = await response.json() as RuntimeInfo & { instance?: string; run_id?: string; status?: string };
+      if (response.ok && health.instance === config.id && health.run_id === runId && health.status === 'ready') {
+        return { build: health.build, started_at: health.started_at, node: health.node, client_sha256: health.client_sha256 };
+      }
     } catch { /* still starting */ }
     await delay(200, undefined, { signal });
   }
   throw new Error('Instance did not become ready; see the container output');
 }
-async function start(path: string): Promise<void> {
+async function start(path: string, compile: boolean): Promise<void> {
   const original = readJson<unknown>(path);
   const config = validate(original);
-  const image = await buildImage();
+  const image = await buildImage(compile);
   const files = clientFiles();
+  const build = buildInfo(ROOT, image);
   const release = await acquireProcessLock(join(INSTANCES, config.id, 'running'));
   let controller: AbortController | undefined;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -124,6 +129,7 @@ async function start(path: string): Promise<void> {
     let privatePath: string;
     try { ({ privatePath } = configure(config)); } finally { await configureRelease(); }
     writeJson(join(privatePath, 'client-files.json'), files);
+    writeJson(join(privatePath, 'build.json'), build);
     writeFileSync(join(privatePath, 'install.mjs'), readFileSync(join(ROOT, 'dist/install.mjs')), { mode: 0o600 });
     if (original && typeof original === 'object' && 'room' in original) writeJson(path, config);
     const runId = randomUUID();
@@ -142,8 +148,8 @@ async function start(path: string): Promise<void> {
     }, HEARTBEAT_INTERVAL_MS);
     controller = new AbortController();
     try {
-      await Promise.race([waitReady(config, runId, controller.signal), completion.then(code => { throw new Error(`Container exited before startup completed (${code})`); })]);
-      emit(details(config.id));
+      const runtime = await Promise.race([waitReady(config, runId, controller.signal), completion.then(code => { throw new Error(`Container exited before startup completed (${code})`); })]);
+      emit({ ...details(config.id), ...runtime });
       console.log(onboarding(readSettings(join(privatePath, 'settings.json'))));
       console.log('Instance is running in this terminal. Press Ctrl+C to stop.');
       const code = await completion;
@@ -189,13 +195,14 @@ function exportClient(instance: string, destination: string): void {
   if (existsSync(folder)) throw new Error('Choose a new directory for the client bundle');
   mkdirSync(folder, { recursive: true, mode: 0o700 });
   writeJson(join(folder, 'client.json'), bundle);
-  writeFileSync(join(folder, 'install.mts'), readFileSync(join(ROOT, 'scripts/install-client.ts')), { mode: 0o600 });
+  writeFileSync(join(folder, 'install.mts'), readFileSync(join(ROOT, 'dist/install.mjs')), { mode: 0o600 });
   emit({ instance, directory: folder, installer: join(folder, 'install.mts'), bundle: join(folder, 'client.json') });
 }
 export async function main(): Promise<void> {
+  requireNode();
   const usage = 'Usage: node crossfire COMMAND\n'
     + '  init INSTANCE [--matrix-port N] [--web-port N]  Create a private configuration\n'
-    + '  start CONFIG_OR_INSTANCE                      Run in this terminal until it closes\n'
+    + '  start CONFIG_OR_INSTANCE [--compile]          Rebuild if requested, then run in this terminal\n'
     + '  stop INSTANCE                                 Stop a running instance; retain its data\n'
     + '  info INSTANCE                                 Show URLs, storage, and login-file path\n'
     + '  onboarding INSTANCE                           Print copyable HTTP client installation instructions\n'
@@ -207,11 +214,11 @@ export async function main(): Promise<void> {
     + '  --help';
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     help: { type: 'boolean' }, 'skill-dir': { type: 'string' }, 'config-dir': { type: 'string' },
-    'state-dir': { type: 'string' }, 'matrix-port': { type: 'string' }, 'web-port': { type: 'string' },
+    'state-dir': { type: 'string' }, 'matrix-port': { type: 'string' }, 'web-port': { type: 'string' }, compile: { type: 'boolean' },
   } });
   if (values.help) { console.log(usage); return; }
   const [command, value, destination] = positionals;
-  const allowed = command === 'init' ? ['matrix-port', 'web-port'] : command === 'install-client' ? ['skill-dir', 'config-dir', 'state-dir'] : [];
+  const allowed = command === 'init' ? ['matrix-port', 'web-port'] : command === 'install-client' ? ['skill-dir', 'config-dir', 'state-dir'] : command === 'start' ? ['compile'] : [];
   if (Object.keys(values).some(option => !allowed.includes(option))) throw new Error('Unsupported option for this command\n' + usage);
   if (positionals.length > (command === 'export-client' ? 3 : command === 'build' ? 1 : 2)) throw new Error(usage);
   if (command === 'init' && value) {
@@ -227,7 +234,7 @@ export async function main(): Promise<void> {
   } else if (command === 'build') { emit({ image: await buildImage() }); }
   else if (command === 'start' && value) {
     const configured = join(CONFIGURATIONS, name(existsSync(value) ? 'unused' : value) + '.json');
-    await start(existsSync(value) ? value : existsSync(configured) ? configured : join(INSTANCES, value, 'instance.json'));
+    await start(existsSync(value) ? value : existsSync(configured) ? configured : join(INSTANCES, value, 'instance.json'), values.compile === true);
   } else if (command === 'install-client' && value) installClient(value, values);
   else if (command === 'export-client' && value && destination) exportClient(value, destination);
   else if (command === 'info' && value) emit(details(value));

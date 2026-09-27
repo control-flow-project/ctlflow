@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +11,7 @@ import { ROOT, type InstanceConfig } from './instance.ts';
 import { serve } from './room-service.ts';
 import { enrollmentUrl, onboarding } from './onboarding.ts';
 import { Matrix, type Settings } from '../skills/conduit-chat/scripts/lib.ts';
+import { buildInfo } from './version.ts';
 
 const execute = promisify(execFile);
 const shell = promisify(exec);
@@ -37,11 +38,17 @@ test('printed HTTP onboarding installs outside the checkout, authenticates the i
   const files = JSON.parse(readFileSync(join(bundlePath, 'client.json'), 'utf8')).files;
   writeFileSync(join(profile, 'client-files.json'), JSON.stringify(files));
   writeFileSync(join(profile, 'install.mjs'), readFileSync(join(ROOT, 'dist/install.mjs')));
-  const server = serve({ ...config, web_port: 0 }, settings, new Matrix(settings.homeserver), profile);
+  const startup = { build: buildInfo(ROOT, 'test-image'), started_at: new Date().toISOString(), node: process.versions.node };
+  const clientHash = createHash('sha256').update(files['scripts/chat.mjs']).digest('hex');
+  const server = serve({ ...config, web_port: 0 }, settings, new Matrix(settings.homeserver), profile, startup);
   t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
   await once(server, 'listening');
   const address = server.address(); assert(address && typeof address === 'object');
   settings.room_service = `http://127.0.0.1:${address.port}`;
+  const health = await (await fetch(settings.room_service + '/_coord/health')).json();
+  assert.deepEqual(health, { instance: config.id, status: 'ready', ...startup, client_sha256: clientHash });
+  assert.deepEqual(await (await fetch(settings.room_service + '/_coord/health')).json(), health);
+  assert(!JSON.stringify(health).includes(settings.registration_token));
   const clientUrl = settings.room_service + '/_coord/client';
   for (const headers of [{}, { Authorization: 'Bearer ' + randomBytes(40).toString('base64url') }, { Authorization: 'Bearer ' + controlSecret }]) {
     const response = await fetch(clientUrl, { headers });
@@ -68,6 +75,10 @@ test('printed HTTP onboarding installs outside the checkout, authenticates the i
   const installed = JSON.parse((await shell(command, { env, cwd: workspace })).stdout);
   assert.equal(installed.instance, config.id);
   assert.equal(installed.skill_file, join(skill, 'SKILL.md'));
+  assert.equal(installed.node_version, process.versions.node);
+  assert.equal(installed.client_sha256, clientHash);
+  assert.equal(createHash('sha256').update(readFileSync(installed.chat)).digest('hex'), clientHash);
+  assert(onboarding(settings).includes('Node.js 26+'));
   const accountPath = join(clientConfig, 'accounts/project-one/worker-a.json');
   mkdirSync(join(clientConfig, 'accounts/project-one'), { recursive: true });
   const account = { user_id: '@agent-worker-a:project-one.localhost', access_token: randomUUID(), device_id: 'existing' };

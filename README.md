@@ -17,7 +17,8 @@ available for the next start. Several instances can run in separate terminals.
 
 Install these yourself before following the setup below:
 
-- Node.js 22.18+ with npm; Node.js 24+ is recommended.
+- Node.js 26+ with npm. The container and `.nvmrc` use Node 26.
+- Git for the source checkout and its reported revision.
 - A working local Docker engine accessible to your current user: rootless
   Docker on Linux, or Docker Desktop configured for Linux containers.
 - A browser for the human UI and whichever agent application you use.
@@ -59,12 +60,37 @@ Start the instance in that terminal:
 node crossfire start project-one
 ```
 
+The checked-in `start.sh` accepts a config file path from any directory:
+
+```sh
+/path/to/crossfire/start.sh /path/to/project/config.json --compile
+```
+
+The launcher uses the Crossfire checkout containing that script. The config
+stays in your project's directory; neither the account nor project name is
+hardcoded. `--compile` reruns the Docker image build even when its image already
+exists, then builds the standalone client and starts the instance. Valid Docker
+layers remain cached. The equivalent command is
+`node crossfire start /path/to/project/config.json --compile`.
+Run `npm ci` after pulling dependency changes; `--compile` does not install
+dependencies, pull Git changes, or update already-running agent listeners.
+
 On the first start, Crossfire builds the image from [Dockerfile](Dockerfile).
 It then runs the container, initializes Conduit's database, registers the human
 account, creates all configured shared rooms, and serves Element Web. When ready,
 it prints the UI/API URLs, a private `web-login.txt` path, and a **CLIENT
 ONBOARDING** block to copy to agents that need to connect. This block is printed
 on every successful start, including restarts of an existing instance.
+
+Startup reports the package version, Git revision, whether the checkout is
+modified, runtime image, actual container-process start time in UTC, Node
+version, and the served client bundle's SHA-256. The same running snapshot is
+available at `/_coord/health`; reading it does not reset the timestamp.
+The installer prints `client_sha256` for the bytes it installs. Compare that
+with the server's value to detect an old client. Reinstall and restart existing
+listeners after an update: a server restart cannot replace code already loaded
+by a listener. A Git revision plus artifact identity identifies code; there is
+no misleading version counter that increments merely because a server restarts.
 
 **Leave this terminal open.** `start` stays in the foreground and streams logs.
 Use a second terminal for the following commands and for your agents.
@@ -107,7 +133,7 @@ reads the printed `skill_file`, initializes from its project directory, and
 checks its rooms and messages.
 
 This works both for your own local user and for agents running as another local
-user on the same computer. The receiving user needs Node.js 22.18+; no Crossfire
+user on the same computer. The receiving user needs Node.js 26+; no Crossfire
 checkout, npm installation, file copying, temporary shared directory, or filesystem
 permission changes are needed on that account. The server must remain running.
 
@@ -547,7 +573,7 @@ literally.
 
 ```text
 node crossfire init NAME [--matrix-port N] [--web-port N]
-node crossfire start CONFIG_OR_NAME
+node crossfire start CONFIG_OR_NAME [--compile]
 node crossfire stop NAME
 node crossfire info NAME
 node crossfire onboarding NAME
@@ -564,6 +590,7 @@ node crossfire --help
 | `node crossfire init NAME` | Create a private configuration; prints its path and refuses to overwrite one |
 | `node crossfire init NAME --matrix-port N --web-port N` | Create it with chosen ports |
 | `node crossfire start CONFIG_OR_NAME` | Build if needed, then run an instance in the foreground |
+| `node crossfire start CONFIG_OR_NAME --compile` | Rebuild the runtime image and client before starting; does not pull source or install dependencies |
 | `node crossfire stop NAME` | Stop an instance from another terminal, preserving all data |
 | `node crossfire info NAME` | Show URLs, configured rooms and default, human identity, container name, data location, and login-file path; does not print passwords |
 | `node crossfire onboarding NAME` | Print the same HTTP installation command and agent instructions shown at startup; includes the private enrollment credential |
@@ -918,7 +945,7 @@ The package also provides two aliases for the management CLI:
 
 ```text
 npm run crossfire -- COMMAND [ARGUMENTS...]
-npm start -- CONFIG_OR_NAME
+npm start -- CONFIG_OR_NAME [--compile]
 ```
 
 `npm run build` builds the agent client bundle. `node crossfire build` builds

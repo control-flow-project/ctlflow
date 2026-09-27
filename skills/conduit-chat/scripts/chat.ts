@@ -8,9 +8,11 @@ import { API, CONFIG, STATE, Matrix, name, readJson, readSettings, selectRoom, w
   type Account, type Event, type JsonObject } from './lib.ts';
 import { eventView, readUnread, sharedRooms, synchronize } from './receive.ts';
 import { listen } from './listen.ts';
+import { requireNode } from '../../../scripts/version.ts';
 
 type Page = { chunk: Event[]; end?: string };
 async function main(): Promise<void> {
+  requireNode();
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     instance: { type: 'string' }, agent: { type: 'string' }, room: { type: 'string' },
     to: { type: 'string' }, message: { type: 'string' }, 'message-file': { type: 'string' },
