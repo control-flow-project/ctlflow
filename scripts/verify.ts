@@ -159,7 +159,7 @@ for (const instance of [values.instance, values.secondary]) {
   }
 }
 const settings = readSettings(join(INSTANCES, values.instance, 'private/settings.json'));
-const observer = readJson<Account>(join(INSTANCES, values.instance, 'private/admin.json'));
+const observer = readJson<Account>(join(INSTANCES, values.instance, 'private/control-session.json'));
 const admin = new Matrix(settings.homeserver, observer.access_token);
 for (const event of [report.dmEvent, report.fileEvent]) {
   const visible = await admin.get<Event>(`${API}/rooms/${segment(report.room)}/event/${segment(event)}`);

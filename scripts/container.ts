@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import { setTimeout as delay } from 'node:timers/promises';
 import { INSTANCES, load } from './instance.ts';
 import { accounts } from './bootstrap.ts';
+import { serve } from './room-service.ts';
 import { Lease, type Heartbeat } from './lease.ts';
 import { Matrix, name, readJson, type Settings } from '../skills/conduit-chat/scripts/lib.ts';
 
@@ -41,6 +42,6 @@ try {
     try { await new Matrix(settings.homeserver).get('/_matrix/client/versions'); break; }
     catch (error) { if (attempt >= 149) throw error; await delay(200); }
   }
-  await accounts(config, privatePath, settings);
-  await import('./room-service.ts');
+  const control = await accounts(config, privatePath, settings);
+  serve(config, settings, control, privatePath);
 } catch (error) { console.error(error instanceof Error ? error.message : 'Instance startup failed'); shutdown(1); }

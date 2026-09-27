@@ -56,6 +56,7 @@ test('exported client installs with custom paths, survives reinstall, and runs o
   const accessToken = randomUUID();
   const adminPassword = randomUUID();
   const adminToken = randomUUID();
+  const controlSecret = randomUUID(), controlToken = randomUUID();
   let authorizedRequests = 0;
   const server = createServer((request, response) => {
     if (request.headers.authorization !== 'Bearer ' + accessToken) { response.writeHead(401); response.end('{}'); return; }
@@ -74,11 +75,14 @@ test('exported client installs with custom paths, survives reinstall, and runs o
     default_room: 'coordination', rooms: [{ alias: 'coordination', name: 'Coordination', purpose: 'Shared updates.', room_id: '!example:project-one.localhost' }], max_upload_bytes: 104857600 };
   writeFileSync(join(profile, 'settings.json'), JSON.stringify(settings));
   writeFileSync(join(profile, 'admin.json'), JSON.stringify({ password: adminPassword, access_token: adminToken }));
+  writeFileSync(join(profile, 'control-key.json'), JSON.stringify({ secret: controlSecret }));
+  writeFileSync(join(profile, 'control-session.json'), JSON.stringify({ access_token: controlToken }));
   const env = { ...process.env, CROSSFIRE_DATA_DIR: data };
   const bundle = join(temporary, 'export with spaces');
   await execute(process.execPath, [join(ROOT, 'crossfire'), 'export-client', 'project-one', bundle], { env, cwd: workspace });
   const exported = readFileSync(join(bundle, 'client.json'), 'utf8');
   assert(!exported.includes(adminPassword)); assert(!exported.includes(adminToken));
+  assert(!exported.includes(controlSecret)); assert(!exported.includes(controlToken));
   const install = [join(bundle, 'install.mts'), join(bundle, 'client.json'), '--skill-dir', skill, '--config-dir', config, '--state-dir', state];
   await execute(process.execPath, install, { cwd: workspace });
   mkdirSync(join(config, 'accounts/project-one'), { recursive: true });
