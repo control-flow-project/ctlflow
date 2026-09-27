@@ -8,6 +8,8 @@
 !scripts/instance.ts
 !scripts/room-service.ts
 !scripts/lease.ts
+!scripts/control-auth.ts
+!scripts/onboarding.ts
 !skills/
 !skills/conduit-chat/
 !skills/conduit-chat/scripts/

@@ -62,7 +62,9 @@ node crossfire start project-one
 On the first start, Crossfire builds the image from [Dockerfile](Dockerfile).
 It then runs the container, initializes Conduit's database, registers the human
 account, creates all configured shared rooms, and serves Element Web. When ready,
-it prints the UI/API URLs and a private `web-login.txt` path.
+it prints the UI/API URLs, a private `web-login.txt` path, and a **CLIENT
+ONBOARDING** block to copy to agents that need to connect. This block is printed
+on every successful start, including restarts of an existing instance.
 
 **Leave this terminal open.** `start` stays in the foreground and streams logs.
 Use a second terminal for the following commands and for your agents.
@@ -82,9 +84,56 @@ browser and sign in. With the default ports, the URL is
 rooms. Each room's purpose appears as its topic in the UI.
 
 Passwords are generated per installation. There is no shared/default password,
-and credentials do not belong in the repository or agent prompts.
+and human passwords do not belong in the repository or agent prompts.
 
-### Install the agent skill
+The login file records the **initial** password. If you change it in Element,
+use your new password; Crossfire does not reset it on startup. Server operations
+use a separate, automatically renewable control session, so browser sign-out,
+device removal, and password changes do not require repairing server credentials.
+
+Element is the unmodified upstream client. Its account-verification screens
+are separate from room encryption. Crossfire rooms are unencrypted and
+verification is not forced, but Element can still offer key setup or verification
+after signing in. Keeping your browser session avoids creating a fresh device
+on every visit. Crossfire does not customize or suppress those screens.
+
+### Give a client everything it needs to connect
+
+Copy the **CLIENT ONBOARDING** block from the server terminal into an agent
+session. Add a unique name for that session, for example `worker-a`. The block
+includes a ready-to-run Node command that downloads the standalone installer
+and retrieves the instance's client bundle over loopback HTTP. The agent then
+reads the printed `skill_file`, initializes from its project directory, and
+checks its rooms and messages.
+
+This works both for your own local user and for agents running as another local
+user on the same computer. The receiving user needs Node.js 22.18+; no Crossfire
+checkout, npm installation, file copying, temporary shared directory, or filesystem
+permission changes are needed on that account. The server must remain running.
+
+To print the same block again without restarting the server, run this from the
+Crossfire checkout:
+
+```sh
+node crossfire onboarding project-one
+```
+
+The command contains an enrollment credential; give it only to intended local
+clients. It contains no human password, human session token, or server control
+key. The installer uses that credential in an HTTP Authorization header.
+Public UI configuration and unauthenticated requests do not expose the bundle.
+
+Installation is per local user, and enrollment is per agent name. Repeating the
+installation updates the skill and instance settings while preserving existing
+accounts, other configured instances, and unread positions. For another session
+under a user that has already installed this instance, give it the skill path,
+instance name, and a new agent name; it can initialize immediately.
+
+The printed command also accepts `--skill-dir PATH`, `--config-dir PATH`, and
+`--state-dir PATH` at the end for custom receiving-side locations. The installer
+prints the paths it actually selected. Continue using those paths in agent prompts.
+
+### Install the agent skill directly from the checkout
 
 Still in the second terminal:
 
@@ -92,8 +141,9 @@ Still in the second terminal:
 node crossfire install-client project-one
 ```
 
-This builds and installs the standalone client, the `conduit-chat` skill, and
-this instance's connection settings for your current user. It prints the exact
+As an alternative to HTTP onboarding, this builds and installs the standalone
+client, the `conduit-chat` skill, and this instance's connection settings for
+your current user. It prints the exact
 skill and client paths. The default skill location is
 `~/.codex/skills/conduit-chat`, or `$CODEX_HOME/skills/conduit-chat` when set.
 
@@ -345,7 +395,9 @@ node crossfire install-client project-two
 ```
 
 Open the second UI at `http://127.0.0.1:8089` and use that instance's login
-file. Assign its agents `--instance project-two`. Agent names can repeat
+file. Give its agents the onboarding block from that instance's server terminal,
+or use `install-client` as above, and assign them `--instance project-two`.
+Agent names can repeat
 across instances: accounts, credentials, rooms, attachments, and read positions
 remain separate. Closing one instance's terminal leaves the others running.
 
@@ -363,6 +415,7 @@ node crossfire init NAME [--matrix-port N] [--web-port N]
 node crossfire start CONFIG_OR_NAME
 node crossfire stop NAME
 node crossfire info NAME
+node crossfire onboarding NAME
 node crossfire status NAME
 node crossfire logs NAME
 node crossfire build
@@ -378,6 +431,7 @@ node crossfire --help
 | `node crossfire start CONFIG_OR_NAME` | Build if needed, then run an instance in the foreground |
 | `node crossfire stop NAME` | Stop an instance from another terminal, preserving all data |
 | `node crossfire info NAME` | Show URLs, configured rooms and default, human identity, container name, data location, and login-file path; does not print passwords |
+| `node crossfire onboarding NAME` | Print the same HTTP installation command and agent instructions shown at startup; includes the private enrollment credential |
 | `node crossfire status NAME` | Show whether the instance container is running |
 | `node crossfire logs NAME` | Show the last 100 container log lines while it exists |
 | `node crossfire build` | Build/cache the image without starting an instance |
@@ -519,6 +573,29 @@ IDs, aliases, names, purposes, and the selected default. Clients refresh it on
 each command. Room provisioning recovers by stable aliases after interrupted
 startup, and preserves removed rooms for existing participants and history.
 
+The web service also serves a standalone Node installer at
+`/_coord/install.mjs`. The installer fetches `/_coord/client` using the instance's
+enrollment credential; that endpoint returns the bundled client, skill, and
+connection settings. It requires the correct instance credential, rejects
+unauthenticated requests, and disables response caching. Enrollment uses the
+same loopback web port as the UI, with no additional listener.
+
+Crossfire creates a private signing key for Conduit's existing token-login
+support. It uses short-lived signed login assertions to maintain the observer's
+dedicated `CROSSFIRE_CONTROL` device, displayed as **Crossfire coordination
+service**. Browser devices and passwords are independent of this credential.
+When Conduit rejects its control access token with `M_UNKNOWN_TOKEN`, Crossfire
+renews it and retries that request once. Concurrent renewals share one login;
+network failures and permission errors are not automatically replayed. The
+same client handles startup provisioning and live conversation creation.
+
+Upgrading an existing instance creates the control credentials automatically.
+Even if the old saved human token has been revoked and the human password has
+changed, the existing account, room IDs, messages, and attachments are retained.
+The signing key and control session stay in the server's private directory and
+are never included in client enrollment or exports. Element and Conduit source
+and images remain unmodified.
+
 The [skill](skills/conduit-chat/SKILL.md) supplies workflow instructions. The
 bundled CLI handles authentication, invitations, cursors, and attachments.
 This implementation uses a skill and CLI; it does not install an MCP server.
@@ -559,6 +636,10 @@ locations; explicit client environment overrides take precedence.
 
 Each runtime `instances/<id>` directory contains its configuration snapshot,
 `private/` credentials and enrollment settings, and `data/` database/media.
+The private directory includes `control-key.json` and `control-session.json`
+for server authentication. Startup also prepares the client code and standalone
+installer there for HTTP enrollment. Do not distribute this directory; use the
+printed onboarding command or an explicit client export.
 Client accounts are stored at `accounts/<instance>/<agent>.json` under the
 client configuration root. Agent cursor files live under
 `<instance>/<agent>/cursors.json` in the client state root. Private files and
@@ -566,9 +647,14 @@ directories use owner-only permissions where supported by the host.
 
 ### Agents under another local user
 
-The usual setup installs the client for your current user. If agents run under
-a different local user, export a bundle to a new private directory outside the
-checkout:
+Use the **CLIENT ONBOARDING** block printed at startup. Run its command as the
+receiving user; it installs into that user's directories over HTTP, regardless
+of whether that user can read the server owner's home directory. Give every
+simultaneous agent a unique name in the instance. No account password needs to
+be copied between local users.
+
+For an explicit file-based export instead, create a bundle in a new private
+directory outside the checkout:
 
 ```sh
 node crossfire export-client project-one /absolute/path/to/new-client-bundle
@@ -585,17 +671,19 @@ The standalone installer accepts the same three directory options as
 `install-client`. It needs Node and the bundle, with no copy of this repository
 or package installation. Paths are selected on the receiving account.
 The bundle contains an enrollment token, so treat it as a private credential.
-It contains neither the human password nor the human access token.
+It contains neither human credentials nor server control credentials.
 
 Its complete syntax is:
 
 ```text
-node /path/to/bundle/install.mts [CLIENT_JSON] [--skill-dir PATH] [--config-dir PATH] [--state-dir PATH]
+node /path/to/bundle/install.mts [CLIENT_JSON_OR_ENROLLMENT_URL] [--skill-dir PATH] [--config-dir PATH] [--state-dir PATH]
 node /path/to/bundle/install.mts --help
 ```
 
-If `CLIENT_JSON` is omitted, the installer reads the bundle JSON from standard
-input. The file-based command above is the usual interactive workflow.
+If the source is omitted, the installer reads the bundle JSON from standard
+input. An enrollment URL uses the loopback address and private credential from
+the startup block. HTTP onboarding is the usual workflow; exports remain
+available when you prefer to transfer files yourself.
 
 ## Updating, stopping, and backup
 
@@ -626,6 +714,11 @@ configuration/runtime directories. Crossfire does not automatically purge data.
 | Startup never becomes ready | Read the foreground logs; `node crossfire logs NAME` works from another terminal while the container exists |
 | UI cannot connect | Keep the owning terminal open, check `status`, and use the printed loopback URL in a browser on the same computer |
 | Agent cannot find its skill/settings | Use the paths printed by installation; reinstall for the user actually running the session |
+| Agent only knows an older instance | Give it the current instance's startup onboarding block, choose a unique agent name, and have it install and initialize. Existing instances are preserved |
+| Client enrollment returns HTTP 401 | Get the current block with `node crossfire onboarding NAME`; use that instance's complete command while its server is running |
+| Browser password changed | Use the new password in the UI. The login file contains only the initial password; server authentication renews independently |
+| Control device was removed or its token revoked | Crossfire recreates the session automatically when needed, including on startup. Do not reset the database or human password |
+| Element offers verification or key setup | These are upstream account-security screens, separate from Crossfire's unencrypted rooms. Keeping your existing browser session avoids repeated fresh-device sign-ins |
 | Recipient does not exist | That agent must call `init` for the same instance before you address it |
 | Agent has not replied | Ask it to `read`; there are no automatic interrupts. Drain results while `more` is true |
 | A reused name skips messages | Two sessions share that identity's cursor; use a unique name for every simultaneous session |
@@ -642,7 +735,8 @@ npm test
 npm run build
 ```
 
-The client build bundles its dependencies into `dist/chat.mjs`. Source remains
+The client build bundles its dependencies into `dist/chat.mjs` and builds the
+standalone HTTP/file installer as `dist/install.mjs`. Source remains
 TypeScript, and Node runs management/runtime TypeScript directly. Generated
 artifacts and local state stay out of source control.
 
@@ -656,6 +750,21 @@ npm start -- CONFIG_OR_NAME
 `npm run build` builds the agent client bundle. `node crossfire build` builds
 the Docker runtime image. `npm start` has the same foreground lifetime as
 `node crossfire start`.
+
+For a complete disposable Docker regression run:
+
+```sh
+npm run verify:startup
+```
+
+This builds the image and creates two temporary instances with automatically
+selected ports and isolated server/client directories. It exercises the printed
+HTTP onboarding command, repeat installation, messaging and attachments,
+cross-instance credential rejection, browser logout, control-token revocation,
+password changes, revocation of every observer device, and restart with room,
+message, and file preservation. It also tests adding control credentials to an
+existing database with unusable old human credentials. It stops its containers
+and removes its temporary data afterwards; existing instances are untouched.
 
 For real messaging checks, create two disposable instances with distinct ports
 and at least two shared rooms in the first instance (the examples provide three),

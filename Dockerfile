@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=element /app /app/web
-COPY scripts/bootstrap.ts scripts/container.ts scripts/instance.ts scripts/room-service.ts scripts/lease.ts ./scripts/
+COPY scripts/bootstrap.ts scripts/container.ts scripts/instance.ts scripts/room-service.ts scripts/lease.ts scripts/control-auth.ts scripts/onboarding.ts ./scripts/
 COPY skills/conduit-chat/scripts/lib.ts ./skills/conduit-chat/scripts/lib.ts
 ENV CROSSFIRE_DATA_DIR=/runtime CROSSFIRE_WEB_ROOT=/app/web
 STOPSIGNAL SIGTERM

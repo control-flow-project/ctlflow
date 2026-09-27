@@ -7,11 +7,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { ROOT, DATA, INSTANCES, CONFIGURATIONS, validate, type InstanceConfig } from './instance.ts';
 import { configure } from './bootstrap.ts';
 import { HEARTBEAT_INTERVAL_MS } from './lease.ts';
+import { onboarding, type ClientFiles } from './onboarding.ts';
 import { name, readJson, readSettings, roomCatalog, writeJson, emit, acquireProcessLock } from '../skills/conduit-chat/scripts/lib.ts';
 
 const runtimeFiles = ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json',
   'scripts/bootstrap.ts', 'scripts/container.ts', 'scripts/instance.ts', 'scripts/room-service.ts',
-  'scripts/lease.ts', 'skills/conduit-chat/scripts/lib.ts'];
+  'scripts/lease.ts', 'scripts/control-auth.ts', 'scripts/onboarding.ts', 'skills/conduit-chat/scripts/lib.ts'];
 const storeId = createHash('sha256').update(DATA).digest('hex').slice(0, 12);
 export const containerName = (instance: string) => `crossfire-${name(instance)}-${storeId}`;
 
@@ -96,6 +97,7 @@ async function start(path: string): Promise<void> {
   const original = readJson<unknown>(path);
   const config = validate(original);
   const image = await buildImage();
+  const files = clientFiles();
   const release = await acquireProcessLock(join(INSTANCES, config.id, 'running'));
   let controller: AbortController | undefined;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -121,6 +123,8 @@ async function start(path: string): Promise<void> {
     const configureRelease = await acquireProcessLock(join(INSTANCES, 'configure'));
     let privatePath: string;
     try { ({ privatePath } = configure(config)); } finally { await configureRelease(); }
+    writeJson(join(privatePath, 'client-files.json'), files);
+    writeFileSync(join(privatePath, 'install.mjs'), readFileSync(join(ROOT, 'dist/install.mjs')), { mode: 0o600 });
     if (original && typeof original === 'object' && 'room' in original) writeJson(path, config);
     const runId = randomUUID();
     let sequence = 0;
@@ -140,6 +144,7 @@ async function start(path: string): Promise<void> {
     try {
       await Promise.race([waitReady(config, runId, controller.signal), completion.then(code => { throw new Error(`Container exited before startup completed (${code})`); })]);
       emit(details(config.id));
+      console.log(onboarding(readSettings(join(privatePath, 'settings.json'))));
       console.log('Instance is running in this terminal. Press Ctrl+C to stop.');
       const code = await completion;
       if (code !== 0 && !stopping) throw new Error(`Container exited with status ${code}`);
@@ -153,17 +158,20 @@ async function start(path: string): Promise<void> {
     await release();
   }
 }
+function clientFiles(): ClientFiles {
+  const built = spawnSync(process.execPath, [join(ROOT, 'scripts/build-client.ts')], { encoding: 'utf8' });
+  if (built.status !== 0) throw new Error(built.stderr || 'Client build failed; run npm ci in the checkout');
+  const source = join(ROOT, 'skills/conduit-chat');
+  const files: ClientFiles = {};
+  for (const file of ['SKILL.md', 'scripts/chat', 'scripts/package.json']) files[file] = readFileSync(join(source, file), 'utf8');
+  files['scripts/chat.mjs'] = readFileSync(join(ROOT, 'dist/chat.mjs'), 'utf8');
+  return files;
+}
 function clientBundle(instance: string) {
   const settings = readSettings(join(INSTANCES, name(instance), 'private/settings.json'));
   if (settings.rooms.some(room => !room.room_id)) throw new Error('Wait for the instance to finish starting before installing its client');
   roomCatalog(settings);
-  const built = spawnSync(process.execPath, [join(ROOT, 'scripts/build-client.ts')], { encoding: 'utf8' });
-  if (built.status !== 0) throw new Error(built.stderr || 'Client build failed; run npm ci in the checkout');
-  const source = join(ROOT, 'skills/conduit-chat');
-  const files: Record<string, string> = {};
-  for (const file of ['SKILL.md', 'scripts/chat', 'scripts/package.json']) files[file] = readFileSync(join(source, file), 'utf8');
-  files['scripts/chat.mjs'] = readFileSync(join(ROOT, 'dist/chat.mjs'), 'utf8');
-  return { format: 3, settings, files };
+  return { format: 3, settings, files: clientFiles() };
 }
 function installClient(instance: string, options: Record<string, string | boolean | undefined>): void {
   const args = [join(ROOT, 'scripts/install-client.ts')];
@@ -190,6 +198,7 @@ export async function main(): Promise<void> {
     + '  start CONFIG_OR_INSTANCE                      Run in this terminal until it closes\n'
     + '  stop INSTANCE                                 Stop a running instance; retain its data\n'
     + '  info INSTANCE                                 Show URLs, storage, and login-file path\n'
+    + '  onboarding INSTANCE                           Print copyable HTTP client installation instructions\n'
     + '  status INSTANCE                               Show whether its container is running\n'
     + '  logs INSTANCE                                 Show recent container logs\n'
     + '  build                                         Build/cache the Docker image\n'
@@ -222,6 +231,7 @@ export async function main(): Promise<void> {
   } else if (command === 'install-client' && value) installClient(value, values);
   else if (command === 'export-client' && value && destination) exportClient(value, destination);
   else if (command === 'info' && value) emit(details(value));
+  else if (command === 'onboarding' && value) console.log(onboarding(readSettings(join(INSTANCES, name(value), 'private/settings.json'))));
   else if (['stop', 'status', 'logs'].includes(command) && value) {
     requireDocker(); const existing = inspect(name(value));
     if (command === 'status') emit({ instance: value, running: existing?.State.Running ?? false, container: containerName(value) });

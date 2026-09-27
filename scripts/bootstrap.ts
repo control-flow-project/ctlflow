@@ -2,7 +2,8 @@ import { join } from 'node:path';
 import { existsSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { INSTANCES, type InstanceConfig } from './instance.ts';
-import { API, Matrix, MatrixError, privateDir, readJson, readSettings, writeJson, register, segment, powerLevels, ensureObserver,
+import { ControlMatrix, controlKey } from './control-auth.ts';
+import { API, MatrixError, privateDir, readJson, readSettings, writeJson, register, segment, powerLevels, ensureObserver,
   type Settings, type Account, type Event } from '../skills/conduit-chat/scripts/lib.ts';
 
 export function configure(config: InstanceConfig): { privatePath: string; settings: Settings } {
@@ -39,6 +40,7 @@ export function configure(config: InstanceConfig): { privatePath: string; settin
     address: '0.0.0.0', port: config.matrix_port, db_cache_capacity_mb: 128.0,
     max_request_size: config.max_upload_bytes, allow_federation: false, trusted_servers: [],
     allow_check_for_updates: false, allow_registration: true, registration_token: settings.registration_token,
+    jwt_secret: controlKey(privatePath),
     allow_room_creation: false, allow_encryption: false, allow_unstable_room_versions: false,
     default_room_version: '12', enable_lightning_bolt: false, log: 'warn',
   };
@@ -49,7 +51,7 @@ export function configure(config: InstanceConfig): { privatePath: string; settin
   return { privatePath, settings };
 }
 
-export async function accounts(config: InstanceConfig, privatePath: string, settings: Settings): Promise<void> {
+export async function accounts(config: InstanceConfig, privatePath: string, settings: Settings): Promise<ControlMatrix> {
   const accountPath = join(privatePath, 'admin.json');
   if (!existsSync(accountPath)) {
     const password = randomBytes(30).toString('base64url');
@@ -58,7 +60,7 @@ export async function accounts(config: InstanceConfig, privatePath: string, sett
     writeJson(accountPath, account);
   }
   const admin = readJson<Account>(accountPath);
-  const client = new Matrix(settings.homeserver, admin.access_token);
+  const client = new ControlMatrix(settings, privatePath);
   await client.put(`${API}/profile/${segment(admin.user_id)}/displayname`, { displayname: settings.observer_label });
   const roomIds = new Set<string>();
   for (const room of settings.rooms) {
@@ -100,6 +102,7 @@ export async function accounts(config: InstanceConfig, privatePath: string, sett
     writeJson(join(privatePath, 'settings.json'), settings);
   }
   const credentials = join(privatePath, 'web-login.txt');
-  writeFileSync(credentials, `URL: ${settings.room_service}\nHomeserver: ${settings.homeserver}\nUsername: ${admin.user_id}\nPassword: ${admin.password}\n`, { mode: 0o600 });
+  writeFileSync(credentials, `URL: ${settings.room_service}\nHomeserver: ${settings.homeserver}\nUsername: ${admin.user_id}\nInitial password: ${admin.password}\n\nIf you changed your password in the UI, use that password instead. Crossfire does not reset it.\n`, { mode: 0o600 });
   chmodSync(credentials, 0o600);
+  return client;
 }

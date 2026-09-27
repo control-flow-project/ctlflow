@@ -16,7 +16,8 @@
     "crossfire": "node crossfire",
     "typecheck": "tsc --noEmit",
     "start": "node scripts/manage.ts start",
-    "verify": "node scripts/verify.ts"
+    "verify": "node scripts/verify.ts",
+    "verify:startup": "node scripts/verify-startup.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
