@@ -102,11 +102,11 @@ export function emit(value: unknown): void {
   while (offset < bytes.length) offset += writeSync(1, bytes, offset);
 }
 
-export async function acquireProcessLock(path: string): Promise<() => Promise<void>> {
+export async function acquireProcessLock(path: string, retries = 45): Promise<() => Promise<void>> {
   privateDir(dirname(path));
   return lockfile.lock(path, {
     realpath: false, stale: 30_000, update: 5_000,
-    retries: { retries: 45, factor: 1, minTimeout: 1000, maxTimeout: 1000 },
+    retries: { retries, factor: 1, minTimeout: 1000, maxTimeout: 1000 },
   });
 }
 
@@ -123,7 +123,8 @@ export class MatrixError extends Error {
 export class Matrix {
   base: string;
   token?: string;
-  constructor(base: string, token?: string) {
+  signal?: AbortSignal;
+  constructor(base: string, token?: string, signal?: AbortSignal) {
     const url = new URL(base);
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password
         || url.search || url.hash || url.pathname !== '/') {
@@ -131,6 +132,7 @@ export class Matrix {
     }
     this.base = base.replace(/\/$/, '');
     this.token = token;
+    this.signal = signal;
   }
 
   async open(method: string, path: string, data?: Buffer, contentType = 'application/json'): Promise<IncomingMessage> {
@@ -140,7 +142,7 @@ export class Matrix {
       if (this.token) headers.Authorization = 'Bearer ' + this.token;
       if (data) headers['Content-Length'] = String(data.length);
       // node:http connects directly; no HTTP proxy environment or redirects.
-      const request = httpRequest(this.base + path, { method, headers }, resolve);
+      const request = httpRequest(this.base + path, { method, headers, signal: this.signal }, resolve);
       request.setTimeout(45_000, () => request.destroy(new Error('Local server request timed out')));
       request.on('error', reject);
       request.end(data);

@@ -3,54 +3,28 @@ import { parseArgs } from 'node:util';
 import { existsSync, readFileSync, statSync, openSync, writeSync, closeSync, unlinkSync } from 'node:fs';
 import { join, basename, extname, resolve } from 'node:path';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
-import { API, CONFIG, STATE, Matrix, name, readJson, readSettings, roomCatalog, selectRoom, writeJson, emit, acquireProcessLock,
+import { API, CONFIG, STATE, Matrix, name, readJson, readSettings, selectRoom, writeJson, emit, acquireProcessLock,
   register, segment, localUser, ensureObserver, collect,
-  type Settings, type Account, type Event, type JsonObject } from './lib.ts';
+  type Account, type Event, type JsonObject } from './lib.ts';
+import { eventView, readUnread, sharedRooms, synchronize } from './receive.ts';
+import { listen } from './listen.ts';
 
 type Page = { chunk: Event[]; end?: string };
-type Invites = { rooms?: { invite?: Record<string, { invite_state: { events: Event[] } }> } };
-
-async function acceptInvites(client: Matrix, settings: Settings, account: Account): Promise<void> {
-  const result = await client.get<Invites>(API + '/sync', { timeout: 0, filter: JSON.stringify({
-    room: { timeline: { limit: 0 }, state: { types: ['m.room.member'] },
-      ephemeral: { types: [] }, account_data: { types: [] } },
-  }) });
-  for (const [room, invite] of Object.entries(result.rooms?.invite ?? {})) {
-    if (invite.invite_state.events.some(event => event.type === 'm.room.member'
-        && event.state_key === account.user_id && event.sender === settings.observer
-        && event.content.membership === 'invite')) {
-      await client.post(`${API}/join/${segment(room)}`, {});
-      await ensureObserver(client, room, settings);
-    }
-  }
-}
-
-function eventView(event: Event, room: string) {
-  return { room_id: room, event_id: event.event_id, sender: event.sender,
-    type: event.type, content: event.content,
-    timestamp: event.origin_server_ts === undefined ? undefined : new Date(event.origin_server_ts).toISOString() };
-}
-
-async function sharedRooms(client: Matrix, settings: Settings): Promise<void> {
-  const catalog = roomCatalog(await new Matrix(settings.room_service, client.token).get('/_coord/rooms'));
-  Object.assign(settings, catalog);
-  const joined = new Set((await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms')).joined_rooms);
-  for (const room of settings.rooms) {
-    if (!joined.has(room.room_id)) await client.post(`${API}/join/${segment(room.room_id)}`, {});
-    await ensureObserver(client, room.room_id, settings);
-  }
-}
-
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     instance: { type: 'string' }, agent: { type: 'string' }, room: { type: 'string' },
     to: { type: 'string' }, message: { type: 'string' }, 'message-file': { type: 'string' },
     caption: { type: 'string' }, txn: { type: 'string' }, limit: { type: 'string' }, help: { type: 'boolean' },
+    thread: { type: 'string' }, 'codex-socket': { type: 'string' }, 'codex-binary': { type: 'string' },
+    'poll-ms': { type: 'string' }, 'request-timeout-ms': { type: 'string' },
   } });
   if (values.help) {
     console.log('chat --instance NAME --agent NAME COMMAND\n'
       + 'init                                Join configured shared rooms and announce this identity\n'
       + 'read [--room ROOM] [--limit 1..100]    Read unread events and save cursors\n'
+      + 'listen --thread UUID                Relay chat into a loaded Codex thread without blocking it\n'
+      + '  [--codex-socket ABSOLUTE_PATH] [--codex-binary PATH] [--poll-ms 10000]\n'
+      + '  [--request-timeout-ms 30000] [--room ROOM] [--limit 1..100]\n'
       + 'history [--room ROOM] [--limit 1..100] Read recent messages without moving cursors\n'
       + 'send --message TEXT [--to PEER|--room ROOM] [--txn ID]\n'
       + 'send --message-file FILE [--to PEER|--room ROOM] [--txn ID]\n'
@@ -66,16 +40,25 @@ async function main(): Promise<void> {
   const instance = name(values.instance ?? '');
   const agent = name(values.agent ?? '');
   const command = positionals[0];
-  const validCommands = ['init', 'read', 'history', 'send', 'upload', 'download', 'who', 'rooms'];
+  const validCommands = ['init', 'read', 'listen', 'history', 'send', 'upload', 'download', 'who', 'rooms'];
   if (!validCommands.includes(command)) throw new Error('Unknown command. Use --help.');
   if (values.to && values.room) throw new Error('Choose --to or --room, not both');
   const limit = Number(values.limit ?? '50');
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('--limit must be 1..100');
+  if (command !== 'listen' && [values.thread, values['codex-socket'], values['codex-binary'], values['poll-ms'], values['request-timeout-ms']]
+      .some(value => value !== undefined)) throw new Error('Listener options require the listen command');
+  const pollMs = Number(values['poll-ms'] ?? '10000');
+  const requestTimeoutMs = Number(values['request-timeout-ms'] ?? '30000');
+  if (!Number.isInteger(pollMs) || pollMs < 100 || pollMs > 30000) throw new Error('--poll-ms must be 100..30000');
+  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 100 || requestTimeoutMs > 300000) {
+    throw new Error('--request-timeout-ms must be 100..300000');
+  }
+  if (command === 'listen' && !values.thread) throw new Error('listen requires --thread with the existing Codex thread UUID');
   const settings = readSettings(join(CONFIG, 'instances', instance + '.json'));
   if (settings.instance !== instance) throw new Error('Instance configuration identity mismatch');
   const profile = join(CONFIG, 'accounts', instance, agent + '.json');
   const state = join(STATE, instance, agent);
-  const release = command === 'init' || command === 'read' ? await acquireProcessLock(join(state, 'client')) : undefined;
+  const release = ['init', 'read', 'listen'].includes(command) ? await acquireProcessLock(join(state, 'client'), 0) : undefined;
   try {
 
   if (command === 'init') {
@@ -100,30 +83,28 @@ async function main(): Promise<void> {
   }
 
   const account = readJson<Account>(profile);
+  if (command === 'listen') {
+    if (!account.workspace) throw new Error('The enrolled identity has no workspace; use an identity initialized from its project directory');
+    const controller = new AbortController();
+    const cancel = () => controller.abort(new Error('Listener stopped'));
+    const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+    for (const signal of signals) process.on(signal, cancel);
+    try {
+      await listen({ settings, account, cursorFile: join(state, 'cursors.json'), limit, room: values.room, pollMs,
+        codex: { thread: values.thread!, workspace: account.workspace, binary: values['codex-binary'],
+          socket: values['codex-socket'], timeoutMs: requestTimeoutMs } }, controller.signal);
+    } catch (error) { if (!controller.signal.aborted) throw error; }
+    finally { for (const signal of signals) process.removeListener(signal, cancel); }
+    return;
+  }
   const client = new Matrix(settings.homeserver, account.access_token);
   await sharedRooms(client, settings);
   if (command === 'read') {
-    await acceptInvites(client, settings, account);
-    const rooms = values.room ? [selectRoom(settings, values.room)] : (await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms')).joined_rooms;
+    await synchronize(client, settings, account);
     const cursorFile = join(state, 'cursors.json');
-    const cursors = existsSync(cursorFile) ? readJson<Record<string, string>>(cursorFile) : {};
-    const events: ReturnType<typeof eventView>[] = [];
-    const moreRooms: string[] = [];
-    for (const room of rooms.sort()) {
-      await ensureObserver(client, room, settings);
-      const query: Record<string, string | number> = { dir: 'f', limit };
-      if (cursors[room]) query.from = cursors[room];
-      const page = await client.get<Page>(`${API}/rooms/${segment(room)}/messages`, query);
-      if (page.end) cursors[room] = page.end;
-      if (page.chunk.length >= limit) moreRooms.push(room);
-      for (const event of page.chunk) {
-        if (['m.room.message', 'm.room.encrypted', 'm.room.redaction'].includes(event.type)) events.push(eventView(event, room));
-      }
-    }
-    // Keep the server's timeline order within each room. Timestamps can tie,
-    // and event IDs are identifiers, not chronological sort keys.
-    emit({ instance, agent, events, more: moreRooms.length > 0, more_rooms: moreRooms });
-    writeJson(cursorFile, cursors);
+    const batch = await readUnread(client, settings, cursorFile, limit, values.room);
+    emit({ instance, agent, events: batch.events, more: batch.more_rooms.length > 0, more_rooms: batch.more_rooms });
+    writeJson(cursorFile, batch.cursors);
   } else if (command === 'history') {
     const room = selectRoom(settings, values.room);
     await ensureObserver(client, room, settings);
@@ -196,7 +177,7 @@ async function main(): Promise<void> {
     const room = selectRoom(settings, values.room);
     emit({ instance, room_id: room, members: await ensureObserver(client, room, settings) });
   } else {
-    await acceptInvites(client, settings, account);
+    await synchronize(client, settings, account);
     const rooms = [];
     for (const room of (await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms')).joined_rooms) {
       const members = await ensureObserver(client, room, settings);

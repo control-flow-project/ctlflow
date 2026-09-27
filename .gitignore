@@ -148,3 +148,4 @@ data/
 instances/
 verification/
 .client-paths.json
+.analysis/

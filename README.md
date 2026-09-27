@@ -218,7 +218,8 @@ Check your conduit-chat messages and reply to worker-a.
 A room containing **worker-a, worker-b, and you** appears in Element. You can
 read and reply there, and exchange attachments. These conversations appear as
 ordinary rooms named for their participants. Your replies are received when
-the agents next call `read`; Crossfire does not interrupt a running session.
+the agents next call `read`, or delivered automatically when a Codex listener
+is connected as described below.
 
 For real work, replace the demonstration task with its assignment, owned
 files/directories, constraints, and completion criteria. Chat does not expand
@@ -251,10 +252,115 @@ initialization. Crossfire does not create workspaces or start agent processes.
 - Names start with a lowercase letter and contain 1–40 lowercase letters,
   digits, or hyphens. `admin` is reserved for the human recipient.
 - Read at task start, between work batches, before coordinating shared changes,
-  and before completion. During sustained work, the skill asks agents to check
-  every few minutes when their work permits. Polling is on demand.
+  and before completion when using manual reads. With a Codex listener, receiving
+  happens outside the model; do not also poll `read`.
 - `who` lists enrolled members. It does not indicate whether their processes
   are currently running; ending a session preserves its account and history.
+
+## Automatic input for Codex
+
+Crossfire is project-independent. Any agent can use the chat commands. The
+optional `listen` command connects chat to an existing Codex conversation;
+it does not start an agent, assign tasks, or choose a lead agent.
+
+A Codex terminal normally talks to its own internal engine. Automatic delivery
+needs a connection to that engine, so use Codex's shared app-server mode. This
+is **not another Crossfire server**. Each terminal still has its own conversation,
+working directory, agent name, and permissions.
+
+### Open each agent terminal
+
+The adapter uses the experimental Codex app-server protocol, verified with
+Codex CLI 0.156.1 on Linux. It requires `app-server proxy`, a local Unix control
+socket, and thread metadata reporting `canAcceptDirectInput`. Other agent tools
+can use manual `read`; there is no simulated keyboard or transcript-file path.
+
+In each project directory, launch Codex with:
+
+```sh
+codex --enable daemon_auto_start
+```
+
+Give that session the usual Crossfire onboarding instructions and its unique
+name. Codex manages its own shared engine. You still start Crossfire separately
+and keep its server terminal open.
+
+For a conversation that was already open in embedded mode, exit that TUI first,
+then reopen **the same session**, not a fork or a second copy:
+
+```sh
+codex --enable daemon_auto_start resume SESSION_UUID
+```
+
+Codex configuration overrides and some features can force embedded mode. Check
+its startup notices. If it reports embedded mode, `listen` will fail rather than
+silently start another conversation. For an explicitly managed local app server,
+connect the TUI with `codex --remote unix:///absolute/path/codex.sock` and give
+the listener the same path using `--codex-socket`. Crossfire never starts that
+server or modifies your Codex configuration.
+
+### Have that agent start its listener
+
+After `init`, ask the agent to run this as a background process. In an agent's
+shell, `CODEX_THREAD_ID` identifies its conversation; an ordinary terminal may
+not have that variable. Never substitute `latest` or another session's UUID.
+
+```sh
+umask 077
+CHAT="${CODEX_HOME:-$HOME/.codex}/skills/conduit-chat/scripts/chat.mjs"
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/conduit-chat/listeners"
+mkdir -p "$LOG_DIR"
+nohup node "$CHAT" --instance project-one --agent worker-a listen \
+  --thread "${CODEX_THREAD_ID:?Run inside the intended Codex session}" \
+  >"$LOG_DIR/project-one-worker-a.log" 2>&1 < /dev/null &
+echo "Listener PID: $!"
+```
+
+Use the installed script path if you selected a custom skill directory. Each
+listener runs under the same local user and Codex home as its Codex session.
+Keep the printed PID; `kill -TERM PID` stops only that listener. Check its log
+once for startup errors, rather than repeatedly asking the model to poll it.
+
+The listener waits in Matrix `/sync` for up to ten seconds. A new event wakes
+it immediately; ten seconds is the idle request timeout, not a forced delay.
+It then reads through the same paginated room history as `read`. Empty polls,
+membership-only updates and echoes of that identity's own messages produce no
+Codex input and no console output.
+
+For actual messages, the adapter verifies the selected thread and workspace,
+then submits one bounded input. Codex starts a turn when idle or steers its
+existing turn when busy. Work continues while the listener waits; messages are
+consumed at Codex's normal input boundaries, not by forcibly interrupting a
+running tool. The original TUI remains responsible for approvals and tool
+requests. The relay never approves anything or changes sandbox/model settings.
+
+Inputs include the instance, observer, sender, room, event ID, timestamp, and
+original content. Attachments remain attachment references; the agent can
+download them using the existing command. Peer text is attributed external
+input, not authority to change the user's task or instructions. Avoid automatic
+acknowledgements that cause agents to reply to each other indefinitely.
+
+### Delivery and recovery
+
+- One identity has one cursor consumer. While `listen` runs, another `listen`,
+  `read`, or `init` for that identity fails promptly. `send`, `history`, `who`,
+  and `rooms` remain available.
+- Cursors advance only after Codex acknowledges every batch. Recovery is
+  **at least once**, not exactly once: a crash after acceptance but before the
+  checkpoint can replay messages. Original event IDs identify replays.
+- Each input is limited to 128 KiB of UTF-8 JSON and attribution text. Messages
+  are batched without truncation. An oversized event stops delivery with its
+  cursor unchanged; inspect it with `read` after stopping the listener.
+- Transient Matrix failures get at most three retries. Authentication, observer,
+  native-protocol and ambiguous submission failures stop the listener. No
+  possibly accepted native input is automatically retried. Check the TUI and
+  event IDs before restarting after an uncertain acknowledgement.
+- SIGINT, SIGTERM and SIGHUP cancel outstanding waits and release the reader
+  lock. If the process is killed abruptly, lock recovery takes about 30 seconds.
+- If the thread is unloaded or cannot accept direct input, delivery stops.
+  Crossfire does not resume, fork, launch or take over conversations. Stop the
+  listener when ending the assignment; an intentionally idle loaded session
+  can be woken by new messages.
 
 ## Example configurations and what “start from config” means
 
@@ -481,6 +587,8 @@ identity placeholders with the installation path and assigned names.
 ```text
 chat init
 chat read [--room ROOM] [--limit N]
+chat listen --thread UUID [--room ROOM] [--limit N] [--poll-ms N]
+  [--codex-socket ABSOLUTE_PATH] [--codex-binary PATH] [--request-timeout-ms N]
 chat history [--room ROOM] [--limit N]
 chat send --message TEXT [--to PEER | --room ROOM] [--txn ID]
 chat send --message-file FILE [--to PEER | --room ROOM] [--txn ID]
@@ -502,6 +610,7 @@ node /path/to/chat.mjs --help
 | `chat init` | Create/reuse the identity, join all configured shared rooms, announce its initial working directory in the default room |
 | `chat read` | Accept human-created invitations, read unread events, and save per-room read positions |
 | `chat read --room reviews --limit 100` | Read one configured room with a chosen page size |
+| `chat listen --thread UUID` | Deliver unread chat to that loaded Codex session until stopped |
 | `chat history` | Replay recent default-room messages without changing read positions |
 | `chat history --room '!room-id' --limit 50` | Replay recent messages from a selected room |
 | `chat send --message 'Task started.'` | Send text to the configured default room |
@@ -520,23 +629,29 @@ node /path/to/chat.mjs --help
 | --- | --- | --- |
 | `--instance NAME` | Every operation | Select the project instance; required |
 | `--agent NAME` | Every operation | Select the identity and its read positions; required |
-| `--room ROOM` | `read`, `history`, `send`, `upload`, `who` | Configured alias, full local alias, or Matrix room ID |
+| `--room ROOM` | `read`, `listen`, `history`, `send`, `upload`, `who` | Configured alias, full local alias, or Matrix room ID |
 | `--to PEER` | `send`, `upload` | Agent name, full local Matrix ID, or `admin`; mutually exclusive with `--room` |
-| `--limit N` | `read`, `history` | 1–100 timeline events per room; default 50. State events count toward the limit |
+| `--limit N` | `read`, `listen`, `history` | 1–100 timeline events per room; default 50. State events count toward the limit |
+| `--thread UUID` | `listen` | Exact existing Codex conversation; required |
+| `--codex-socket PATH` | `listen` | Absolute local app-server socket; defaults to Codex's own control socket |
+| `--codex-binary PATH` | `listen` | Codex executable; defaults to `codex` on PATH |
+| `--poll-ms N` | `listen` | Matrix long-poll timeout, 100–30,000 ms; default 10,000 |
+| `--request-timeout-ms N` | `listen` | Native acknowledgement timeout, 100–300,000 ms; default 30,000 |
 | `--message TEXT` | `send` | Text; supply exactly one of this and `--message-file` |
 | `--message-file PATH` | `send` | Read message text from a file |
 | `--caption TEXT` | `upload` | Caption; defaults to the filename |
 | `--txn ID` | `send`, `upload` | Preserve this on retry to avoid duplicate message events; repeating an upload may still store another media copy |
 | `--help` | CLI | Show help |
 
-Successful calls return JSON. Inspect `events` from `read` and repeat while
+Successful one-shot calls return JSON; `listen` stays silent on success. Inspect `events` from `read` and repeat while
 `more` is true. Events retain server order within each room; different rooms
 are returned in groups, not a single global timeline. An attachment's
 `content.url` supplies the `mxc://` URI for `download`.
 
 Each identity has independent cursors. `history` leaves those cursors unchanged.
 A crash after output but before checkpointing may replay events; callers can
-deduplicate by `event_id`. Calls updating one identity's state are serialized.
+deduplicate by `event_id`. Concurrent cursor consumers fail rather than block
+an agent behind a long-running listener.
 
 ## Architecture, skills, and human visibility
 
@@ -599,6 +714,15 @@ and images remain unmodified.
 The [skill](skills/conduit-chat/SKILL.md) supplies workflow instructions. The
 bundled CLI handles authentication, invitations, cursors, and attachments.
 This implementation uses a skill and CLI; it does not install an MCP server.
+
+The optional listener uses Matrix sync only as a wakeup signal. `receive.ts`
+owns history reads for both manual and automatic delivery; `listen.ts` owns
+batching and checkpoint order; `codex.ts` owns the native input connection.
+Codex's proxy tunnels bytes to its Unix control socket. The adapter uses `ws`
+over Node's stream-pair Duplex to perform the WebSocket handshake and framing.
+Two local type assertions cover declaration gaps for these supported stream
+APIs; neither implements a transport fallback. The native verification gate
+exercises that exact connection.
 
 Human visibility comes from room membership. The room service creates every
 agent conversation using the human account, so the human is already joined.
@@ -720,7 +844,10 @@ configuration/runtime directories. Crossfire does not automatically purge data.
 | Control device was removed or its token revoked | Crossfire recreates the session automatically when needed, including on startup. Do not reset the database or human password |
 | Element offers verification or key setup | These are upstream account-security screens, separate from Crossfire's unencrypted rooms. Keeping your existing browser session avoids repeated fresh-device sign-ins |
 | Recipient does not exist | That agent must call `init` for the same instance before you address it |
-| Agent has not replied | Ask it to `read`; there are no automatic interrupts. Drain results while `more` is true |
+| Agent has not replied | Check its listener log, or ask it to `read` when no listener is running. Drain manual reads while `more` is true |
+| Listener cannot connect to Codex | Use shared app-server mode for the same session and local user; check the socket and `codex` executable. Crossfire will not start another agent |
+| Listener rejects the workspace | The selected thread must match the working directory saved by that agent's `init`; do not reuse another agent's identity |
+| Listener reports uncertain delivery | Inspect the TUI and event IDs before restarting. Cursors were not advanced; replay is possible |
 | A reused name skips messages | Two sessions share that identity's cursor; use a unique name for every simultaneous session |
 | A lock remains after abrupt termination | Wait about 30 seconds for stale-lock recovery, then retry |
 | Stored access token was lost | Restore its private account file from backup, or enroll a new agent name; registration passwords are not retained |
@@ -734,6 +861,23 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+The tests include deterministic Matrix and native-protocol fixtures for empty
+polls, message bursts, paging, identity binding, observer enforcement, bounded
+inputs, failures, cancellation and reader locking. They use no model service.
+
+To verify against an installed Codex executable:
+
+```sh
+npm run verify:codex
+```
+
+This uses an isolated temporary Codex home and a local mock model endpoint, not
+your login, sessions, provider, or Crossfire deployment. It verifies idle input,
+busy-turn input, delivery to the original controlling client, native tool-request
+routing, and retained control after the relay disconnects. It makes no paid model
+calls and starts no agent workers. Select a different executable with
+`CROSSFIRE_TEST_CODEX=/absolute/path/to/codex`.
 
 The client build bundles its dependencies into `dist/chat.mjs` and builds the
 standalone HTTP/file installer as `dist/install.mjs`. Source remains
