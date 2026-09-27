@@ -7,12 +7,15 @@ import lockfile from 'proper-lockfile';
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type JsonObject = { [key: string]: Json };
-export type Settings = {
+export type RoomDefinition = { alias: string; name: string; purpose: string };
+export type SharedRoom = RoomDefinition & { room_id: string };
+export type RoomCatalog = { default_room: string; rooms: SharedRoom[] };
+export type Settings = RoomCatalog & {
   instance: string; label: string; homeserver: string; room_service: string;
   server_name: string; observer: string; observer_label: string;
-  registration_token: string; max_upload_bytes: number; room_id: string; room_alias: string;
+  registration_token: string; max_upload_bytes: number;
 };
-export type Account = { user_id: string; access_token: string; device_id: string; workspace?: string; password?: string };
+export type Account = { user_id: string; access_token: string; device_id: string; workspace?: string; password?: string; announcement_room_id?: string };
 export type Event = { event_id: string; sender: string; type: string; state_key?: string; content: JsonObject; origin_server_ts?: number };
 export type Members = Record<string, { display_name?: string; avatar_url?: string }>;
 const pathsFile = new URL('.client-paths.json', import.meta.url);
@@ -40,6 +43,41 @@ export function privateDir(path: string): string {
 export function readJson<T>(path: string): T {
   const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
   return parsed as T;
+}
+
+export function readSettings(path: string): Settings {
+  const stored = readJson<Settings & { room_id?: string; room_alias?: string }>(path);
+  if (Array.isArray(stored.rooms)) return stored;
+  // Preserve the Matrix ID from the original single-room installation.
+  const { room_id, room_alias, ...base } = stored;
+  if (typeof room_id !== 'string' || typeof room_alias !== 'string') throw new Error('Invalid instance settings');
+  const alias = room_alias.slice(1).split(':')[0] || 'coordination';
+  return { ...base, default_room: alias, rooms: [{ alias, name: alias, purpose: 'Shared coordination.', room_id }] };
+}
+
+export function roomCatalog(value: unknown): RoomCatalog {
+  if (!value || typeof value !== 'object') throw new Error('Invalid room catalog');
+  const catalog = value as RoomCatalog;
+  if (typeof catalog.default_room !== 'string' || !Array.isArray(catalog.rooms) || !catalog.rooms.length) throw new Error('Invalid room catalog');
+  const aliases = new Set<string>(), ids = new Set<string>();
+  for (const room of catalog.rooms) {
+    if (!room || typeof room.alias !== 'string' || typeof room.name !== 'string' || !room.name
+        || typeof room.purpose !== 'string' || !room.purpose || typeof room.room_id !== 'string' || !room.room_id.startsWith('!')) {
+      throw new Error('Invalid configured room');
+    }
+    name(room.alias);
+    if (aliases.has(room.alias) || ids.has(room.room_id)) throw new Error('Duplicate configured room');
+    aliases.add(room.alias); ids.add(room.room_id);
+  }
+  if (!aliases.has(catalog.default_room)) throw new Error('Default room is not configured');
+  return { default_room: catalog.default_room, rooms: catalog.rooms };
+}
+
+export function selectRoom(settings: Settings, selector = settings.default_room): string {
+  const configured = settings.rooms.find(room => selector === room.alias || selector === `#${room.alias}:${settings.server_name}`);
+  if (configured?.room_id) return configured.room_id;
+  if (selector.startsWith('!')) return selector;
+  throw new Error('Unknown room: ' + selector + '. Use rooms to list configured aliases and Matrix IDs.');
 }
 
 export function writeJson(path: string, value: unknown): void {

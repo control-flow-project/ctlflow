@@ -1,7 +1,7 @@
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { readJson, name } from '../skills/conduit-chat/scripts/lib.ts';
+import { readJson, name, type RoomDefinition } from '../skills/conduit-chat/scripts/lib.ts';
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const DATA = resolve(process.env.CROSSFIRE_DATA_DIR ?? join(process.env.XDG_DATA_HOME ?? join(homedir(), '.local/share'), 'crossfire'));
@@ -10,7 +10,7 @@ export const CONFIGURATIONS = resolve(process.env.CROSSFIRE_CONFIG_DIR ?? join(p
 export type InstanceConfig = {
   id: string; label: string; server_name: string; matrix_port: number; web_port: number;
   observer: { username: string; display_name: string };
-  room: { alias: string; name: string; topic: string }; max_upload_bytes: number;
+  default_room: string; rooms: RoomDefinition[]; max_upload_bytes: number;
 };
 
 function object(value: unknown): Record<string, unknown> {
@@ -25,8 +25,16 @@ function text(value: unknown): asserts value is string {
 }
 
 export function validate(value: unknown): InstanceConfig {
-  const config = object(value);
-  keys(config, ['id', 'label', 'server_name', 'matrix_port', 'web_port', 'observer', 'room', 'max_upload_bytes']);
+  let config = object(value);
+  if ('room' in config) {
+    keys(config, ['id', 'label', 'server_name', 'matrix_port', 'web_port', 'observer', 'room', 'max_upload_bytes']);
+    const legacy = object(config.room);
+    keys(legacy, ['alias', 'name', 'topic']);
+    const { room: _legacy, ...rest } = config;
+    config = { ...rest, default_room: legacy.alias,
+      rooms: [{ alias: legacy.alias, name: legacy.name, purpose: legacy.topic }] };
+  }
+  keys(config, ['id', 'label', 'server_name', 'matrix_port', 'web_port', 'observer', 'default_room', 'rooms', 'max_upload_bytes']);
   text(config.id); name(config.id);
   text(config.server_name);
   if (!/^[a-z0-9][a-z0-9.-]*$/.test(config.server_name)) throw new Error('server_name must be a lowercase DNS-style identity');
@@ -37,8 +45,17 @@ export function validate(value: unknown): InstanceConfig {
   const observer = object(config.observer); keys(observer, ['username', 'display_name']);
   text(observer.username); text(observer.display_name);
   if (!/^[a-z][a-z0-9_-]{0,39}$/.test(observer.username)) throw new Error('Invalid observer username');
-  const room = object(config.room); keys(room, ['alias', 'name', 'topic']);
-  text(room.alias); name(room.alias); text(room.name); text(room.topic); text(config.label);
+  if (!Array.isArray(config.rooms) || config.rooms.length === 0) throw new Error('rooms must be a nonempty array');
+  const aliases = new Set<string>();
+  for (const entry of config.rooms) {
+    const room = object(entry); keys(room, ['alias', 'name', 'purpose']);
+    text(room.alias); name(room.alias); text(room.name); text(room.purpose);
+    if (aliases.has(room.alias)) throw new Error('Duplicate room alias: ' + room.alias);
+    aliases.add(room.alias);
+  }
+  text(config.default_room);
+  if (!aliases.has(config.default_room)) throw new Error('default_room must name a configured room alias');
+  text(config.label);
   if (typeof config.max_upload_bytes !== 'number' || !Number.isInteger(config.max_upload_bytes)
       || config.max_upload_bytes < 1 || config.max_upload_bytes > 1073741824) throw new Error('Upload limit must be 1 byte to 1 GiB');
   return config as unknown as InstanceConfig;

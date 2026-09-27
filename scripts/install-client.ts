@@ -33,7 +33,7 @@ function main(): void {
   const [major, minor] = process.versions.node.split('.').map(Number);
   if (major < 22 || (major === 22 && minor < 18)) throw new Error('Node 22.18+ is required');
   const bundle = JSON.parse(readFileSync(positionals[0] ?? 0, 'utf8')) as Bundle;
-  if (bundle.format !== 2 || !/^[a-z][a-z0-9-]{0,39}$/.test(bundle.settings?.instance)
+  if (bundle.format !== 3 || !/^[a-z][a-z0-9-]{0,39}$/.test(bundle.settings?.instance)
       || bundle.settings.instance === 'admin') throw new Error('Invalid Crossfire client bundle');
   for (const base of [bundle.settings.homeserver, bundle.settings.room_service]) {
     const url = new URL(base);

@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { Lease, LEASE_TIMEOUT_MS } from './lease.ts';
 import { runArguments } from './manage.ts';
 import { ROOT, validate, type InstanceConfig } from './instance.ts';
+import { readSettings, roomCatalog, selectRoom } from '../skills/conduit-chat/scripts/lib.ts';
 
 const execute = promisify(execFile);
 const example = (): InstanceConfig => JSON.parse(readFileSync(join(ROOT, 'examples/project-one.json'), 'utf8'));
@@ -60,7 +61,9 @@ test('exported client installs with custom paths, survives reinstall, and runs o
     if (request.headers.authorization !== 'Bearer ' + accessToken) { response.writeHead(401); response.end('{}'); return; }
     authorizedRequests++;
     response.setHeader('Content-Type', 'application/json');
-    response.end(JSON.stringify({ joined: { '@coordinator:project-one.localhost': {}, '@agent-worker-a:project-one.localhost': {} } }));
+    if (request.url === '/_coord/rooms') response.end(JSON.stringify({ default_room: settings.default_room, rooms: settings.rooms }));
+    else if (request.url === '/_matrix/client/v3/joined_rooms') response.end(JSON.stringify({ joined_rooms: settings.rooms.map(room => room.room_id) }));
+    else response.end(JSON.stringify({ joined: { '@coordinator:project-one.localhost': {}, '@agent-worker-a:project-one.localhost': {} } }));
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
@@ -68,7 +71,7 @@ test('exported client installs with custom paths, survives reinstall, and runs o
   const settings = { instance: 'project-one', label: 'Project One', server_name: 'project-one.localhost',
     homeserver: `http://127.0.0.1:${address.port}`, room_service: `http://127.0.0.1:${address.port}`,
     observer: '@coordinator:project-one.localhost', observer_label: 'Coordinator', registration_token: randomUUID(),
-    room_id: '!example:project-one.localhost', room_alias: '#coordination:project-one.localhost', max_upload_bytes: 104857600 };
+    default_room: 'coordination', rooms: [{ alias: 'coordination', name: 'Coordination', purpose: 'Shared updates.', room_id: '!example:project-one.localhost' }], max_upload_bytes: 104857600 };
   writeFileSync(join(profile, 'settings.json'), JSON.stringify(settings));
   writeFileSync(join(profile, 'admin.json'), JSON.stringify({ password: adminPassword, access_token: adminToken }));
   const env = { ...process.env, CROSSFIRE_DATA_DIR: data };
@@ -87,8 +90,34 @@ test('exported client installs with custom paths, survives reinstall, and runs o
   assert(!existsSync(join(skill, 'node_modules')));
   assert(!existsSync(join(skill, 'scripts/node_modules')));
   const result = await execute(process.execPath, [join(skill, 'scripts/chat.mjs'), '--instance', 'project-one', '--agent', 'worker-a', 'who'], { cwd: workspace });
-  assert.equal(authorizedRequests, 1);
+  assert(authorizedRequests > 0);
   assert(JSON.parse(result.stdout).members[settings.observer]);
   assert.deepEqual(JSON.parse(readFileSync(join(skill, 'scripts/.client-paths.json'), 'utf8')), { config_dir: config, state_dir: state });
   if (process.platform !== 'win32') assert.equal(statSync(join(config, 'instances/project-one.json')).mode & 0o777, 0o600);
+});
+
+test('room configuration rejects ambiguous destinations and migrates a legacy room without changing its identity', t => {
+  const config = example();
+  assert.equal(validate(config).rooms.length, 3);
+  assert.throws(() => validate({ ...config, rooms: [] }), /nonempty/);
+  assert.throws(() => validate({ ...config, rooms: [config.rooms[0], config.rooms[0]] }), /Duplicate/);
+  assert.throws(() => validate({ ...config, default_room: 'missing' }), /default_room/);
+  assert.throws(() => validate({ ...config, rooms: [{ ...config.rooms[0], purpose: '' }] }), /Display text/);
+  const { rooms, default_room, ...base } = config;
+  const legacy = { ...base, room: { alias: 'existing', name: 'Existing room', topic: 'Existing purpose' } };
+  assert.deepEqual(validate(legacy), { ...base, default_room: 'existing', rooms: [{ alias: 'existing', name: 'Existing room', purpose: 'Existing purpose' }] });
+  assert.throws(() => validate({ ...legacy, rooms }), /Required fields/);
+  const temporary = mkdtempSync(join(tmpdir(), 'crossfire-migration-'));
+  t.after(() => rmSync(temporary, { recursive: true, force: true }));
+  const path = join(temporary, 'settings.json');
+  writeFileSync(path, JSON.stringify({ server_name: 'project-one.localhost', room_id: '!original', room_alias: '#existing:project-one.localhost' }));
+  const migrated = readSettings(path);
+  assert.equal(selectRoom(migrated), '!original');
+  assert.equal(selectRoom(migrated, 'existing'), '!original');
+  assert.equal(selectRoom(migrated, '#existing:project-one.localhost'), '!original');
+  assert.equal(selectRoom(migrated, '!direct-conversation'), '!direct-conversation');
+  assert.throws(() => selectRoom(migrated, 'typo'), /Unknown room/);
+  const settings = { ...migrated, default_room, rooms: rooms.map((room, index) => ({ ...room, room_id: '!room-' + index })) };
+  assert.equal(selectRoom(settings), selectRoom({ ...settings, rooms: [...settings.rooms].reverse() }));
+  assert.throws(() => roomCatalog({ ...settings, rooms: [settings.rooms[0], { ...settings.rooms[1], room_id: settings.rooms[0].room_id }] }), /Duplicate/);
 });

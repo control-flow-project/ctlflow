@@ -26,6 +26,7 @@ Resolve the script relative to this SKILL.md. With the standard user install:
 ```sh
 CONDUIT_CHAT="${CODEX_HOME:-$HOME/.codex}/skills/conduit-chat/scripts/chat.mjs"
 node "$CONDUIT_CHAT" --instance project-a --agent worker-a init
+node "$CONDUIT_CHAT" --instance project-a --agent worker-a rooms
 node "$CONDUIT_CHAT" --instance project-a --agent worker-a read
 node "$CONDUIT_CHAT" --instance project-a --agent worker-a send --message 'Working on my assigned task.'
 node "$CONDUIT_CHAT" --instance project-a --agent worker-a who
@@ -34,9 +35,10 @@ node "$CONDUIT_CHAT" --instance project-a --agent worker-a who
 Replace example names with the assignment's values. Set `CONDUIT_CHAT` in each
 shell invocation if shell state is not persistent, or use the resolved absolute
 script path. Run `init` from the session's working directory. It creates the
-account, joins the shared room, and posts one announcement with the agent's name
-and directory. Repeating `init` reuses that identity without duplicate
-announcements. It does not start an agent session or modify the repository. The human keeps
+account, joins every configured shared room, and posts an announcement with the
+agent's name and directory in the configured default room. Repeating `init`
+reuses the original announcement room and transaction. It does not start an
+agent session or modify the repository. The human keeps
 the instance running in its own terminal. If it is offline, report that instead
 of starting a server unless the human assigned you instance management.
 
@@ -55,10 +57,26 @@ for a reply. These are on-demand calls, not background notifications. If
 `more` is true, read again until the backlog is consumed. Each room has a durable
 cursor; `history` replays recent messages without changing it.
 Events retain the server's order within each room; different rooms are returned
-in groups, not as one globally ordered timeline. `who` lists enrolled members,
-not whether their sessions are currently running.
+in groups, not as one globally ordered timeline. `who` lists members of the
+default room, or a room selected with `--room`; it does not show whether their
+sessions are currently running.
 
-The shared room is visible to the instance's participating agents and observer.
+Use `rooms` to discover each configured room's alias, name, purpose, members,
+and whether it is the default. Choose a room whose purpose fits the update.
+`--room planning` selects the configured `planning` alias; full local Matrix
+aliases and Matrix room IDs also work. Do not invent aliases. Untargeted `send`,
+`upload`, `history`, and `who` use `default_room`; untargeted `read` checks all
+joined rooms. Reading one room does not consume another room's unread events.
+Every command refreshes the room catalog and joins newly configured shared
+rooms, so rooms added by the human become available without reinstallation.
+
+```sh
+node "$CONDUIT_CHAT" --instance project-a --agent worker-a send --room planning --message 'Proposed interface for review.'
+node "$CONDUIT_CHAT" --instance project-a --agent worker-a read --room reviews
+node "$CONDUIT_CHAT" --instance project-a --agent worker-a upload /absolute/path/to/review.md --room reviews
+```
+
+All configured shared rooms include the instance's participating agents and observer.
 Every direct conversation includes the selected peer and **the human observer
 as a joined member**. This is a hard rule: never create a channel that omits the
 observer. The room service creates these rooms; agent accounts cannot create

@@ -2,8 +2,8 @@ import { join } from 'node:path';
 import { existsSync, readdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { INSTANCES, type InstanceConfig } from './instance.ts';
-import { API, Matrix, privateDir, readJson, writeJson, register, segment, powerLevels,
-  type Settings, type Account } from '../skills/conduit-chat/scripts/lib.ts';
+import { API, Matrix, MatrixError, privateDir, readJson, readSettings, writeJson, register, segment, powerLevels, ensureObserver,
+  type Settings, type Account, type Event } from '../skills/conduit-chat/scripts/lib.ts';
 
 export function configure(config: InstanceConfig): { privatePath: string; settings: Settings } {
   if (existsSync(INSTANCES)) for (const entry of readdirSync(INSTANCES, { withFileTypes: true })) {
@@ -23,13 +23,14 @@ export function configure(config: InstanceConfig): { privatePath: string; settin
   const privatePath = privateDir(join(folder, 'private'));
   privateDir(join(folder, 'data'));
   const settingsPath = join(privatePath, 'settings.json');
-  const previous = existsSync(settingsPath) ? readJson<Settings>(settingsPath) : undefined;
+  const previous = existsSync(settingsPath) ? readSettings(settingsPath) : undefined;
   const settings: Settings = {
     instance: config.id, label: config.label, homeserver: `http://127.0.0.1:${config.matrix_port}`,
     room_service: `http://127.0.0.1:${config.web_port}`, server_name: config.server_name,
     observer: `@${config.observer.username}:${config.server_name}`, observer_label: config.observer.display_name,
     registration_token: previous?.registration_token ?? randomBytes(40).toString('base64url'),
-    max_upload_bytes: config.max_upload_bytes, room_id: previous?.room_id ?? '', room_alias: previous?.room_alias ?? '',
+    max_upload_bytes: config.max_upload_bytes, default_room: config.default_room,
+    rooms: config.rooms.map(room => ({ ...room, room_id: previous?.rooms.find(old => old.alias === room.alias)?.room_id ?? '' })),
   };
   writeJson(settingsPath, settings);
   writeJson(join(folder, 'instance.json'), config);
@@ -59,29 +60,45 @@ export async function accounts(config: InstanceConfig, privatePath: string, sett
   const admin = readJson<Account>(accountPath);
   const client = new Matrix(settings.homeserver, admin.access_token);
   await client.put(`${API}/profile/${segment(admin.user_id)}/displayname`, { displayname: settings.observer_label });
-  const alias = `#${config.room.alias}:${config.server_name}`;
-  if (!settings.room_id) {
-    const result = await client.post<{ room_id: string }>(API + '/createRoom', {
-      room_alias_name: config.room.alias, name: config.room.name, topic: config.room.topic,
-      visibility: 'private', preset: 'public_chat', creation_content: { 'm.federate': false }, room_version: '12',
-      power_level_content_override: powerLevels(),
-      initial_state: [{ type: 'm.room.history_visibility', state_key: '', content: { history_visibility: 'shared' } }],
-    });
-    settings.room_id = result.room_id;
-    settings.room_alias = alias;
+  const roomIds = new Set<string>();
+  for (const room of settings.rooms) {
+    const alias = `#${room.alias}:${config.server_name}`;
+    // Alias lookup recovers after an interrupted startup or removing/re-adding
+    // a configured room. Removing configuration never deletes its history.
+    let registered: string | undefined;
+    try { registered = (await client.get<{ room_id: string }>(`${API}/directory/room/${segment(alias)}`)).room_id; }
+    catch (error) { if (!(error instanceof MatrixError) || error.status !== 404) throw error; }
+    if (room.room_id && registered && room.room_id !== registered) throw new Error('Room alias points to another room: ' + room.alias);
+    room.room_id ||= registered ?? '';
+    if (!room.room_id) {
+      room.room_id = (await client.post<{ room_id: string }>(API + '/createRoom', {
+        room_alias_name: room.alias, name: room.name, topic: room.purpose,
+        visibility: 'private', preset: 'public_chat', creation_content: { 'm.federate': false }, room_version: '12',
+        power_level_content_override: powerLevels(),
+        initial_state: [{ type: 'm.room.history_visibility', state_key: '', content: { history_visibility: 'shared' } }],
+      })).room_id;
+      registered = room.room_id;
+    }
+    if (roomIds.has(room.room_id)) throw new Error('Configured aliases must identify different rooms: ' + room.alias);
+    roomIds.add(room.room_id);
+    const base = `${API}/rooms/${segment(room.room_id)}`;
+    const state = await client.get<Event[]>(base + '/state');
+    const creation = state.find(event => event.type === 'm.room.create');
+    if (!creation || creation.sender !== settings.observer || creation.content.room_version !== '12'
+        || (Array.isArray(creation.content.additional_creators) && creation.content.additional_creators.length)) {
+      throw new Error('The observer must be the sole creator of configured room: ' + room.alias);
+    }
+    if (state.some(event => event.type === 'm.room.encryption')) throw new Error('Configured rooms must be unencrypted: ' + room.alias);
+    await ensureObserver(client, room.room_id, settings);
+    await client.put(base + '/state/m.room.power_levels', powerLevels());
+    await client.put(base + '/state/m.room.join_rules', { join_rule: 'public' });
+    await client.put(base + '/state/m.room.history_visibility', { history_visibility: 'shared' });
+    await client.put(base + '/state/m.room.name', { name: room.name });
+    await client.put(base + '/state/m.room.topic', { topic: room.purpose });
+    if (!registered) await client.put(`${API}/directory/room/${segment(alias)}`, { room_id: room.room_id });
+    await client.put(base + '/state/m.room.canonical_alias', { alias });
     writeJson(join(privatePath, 'settings.json'), settings);
   }
-  const base = `${API}/rooms/${segment(settings.room_id)}`;
-  await client.put(base + '/state/m.room.name', { name: config.room.name });
-  await client.put(base + '/state/m.room.topic', { topic: config.room.topic });
-  const oldAlias = (await client.get<{ alias?: string }>(base + '/state/m.room.canonical_alias')).alias;
-  if (oldAlias !== alias) {
-    await client.put(`${API}/directory/room/${segment(alias)}`, { room_id: settings.room_id });
-    await client.put(base + '/state/m.room.canonical_alias', { alias });
-    if (oldAlias) await client.request('DELETE', `${API}/directory/room/${segment(oldAlias)}`);
-  }
-  settings.room_alias = alias;
-  writeJson(join(privatePath, 'settings.json'), settings);
   const credentials = join(privatePath, 'web-login.txt');
   writeFileSync(credentials, `URL: ${settings.room_service}\nHomeserver: ${settings.homeserver}\nUsername: ${admin.user_id}\nPassword: ${admin.password}\n`, { mode: 0o600 });
   chmodSync(credentials, 0o600);

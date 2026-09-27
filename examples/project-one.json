@@ -5,10 +5,23 @@
   "matrix_port": 6167,
   "web_port": 8088,
   "observer": {"username": "coordinator", "display_name": "Coordinator"},
-  "room": {
-    "alias": "coordination",
-    "name": "Project One coordination",
-    "topic": "Shared coordination. The human coordinator participates in every direct conversation."
-  },
+  "default_room": "coordination",
+  "rooms": [
+    {
+      "alias": "coordination",
+      "name": "Project One coordination",
+      "purpose": "Assignments, progress, blockers, and requests for the human coordinator."
+    },
+    {
+      "alias": "planning",
+      "name": "Project One planning",
+      "purpose": "Discuss designs, dependencies, and ownership before implementation."
+    },
+    {
+      "alias": "reviews",
+      "name": "Project One reviews",
+      "purpose": "Share changes, review feedback, and verification results."
+    }
+  ],
   "max_upload_bytes": 104857600
 }
