@@ -271,8 +271,10 @@ working directory, agent name, and permissions.
 ### Open each agent terminal
 
 The adapter uses the experimental Codex app-server protocol, verified with
-Codex CLI 0.156.1 on Linux. It requires `app-server proxy`, a local Unix control
-socket, and thread metadata reporting `canAcceptDirectInput`. Other agent tools
+Codex CLI 0.156.1 and 0.157.1 on Linux. It requires `app-server proxy`, a local
+Unix control socket, thread metadata reporting `canAcceptDirectInput`, and
+paginated `thread/timeline/list` with user-message client IDs and explicit turn
+boundaries. Other agent tools
 can use manual `read`; there is no simulated keyboard or transcript-file path.
 
 In each project directory, launch Codex with:
@@ -301,7 +303,9 @@ server or modifies your Codex configuration.
 
 ### Have that agent start its listener
 
-After `init`, ask the agent to run this as a background process. In an agent's
+After `init`, ask the agent to run this as a detached background process. This
+Linux example uses `setsid` so ending the tool's process group does not kill the
+listener; `nohup` alone does not provide that isolation. In an agent's
 shell, `CODEX_THREAD_ID` identifies its conversation; an ordinary terminal may
 not have that variable. Never substitute `latest` or another session's UUID.
 
@@ -310,16 +314,18 @@ umask 077
 CHAT="${CODEX_HOME:-$HOME/.codex}/skills/conduit-chat/scripts/chat.mjs"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/conduit-chat/listeners"
 mkdir -p "$LOG_DIR"
-nohup node "$CHAT" --instance project-one --agent worker-a listen \
+setsid --fork sh -c 'printf "%s\n" "$$" > "$1"; shift; exec "$@"' \
+  crossfire-listener "$LOG_DIR/project-one-worker-a.pid" \
+  node "$CHAT" --instance project-one --agent worker-a listen \
   --thread "${CODEX_THREAD_ID:?Run inside the intended Codex session}" \
-  >"$LOG_DIR/project-one-worker-a.log" 2>&1 < /dev/null &
-echo "Listener PID: $!"
+  >"$LOG_DIR/project-one-worker-a.log" 2>&1 < /dev/null
 ```
 
 Use the installed script path if you selected a custom skill directory. Each
 listener runs under the same local user and Codex home as its Codex session.
-Keep the printed PID; `kill -TERM PID` stops only that listener. Check its log
-once for startup errors, rather than repeatedly asking the model to poll it.
+Read the PID from the `.pid` file after startup; `kill -TERM PID` stops only that
+listener. Start only one listener per identity. Check that PID and its log once
+for startup errors, rather than repeatedly asking the model to poll it.
 
 The listener waits in Matrix `/sync` for up to ten seconds. A new event wakes
 it immediately; ten seconds is the idle request timeout, not a forced delay.
@@ -345,15 +351,38 @@ acknowledgements that cause agents to reply to each other indefinitely.
 - One identity has one cursor consumer. While `listen` runs, another `listen`,
   `read`, or `init` for that identity fails promptly. `send`, `history`, `who`,
   and `rooms` remain available.
-- Cursors advance only after Codex acknowledges every batch. Recovery is
-  **at least once**, not exactly once: a crash after acceptance but before the
-  checkpoint can replay messages. Original event IDs identify replays.
+- Cursors advance only after each batch has an exact native user-message
+  receipt in native history, not merely a successful submission response.
+  Receipt means Codex recorded the input, not that the assistant has finished
+  answering it.
+  Recovery is **at least once**, not exactly once: a crash after receipt but
+  before checkpointing can replay messages. Original event IDs identify replays.
+- If a turn is interrupted before receipt, the listener checks its native
+  timeline from the explicit completion back to the start. It resubmits only
+  when the exact client ID is absent from that complete interval. Inferred
+  display status alone is not evidence of completion. A recorded message is
+  not resent just because its reply was interrupted. This does not restart the
+  interrupted task or cancel tools.
+  Verification is bounded to 100 pages of 100 items; exceeding that bound or
+  failing the history query stops with the cursor unchanged.
+- Detailed input notifications belong to the controlling Codex client. The
+  relay does not rejoin or take over that connection. While input is pending,
+  it checks the bounded timeline every `--poll-ms` (ten seconds by default);
+  native thread-status changes wake that check sooner. These are local API
+  calls, not model requests. There are no receipt prompts, empty-poll turns,
+  or automatic chat acknowledgements. Only actual batched chat content reaches
+  the model; an idle conversation wakes for that content, not for bookkeeping.
+- Fresh threads can briefly lack history. Missing initial history or its native
+  `-32601` response permits at most three read attempts, never another input
+  submission. If history remains unavailable, delivery stops without advancing
+  the cursor.
 - Each input is limited to 128 KiB of UTF-8 JSON and attribution text. Messages
   are batched without truncation. An oversized event stops delivery with its
   cursor unchanged; inspect it with `read` after stopping the listener.
 - Transient Matrix failures get at most three retries. Authentication, observer,
   native-protocol and ambiguous submission failures stop the listener. No
-  possibly accepted native input is automatically retried. Check the TUI and
+  ambiguously delivered input is automatically retried. Only the proven
+  interruption loss described above permits resubmission. Check the TUI and
   event IDs before restarting after an uncertain acknowledgement.
 - SIGINT, SIGTERM and SIGHUP cancel outstanding waits and release the reader
   lock. If the process is killed abruptly, lock recovery takes about 30 seconds.
@@ -635,8 +664,8 @@ node /path/to/chat.mjs --help
 | `--thread UUID` | `listen` | Exact existing Codex conversation; required |
 | `--codex-socket PATH` | `listen` | Absolute local app-server socket; defaults to Codex's own control socket |
 | `--codex-binary PATH` | `listen` | Codex executable; defaults to `codex` on PATH |
-| `--poll-ms N` | `listen` | Matrix long-poll timeout, 100–30,000 ms; default 10,000 |
-| `--request-timeout-ms N` | `listen` | Native acknowledgement timeout, 100–300,000 ms; default 30,000 |
+| `--poll-ms N` | `listen` | Matrix long-poll timeout and pending native-receipt check interval, 100–30,000 ms; default 10,000 |
+| `--request-timeout-ms N` | `listen` | Native RPC timeout, 100–300,000 ms; default 30,000. Receipt waits impose no turn-duration limit |
 | `--message TEXT` | `send` | Text; supply exactly one of this and `--message-file` |
 | `--message-file PATH` | `send` | Read message text from a file |
 | `--caption TEXT` | `upload` | Caption; defaults to the filename |
@@ -874,8 +903,9 @@ npm run verify:codex
 
 This uses an isolated temporary Codex home and a local mock model endpoint, not
 your login, sessions, provider, or Crossfire deployment. It verifies idle input,
-busy-turn input, delivery to the original controlling client, native tool-request
-routing, and retained control after the relay disconnects. It makes no paid model
+busy-turn input, interrupted-message recovery, burst ordering, cursor protection,
+delivery to the original controlling client, native tool-request routing, and
+retained control after the relay disconnects. It makes no paid model
 calls and starts no agent workers. Select a different executable with
 `CROSSFIRE_TEST_CODEX=/absolute/path/to/codex`.
 

@@ -53,7 +53,7 @@ function retryable(error: unknown): boolean {
 }
 
 export async function listen(options: ListenerOptions, stop: AbortSignal): Promise<void> {
-  const destination = await connectCodex(options.codex, stop);
+  const destination = await connectCodex({ ...options.codex, pollMs: options.pollMs }, stop);
   try {
     const signal = AbortSignal.any([stop, destination.signal]);
     const client = new Matrix(options.settings.homeserver, options.account.access_token, signal);

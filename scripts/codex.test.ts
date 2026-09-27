@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { setTimeout as delay } from 'node:timers/promises';
 import { connectCodex } from '../skills/conduit-chat/scripts/codex.ts';
-import { fakeCodex, THREAD } from './test-support/listener.ts';
+import { fakeCodex, inputReceipt, THREAD, until } from './test-support/listener.ts';
 
 test('native delivery verifies the selected workspace and uses only start-or-steer without policy overrides', async t => {
   const fixture = await fakeCodex(t);
@@ -11,7 +12,8 @@ test('native delivery verifies the selected workspace and uses only start-or-ste
   fixture.update({ status: 'active' });
   await connection.deliver('active input', 'second');
   assert.deepEqual(fixture.requests().map(request => request.method),
-    ['initialize', 'initialized', 'thread/read', 'thread/read', 'turn/start', 'thread/read', 'turn/start']);
+    ['initialize', 'initialized', 'thread/read', 'thread/read', 'turn/start', 'thread/timeline/list',
+      'thread/read', 'turn/start', 'thread/timeline/list']);
   const starts = fixture.requests().filter(request => request.method === 'turn/start');
   assert.deepEqual(starts.map(request => request.params), ['idle input', 'active input'].map((text, index) => ({
     threadId: THREAD, clientUserMessageId: index === 0 ? 'first' : 'second',
@@ -83,5 +85,171 @@ test('invalid destinations and unavailable executables fail before native reques
   await assert.rejects(connectCodex({ ...fixture.options, thread: 'latest' }, signal), /exact Codex thread UUID/);
   await assert.rejects(connectCodex({ ...fixture.options, socket: 'relative.sock' }, signal), /absolute path/);
   await assert.rejects(connectCodex({ ...fixture.options, binary: '/no-such-codex' }, signal), /Cannot connect/);
+  for (const pollMs of [0, 99, 30_001, NaN, Infinity]) {
+    await assert.rejects(connectCodex({ ...fixture.options, pollMs }, signal), /poll interval/);
+  }
   assert.deepEqual(fixture.requests(), []);
+});
+
+test('acceptance is not receipt: only the exact completed native user item acknowledges input', async context => {
+  const fixture = await fakeCodex(context, { mode: 'accepted' });
+  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  context.after(connection.close);
+  let delivered = false;
+  const delivery = connection.deliver('input', 'exact').then(() => { delivered = true; });
+  await until(() => fixture.requests().some(request => request.method === 'turn/start'));
+  await assert.rejects(connection.deliver('concurrent', 'other'), /must be sequential/);
+  fixture.notify('item/completed', { threadId: 'another-thread', item: inputReceipt('exact') });
+  fixture.notify('item/completed', { threadId: THREAD, item: inputReceipt('other') });
+  fixture.notify('item/started', { threadId: THREAD, item: inputReceipt('exact') });
+  await connection.verify();
+  assert.equal(delivered, false);
+  fixture.notify('item/completed', { threadId: THREAD, item: inputReceipt('exact') });
+  await delivery;
+  assert.equal(delivered, true);
+  assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+});
+
+test('history receipts acknowledge input without detailed event subscriptions', async context => {
+  const fixture = await fakeCodex(context, { receiptFirst: true });
+  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  context.after(connection.close);
+  await connection.deliver('input', 'early');
+  assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+  assert(fixture.requests().some(request => request.method === 'thread/timeline/list'));
+});
+
+test('busy receipt checks are bounded polls, not additional model turns or turn-duration timeouts', async context => {
+  const fixture = await fakeCodex(context, { mode: 'accepted' });
+  const connection = await connectCodex({ ...fixture.options, timeoutMs: 100 }, new AbortController().signal);
+  context.after(connection.close);
+  const delivery = connection.deliver('input', 'waiting');
+  await until(() => fixture.requests().some(request => request.method === 'turn/start'));
+  await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list'));
+  const count = fixture.requests().length;
+  await delay(150);
+  assert(fixture.requests().length > count && fixture.requests().length <= count + 2);
+  assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+  assert.equal(connection.signal.aborted, false);
+  fixture.notify('item/completed', { threadId: THREAD, item: inputReceipt('waiting') });
+  await delivery;
+});
+
+test('interrupted input is retried only after complete bounded history proves it absent', async context => {
+  const fixture = await fakeCodex(context, { mode: 'accepted' });
+  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  context.after(connection.close);
+  const delivery = connection.deliver('input', 'interrupted');
+  await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list'));
+  fixture.update({ mode: 'normal', turnId: 'replacement-turn', historyPages: [
+    { data: [{ type: 'item', turnId: 'existing-turn', position: 2, item: inputReceipt('other') },
+      { type: 'turnCompleted', turnId: 'existing-turn', position: 3, status: 'interrupted' }], nextCursor: 'next' },
+    { data: [{ type: 'turnStarted', turnId: 'existing-turn', position: 1 }], nextCursor: null },
+  ] });
+  fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
+  await delivery;
+  const starts = fixture.requests().filter(request => request.method === 'turn/start');
+  assert.equal(starts.length, 2);
+  assert.deepEqual(starts[0].params, starts[1].params);
+  const reads = fixture.requests().filter(request => request.method === 'thread/timeline/list');
+  const paged = reads.findIndex(request => request.params!.cursor === 'next');
+  assert(paged > 0);
+  assert.deepEqual(reads.slice(paged - 1, paged + 1).map(request => request.params), [
+    { threadId: THREAD, limit: 100 },
+    { threadId: THREAD, limit: 100, cursor: 'next' },
+  ]);
+});
+
+test('history receipts prevent retries even when interruption precedes the start response', async context => {
+  const fixture = await fakeCodex(context, { mode: 'accepted', completionFirst: true, historyPages: [
+    { data: [{ type: 'turnCompleted', turnId: 'existing-turn', position: 3, status: 'interrupted' }], nextCursor: 'older' },
+    { data: [{ type: 'turnStarted', turnId: 'existing-turn', position: 1 },
+      { type: 'item', turnId: 'existing-turn', position: 2, item: inputReceipt('persisted') }], nextCursor: null },
+  ] });
+  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  context.after(connection.close);
+  await connection.deliver('input', 'persisted');
+  assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+});
+
+test('uncertain, malformed, foreign, cyclic, or excessive history cannot authorize replay', async context => {
+  const configurations = [
+    { historyError: true },
+    { historyPages: [{ data: [], nextCursor: '' }] },
+    { historyPages: [{ data: [], nextCursor: 'cycle' }, { data: [], nextCursor: 'cycle' }] },
+    { historyPages: [{ data: [], nextCursor: undefined }] },
+    { historyPages: [{ data: 'invalid', nextCursor: null }] },
+    { historyPages: Array.from({ length: 3 }, () => ({ data: [{ type: 'item', turnId: 'foreign', position: 1, item: inputReceipt('input') }], nextCursor: null })) },
+    { historyPages: Array.from({ length: 3 }, () => ({ data: [{ type: 'turnCompleted', turnId: 'existing-turn', position: 2, status: 'interrupted' }], nextCursor: null })) },
+    { historyPages: [{ data: [{ type: 'item', turnId: 'existing-turn', position: 2, item: inputReceipt('input', []) }], nextCursor: null }] },
+    { historyPages: [{ data: [{ type: 'turnCompleted', turnId: 'existing-turn', position: 2, status: 'interrupted' },
+      { type: 'turnStarted', turnId: 'existing-turn', position: 1 }], nextCursor: null }] },
+    { historyPages: [{ data: Array.from({ length: 101 }, () => ({ turnId: 'existing-turn', item: inputReceipt('other') })), nextCursor: null }] },
+    { historyPages: Array.from({ length: 100 }, (_, index) => ({ data: [], nextCursor: 'page-' + index })) },
+  ];
+  for (const configuration of configurations) {
+    const fixture = await fakeCodex(context, { mode: 'accepted' });
+    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    const rejection = assert.rejects(connection.deliver('input', 'input'));
+    await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list'));
+    fixture.update(configuration);
+    fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
+    await rejection;
+    assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+    connection.close();
+  }
+});
+
+test('successful or failed turns without input evidence stop instead of resubmitting', async context => {
+  for (const status of ['completed', 'failed']) {
+    const fixture = await fakeCodex(context, { mode: 'accepted' });
+    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    const rejection = assert.rejects(connection.deliver('input', 'input'), /without recording the input/);
+    await until(() => fixture.requests().some(request => request.method === 'turn/start'));
+    fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status } });
+    await rejection;
+    assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+    connection.close();
+  }
+});
+
+test('mismatched receipts, cancellation, and disconnect release a pending receipt wait without retry', async context => {
+  for (const mode of ['wrong-content', 'cancel', 'disconnect']) {
+    const fixture = await fakeCodex(context, { mode: 'accepted' });
+    const controller = new AbortController();
+    const connection = await connectCodex(fixture.options, controller.signal);
+    const rejection = assert.rejects(connection.deliver('input', 'input'));
+    await until(() => fixture.requests().some(request => request.method === 'turn/start'));
+    if (mode === 'wrong-content') fixture.notify('item/completed', { threadId: THREAD,
+      item: inputReceipt('input', [{ type: 'text', text: 'different input', text_elements: [] }]) });
+    else if (mode === 'cancel') controller.abort(new Error('cancelled by test'));
+    else fixture.disconnect();
+    await rejection;
+    assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+    if (mode !== 'wrong-content') assert.equal(connection.signal.aborted, true);
+    connection.close();
+  }
+});
+
+test('missing or malformed turn history never proves interruption or permits replay', async context => {
+  for (const data of [[], [{ type: 'turnCompleted', turnId: 'existing-turn', position: 1, status: 'unknown' }],
+    [{ type: 'unknown', turnId: 'existing-turn', position: 1 }]]) {
+    const fixture = await fakeCodex(context, { mode: 'accepted', historyPages: Array.from({ length: 3 }, () => ({ data, nextCursor: null })) });
+    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    context.after(connection.close);
+    await assert.rejects(connection.deliver('input', 'input'), /turn/);
+    assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+  }
+});
+
+test('new-thread history initialization permits only bounded read-only retries, never another input', async context => {
+  for (const count of [2, 3]) {
+    const fixture = await fakeCodex(context, { historyUnavailable: Array.from({ length: count }, () => -32601) });
+    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    context.after(connection.close);
+    if (count === 2) await connection.deliver('input', 'input');
+    else await assert.rejects(connection.deliver('input', 'input'), /not supported yet/);
+    assert.equal(fixture.requests().filter(request => request.method === 'thread/timeline/list').length, 3);
+    assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+  }
 });

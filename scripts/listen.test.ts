@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { API, writeJson } from '../skills/conduit-chat/scripts/lib.ts';
 import { listen, type ListenerOptions } from '../skills/conduit-chat/scripts/listen.ts';
 import { ROOT } from './instance.ts';
-import { fakeCodex, matrixFixture, message, ROOM, SELF, THREAD, until } from './test-support/listener.ts';
+import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, SELF, THREAD, until } from './test-support/listener.ts';
 
 const execute = promisify(execFile);
 
@@ -66,6 +66,29 @@ test('an incoming message wakes a ten-second long poll without waiting for its t
   matrix.add(ROOM, message('$wake'));
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
+});
+
+test('active-turn acceptance leaves messages unread until native receipt, including interrupted bursts', async context => {
+  const native = await fakeCodex(context, { mode: 'accepted' });
+  const matrix = await matrixFixture(context, native.directory);
+  const controller = new AbortController();
+  const result = listen({ ...matrix, limit: 1, pollMs: 100, codex: native.options }, controller.signal).catch(error => error);
+  context.after(async () => { controller.abort(new Error('test complete')); await result; });
+  await until(() => matrix.waiting() === 1);
+  matrix.add(ROOM, message('$first'), message('$second'));
+  const starts = () => native.requests().filter(request => request.method === 'turn/start');
+  await until(() => starts().length === 1);
+  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: '0' });
+  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
+  await until(() => starts().length === 2);
+  assert.deepEqual(starts()[0].params, starts()[1].params);
+  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: '0' });
+  const accepted = starts()[1].params!;
+  native.update({ mode: 'normal' });
+  native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(accepted.clientUserMessageId), accepted.input) });
+  await until(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '2');
+  assert.equal(starts().length, 3);
+  assert.notEqual(starts()[1].params!.clientUserMessageId, starts()[2].params!.clientUserMessageId);
 });
 
 test('transient Matrix errors retry bounded reads, never replaying acknowledged native inputs', async t => {
@@ -133,6 +156,32 @@ test('CLI validates listener-only controls before network use', async () => {
     ['listen', '--thread', THREAD, '--request-timeout-ms', 'Infinity']]) {
     await assert.rejects(execute(process.execPath, [...base, ...args]), /Listener options|listen requires|must be/);
   }
+});
+
+test('the documented Linux detached launcher survives its parent and records the listener PID', { skip: process.platform !== 'linux' }, async context => {
+  const native = await fakeCodex(context);
+  const matrix = await matrixFixture(context, native.directory);
+  const pidFile = join(native.directory, 'listener.pid');
+  context.after(async () => {
+    if (!existsSync(pidFile)) return;
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    try { process.kill(pid, 'SIGTERM'); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+    }
+    await until(() => !existsSync(join(matrix.env.CROSSFIRE_CLIENT_STATE_DIR, 'test/watson/client.lock')));
+  });
+  await execute('setsid', ['--fork', 'sh', '-c', 'printf "%s\\n" "$$" > "$1"; shift; exec "$@" >/dev/null 2>&1 < /dev/null',
+    'crossfire-listener', pidFile, process.execPath, join(ROOT, 'skills/conduit-chat/scripts/chat.ts'),
+    '--instance', 'test', '--agent', 'watson', 'listen', '--thread', THREAD, '--codex-binary', native.options.binary,
+    '--poll-ms', '100'], { env: matrix.env });
+  await until(() => matrix.waiting() === 1);
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  assert(Number.isSafeInteger(pid) && pid > 1);
+  process.kill(pid, 0);
+  const status = await execute('ps', ['-p', String(pid), '-o', 'sid=']);
+  assert.equal(Number(status.stdout.trim()), pid);
+  matrix.add(ROOM, message('$detached'));
+  await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
 });
 
 test('the standalone bundle relays from a foreign project without node_modules', async t => {
