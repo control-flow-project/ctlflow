@@ -5,7 +5,7 @@ import { join, resolve, sep, extname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseArgs, isDeepStrictEqual } from 'node:util';
 import { ROOT, INSTANCES, load, elementConfig } from './instance.ts';
-import { API, Matrix, MatrixError, readJson, segment, name, localUser, powerLevels, collect,
+import { API, Matrix, MatrixError, readJson, segment, name, localUser, powerLevels, collect, ensureObserver,
   type Settings, type Account, type Members, type Event, type JsonObject } from '../skills/conduit-chat/scripts/lib.ts';
 
 const { values } = parseArgs({ options: { instance: { type: 'string' } } });
@@ -21,8 +21,9 @@ async function conversation(token: string, target: string): Promise<{ room_id: s
   const caller = new Matrix(settings.homeserver, token);
   const sender = (await caller.get<{ user_id: string }>(API + '/account/whoami')).user_id;
   const recipient = localUser(target, settings);
-  const roster = (await matrix.get<{ joined: Members }>(`${API}/rooms/${segment(settings.room_id)}/joined_members`)).joined;
-  if (!(sender in roster) || !(recipient in roster)) throw new Error('Both participants must first join this instance\'s coordination room');
+  const roster: Members = {};
+  for (const room of settings.rooms) Object.assign(roster, await ensureObserver(matrix, room.room_id, settings));
+  if (!(sender in roster) || !(recipient in roster)) throw new Error('Both participants must first join a configured shared room in this instance');
   if (sender === recipient) throw new Error('Choose another participant');
   const peers = [...new Set([sender, recipient, settings.observer])].sort();
   const pair = [sender, recipient].filter(user => user !== settings.observer).sort();
@@ -80,6 +81,13 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
   if (request.method === 'GET' && pathname === '/_coord/health') {
     json(response, 200, { instance, status: 'ready', run_id: process.env.CROSSFIRE_RUN_ID });
+    return;
+  }
+  if (request.method === 'GET' && pathname === '/_coord/rooms') {
+    const auth = request.headers.authorization ?? '';
+    if (!auth.startsWith('Bearer ') || auth.length <= 7) { json(response, 401, { error: 'Matrix access token required' }); return; }
+    await new Matrix(settings.homeserver, auth.slice(7)).get(API + '/account/whoami');
+    json(response, 200, { default_room: settings.default_room, rooms: settings.rooms });
     return;
   }
   if (request.method === 'POST' && pathname === '/_coord/dm') {

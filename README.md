@@ -61,7 +61,7 @@ node crossfire start project-one
 
 On the first start, Crossfire builds the image from [Dockerfile](Dockerfile).
 It then runs the container, initializes Conduit's database, registers the human
-account, creates the coordination room, and serves Element Web. When ready,
+account, creates all configured shared rooms, and serves Element Web. When ready,
 it prints the UI/API URLs and a private `web-login.txt` path.
 
 **Leave this terminal open.** `start` stays in the foreground and streams logs.
@@ -78,7 +78,8 @@ node crossfire info project-one
 Open the `login_file` printed by this command in your editor. It contains the
 generated human username and password. Open the printed `ui` URL in your
 browser and sign in. With the default ports, the URL is
-`http://127.0.0.1:8088`. Open the coordination room.
+`http://127.0.0.1:8088`. The example provides coordination, planning, and reviews
+rooms. Each room's purpose appears as its topic in the UI.
 
 Passwords are generated per installation. There is no shared/default password,
 and credentials do not belong in the repository or agent prompts.
@@ -131,22 +132,24 @@ Initialize from this directory and read messages.
 For this demonstration, inspect the checkout and summarize its main
 components. Do not edit files.
 
-Announce your assignment in the shared room. Check messages between
-work batches and before reporting completion. Use the skill for
+List the rooms and their purposes. Announce your assignment in the default
+coordination room and choose the appropriate room for other updates.
+Check messages between work batches and before reporting completion. Use the skill for
 communication, keeping the human included in every conversation.
 
 If another agent is needed, send admin a request with a proposed name,
 exact directory, bounded task, and prompt. I will start it manually.
 ```
 
-The agent initializes its own account and announces its name and working
-directory. That announcement appears in the UI. You do not give it a password.
+The agent initializes its own account, joins every configured shared room, and
+announces its name and working directory in the default room. That announcement
+appears in the UI. You do not give it a password.
 
 Start a second session in its assigned directory. Give it the same prompt with
 `worker-b` as the name and this task:
 
 ```text
-Identify this project's test commands and report them in the shared room.
+Identify this project's test commands and report them in the reviews room.
 Do not edit files.
 ```
 
@@ -217,11 +220,24 @@ credentials or machine-specific paths. The first example is:
   "matrix_port": 6167,
   "web_port": 8088,
   "observer": {"username": "coordinator", "display_name": "Coordinator"},
-  "room": {
-    "alias": "coordination",
-    "name": "Project One coordination",
-    "topic": "Shared coordination. The human coordinator participates in every direct conversation."
-  },
+  "default_room": "coordination",
+  "rooms": [
+    {
+      "alias": "coordination",
+      "name": "Project One coordination",
+      "purpose": "Assignments, progress, blockers, and requests for the human coordinator."
+    },
+    {
+      "alias": "planning",
+      "name": "Project One planning",
+      "purpose": "Discuss designs, dependencies, and ownership before implementation."
+    },
+    {
+      "alias": "reviews",
+      "name": "Project One reviews",
+      "purpose": "Share changes, review feedback, and verification results."
+    }
+  ],
   "max_upload_bytes": 104857600
 }
 ```
@@ -245,9 +261,11 @@ You do not need to write a container configuration yourself.
 | `web_port` | Host port for Element and conversation creation; integer 1024–65535, different from `matrix_port` |
 | `observer.username` | Human account name; starts with a letter and uses lowercase letters, digits, `_`, or `-`, up to 40 characters |
 | `observer.display_name` | Human name shown in rooms |
-| `room.alias` | Shared-room alias using the same lowercase name rules as `id` |
-| `room.name` | Shared-room display name |
-| `room.topic` | Shared-room description |
+| `default_room` | Alias of a room in `rooms`; used for untargeted messages, uploads, history, member lists, and the initial enrollment announcement |
+| `rooms` | Nonempty array of shared rooms; every enrolled agent joins all of them |
+| `rooms[].alias` | Unique, stable room identifier within the instance; uses the same lowercase name rules as `id`, and is accepted by `--room` |
+| `rooms[].name` | Display name shown in the UI and agent room list |
+| `rooms[].purpose` | What belongs in this room; shown to agents and used as the Matrix room topic |
 | `max_upload_bytes` | Conduit's maximum request/upload size; examples use 100 MiB. Keep enough room for ordinary Matrix API requests |
 
 All fields are required; unknown fields are rejected. Display text must have
@@ -256,10 +274,56 @@ The two ports and server identity must not be reserved by another configured
 instance in the same storage root. Ports must also be free on the host.
 
 After initialization, preserve `id`, `server_name`, and `observer.username`.
-Create a new instance to change its identity. To update room names, topics,
+Create a new instance to change its identity. To update room names, purposes,
 display names, ports, or upload limits, stop the instance, edit the private
 JSON, and start it again. Reinstall client settings after changing connection
 settings or limits; existing accounts and read positions are retained.
+
+### Selecting and maintaining shared rooms
+
+Use as many entries as your project needs. Room purposes guide conversation
+routing; all configured shared rooms include the human and all enrolled agents.
+They are not per-team access restrictions. Direct conversations are additional,
+automatically created rooms containing their participants and the human.
+
+Agents run `rooms` to discover aliases, names, purposes, members, and the default
+room, then use those aliases directly:
+
+```sh
+node /path/to/chat.mjs --instance project-one --agent worker-a rooms
+node /path/to/chat.mjs --instance project-one --agent worker-a send --room planning --message 'Proposed interface for review.'
+node /path/to/chat.mjs --instance project-one --agent worker-a read --room reviews
+node /path/to/chat.mjs --instance project-one --agent worker-a upload ./review.md --room reviews
+```
+
+`--room` accepts a configured short alias, its full local Matrix alias such as
+`#planning:project-one.localhost`, or a Matrix room ID. Unknown aliases fail
+instead of falling back to the default. Untargeted `read` checks every joined
+room, including direct conversations. Reading one room preserves the unread
+positions of the others.
+
+Keep an entry's alias when editing its name or purpose to preserve the same
+conversation and history. Reordering entries does not change the default;
+change `default_room` explicitly. New aliases create new rooms. Removing an
+entry stops managing and enrolling newcomers into that room; it does not delete
+the room, its existing memberships, or history. Existing members can still read
+it and address its Matrix ID. Re-adding the original alias reuses that room.
+
+Stop the instance before editing its configuration, then start it again. The
+updated client fetches the current room catalog and joins newly configured
+rooms on its next command. Room changes alone require no client reinstall.
+
+### Upgrading an existing single-room instance
+
+The previous `room: { alias, name, topic }` format is accepted on startup and
+rewritten into a one-entry `rooms` array, with `topic` becoming `purpose` and
+that alias becoming `default_room`. Existing Matrix room IDs, accounts,
+attachments, and history are preserved. Add more entries after migration.
+Do not combine `room` with `rooms` in one configuration.
+
+After updating the checkout, restart the instance and reinstall the agent
+client for each participating user to enable room discovery and alias selection.
+Existing account tokens and unread positions remain intact.
 
 `start NAME` reads the private configuration created by `init` when present;
 otherwise it uses the last saved configuration for that instance. Supplying a
@@ -290,13 +354,30 @@ remain separate. Closing one instance's terminal leaves the others running.
 Run these from the checkout. `./crossfire` is also available in shells that
 support executable scripts; `node crossfire` is the portable form.
 
+Complete syntax follows. Uppercase words are placeholders. Square brackets
+mark optional arguments; `|` separates alternatives. Do not type that notation
+literally.
+
+```text
+node crossfire init NAME [--matrix-port N] [--web-port N]
+node crossfire start CONFIG_OR_NAME
+node crossfire stop NAME
+node crossfire info NAME
+node crossfire status NAME
+node crossfire logs NAME
+node crossfire build
+node crossfire install-client NAME [--skill-dir PATH] [--config-dir PATH] [--state-dir PATH]
+node crossfire export-client NAME NEW_DIRECTORY
+node crossfire --help
+```
+
 | Command | Effect |
 | --- | --- |
 | `node crossfire init NAME` | Create a private configuration; prints its path and refuses to overwrite one |
 | `node crossfire init NAME --matrix-port N --web-port N` | Create it with chosen ports |
 | `node crossfire start CONFIG_OR_NAME` | Build if needed, then run an instance in the foreground |
 | `node crossfire stop NAME` | Stop an instance from another terminal, preserving all data |
-| `node crossfire info NAME` | Show URLs, human identity, container name, data location, and login-file path; does not print passwords |
+| `node crossfire info NAME` | Show URLs, configured rooms and default, human identity, container name, data location, and login-file path; does not print passwords |
 | `node crossfire status NAME` | Show whether the instance container is running |
 | `node crossfire logs NAME` | Show the last 100 container log lines while it exists |
 | `node crossfire build` | Build/cache the image without starting an instance |
@@ -339,31 +420,53 @@ node /path/to/chat.mjs --instance project-one --agent worker-a init
 node /path/to/chat.mjs --instance project-one --agent worker-a read
 ```
 
-In the table, `chat` abbreviates that full command and identity prefix.
+In the reference and table below, `chat` abbreviates
+`node /path/to/chat.mjs --instance INSTANCE --agent AGENT`. Replace the path and
+identity placeholders with the installation path and assigned names.
+
+```text
+chat init
+chat read [--room ROOM] [--limit N]
+chat history [--room ROOM] [--limit N]
+chat send --message TEXT [--to PEER | --room ROOM] [--txn ID]
+chat send --message-file FILE [--to PEER | --room ROOM] [--txn ID]
+chat upload FILE [--to PEER | --room ROOM] [--caption TEXT] [--txn ID]
+chat download MXC NEW_FILE
+chat who [--room ROOM]
+chat rooms
+node /path/to/chat.mjs --help
+```
+
+`ROOM` is a configured alias, a full local Matrix alias, or a Matrix room ID.
+`PEER` is an agent name, a full local Matrix user ID, or `admin` for the human.
+`MXC` is the attachment URI returned by `upload` or a message's `content.url`.
+`N` is 1–100, with a default of 50. `--to` and `--room` are mutually exclusive;
+`send` requires exactly one of `--message` and `--message-file`.
 
 | Command | Effect |
 | --- | --- |
-| `chat init` | Create/reuse the identity, join the shared room, announce its initial working directory |
+| `chat init` | Create/reuse the identity, join all configured shared rooms, announce its initial working directory in the default room |
 | `chat read` | Accept human-created invitations, read unread events, and save per-room read positions |
-| `chat read --room '!room-id' --limit 100` | Read one room with a chosen page size |
-| `chat history` | Replay recent shared-room messages without changing read positions |
+| `chat read --room reviews --limit 100` | Read one configured room with a chosen page size |
+| `chat history` | Replay recent default-room messages without changing read positions |
 | `chat history --room '!room-id' --limit 50` | Replay recent messages from a selected room |
-| `chat send --message 'Task started.'` | Send text to the shared room |
+| `chat send --message 'Task started.'` | Send text to the configured default room |
+| `chat send --room planning --message 'Proposed design.'` | Send text to a configured room by its alias |
 | `chat send --message-file ./update.md` | Send a file's contents as text, up to 50,000 bytes |
 | `chat send --to worker-b --message 'Please confirm the interface.'` | Send to a conversation containing both agents and the human |
 | `chat send --to admin --message 'I need a decision.'` | Send to a conversation containing the sender and human |
 | `chat send --room '!room-id' --message 'Confirmed.'` | Reply to an existing room containing the human |
-| `chat upload ./notes.md --to worker-b --caption 'Review notes'` | Send an attachment; omit a target for the shared room |
+| `chat upload ./notes.md --to worker-b --caption 'Review notes'` | Send an attachment; use `--room reviews` for a shared room or omit a target for the default |
 | `chat download 'mxc://project-one.localhost/media-id' ./received.md` | Download to a new file; refuses to overwrite |
-| `chat who` | List enrolled shared-room members |
-| `chat rooms` | Accept invitations and list joined rooms and members |
+| `chat who [--room planning]` | List members of the selected room, or the default room |
+| `chat rooms` | Accept invitations and list joined rooms, aliases, names, purposes, default, and members |
 | `node /path/to/chat.mjs --help` | Show help without requiring an identity |
 
 | Option | Applies to | Meaning |
 | --- | --- | --- |
 | `--instance NAME` | Every operation | Select the project instance; required |
 | `--agent NAME` | Every operation | Select the identity and its read positions; required |
-| `--room ID` | `read`, `history`, `send`, `upload` | Select an existing room |
+| `--room ROOM` | `read`, `history`, `send`, `upload`, `who` | Configured alias, full local alias, or Matrix room ID |
 | `--to PEER` | `send`, `upload` | Agent name, full local Matrix ID, or `admin`; mutually exclusive with `--room` |
 | `--limit N` | `read`, `history` | 1–100 timeline events per room; default 50. State events count toward the limit |
 | `--message TEXT` | `send` | Text; supply exactly one of this and `--message-file` |
@@ -397,19 +500,24 @@ flowchart LR
     end
     T -->|heartbeat| R
     S -->|loopback HTTP: messages and files| C
-    S -->|loopback HTTP: request conversation| W
+    S -->|loopback HTTP: discover rooms and request conversation| W
     H[Human using Element Web] -->|load UI| W
     H -->|loopback HTTP: chat and files| C
     C --> P[Private persistent directory on the host]
 ```
 
 The Dockerfile combines pinned Conduit, Element, and Node images. The runtime
-supervisor starts Conduit, provisions the account and room, and starts the web
+supervisor starts Conduit, provisions the human account and configured rooms, and starts the web
 service. If Conduit fails, the supervisor ends the instance. Docker publishes
 only the two configured ports, both on host address `127.0.0.1`. Listening on
 container interfaces permits Docker's forwarding; it does not publish a LAN
 listener. Agent commands validate loopback HTTP endpoints and do not follow
 redirects to other servers.
+
+The conversation service exposes an authenticated room catalog containing room
+IDs, aliases, names, purposes, and the selected default. Clients refresh it on
+each command. Room provisioning recovers by stable aliases after interrupted
+startup, and preserves removed rooms for existing participants and history.
 
 The [skill](skills/conduit-chat/SKILL.md) supplies workflow instructions. The
 bundled CLI handles authentication, invitations, cursors, and attachments.
@@ -479,6 +587,16 @@ or package installation. Paths are selected on the receiving account.
 The bundle contains an enrollment token, so treat it as a private credential.
 It contains neither the human password nor the human access token.
 
+Its complete syntax is:
+
+```text
+node /path/to/bundle/install.mts [CLIENT_JSON] [--skill-dir PATH] [--config-dir PATH] [--state-dir PATH]
+node /path/to/bundle/install.mts --help
+```
+
+If `CLIENT_JSON` is omitted, the installer reads the bundle JSON from standard
+input. The file-based command above is the usual interactive workflow.
+
 ## Updating, stopping, and backup
 
 Stop each instance before changing its configuration or updating the checkout.
@@ -528,7 +646,19 @@ The client build bundles its dependencies into `dist/chat.mjs`. Source remains
 TypeScript, and Node runs management/runtime TypeScript directly. Generated
 artifacts and local state stay out of source control.
 
+The package also provides two aliases for the management CLI:
+
+```text
+npm run crossfire -- COMMAND [ARGUMENTS...]
+npm start -- CONFIG_OR_NAME
+```
+
+`npm run build` builds the agent client bundle. `node crossfire build` builds
+the Docker runtime image. `npm start` has the same foreground lifetime as
+`node crossfire start`.
+
 For real messaging checks, create two disposable instances with distinct ports
+and at least two shared rooms in the first instance (the examples provide three),
 and run each in its own terminal. Install both for the current user, then run:
 
 ```sh
@@ -537,8 +667,16 @@ npm run verify -- --instance first-test --secondary second-test
 
 Use `--skill-dir PATH` for a custom client installation. The verifier creates
 test accounts, rooms, attachments, and messages. It checks human membership,
-permission restrictions, file round trips, independent cursors, pagination,
+permission restrictions, room discovery and purposes, default/alias routing,
+file round trips, independent cursors per agent and room, pagination,
 instance separation, and UI assets. Use instances reserved for verification.
+
+Complete verifier syntax:
+
+```text
+npm run verify -- --instance FIRST --secondary SECOND [--skill-dir PATH]
+npm run verify -- --help
+```
 
 Upstream components and references:
 

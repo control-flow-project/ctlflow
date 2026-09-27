@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util';
 import { existsSync, readFileSync, statSync, openSync, writeSync, closeSync, unlinkSync } from 'node:fs';
 import { join, basename, extname, resolve } from 'node:path';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
-import { API, CONFIG, STATE, Matrix, name, readJson, writeJson, emit, acquireProcessLock,
+import { API, CONFIG, STATE, Matrix, name, readJson, readSettings, roomCatalog, selectRoom, writeJson, emit, acquireProcessLock,
   register, segment, localUser, ensureObserver, collect,
   type Settings, type Account, type Event, type JsonObject } from './lib.ts';
 
@@ -31,6 +31,16 @@ function eventView(event: Event, room: string) {
     timestamp: event.origin_server_ts === undefined ? undefined : new Date(event.origin_server_ts).toISOString() };
 }
 
+async function sharedRooms(client: Matrix, settings: Settings): Promise<void> {
+  const catalog = roomCatalog(await new Matrix(settings.room_service, client.token).get('/_coord/rooms'));
+  Object.assign(settings, catalog);
+  const joined = new Set((await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms')).joined_rooms);
+  for (const room of settings.rooms) {
+    if (!joined.has(room.room_id)) await client.post(`${API}/join/${segment(room.room_id)}`, {});
+    await ensureObserver(client, room.room_id, settings);
+  }
+}
+
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     instance: { type: 'string' }, agent: { type: 'string' }, room: { type: 'string' },
@@ -39,17 +49,18 @@ async function main(): Promise<void> {
   } });
   if (values.help) {
     console.log('chat --instance NAME --agent NAME COMMAND\n'
-      + 'init                                Register/reuse this identity and announce it\n'
-      + 'read [--room ID] [--limit 1..100]    Read unread events and save cursors\n'
-      + 'history [--room ID] [--limit 1..100] Read recent messages without moving cursors\n'
-      + 'send --message TEXT [--to PEER|--room ID] [--txn ID]\n'
-      + 'send --message-file FILE [--to PEER|--room ID] [--txn ID]\n'
-      + 'upload FILE [--to PEER|--room ID] [--caption TEXT] [--txn ID]\n'
+      + 'init                                Join configured shared rooms and announce this identity\n'
+      + 'read [--room ROOM] [--limit 1..100]    Read unread events and save cursors\n'
+      + 'history [--room ROOM] [--limit 1..100] Read recent messages without moving cursors\n'
+      + 'send --message TEXT [--to PEER|--room ROOM] [--txn ID]\n'
+      + 'send --message-file FILE [--to PEER|--room ROOM] [--txn ID]\n'
+      + 'upload FILE [--to PEER|--room ROOM] [--caption TEXT] [--txn ID]\n'
       + 'download MXC NEW_FILE');
-    console.log('who                                 List shared-room members\n'
-      + 'rooms                               List joined rooms and their members\n'
+    console.log('who [--room ROOM]                    List members of a shared room\n'
+      + 'rooms                               List rooms, aliases, purposes, and members\n'
       + '--help                              Show this command list\n'
-      + 'PEER is an agent name, a local Matrix ID, or admin. Without a target, send/upload use the shared room.');
+      + 'ROOM is a configured alias, full local alias, or Matrix room ID.\n'
+      + 'PEER is an agent name, a local Matrix ID, or admin. Untargeted send/upload/history/who use default_room.');
     return;
   }
   const instance = name(values.instance ?? '');
@@ -60,7 +71,7 @@ async function main(): Promise<void> {
   if (values.to && values.room) throw new Error('Choose --to or --room, not both');
   const limit = Number(values.limit ?? '50');
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('--limit must be 1..100');
-  const settings = readJson<Settings>(join(CONFIG, 'instances', instance + '.json'));
+  const settings = readSettings(join(CONFIG, 'instances', instance + '.json'));
   if (settings.instance !== instance) throw new Error('Instance configuration identity mismatch');
   const profile = join(CONFIG, 'accounts', instance, agent + '.json');
   const state = join(STATE, instance, agent);
@@ -77,20 +88,23 @@ async function main(): Promise<void> {
     }
     const client = new Matrix(settings.homeserver, account.access_token);
     await client.put(`${API}/profile/${segment(account.user_id)}/displayname`, { displayname: agent });
-    await client.post(`${API}/join/${segment(settings.room_id)}`, {});
-    await ensureObserver(client, settings.room_id, settings);
-    await client.put(`${API}/rooms/${segment(settings.room_id)}/send/m.room.message/enrolled-${agent}`, {
+    await sharedRooms(client, settings);
+    account.announcement_room_id ??= selectRoom(settings);
+    writeJson(profile, account);
+    await ensureObserver(client, account.announcement_room_id, settings);
+    await client.put(`${API}/rooms/${segment(account.announcement_room_id)}/send/m.room.message/enrolled-${agent}`, {
       msgtype: 'm.notice', body: `${agent} connected.\nWorkspace: ${account.workspace}`,
     });
-    emit({ instance, agent, user_id: account.user_id, room_id: settings.room_id });
+    emit({ instance, agent, user_id: account.user_id, default_room: settings.default_room, rooms: settings.rooms });
     return;
   }
 
   const account = readJson<Account>(profile);
   const client = new Matrix(settings.homeserver, account.access_token);
+  await sharedRooms(client, settings);
   if (command === 'read') {
     await acceptInvites(client, settings, account);
-    const rooms = values.room ? [values.room] : (await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms')).joined_rooms;
+    const rooms = values.room ? [selectRoom(settings, values.room)] : (await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms')).joined_rooms;
     const cursorFile = join(state, 'cursors.json');
     const cursors = existsSync(cursorFile) ? readJson<Record<string, string>>(cursorFile) : {};
     const events: ReturnType<typeof eventView>[] = [];
@@ -111,12 +125,12 @@ async function main(): Promise<void> {
     emit({ instance, agent, events, more: moreRooms.length > 0, more_rooms: moreRooms });
     writeJson(cursorFile, cursors);
   } else if (command === 'history') {
-    const room = values.room ?? settings.room_id;
+    const room = selectRoom(settings, values.room);
     await ensureObserver(client, room, settings);
     const page = await client.get<Page>(`${API}/rooms/${segment(room)}/messages`, { dir: 'b', limit });
     emit({ instance, room_id: room, events: page.chunk.reverse().filter(e => e.type === 'm.room.message').map(e => eventView(e, room)) });
   } else if (command === 'send' || command === 'upload') {
-    let room = values.room ?? settings.room_id;
+    let room = selectRoom(settings, values.room);
     if (values.to) {
       const broker = new Matrix(settings.room_service, account.access_token);
       room = (await broker.post<{ room_id: string }>('/_coord/dm', { recipient: localUser(values.to, settings) })).room_id;
@@ -179,16 +193,23 @@ async function main(): Promise<void> {
     finally { closeSync(fd); }
     emit({ instance, path: resolve(destination), bytes: size, sha256: hash.digest('hex') });
   } else if (command === 'who') {
-    emit({ instance, members: await ensureObserver(client, settings.room_id, settings) });
+    const room = selectRoom(settings, values.room);
+    emit({ instance, room_id: room, members: await ensureObserver(client, room, settings) });
   } else {
     await acceptInvites(client, settings, account);
     const rooms = [];
     for (const room of (await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms')).joined_rooms) {
       const members = await ensureObserver(client, room, settings);
       const title = await client.get<{ name: string }>(`${API}/rooms/${segment(room)}/state/m.room.name`);
-      rooms.push({ room_id: room, name: title.name, members: Object.keys(members) });
+      const topic = await client.get<{ topic?: string }>(`${API}/rooms/${segment(room)}/state/m.room.topic`).catch(error => {
+        if (error instanceof Error && 'status' in error && error.status === 404) return { topic: '' };
+        throw error;
+      });
+      const configured = settings.rooms.find(entry => entry.room_id === room);
+      rooms.push({ room_id: room, alias: configured?.alias, name: title.name, purpose: topic.topic ?? '',
+        configured: !!configured, default: configured?.alias === settings.default_room, members: Object.keys(members) });
     }
-    emit({ instance, rooms });
+    emit({ instance, default_room: settings.default_room, rooms });
   }
   } finally { await release?.(); }
 }

@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { ROOT, DATA, INSTANCES, CONFIGURATIONS, validate, type InstanceConfig } from './instance.ts';
 import { configure } from './bootstrap.ts';
 import { HEARTBEAT_INTERVAL_MS } from './lease.ts';
-import { name, readJson, writeJson, emit, acquireProcessLock, type Settings } from '../skills/conduit-chat/scripts/lib.ts';
+import { name, readJson, readSettings, roomCatalog, writeJson, emit, acquireProcessLock } from '../skills/conduit-chat/scripts/lib.ts';
 
 const runtimeFiles = ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json',
   'scripts/bootstrap.ts', 'scripts/container.ts', 'scripts/instance.ts', 'scripts/room-service.ts',
@@ -75,9 +75,9 @@ export function runArguments(config: InstanceConfig, folder: string, image: stri
     image, '--instance', config.id];
 }
 function details(instance: string) {
-  const settings = readJson<Settings>(join(INSTANCES, name(instance), 'private/settings.json'));
+  const settings = readSettings(join(INSTANCES, name(instance), 'private/settings.json'));
   return { instance, ui: settings.room_service, homeserver: settings.homeserver, observer: settings.observer,
-    room_id: settings.room_id, container: containerName(instance), data_directory: join(INSTANCES, instance),
+    default_room: settings.default_room, rooms: settings.rooms, container: containerName(instance), data_directory: join(INSTANCES, instance),
     login_file: join(INSTANCES, instance, 'private/web-login.txt') };
 }
 async function waitReady(config: InstanceConfig, runId: string, signal: AbortSignal): Promise<void> {
@@ -93,7 +93,8 @@ async function waitReady(config: InstanceConfig, runId: string, signal: AbortSig
   throw new Error('Instance did not become ready; see the container output');
 }
 async function start(path: string): Promise<void> {
-  const config = validate(readJson<unknown>(path));
+  const original = readJson<unknown>(path);
+  const config = validate(original);
   const image = await buildImage();
   const release = await acquireProcessLock(join(INSTANCES, config.id, 'running'));
   let controller: AbortController | undefined;
@@ -120,6 +121,7 @@ async function start(path: string): Promise<void> {
     const configureRelease = await acquireProcessLock(join(INSTANCES, 'configure'));
     let privatePath: string;
     try { ({ privatePath } = configure(config)); } finally { await configureRelease(); }
+    if (original && typeof original === 'object' && 'room' in original) writeJson(path, config);
     const runId = randomUUID();
     let sequence = 0;
     tick = (stopped = false) => writeJson(join(privatePath, 'lease.json'), { run_id: runId, sequence: sequence++, stopped });
@@ -152,15 +154,16 @@ async function start(path: string): Promise<void> {
   }
 }
 function clientBundle(instance: string) {
-  const settings = readJson<Settings>(join(INSTANCES, name(instance), 'private/settings.json'));
-  if (!settings.room_id) throw new Error('Wait for the instance to finish starting before installing its client');
+  const settings = readSettings(join(INSTANCES, name(instance), 'private/settings.json'));
+  if (settings.rooms.some(room => !room.room_id)) throw new Error('Wait for the instance to finish starting before installing its client');
+  roomCatalog(settings);
   const built = spawnSync(process.execPath, [join(ROOT, 'scripts/build-client.ts')], { encoding: 'utf8' });
   if (built.status !== 0) throw new Error(built.stderr || 'Client build failed; run npm ci in the checkout');
   const source = join(ROOT, 'skills/conduit-chat');
   const files: Record<string, string> = {};
   for (const file of ['SKILL.md', 'scripts/chat', 'scripts/package.json']) files[file] = readFileSync(join(source, file), 'utf8');
   files['scripts/chat.mjs'] = readFileSync(join(ROOT, 'dist/chat.mjs'), 'utf8');
-  return { format: 2, settings, files };
+  return { format: 3, settings, files };
 }
 function installClient(instance: string, options: Record<string, string | boolean | undefined>): void {
   const args = [join(ROOT, 'scripts/install-client.ts')];
@@ -207,7 +210,8 @@ export async function main(): Promise<void> {
     const path = join(CONFIGURATIONS, id + '.json');
     if (existsSync(path)) throw new Error('Configuration already exists: ' + path);
     const config = readJson<InstanceConfig>(join(ROOT, 'examples/project-one.json'));
-    config.id = id; config.server_name = id + '.localhost'; config.label = id + ' agents'; config.room.name = id + ' coordination';
+    config.id = id; config.server_name = id + '.localhost'; config.label = id + ' agents';
+    for (const room of config.rooms) room.name = id + ' ' + room.alias;
     if (values['matrix-port']) config.matrix_port = Number(values['matrix-port']);
     if (values['web-port']) config.web_port = Number(values['web-port']);
     writeJson(path, validate(config)); emit({ instance: id, configuration: path });
