@@ -24,7 +24,7 @@ export function onboarding(settings: Settings): string {
   const args = bootstrapArguments(settings);
   const command = `node --input-type=module -e "${args[2]}" crossfire-install "${args[4]}"`;
   return [
-    '', 'CLIENT ONBOARDING — copy this block to each agent:',
+    '', '======', 'CLIENT ONBOARDING — copy this block to each agent:',
     `Instance: ${settings.instance}`,
     'Run this command as the local user running the agent (Node.js 22.18+):',
     command,
@@ -34,5 +34,6 @@ export function onboarding(settings: Settings): string {
     'Installation can be repeated; existing accounts and unread positions are preserved.',
     'This command contains an enrollment credential. Share it only with intended local clients.',
     `Print these instructions again with: node crossfire onboarding ${settings.instance}`,
+    '======',
   ].join('\n');
 }
