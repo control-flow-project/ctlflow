@@ -1,0 +1,30 @@
+{
+  "name": "crossfire",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "crossfire": "./crossfire"
+  },
+  "type": "module",
+  "description": "Local, human-observed coordination for manually started agents",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "build": "node scripts/build-client.ts",
+    "test": "node --test scripts/*.test.ts",
+    "crossfire": "node crossfire",
+    "typecheck": "tsc --noEmit",
+    "start": "node scripts/manage.ts start",
+    "verify": "node scripts/verify.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/proper-lockfile": "4.1.4",
+    "esbuild": "0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "proper-lockfile": "4.1.2"
+  }
+}

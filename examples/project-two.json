@@ -1,0 +1,14 @@
+{
+  "id": "project-two",
+  "label": "Project Two agents",
+  "server_name": "project-two.localhost",
+  "matrix_port": 6169,
+  "web_port": 8089,
+  "observer": {"username": "coordinator", "display_name": "Coordinator"},
+  "room": {
+    "alias": "coordination",
+    "name": "Project Two coordination",
+    "topic": "Shared coordination. The human coordinator participates in every direct conversation."
+  },
+  "max_upload_bytes": 104857600
+}
