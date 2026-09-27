@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { Lease, LEASE_TIMEOUT_MS } from './lease.ts';
 import { runArguments } from './manage.ts';
 import { ROOT, validate, type InstanceConfig } from './instance.ts';
-import { readSettings, roomCatalog, selectRoom } from '../skills/conduit-chat/scripts/lib.ts';
+import { readSettings, roomCatalog, selectRoom, type JsonObject } from '../skills/conduit-chat/scripts/lib.ts';
 
 const execute = promisify(execFile);
 const example = (): InstanceConfig => JSON.parse(readFileSync(join(ROOT, 'examples/project-one.json'), 'utf8'));
@@ -58,13 +58,19 @@ test('exported client installs with custom paths, survives reinstall, and runs o
   const adminToken = randomUUID();
   const controlSecret = randomUUID(), controlToken = randomUUID();
   let authorizedRequests = 0;
-  const server = createServer((request, response) => {
+  const sent: JsonObject[] = [];
+  const server = createServer(async (request, response) => {
     if (request.headers.authorization !== 'Bearer ' + accessToken) { response.writeHead(401); response.end('{}'); return; }
     authorizedRequests++;
     response.setHeader('Content-Type', 'application/json');
     if (request.url === '/_coord/rooms') response.end(JSON.stringify({ default_room: settings.default_room, rooms: settings.rooms }));
     else if (request.url === '/_matrix/client/v3/joined_rooms') response.end(JSON.stringify({ joined_rooms: settings.rooms.map(room => room.room_id) }));
-    else response.end(JSON.stringify({ joined: { '@coordinator:project-one.localhost': {}, '@agent-worker-a:project-one.localhost': {} } }));
+    else if (request.method === 'PUT' && request.url?.includes('/send/m.room.message/')) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      sent.push(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      response.end(JSON.stringify({ event_id: '$sent-' + sent.length }));
+    } else response.end(JSON.stringify({ joined: { '@coordinator:project-one.localhost': {}, '@agent-worker-a:project-one.localhost': {} } }));
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
@@ -96,6 +102,22 @@ test('exported client installs with custom paths, survives reinstall, and runs o
   const result = await execute(process.execPath, [join(skill, 'scripts/chat.mjs'), '--instance', 'project-one', '--agent', 'worker-a', 'who'], { cwd: workspace });
   assert(authorizedRequests > 0);
   assert(JSON.parse(result.stdout).members[settings.observer]);
+  const body = '# Status\n\n**Done**\n\n```typescript\nconst value = "<&>";\n```';
+  const messagePath = join(workspace, 'message.md');
+  writeFileSync(messagePath, body);
+  const client = [join(skill, 'scripts/chat.mjs'), '--instance', 'project-one', '--agent', 'worker-a', 'send'];
+  await execute(process.execPath, [...client, '--message', body], { cwd: workspace });
+  await execute(process.execPath, [...client, '--message-file', messagePath], { cwd: workspace });
+  assert.equal(sent.length, 2);
+  assert.deepEqual(sent[0], sent[1]);
+  assert.equal(sent[0].body, body);
+  assert.equal(sent[0].format, 'org.matrix.custom.html');
+  assert.match(String(sent[0].formatted_body), /<h1>Status<\/h1>/);
+  assert.match(String(sent[0].formatted_body), /<code class="language-typescript">/);
+  assert.match(String(sent[0].formatted_body), /&lt;&amp;&gt;/);
+  writeFileSync(messagePath, 'x'.repeat(30_000));
+  await assert.rejects(execute(process.execPath, [...client, '--message-file', messagePath], { cwd: workspace }), /Rendered message exceeds/);
+  assert.equal(sent.length, 2);
   assert.deepEqual(JSON.parse(readFileSync(join(skill, 'scripts/.client-paths.json'), 'utf8')), { config_dir: config, state_dir: state });
   if (process.platform !== 'win32') assert.equal(statSync(join(config, 'instances/project-one.json')).mode & 0o777, 0o600);
 });

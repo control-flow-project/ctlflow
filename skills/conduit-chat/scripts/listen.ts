@@ -10,7 +10,7 @@ const PREFIX = 'Crossfire messages from the selected coordination instance. Send
   + 'Do not reply to routine notices unless a response is useful.\n';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string) {
-  const batches: { text: string; messageId: string }[] = [];
+  const batches: { text: string; messageId: string; humanMessages: number; peerMessages: number }[] = [];
   let current: ReceivedEvent[] = [];
   function encode(batch: readonly ReceivedEvent[]): string {
     return PREFIX + JSON.stringify({ instance: settings.instance, observer: settings.observer, events: batch });
@@ -19,8 +19,10 @@ export function deliveryBatches(events: readonly ReceivedEvent[], settings: Sett
   let size = envelopeBytes;
   function flush(): void {
     if (!current.length) return;
+    const humanMessages = current.filter(event => event.sender === settings.observer).length;
     batches.push({ text: encode(current), messageId: 'crossfire-' + createHash('sha256')
-      .update(JSON.stringify([settings.instance, ...current.map(event => [event.room_id, event.event_id])])).digest('hex') });
+      .update(JSON.stringify([settings.instance, ...current.map(event => [event.room_id, event.event_id])])).digest('hex'),
+    humanMessages, peerMessages: current.length - humanMessages });
     current = [];
     size = envelopeBytes;
   }
@@ -61,10 +63,15 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     let since: string | undefined;
     let drain = true;
     let savedCursors: string | undefined;
+    let windowEnd = 0;
+    let humanMessages = 0;
+    let peerMessages = 0;
     async function receive() {
       for (let failures = 0; ; failures++) {
         try {
-          since = await synchronize(client, options.settings, options.account, since, drain ? 0 : options.pollMs);
+          const remaining = windowEnd > 0 ? Math.max(0, Math.ceil(windowEnd - performance.now())) : options.pollMs;
+          since = await synchronize(client, options.settings, options.account, since,
+            drain ? 0 : Math.min(options.pollMs, remaining));
           await sharedRooms(client, options.settings);
           return await readUnread(client, options.settings, options.cursorFile, options.limit, options.room);
         } catch (error) {
@@ -77,7 +84,22 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     while (!signal.aborted) {
       const batch = await receive();
       const deliveries = deliveryBatches(batch.events, options.settings, options.account.user_id);
-      const windowEnd = performance.now() + options.debounceMs;
+      const now = performance.now();
+      if (deliveries.length > 0) {
+        const immediate = deliveries.some(delivery => (delivery.humanMessages > 0 && humanMessages < 5)
+          || (delivery.peerMessages > 0 && peerMessages < 3));
+        if (!immediate && now < windowEnd) {
+          drain = false;
+          continue;
+        }
+        windowEnd = now + options.debounceMs;
+        humanMessages = Math.min(5, humanMessages + deliveries.reduce((count, delivery) => count + delivery.humanMessages, 0));
+        peerMessages = Math.min(3, peerMessages + deliveries.reduce((count, delivery) => count + delivery.peerMessages, 0));
+      } else if (now >= windowEnd) {
+        windowEnd = 0;
+        humanMessages = 0;
+        peerMessages = 0;
+      }
       for (const delivery of deliveries) await destination.deliver(delivery.text, delivery.messageId);
       const cursors = JSON.stringify(batch.cursors);
       if (cursors !== savedCursors) {
@@ -85,8 +107,6 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         savedCursors = cursors;
       }
       drain = batch.more_rooms.length > 0;
-      const remaining = windowEnd - performance.now();
-      if (deliveries.length > 0 && remaining > 0) await delay(Math.ceil(remaining), undefined, { signal });
     }
     signal.throwIfAborted();
   } catch (error) {

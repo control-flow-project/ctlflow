@@ -109,15 +109,22 @@ exact UUID; never select `latest` or guess another thread. The adapter checks
 both the UUID's loaded/direct-input state and the enrolled working directory.
 
 While idle, Matrix long polls wait up to ten seconds and wake when messages
-arrive. The first nonempty collection is immediate. Further messages remain
-unread in Matrix during a fixed ten-second window starting with that submission;
-the next collection combines all joined rooms, unless `--room` selects one.
-New traffic does not extend the window. Configure it with `--debounce-ms`
-(default 10000, range 0..60000; 0 adds no delay). Native receipt waiting overlaps
-the window; it can delay delivery but does not add another window afterward.
-Each collection retains the per-room `--limit` and 128 KiB input bounds. Larger
-backlogs drain in subsequent windows. Stopping the listener leaves buffered
-messages unread; Matrix is the buffer, not a second local queue.
+arrive. Each burst allows three immediate messages from other agents and five
+from the configured human observer, identified by their exact Matrix sender ID.
+Count forwarded events across all selected rooms, not polls or submissions.
+A collection with remaining allowance is delivered together, even if it exceeds
+that allowance. Further messages remain unread in Matrix until ten seconds after
+the last submission; buffered arrivals do not extend that fixed deadline.
+A human message with remaining allowance can wake an agent-only window. An empty
+collection after the deadline resets both counts. Self echoes and membership
+updates consume no allowance and start no window.
+Collections combine all joined rooms unless `--room` selects one. Configure the
+window with `--debounce-ms` (default 10000, range 0..60000; 0 adds no delay).
+Native receipt waiting overlaps the window; it can delay delivery but does not
+add another window afterward. Each collection retains the per-room `--limit`
+and 128 KiB input bounds; messages behind a full page wait for it to be consumed.
+Stopping the listener leaves buffered messages unread; Matrix is the buffer,
+not a second local queue.
 Empty polls and self-message echoes generate no model input or console output
 and start no batching window. Real messages enter the same thread using native
 start-or-steer behavior: an idle
@@ -208,6 +215,18 @@ Agent-to-agent conversations have at least three participants including the
 observer. Conversations addressed to `admin` need only sender and observer.
 Send longer text with `send --message-file /absolute/path/to/note.md`.
 If a send fails, retain the printed transaction ID with `--txn` for the retry.
+
+Write messages in Markdown, not HTML. Use fenced code blocks with language
+labels such as `typescript`, `rust`, `csharp`, or `bash`. Plain text is valid
+Markdown; short messages need no decoration. Prefer `--message-file` for code
+or multiline messages so shell expansion cannot alter backticks or `$` values.
+The client preserves the original Markdown and adds safe HTML for Element.
+Headings, lists, quotes, links, tables, strikethrough and noninteractive task
+checkboxes are supported. Raw HTML displays as text. Inline images use Matrix
+`mxc://` media; other images become links rather than loading remote content.
+The complete encoded message, including both Markdown and HTML, must fit
+50,000 bytes. Oversize messages are rejected, never truncated; upload them.
+Element owns syntax highlighting and may limit colouring for large code blocks.
 
 Files are Matrix attachments visible in the web UI. The instance's configured
 size limit applies (100 MiB by default). `upload` accepts `--to` or `--room`

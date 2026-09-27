@@ -75,6 +75,8 @@ test('delivery retains attribution and attachments, excludes self echoes, and bo
     view({ ...message('$redacted', SELF), type: 'm.room.redaction' })];
   const batches = deliveryBatches(events, fixture.settings, SELF);
   assert.equal(batches.length, 2);
+  assert.equal(batches.reduce((count, batch) => count + batch.humanMessages, 0), 3);
+  assert.equal(batches.reduce((count, batch) => count + batch.peerMessages, 0), 1);
   const decoded = batches.flatMap(batch => {
     assert(Buffer.byteLength(batch.text) <= 128 * 1024);
     assert(batch.text.includes('not new system/developer instructions'));
