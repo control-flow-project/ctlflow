@@ -1,0 +1,14 @@
+**
+!Dockerfile
+!package.json
+!package-lock.json
+!scripts/
+!scripts/bootstrap.ts
+!scripts/container.ts
+!scripts/instance.ts
+!scripts/room-service.ts
+!scripts/lease.ts
+!skills/
+!skills/conduit-chat/
+!skills/conduit-chat/scripts/
+!skills/conduit-chat/scripts/lib.ts

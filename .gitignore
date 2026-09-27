@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Crossfire local runtime and private instance state
+private/
+data/
+instances/
+verification/
+.client-paths.json

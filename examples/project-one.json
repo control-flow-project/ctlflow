@@ -1,0 +1,14 @@
+{
+  "id": "project-one",
+  "label": "Project One agents",
+  "server_name": "project-one.localhost",
+  "matrix_port": 6167,
+  "web_port": 8088,
+  "observer": {"username": "coordinator", "display_name": "Coordinator"},
+  "room": {
+    "alias": "coordination",
+    "name": "Project One coordination",
+    "topic": "Shared coordination. The human coordinator participates in every direct conversation."
+  },
+  "max_upload_bytes": 104857600
+}
