@@ -99,15 +99,15 @@ test('exported client installs with custom paths, survives reinstall, and runs o
   assert.deepEqual(JSON.parse(readFileSync(accountPath, 'utf8')), account);
   assert(!existsSync(join(skill, 'node_modules')));
   assert(!existsSync(join(skill, 'scripts/node_modules')));
-  const result = await execute(process.execPath, [join(skill, 'scripts/chat.mjs'), '--instance', 'project-one', '--agent', 'worker-a', 'who'], { cwd: workspace });
+  const result = await execute(process.execPath, [join(skill, 'scripts/chat.mjs'), '--instance', 'project-one', '--agent', 'worker-a', 'matrix', 'get-joined-members-by-room', '--room-id', settings.rooms[0].room_id], { cwd: workspace });
   assert(authorizedRequests > 0);
-  assert(JSON.parse(result.stdout).members[settings.observer]);
+  assert(JSON.parse(result.stdout).joined[settings.observer]);
   const body = '# Status\n\n**Done**\n\n```typescript\nconst value = "<&>";\n```';
   const messagePath = join(workspace, 'message.md');
   writeFileSync(messagePath, body);
-  const client = [join(skill, 'scripts/chat.mjs'), '--instance', 'project-one', '--agent', 'worker-a', 'send'];
-  await execute(process.execPath, [...client, '--message', body], { cwd: workspace });
-  await execute(process.execPath, [...client, '--message-file', messagePath], { cwd: workspace });
+  const client = [join(skill, 'scripts/chat.mjs'), '--instance', 'project-one', '--agent', 'worker-a', 'matrix', 'send-message', '--room-id', settings.rooms[0].room_id, '--event-type', 'm.room.message'];
+  await execute(process.execPath, [...client, '--markdown', body], { cwd: workspace });
+  await execute(process.execPath, [...client, '--markdown-file', messagePath], { cwd: workspace });
   assert.equal(sent.length, 2);
   assert.deepEqual(sent[0], sent[1]);
   assert.equal(sent[0].body, body);
@@ -116,13 +116,13 @@ test('exported client installs with custom paths, survives reinstall, and runs o
   assert.match(String(sent[0].formatted_body), /<code class="language-typescript">/);
   assert.match(String(sent[0].formatted_body), /&lt;&amp;&gt;/);
   writeFileSync(messagePath, 'x'.repeat(30_000));
-  await assert.rejects(execute(process.execPath, [...client, '--message-file', messagePath], { cwd: workspace }), /Rendered message exceeds/);
+  await assert.rejects(execute(process.execPath, [...client, '--markdown-file', messagePath], { cwd: workspace }), /Rendered message exceeds/);
   assert.equal(sent.length, 2);
   assert.deepEqual(JSON.parse(readFileSync(join(skill, 'scripts/.client-paths.json'), 'utf8')), { config_dir: config, state_dir: state });
   if (process.platform !== 'win32') assert.equal(statSync(join(config, 'instances/project-one.json')).mode & 0o777, 0o600);
 });
 
-test('room configuration rejects ambiguous destinations and migrates a legacy room without changing its identity', t => {
+test('room configuration rejects ambiguous destinations and superseded single-room forms', t => {
   const config = example();
   assert.equal(validate(config).rooms.length, 3);
   assert.throws(() => validate({ ...config, rooms: [] }), /nonempty/);
@@ -131,19 +131,20 @@ test('room configuration rejects ambiguous destinations and migrates a legacy ro
   assert.throws(() => validate({ ...config, rooms: [{ ...config.rooms[0], purpose: '' }] }), /Display text/);
   const { rooms, default_room, ...base } = config;
   const legacy = { ...base, room: { alias: 'existing', name: 'Existing room', topic: 'Existing purpose' } };
-  assert.deepEqual(validate(legacy), { ...base, default_room: 'existing', rooms: [{ alias: 'existing', name: 'Existing room', purpose: 'Existing purpose' }] });
+  assert.throws(() => validate(legacy), /Required fields/);
   assert.throws(() => validate({ ...legacy, rooms }), /Required fields/);
   const temporary = mkdtempSync(join(tmpdir(), 'crossfire-migration-'));
   t.after(() => rmSync(temporary, { recursive: true, force: true }));
   const path = join(temporary, 'settings.json');
   writeFileSync(path, JSON.stringify({ server_name: 'project-one.localhost', room_id: '!original', room_alias: '#existing:project-one.localhost' }));
-  const migrated = readSettings(path);
-  assert.equal(selectRoom(migrated), '!original');
-  assert.equal(selectRoom(migrated, 'existing'), '!original');
-  assert.equal(selectRoom(migrated, '#existing:project-one.localhost'), '!original');
-  assert.equal(selectRoom(migrated, '!direct-conversation'), '!direct-conversation');
-  assert.throws(() => selectRoom(migrated, 'typo'), /Unknown room/);
-  const settings = { ...migrated, default_room, rooms: rooms.map((room, index) => ({ ...room, room_id: '!room-' + index })) };
+  assert.throws(() => readSettings(path), /Invalid room catalog/);
+  const settings = { ...config, instance: config.id, homeserver: 'http://127.0.0.1:8000', room_service: 'http://127.0.0.1:8001',
+    observer: '@human:project-one.localhost', observer_label: 'Human', registration_token: 'test', default_room,
+    rooms: rooms.map((room, index) => ({ ...room, room_id: '!room-' + index })) };
+  assert.equal(selectRoom(settings, '!direct-conversation'), '!direct-conversation');
+  assert.throws(() => selectRoom(settings, 'typo'), /Unknown room/);
+  writeFileSync(path, JSON.stringify(settings));
+  assert.deepEqual(readSettings(path), settings);
   assert.equal(selectRoom(settings), selectRoom({ ...settings, rooms: [...settings.rooms].reverse() }));
   assert.throws(() => roomCatalog({ ...settings, rooms: [settings.rooms[0], { ...settings.rooms[1], room_id: settings.rooms[0].room_id }] }), /Duplicate/);
 });

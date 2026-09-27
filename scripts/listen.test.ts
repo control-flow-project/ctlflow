@@ -36,7 +36,7 @@ test('listener long-polls silently, wakes promptly, drains backlog, and checkpoi
   assert.deepEqual(ids, Array.from({ length: 7 }, (_, index) => '$' + index));
   const polls = matrix.requests.filter(request => request.path === API + '/sync');
   assert(polls.some(request => request.query.get('timeout') === '100'));
-  assert(polls.filter(request => request.query.get('timeout') === '0').length >= 4);
+  assert(polls.length >= 4);
   assert(native.requests().every(request => !['thread/start', 'thread/resume', 'thread/fork'].includes(request.method ?? '')));
   controller.abort(new Error('test complete'));
   assert.match(String(await result), /test complete/);
@@ -74,15 +74,15 @@ test('active-turn acceptance leaves messages unread until native receipt, includ
   const controller = new AbortController();
   const result = listen({ ...matrix, limit: 1, pollMs: 100, debounceMs: 0, codex: native.options }, controller.signal).catch(error => error);
   context.after(async () => { controller.abort(new Error('test complete')); await result; });
-  await until(() => matrix.waiting() === 1);
+  await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
   matrix.add(ROOM, message('$first'), message('$second'));
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
   await until(() => starts().length === 1);
-  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: '0' });
+  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: 'sync-0' });
   native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
   await until(() => starts().length === 2);
   assert.deepEqual(starts()[0].params, starts()[1].params);
-  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: '0' });
+  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: 'sync-0' });
   const accepted = starts()[1].params!;
   native.update({ mode: 'normal' });
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(accepted.clientUserMessageId), accepted.input) });
@@ -95,6 +95,7 @@ test('transient Matrix errors retry bounded reads, never replaying acknowledged 
   const native = await fakeCodex(t);
   const matrix = await matrixFixture(t, native.directory);
   matrix.failures.set(API + '/sync', [503, 429]);
+  matrix.subscribe(ROOM);
   matrix.add(ROOM, message('$one'));
   const controller = new AbortController();
   const result = listen({ ...matrix, limit: 50, pollMs: 100, debounceMs: 0, codex: native.options }, controller.signal).catch(error => error);
@@ -115,7 +116,7 @@ test('permanent Matrix errors, observer failures, and oversized messages stop wi
     if (kind === 'observer') matrix.missingObserver.add(ROOM);
     matrix.add(ROOM, message('$one', undefined, kind === 'oversized' ? 'x'.repeat(128 * 1024) : 'normal'));
     await assert.rejects(listen({ ...matrix, limit: 50, pollMs: 100, debounceMs: 0, codex: native.options }, new AbortController().signal),
-      kind === 'authentication' ? /HTTP 401/ : kind === 'observer' ? /observer/ : /exceeds the 128 KiB/);
+      kind === 'authentication' ? /HTTP 401/ : kind === 'observer' ? /observer/ : /65536-byte/);
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
     assert.equal(existsSync(matrix.cursorFile), false);
   }
@@ -125,7 +126,7 @@ test('CLI runs independently, emits nothing on idle polls, rejects concurrent re
   const native = await fakeCodex(t);
   const matrix = await matrixFixture(t, native.directory);
   const base = [join(ROOT, 'skills/conduit-chat/scripts/chat.ts'), '--instance', 'test', '--agent', 'watson'];
-  const args = [...base, 'listen', '--thread', THREAD, '--codex-binary', native.options.binary, '--poll-ms', '100'];
+  const args = [...base, 'agent', 'listen', '--thread', THREAD, '--codex-binary', native.options.binary, '--poll-ms', '100'];
   const child = spawn(process.execPath, args, { env: matrix.env, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '', errors = '';
   child.stdout.on('data', chunk => { output += String(chunk); });
@@ -134,18 +135,18 @@ test('CLI runs independently, emits nothing on idle polls, rejects concurrent re
   t.after(async () => { child.kill('SIGTERM'); await stopped; });
   await until(() => matrix.waiting() === 1, errors);
   for (const command of ['read', 'init']) {
-    await assert.rejects(execute(process.execPath, [...base, command], { env: matrix.env }), /already being held/);
+    await assert.rejects(execute(process.execPath, [...base, 'agent', command], { env: matrix.env }), /already being held/);
   }
   await assert.rejects(execute(process.execPath, args, { env: matrix.env }), /already being held/);
-  const who = await execute(process.execPath, [...base, 'who'], { env: matrix.env });
-  assert(JSON.parse(who.stdout).members[SELF]);
+  const who = await execute(process.execPath, [...base, 'matrix', 'get-joined-members-by-room', '--room-id', ROOM], { env: matrix.env });
+  assert(JSON.parse(who.stdout).joined[SELF]);
   matrix.add(ROOM, message('$one'));
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   await delay(110);
   assert.equal(output, ''); assert.equal(errors, '');
   child.kill('SIGTERM');
   assert.deepEqual(await stopped, [0, null]);
-  const read = await execute(process.execPath, [...base, 'read'], { env: matrix.env });
+  const read = await execute(process.execPath, [...base, 'agent', 'read'], { env: matrix.env });
   assert.deepEqual(JSON.parse(read.stdout).events, []);
 });
 
@@ -155,7 +156,7 @@ test('CLI validates listener-only controls before network use', async () => {
     ['listen', '--thread', THREAD, '--poll-ms', '0'], ['listen', '--thread', THREAD, '--poll-ms', '30001'],
     ['listen', '--thread', THREAD, '--request-timeout-ms', 'Infinity'], ['read', '--debounce-ms', '10000'],
     ...['', ' ', 'NaN', 'Infinity', '-1', '0.5', '60001'].map(value => ['listen', '--thread', THREAD, '--debounce-ms=' + value])]) {
-    await assert.rejects(execute(process.execPath, [...base, ...args]), /Listener options|listen requires|must be/);
+    await assert.rejects(execute(process.execPath, [...base, 'agent', ...args]), /Unsupported option|listen requires|must be/);
   }
 });
 
@@ -173,7 +174,7 @@ test('the documented Linux detached launcher survives its parent and records the
   });
   await execute('setsid', ['--fork', 'sh', '-c', 'printf "%s\\n" "$$" > "$1"; shift; exec "$@" >/dev/null 2>&1 < /dev/null',
     'crossfire-listener', pidFile, process.execPath, join(ROOT, 'skills/conduit-chat/scripts/chat.ts'),
-    '--instance', 'test', '--agent', 'watson', 'listen', '--thread', THREAD, '--codex-binary', native.options.binary,
+    '--instance', 'test', '--agent', 'watson', 'agent', 'listen', '--thread', THREAD, '--codex-binary', native.options.binary,
     '--poll-ms', '100'], { env: matrix.env });
   await until(() => matrix.waiting() === 1);
   const pid = Number(readFileSync(pidFile, 'utf8'));
@@ -192,8 +193,9 @@ test('the standalone bundle relays from a foreign project without node_modules',
   const script = join(native.directory, 'chat.mjs');
   copyFileSync(join(ROOT, 'dist/chat.mjs'), script);
   writeFileSync(join(native.directory, 'package.json'), '{"type":"commonjs"}');
+  matrix.subscribe(ROOM);
   matrix.add(ROOM, message('$standalone'));
-  const child = spawn(process.execPath, [script, '--instance', 'test', '--agent', 'watson', 'listen', '--thread', THREAD,
+  const child = spawn(process.execPath, [script, '--instance', 'test', '--agent', 'watson', 'agent', 'listen', '--thread', THREAD,
     '--codex-binary', native.options.binary, '--debounce-ms', '60000'],
     { env: matrix.env, cwd: native.directory, stdio: ['ignore', 'pipe', 'pipe'] });
   const stopped = once(child, 'close');
@@ -201,7 +203,7 @@ test('the standalone bundle relays from a foreign project without node_modules',
   child.stderr.on('data', chunk => { errors += String(chunk); });
   child.stdout.on('data', chunk => { output += String(chunk); });
   t.after(async () => { child.kill('SIGTERM'); await stopped; });
-  await until(() => existsSync(matrix.cursorFile) || child.exitCode !== null);
+  await until(() => child.exitCode !== null || existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   assert.equal(errors, ''); assert.equal(output, '');
   assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], '1');
   assert(!existsSync(join(native.directory, 'node_modules')));

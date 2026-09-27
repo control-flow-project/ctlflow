@@ -40,13 +40,14 @@ async function start(config: InstanceConfig, compile = false): Promise<string> {
   const beforeStart = Date.now();
   const path = join(directory, config.id + '.json');
   writeFileSync(path, JSON.stringify(config), { mode: 0o600 });
-  const child = spawn(process.execPath, [join(ROOT, 'crossfire'), 'start', path, ...(compile ? ['--compile'] : [])], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(ROOT, 'crossfire'), 'start', path, ...(compile ? ['--compile'] : [])], { env, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
   const running = { child, done: new Promise(resolve => child.once('exit', resolve)), output: '' };
   processes.set(config.id, running);
   for (const stream of [child.stdout, child.stderr]) stream!.on('data', bytes => { running.output = (running.output + String(bytes)).slice(-100_000); });
-  for (let n = 0; n < 300; n++) {
+  const deadline = Date.now() + (compile ? 600_000 : 60_000);
+  while (Date.now() < deadline) {
     if (interrupted) throw new Error('Verification interrupted');
-    if (child.exitCode !== null || child.signalCode !== null) throw new Error('Test instance stopped before readiness');
+    if (child.exitCode !== null || child.signalCode !== null) throw new Error('Test instance stopped before readiness:\n' + running.output);
     if (running.output.includes('CLIENT ONBOARDING')) {
       const response = await fetch(`http://127.0.0.1:${config.web_port}/_coord/health`);
       const health = await response.json() as RuntimeInfo & { instance: string; status: string };
@@ -66,14 +67,21 @@ async function start(config: InstanceConfig, compile = false): Promise<string> {
     }
     await delay(100);
   }
-  throw new Error('Test instance did not print onboarding instructions');
+  throw new Error('Test instance did not print onboarding instructions:\n' + running.output);
 }
 async function stop(id: string): Promise<void> {
   const running = processes.get(id);
   if (!running) return;
-  await run('stop', id);
-  await running.done;
-  processes.delete(id);
+  const timer = setTimeout(() => {
+    if (running.child.exitCode !== null || running.child.signalCode !== null || !running.child.pid) return;
+    if (process.platform === 'win32') running.child.kill('SIGKILL');
+    else process.kill(-running.child.pid, 'SIGKILL');
+  }, 30_000);
+  try {
+    running.child.kill('SIGTERM');
+    await run('stop', id);
+    await running.done;
+  } finally { clearTimeout(timer); processes.delete(id); }
 }
 async function chat(instance: string, agent: string, ...args: string[]): Promise<JsonObject> {
   const result = await execute(process.execPath, [join(skill, 'scripts/chat.mjs'), '--instance', instance, '--agent', agent, ...args], { env, cwd: directory });
@@ -120,15 +128,21 @@ try {
     { env, cwd: directory, maxBuffer: 4 * 1024 * 1024 });
   const verified = JSON.parse(verification.stdout) as { checks: string[] };
   console.log(`PASS ${verified.checks.length} messaging, file, room-permission, UI, and instance-isolation checks.`);
-  for (const agent of ['recovery-a', 'recovery-b']) await chat(first.id, agent, 'init');
+  for (const agent of ['recovery-a', 'recovery-b']) await chat(first.id, agent, 'agent', 'init');
   const accountPath = join(clientConfig, 'accounts', first.id, 'recovery-a.json');
   const savedAgent = readJson<Account>(accountPath);
   await execute(process.execPath, bootstrapArguments(s), { env, cwd: directory });
   assert.deepEqual(readJson<Account>(accountPath), savedAgent);
-  const send = () => chat(first.id, 'recovery-a', 'send', '--to', 'recovery-b', '--message', 'Recovery verification.');
+  const send = async (): Promise<JsonObject> => {
+    const conversation = await chat(first.id, 'recovery-a', 'agent', 'conversation', '--recipient', 'recovery-b');
+    return { room_id: conversation.room_id, ...await chat(first.id, 'recovery-a', 'matrix', 'send-message',
+      '--room-id', String(conversation.room_id), '--event-type', 'm.room.message', '--markdown', 'Recovery verification.') };
+  };
   const before = await send();
   const file = join(directory, 'retained.txt'); writeFileSync(file, 'Attachment retained after all sessions were revoked.');
-  const attachment = await chat(first.id, 'recovery-a', 'upload', file, '--to', 'recovery-b');
+  const attachment = await chat(first.id, 'recovery-a', 'matrix', 'upload-content', '--input-file', file);
+  await chat(first.id, 'recovery-a', 'matrix', 'send-message', '--room-id', String(before.room_id), '--event-type', 'm.room.message',
+    '--body', JSON.stringify({ msgtype: 'm.file', body: 'retained.txt', url: attachment.content_uri }));
   const originalRooms = s.rooms.map(room => room.room_id);
   const initial = readJson<Account>(join(privatePath(first.id), 'admin.json'));
   let human = await login(s, initial.password!);
@@ -158,7 +172,9 @@ try {
   const event = await admin.get(`${API}/rooms/${segment(String(before.room_id))}/event/${segment(String(before.event_id))}`);
   assert.equal(event.event_id, before.event_id);
   const received = join(directory, 'received.txt');
-  await chat(first.id, 'recovery-b', 'download', String(attachment.mxc), received);
+  const media = new URL(String(attachment.content_uri));
+  await chat(first.id, 'recovery-b', 'matrix', 'get-content-authed', '--server-name', media.host,
+    '--media-id', media.pathname.slice(1), '--output-file', received);
   assert.equal(readFileSync(received, 'utf8'), readFileSync(file, 'utf8'));
   console.log('PASS restart after revoking all observer devices preserves rooms, messages, and files.');
   await stop(first.id);

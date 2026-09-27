@@ -4,6 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import lockfile from 'proper-lockfile';
+import { Readable } from 'node:stream';
+import { encodeOutput, MAX_JSON_BYTES } from './limits.ts';
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type JsonObject = { [key: string]: Json };
@@ -16,7 +18,7 @@ export type Settings = RoomCatalog & {
   registration_token: string; max_upload_bytes: number;
 };
 export type Account = { user_id: string; access_token: string; device_id: string; workspace?: string; password?: string; announcement_room_id?: string };
-export type Event = { event_id: string; sender: string; type: string; state_key?: string; content: JsonObject; origin_server_ts?: number };
+export type Event = { event_id: string; sender: string; type: string; state_key?: string; content: JsonObject; origin_server_ts?: number; unsigned?: JsonObject };
 export type Members = Record<string, { display_name?: string; avatar_url?: string }>;
 const pathsFile = new URL('.client-paths.json', import.meta.url);
 const installedPaths = existsSync(pathsFile) ? JSON.parse(readFileSync(pathsFile, 'utf8')) as { config_dir?: string; state_dir?: string } : {};
@@ -46,13 +48,11 @@ export function readJson<T>(path: string): T {
 }
 
 export function readSettings(path: string): Settings {
-  const stored = readJson<Settings & { room_id?: string; room_alias?: string }>(path);
-  if (Array.isArray(stored.rooms)) return stored;
-  // Preserve the Matrix ID from the original single-room installation.
-  const { room_id, room_alias, ...base } = stored;
-  if (typeof room_id !== 'string' || typeof room_alias !== 'string') throw new Error('Invalid instance settings');
-  const alias = room_alias.slice(1).split(':')[0] || 'coordination';
-  return { ...base, default_room: alias, rooms: [{ alias, name: alias, purpose: 'Shared coordination.', room_id }] };
+  const stored = readJson<Settings>(path);
+  roomCatalog(stored);
+  if (typeof stored.observer !== 'string' || !stored.observer.startsWith('@') || typeof stored.server_name !== 'string'
+      || !Number.isSafeInteger(stored.max_upload_bytes) || stored.max_upload_bytes < 1) throw new Error('Invalid instance settings');
+  return stored;
 }
 
 export function roomCatalog(value: unknown): RoomCatalog {
@@ -77,7 +77,7 @@ export function selectRoom(settings: Settings, selector = settings.default_room)
   const configured = settings.rooms.find(room => selector === room.alias || selector === `#${room.alias}:${settings.server_name}`);
   if (configured?.room_id) return configured.room_id;
   if (selector.startsWith('!')) return selector;
-  throw new Error('Unknown room: ' + selector + '. Use rooms to list configured aliases and Matrix IDs.');
+  throw new Error('Unknown room: ' + selector + '. Use matrix get-joined-rooms for Matrix room IDs.');
 }
 
 export function writeJson(path: string, value: unknown): void {
@@ -94,10 +94,8 @@ export function writeJson(path: string, value: unknown): void {
   finally { if (existsSync(temporary)) unlinkSync(temporary); }
 }
 
-export function emit(value: unknown): void {
-  // Synchronous output precedes a cursor checkpoint. A crash may replay events;
-  // the client never advances its cursor before writing the response.
-  const bytes = Buffer.from(JSON.stringify(value, null, 2) + '\n');
+export function emit(value: unknown, maximum?: number): void {
+  const bytes = encodeOutput(value, maximum);
   let offset = 0;
   while (offset < bytes.length) offset += writeSync(1, bytes, offset);
 }
@@ -135,17 +133,21 @@ export class Matrix {
     this.signal = signal;
   }
 
-  async open(method: string, path: string, data?: Buffer, contentType = 'application/json'): Promise<IncomingMessage> {
+  async open(method: string, path: string, data?: Buffer | Readable, contentType = 'application/json'): Promise<IncomingMessage> {
     if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Expected a local API path');
     const response = await new Promise<IncomingMessage>((resolve, reject) => {
       const headers: Record<string, string> = { 'Content-Type': contentType };
       if (this.token) headers.Authorization = 'Bearer ' + this.token;
-      if (data) headers['Content-Length'] = String(data.length);
+      if (Buffer.isBuffer(data)) headers['Content-Length'] = String(data.length);
       // node:http connects directly; no HTTP proxy environment or redirects.
       const request = httpRequest(this.base + path, { method, headers, signal: this.signal }, resolve);
       request.setTimeout(45_000, () => request.destroy(new Error('Local server request timed out')));
       request.on('error', reject);
-      request.end(data);
+      if (data instanceof Readable) {
+        data.once('error', error => request.destroy(error));
+        request.once('error', () => data.destroy());
+        data.pipe(request);
+      } else request.end(data);
     });
     if ((response.statusCode ?? 500) >= 300) {
       const raw = await collect(response, 65536);
@@ -158,7 +160,7 @@ export class Matrix {
 
   async request<T = JsonObject>(method: string, path: string, body?: unknown): Promise<T> {
     const response = await this.open(method, path, body === undefined ? undefined : Buffer.from(JSON.stringify(body)));
-    const bytes = await collect(response, 32 * 1024 * 1024);
+    const bytes = await collect(response, MAX_JSON_BYTES);
     const value: unknown = JSON.parse(bytes.toString());
     return value as T;
   }

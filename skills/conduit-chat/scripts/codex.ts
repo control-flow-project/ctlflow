@@ -4,14 +4,19 @@ import { isAbsolute } from 'node:path';
 import { Duplex } from 'node:stream';
 import type { Socket } from 'node:net';
 import WebSocket from 'ws';
+import { setTimeout as delay } from 'node:timers/promises';
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout };
 type HistoryBoundary = { position: number; key: string };
+type Delivery = { turn: string; text: string; messageId: string; boundary: HistoryBoundary | null };
 export type CodexOptions = { thread: string; workspace: string; binary?: string; socket?: string; timeoutMs?: number; pollMs?: number };
 export type CodexConnection = {
   signal: AbortSignal;
   verify: () => Promise<void>;
-  deliver: (text: string, messageId: string) => Promise<void>;
+  deliver: (text: string, messageId: string, cancelled?: AbortSignal) => Promise<void>;
+  settle: () => Promise<boolean>;
+  activeTurn: () => Promise<string | null>;
+  interrupt: (turnId: string, recovery?: boolean) => Promise<void>;
   close: () => void;
 };
 
@@ -37,6 +42,7 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
   let stderr = '';
   let closing = false;
   let receiveDelivery: ((message: Record<string, unknown>) => void) | undefined;
+  let pendingDelivery: Delivery | undefined;
   const pipes = { readable: child.stdout, writable: child.stdin };
   const fromStreams = Duplex.from as typeof Duplex.from & ((streams: typeof pipes) => Duplex);
   const tunnel = fromStreams(pipes);
@@ -113,6 +119,61 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
     }
     if (typeof thread.cwd !== 'string' || realpathSync(thread.cwd) !== realpathSync(options.workspace)) {
       throw new Error('The Codex thread workspace differs from this Crossfire identity; refusing delivery');
+    }
+  }
+
+  async function latestTurn() {
+    const result = object(await request('thread/turns/list', {
+      threadId: options.thread, limit: 1, sortDirection: 'desc', itemsView: 'notLoaded',
+    }));
+    if (!Array.isArray(result.data) || result.data.length > 1) throw new Error('Invalid Codex turn page');
+    if (!result.data.length) return null;
+    const turn = object(result.data[0]);
+    if (typeof turn.id !== 'string' || !turn.id || !['inProgress', 'completed', 'interrupted', 'failed'].includes(String(turn.status))) {
+      throw new Error('Invalid Codex turn identity or status');
+    }
+    return { id: turn.id, status: String(turn.status) };
+  }
+
+  async function activeTurn(): Promise<string | null> {
+    await verify();
+    const turn = await latestTurn();
+    return turn?.status === 'inProgress' ? turn.id : null;
+  }
+
+  async function turnStatus(turnId: string): Promise<string> {
+    let cursor: string | undefined;
+    const visited = new Set<string>();
+    for (let page = 0; page < 100; page++) {
+      const result = object(await request('thread/turns/list', {
+        threadId: options.thread, limit: 100, sortDirection: 'desc', itemsView: 'notLoaded', ...(cursor ? { cursor } : {}),
+      }));
+      if (!Array.isArray(result.data) || result.data.length > 100) throw new Error('Invalid Codex turn page');
+      for (const value of result.data) {
+        const turn = object(value);
+        if (turn.id !== turnId) continue;
+        if (!['inProgress', 'completed', 'interrupted', 'failed'].includes(String(turn.status))) throw new Error('Invalid Codex turn status');
+        return String(turn.status);
+      }
+      if (result.nextCursor === null) break;
+      if (typeof result.nextCursor !== 'string' || !result.nextCursor || !result.data.length || visited.has(result.nextCursor)) throw new Error('Invalid Codex turn cursor');
+      cursor = result.nextCursor;
+      visited.add(cursor);
+    }
+    throw new Error('Cannot prove the captured Codex turn status; refusing replacement input');
+  }
+
+  async function interrupt(turnId: string, recovery = false): Promise<void> {
+    await verify();
+    if (await turnStatus(turnId) !== 'inProgress') return;
+    if (recovery) throw new Error('Previous cancellation is uncertain and the captured turn is still active; inspect it before restarting the listener');
+    try { await request('turn/interrupt', { threadId: options.thread, turnId }); }
+    catch (error) { if (await turnStatus(turnId) === 'inProgress') throw error; }
+    const deadline = performance.now() + timeoutMs;
+    for (;;) {
+      if (await turnStatus(turnId) !== 'inProgress') return;
+      if (performance.now() >= deadline) throw new Error('Codex cancellation remains uncertain; refusing replacement input');
+      await delay(Math.min(pollMs, 100), undefined, { signal: failure.signal });
     }
   }
 
@@ -214,7 +275,7 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
     throw new Error('Codex input history exceeds the verification bound; read positions were not advanced');
   }
 
-  async function deliver(text: string, messageId: string): Promise<void> {
+  async function waitForReceipt(delivery: Delivery, deliverySignal: AbortSignal): Promise<boolean> {
     if (receiveDelivery) throw new Error('Codex input delivery must be sequential');
     let revision = 0;
     let wake: (() => void) | undefined;
@@ -229,60 +290,78 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
       wake?.();
     };
     async function wait(previousRevision: number): Promise<void> {
-      failure.signal.throwIfAborted();
+      deliverySignal.throwIfAborted();
       if (revision !== previousRevision) return;
       await new Promise<void>(resolve => {
         const finish = () => {
           clearTimeout(timer);
-          failure.signal.removeEventListener('abort', finish);
+          deliverySignal.removeEventListener('abort', finish);
           wake = undefined;
           resolve();
         };
         const timer = setTimeout(finish, pollMs);
         wake = finish;
-        failure.signal.addEventListener('abort', finish, { once: true });
+        deliverySignal.addEventListener('abort', finish, { once: true });
       });
-      failure.signal.throwIfAborted();
+      deliverySignal.throwIfAborted();
     }
     try {
+      let unavailable = 0;
       for (;;) {
-        await verify();
-        let boundary = await historyBoundary();
-        const result = object(await request('turn/start', {
-          threadId: options.thread, clientUserMessageId: messageId,
-          input: [{ type: 'text', text, text_elements: [] }],
-        }));
-        const turn = object(result.turn);
-        if (typeof turn.id !== 'string' || !turn.id) throw new Error('Codex did not acknowledge a turn; delivery may be uncertain');
-        let unavailable = 0;
-        for (;;) {
-          failure.signal.throwIfAborted();
-          const previousRevision = revision;
-          let status: Awaited<ReturnType<typeof receipt>>['status'];
-          try {
-            const checked = await receipt(turn.id, text, messageId, boundary);
-            status = checked.status;
-            if (status === 'received') return;
-            boundary = checked.boundary;
-          } catch (error) {
-            if (!(error instanceof Error) || !('code' in error) || error.code !== -32601 || ++unavailable >= 3) throw error;
-            await wait(revision);
-            continue;
-          }
-          if (status === 'unavailable') {
-            if (++unavailable >= 3) throw new Error('Codex did not retain the accepted turn; read positions were not advanced');
-            await wait(revision);
-            continue;
-          }
-          unavailable = 0;
-          if (status === 'interrupted') break;
-          if (status === 'missing') throw new Error('Codex finished without recording the input; read positions were not advanced');
-          await wait(previousRevision);
+        deliverySignal.throwIfAborted();
+        const previousRevision = revision;
+        let status: Awaited<ReturnType<typeof receipt>>['status'];
+        try {
+          const checked = await receipt(delivery.turn, delivery.text, delivery.messageId, delivery.boundary);
+          status = checked.status;
+          if (status === 'received') return true;
+          delivery.boundary = checked.boundary;
+        } catch (error) {
+          if (!(error instanceof Error) || !('code' in error) || error.code !== -32601 || ++unavailable >= 3) throw error;
+          await wait(revision);
+          continue;
         }
+        if (status === 'unavailable') {
+          if (++unavailable >= 3) throw new Error('Codex did not retain the accepted turn; read positions were not advanced');
+          await wait(revision);
+          continue;
+        }
+        unavailable = 0;
+        if (status === 'interrupted') return false;
+        if (status === 'missing') throw new Error('Codex finished without recording the input; read positions were not advanced');
+        await wait(previousRevision);
       }
     } finally {
       receiveDelivery = undefined;
       wake?.();
+    }
+  }
+
+  async function settle(): Promise<boolean> {
+    if (!pendingDelivery) return false;
+    const received = await waitForReceipt(pendingDelivery, failure.signal);
+    pendingDelivery = undefined;
+    return received;
+  }
+
+  async function deliver(text: string, messageId: string, cancelled?: AbortSignal): Promise<void> {
+    if (pendingDelivery || receiveDelivery) throw new Error('Codex input delivery must be sequential; settle the preceding delivery before submitting another');
+    const deliverySignal = cancelled ? AbortSignal.any([failure.signal, cancelled]) : failure.signal;
+    for (;;) {
+      deliverySignal.throwIfAborted();
+      await verify();
+      const boundary = await historyBoundary();
+      deliverySignal.throwIfAborted();
+      const result = object(await request('turn/start', {
+        threadId: options.thread, clientUserMessageId: messageId,
+        input: [{ type: 'text', text, text_elements: [] }],
+      }));
+      const turn = object(result.turn);
+      if (typeof turn.id !== 'string' || !turn.id) throw new Error('Codex did not acknowledge a turn; delivery may be uncertain');
+      pendingDelivery = { turn: turn.id, text, messageId, boundary };
+      const received = await waitForReceipt(pendingDelivery, deliverySignal);
+      pendingDelivery = undefined;
+      if (received) return;
     }
   }
 
@@ -310,7 +389,7 @@ export async function connectCodex(options: CodexOptions, signal: AbortSignal): 
       capabilities: { experimentalApi: true } });
     socket.send(JSON.stringify({ method: 'initialized' }));
     await verify();
-    return { signal: failure.signal, verify, close, deliver };
+    return { signal: failure.signal, verify, close, deliver, settle, activeTurn, interrupt };
   } catch (error) {
     close();
     throw error;

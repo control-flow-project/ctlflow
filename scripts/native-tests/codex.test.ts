@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { connectCodex } from '../../skills/conduit-chat/scripts/codex.ts';
 import { listen } from '../../skills/conduit-chat/scripts/listen.ts';
-import { matrixFixture, message, ROOM, until } from '../test-support/listener.ts';
+import { matrixFixture, message, ROOM, OBSERVER, until } from '../test-support/listener.ts';
 import { nativeCodex } from '../test-support/native-codex.ts';
 
 test('installed Codex receipts, interruption recovery, original controller, and Matrix integration', { timeout: 60_000 }, async context => {
@@ -79,7 +79,7 @@ test('installed Codex receipts, interruption recovery, original controller, and 
   const beforeBurst = native.acknowledgements().length;
   matrix.add(ROOM, ...Array.from({ length: 6 }, (_, index) => message('$native-' + index, undefined, 'Matrix burst ' + index)));
   await until(() => native.acknowledgements().length > beforeBurst);
-  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], '0');
+  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
   await native.call('turn/interrupt', { threadId: native.thread.id, turnId: native.acknowledgements().at(-1)!.turn.id });
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '6');
   await until(() => native.requests.some(request => JSON.stringify(request).includes('Matrix burst 5')));
@@ -123,4 +123,33 @@ test('installed Codex verifies new input independently of previous turn history'
   }
   assert(!native.relayRequests.some(request => ['turn/interrupt', 'thread/start', 'thread/resume', 'thread/fork'].includes(request.method ?? '')));
   console.log('PASS 60 native deliveries over paginated prior history with bounded, non-historical receipt queries.');
+});
+
+test('a human Matrix control cancels through the noncontrolling native Codex connection during receipt wait', { timeout: 60_000 }, async context => {
+  const native = await nativeCodex(context);
+  const matrix = await matrixFixture(context, native.workspace);
+  const stop = new AbortController();
+  const result = listen({ ...matrix, limit: 20, pollMs: 100, debounceMs: 10000, codex: native.options }, stop.signal).catch(error => error);
+  context.after(async () => { stop.abort(new Error('verification complete')); await result; });
+  await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
+  await native.call('turn/start', { threadId: native.thread.id, input: [{ type: 'text', text: 'human-owned work', text_elements: [] }] });
+  await until(() => native.held() !== undefined);
+  matrix.add(ROOM, message('$pending-native'));
+  await until(() => native.acknowledgements().length === 1);
+  const captured = native.acknowledgements()[0].turn.id;
+  matrix.add(ROOM, message('$stop-native', OBSERVER, '!!'));
+  await until(() => {
+    const state = JSON.parse(readFileSync(matrix.cursorFile + '.control', 'utf8'));
+    return state.paused;
+  });
+  const interruptions = native.relayRequests.filter(request => request.method === 'turn/interrupt');
+  assert.equal(interruptions.length, 1);
+  assert.deepEqual(interruptions[0].params, { threadId: native.thread.id, turnId: captured });
+  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
+  assert.equal(native.acknowledgements().length, 1);
+  assert(native.notifications.some(event => event.method === 'turn/completed' && (event.params.turn as { id: string; status: string }).id === captured));
+  matrix.add(ROOM, message('$redirect-native', OBSERVER, '!! Only do this new work.'));
+  await until(() => native.requests.some(request => JSON.stringify(request).includes('Only do this new work.')));
+  assert(!native.relayRequests.some(request => ['thread/resume', 'thread/start', 'thread/fork'].includes(request.method ?? '')));
+  console.log('PASS noncontrolling exact-turn cancellation, paused unread input, and human redirect through the real Codex server.');
 });

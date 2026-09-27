@@ -25,15 +25,7 @@ function text(value: unknown): asserts value is string {
 }
 
 export function validate(value: unknown): InstanceConfig {
-  let config = object(value);
-  if ('room' in config) {
-    keys(config, ['id', 'label', 'server_name', 'matrix_port', 'web_port', 'observer', 'room', 'max_upload_bytes']);
-    const legacy = object(config.room);
-    keys(legacy, ['alias', 'name', 'topic']);
-    const { room: _legacy, ...rest } = config;
-    config = { ...rest, default_room: legacy.alias,
-      rooms: [{ alias: legacy.alias, name: legacy.name, purpose: legacy.topic }] };
-  }
+  const config = object(value);
   keys(config, ['id', 'label', 'server_name', 'matrix_port', 'web_port', 'observer', 'default_room', 'rooms', 'max_upload_bytes']);
   text(config.id); name(config.id);
   text(config.server_name);

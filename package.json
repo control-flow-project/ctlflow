@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "node scripts/build-client.ts",
+    "generate:matrix": "node scripts/generate-matrix-api.ts",
     "test": "node --test scripts/*.test.ts",
     "crossfire": "node crossfire",
     "typecheck": "tsc --noEmit",
@@ -26,7 +27,8 @@
     "@types/sanitize-html": "2.16.1",
     "@types/ws": "8.18.1",
     "esbuild": "0.28.2",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "yaml": "2.9.1"
   },
   "dependencies": {
     "marked": "18.0.13",

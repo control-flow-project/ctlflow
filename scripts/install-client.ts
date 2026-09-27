@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync, chmodSync, existsSync } from 'n
 import { request } from 'node:http';
 import { createHash } from 'node:crypto';
 import { requireNode } from './version.ts';
+import { CLIENT_FORMAT, CLIENT_FILES } from './onboarding.ts';
 
 type Paths = { config_dir?: string; state_dir?: string; skill_dir?: string };
 type Bundle = {
@@ -69,14 +70,14 @@ async function main(): Promise<void> {
   }
   if (positionals.length > 1) throw new Error('Supply one client bundle path');
   const bundle = await readBundle(positionals[0]);
-  if (bundle.format !== 3 || !/^[a-z][a-z0-9-]{0,39}$/.test(bundle.settings?.instance)
+  if (bundle.format !== CLIENT_FORMAT || !/^[a-z][a-z0-9-]{0,39}$/.test(bundle.settings?.instance)
       || bundle.settings.instance === 'admin') throw new Error('Invalid Crossfire client bundle');
   for (const base of [bundle.settings.homeserver, bundle.settings.room_service]) {
     const url = new URL(base);
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.pathname !== '/'
         || url.username || url.password || url.search || url.hash) throw new Error('Client endpoints must use loopback HTTP');
   }
-  const expected = ['SKILL.md', 'scripts/chat', 'scripts/chat.mjs', 'scripts/package.json'];
+  const expected = CLIENT_FILES;
   if (!bundle.files || Object.keys(bundle.files).sort().join('\n') !== [...expected].sort().join('\n')
       || expected.some(file => typeof bundle.files[file] !== 'string')) throw new Error('Client bundle has unexpected files');
 
