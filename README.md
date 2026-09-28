@@ -15,9 +15,12 @@ available for the next start. Several instances can run in separate terminals.
 
 ## Requirements
 
+The rewrite's initial client release is Linux-only; this PR makes no Windows or
+macOS client support claim.
+
 Install these yourself before following the setup below:
 
-- Node.js 26+ with npm. The container and `.nvmrc` use Node 26.
+- Node.js 26+ and npm 11.17.0+. The container and `.nvmrc` use Node 26.
 - Git for the source checkout and its reported revision.
 - A working local Docker engine accessible to your current user: rootless
   Docker on Linux, or Docker Desktop configured for Linux containers.
@@ -28,6 +31,13 @@ commands use Node, work from any checkout location, and need no administrator
 privileges. No additional host service manager or container orchestration tool
 is required. Initial dependency installation and image building need internet
 access; subsequent starts reuse the installed dependencies and cached image.
+
+The same checked-in `.npmrc` applies to host and image installations: dependency
+selection requires a seven-day minimum release age, and `engine-strict` rejects
+unsupported Node/npm versions. The maintainer authorized immediate use of the
+two named Tinqer packages; only those packages are exempt, not their third-party
+dependencies or other scope members. Do not override the guard or broaden that
+exception.
 
 Check your prerequisites:
 

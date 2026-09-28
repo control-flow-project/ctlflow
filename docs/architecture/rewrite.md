@@ -1,9 +1,9 @@
 # Crossfire: human-owned agents
 
 This is the required architecture for the complete rewrite. The architecture
-checkpoint does not implement or certify the management application. Dependent
-implementation waits for the homeserver enforcement and local-session lifecycle
-decisions described in `feasibility.md`.
+checkpoint does not implement or certify the management application. The
+maintainer-approved native limitations and remaining implementation proofs are
+recorded in `feasibility.md`. Every milestone still requires exact-commit review.
 
 ## Boundaries
 
@@ -30,7 +30,14 @@ transactions, constraints and writer exclusion. Raw SQL is for schema creation,
 migrations and native database configuration, not a second application query
 API. Do not store a second copy of Matrix messages/history. Dependency selection
 preserves the seven-day minimum release age. TypeScript uses the approved 6.x
-toolchain.
+toolchain. Host and container installs use the same `.npmrc`, require npm
+11.17.0 or newer, and reject unsupported tooling through `engine-strict`. The
+maintainer explicitly authorized an age exemption for `@tinqerjs/tinqer` and
+`@tinqerjs/better-sqlite3-adapter`. No scope wildcard or third-party exemption
+is permitted.
+
+The first release supports and certifies Linux clients only, as approved by the
+maintainer. No macOS or Windows support claim is made by this PR.
 
 ## Structure and dependency direction
 
@@ -75,7 +82,7 @@ minimal self-authentication, enrollment status and listener-presence bookkeeping
 are available. Enrollment does not briefly grant broad access before restricting
 it.
 
-For every resource/action, all of the following must allow the operation:
+Crossfire computes the agent's permitted target from:
 
 ```text
 current owner authority
@@ -86,28 +93,43 @@ current owner authority
 
 The owner explicitly chooses a subset of eligible rooms/actions. Room admission
 requirements still apply: owner membership alone is not invitation authority.
-Owner permission reductions and suspension must affect dependent agents, including
-direct native reads. New owner rooms/privileges are never automatically delegated.
-Another administrator inviting/promoting an agent cannot override its ceiling.
+New owner rooms/privileges are never automatically delegated. Crossfire applies
+management changes using native Matrix account, membership and power-level
+operations. Administrators can restrict or remove people, selected agents or
+an owner and their agents through the management API/UI.
 
-Read-only access excludes messages, reactions, typing and administration;
-private read bookkeeping is separate. Read-and-reply adds ordinary messages and
-reactions, not invitation/moderation powers. Muting listener delivery does not
-revoke access. Revocation cannot erase data already downloaded or stop a process
-on someone else's machine.
+The server reconciles owner authority, explicit grants and native agent permissions
+on a configurable interval, default **300 seconds**. It only reduces access that
+exceeds the approved target; discovering a new room or privilege does not grant
+it. Out-of-band owner removal, suspension or agent promotion can leave stale
+agent access until reconciliation succeeds. This eventual ceiling is explicitly
+approved: it is not a check on every native request or an unconditional five-minute
+revocation guarantee. Native Matrix remains the enforcement point for applied
+permissions. Crossfire records desired versus applied state, pending/failed work,
+last successful reconciliation and bounded failure details. Errors remain visible;
+neither the API nor UI reports a queued restriction as successfully enforced.
 
-Crossfire-owned management state requires durable transactions and revision
-checks. Native admission and the mandatory continuing delegation ceiling must
-have one authoritative enforcing owner. Merely committing grants to SQLite and
-asynchronously copying permissions to Matrix is prohibited. The exact native
-integration/transaction boundary is a feasibility decision, not an assumed
-atomic transaction spanning two independent services.
+Crossfire-owned changes require durable transactions and revision checks. Native
+permission updates are not part of an atomic SQLite transaction. Persist the
+desired restriction before applying it and retain enough state to reconcile
+interruption or partial failure. No parallel permission engine or Matrix proxy
+is introduced. The reconciliation worker is the single owner of applying these
+desired native restrictions, including work triggered by management changes.
 
-Display names default to `Holmes (jeswin)`. Administrator overrides may remove
-the suffix, persist across reconnects and must resist direct native profile
-and self-membership display-name mutation. The management UI always shows the
-verified owner separately. Renaming
-does not change stable identity, ownership or permissions.
+Read-only uses native power levels to deny messages/reactions and administration;
+**native typing remains allowed**. Private read bookkeeping is separate.
+Read-and-reply adds ordinary messages and reactions, not invitation/moderation
+powers. Muting listener delivery does not revoke access. Native revocation behavior
+must be proved across read paths; it cannot erase data already downloaded or stop
+a process on someone else's machine.
+
+Configured display names default to `Holmes (jeswin)`. Administrator overrides
+may remove the suffix and persist in Crossfire across reconnects. The client must
+not overwrite that configured override. **An agent can still change its native
+Matrix profile display name**; this accepted limitation is not an administrative
+lock on Matrix profile/member-state APIs. Management shows the configured name,
+native display name and verified owner distinctly. Names never change stable
+identity, ownership or permissions and are never evidence of authority.
 
 ## Enrollment and management API
 
@@ -177,8 +199,24 @@ positions. Manual history/search do not consume live cursors. Matrix notificatio
 counts are not fabricated exact unread totals. Markdown sends original text and
 sanitized Matrix HTML; file transfers are bounded and retain native media IDs.
 
+Important room changes must also reach the agent, through one explicit event
+selection owned by the receiver contract: `m.room.name`, `m.room.topic`,
+`m.room.member`, `m.room.power_levels`, `m.room.join_rules`,
+`m.room.history_visibility`, `m.room.encryption` and `m.room.tombstone`.
+These cover identity/membership, access/security and room-replacement changes,
+not every Matrix event. Exclude typing, receipts, presence chatter, cosmetic
+room-avatar changes and unchanged state snapshots. Notify about encryption or
+replacement without pretending to add E2EE support or automatically join a
+replacement room.
+
+Preserve native event type, sender, room, event ID, state key and bounded content
+rather than inventing a text message from a system user. Use the same batch
+budgets, durable receipt/cursor owner and catch-up path as messages. Do not turn
+routine notices into automatic replies. Room-state content cannot authorize
+human steering.
+
 The detached per-session listener long-polls outside the model. Empty waits,
-own echoes, presence refresh and periodic reconciliation consume no model turns.
+own echoes and periodic reconciliation consume no model turns.
 Retain immediate burst delivery and configurable 10-second batching. Every
 120 seconds by default, reconcile current authorized membership and bounded
 native history from the same durable acknowledged positions. Deadlines bound
@@ -193,13 +231,20 @@ identity and intended recipient; service administration does not automatically
 authorize local coding-session control. No approval responses, policy changes,
 session resume/fork or keystroke injection by the listener.
 
-Availability uses native Matrix presence: healthy exact attached session is
-online even between model turns; deliberate pause is unavailable; shutdown is
-best-effort offline; crashes/network loss expire within a finite documented
-server bound; inability to determine state is unknown. A listener PID, surviving
-daemon or loaded thread is not proof the actual TUI remains attached. Management
-must see appropriately authorized zero-room agents without manufacturing room
-membership. Presence is operational information, not authorization or task proof.
+The listener must stop when its **exact intended TUI exits**, without stopping
+a shared Codex daemon or another session's listener. Prove the local lifecycle
+association; a listener PID, surviving daemon, loaded thread or direct-input
+capability is insufficient. The listener's 120-second unread-history backstop
+is independent of the server's 300-second permission reconciliation.
+
+Availability is **unknown** on the pinned Conduit build, whose native presence
+implementation does not work. This limitation is explicitly accepted for this
+release. Do not invent a Crossfire heartbeat/presence service, treat a successful
+presence update as evidence or manufacture room membership for visibility.
+Management separates unknown availability from administrative suspension and
+reconciliation status. No online/offline, server expiry or zero-room presence
+visibility guarantee is claimed. Native presence remains a Matrix capability,
+not authorization, successful delivery or task-progress evidence.
 
 ## Deployment
 
@@ -234,11 +279,11 @@ Every row is a final acceptance obligation, not a checkpoint completion claim.
 | A05 | Verified account kind, one human owner, member/admin roles | Enrollment/auth | Forged ownership, agent-as-human, cross-owner/admin denial |
 | A06 | Default no rooms/actions, no transient broad access | Homeserver/enrollment | Direct sync/history/join/send/typing/moderation/creation/enrollment tests |
 | A07 | Explicit owner subset plus native room admission | Grants/homeserver | Eligible selections, invitation requirements, unauthorized invite/promote |
-| A08 | Continuing owner ceiling and owner suspension | Homeserver | Direct reads/writes before/after native owner changes and concurrent requests |
-| A09 | Read-only versus read/reply; private read state separate | Homeserver | Native messages/reactions/typing/receipts/state/moderation controls |
-| A10 | Revocation affects sync/history/search/media/notifications | Homeserver | Native alternative read paths and in-flight authorization boundaries |
+| A08 | Eventual owner ceiling/suspension; default300s downward reconciliation | Grants/reconciler/homeserver | Direct calls before/after reconciliation; drift, partial failure, crash/retry, concurrent narrowing and visible applied state |
+| A09 | Native read-only denies messages/reactions/admin; typing allowed | Homeserver | Positive/negative messages/reactions/typing/receipts/state/moderation controls |
+| A10 | Applied native revocation verified across sync/history/search/media/notifications | Homeserver/reconciler | Alternative read paths and in-flight boundaries; no claim that queued work is enforced |
 | A11 | No accidental inheritance/new-room grants; mute != revoke | Grants/listener/UI | Membership changes, UI state and direct history after mute/revoke |
-| A12 | Default owner name and durable admin override | Homeserver/naming | Reconnect and direct profile/member-state mutation bypass tests |
+| A12 | Configured owner name/admin override; native profile remains mutable | Naming/UI | Persist/reconnect without client overwrite; direct native mutation cannot alter ownership or configured identity |
 | A13 | Exact bounded expiring pairing; private exchange | Enrollment | Wrong/stolen code, secret, expiry, replay, changed request, impersonation |
 | A14 | Atomic finite quota/approval and uncertain recovery | Data/enrollment | Concurrent approve/exchange/capacity, crashes and nonduplicate accounts |
 | A15 | Native registration/login cannot bypass enrollment | Homeserver | Direct register/login/account/device routes |
@@ -247,14 +292,14 @@ Every row is a final acceptance obligation, not a checkpoint completion claim.
 | A18 | Public README/artifacts, inspectable project-local installation | Publication/client | Fresh install, sizes/hashes, unsafe names, private modes, no eval/global install |
 | A19 | One skill/client; obsolete API removal | Build/skill/client | Removed signature/handler rejection and owned consumer audit |
 | A20 | Native operation identities and supported endpoint classification | Matrix | Generated catalog comparison, real native payloads and error reporting |
-| A21 | Bounded history/search, pagination and no skipped unread | Receiver | Multi-room gaps, byte/page budgets, native cursors, search/history independence |
+| A21 | Bounded history/search and message/state-change catch-up, no skipped unread | Receiver | Room rename/topic/member changes, limited timelines, byte/page budgets, native cursors and search/history independence |
 | A22 | Markdown and attachments | Matrix client | Sanitization, browser rendering, UTF-8 bounds, streamed file controls |
-| A23 | Immediate/batched bulk delivery; no empty model polling | Listener | Bursts across rooms, debounce deadlines, own echoes, model-input count |
+| A23 | Bulk messages and native room notices; no empty model polling | Listener | Busy-session rename delivery, cross-room bursts, debounce, own echoes, snapshot/duplicate suppression and model-input count |
 | A24 | Default120s reconciliation, one cursor/receipt path | Listener | Missed notifications, hung acquisition, gaps, reconnect, pause/revocation |
 | A25 | Exact receipts, read-marker failure and crash replay | Codex/receiver | Real native busy/interrupted delivery, receipt lag, ack failure, deduplication |
 | A26 | Human steering with exact recipient and no extra authority | Codex/control | Native mentions, spoof/agent/edit/quote denial, captured-turn cancellation |
-| A27 | Exact TUI lifecycle, idle-ready/pause/stop availability | Local adapter | Actual TUI exit while daemon/listener survives, crash and reconnect |
-| A28 | Native presence, expiry and zero-room owner visibility | Homeserver/listener | Native update/read, finite expiry, network loss, no artificial room joins |
+| A27 | Exact TUI exit stops only its listener; daemon may survive | Local adapter | Real TUI exit, idle-ready/pause, daemon/other-session survival, crash and reconnect |
+| A28 | Unknown availability on pinned Conduit; no invented presence | Homeserver/client/UI | Native update/read characterization; unknown with zero rooms, no heartbeat/model turn or artificial joins |
 | A29 | Shared React member/admin views and URL state | UI/server | Real browser role flows, accessibility, reload/deep links, mutation denials |
 | A30 | Member agents/enrollments/access/revocation/history | UI/server | Human pairing, empty defaults, narrower grants, stale edits, suspension |
 | A31 | Admin members/all agents/naming/quotas/audit | UI/server | Selective/owner-wide control, persistent naming, roles/limits, bounded audit |

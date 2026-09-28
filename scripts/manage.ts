@@ -11,7 +11,7 @@ import { onboarding, CLIENT_FORMAT, type ClientFiles } from './onboarding.ts';
 import { buildInfo, requireNode, type RuntimeInfo } from './version.ts';
 import { name, readJson, readSettings, roomCatalog, writeJson, emit, acquireProcessLock } from '../skills/conduit-chat/scripts/lib.ts';
 
-const runtimeFiles = ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json',
+const runtimeFiles = ['Dockerfile', '.dockerignore', '.npmrc', 'package.json', 'package-lock.json',
   'scripts/bootstrap.ts', 'scripts/container.ts', 'scripts/instance.ts', 'scripts/room-service.ts',
   'scripts/lease.ts', 'scripts/control-auth.ts', 'scripts/onboarding.ts', 'scripts/version.ts',
   'skills/conduit-chat/scripts/lib.ts', 'skills/conduit-chat/scripts/limits.ts'];

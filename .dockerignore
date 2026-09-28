@@ -1,5 +1,6 @@
 **
 !Dockerfile
+!.npmrc
 !package.json
 !package-lock.json
 !scripts/

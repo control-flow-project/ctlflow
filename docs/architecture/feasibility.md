@@ -1,12 +1,13 @@
 # Rewrite feasibility checkpoint
 
 The checks here distinguish **observed native behavior** from the rewrite's
-required guarantees. A passing characterization test that exposes a gap is not
-acceptance of that gap. The live coordination service is unchanged.
+required guarantees. A passing characterization test does not itself accept a
+limitation; the maintainer's explicit revisions below determine the current
+requirements. The live coordination service is unchanged.
 
 ## Reproduce
 
-Requirements: Node 26, the locked dependencies, Docker, Codex CLI 0.156.1 and
+Requirements: Node 26, npm 11.17.0+, the locked dependencies, Docker, Codex CLI 0.156.1 and
 tmux on Linux. The actual TUI fixture is isolated and makes no model calls; it
 does not start an implementation worker. Every fixture uses private local
 endpoints and independent databases/session state under ignored `.temp/`.
@@ -34,6 +35,32 @@ published Tinqer execution, native Matrix requests and an actual attached/closed
 Codex TUI. It does not claim the production service or its security controls are
 already implemented.
 
+### Native installation policy
+
+Host installation and the runtime image consume the same checked-in `.npmrc`.
+Native `engine-strict` requires Node 26+ and npm 11.17.0+, including with lifecycle
+scripts disabled. npm 11.17.0 is the first version supporting the required
+package-name age exemptions. The maintainer approved immediate use of the two
+consumed Tinqer packages; only those names are exempt from the seven-day guard.
+Third-party dependencies, including their transitive dependencies, remain guarded.
+
+`npm run verify:installation` compiles and runs only the focused installation
+proof through the same fresh-output runner. It checks host configuration, Docker
+context/COPY and lock admission alignment, actual npm 11.16.0 rejection before
+installation touches `node_modules`, and the real image fingerprint after changing
+only policy bytes. An isolated native registry proves aged selection, fresh range
+and exact-version rejection, the two approved exemptions, rejection of another
+package in the same scope and continued protection of their transitive dependency.
+The negative installer is downloaded as aged, pinned fixture tooling into private
+scratch; it is never installed globally or added to Crossfire's dependencies.
+
+The age policy governs native dependency selection; a locked replay is not a
+second independently implemented dependency resolver. No guard, peer or force
+override is used. These proofs certify the configured native install policy,
+not security against an operator deliberately overriding their own npm settings.
+
+- [npm 11.17.0 native exemption support](https://github.com/npm/cli/releases/tag/v11.17.0)
+
 Early repeat runs exposed intermittent startup failures while initializing a
 fresh database in this machine's HDD-backed Docker image layer. Inspection found
 Conduit blocked in disk I/O before its native TCP socket existed. Moving the
@@ -49,12 +76,13 @@ Pinned integration dependencies:
 | Dependency | Version |
 | --- | --- |
 | TypeScript | 6.0.3 |
-| `@tinqerjs/tinqer` | 0.0.27 |
-| `@tinqerjs/better-sqlite3-adapter` | 0.0.27 |
+| `@tinqerjs/tinqer` | 0.0.28 |
+| `@tinqerjs/better-sqlite3-adapter` | 0.0.28 |
 | `better-sqlite3` | 13.0.3 |
 
-The seven-day minimum release age is preserved in `.npmrc`. The integration
-uses the published adapter, not Mycroft's unpublished dependency-refresh tree.
+The seven-day minimum release age remains active in `.npmrc`, except for the two
+explicitly approved owned packages. The integration uses Mycroft's verified
+published release, not a workspace dependency or unpublished tree.
 The Snapped and Lesser projects supplied real usage examples; no second ORM is
 introduced.
 
@@ -131,10 +159,12 @@ Source corroboration:
   continuing delegation. Adding those facts only in a client cannot protect
   another direct native caller.
 
-This is not an exhaustive bypass certification. Sync/search/media/notification,
+These observations refuted the original strict specification. They remain
+native characterization evidence, not failures against requirements that the
+maintainer subsequently changed. Sync/search/media/notification,
 account/device/login/registration and in-flight revocation paths still require
-the approved enforcing integration and full acceptance tests. The demonstrated
-gaps already refute stock pinned-server sufficiency for the agreed specification.
+full implementation acceptance tests. Accepting the specific limitations below
+does not waive unrelated security requirements.
 
 Primary sources:
 
@@ -169,39 +199,51 @@ must not become proof that the human's TUI is attached.
 - [Official Codex app-server lifecycle documentation](https://developers.openai.com/codex/app-server)
 
 The existing local-session adapter is therefore not certified for A27 by this
-checkpoint. A concrete exact-controller lifecycle capability or explicitly
-approved local attachment contract must be selected and verified before it can
-announce TUI-attached availability. No orphaned listener is reported online merely
+checkpoint. The maintainer requires the listener to exit when its intended TUI
+exits. Establishing and verifying that exact association is implementation work;
+native reachability alone is not a lifecycle signal. The shared daemon must not
+be stopped merely because one TUI exits. No orphaned listener is reported online
 to satisfy a UI expectation.
 
-## Required architecture decisions
+## Approved requirement revisions
 
-The unchanged specification cannot be met by stock Conduit configuration plus
-the current reachability-only local adapter. This conflict must be resolved
-before dependent management implementation. These are not discretionary quality
-tradeoffs or permission to weaken the requirements.
+On 2026-09-28 the maintainer accepted these exact native limitations after
+clarification. `rewrite.md` and its acceptance map own the updated specification,
+not the superseded strict guarantees:
 
-1. **Homeserver enforcing integration:** authorize investigation of a suitable
-   homeserver/native extension that supplies the required ownership/delegation,
-   account-kind/naming controls and presence, while preserving direct Matrix.
-   Selection requires proof across native read/write/ephemeral/account paths and
-   one authoritative policy owner. A replacement alone is not presumed to add
-   ownership semantics. A native extension may require changes outside this
-   Crossfire TypeScript repository; that scope is not implicitly authorized.
-2. **Exact local attachment:** authorize and select a concrete lifecycle contract
-   for the already-open TUI. An upstream native controller-lifecycle capability
-   or a verified explicit local attachment can be evaluated; guessed process
-   scans, loaded-thread status and listener self-heartbeats are not solutions.
-3. **Client platform certification:** state which operating systems must be
-   certified. This checkpoint verifies Linux only and makes no Windows/macOS
-   claim. TypeScript removes the earlier NativeAOT artifact requirement, not
-   platform-specific lifecycle verification.
+1. **Eventual owner ceiling:** Crossfire management applies native restrictions;
+   a server reconciliation worker reduces stale agent permissions periodically,
+   defaulting to 300 seconds. Owner/native permission changes outside Crossfire
+   can leave agent access intact until reconciliation succeeds. Store desired
+   versus applied state and report failures; do not claim per-request enforcement
+   or an unconditional five-minute guarantee during outages.
+2. **Native read-only:** messages/reactions and administration are denied through
+   native permissions; joined agents may still use typing. This accepted limit
+   replaces the original no-ephemeral-actions promise.
+3. **Configured names:** Crossfire persists the configured owner-qualified name
+   and administrator override. Native Matrix display names remain agent-mutable;
+   show them separately from verified ownership and configured identity.
+4. **Unavailable presence:** display unknown with the pinned Conduit, including
+   zero-room agents. No fake availability, custom heartbeat or homeserver
+   presence implementation is added.
 
-No Matrix proxy, asynchronous membership copier, fake presence service, client-only
-permission gate, server replacement or local TUI wrapper has been introduced.
-The next implementation milestone waits for Mycroft's exact-commit review and
-the required maintainer decisions. Remaining obligations stay in the acceptance
-map; none are silently removed.
+The evidence/clarification is recorded by the Matrix events:
+
+- Initial revision: `$I8Zd439J6hImTD2WbCHyYt3iKH1wtGAvUAL05FLlAYs`.
+- Exact limitations explained: `$fdasbpocCoSkE_SR6ZWA6BXndVaJ-4hSz7FVXBIucbU`.
+- Acceptance: `$6lfAlDJ9Isrp0mepWlm9NBKrpD7wqidge1G9ON2_Tu4`.
+
+These changes remove the need to modify/replace Conduit for those four items.
+Keep direct native Matrix and one Crossfire delegation/reconciliation owner.
+Account-kind, registration, zero-access defaults, remaining native access paths
+and exact Linux TUI/listener shutdown are still implementation/proof obligations,
+not assumed successes. If further proof demonstrates a new architectural
+conflict, explain it rather than silently introduce a proxy or weaken the rule.
+Linux-only certification is approved; there is no Windows/macOS support claim.
+
+The next milestone waits for Mycroft's review of this exact corrected checkpoint.
+No server replacement, Matrix proxy, fake presence or local TUI wrapper has been
+introduced. The current evidence does not implement a management reconciler.
 
 ## Checkpoint verification
 
@@ -213,12 +255,41 @@ Verified on Linux with Node 26.8.1 and Codex CLI 0.156.1:
 - Baseline `npm run verify:codex`: three real-Codex integration tests passed.
 - `npm run verify:architecture`: 18 checks, including native capability gaps,
   HTTP/Tinqer integration, database behavior and malformed protocol boundaries.
+
 - Independent fresh fixture runs confirm repeatability after the database
   isolation correction; the original finite deadlines remain unchanged.
 - `git diff --check`, ignored scratch/analysis and no tracked `.analysis` paths.
 
+### Corrected checkpoint
+
+The correction upgrades both published Tinqer packages to `0.0.28` and reruns
+the full proof bank: **22 checks pass**, including the four native installation
+checks. Its fresh install, strict type check and standalone client build pass.
+The strengthened installation proof separately passes after adding its
+transitive-dependency control. The owning version/launcher bank passes all four
+checks. Unchanged baseline behavioral certification above is retained, not
+substituted for the new Tinqer/install evidence.
+
+A fresh isolated runtime image build succeeds. An offline read-only probe of that
+actual image confirms Node 26.10.0, npm 11.19.1, the seven-day setting, both exact
+owned exemptions, strict engine admission and Tinqer 0.0.28. The image also rejects
+actual npm 11.16.0 with `EBADENGINE` without touching a fixture sentinel. A cached
+build had failed with a missing Docker parent snapshot; the successful fresh
+no-cache build does not certify that damaged cache. No cache pruning, production
+restart or database reset was performed.
+
+An additional isolated lifecycle run using Codex `0.158.0` reproduces the same
+direct-input false positive after the real TUI exits. This is not an exhaustive
+proof against every possible native attachment capability.
+
+After the approved specification revision, the focused native homeserver bank
+passes all seven checks with its original assertions unchanged. Only the proof
+labels now describe characterized limits rather than rejected requirements.
+Strict compilation and the 35-row acceptance-map check pass. The earlier SQL,
+protocol and Codex evidence is retained for its unchanged inputs.
+
 This certifies the stated architecture/proof checkpoint only. Production
-management, enrollment, authorization integration, onboarding migration,
-presence/lifecycle changes, React/browser flows and complete Docker certification
-remain pending. The current homeserver/runtime gaps are not waived by a green
-characterization suite.
+management, enrollment, native restriction reconciliation, onboarding migration,
+listener lifecycle, React/browser flows and complete Docker certification remain
+pending. The updated guarantees need product acceptance evidence, not merely
+green characterization tests or this install-policy image probe.

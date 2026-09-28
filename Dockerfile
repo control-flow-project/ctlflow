@@ -5,7 +5,7 @@ FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2ee
 COPY --from=conduit /nix/store /nix/store
 RUN set -eu; for binary in /nix/store/*/bin/conduit; do cp "$binary" /usr/local/bin/conduit; done; test -x /usr/local/bin/conduit; rm -rf /nix/store
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY .npmrc package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=element /app /app/web
 COPY scripts/bootstrap.ts scripts/container.ts scripts/instance.ts scripts/room-service.ts scripts/lease.ts scripts/control-auth.ts scripts/onboarding.ts scripts/version.ts ./scripts/

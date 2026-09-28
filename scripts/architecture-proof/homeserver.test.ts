@@ -3,7 +3,7 @@ import test from "node:test";
 import { conduitFixture, conduitImage } from "./conduit-fixture.js";
 import { object, request, string } from "./native-http.js";
 
-test("pinned Conduit native capabilities and explicit redesign gaps", { timeout: 180_000 }, async context => {
+test("pinned Conduit native capabilities and characterized limits", { timeout: 180_000 }, async context => {
   const fixture = await conduitFixture(context);
   const admin = await fixture.register("fixture-admin");
   const owner = await fixture.register("alice");
@@ -44,15 +44,15 @@ test("pinned Conduit native capabilities and explicit redesign gaps", { timeout:
     assert.equal(response.body.errcode, "M_FORBIDDEN");
   });
 
-  await context.test("gap: read-only power levels do not deny native typing", async () => {
+  await context.test("native read-only power levels still permit typing", async () => {
     const response = await request(fixture.base, "PUT", path + "/typing/" + encodeURIComponent(agent.id), {
       typing: true, timeout: 5000,
     }, agent.token);
     assert.equal(response.status, 200);
-    console.log("GAP read-only ephemeral restriction: native typing accepted (200).");
+    console.log("NATIVE read-only limit: typing accepted (200).");
   });
 
-  await context.test("gap: an independent agent retains native history access after its designated owner leaves", async () => {
+  await context.test("independent membership retains history until agent access is changed", async () => {
     const kicked = await request(fixture.base, "POST", path + "/kick", { user_id: owner.id }, admin.token);
     assert.equal(kicked.status, 200);
     const sent = await request(fixture.base, "PUT", path + "/send/m.room.message/post-owner", {
@@ -67,26 +67,26 @@ test("pinned Conduit native capabilities and explicit redesign gaps", { timeout:
     assert.equal(history.status, 200);
     assert(Array.isArray(history.body.chunk));
     assert(history.body.chunk.some(value => object(object(value).content).body === "after-owner-removal"));
-    console.log("GAP continuing ownership ceiling: stock native accounts have no owner relationship.");
+    console.log("NATIVE ownership limit: agent membership does not track designated owner membership.");
   });
 
-  await context.test("gap: native profile mutation has no administrator-controlled agent-name restriction", async () => {
+  await context.test("native agent profile remains mutable independently of configured naming", async () => {
     const path = "/_matrix/client/v3/profile/" + encodeURIComponent(agent.id) + "/displayname";
     const changed = await request(fixture.base, "PUT", path, { displayname: "Ownerless name" }, agent.token);
     assert.equal(changed.status, 200);
     const read = await request(fixture.base, "GET", path, undefined, admin.token);
     assert.equal(read.status, 200);
     assert.equal(read.body.displayname, "Ownerless name");
-    console.log("GAP administrative naming: native self-profile mutation accepted (200).");
+    console.log("NATIVE naming limit: self-profile mutation accepted (200).");
   });
 
-  await context.test("gap: a successful presence PUT does not establish readable native presence", async () => {
+  await context.test("a successful presence PUT does not establish readable native presence", async () => {
     const path = "/_matrix/client/v3/presence/" + encodeURIComponent(agent.id) + "/status";
     const changed = await request(fixture.base, "PUT", path, { presence: "online" }, agent.token);
     assert.equal(changed.status, 200);
     const read = await request(fixture.base, "GET", path, undefined, admin.token);
     assert.equal(read.status, 404);
     assert.equal(read.body.errcode, "M_NOT_FOUND");
-    console.log("GAP working presence: update accepted (200), shared-room read returned M_NOT_FOUND (404).");
+    console.log("NATIVE presence limit: update accepted (200), shared-room read returned M_NOT_FOUND (404).");
   });
 });
