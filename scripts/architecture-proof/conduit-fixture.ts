@@ -16,7 +16,7 @@ async function docker(args: string[]): Promise<string> {
   return result.stdout.trim();
 }
 
-export async function conduitFixture(context: TestContext) {
+export async function conduitFixture(context: TestContext, options: { allowRoomCreation?: boolean } = {}) {
   const name = "crossfire-architecture-" + randomUUID();
   const registrationToken = randomUUID();
   const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-conduit-"));
@@ -32,7 +32,7 @@ port = 6167
 allow_federation = false
 allow_registration = true
 registration_token = "${registrationToken}"
-allow_room_creation = true
+allow_room_creation = ${options.allowRoomCreation ?? true}
 allow_encryption = false
 allow_check_for_updates = false
 trusted_servers = []

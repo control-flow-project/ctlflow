@@ -173,6 +173,54 @@ Primary sources:
 - [Pinned Conduit native profile updates](https://gitlab.com/famedly/conduit/-/blob/v0.10.14/src/api/client_server/profile.rs)
 - [Native Matrix permissions](https://spec.matrix.org/v1.12/client-server-api/#permissions)
 
+## Milestone 2: direct admission, history and media proof
+
+The next native proof uses the same pinned server, with room creation disabled
+for ordinary accounts, and a private room with `joined` history visibility.
+It does not exercise the live instance. The shared bounded transport also carries
+media bytes, so comparing actual downloaded content does not rely on status alone.
+
+Observed controls:
+
+- Registration without the private authority cannot complete a dummy challenge.
+- A zero-room ordinary identity cannot create a room or join the private room.
+- A private message is readable by a joined agent, denied to the unjoined identity,
+  and a post-kick message is denied to the removed agent while the creator reads it.
+- Authenticated native media returns the exact attachment bytes to a joined agent.
+- The unauthenticated legacy media route denies this newly uploaded content with
+  `404 M_NOT_FOUND`; the modern media route without a token returns 401.
+
+**Additional restrictions are not proved and are not silently waived:**
+
+- A zero-room authenticated identity can download that same known private-room
+  `mxc://` attachment through the native authenticated media API. The pinned
+  handler's media store receives a boolean authentication flag, not a room/owner
+  delegation check. Room power levels do not narrow this access.
+- Applied kick denies new messages but leaves previously authorized server-side
+  history and known attachment bytes accessible through new native requests.
+- A zero-room history query returns the private room's `m.room.create` event,
+  including creator and room version. The strict no-content assertion remains
+  failing; it is not weakened into a product acceptance claim. Pinned source
+  `user_can_see_event` returns true when an event has no short-state hash.
+
+The initial run wrongly expected the messages route to return whole-request403
+and suspected anonymous download access. Direct responses and source inspection
+disproved those hypotheses. The corrected run retains the strict no-room-content
+assertion; it reports **14/16 passing, two failures from that same assertion**
+across the new access proof and unchanged HTTP/homeserver transport callers.
+The other two observations are successful characterizations, not acceptance of
+roomless media or post-revocation server access.
+
+Management UI/client filtering cannot enforce additional restrictions against
+direct native calls. The maintainer must decide whether the access contract adopts
+these native Matrix semantics or requires additional homeserver enforcement.
+Neither broader native integration nor a proxy is assumed approved. These are
+not implied waivers from the four earlier accepted limitations.
+
+- [Native Matrix authenticated media API](https://spec.matrix.org/v1.12/client-server-api/#get_matrixclientv1mediadownloadservername-mediaid)
+- [Pinned native media handler](https://gitlab.com/famedly/conduit/-/blob/v0.10.14/src/api/client_server/media.rs)
+- [Pinned event visibility implementation](https://gitlab.com/famedly/conduit/-/blob/v0.10.14/src/service/rooms/state_accessor/mod.rs)
+
 ## Actual coding-session lifecycle
 
 The Linux proof starts a fixture app-server and opens a real interactive Codex

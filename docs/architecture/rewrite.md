@@ -310,8 +310,13 @@ Every row is a final acceptance obligation, not a checkpoint completion claim.
 
 ## Review order
 
-Architecture/proofs → service/contracts → client/listener/onboarding → React →
-Docker/integrated certification. Lestrade is the sole writer. Each substantial
-checkpoint is committed/pushed and reviewed by Mycroft against its exact hash;
-the next milestone waits for explicit approval. Checkpoint approval does not
-authorize production replacement or claim final certification.
+Three substantial checkpoints, including the approved architecture/proof gate:
+
+1. Architecture and native/dependency feasibility.
+2. Complete contracts/service/reconciler plus client/listener/onboarding core.
+3. React, Docker and integrated certification of the complete rewrite.
+
+Lestrade is the sole writer. Each checkpoint is committed/pushed and reviewed
+by Mycroft against its exact hash; the next milestone waits for explicit approval.
+No service-only, client-only or UI-only extra review gates. Checkpoint approval
+does not authorize production replacement or claim final certification.
