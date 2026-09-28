@@ -144,7 +144,7 @@ vite.config.ts.timestamp-*
 
 # Crossfire local runtime and private instance state
 private/
-data/
+/data/
 instances/
 verification/
 .client-paths.json
