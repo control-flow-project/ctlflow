@@ -9,7 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY --from=element /app /app/web
 COPY scripts/bootstrap.ts scripts/container.ts scripts/instance.ts scripts/room-service.ts scripts/lease.ts scripts/control-auth.ts scripts/onboarding.ts scripts/version.ts ./scripts/
-COPY skills/conduit-chat/scripts/lib.ts ./skills/conduit-chat/scripts/lib.ts
+COPY skills/conduit-chat/scripts/lib.ts skills/conduit-chat/scripts/limits.ts ./skills/conduit-chat/scripts/
 ENV CROSSFIRE_DATA_DIR=/runtime CROSSFIRE_WEB_ROOT=/app/web
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["node", "/app/scripts/container.ts"]

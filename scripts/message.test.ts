@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownMessage, MAX_MESSAGE_BYTES } from '../skills/conduit-chat/scripts/message.ts';
+import { markdownMessage, messageContent, MAX_MESSAGE_BYTES } from '../skills/conduit-chat/scripts/message.ts';
 
 test('formatted Matrix messages retain the exact original Markdown', () => {
   const body = 'Status: **complete**\r\nUnicode: 日本語 🦀\n';
@@ -11,6 +11,20 @@ test('formatted Matrix messages retain the exact original Markdown', () => {
   assert.match(content.formatted_body, /<strong>complete<\/strong>/);
   assert.match(content.formatted_body, /<br \/>/);
   assert.match(content.formatted_body, /日本語 🦀/);
+});
+
+test('native edits and mentions retain their fields and render replacement text through the same formatter', () => {
+  const content = { msgtype: 'm.text', body: '* corrected **text**', 'm.mentions': { user_ids: ['@peer:local'] },
+    'm.relates_to': { rel_type: 'm.replace', event_id: '$original' },
+    'm.new_content': { msgtype: 'm.text', body: '**corrected** <script>unsafe()</script>' } };
+  const rendered = messageContent(content);
+  assert.deepEqual(rendered['m.mentions'], content['m.mentions']);
+  assert.deepEqual(rendered['m.relates_to'], content['m.relates_to']);
+  assert.deepEqual(rendered['m.new_content'], markdownMessage(content['m.new_content'].body));
+  assert(!('formatted_body' in content));
+  assert.throws(() => messageContent({ ...content, 'm.new_content': { ...content['m.new_content'], formatted_body: '<script>unsafe()</script>' } }), /independently supplied HTML/);
+  assert.throws(() => messageContent({ ...content, 'm.new_content': { ...content['m.new_content'], 'm.new_content': {} } }), /one replacement/);
+  assert.throws(() => messageContent({ ...content, metadata: 'x'.repeat(MAX_MESSAGE_BYTES) }), /Encoded event/);
 });
 
 test('headings, paragraphs, emphasis, strikethrough and escaped punctuation render', () => {

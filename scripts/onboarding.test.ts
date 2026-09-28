@@ -78,6 +78,7 @@ test('printed HTTP onboarding installs outside the checkout, authenticates the i
   assert.equal(installed.node_version, process.versions.node);
   assert.equal(installed.client_sha256, clientHash);
   assert.equal(createHash('sha256').update(readFileSync(installed.chat)).digest('hex'), clientHash);
+  assert.equal(readFileSync(join(skill, 'licenses/matrix-spec.txt'), 'utf8'), readFileSync(join(ROOT, 'third-party/matrix-spec-LICENSE'), 'utf8'));
   assert(onboarding(settings).includes('Node.js 26+'));
   const accountPath = join(clientConfig, 'accounts/project-one/worker-a.json');
   mkdirSync(join(clientConfig, 'accounts/project-one'), { recursive: true });
@@ -95,6 +96,13 @@ test('printed HTTP onboarding installs outside the checkout, authenticates the i
   assert.equal(readFileSync(olderInstance, 'utf8'), '{"preserve":true}');
   assert.equal(JSON.parse(readFileSync(join(clientConfig, 'instances/project-one.json'), 'utf8')).rooms[0].purpose, settings.rooms[0].purpose);
   assert(!existsSync(join(skill, 'node_modules')));
+  for (const invalid of [{ ...JSON.parse(body), format: 3 },
+    { ...JSON.parse(body), files: { ...files, '../unwanted': 'no' } }]) {
+    const invalidFile = join(directory, 'invalid-bundle.json');
+    writeFileSync(invalidFile, JSON.stringify(invalid));
+    await assert.rejects(execute(process.execPath, [join(ROOT, 'dist/install.mjs'), invalidFile], { env, cwd: workspace }), /Invalid Crossfire client bundle|unexpected files/);
+    assert.deepEqual(JSON.parse(readFileSync(accountPath, 'utf8')), account);
+  }
   const badLink = settings.room_service + '/_coord/client#' + randomBytes(40).toString('base64url');
   await assert.rejects(execute(process.execPath, [join(ROOT, 'dist/install.mjs'), badLink], { env, cwd: workspace }), /HTTP 401/);
   await assert.rejects(execute(process.execPath, [join(ROOT, 'dist/install.mjs'), enrollmentUrl(settings).replace('127.0.0.1', 'example.com')], { env }), /loopback/);

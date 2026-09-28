@@ -244,7 +244,7 @@ Check your conduit-chat messages and reply to worker-a.
 A room containing **worker-a, worker-b, and you** appears in Element. You can
 read and reply there, and exchange attachments. These conversations appear as
 ordinary rooms named for their participants. Your replies are received when
-the agents next call `read`, or delivered automatically when a Codex listener
+the agents next call `agent read`, or delivered automatically when a Codex listener
 is connected as described below.
 
 For real work, replace the demonstration task with its assignment, owned
@@ -269,71 +269,32 @@ initialization. Crossfire does not create workspaces or start agent processes.
 
 - Instance `project-one` and agent `worker-a` produce the Matrix identity
   `@agent-worker-a:project-one.localhost` with the example configuration.
-- `init` generates a random registration password and saves the returned access
+- `agent init` generates a random registration password and saves the returned access
   token privately. The password is not retained. Subsequent calls use the token
   automatically. Agents never need the human's credentials.
 - Give simultaneous sessions different names within an instance. Reuse a name
-  when resuming the same identity and unread positions. Repeating `init` does
+  when resuming the same identity and unread positions. Repeating `agent init` does
   not repeat the original enrollment announcement or change its stored directory.
 - Names start with a lowercase letter and contain 1–40 lowercase letters,
   digits, or hyphens. `admin` is reserved for the human recipient.
 - Read at task start, between work batches, before coordinating shared changes,
   and before completion when using manual reads. With a Codex listener, receiving
-  happens outside the model; do not also poll `read`.
-- `who` lists enrolled members. It does not indicate whether their processes
+  happens outside the model; do not also poll `agent read`.
+- `matrix get-joined-members-by-room` lists members. It does not indicate whether their processes
   are currently running; ending a session preserves its account and history.
 
 ## Automatic input for Codex
 
-Crossfire is project-independent. Any agent can use the chat commands. The
-optional `listen` command connects chat to an existing Codex conversation;
-it does not start an agent, assign tasks, or choose a lead agent.
+The optional `agent listen` attaches to an **existing** Codex session. Open each
+terminal with `codex --enable daemon_auto_start`; the native shared engine is
+not another Crossfire server. If a session is already embedded, the human must
+close and reopen that exact session with
+`codex --enable daemon_auto_start resume SESSION_UUID`. Do not create another
+copy. With an explicitly managed server, the TUI uses
+`--remote unix:///absolute/path/codex.sock`, and Crossfire uses
+`--codex-socket /absolute/path/codex.sock`.
 
-A Codex terminal normally talks to its own internal engine. Automatic delivery
-needs a connection to that engine, so use Codex's shared app-server mode. This
-is **not another Crossfire server**. Each terminal still has its own conversation,
-working directory, agent name, and permissions.
-
-### Open each agent terminal
-
-The adapter uses the experimental Codex app-server protocol, verified with
-Codex CLI 0.156.1 and 0.157.1 on Linux. It requires `app-server proxy`, a local
-Unix control socket, thread metadata reporting `canAcceptDirectInput`, and
-paginated `thread/timeline/list` with user-message client IDs and explicit turn
-boundaries. Other agent tools
-can use manual `read`; there is no simulated keyboard or transcript-file path.
-
-In each project directory, launch Codex with:
-
-```sh
-codex --enable daemon_auto_start
-```
-
-Give that session the usual Crossfire onboarding instructions and its unique
-name. Codex manages its own shared engine. You still start Crossfire separately
-and keep its server terminal open.
-
-For a conversation that was already open in embedded mode, exit that TUI first,
-then reopen **the same session**, not a fork or a second copy:
-
-```sh
-codex --enable daemon_auto_start resume SESSION_UUID
-```
-
-Codex configuration overrides and some features can force embedded mode. Check
-its startup notices. If it reports embedded mode, `listen` will fail rather than
-silently start another conversation. For an explicitly managed local app server,
-connect the TUI with `codex --remote unix:///absolute/path/codex.sock` and give
-the listener the same path using `--codex-socket`. Crossfire never starts that
-server or modifies your Codex configuration.
-
-### Have that agent start its listener
-
-After `init`, ask the agent to run this as a detached background process. This
-Linux example uses `setsid` so ending the tool's process group does not kill the
-listener; `nohup` alone does not provide that isolation. In an agent's
-shell, `CODEX_THREAD_ID` identifies its conversation; an ordinary terminal may
-not have that variable. Never substitute `latest` or another session's UUID.
+After `agent init` in the assigned directory, the agent starts its own listener:
 
 ```sh
 umask 077
@@ -342,114 +303,44 @@ LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/conduit-chat/listeners"
 mkdir -p "$LOG_DIR"
 setsid --fork sh -c 'printf "%s\n" "$$" > "$1"; shift; exec "$@"' \
   crossfire-listener "$LOG_DIR/project-one-worker-a.pid" \
-  node "$CHAT" --instance project-one --agent worker-a listen \
-  --thread "${CODEX_THREAD_ID:?Run inside the intended Codex session}" \
+  node "$CHAT" --instance project-one --agent worker-a agent listen \
+  --thread "${CODEX_THREAD_ID:?Exact current session required}" \
   >"$LOG_DIR/project-one-worker-a.log" 2>&1 < /dev/null
 ```
 
-Use the installed script path if you selected a custom skill directory. Each
-listener runs under the same local user and Codex home as its Codex session.
-Read the PID from the `.pid` file after startup; `kill -TERM PID` stops only that
-listener. Start only one listener per identity. Check that PID and its log once
-for startup errors, rather than repeatedly asking the model to poll it.
+Use the actual installed skill path. Keep the PID and check its log once.
+The detached process waits without spending model tokens. Matrix acquisition
+continues while native input awaits receipt. Empty polls and self echoes are
+silent. `kill -TERM PID` stops only that listener; stale locks after abrupt death
+take about 30 seconds to recover.
 
-While idle, the listener waits in Matrix `/sync` for up to ten seconds. A new
-event wakes it immediately. It reads all joined rooms together through the same
-paginated history as `read`, unless you select one with `--room`. Empty polls,
-membership-only updates and echoes of that identity's own messages produce no
-Codex input and no console output.
+The first three peer messages and five messages from the exact configured human
+are immediate in a burst. After that, messages stay in Matrix for a fixed window
+ending ten seconds after the last submission. Buffered arrivals do not extend
+it. Configure `--debounce-ms 0..60000` (default10000). All selected rooms are
+collected together under a **total** 20-event/64KiB default, not a per-room
+allowance. Native protocol polling and receipts are not model calls.
 
-Within a burst, the first three messages from other agents and the first five
-from the configured human observer have no batching delay. The human allowance
-uses the exact Matrix sender ID, not a display name, message body or room name.
-Both counts span all selected rooms and count forwarded events, not polls or
-Codex submissions. A collection that contains a message with remaining allowance
-goes through together; existing cross-room batches are never split to consume
-the allowance one message at a time.
+The authenticated human can send `!! instruction` to cancel the captured turn
+and redirect, or bare `!!` to stop and pause delivery until later human input.
+Shared rooms require a native mention of the intended agent; a human-agent DM
+is unambiguous. Edits, quoted examples, agents and historical snapshots cannot
+cancel work. Urgent controls bypass debounce and ordinary receipt waits.
+Cancellation is not rollback or a guarantee about detached child processes.
 
-After the applicable allowance is used, further messages stay unread in Matrix
-until ten seconds after the last submission. New buffered messages do not reset
-that deadline. The listener still long-polls: a human message with allowance
-remaining can wake an agent-only batching window and flush the current collection.
-An empty collection after the deadline resets both counts for the next burst.
-Self echoes and membership updates neither consume allowance nor extend windows.
-`--debounce-ms 5000` selects five seconds; the default is `10000`, the accepted
-range is `0..60000`, and `0` adds no batching delay. This is independent of the
-idle long-poll timeout configured by `--poll-ms`. There is no extra local queue,
-model turn, or receipt notice for buffering.
+The adapter never starts, resumes or forks an agent, takes over its controlling
+TUI, answers approvals or changes model/sandbox settings. It requires Codex's
+experimental `app-server proxy`, exact workspace/direct-input metadata,
+`thread/timeline/list` receipts, `thread/turns/list` and `turn/interrupt`.
+A receipt, not request acceptance, authorizes checkpointing. Urgent delivery
+cannot mark older unread messages read. Minimal durable control identity/turn
+proof prevents retargeting a replay to new work. Ambiguous cancellation fails
+closed. The original TUI keeps its full native message notifications.
 
-Each collection keeps the existing per-room page limit (`--limit`, default 50)
-and splits inputs at 128 KiB. Larger backlogs continue in subsequent collections;
-nothing is truncated. Waiting for native receipt overlaps the window, rather
-than adding another ten seconds afterward. Native backpressure and network
-failures can still delay delivery, and later messages behind a full page must
-wait until that page is consumed. Stopping during a window leaves pending
-messages unread for the next listener or manual read.
+Detailed command options, membership semantics, interruption recovery and
+bounded history recipes have one maintained owner:
 
-For actual messages, the adapter verifies the selected thread and workspace,
-then submits the bounded inputs. Codex starts a turn when idle or steers its
-existing turn when busy. Work continues while the listener waits; messages are
-consumed at Codex's normal input boundaries, not by forcibly interrupting a
-running tool. The original TUI remains responsible for approvals and tool
-requests. The relay never approves anything or changes sandbox/model settings.
-
-Inputs include the instance, observer, sender, room, event ID, timestamp, and
-original content. Attachments remain attachment references; the agent can
-download them using the existing command. Peer text is attributed external
-input, not authority to change the user's task or instructions. Avoid automatic
-acknowledgements that cause agents to reply to each other indefinitely.
-
-### Delivery and recovery
-
-- One identity has one cursor consumer. While `listen` runs, another `listen`,
-  `read`, or `init` for that identity fails promptly. `send`, `history`, `who`,
-  and `rooms` remain available.
-- Cursors advance only after each batch has an exact native user-message
-  receipt in native history, not merely a successful submission response.
-  Receipt means Codex recorded the input, not that the assistant has finished
-  answering it.
-  Recovery is **at least once**, not exactly once: a crash after receipt but
-  before checkpointing can replay messages. Original event IDs identify replays.
-- Before submission, the listener records the native timeline's latest entry.
-  Receipt checks inspect only the interval after that boundary and advance it
-  after each complete check. Acknowledgement can precede history publication;
-  an unchanged tail means wait, not search the entire older conversation.
-- If a turn is interrupted before receipt, the listener checks its native
-  timeline through the explicit completion. It resubmits only when every entry
-  since submission has been inspected and the exact client ID is absent. Inferred
-  display status alone is not evidence of completion. A recorded message is
-  not resent just because its reply was interrupted. This does not restart the
-  interrupted task or cancel tools.
-  Each new interval is bounded to 100 pages of 100 items, independent of total
-  conversation or active-turn length. Missing boundaries, malformed pages,
-  exceeding that bound or failing the query stop with the cursor unchanged.
-- Detailed input notifications belong to the controlling Codex client. The
-  relay does not rejoin or take over that connection. While input is pending,
-  it checks the bounded timeline every `--poll-ms` (ten seconds by default);
-  native thread-status changes wake that check sooner. These are local API
-  calls, not model requests. There are no receipt prompts, empty-poll turns,
-  or automatic chat acknowledgements. Only actual batched chat content reaches
-  the model; an idle conversation wakes for that content, not for bookkeeping.
-- Fresh threads can briefly lack history. An empty initial timeline or native
-  `-32601` response leaves the initial boundary unset; the first receipt check
-  must then find the receipt or verify the beginning of history and the accepted
-  turn's start. Unavailable post-submission history permits at most three read
-  attempts, never another input submission. If it remains unavailable, delivery
-  stops without advancing the cursor.
-- Each input is limited to 128 KiB of UTF-8 JSON and attribution text. Messages
-  are batched without truncation. An oversized event stops delivery with its
-  cursor unchanged; inspect it with `read` after stopping the listener.
-- Transient Matrix failures get at most three retries. Authentication, observer,
-  native-protocol and ambiguous submission failures stop the listener. No
-  ambiguously delivered input is automatically retried. Only the proven
-  interruption loss described above permits resubmission. Check the TUI and
-  event IDs before restarting after an uncertain acknowledgement.
-- SIGINT, SIGTERM and SIGHUP cancel outstanding waits and release the reader
-  lock. If the process is killed abruptly, lock recovery takes about 30 seconds.
-- If the thread is unloaded or cannot accept direct input, delivery stops.
-  Crossfire does not resume, fork, launch or take over conversations. Stop the
-  listener when ending the assignment; an intentionally idle loaded session
-  can be woken by new messages.
+- [Agent skill and command workflows](skills/conduit-chat/SKILL.md)
 
 ## Example configurations and what “start from config” means
 
@@ -506,8 +397,8 @@ You do not need to write a container configuration yourself.
 | `web_port` | Host port for Element and conversation creation; integer 1024–65535, different from `matrix_port` |
 | `observer.username` | Human account name; starts with a letter and uses lowercase letters, digits, `_`, or `-`, up to 40 characters |
 | `observer.display_name` | Human name shown in rooms |
-| `default_room` | Alias of a room in `rooms`; used for untargeted messages, uploads, history, member lists, and the initial enrollment announcement |
-| `rooms` | Nonempty array of shared rooms; every enrolled agent joins all of them |
+| `default_room` | Alias of a room in `rooms`; selects the first-enrollment announcement destination; native operations require their explicit Matrix parameters |
+| `rooms` | Nonempty array of shared rooms; first enrollment joins them once, subsequent membership is explicit |
 | `rooms[].alias` | Unique, stable room identifier within the instance; uses the same lowercase name rules as `id`, and is accepted by `--room` |
 | `rooms[].name` | Display name shown in the UI and agent room list |
 | `rooms[].purpose` | What belongs in this room; shown to agents and used as the Matrix room topic |
@@ -526,53 +417,35 @@ settings or limits; existing accounts and read positions are retained.
 
 ### Selecting and maintaining shared rooms
 
-Use as many entries as your project needs. Room purposes guide conversation
-routing; all configured shared rooms include the human and all enrolled agents.
-They are not per-team access restrictions. Direct conversations are additional,
-automatically created rooms containing their participants and the human.
+Configured rooms define first-enrollment membership, names, purposes and the
+default announcement room. Native Matrix membership is the live subscription.
+Removing an entry does not delete its room or history. Keeping the alias when
+editing names/purposes preserves identity. Reordering entries does not change
+`default_room`.
 
-Agents run `rooms` to discover aliases, names, purposes, members, and the default
-room, then use those aliases directly:
+Agents discover native rooms with `matrix get-joined-rooms`, read names/topics
+with `matrix get-room-state-with-key`, and resolve local aliases using
+`matrix get-room-id-by-alias`. `agent read --room planning` accepts a configured
+short alias. Native commands use Matrix IDs/aliases exactly as their APIs do.
 
 ```sh
-node /path/to/chat.mjs --instance project-one --agent worker-a rooms
-node /path/to/chat.mjs --instance project-one --agent worker-a send --room planning --message 'Proposed interface for review.'
-node /path/to/chat.mjs --instance project-one --agent worker-a read --room reviews
-node /path/to/chat.mjs --instance project-one --agent worker-a upload ./review.md --room reviews
+node /path/to/chat.mjs --instance project-one --agent worker-a matrix leave-room --room-id '!room-id' --body '{}'
+node /path/to/chat.mjs --instance project-one --agent worker-a matrix join-room-by-id --room-id '!room-id' --body '{}'
 ```
 
-`--room` accepts a configured short alias, its full local Matrix alias such as
-`#planning:project-one.localhost`, or a Matrix room ID. Unknown aliases fail
-instead of falling back to the default. Untargeted `read` checks every joined
-room, including direct conversations. Reading one room preserves the unread
-positions of the others.
+Leaving persists through reads, catalog refreshes and repeat initialization.
+An explicit join or a new human invitation restores membership. Returning
+receives bounded recent context, not all history while away. Already-recorded
+model input cannot be withdrawn.
 
-Keep an entry's alias when editing its name or purpose to preserve the same
-conversation and history. Reordering entries does not change the default;
-change `default_room` explicitly. New aliases create new rooms. Removing an
-entry stops managing and enrolling newcomers into that room; it does not delete
-the room, its existing memberships, or history. Existing members can still read
-it and address its Matrix ID. Re-adding the original alias reuses that room.
-
-Stop the instance before editing its configuration, then start it again. The
-updated client fetches the current room catalog and joins newly configured
-rooms on its next command. Room changes alone require no client reinstall.
-
-### Upgrading an existing single-room instance
-
-The previous `room: { alias, name, topic }` format is accepted on startup and
-rewritten into a one-entry `rooms` array, with `topic` becoming `purpose` and
-that alias becoming `default_room`. Existing Matrix room IDs, accounts,
-attachments, and history are preserved. Add more entries after migration.
-Do not combine `room` with `rooms` in one configuration.
-
-After updating the checkout, restart the instance and reinstall the agent
-client for each participating user to enable room discovery and alias selection.
-Existing account tokens and unread positions remain intact.
+Stop the instance before editing its configuration, then restart. New rooms do
+not forcibly re-enroll existing agents; join explicitly. Use the canonical
+`rooms` array/`default_room` configuration; the superseded single-`room` format
+is rejected. No room migration or compatibility mode is retained.
 
 `start NAME` reads the private configuration created by `init` when present;
-otherwise it uses the last saved configuration for that instance. Supplying a
-file path explicitly always uses that file.
+otherwise it uses the last saved configuration for that instance. An explicit
+file path selects that file.
 
 ## Several projects at the same time
 
@@ -659,122 +532,86 @@ A terminal multiplexer deliberately keeps its processes alive when detached;
 the instance stays running while that terminal session still exists. End the
 session or use `stop` to shut it down.
 
-## Agent CLI: every command and option
+## Agent CLI: native operations and bounded workflows
 
-Use the `chat` path printed by `install-client`. The examples below use a
-placeholder; replace `/path/to/chat.mjs` with that actual path. Every operation
-requires the assigned instance and agent name.
+`chat` here abbreviates
+`node /installed/path/chat.mjs --instance INSTANCE --agent AGENT`.
+The standalone bundle requires Node 26+, including when installed per project.
+
+| Namespace | Contract |
+| --- | --- |
+| `agent init` | Enroll once, announce workspace and return bounded recent context |
+| `agent read` | Read since acknowledged positions; aggregate bounded output; publish native read markers after output |
+| `agent listen --thread UUID` | Automatic native Codex delivery and authenticated human controls |
+| `agent conversation --recipient NAME` | Explicit human-observed DM provisioning; no implicit message send |
+| `matrix OPERATION` | One native Matrix request plus credential/observer/resource checks |
+| `matrix --help` | All 157 pinned operation IDs, mechanical command names and access classifications |
+| `matrix OPERATION --help` | Exact native path, method, parameters, body and policy |
+
+There are no old top-level command aliases. The catalog is generated from the
+official Matrix v1.12 schemas, with a checked source fingerprint. Operation IDs
+and parameter names become kebab-case flags; native JSON fields/tokens are
+unchanged. For example `getRoomEvents` becomes `get-room-events`,
+`roomId` becomes `--room-id`, and native `next_batch` stays `next_batch`
+inside JSON.
+
+Typical native commands cover history, search, event/context lookup, relations,
+threads, memberships, room state, profiles, filters, account data, read markers,
+notifications, push rules, tags, spaces and files. The manifest explicitly marks
+operator/account operations, unsupported encryption/calling/identity services
+and deprecated endpoints. Disabled operations cannot be enabled with raw paths.
+An admitted standard endpoint can still be unsupported by the installed Matrix
+server; its error is surfaced without substituting another API.
 
 ```sh
-node /path/to/chat.mjs --instance project-one --agent worker-a init
-node /path/to/chat.mjs --instance project-one --agent worker-a read
+chat matrix get-room-events --room-id '!room-id' --dir b --limit 10 --view messages
+chat matrix get-room-events --room-id '!room-id' --dir b --limit 10 --from 'PREVIOUS_END'
+chat matrix sync --view inbox
+chat agent conversation --recipient admin
+chat matrix send-message --room-id '!returned-room-id' --event-type m.room.message --markdown '**Ready**'
+chat matrix send-message --room-id '!returned-room-id' --event-type m.room.message --markdown-file /absolute/report.md
+chat matrix upload-content --input-file /absolute/report.md --filename report.md
 ```
 
-In the reference and table below, `chat` abbreviates
-`node /path/to/chat.mjs --instance INSTANCE --agent AGENT`. Replace the path and
-identity placeholders with the installation path and assigned names.
+Uploading does not send an attachment implicitly. Use the returned native
+`content_uri` in an explicit `m.file` event; download with
+`get-content-authed --server-name SERVER --media-id ID --output-file NEW_PATH`.
+Files stream within the instance limit and never overwrite an existing path.
+For idempotent message retry, retain an explicit `--txn-id` from the outset.
+The client does not retry uncertain sends or infer a previous generated ID.
 
-```text
-chat init
-chat read [--room ROOM] [--limit N]
-chat listen --thread UUID [--room ROOM] [--limit N] [--poll-ms N]
-  [--codex-socket ABSOLUTE_PATH] [--codex-binary PATH] [--request-timeout-ms N]
-chat history [--room ROOM] [--limit N]
-chat send --message TEXT [--to PEER | --room ROOM] [--txn ID]
-chat send --message-file FILE [--to PEER | --room ROOM] [--txn ID]
-chat upload FILE [--to PEER | --room ROOM] [--caption TEXT] [--txn ID]
-chat download MXC NEW_FILE
-chat who [--room ROOM]
-chat rooms
-node /path/to/chat.mjs --help
-```
-
-`ROOM` is a configured alias, a full local Matrix alias, or a Matrix room ID.
-`PEER` is an agent name, a full local Matrix user ID, or `admin` for the human.
-`MXC` is the attachment URI returned by `upload` or a message's `content.url`.
-`N` is 1–100, with a default of 50. `--to` and `--room` are mutually exclusive;
-`send` requires exactly one of `--message` and `--message-file`.
-
-| Command | Effect |
+| Guard | Default / maximum |
 | --- | --- |
-| `chat init` | Create/reuse the identity, join all configured shared rooms, announce its initial working directory in the default room |
-| `chat read` | Accept human-created invitations, read unread events, and save per-room read positions |
-| `chat read --room reviews --limit 100` | Read one configured room with a chosen page size |
-| `chat listen --thread UUID` | Deliver unread chat to that loaded Codex session until stopped |
-| `chat history` | Replay recent default-room messages without changing read positions |
-| `chat history --room '!room-id' --limit 50` | Replay recent messages from a selected room |
-| `chat send --message 'Task started.'` | Send text to the configured default room |
-| `chat send --room planning --message 'Proposed design.'` | Send text to a configured room by its alias |
-| `chat send --message-file ./update.md` | Send a file's Markdown as a formatted message, within the encoded size limit |
-| `chat send --to worker-b --message 'Please confirm the interface.'` | Send to a conversation containing both agents and the human |
-| `chat send --to admin --message 'I need a decision.'` | Send to a conversation containing the sender and human |
-| `chat send --room '!room-id' --message 'Confirmed.'` | Reply to an existing room containing the human |
-| `chat upload ./notes.md --to worker-b --caption 'Review notes'` | Send an attachment; use `--room reviews` for a shared room or omit a target for the default |
-| `chat download 'mxc://project-one.localhost/media-id' ./received.md` | Download to a new file; refuses to overwrite |
-| `chat who [--room planning]` | List members of the selected room, or the default room |
-| `chat rooms` | Accept invitations and list joined rooms, aliases, names, purposes, default, and members |
-| `node /path/to/chat.mjs --help` | Show help without requiring an identity |
+| Complete context output/input | 64 KiB / 96 KiB, configurable `--max-output-bytes` |
+| Automatic/manual receive events | 20 total across rooms / 100 |
+| Native `--limit` | 20 / 100 where present |
+| Normal JSON transport | 1 MiB, independent of context output |
+| Explicit file transfer/output | Instance file limit; 100 MiB in examples |
+| Encoded outgoing message content | 50,000 UTF-8 bytes including Markdown and HTML |
 
-| Option | Applies to | Meaning |
-| --- | --- | --- |
-| `--instance NAME` | Every operation | Select the project instance; required |
-| `--agent NAME` | Every operation | Select the identity and its read positions; required |
-| `--room ROOM` | `read`, `listen`, `history`, `send`, `upload`, `who` | Configured alias, full local alias, or Matrix room ID |
-| `--to PEER` | `send`, `upload` | Agent name, full local Matrix ID, or `admin`; mutually exclusive with `--room` |
-| `--limit N` | `read`, `listen`, `history` | 1–100 timeline events per room; default 50. State events count toward the limit |
-| `--thread UUID` | `listen` | Exact existing Codex conversation; required |
-| `--codex-socket PATH` | `listen` | Absolute local app-server socket; defaults to Codex's own control socket |
-| `--codex-binary PATH` | `listen` | Codex executable; defaults to `codex` on PATH |
-| `--poll-ms N` | `listen` | Matrix long-poll timeout and pending native-receipt check interval, 100–30,000 ms; default 10,000 |
-| `--request-timeout-ms N` | `listen` | Native RPC timeout, 100–300,000 ms; default 30,000. Receipt waits impose no turn-duration limit |
-| `--message TEXT` | `send` | Text; supply exactly one of this and `--message-file` |
-| `--message-file PATH` | `send` | Read message text from a file |
-| `--caption TEXT` | `upload` | Caption; defaults to the filename |
-| `--txn ID` | `send`, `upload` | Preserve this on retry to avoid duplicate message events; repeating an upload may still store another media copy |
-| `--help` | CLI | Show help |
+History/search do not consume listener positions. Native continuations remain
+opaque and lossless. Oversized pages are not truncated with a misleading next
+token: narrow the query or save a bounded native response to an explicit file.
+`--view messages` removes duplicate HTML with an explicit omission field;
+`--view inbox` reports native notifications/read state. Notification counts
+are **not exact unread-message counts**. There is no custom message index,
+total-room counter, unread-count engine or durable message queue.
 
-Successful one-shot calls return JSON; `listen` stays silent on success. Inspect `events` from `read` and repeat while
-`more` is true. Events retain server order within each room; different rooms
-are returned in groups, not a single global timeline. An attachment's
-`content.url` supplies the `mxc://` URI for `download`.
+Agents author Markdown. The shared formatter emits sanitized Matrix HTML,
+including headings, tables and language-labelled code; Element renders it
+without a fork. Raw HTML is text, unsafe links are removed, and external images
+do not auto-load. Mermaid, math and footnotes are outside this formatter.
+The pinned Element release does not syntax-colour code blocks longer than 4096
+characters, but still displays their code.
 
-Each identity has independent cursors. `history` leaves those cursors unchanged.
-A crash after output but before checkpointing may replay events; callers can
-deduplicate by `event_id`. Concurrent cursor consumers fail rather than block
-an agent behind a long-running listener.
+A single receiver lock protects delivery checkpoints and native read-marker
+mutations. Exact native receipts precede local checkpoints; retryable Matrix
+read-marker publication uses a small proof journal, not re-delivery. A crash
+between receipt and checkpoint can replay an event; no exactly-once claim is
+made. The complete recipes and failure recovery are maintained in the skill.
 
-### Message formatting
-
-Agents write Markdown, not HTML. Both `--message` and `--message-file` use the
-same formatter. Crossfire sends the unchanged Markdown in Matrix's `body` and
-sanitized HTML in `formatted_body`, with `format: "org.matrix.custom.html"`.
-Element renders that HTML; readers still have the original Markdown. Existing
-messages are not rewritten.
-
-Supported formatting includes headings, paragraphs, emphasis, strikethrough,
-ordered and unordered lists, nested lists, blockquotes, links, tables, task
-lists, inline code, and fenced or indented code blocks. Task lists use readable
-checkbox symbols, not interactive form controls. Single line breaks are
-preserved. Raw HTML displays as text; unsafe link schemes are removed.
-Inline images use Matrix `mxc://` media. Other Markdown images become links,
-so viewing an agent message does not automatically load an external image.
-
-Use a language label on code fences, such as `typescript`, `rust`, `csharp`,
-`bash`, or `json`. Element provides syntax colouring, a copy button, and
-optional line numbers. The pinned Element version stops syntax colouring for
-blocks over 4,096 characters; it still displays their code. Extensions such as
-Mermaid diagrams, mathematical notation, and footnotes are not interpreted by
-this formatter.
-
-Prefer `--message-file` for multiline Markdown and code. This avoids shell
-expansion of backticks and `$` inside double-quoted command arguments. The
-complete JSON message content, including both Markdown and HTML, must fit
-50,000 UTF-8 bytes. An oversized message fails without truncation or sending;
-use `upload` for larger documents.
-
-After updating Crossfire, rebuild and export or reinstall the client so agents
-use the new formatter. Updating the server alone does not replace installed
-agent clients. The Element client needs no fork or custom renderer.
+- [Agent skill](skills/conduit-chat/SKILL.md)
+- [Native API catalog provenance](docs/matrix-api.md)
 
 ## Architecture, skills, and human visibility
 
@@ -807,8 +644,7 @@ listener. Agent commands validate loopback HTTP endpoints and do not follow
 redirects to other servers.
 
 The conversation service exposes an authenticated room catalog containing room
-IDs, aliases, names, purposes, and the selected default. Clients refresh it on
-each command. Room provisioning recovers by stable aliases after interrupted
+IDs, aliases, names, purposes, and the selected default. Enrollment and receive workflows refresh this configuration without changing memberships. Room provisioning recovers by stable aliases after interrupted
 startup, and preserves removed rooms for existing participants and history.
 
 The web service also serves a standalone Node installer at
@@ -827,7 +663,7 @@ renews it and retries that request once. Concurrent renewals share one login;
 network failures and permission errors are not automatically replayed. The
 same client handles startup provisioning and live conversation creation.
 
-Upgrading an existing instance creates the control credentials automatically.
+Starting an instance provisions the required control credentials.
 Even if the old saved human token has been revoked and the human password has
 changed, the existing account, room IDs, messages, and attachments are retained.
 The signing key and control session stay in the server's private directory and
@@ -838,9 +674,9 @@ The [skill](skills/conduit-chat/SKILL.md) supplies workflow instructions. The
 bundled CLI handles authentication, invitations, cursors, and attachments.
 This implementation uses a skill and CLI; it does not install an MCP server.
 
-The optional listener uses Matrix sync only as a wakeup signal. `receive.ts`
+The optional listener uses Matrix sync for wakeups and authenticated human controls. `receive.ts`
 owns history reads for both manual and automatic delivery; `listen.ts` owns
-batching and checkpoint order; `codex.ts` owns the native input connection.
+batching and checkpoint order; `control.ts` owns bounded control evidence; `codex.ts` owns the native input connection.
 Codex's proxy tunnels bytes to its Unix control socket. The adapter uses `ws`
 over Node's stream-pair Duplex to perform the WebSocket handshake and framing.
 Two local type assertions cover declaration gaps for these supported stream

@@ -5,7 +5,7 @@ import { join, resolve, sep, extname } from 'node:path';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { ROOT, elementConfig, type InstanceConfig } from './instance.ts';
-import { CLIENT_PATH, INSTALLER_PATH, type ClientFiles } from './onboarding.ts';
+import { CLIENT_PATH, INSTALLER_PATH, CLIENT_FORMAT, type ClientFiles } from './onboarding.ts';
 import type { RuntimeInfo } from './version.ts';
 import { API, Matrix, MatrixError, readJson, segment, localUser, powerLevels, collect, ensureObserver,
   type Settings, type Members, type Event } from '../skills/conduit-chat/scripts/lib.ts';
@@ -25,7 +25,19 @@ export function serve(config: InstanceConfig, settings: Settings, matrix: Matrix
     const recipient = localUser(target, settings);
     const roster: Members = {};
     for (const room of settings.rooms) Object.assign(roster, await ensureObserver(matrix, room.room_id, settings));
-    if (!(sender in roster) || !(recipient in roster)) throw new Error('Both participants must first join a configured shared room in this instance');
+    for (const user of [sender, recipient]) {
+      if (user in roster) continue;
+      for (const room of settings.rooms) {
+        try {
+          const member = await matrix.get(`${API}/rooms/${segment(room.room_id)}/state/m.room.member/${segment(user)}`);
+          if (member.membership === 'join' || member.membership === 'leave') {
+            roster[user] = { ...(typeof member.displayname === 'string' ? { display_name: member.displayname } : {}) };
+            break;
+          }
+        } catch (error) { if (!(error instanceof MatrixError) || error.status !== 404) throw error; }
+      }
+      if (!(user in roster)) throw new Error('Both participants must first join a configured shared room in this instance');
+    }
     if (sender === recipient) throw new Error('Choose another participant');
     const peers = [...new Set([sender, recipient, settings.observer])].sort();
     const pair = [sender, recipient].filter(user => user !== settings.observer).sort();
@@ -96,7 +108,7 @@ export function serve(config: InstanceConfig, settings: Settings, matrix: Matrix
       if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
         json(response, 401, { error: 'Use the enrollment instructions printed by the server owner' }); return;
       }
-      json(response, 200, { format: 3, settings, files: clientFiles });
+      json(response, 200, { format: CLIENT_FORMAT, settings, files: clientFiles });
       return;
     }
     if (request.method === 'GET' && pathname === '/_coord/rooms') {

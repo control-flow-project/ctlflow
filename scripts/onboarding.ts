@@ -2,6 +2,8 @@ import type { Settings } from '../skills/conduit-chat/scripts/lib.ts';
 
 export const CLIENT_PATH = '/_coord/client';
 export const INSTALLER_PATH = '/_coord/install.mjs';
+export const CLIENT_FORMAT = 4;
+export const CLIENT_FILES = ['SKILL.md', 'scripts/chat', 'scripts/chat.mjs', 'scripts/package.json', 'licenses/matrix-spec.txt'] as const;
 export type ClientFiles = Record<string, string>;
 
 export function enrollmentUrl(settings: Settings): string {

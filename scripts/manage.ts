@@ -7,13 +7,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { ROOT, DATA, INSTANCES, CONFIGURATIONS, validate, type InstanceConfig } from './instance.ts';
 import { configure } from './bootstrap.ts';
 import { HEARTBEAT_INTERVAL_MS } from './lease.ts';
-import { onboarding, type ClientFiles } from './onboarding.ts';
+import { onboarding, CLIENT_FORMAT, type ClientFiles } from './onboarding.ts';
 import { buildInfo, requireNode, type RuntimeInfo } from './version.ts';
 import { name, readJson, readSettings, roomCatalog, writeJson, emit, acquireProcessLock } from '../skills/conduit-chat/scripts/lib.ts';
 
 const runtimeFiles = ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json',
   'scripts/bootstrap.ts', 'scripts/container.ts', 'scripts/instance.ts', 'scripts/room-service.ts',
-  'scripts/lease.ts', 'scripts/control-auth.ts', 'scripts/onboarding.ts', 'scripts/version.ts', 'skills/conduit-chat/scripts/lib.ts'];
+  'scripts/lease.ts', 'scripts/control-auth.ts', 'scripts/onboarding.ts', 'scripts/version.ts',
+  'skills/conduit-chat/scripts/lib.ts', 'skills/conduit-chat/scripts/limits.ts'];
 const storeId = createHash('sha256').update(DATA).digest('hex').slice(0, 12);
 export const containerName = (instance: string) => `crossfire-${name(instance)}-${storeId}`;
 
@@ -131,7 +132,6 @@ async function start(path: string, compile: boolean): Promise<void> {
     writeJson(join(privatePath, 'client-files.json'), files);
     writeJson(join(privatePath, 'build.json'), build);
     writeFileSync(join(privatePath, 'install.mjs'), readFileSync(join(ROOT, 'dist/install.mjs')), { mode: 0o600 });
-    if (original && typeof original === 'object' && 'room' in original) writeJson(path, config);
     const runId = randomUUID();
     let sequence = 0;
     tick = (stopped = false) => writeJson(join(privatePath, 'lease.json'), { run_id: runId, sequence: sequence++, stopped });
@@ -171,13 +171,14 @@ function clientFiles(): ClientFiles {
   const files: ClientFiles = {};
   for (const file of ['SKILL.md', 'scripts/chat', 'scripts/package.json']) files[file] = readFileSync(join(source, file), 'utf8');
   files['scripts/chat.mjs'] = readFileSync(join(ROOT, 'dist/chat.mjs'), 'utf8');
+  files['licenses/matrix-spec.txt'] = readFileSync(join(ROOT, 'third-party/matrix-spec-LICENSE'), 'utf8');
   return files;
 }
 function clientBundle(instance: string) {
   const settings = readSettings(join(INSTANCES, name(instance), 'private/settings.json'));
   if (settings.rooms.some(room => !room.room_id)) throw new Error('Wait for the instance to finish starting before installing its client');
   roomCatalog(settings);
-  return { format: 3, settings, files: clientFiles() };
+  return { format: CLIENT_FORMAT, settings, files: clientFiles() };
 }
 function installClient(instance: string, options: Record<string, string | boolean | undefined>): void {
   const args = [join(ROOT, 'scripts/install-client.ts')];

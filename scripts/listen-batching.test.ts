@@ -22,7 +22,7 @@ function content(native: Awaited<ReturnType<typeof fakeCodex>>) {
     const input = request.params!.input as { text: string }[];
     assert.equal(input.length, 1);
     const text = input[0].text;
-    assert(Buffer.byteLength(text) <= 128 * 1024);
+    assert(Buffer.byteLength(text) <= 64 * 1024);
     return (JSON.parse(text.slice(text.indexOf('\n') + 1)) as { events: ReceivedEvent[] }).events;
   });
 }
@@ -36,13 +36,14 @@ async function fixture(context: TestContext,
     ...controls, codex: native.options };
   const result = listen(options, stop.signal).catch((error: unknown) => error);
   context.after(async () => { stop.abort(new Error('test complete')); await result; });
-  await until(() => matrix.waiting() === 1);
+  await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
   const cursors = () => readJson<Record<string, string>>(matrix.cursorFile);
   return { native, matrix, stop, options, result, cursors };
 }
 
 async function leading(matrix: Awaited<ReturnType<typeof matrixFixture>>, count = 3, sender?: string) {
-  const start = Number(readJson<Record<string, string>>(matrix.cursorFile)[ROOM]);
+  const token = readJson<Record<string, string>>(matrix.cursorFile)[ROOM];
+  const start = token === 'sync-0' ? 0 : Number(token);
   const ids = Array.from({ length: count }, (_, index) => '$leading-' + (start + index));
   for (const [index, id] of ids.entries()) {
     matrix.add(ROOM, message(id, sender));
@@ -57,7 +58,7 @@ test('three leading agent messages are immediate and continuous cross-room traff
   const immediate = await leading(matrix);
   assert(performance.now() - started < 700, 'the first three messages must not wait for a window');
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), immediate.map(id => [id]));
-  matrix.joined.add(PLANNING);
+  matrix.subscribe(PLANNING);
   matrix.add(PLANNING, message('$planning'));
   matrix.add(ROOM, message('$second'));
   const created = ['$second'];
@@ -70,7 +71,7 @@ test('three leading agent messages are immediate and continuous cross-room traff
   await delay(200);
   assert.equal(submissions(native).length, 3);
   assert.equal(cursors()[ROOM], '3');
-  assert.equal(cursors()[PLANNING], undefined);
+  assert.equal(cursors()[PLANNING], '0');
   await until(() => submissions(native).length === 4 && Number(cursors()[ROOM]) > 3);
   clearInterval(producer);
   const trailing = content(native)[3];
@@ -87,7 +88,7 @@ test('the CLI defaults to ten seconds and accepts a shorter configured window', 
       const native = await fakeCodex(childContext);
       const matrix = await matrixFixture(childContext, native.directory);
       const args = [join(ROOT, 'skills/conduit-chat/scripts/chat.ts'), '--instance', 'test', '--agent', 'watson',
-        'listen', '--thread', THREAD, '--codex-binary', native.options.binary, '--poll-ms', '100',
+        'agent', 'listen', '--thread', THREAD, '--codex-binary', native.options.binary, '--poll-ms', '100',
         ...(debounceMs === undefined ? [] : ['--debounce-ms', String(debounceMs)])];
       const child = spawn(process.execPath, args, { env: matrix.env, stdio: ['ignore', 'pipe', 'pipe'] });
       const stopped = once(child, 'close');
@@ -95,7 +96,7 @@ test('the CLI defaults to ten seconds and accepts a shorter configured window', 
       child.stdout.on('data', chunk => { output += String(chunk); });
       child.stderr.on('data', chunk => { errors += String(chunk); });
       childContext.after(async () => { child.kill('SIGTERM'); await stopped; });
-      await until(() => matrix.waiting() === 1);
+      await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
       const immediate = await leading(matrix, 2);
       const started = performance.now();
       immediate.push(...await leading(matrix, 1));
@@ -141,11 +142,11 @@ test('cancelling a window preserves unread messages for an immediate restart', a
   const { native, matrix, stop, options, result, cursors } = await fixture(context, { debounceMs: 1000 });
   const immediate = await leading(matrix);
   matrix.add(ROOM, message('$buffered'), message('$self', SELF));
-  matrix.joined.add(PLANNING);
+  matrix.subscribe(PLANNING);
   matrix.add(PLANNING, message('$other-room'));
   stop.abort(new Error('cancel batching window'));
   assert.match(String(await result), /cancel batching window/);
-  assert.deepEqual(cursors(), { [ROOM]: '3' });
+  assert.deepEqual(cursors(), { [ROOM]: '3', [PLANNING]: '0' });
   assert.equal(submissions(native).length, 3);
   const restarted = new AbortController();
   const restartedResult = listen(options, restarted.signal).catch((error: unknown) => error);
@@ -169,18 +170,18 @@ test('native connection failure during a window leaves pending events unread', a
 
 test('multi-window backlogs keep every event, room cursor, and bounded input', async context => {
   const { native, matrix, cursors } = await fixture(context, { debounceMs: 100, limit: 2 });
-  matrix.joined.add(PLANNING);
+  matrix.subscribe(PLANNING);
   for (const room of [ROOM, PLANNING]) {
     matrix.add(room, ...Array.from({ length: 5 }, (_, index) => message(`${room}-${index}`, undefined, 'x'.repeat(50_000))));
   }
   await until(() => cursors()[ROOM] === '5' && cursors()[PLANNING] === '5');
   const inputs = content(native);
-  assert.equal(inputs.length, 5);
+  assert.equal(inputs.length, 10);
   for (const room of [ROOM, PLANNING]) {
     assert.deepEqual(inputs.flat().filter(event => event.room_id === room).map(event => event.event_id),
       Array.from({ length: 5 }, (_, index) => `${room}-${index}`));
     assert(matrix.requests.filter(request => request.path === `${API}/rooms/${room}/messages`)
-      .every(request => request.query.get('limit') === '2'));
+      .every(request => Number(request.query.get('limit')) <= 2));
   }
 });
 
@@ -222,7 +223,7 @@ test('buffering never bypasses observer, authorization, or oversized-event rejec
       matrix.add(ROOM, message('$reject', undefined, kind === 'oversized' ? 'x'.repeat(128 * 1024) : kind));
       if (kind === 'observer') matrix.missingObserver.add(ROOM);
       if (kind === 'authorization') matrix.failures.set(API + '/sync', [401]);
-      assert.match(String(await result), kind === 'observer' ? /observer/ : kind === 'authorization' ? /HTTP 401/ : /128 KiB/);
+      assert.match(String(await result), kind === 'observer' ? /observer/ : kind === 'authorization' ? /HTTP 401/ : /65536-byte/);
       assert.equal(cursors()[ROOM], '3');
       assert.equal(submissions(native).length, 3);
       assert(existsSync(matrix.cursorFile));
@@ -261,7 +262,7 @@ test('human-looking names and message content cannot grant the human allowance',
 
 test('allowances count actual messages across rooms rather than delivery batches', async context => {
   const { native, matrix, cursors } = await fixture(context, { debounceMs: 700 });
-  matrix.joined.add(PLANNING);
+  matrix.subscribe(PLANNING);
   matrix.add(ROOM, message('$one'), message('$two'));
   matrix.add(PLANNING, message('$three'));
   await until(() => cursors()[ROOM] === '2' && cursors()[PLANNING] === '1');
@@ -278,7 +279,7 @@ test('allowances count actual messages across rooms rather than delivery batches
 test('human messages wake an agent window until their independent fifth message', async context => {
   const { native, matrix, cursors } = await fixture(context, { debounceMs: 700, pollMs: 10_000 });
   const initial = await leading(matrix);
-  matrix.joined.add(PLANNING);
+  matrix.subscribe(PLANNING);
   for (let index = 1; index <= 5; index++) {
     matrix.add(ROOM, message('$peer-' + index));
     await delay(40);

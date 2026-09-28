@@ -1,0 +1,3278 @@
+{
+  "version": "v1.12",
+  "sourceSha256": "037337015f765c9d96a0561888ea15c870d34ea327dac94bab6884e33a0b30cd",
+  "operations": [
+    {
+      "id": "add3PID",
+      "command": "add3-pid",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/3pid/add",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "ban",
+      "command": "ban",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/ban",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "bind3PID",
+      "command": "bind3-pid",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/3pid/bind",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "changePassword",
+      "command": "change-password",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/password",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "checkUsernameAvailability",
+      "command": "check-username-availability",
+      "method": "GET",
+      "path": "/_matrix/client/v3/register/available",
+      "access": "account",
+      "parameters": [
+        {
+          "name": "username",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "claimKeys",
+      "command": "claim-keys",
+      "method": "POST",
+      "path": "/_matrix/client/v3/keys/claim",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "createContent",
+      "command": "create-content",
+      "method": "POST",
+      "path": "/_matrix/media/v1/create",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "createRoom",
+      "command": "create-room",
+      "method": "POST",
+      "path": "/_matrix/client/v3/createRoom",
+      "access": "operator",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "deactivateAccount",
+      "command": "deactivate-account",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/deactivate",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "defineFilter",
+      "command": "define-filter",
+      "method": "POST",
+      "path": "/_matrix/client/v3/user/{userId}/filter",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "deleteDevice",
+      "command": "delete-device",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/devices/{deviceId}",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "deviceId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "deleteDevices",
+      "command": "delete-devices",
+      "method": "POST",
+      "path": "/_matrix/client/v3/delete_devices",
+      "access": "operator",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "deletePushRule",
+      "command": "delete-push-rule",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/pushrules/global/{kind}/{ruleId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "override",
+            "underride",
+            "sender",
+            "room",
+            "content"
+          ]
+        },
+        {
+          "name": "ruleId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "deleteRoomAlias",
+      "command": "delete-room-alias",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/directory/room/{roomAlias}",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomAlias",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "deleteRoomKeyBySessionId",
+      "command": "delete-room-key-by-session-id",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "sessionId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "deleteRoomKeys",
+      "command": "delete-room-keys",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/room_keys/keys",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "deleteRoomKeysByRoomId",
+      "command": "delete-room-keys-by-room-id",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/room_keys/keys/{roomId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "deleteRoomKeysVersion",
+      "command": "delete-room-keys-version",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/room_keys/version/{version}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "deleteRoomTag",
+      "command": "delete-room-tag",
+      "method": "DELETE",
+      "path": "/_matrix/client/v3/user/{userId}/rooms/{roomId}/tags/{tag}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "tag",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "delete3pidFromAccount",
+      "command": "delete3pid-from-account",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/3pid/delete",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "forgetRoom",
+      "command": "forget-room",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/forget",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "generateLoginToken",
+      "command": "generate-login-token",
+      "method": "POST",
+      "path": "/_matrix/client/v1/login/get_token",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "getAccountData",
+      "command": "get-account-data",
+      "method": "GET",
+      "path": "/_matrix/client/v3/user/{userId}/account_data/{type}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getAccountDataPerRoom",
+      "command": "get-account-data-per-room",
+      "method": "GET",
+      "path": "/_matrix/client/v3/user/{userId}/rooms/{roomId}/account_data/{type}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getAccount3PIDs",
+      "command": "get-account3-pids",
+      "method": "GET",
+      "path": "/_matrix/client/v3/account/3pid",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getAvatarUrl",
+      "command": "get-avatar-url",
+      "method": "GET",
+      "path": "/_matrix/client/v3/profile/{userId}/avatar_url",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getCapabilities",
+      "command": "get-capabilities",
+      "method": "GET",
+      "path": "/_matrix/client/v3/capabilities",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getConfig",
+      "command": "get-config",
+      "method": "GET",
+      "path": "/_matrix/media/v3/config",
+      "access": "deprecated",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getConfigAuthed",
+      "command": "get-config-authed",
+      "method": "GET",
+      "path": "/_matrix/client/v1/media/config",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getContent",
+      "command": "get-content",
+      "method": "GET",
+      "path": "/_matrix/media/v3/download/{serverName}/{mediaId}",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "serverName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "mediaId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "allow_remote",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "timeout_ms",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "allow_redirect",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "binary"
+    },
+    {
+      "id": "getContentAuthed",
+      "command": "get-content-authed",
+      "method": "GET",
+      "path": "/_matrix/client/v1/media/download/{serverName}/{mediaId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "serverName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "mediaId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "timeout_ms",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "body": "none",
+      "response": "binary"
+    },
+    {
+      "id": "getContentOverrideName",
+      "command": "get-content-override-name",
+      "method": "GET",
+      "path": "/_matrix/media/v3/download/{serverName}/{mediaId}/{fileName}",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "serverName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "mediaId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "fileName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "allow_remote",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "timeout_ms",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "allow_redirect",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "binary"
+    },
+    {
+      "id": "getContentOverrideNameAuthed",
+      "command": "get-content-override-name-authed",
+      "method": "GET",
+      "path": "/_matrix/client/v1/media/download/{serverName}/{mediaId}/{fileName}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "serverName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "mediaId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "fileName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "timeout_ms",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "body": "none",
+      "response": "binary"
+    },
+    {
+      "id": "getContentThumbnail",
+      "command": "get-content-thumbnail",
+      "method": "GET",
+      "path": "/_matrix/media/v3/thumbnail/{serverName}/{mediaId}",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "serverName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "mediaId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "width",
+          "location": "query",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "height",
+          "location": "query",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "method",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "crop",
+            "scale"
+          ]
+        },
+        {
+          "name": "allow_remote",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "timeout_ms",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "allow_redirect",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "animated",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "binary"
+    },
+    {
+      "id": "getContentThumbnailAuthed",
+      "command": "get-content-thumbnail-authed",
+      "method": "GET",
+      "path": "/_matrix/client/v1/media/thumbnail/{serverName}/{mediaId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "serverName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "mediaId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "width",
+          "location": "query",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "height",
+          "location": "query",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "method",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "crop",
+            "scale"
+          ]
+        },
+        {
+          "name": "timeout_ms",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "animated",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "binary"
+    },
+    {
+      "id": "getDevice",
+      "command": "get-device",
+      "method": "GET",
+      "path": "/_matrix/client/v3/devices/{deviceId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "deviceId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getDevices",
+      "command": "get-devices",
+      "method": "GET",
+      "path": "/_matrix/client/v3/devices",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getDisplayName",
+      "command": "get-display-name",
+      "method": "GET",
+      "path": "/_matrix/client/v3/profile/{userId}/displayname",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getEventByTimestamp",
+      "command": "get-event-by-timestamp",
+      "method": "GET",
+      "path": "/_matrix/client/v1/rooms/{roomId}/timestamp_to_event",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ts",
+          "location": "query",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "dir",
+          "location": "query",
+          "required": true,
+          "type": "string",
+          "values": [
+            "f",
+            "b"
+          ]
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getEventContext",
+      "command": "get-event-context",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/context/{eventId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "filter",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getEvents",
+      "command": "get-events",
+      "method": "GET",
+      "path": "/_matrix/client/v3/events",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "timeout",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getFilter",
+      "command": "get-filter",
+      "method": "GET",
+      "path": "/_matrix/client/v3/user/{userId}/filter/{filterId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "filterId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getJoinedMembersByRoom",
+      "command": "get-joined-members-by-room",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/joined_members",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getJoinedRooms",
+      "command": "get-joined-rooms",
+      "method": "GET",
+      "path": "/_matrix/client/v3/joined_rooms",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getKeysChanges",
+      "command": "get-keys-changes",
+      "method": "GET",
+      "path": "/_matrix/client/v3/keys/changes",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "from",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getLocalAliases",
+      "command": "get-local-aliases",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/aliases",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getLoginFlows",
+      "command": "get-login-flows",
+      "method": "GET",
+      "path": "/_matrix/client/v3/login",
+      "access": "account",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getMembersByRoom",
+      "command": "get-members-by-room",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/members",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "at",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "membership",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "join",
+            "invite",
+            "knock",
+            "leave",
+            "ban"
+          ]
+        },
+        {
+          "name": "not_membership",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "join",
+            "invite",
+            "knock",
+            "leave",
+            "ban"
+          ]
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getNotifications",
+      "command": "get-notifications",
+      "method": "GET",
+      "path": "/_matrix/client/v3/notifications",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "only",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getOneEvent",
+      "command": "get-one-event",
+      "method": "GET",
+      "path": "/_matrix/client/v3/events/{eventId}",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getOneRoomEvent",
+      "command": "get-one-room-event",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/event/{eventId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getPresence",
+      "command": "get-presence",
+      "method": "GET",
+      "path": "/_matrix/client/v3/presence/{userId}/status",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getProtocolMetadata",
+      "command": "get-protocol-metadata",
+      "method": "GET",
+      "path": "/_matrix/client/v3/thirdparty/protocol/{protocol}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "protocol",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getProtocols",
+      "command": "get-protocols",
+      "method": "GET",
+      "path": "/_matrix/client/v3/thirdparty/protocols",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getPublicRooms",
+      "command": "get-public-rooms",
+      "method": "GET",
+      "path": "/_matrix/client/v3/publicRooms",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "since",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "server",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getPushRule",
+      "command": "get-push-rule",
+      "method": "GET",
+      "path": "/_matrix/client/v3/pushrules/global/{kind}/{ruleId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "override",
+            "underride",
+            "sender",
+            "room",
+            "content"
+          ]
+        },
+        {
+          "name": "ruleId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getPushRuleActions",
+      "command": "get-push-rule-actions",
+      "method": "GET",
+      "path": "/_matrix/client/v3/pushrules/global/{kind}/{ruleId}/actions",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "override",
+            "underride",
+            "sender",
+            "room",
+            "content"
+          ]
+        },
+        {
+          "name": "ruleId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getPushRules",
+      "command": "get-push-rules",
+      "method": "GET",
+      "path": "/_matrix/client/v3/pushrules/",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getPushRulesGlobal",
+      "command": "get-push-rules-global",
+      "method": "GET",
+      "path": "/_matrix/client/v3/pushrules/global/",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getPushers",
+      "command": "get-pushers",
+      "method": "GET",
+      "path": "/_matrix/client/v3/pushers",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRelatingEvents",
+      "command": "get-relating-events",
+      "method": "GET",
+      "path": "/_matrix/client/v1/rooms/{roomId}/relations/{eventId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "dir",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "b",
+            "f"
+          ]
+        },
+        {
+          "name": "recurse",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRelatingEventsWithRelType",
+      "command": "get-relating-events-with-rel-type",
+      "method": "GET",
+      "path": "/_matrix/client/v1/rooms/{roomId}/relations/{eventId}/{relType}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "relType",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "dir",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "b",
+            "f"
+          ]
+        },
+        {
+          "name": "recurse",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRelatingEventsWithRelTypeAndEventType",
+      "command": "get-relating-events-with-rel-type-and-event-type",
+      "method": "GET",
+      "path": "/_matrix/client/v1/rooms/{roomId}/relations/{eventId}/{relType}/{eventType}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "relType",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventType",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "dir",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "b",
+            "f"
+          ]
+        },
+        {
+          "name": "recurse",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomEvents",
+      "command": "get-room-events",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/messages",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "dir",
+          "location": "query",
+          "required": true,
+          "type": "string",
+          "values": [
+            "b",
+            "f"
+          ]
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "filter",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomIdByAlias",
+      "command": "get-room-id-by-alias",
+      "method": "GET",
+      "path": "/_matrix/client/v3/directory/room/{roomAlias}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomAlias",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomKeyBySessionId",
+      "command": "get-room-key-by-session-id",
+      "method": "GET",
+      "path": "/_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "sessionId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomKeys",
+      "command": "get-room-keys",
+      "method": "GET",
+      "path": "/_matrix/client/v3/room_keys/keys",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomKeysByRoomId",
+      "command": "get-room-keys-by-room-id",
+      "method": "GET",
+      "path": "/_matrix/client/v3/room_keys/keys/{roomId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomKeysVersion",
+      "command": "get-room-keys-version",
+      "method": "GET",
+      "path": "/_matrix/client/v3/room_keys/version/{version}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomKeysVersionCurrent",
+      "command": "get-room-keys-version-current",
+      "method": "GET",
+      "path": "/_matrix/client/v3/room_keys/version",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomState",
+      "command": "get-room-state",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/state",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomStateWithKey",
+      "command": "get-room-state-with-key",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/state/{eventType}/{stateKey}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventType",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "stateKey",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomTags",
+      "command": "get-room-tags",
+      "method": "GET",
+      "path": "/_matrix/client/v3/user/{userId}/rooms/{roomId}/tags",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getRoomVisibilityOnDirectory",
+      "command": "get-room-visibility-on-directory",
+      "method": "GET",
+      "path": "/_matrix/client/v3/directory/list/room/{roomId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getSpaceHierarchy",
+      "command": "get-space-hierarchy",
+      "method": "GET",
+      "path": "/_matrix/client/v1/rooms/{roomId}/hierarchy",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "suggested_only",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "max_depth",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getThreadRoots",
+      "command": "get-thread-roots",
+      "method": "GET",
+      "path": "/_matrix/client/v1/rooms/{roomId}/threads",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "include",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "all",
+            "participated"
+          ]
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getTokenOwner",
+      "command": "get-token-owner",
+      "method": "GET",
+      "path": "/_matrix/client/v3/account/whoami",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getTurnServer",
+      "command": "get-turn-server",
+      "method": "GET",
+      "path": "/_matrix/client/v3/voip/turnServer",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getUrlPreview",
+      "command": "get-url-preview",
+      "method": "GET",
+      "path": "/_matrix/media/v3/preview_url",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "url",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ts",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getUrlPreviewAuthed",
+      "command": "get-url-preview-authed",
+      "method": "GET",
+      "path": "/_matrix/client/v1/media/preview_url",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "url",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ts",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getUserProfile",
+      "command": "get-user-profile",
+      "method": "GET",
+      "path": "/_matrix/client/v3/profile/{userId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getVersions",
+      "command": "get-versions",
+      "method": "GET",
+      "path": "/_matrix/client/versions",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getWellknown",
+      "command": "get-wellknown",
+      "method": "GET",
+      "path": "/.well-known/matrix/client",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getWellknownSupport",
+      "command": "get-wellknown-support",
+      "method": "GET",
+      "path": "/.well-known/matrix/support",
+      "access": "agent",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "getWhoIs",
+      "command": "get-who-is",
+      "method": "GET",
+      "path": "/_matrix/client/v3/admin/whois/{userId}",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "initialSync",
+      "command": "initial-sync",
+      "method": "GET",
+      "path": "/_matrix/client/v3/initialSync",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "archived",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "inviteBy3PID",
+      "command": "invite-by3-pid",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/invite",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "inviteUser",
+      "command": "invite-user",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/invite",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "isPushRuleEnabled",
+      "command": "is-push-rule-enabled",
+      "method": "GET",
+      "path": "/_matrix/client/v3/pushrules/global/{kind}/{ruleId}/enabled",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "override",
+            "underride",
+            "sender",
+            "room",
+            "content"
+          ]
+        },
+        {
+          "name": "ruleId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "joinRoom",
+      "command": "join-room",
+      "method": "POST",
+      "path": "/_matrix/client/v3/join/{roomIdOrAlias}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomIdOrAlias",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "via",
+          "location": "query",
+          "required": false,
+          "type": "array"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "joinRoomById",
+      "command": "join-room-by-id",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/join",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "kick",
+      "command": "kick",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/kick",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "knockRoom",
+      "command": "knock-room",
+      "method": "POST",
+      "path": "/_matrix/client/v3/knock/{roomIdOrAlias}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomIdOrAlias",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "via",
+          "location": "query",
+          "required": false,
+          "type": "array"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "leaveRoom",
+      "command": "leave-room",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/leave",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "login",
+      "command": "login",
+      "method": "POST",
+      "path": "/_matrix/client/v3/login",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "logout",
+      "command": "logout",
+      "method": "POST",
+      "path": "/_matrix/client/v3/logout",
+      "access": "account",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "logout_all",
+      "command": "logout-all",
+      "method": "POST",
+      "path": "/_matrix/client/v3/logout/all",
+      "access": "account",
+      "parameters": [],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "peekEvents",
+      "command": "peek-events",
+      "method": "GET",
+      "path": "/_matrix/client/v3/events",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "from",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "timeout",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "room_id",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "pingAppservice",
+      "command": "ping-appservice",
+      "method": "POST",
+      "path": "/_matrix/client/v1/appservice/{appserviceId}/ping",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "appserviceId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "postPusher",
+      "command": "post-pusher",
+      "method": "POST",
+      "path": "/_matrix/client/v3/pushers/set",
+      "access": "operator",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "postReceipt",
+      "command": "post-receipt",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/receipt/{receiptType}/{eventId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "receiptType",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "m.read",
+            "m.read.private",
+            "m.fully_read"
+          ]
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "postRoomKeysVersion",
+      "command": "post-room-keys-version",
+      "method": "POST",
+      "path": "/_matrix/client/v3/room_keys/version",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "post3PIDs",
+      "command": "post3-pids",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/3pid",
+      "access": "deprecated",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "putRoomKeyBySessionId",
+      "command": "put-room-key-by-session-id",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/room_keys/keys/{roomId}/{sessionId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "sessionId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "putRoomKeys",
+      "command": "put-room-keys",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/room_keys/keys",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "putRoomKeysByRoomId",
+      "command": "put-room-keys-by-room-id",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/room_keys/keys/{roomId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "putRoomKeysVersion",
+      "command": "put-room-keys-version",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/room_keys/version/{version}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "version",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "queryKeys",
+      "command": "query-keys",
+      "method": "POST",
+      "path": "/_matrix/client/v3/keys/query",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "queryLocationByAlias",
+      "command": "query-location-by-alias",
+      "method": "GET",
+      "path": "/_matrix/client/v3/thirdparty/location",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "alias",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "queryLocationByProtocol",
+      "command": "query-location-by-protocol",
+      "method": "GET",
+      "path": "/_matrix/client/v3/thirdparty/location/{protocol}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "protocol",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "searchFields",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "queryPublicRooms",
+      "command": "query-public-rooms",
+      "method": "POST",
+      "path": "/_matrix/client/v3/publicRooms",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "server",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "queryUserByID",
+      "command": "query-user-by-id",
+      "method": "GET",
+      "path": "/_matrix/client/v3/thirdparty/user",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "userid",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "queryUserByProtocol",
+      "command": "query-user-by-protocol",
+      "method": "GET",
+      "path": "/_matrix/client/v3/thirdparty/user/{protocol}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "protocol",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "fields",
+          "location": "query",
+          "required": false,
+          "type": "object"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "redactEvent",
+      "command": "redact-event",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/rooms/{roomId}/redact/{eventId}/{txnId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "txnId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "redirectToIdP",
+      "command": "redirect-to-id-p",
+      "method": "GET",
+      "path": "/_matrix/client/v3/login/sso/redirect/{idpId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "idpId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "redirectUrl",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "redirectToSSO",
+      "command": "redirect-to-sso",
+      "method": "GET",
+      "path": "/_matrix/client/v3/login/sso/redirect",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "redirectUrl",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "refresh",
+      "command": "refresh",
+      "method": "POST",
+      "path": "/_matrix/client/v3/refresh",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "register",
+      "command": "register",
+      "method": "POST",
+      "path": "/_matrix/client/v3/register",
+      "access": "account",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "guest",
+            "user"
+          ]
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "registrationTokenValidity",
+      "command": "registration-token-validity",
+      "method": "GET",
+      "path": "/_matrix/client/v1/register/m.login.registration_token/validity",
+      "access": "account",
+      "parameters": [
+        {
+          "name": "token",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "reportContent",
+      "command": "report-content",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/report/{eventId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "requestOpenIdToken",
+      "command": "request-open-id-token",
+      "method": "POST",
+      "path": "/_matrix/client/v3/user/{userId}/openid/request_token",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "requestTokenToRegisterEmail",
+      "command": "request-token-to-register-email",
+      "method": "POST",
+      "path": "/_matrix/client/v3/register/email/requestToken",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "requestTokenToRegisterMSISDN",
+      "command": "request-token-to-register-msisdn",
+      "method": "POST",
+      "path": "/_matrix/client/v3/register/msisdn/requestToken",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "requestTokenToResetPasswordEmail",
+      "command": "request-token-to-reset-password-email",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/password/email/requestToken",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "requestTokenToResetPasswordMSISDN",
+      "command": "request-token-to-reset-password-msisdn",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/password/msisdn/requestToken",
+      "access": "account",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "requestTokenTo3PIDEmail",
+      "command": "request-token-to3-pid-email",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/3pid/email/requestToken",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "requestTokenTo3PIDMSISDN",
+      "command": "request-token-to3-pidmsisdn",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/3pid/msisdn/requestToken",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "roomInitialSync",
+      "command": "room-initial-sync",
+      "method": "GET",
+      "path": "/_matrix/client/v3/rooms/{roomId}/initialSync",
+      "access": "deprecated",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "search",
+      "command": "search",
+      "method": "POST",
+      "path": "/_matrix/client/v3/search",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "next_batch",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "searchUserDirectory",
+      "command": "search-user-directory",
+      "method": "POST",
+      "path": "/_matrix/client/v3/user_directory/search",
+      "access": "agent",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "sendMessage",
+      "command": "send-message",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/rooms/{roomId}/send/{eventType}/{txnId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventType",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "txnId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "sendToDevice",
+      "command": "send-to-device",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/sendToDevice/{eventType}/{txnId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "eventType",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "txnId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setAccountData",
+      "command": "set-account-data",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/user/{userId}/account_data/{type}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setAccountDataPerRoom",
+      "command": "set-account-data-per-room",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/user/{userId}/rooms/{roomId}/account_data/{type}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setAvatarUrl",
+      "command": "set-avatar-url",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/profile/{userId}/avatar_url",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setDisplayName",
+      "command": "set-display-name",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/profile/{userId}/displayname",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setPresence",
+      "command": "set-presence",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/presence/{userId}/status",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setPushRule",
+      "command": "set-push-rule",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/pushrules/global/{kind}/{ruleId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "override",
+            "underride",
+            "sender",
+            "room",
+            "content"
+          ]
+        },
+        {
+          "name": "ruleId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setPushRuleActions",
+      "command": "set-push-rule-actions",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/pushrules/global/{kind}/{ruleId}/actions",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "override",
+            "underride",
+            "sender",
+            "room",
+            "content"
+          ]
+        },
+        {
+          "name": "ruleId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setPushRuleEnabled",
+      "command": "set-push-rule-enabled",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/pushrules/global/{kind}/{ruleId}/enabled",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "kind",
+          "location": "path",
+          "required": true,
+          "type": "string",
+          "values": [
+            "override",
+            "underride",
+            "sender",
+            "room",
+            "content"
+          ]
+        },
+        {
+          "name": "ruleId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setReadMarker",
+      "command": "set-read-marker",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/read_markers",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setRoomAlias",
+      "command": "set-room-alias",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/directory/room/{roomAlias}",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomAlias",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setRoomStateWithKey",
+      "command": "set-room-state-with-key",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/rooms/{roomId}/state/{eventType}/{stateKey}",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "eventType",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "stateKey",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setRoomTag",
+      "command": "set-room-tag",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/user/{userId}/rooms/{roomId}/tags/{tag}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "tag",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setRoomVisibilityOnDirectory",
+      "command": "set-room-visibility-on-directory",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/directory/list/room/{roomId}",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "setTyping",
+      "command": "set-typing",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/rooms/{roomId}/typing/{userId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "sync",
+      "command": "sync",
+      "method": "GET",
+      "path": "/_matrix/client/v3/sync",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "filter",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "since",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "full_state",
+          "location": "query",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "set_presence",
+          "location": "query",
+          "required": false,
+          "type": "string",
+          "values": [
+            "offline",
+            "online",
+            "unavailable"
+          ]
+        },
+        {
+          "name": "timeout",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ],
+      "body": "none",
+      "response": "json"
+    },
+    {
+      "id": "unban",
+      "command": "unban",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/unban",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "unbind3pidFromAccount",
+      "command": "unbind3pid-from-account",
+      "method": "POST",
+      "path": "/_matrix/client/v3/account/3pid/unbind",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "updateAppserviceRoomDirectoryVisibility",
+      "command": "update-appservice-room-directory-visibility",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/directory/list/appservice/{networkId}/{roomId}",
+      "access": "unsupported",
+      "parameters": [
+        {
+          "name": "networkId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "updateDevice",
+      "command": "update-device",
+      "method": "PUT",
+      "path": "/_matrix/client/v3/devices/{deviceId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "deviceId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "upgradeRoom",
+      "command": "upgrade-room",
+      "method": "POST",
+      "path": "/_matrix/client/v3/rooms/{roomId}/upgrade",
+      "access": "operator",
+      "parameters": [
+        {
+          "name": "roomId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "uploadContent",
+      "command": "upload-content",
+      "method": "POST",
+      "path": "/_matrix/media/v3/upload",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "filename",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "binary",
+      "response": "json"
+    },
+    {
+      "id": "uploadContentToMXC",
+      "command": "upload-content-to-mxc",
+      "method": "PUT",
+      "path": "/_matrix/media/v3/upload/{serverName}/{mediaId}",
+      "access": "agent",
+      "parameters": [
+        {
+          "name": "serverName",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "mediaId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "filename",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "body": "binary",
+      "response": "json"
+    },
+    {
+      "id": "uploadCrossSigningKeys",
+      "command": "upload-cross-signing-keys",
+      "method": "POST",
+      "path": "/_matrix/client/v3/keys/device_signing/upload",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "uploadCrossSigningSignatures",
+      "command": "upload-cross-signing-signatures",
+      "method": "POST",
+      "path": "/_matrix/client/v3/keys/signatures/upload",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    },
+    {
+      "id": "uploadKeys",
+      "command": "upload-keys",
+      "method": "POST",
+      "path": "/_matrix/client/v3/keys/upload",
+      "access": "unsupported",
+      "parameters": [],
+      "body": "required",
+      "response": "json"
+    }
+  ]
+}
