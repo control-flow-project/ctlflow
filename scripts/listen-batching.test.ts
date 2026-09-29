@@ -32,17 +32,17 @@ function content(native: Awaited<ReturnType<typeof fakeCodex>>) {
 }
 
 async function fixture(context: TestContext,
-  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}) {
+  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner') {
   const native = await fakeCodex(context);
   const matrix = await matrixFixture(context, native.directory);
-  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  matrix.waking.policy = initialAuthority; matrix.waking.senders = initialAuthority === 'nobody' ? [] : [OBSERVER];
   const stop = new AbortController();
   const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 120,
     ...controls, runtime: native.runtime };
   const result = listen(options, stop.signal).catch((error: unknown) => error);
   context.after(async () => { stop.abort(new Error('test complete')); await result; });
-  await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
-  const cursors = () => readJson<Record<string, string>>(matrix.cursorFile);
+  await until(() => matrix.waiting() === 1 && (existsSync(matrix.cursorFile) || existsSync(matrix.cursorFile + '.snapshot')));
+  const cursors = () => existsSync(matrix.cursorFile) ? readJson<Record<string, string>>(matrix.cursorFile) : {};
   return { native, matrix, stop, options, result, cursors };
 }
 
@@ -63,7 +63,7 @@ test('five waiting messages and an owner burst reach the model together without 
     .every(request => Number(request.query.get('limit')) <= 2));
 });
 
-test('all four policies use exact allowed identities, never self or names inside content', async context => {
+test('all automatic wake policies use exact allowed identities, never self or names inside content', async context => {
   const policies: [WakePolicy, string[], string][] = [
     ['owner', [OBSERVER], OBSERVER], ['owner-agents', [OBSERVER, PEER], PEER],
     ['humans', [OBSERVER, PEER, HUMAN], HUMAN], ['everyone', [OBSERVER, PEER, HUMAN, OTHER_AGENT], OTHER_AGENT],
@@ -79,6 +79,58 @@ test('all four policies use exact allowed identities, never self or names inside
     await until(() => cursors()[ROOM] === '3');
     assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$spoof', '$trigger']]);
   });
+});
+
+test('nobody retains every author’s context across restart and delivers it only after authority is enabled', async context => {
+  const { native, matrix, cursors, stop, options, result } = await fixture(context, { debounceMs: 0 }, 'nobody');
+  const before = cursors();
+  const senders = [OBSERVER, PEER, HUMAN, OTHER_AGENT, '@unknown:elsewhere.localhost'];
+  matrix.add(ROOM, ...senders.map((sender, index) => message('$waiting-' + index, sender)));
+  await delay(1200);
+  assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
+  assert(matrix.requests.some(request => request.path.endsWith('/heartbeat')));
+  assert.equal(matrix.requests.filter(request => request.path.endsWith('/read_markers')).length, 0);
+  stop.abort(); await result;
+  const restarted = new AbortController();
+  const restartedResult = listen(options, restarted.signal).catch((error: unknown) => error);
+  context.after(async () => { restarted.abort(); await restartedResult; });
+  await until(() => matrix.waiting() === 1);
+  await delay(1200);
+  assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
+  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  await until(() => cursors()[ROOM] === '5');
+  assert.deepEqual(content(native).map(events => events.map(event => event.event_id)),
+    [senders.map((_, index) => '$waiting-' + index)]);
+});
+
+test('nobody blocks urgent owner prompts without disabling owner stop or starting a second receiver', async context => {
+  const { native, matrix, cursors } = await fixture(context, { debounceMs: 0 }, 'nobody');
+  const before = cursors();
+  matrix.add(ROOM, message('$urgent', OBSERVER, '!! do this now'));
+  const controls = () => readJson<{ paused: boolean; controls: { event: string; status: string }[] }>(matrix.cursorFile + '.control');
+  await until(() => controls().controls.some(control => control.event === '$urgent' && control.status === 'interrupted'));
+  await delay(300);
+  assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
+  matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
+  await until(() => controls().paused);
+  matrix.add(ROOM, message('$resume', OBSERVER, 'continue'));
+  await until(() => !controls().paused);
+  await delay(300);
+  assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
+  assert.equal(matrix.waiting(), 1);
+});
+
+test('selecting nobody during collection cancels an owner wake and preserves the unread trail', async context => {
+  const { native, matrix, cursors } = await fixture(context, { debounceMs: 1500 });
+  const before = cursors();
+  matrix.add(ROOM, message('$peer'), message('$owner', OBSERVER));
+  await delay(150);
+  matrix.waking.policy = 'nobody'; matrix.waking.senders = [];
+  await delay(1700);
+  assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
+  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  await until(() => cursors()[ROOM] === '2');
+  assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$peer', '$owner']]);
 });
 
 test('a wake beyond 125 pending messages releases one input even with two-event native pages and missed notifications', async context => {

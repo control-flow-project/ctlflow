@@ -4,6 +4,7 @@ import { AGENT_INSTRUCTIONS_MAX_BYTES, DEFAULT_AGENT_INSTRUCTIONS, authorityChan
 import { agentFilters } from "../packages/contracts/src/agent-filters.js";
 import { page } from "../apps/server/src/http.js";
 import { deliveryPolicy } from '../packages/contracts/src/delivery.js';
+import { WAKE_POLICIES, expandsWake } from '../packages/contracts/src/wake.js';
 
 test("native room identities remain opaque, including version 12 IDs", () => {
   const room = "!Z1lqALvgesu1ZL4m19nCNHXvw5TCMT8Os8gljGrpmug";
@@ -17,12 +18,22 @@ test('listener policy is explicit and rejects missing authority, self triggers a
   const policy = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', owner: '@owner:test.localhost', userId: '@agent:test.localhost',
     status: 'active', ownerStatus: 'active', grants: [], wakePolicy: 'owner', senders: ['@owner:test.localhost'] };
   assert(deliveryPolicy(policy).ok);
+  assert(deliveryPolicy({ ...policy, wakePolicy: 'nobody', senders: [] }).ok);
+  assert.equal(deliveryPolicy({ ...policy, wakePolicy: 'nobody' }).ok, false);
   for (const invalid of [{ ...policy, wakePolicy: 'all' }, { ...policy, senders: [] }, { ...policy, senders: ['@owner:test.localhost', '@agent:test.localhost'] },
     { ...policy, senders: ['@owner:test.localhost', '@owner:test.localhost'] }, { ...policy, senders: ['Alice'] }, { ...policy, wake: true }]) {
     assert.equal(deliveryPolicy(invalid).ok, false);
   }
   const { wakePolicy, ...missing } = policy;
   assert.equal(wakePolicy, 'owner'); assert.equal(deliveryPolicy(missing).ok, false);
+});
+
+test('nobody is the least wake-up authority and never a default substitution', () => {
+  assert.deepEqual(WAKE_POLICIES, ['nobody', 'owner', 'owner-agents', 'humans', 'everyone']);
+  for (const policy of WAKE_POLICIES) {
+    assert.equal(expandsWake(policy, 'nobody'), false);
+    assert.equal(expandsWake('nobody', policy), policy !== 'nobody');
+  }
 });
 
 test("cursor filtering and sorting use the same native ID order", () => {

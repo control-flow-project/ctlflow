@@ -87,6 +87,8 @@ test("native unread recovery delivers selected state notices once and keeps rece
   assert.equal(await wakeEvent(agent, waiting, senders, allowed, undefined, async () => true), undefined);
   assert.deepEqual(loadCursors(cursorFile), before);
   const waking = await owner.put<{ event_id: string }>(path + '/send/m.room.message/wake', { msgtype: 'm.text', body: 'Owner wake' });
+  assert.equal(await wakeEvent(agent, waiting, new Set(), allowed, undefined, async () => true), undefined);
+  assert.deepEqual(loadCursors(cursorFile), before);
   const trigger = await wakeEvent(agent, waiting, senders, allowed, undefined, async () => true);
   assert.equal(trigger?.event_id, waking.event_id);
   const cycle = await captureWake(agent, trigger!, allowed, filtered.next_batch);

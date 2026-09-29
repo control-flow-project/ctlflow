@@ -10,9 +10,9 @@ export function deliverySettings(ctx: Context, agent: NonNullable<ReturnType<typ
   if (!owner) throw new Error('Agent owner is missing');
   const humans = new Set(queries.members(ctx.store).filter(member => member.status === 'active').map(member => member.id));
   const senders = new Set<string>();
-  if (humans.has(owner.id)) senders.add(owner.id);
+  if (agent.wakePolicy !== 'nobody' && humans.has(owner.id)) senders.add(owner.id);
   if (agent.wakePolicy === 'humans' || agent.wakePolicy === 'everyone') for (const human of humans) senders.add(human);
-  if (agent.wakePolicy !== 'owner') {
+  if (agent.wakePolicy === 'owner-agents' || agent.wakePolicy === 'humans' || agent.wakePolicy === 'everyone') {
     for (const peer of queries.agents(ctx.store, agent.owner, agent.wakePolicy === 'everyone')) {
       if (peer.status === 'active' && humans.has(peer.owner) && peer.userId !== agent.userId) senders.add(peer.userId);
     }

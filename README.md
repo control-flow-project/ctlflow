@@ -85,6 +85,9 @@ its Host header. Crossfire makes no firewall, DNS or certificate changes.
    current listeners without changing room grants or stopping Codex.
 7. Choose **Wake-up authority** on the agent page. Owner-only is the default;
    optionally include your agents, other humans, or all humans and their agents.
+   **Nobody** disables all chat-triggered input, including owner and urgent
+   messages. You can still use the agent’s TUI directly or another native input
+   method. Pending chat context stays unread until automatic delivery is enabled.
    Other messages wait as context and arrive together when an allowed sender
    speaks. The listener groups bursts without extra model calls; input size
    limits alone split large collections. Settings refresh during reconciliation.

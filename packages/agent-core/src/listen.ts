@@ -88,6 +88,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let synchronized = false;
   let allowed = new Set<string>();
   let senders = new Set<string>();
+  const urgentControl = () => senders.has(options.settings.owner) ? state.controls.findLast(control => control.status === 'interrupted') : undefined;
   let cycle = loadWake(options.cursorFile);
   let windowEnd = 0;
   let lastAccess = -Infinity;
@@ -134,6 +135,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     signal.throwIfAborted();
   }
   async function deliver(events: readonly ReceivedEvent[]): Promise<boolean> {
+    if (!senders.size) return false;
     const cancel = new AbortController();
     const done = (async () => {
       try {
@@ -265,7 +267,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       const previous = revision;
       if (!synchronized || state.paused) { await wait(previous); continue; }
       if (controlling) { await wait(previous, options.reconcileMs, true); continue; }
-      const urgent = state.controls.findLast(control => control.status === 'interrupted');
+      const urgent = urgentControl();
       if (urgent) {
         if (!joined.has(urgent.room) || !allowed.has(urgent.room)) { urgent.status = 'superseded'; saveControl(controlFile, state); continue; }
         const event = await client.get<Event>(`${API}/rooms/${segment(urgent.room)}/event/${segment(urgent.event)}`);
@@ -284,7 +286,8 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       const membershipAtRead = membershipRevision;
       let batch = await work((client, scope) => retry(() => pendingBatch(client, options.settings, options.cursorFile, options.limit,
         selected, maximum, since, allowed, cycle), scope));
-      if (membershipAtRead !== membershipRevision || controlling || state.paused || state.controls.some(control => control.status === 'interrupted')) continue;
+      if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
+      if (!senders.size) { windowEnd = 0; await wait(previous); continue; }
       async function accept(event: ReceivedEvent): Promise<boolean> {
         if (event.sender === options.account.user_id && event.type === 'm.room.message') return false;
         if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id && control.status === 'delivered')) return false;
@@ -305,7 +308,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       }
       if (cycle) batch = await work(client => collectBatch(client, options.settings, options.cursorFile, batch, options.limit,
         selected, maximum, cycle!, allowed));
-      if (membershipAtRead !== membershipRevision || controlling || state.paused || state.controls.some(control => control.status === 'interrupted')) continue;
+      if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       const events: ReceivedEvent[] = [];
       for (const event of batch.events) if (await accept(event)) events.push(event);
       if (!await deliver(events) && !await settle()) continue;

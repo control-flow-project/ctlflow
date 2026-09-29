@@ -187,7 +187,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await page.getByRole('link', { name: 'Manage room access' }).click();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue('owner');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
-  for (const policy of ['owner-agents', 'humans', 'everyone', 'owner']) {
+  await expect(page.getByRole('combobox', { name: 'Wake-up authority' }).locator('option')).toHaveCount(5);
+  await expect(page.getByText('Nobody disables all chat-triggered input', { exact: false })).toBeVisible();
+  for (const policy of ['nobody', 'owner-agents', 'humans', 'everyone', 'owner']) {
     await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption(policy);
     await page.getByRole('button', { name: 'Save wake-up policy' }).click();
     await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
@@ -228,14 +230,34 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, workspace);
   await materialize(engine, provider);
+  await page.goto(origin + '/manage/agents/' + profile.id);
+  await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('nobody');
+  await page.getByRole('button', { name: 'Save wake-up policy' }).click();
+  await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
   const stop = new AbortController();
   let listenerFailure: unknown;
+  let listenerReady = false;
   const receiving = listen({ release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile: join(destination.state, 'cursors.json'),
-    limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 120_000,
+    limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
     runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, hooks }, signal),
   }, stop.signal).catch(error => { listenerFailure = error; });
   scope.after(async () => { stop.abort(); await receiving; });
+  await until(() => listenerReady || listenerFailure !== undefined);
+  assert.equal(listenerFailure, undefined, String(listenerFailure));
   assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/e2e', { msgtype: 'm.text', body: 'Crossfire integrated native delivery' })).ok);
+  await page.waitForTimeout(1200);
+  assert.equal(provider.requests.length, 0, 'Nobody must prevent real Matrix chat from reaching the native model transport');
+  assert.equal(listenerFailure, undefined, String(listenerFailure));
+  await engine.call('turn/start', { threadId: engine.session, input: [{ type: 'text', text: 'Direct native user input with Nobody selected.', text_elements: [] }] });
+  await until(() => !!provider.held());
+  assert.equal(provider.requests.length, 1);
+  assert(!JSON.stringify(provider.requests).includes('Crossfire integrated native delivery'));
+  provider.finish();
+  await until(() => engine.notifications.some(notice => notice.method === 'turn/completed'));
+  provider.hold();
+  await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('owner');
+  await page.getByRole('button', { name: 'Save wake-up policy' }).click();
+  await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
   await until(() => provider.requests.some(value => JSON.stringify(value).includes('Crossfire integrated native delivery')) || listenerFailure !== undefined);
   assert.equal(listenerFailure, undefined, String(listenerFailure));
   provider.finish();

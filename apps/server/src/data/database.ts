@@ -4,7 +4,7 @@ import { closeSync, existsSync, lstatSync, openSync } from "node:fs";
 import { dirname } from "node:path";
 import { AGENT_INSTRUCTIONS_MAX_BYTES, type MemberView, type Policy, type Role, type Status } from "../../../../packages/contracts/src/management.js";
 import { privateDir } from "../../../../packages/files/src/index.js";
-import type { WakePolicy } from '../../../../packages/contracts/src/wake.js';
+import { WAKE_POLICIES, type WakePolicy } from '../../../../packages/contracts/src/wake.js';
 
 export type Tables = {
   members: MemberView & { created: number };
@@ -32,7 +32,16 @@ export type Tables = {
 export const schema = createSchema<Tables>();
 export type Store = Database.Database;
 const instructionsColumn = `agentInstructions TEXT NOT NULL DEFAULT '' CHECK(length(CAST(agentInstructions AS BLOB)) <= ${AGENT_INSTRUCTIONS_MAX_BYTES})`;
-const wakeColumn = "wakePolicy TEXT NOT NULL DEFAULT 'owner' CHECK(wakePolicy IN ('owner','owner-agents','humans','everyone'))";
+const wakeColumn = "wakePolicy TEXT NOT NULL DEFAULT 'owner' CHECK(wakePolicy IN (" + WAKE_POLICIES.map(policy => "'" + policy + "'").join(',') + '))';
+const agentDefinition = `
+  id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES members(id), userId TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL, override TEXT, ${wakeColumn},
+  status TEXT NOT NULL CHECK(status IN ('active','suspended','revoked')),
+  revision INTEGER NOT NULL CHECK(revision >= 0), grantRevision INTEGER NOT NULL CHECK(grantRevision >= 0),
+  grants TEXT NOT NULL CHECK(json_valid(grants)),
+  applied TEXT NOT NULL CHECK(json_valid(applied)), password TEXT NOT NULL, token TEXT,
+  appliedRevision INTEGER, appliedGrantRevision INTEGER, lastSuccess INTEGER, error TEXT, created INTEGER NOT NULL
+`;
 
 export function openStore(path: string): Store {
   if (path !== ":memory:") {
@@ -50,6 +59,20 @@ export function openStore(path: string): Store {
   const pageSize = database.pragma("page_size", { simple: true });
   if (typeof pageSize !== "number" || pageSize < 512 || pageSize > 65536) throw new Error("Invalid SQLite page size");
   database.pragma("max_page_count = " + Math.floor(256 * 1024 * 1024 / pageSize));
+  try {
+    database.pragma('foreign_keys = OFF');
+    database.transaction(() => initializeStore(database)).immediate();
+    database.pragma('foreign_keys = ON');
+    return database;
+  } catch (error) { database.close(); throw error; }
+}
+
+function initializeStore(database: Store): void {
+  const version = database.pragma('user_version', { simple: true });
+  if (version !== 0 && version !== 1) throw new Error('Unsupported management schema version');
+  const tables: unknown = database.pragma('table_list');
+  if (!Array.isArray(tables)) throw new Error('Cannot inspect management schema');
+  const hasAgents = tables.some(table => table !== null && typeof table === 'object' && 'name' in table && table.name === 'agents');
   database.exec(`
     CREATE TABLE IF NOT EXISTS members (
       id TEXT PRIMARY KEY, label TEXT NOT NULL,
@@ -59,15 +82,7 @@ export function openStore(path: string): Store {
       appliedStatus TEXT CHECK(appliedStatus IN ('active','suspended','revoked')), appliedRevision INTEGER,
       lastSuccess INTEGER, error TEXT
     ) STRICT;
-    CREATE TABLE IF NOT EXISTS agents (
-      id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES members(id), userId TEXT NOT NULL UNIQUE,
-      name TEXT NOT NULL, override TEXT, ${wakeColumn},
-      status TEXT NOT NULL CHECK(status IN ('active','suspended','revoked')),
-      revision INTEGER NOT NULL CHECK(revision >= 0), grantRevision INTEGER NOT NULL CHECK(grantRevision >= 0),
-      grants TEXT NOT NULL CHECK(json_valid(grants)),
-      applied TEXT NOT NULL CHECK(json_valid(applied)), password TEXT NOT NULL, token TEXT,
-      appliedRevision INTEGER, appliedGrantRevision INTEGER, lastSuccess INTEGER, error TEXT, created INTEGER NOT NULL
-    ) STRICT;
+    CREATE TABLE IF NOT EXISTS agents (${agentDefinition}) STRICT;
     CREATE TABLE IF NOT EXISTS enrollments (
       id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES members(id), name TEXT NOT NULL,
       code TEXT NOT NULL UNIQUE, secretHash TEXT NOT NULL,
@@ -121,5 +136,17 @@ export function openStore(path: string): Store {
       database.exec('ALTER TABLE ' + addition.table + ' ADD COLUMN ' + addition.declaration);
     }
   }
-  return database;
+  if (version === 0 && hasAgents) {
+    const columns = 'id, owner, userId, name, override, wakePolicy, status, revision, grantRevision, grants, applied, password, token, appliedRevision, appliedGrantRevision, lastSuccess, error, created';
+    database.exec(`
+      CREATE TABLE agents_migration (${agentDefinition}) STRICT;
+      INSERT INTO agents_migration (${columns}) SELECT ${columns} FROM agents;
+      DROP TABLE agents;
+      ALTER TABLE agents_migration RENAME TO agents;
+      CREATE INDEX agents_owner ON agents(owner);
+    `);
+  }
+  const violations: unknown = database.pragma('foreign_key_check');
+  if (!Array.isArray(violations) || violations.length) throw new Error('Management schema has invalid foreign keys');
+  database.pragma('user_version = 1');
 }
