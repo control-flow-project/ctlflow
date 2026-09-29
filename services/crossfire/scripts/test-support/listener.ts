@@ -1,0 +1,304 @@
+import assert from 'node:assert/strict';
+import type { TestContext } from 'node:test';
+import { createServer, type ServerResponse } from 'node:http';
+import { mkdtempSync, mkdirSync, existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
+import { once } from 'node:events';
+import { WebSocketServer } from 'ws';
+import { API } from '@crossfire/contracts/matrix';
+import { writeJson, readJson } from '@crossfire/adapter-filesystem/index';
+import type { Account, Event, Settings } from '@crossfire/contracts/client';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
+import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
+import { builtRelease } from './release.js';
+import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
+import { serveArtifact } from '../../apps/server/src/artifacts.js';
+import type { WakePolicy } from '@crossfire/contracts/wake';
+
+export const THREAD = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+export const OBSERVER = '@human:test.localhost';
+export const AGENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeef';
+export const SELF = '@agent-' + AGENT_ID + ':test.localhost';
+export const ROOM = '!coordination:test.localhost';
+
+export function temporary(_context: TestContext): string {
+  mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
+  const directory = mkdtempSync(join(process.cwd(), '.temp/crossfire-listener-'));
+  return directory;
+}
+
+export async function fakeCodex(t: TestContext, config: Record<string, unknown> = {}) {
+  const directory = temporary(t);
+  const server = new WebSocketServer({ host: '127.0.0.1', port: 0, verifyClient: (info: { req: import('node:http').IncomingMessage }) => info.req.headers.authorization === 'Bearer fixture-only' });
+  await once(server, 'listening');
+  t.after(() => new Promise<void>(resolve => {
+    for (const client of server.clients) client.terminate();
+    server.close(() => resolve());
+  }));
+  const address = server.address(); assert(address && typeof address === 'object');
+  const configuration: Record<string, unknown> = { thread: THREAD, workspace: directory, port: address.port, ...config };
+  const requests: { id?: number | string; method?: string; params?: Record<string, unknown> }[] = [];
+  const history = structuredClone(config.initialHistory ?? []) as Record<string, unknown>[];
+  const turns = new Set(history.filter(entry => entry.type === 'turnStarted').map(entry => String(entry.turnId)));
+  const publications: (() => void)[] = [];
+  let activeTurnId: string | undefined;
+  const append = (entry: Record<string, unknown>) => history.push({ ...entry, position: Number(history.at(-1)?.position ?? 0) + 1 });
+  const notify = (method: string, params: unknown) => {
+    for (const client of server.clients) client.send(JSON.stringify({ method, params }));
+    const event = params as Record<string, unknown>;
+    if (event.threadId !== THREAD) return;
+    if (method === 'item/completed') {
+      append({ type: 'item', turnId: String(event.turnId ?? activeTurnId ?? configuration.turnId ?? 'existing-turn'), item: event.item });
+    } else if (method === 'turn/completed') {
+      const turn = event.turn as { id: string; status: string };
+      append({ type: 'turnCompleted', turnId: turn.id, status: turn.status });
+      if (activeTurnId === turn.id) activeTurnId = undefined;
+      notify('thread/status/changed', { threadId: THREAD, status: { type: 'idle' } });
+    }
+  };
+  server.on('connection', socket => socket.on('message', data => {
+    const request = JSON.parse(data.toString());
+    requests.push(request);
+    const mode = configuration.mode;
+    const send = (value: unknown) => socket.send(JSON.stringify(value));
+    if (request.method === 'initialized') return;
+    if (request.method === 'initialize') {
+      if (mode === 'invalid-json') { socket.send('invalid json'); return; }
+      if (mode === 'malformed-error') { send({ id: request.id, error: null }); return; }
+      if (mode === 'unexpected-id') { send({ id: -1, result: {} }); return; }
+      if (mode === 'oversized') { socket.send('x'.repeat(8 * 1024 * 1024 + 1)); return; }
+      send({ id: request.id, result: { userAgent: 'protocol fixture' } });
+    } else if (['thread/start', 'thread/resume', 'thread/read'].includes(request.method)) {
+      send({ id: request.id, result: { thread: { id: configuration.thread, cwd: configuration.workspace,
+        status: { type: configuration.status ?? 'idle' },
+        canAcceptDirectInput: 'directInput' in configuration ? configuration.directInput : true } } });
+    } else if (request.method === 'thread/turns/list') {
+      if (configuration.unmaterialized && turns.size === 0) {
+        send({ id: request.id, error: { code: -32600, message: `thread ${THREAD} is not materialized yet; thread/turns/list is unavailable before first user message` } });
+        return;
+      }
+      const all = [...turns].reverse().map(id => ({ id, status: [...history].reverse().find(entry => entry.type === 'turnCompleted' && entry.turnId === id)?.status ?? 'inProgress' }));
+      const start = Number(request.params.cursor ?? 0), end = start + Number(request.params.limit);
+      send({ id: request.id, result: { data: all.slice(start, end), nextCursor: end < all.length ? String(end) : null } });
+    } else if (request.method === 'turn/interrupt') {
+      if (configuration.rejectInterrupt) { send({ id: request.id, error: { code: -32602, message: 'interruption refused' } }); return; }
+      send({ id: request.id, result: {} });
+      if (!configuration.delayInterrupt) notify('turn/completed', { threadId: THREAD, turn: { id: request.params.turnId, status: 'interrupted' } });
+    } else if (request.method === 'turn/start') {
+      if (mode === 'disconnect') { socket.terminate(); return; }
+      if (mode === 'timeout') return;
+      if (mode === 'reject') { send({ id: request.id, error: { code: -32602, message: 'input rejected' } }); return; }
+      if (mode === 'missing-turn') { send({ id: request.id, result: {} }); return; }
+      if (mode === 'server-requests') {
+        send({ method: 'turn/started', params: {} });
+        send({ id: 'approval', method: 'item/commandExecution/requestApproval', params: {} });
+      }
+      const turnId = configuration.turnId ?? activeTurnId ?? (turns.size ? 'turn-' + (turns.size + 1) : 'existing-turn');
+      activeTurnId = String(turnId);
+      const publish = () => {
+        if (!turns.has(String(turnId))) {
+          turns.add(String(turnId));
+          append({ type: 'turnStarted', turnId });
+        }
+        if (mode !== 'accepted') {
+          const item = inputReceipt(request.params.clientUserMessageId, request.params.input);
+          append({ type: 'item', turnId: String(turnId), item });
+        }
+        if (configuration.completionFirst) {
+          append({ type: 'turnCompleted', turnId, status: 'interrupted' });
+          activeTurnId = undefined;
+        }
+      };
+      if (configuration.receiptFirst || configuration.completionFirst) publish();
+      send({ id: request.id, result: { turn: { id: turnId } } });
+      if (configuration.deferHistory) publications.push(publish);
+      else if (!configuration.receiptFirst && !configuration.completionFirst) publish();
+    } else if (request.method === 'thread/timeline/list') {
+      const failures = (request.params.limit === 1 ? configuration.boundaryUnavailable : configuration.historyUnavailable) as number[] | undefined;
+      const code = failures?.shift();
+      if (code) { send({ id: request.id, error: { code, message: 'history is not supported yet' } }); return; }
+      if (configuration.historyError) { send({ id: request.id, error: { code: -32603, message: 'history unavailable' } }); return; }
+      const pages = (request.params.limit === 1 ? configuration.boundaryPages : configuration.historyPages) as unknown[] | undefined;
+      const end = request.params.cursor ? Number(request.params.cursor) : history.length;
+      const start = Math.max(0, end - Number(request.params.limit));
+      send({ id: request.id, result: pages?.shift() ?? { data: history.slice(start, end), nextCursor: start ? String(start) : null } });
+    } else send({ id: request.id, error: { code: -32601, message: 'Forbidden method in fixture' } });
+  }));
+  const update = (changes: Record<string, unknown>) => { Object.assign(configuration, changes); };
+  update({});
+  writeJson(join(directory, 'connection.json'), { version: 1, endpoint: `ws://127.0.0.1:${address.port}`, tokenFile: 'token' });
+  writeFileSync(join(directory, 'token'), 'fixture-only', { mode: 0o600 });
+  return {
+    directory, update, notify, publish: () => { for (const publish of publications.splice(0)) publish(); },
+    disconnect: () => { for (const client of server.clients) client.terminate(); },
+    options: { session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs: 2000, pollMs: 100,
+      hooks: { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } },
+    runtime: (signal: AbortSignal, pollMs: number, hooks?: RuntimeHooks, timeoutMs = 2000) => connectCodex({ session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs, pollMs,
+      hooks: hooks ?? { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } }, signal),
+    requests: () => requests,
+  };
+}
+
+export function inputReceipt(clientId: string, content: unknown = [{ type: 'text', text: 'input', text_elements: [] }]) {
+  return { type: 'userMessage', id: 'item-' + clientId, clientId, content };
+}
+
+export function message(id: string, sender = '@agent-holmes:test.localhost', body = id): Event {
+  return { event_id: id, type: 'm.room.message', sender, origin_server_ts: 1,
+    content: { msgtype: 'm.text', body } };
+}
+
+export async function until(predicate: () => boolean, message = 'Condition did not become true'): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while (!predicate()) {
+    if (Date.now() >= deadline) assert.fail(message);
+    await delay(10);
+  }
+}
+
+export async function matrixFixture(t: TestContext, workspace: string) {
+  const settings: Settings = { instance: 'test', server_name: 'test.localhost',
+    homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };
+  const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture' };
+  const rooms = new Map<string, Event[]>([[ROOM, []]]);
+  const joined = new Set([ROOM]);
+  const invites: Record<string, { invite_state: { events: Event[] } }> = {};
+  const missingObserver = new Set<string>();
+  const failures = new Map<string, number[]>();
+  const gates = new Map<string, { wait: Promise<void>; entered: () => void }>();
+  const requests: { path: string; query: URLSearchParams; method?: string; body?: unknown }[] = [];
+  const eventPositions = new Map<string, number>();
+  const extraMembers = new Set<string>();
+  const muted = new Set<string>();
+  const access = { ownerStatus: 'active', status: 'active' };
+  const waking: { policy: WakePolicy; senders: string[] } = { policy: 'owner-agents', senders: [OBSERVER, '@agent-holmes:test.localhost'] };
+  const release = builtRelease().release.manifest;
+  const publication = { release: builtRelease().release };
+  const reporting = { disconnect: false, current: release };
+  const syncUpdates = { enabled: true, hung: false };
+  const waiters = new Set<() => void>();
+  let revision = 0;
+  let pageOverride: unknown;
+  function wake(): void { revision++; for (const waiter of [...waiters]) waiter(); }
+  function send(response: ServerResponse, body: unknown, status = 200): void {
+    response.writeHead(status, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(body));
+  }
+  function api(response: ServerResponse, data: unknown): void { send(response, { data, meta: { requestId: AGENT_ID } }); }
+  const server = createServer(async (request, response) => {
+    if (serveArtifact(publication.release, request.method ?? 'GET', request.url ?? '', response)) return;
+    if (request.url !== '/api/releases/current' && request.headers.authorization !== 'Bearer ' + account.access_token) {
+      send(response, { errcode: 'M_UNAUTHORIZED' }, 401); return;
+    }
+    const url = new URL(request.url!, 'http://127.0.0.1');
+    const path = decodeURIComponent(url.pathname);
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    requests.push({ path, query: url.searchParams, ...(request.method ? { method: request.method } : {}), body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined });
+    const gate = gates.get(path);
+    if (gate) { gates.delete(path); gate.entered(); await gate.wait; }
+    const failure = failures.get(path)?.shift();
+    if (failure) { send(response, { errcode: 'M_TEST', error: 'Fixture failure' }, failure); return; }
+    if (path === '/api/releases/current') {
+      api(response, reporting.current);
+    } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
+      api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, wakeMode: waking.policy,
+        senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
+        roomGrants: [...joined].map(room => ({ roomId: room, accessMode: 'reply', powerLevel: null, muted: muted.has(room) })) });
+    } else if (path === '/api/agents/' + AGENT_ID) {
+      api(response, { agentId: AGENT_ID, matrixUserId: SELF, name: 'watson', displayName: 'Watson (Human)',
+        owner: { memberId: AGENT_ID, matrixUserId: OBSERVER, displayName: 'Human', status: access.ownerStatus },
+        status: access.status, revision: 0, createdAt: 1,
+        application: { appliedRevision: 0, appliedStatus: 'active', nativeDisplayName: 'Watson (Human)',
+          lastAttemptAt: 1, lastSuccessAt: 1, errorCode: null, errorMessage: null },
+        activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, deployment: null, allowedActions: [] });
+    } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && request.method === 'PUT') {
+      api(response, { disconnect: reporting.disconnect, currentRelease: reporting.current.release });
+    } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
+      send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
+    } else if (path === API + '/joined_rooms') {
+      send(response, { joined_rooms: [...joined] });
+    } else if (path === API + '/sync') {
+      if (syncUpdates.hung) return;
+      let timer: NodeJS.Timeout | undefined;
+      const complete = () => {
+        clearTimeout(timer); waiters.delete(complete);
+        const since = Number(url.searchParams.get('since')?.replace('sync-', '') ?? -1);
+        const entries = [...joined].map(room => {
+          const events = syncUpdates.enabled ? (rooms.get(room) ?? []).filter(event => (eventPositions.get(event.event_id) ?? 0) > since) : [];
+          return [room, { timeline: { events: events.slice(-20), limited: events.length > 20 } }];
+        });
+        send(response, { next_batch: 'sync-' + revision, rooms: { invite: invites, join: Object.fromEntries(entries) } });
+      };
+      if (url.searchParams.get('since') === 'sync-' + revision && Number(url.searchParams.get('timeout')) > 0) {
+        waiters.add(complete);
+        timer = setTimeout(complete, Number(url.searchParams.get('timeout')));
+        response.on('close', () => { clearTimeout(timer); waiters.delete(complete); });
+      } else complete();
+    } else if (path.startsWith(API + '/join/')) {
+      const room = path.slice((API + '/join/').length);
+      joined.add(room); delete invites[room]; send(response, { room_id: room });
+    } else if (path.endsWith('/joined_members')) {
+      const room = path.slice((API + '/rooms/').length, -'/joined_members'.length);
+      send(response, { joined: { [SELF]: {}, ...Object.fromEntries([...extraMembers].map(member => [member, {}])), ...(!missingObserver.has(room) ? { [OBSERVER]: {} } : {}) } });
+    } else if (path.endsWith('/messages')) {
+      const room = path.slice((API + '/rooms/').length, -'/messages'.length);
+      const events = rooms.get(room) ?? [];
+      const position = (token: string | null, fallback: number) => token?.startsWith('sync-')
+        ? events.filter(event => (eventPositions.get(event.event_id) ?? 0) <= Number(token.slice(5))).length : token === null ? fallback : Number(token);
+      const backwards = url.searchParams.get('dir') === 'b';
+      const start = position(url.searchParams.get('from'), backwards ? events.length : 0)
+        - (backwards && url.searchParams.has('from') ? 1 : 0);
+      const end = position(url.searchParams.get('to'), backwards ? 0 : events.length)
+        - (url.searchParams.has('to') && !url.searchParams.get('to')!.startsWith('sync-') ? 1 : 0);
+      const limit = Number(url.searchParams.get('limit'));
+      const filter = JSON.parse(url.searchParams.get('filter') ?? '{}');
+      const candidates = (backwards ? events.slice(end, start).reverse() : events.slice(start, end))
+        .filter(event => (!filter.senders || filter.senders.includes(event.sender)) && (!filter.types || filter.types.includes(event.type)));
+      const page = candidates.slice(0, limit);
+      const next = page.length ? events.indexOf(page.at(-1)!) + 1 : start;
+      send(response, pageOverride ?? { chunk: page, ...(page.length ? { end: String(next) } : {}) });
+    } else if (path.endsWith('/read_markers')) {
+      send(response, {});
+    } else if (path.includes('/send/m.room.message/')) {
+      const room = path.slice((API + '/rooms/').length, path.indexOf('/send/'));
+      const event = { ...message('$sent-' + revision, SELF), content: requests.at(-1)!.body as Event['content'] };
+      const events = rooms.get(room) ?? [];
+      events.push(event); rooms.set(room, events);
+      eventPositions.set(event.event_id, revision + 1); wake(); send(response, { event_id: event.event_id });
+    } else if (path.endsWith('/leave')) {
+      const room = path.slice((API + '/rooms/').length, -'/leave'.length);
+      joined.delete(room); delete invites[room]; wake(); send(response, {});
+    } else if (path.includes('/event/')) {
+      const room = path.slice((API + '/rooms/').length, path.indexOf('/event/'));
+      const event = rooms.get(room)?.find(event => event.event_id === path.slice(path.indexOf('/event/') + 7));
+      send(response, event ?? {}, event ? 200 : 404);
+    } else send(response, { error: 'Unexpected fixture request' }, 404);
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
+  const address = server.address(); assert(address && typeof address === 'object');
+  settings.homeserver = `http://127.0.0.1:${address.port}`;
+  const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
+  writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
+  return { coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, access, waking, syncUpdates, failures,
+    env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
+    wake, waiting: () => waiters.size,
+    hold: (path: string) => {
+      let entered = false;
+      let release!: () => void;
+      const wait = new Promise<void>(resolve => { release = resolve; });
+      gates.set(path, { wait, entered: () => { entered = true; } });
+      t.after(release);
+      return { entered: () => entered, release };
+    },
+    overridePage: (page: unknown) => { pageOverride = page; },
+    subscribe: (room: string) => { joined.add(room); writeJson(cursorFile, { ...(existsSync(cursorFile) ? readJson<Record<string, string>>(cursorFile) : {}), [room]: '0' }); },
+    add: (room: string, ...events: Event[]) => {
+      for (const event of events) { eventPositions.set(event.event_id, ++revision); }
+      rooms.set(room, [...rooms.get(room) ?? [], ...events]);
+      if (syncUpdates.enabled) queueMicrotask(() => { for (const waiter of [...waiters]) waiter(); });
+    },
+  };
+}

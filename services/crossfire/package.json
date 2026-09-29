@@ -1,0 +1,27 @@
+{
+  "name": "@crossfire/service",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "crossfire": "./crossfire"
+  },
+  "type": "module",
+  "description": "Human-led Matrix coordination and agent management",
+  "engines": {
+    "node": ">=26.0.0",
+    "npm": ">=11.17.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.core.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "build": "node ../../scripts/build-service.mjs crossfire",
+    "test": "npm run build && node --test --test-concurrency=1 --test-timeout=180000 dist/tests/*.test.js dist/scripts/*.test.js dist/scripts/native-tests/*.test.js",
+    "test:browser": "npm run build && node --test --test-concurrency=1 dist/tests/browser.test.js dist/tests/fleet-browser.test.js",
+    "test:integration": "node --test --test-concurrency=1 --test-timeout=180000 dist/tests/*.integration.js",
+    "generate:matrix": "npm run build && node dist/scripts/generate-matrix-api.js",
+    "start": "node crossfire start",
+    "crossfire": "node crossfire",
+    "verify:architecture": "node scripts/verify-architecture.ts",
+    "verify:installation": "node scripts/verify-architecture.ts installation",
+    "verify:container": "npm run build && node dist/scripts/verify-container.js"
+  }
+}

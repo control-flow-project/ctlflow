@@ -1,0 +1,5 @@
+{
+  "name": "@fleet/ssh-transport", "version": "0.1.0", "private": true, "type": "module",
+  "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
+  "dependencies": {}
+}

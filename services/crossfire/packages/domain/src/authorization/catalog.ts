@@ -1,0 +1,31 @@
+export const permissionCatalog = [
+  { code: 'principal.read', grantScope: 'role', description: 'Search registered active identities', roles: ['member', 'administrator', 'agent'] },
+  { code: 'agent.read.self', grantScope: 'role', description: 'Read own agent identity', roles: ['agent'] },
+  { code: 'agent.read.owned', grantScope: 'role', description: 'Read owned agents', roles: ['member', 'administrator'] },
+  { code: 'agent.read.any', grantScope: 'role', description: 'Read every agent', roles: ['administrator'] },
+  { code: 'agent.configure.owned', grantScope: 'role', description: 'Configure owned agents', roles: ['member', 'administrator'] },
+  { code: 'agent.configure.any', grantScope: 'role', description: 'Configure every agent', roles: ['administrator'] },
+  { code: 'agent.room-grant.manage.owned', grantScope: 'role', description: 'Manage owned agent room access', roles: ['member', 'administrator'] },
+  { code: 'agent.room-grant.manage.any', grantScope: 'role', description: 'Manage every agent room access', roles: ['administrator'] },
+  { code: 'agent.listener.disconnect.owned', grantScope: 'role', description: 'Disconnect owned listeners', roles: ['member', 'administrator'] },
+  { code: 'agent.listener.disconnect.any', grantScope: 'role', description: 'Disconnect every listener', roles: ['administrator'] },
+  { code: 'listener.report.self', grantScope: 'role', description: 'Report own listener activity', roles: ['agent'] },
+  { code: 'wake-notice.publish.self', grantScope: 'role', description: 'Request verified blocked-mention notices', roles: ['agent'] },
+  { code: 'enrollment.approve.owned', grantScope: 'role', description: 'Approve enrollment for oneself', roles: ['member', 'administrator'] },
+  { code: 'enrollment.reject.owned', grantScope: 'role', description: 'Reject enrollment for oneself', roles: ['member', 'administrator'] },
+  { code: 'enrollment.reject.any', grantScope: 'role', description: 'Reject any pending enrollment', roles: ['administrator'] },
+  { code: 'enrollment.read.owned', grantScope: 'role', description: 'Review own enrollment requests', roles: ['member', 'administrator'] },
+  { code: 'enrollment.read.any', grantScope: 'role', description: 'Review every enrollment request', roles: ['administrator'] },
+  { code: 'room.manage.native', grantScope: 'role', description: 'Manage rooms within native Matrix authority', roles: ['member', 'administrator'] },
+  { code: 'member.manage', grantScope: 'role', description: 'Manage human memberships and invitations', roles: ['administrator'] },
+  { code: 'policy.manage', grantScope: 'role', description: 'Manage instance policy and instruction copy', roles: ['administrator'] },
+  { code: 'audit.read.owned', grantScope: 'role', description: 'Read own audit events', roles: ['member', 'administrator'] },
+  { code: 'audit.read.any', grantScope: 'role', description: 'Read all audit events', roles: ['administrator'] },
+  { code: 'room.agent.invite', grantScope: 'agent_room', description: 'Invite registered agents and withdraw own additions in this room', roles: [] },
+] as const;
+export type PermissionCode = typeof permissionCatalog[number]['code'];
+export const roleCatalog = [
+  { code: 'member', principalKind: 'human', label: 'Member' },
+  { code: 'administrator', principalKind: 'human', label: 'Administrator' },
+  { code: 'agent', principalKind: 'agent', label: 'Agent' },
+] as const;

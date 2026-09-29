@@ -1,0 +1,5 @@
+{
+  "name": "@fleetd/storage", "version": "0.1.0", "private": true, "type": "module",
+  "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
+  "dependencies": { "@fleetd/contracts": "0.1.0", "@fleetd/domain": "0.1.0", "@crossfire/contracts": "0.1.0", "@crossfire/kernel": "0.1.0", "@crossfire/adapter-filesystem": "0.1.0", "smol-toml": "1.8.0" }
+}

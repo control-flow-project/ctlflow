@@ -1,0 +1,64 @@
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+import { createClient } from '@crossfire/adapter-crossfire/client';
+import { operations } from '@crossfire/contracts/rest/operations';
+import { failure, success } from '@crossfire/kernel/result';
+import { loadBinding, saveBinding } from '@fleetd/storage/binding';
+import type { Configuration, Controller, Approval } from '@fleetd/domain/model';
+
+export async function prepareEnrollment(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (value: Approval) => void) {
+  const loaded = loadBinding(configuration);
+  if (!loaded.ok) return loaded;
+  const binding = loaded.value, roster = configuration.roster;
+  if (binding.server !== roster.coordination.server || binding.owner !== roster.coordination.owner || binding.fleetKey !== roster.fleet) return failure('conflict', 'Fleet connection differs from its saved identity; it cannot be silently replaced');
+  const instances = roster.instances.map(instance => {
+    const existing = binding.identities.find(item => item.instanceKey === instance.key);
+    return { instanceKey: instance.key, name: instance.name, ...(existing ? { identity: { agentId: existing.agentId, accessToken: existing.account.access_token } } : {}) };
+  });
+  if (roster.instances.some(instance => binding.identities.some(identity => identity.instanceKey === instance.key && identity.name !== instance.name))) return failure('conflict', 'An enrolled instance name is immutable');
+  const client = createClient({ origin: binding.server, signal });
+  const input = { ownerMatrixId: binding.owner, fleetKey: binding.fleetKey, controller, instances, ...(binding.controllerCredential ? { controllerCredential: binding.controllerCredential } : {}) };
+  const digest = createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  if (!binding.request || binding.request.digest !== digest) {
+    const checked = await client.call(operations.preflight, {}, input);
+    if (!checked.ok) return checked;
+    if (!checked.value.data.available) return failure('name_collision', 'Fleet names are not available');
+    binding.request = { enrollmentId: randomUUID(), claimSecret: randomBytes(32).toString('base64url'), digest };
+    saveBinding(configuration.directory, binding);
+  }
+  const introduced = await client.call(operations.introduceEnrollment, {}, { ...input, enrollmentId: binding.request.enrollmentId, claimSecret: binding.request.claimSecret });
+  if (!introduced.ok) return introduced;
+  let waiting = false;
+  for (;;) {
+    signal.throwIfAborted();
+    const result = await client.call(operations.exchangeEnrollment, { enrollmentId: binding.request.enrollmentId }, { claimSecret: binding.request.claimSecret });
+    if (!result.ok) return result;
+    const exchanged = result.value.data;
+    if (exchanged.status === 'rejected' || exchanged.status === 'expired') return failure('forbidden', 'Fleet enrollment is ' + exchanged.status);
+    if (exchanged.status === 'pending' && !waiting) {
+      waiting = true; approval({ url: introduced.value.data.approvalUrl, code: introduced.value.data.enrollment.enrollment.verificationCode });
+    }
+    if (exchanged.status === 'ready') {
+      if (!exchanged.fleet || exchanged.ownerMatrixId !== binding.owner) return failure('native', 'Enrollment does not match the approved fleet');
+      binding.fleetId = exchanged.fleet.fleetId;
+      binding.controllerCredential = exchanged.fleet.controllerCredential ?? binding.controllerCredential;
+      if (!binding.controllerCredential) return failure('forbidden', 'This fleet controller has not been authorized');
+      const failed: { instanceKey: string; code: string; message: string }[] = [];
+      for (const instance of exchanged.instances) {
+        const requested = roster.instances.find(item => item.key === instance.instanceKey && item.name === instance.name);
+        if (!requested) return failure('native', 'Unexpected enrollment identity');
+        if (instance.status === 'failed') { failed.push({ instanceKey: instance.instanceKey, code: instance.errorCode ?? 'native', message: instance.name + ': ' + (instance.errorCode ?? 'Enrollment failed') }); continue; }
+        if (!instance.agentId || !instance.account) return failure('native', 'Approved identity is not ready');
+        const account = { user_id: instance.account.matrixUserId, access_token: instance.account.accessToken, device_id: instance.account.deviceId };
+        binding.identities = [...binding.identities.filter(item => item.instanceKey !== instance.instanceKey), { instanceKey: instance.instanceKey, name: instance.name, agentId: instance.agentId, account }];
+      }
+      binding.request = null; saveBinding(configuration.directory, binding);
+      const authenticated = createClient({ origin: binding.server, token: binding.controllerCredential, signal });
+      const current = await authenticated.call(operations.fleet, { fleetId: binding.fleetId }, {});
+      if (!current.ok) return current;
+      const updated = await authenticated.call(operations.changeFleet, { fleetId: binding.fleetId }, { expectedRevision: current.value.data.revision, label: current.value.data.label, controller });
+      return updated.ok ? success({ failed }) : updated;
+    }
+    await delay(1000, undefined, { signal });
+  }
+}

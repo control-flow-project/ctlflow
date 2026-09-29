@@ -1,0 +1,79 @@
+import { useState } from 'react';
+import type { AgentView, RoomView, RoomGrantView } from '@crossfire/contracts/schema/response';
+import { call, operations, useAction, useResource } from './api.js';
+import { useSession } from './session.js';
+import { Alert, Loaded, Page, Panel, Status, timestamp } from './ui.js';
+
+const labels = { none: 'No access', read: 'Read only', reply: 'Read & reply', custom: 'Custom power level' } as const;
+function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; view?: RoomGrantView }) {
+  const viewer = useSession(), action = useAction();
+  const [mode, setMode] = useState<keyof typeof labels>(view?.grant?.accessMode ?? 'none'), [muted, setMuted] = useState(view?.grant?.muted ?? false);
+  const [level, setLevel] = useState(view?.grant?.powerLevel ?? 0), [revision] = useState(view?.revision ?? agent.revision);
+  const editable = agent.allowedActions.includes('room-grant.manage') && agent.status !== 'revoked';
+  const canReply = room.authority && (room.authority.creator || room.authority.replyLevel <= room.authority.powerLevel);
+  return <form onSubmit={event => { event.preventDefault();
+    if (mode === 'none' && view?.grant && !confirm('Remove this agent’s access to ' + room.name + '?')) return;
+    const params = { agentId: agent.agentId, roomId: room.roomId }, base = { expectedRevision: revision, expectedGeneration: view?.grant?.generation ?? null };
+    void action.run(() => mode === 'none' ? call(operations.removeGrant, params, base, viewer.csrfSecret)
+      : call(operations.setGrant, params, { ...base, accessMode: mode, powerLevel: mode === 'custom' ? level : null, muted }, viewer.csrfSecret));
+  }}><fieldset disabled={!editable || action.pending}><label className="sr-only" htmlFor={'access-' + room.roomId}>Access for {room.name}</label>
+    <select id={'access-' + room.roomId} value={mode} onChange={event => { const value = event.target.value; if (value === 'none' || value === 'read' || value === 'reply' || value === 'custom') setMode(value); }}>
+      <option value="none">No access</option><option value="read" disabled={!room.authority}>Read only</option>
+      <option value="reply" disabled={!canReply}>Read &amp; reply</option><option value="custom" disabled={!room.authority}>Custom power level</option></select>
+    {mode === 'custom' && <label>Power level<input type="number" required value={level} max={room.authority?.creator ? undefined : room.authority?.powerLevel} onChange={event => setLevel(Number(event.target.value))}/></label>}
+    <div className="room-actions"><label className="check"><input type="checkbox" disabled={mode === 'none'} checked={muted} onChange={event => setMuted(event.target.checked)}/>Mute delivery</label><button className="room-save">Save access</button></div>
+  </fieldset><Alert>{action.error}</Alert></form>;
+}
+function AppliedGrant({ view }: { view?: RoomGrantView }) {
+  const grant = view?.grant, application = view?.application;
+  const status = application?.errorMessage ? 'Failed' : !grant ? 'No access'
+    : application?.observedGeneration === grant.generation && application.appliedRevision === grant.revision ? labels[grant.accessMode] : 'Pending';
+  return <><Status value={status}/>{application?.errorMessage && <span className="subline">{application.errorMessage}</span>}</>;
+}
+function Authority({ room }: { room: RoomView }) {
+  return room.authority ? <><span>{room.authority.creator ? 'Room creator' : 'Your power level ' + room.authority.powerLevel}</span>
+    <span className="subline">Reply requires native level {room.authority.replyLevel}.</span></> : <span>No current native authority for this room</span>;
+}
+export function AgentRooms({ agent }: { agent: AgentView }) {
+  const [page, setPage] = useState(1), [search, setSearch] = useState('');
+  const rooms = useResource(operations.rooms, {}, new URLSearchParams({ agentId: agent.agentId, search, page: String(page), pageSize: '20' }).toString());
+  return <Panel title="Rooms & access" description="Assign access directly. Select a room for native permissions and delegation." action={<button onClick={rooms.refresh}>Refresh rooms</button>}>
+    <label>Search rooms<input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }}/></label>
+    <Loaded {...rooms} retry={rooms.refresh}>{found => <>
+      <RoomAssignments agent={agent} rooms={found.data}/>
+      {!found.data.length && <p>No matching rooms. Join or create a room in Element, then refresh.</p>}
+      <div className="pagination"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><span>Page {page}</span><button disabled={page >= (found.meta.totalPages ?? 0)} onClick={() => setPage(page + 1)}>Next</button></div>
+    </>}</Loaded></Panel>;
+}
+function RoomAssignments({ agent, rooms }: { agent: AgentView; rooms: RoomView[] }) {
+  const query = new URLSearchParams({ roomIds: JSON.stringify(rooms.map(room => room.roomId)), pageSize: String(Math.max(1, rooms.length)) });
+  const grants = useResource(operations.grants, { agentId: agent.agentId }, query.toString(), 5000);
+  return <Loaded {...grants} retry={grants.refresh}>{assigned => <>
+      <div className="table-wrap agent-room-table"><table><thead><tr><th>Room</th><th>Assigned access</th><th>Applied access</th><th>Native permissions</th></tr></thead>
+        <tbody>{rooms.map(room => { const grant = assigned.data.find(view => view.grant?.roomId === room.roomId); return <tr key={room.roomId}>
+          <td><strong><a href={'/manage/agents/' + agent.agentId + '/rooms/' + encodeURIComponent(room.roomId)}>{room.name}</a></strong><span className="subline">{room.alias ?? room.roomId}</span></td>
+          <td><GrantEditor agent={agent} room={room} {...(grant ? { view: grant } : {})}/></td><td><AppliedGrant {...(grant ? { view: grant } : {})}/></td><td><Authority room={room}/></td></tr>; })}</tbody></table></div>
+    </>}</Loaded>;
+}
+function Delegation({ view, roomId }: { view: RoomGrantView; roomId: string }) {
+  const viewer = useSession(), action = useAction();
+  const [enabled, setEnabled] = useState(view.permissions.includes('room.agent.invite'));
+  const grant = view.grant;
+  if (!grant || grant.accessMode === 'none') return <p>Grant room access before delegating invitations.</p>;
+  return <form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.setGrantPermissions, { agentId: view.agentId, roomId },
+    { expectedRevision: view.revision, expectedGeneration: grant.generation, permissions: enabled ? ['room.agent.invite'] : [] }, viewer.csrfSecret)); }}>
+    <fieldset disabled={!view.allowedActions.includes('permissions.set') || action.pending}><label className="check"><input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)}/>Allow this agent to invite other registered agents</label>
+      <p className="support">May cross owners, within the inviter’s native Matrix authority. The agent may remove only additions it made. It cannot pass this permission onward.</p><button>Save invitation permission</button></fieldset><Alert>{action.error}</Alert>
+    <dl><dt>Added by principal</dt><dd className="mono">{grant.addedById}</dd><dt>Authorizing principal</dt><dd className="mono">{grant.authorizerId}</dd><dt>Membership generation</dt><dd className="mono">{grant.generation}</dd></dl></form>;
+}
+export function AgentRoomDetail({ id, room }: { id: string; room: string }) {
+  const agent = useResource(operations.agent, { agentId: id }), resource = useResource(operations.room, { roomId: room }, new URLSearchParams({ agentId: id }).toString());
+  const grant = useResource(operations.grant, { agentId: id, roomId: room }, '', 5000);
+  return <Page title="Room access" description="Native authority, durable room access and explicit delegation."><a className="back" href={'/manage/agents/' + id}>← Agent details</a>
+    <Loaded {...agent} retry={agent.refresh}>{identity => <Loaded {...resource} retry={resource.refresh}>{native => <Loaded {...grant} retry={grant.refresh}>{access => <>
+      <Panel title={native.data.name}><p className="mono">{room}</p><p>{native.data.topic}</p><GrantEditor agent={identity.data} room={native.data} view={access.data}/><AppliedGrant view={access.data}/><p>Last applied: {timestamp(access.data.application?.lastSuccessAt ?? null)}</p></Panel>
+      <Panel title="Agent invitations"><Delegation view={access.data} roomId={room}/></Panel>
+      <Panel title="Native Matrix permissions"><Authority room={native.data}/><div className="table-wrap"><table><thead><tr><th>Action</th><th>Required power</th></tr></thead><tbody>
+        {native.data.authority?.nativePermissions.map(permission => <tr key={permission.action}><td>{permission.action}</td><td>{permission.level}</td></tr>)}</tbody></table></div></Panel>
+    </>}</Loaded>}</Loaded>}</Loaded></Page>;
+}

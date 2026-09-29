@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
+import { createController } from '@fleetd/domain/controller';
+import type { Execution } from '@fleetd/domain/port';
+import type { Operation } from '@fleetd/domain/model';
+import { createRegistry } from '@fleetd/storage/registry';
+import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
+import { success, failure, type Result } from '@crossfire/kernel/result';
+
+function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
+function fixture(execution?: Partial<Execution>) {
+  const directory = mkdtempSync(join(tmpdir(), 'fleetd-test-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
+  mkdirSync(join(fleet, 'agents', 'analyst'), { recursive: true, mode: 0o700 });
+  const definition = join(fleet, 'agents', 'analyst');
+  writeFileSync(join(definition, 'agent.toml'), 'name = "Analyst"\nruntime = "codex"\n[runtime_options]\nsandbox_mode = "read-only"\napproval_policy = "never"\n', { mode: 0o600 });
+  writeFileSync(join(definition, 'AGENTS.md'), 'Inspect project inputs.', { mode: 0o600 });
+  writeFileSync(join(fleet, 'runtime.toml'), 'fleet = "research"\n[coordination]\nadapter = "crossfire"\nserver = "http://127.0.0.1:8098"\nowner = "@owner:test"\n[[instances]]\nkey = "analyst"\nname = "analyst"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n', { mode: 0o600 });
+  const closed: string[] = [], started: string[] = [];
+  const registry = createRegistry(root), services = { registry, controller: { name: 'desktop' }, now: Date.now, id: randomUUID,
+    execution: { validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
+      start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(); return success({ sessionId: randomUUID(), signal: stop.signal, close: async () => { closed.push(instance.key); stop.abort(); } }); }, ...execution } satisfies Execution };
+  const controller = value(createController(services)), record = value(controller.add(fleet));
+  async function operation(action: 'start' | 'stop', instanceKey?: string) {
+    const current = value(controller.view(record.fleetId));
+    return value(await controller.operate({ operationId: randomUUID(), action, target: instanceKey ? { kind: 'agent', fleetId: record.fleetId, instanceKey } : { kind: 'fleet', fleetId: record.fleetId }, expectedRevision: current.revision }));
+  }
+  async function finish(operation: Operation) {
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const current = value(controller.operation(operation.operationId));
+      if (current.status === 'failed' || current.status === 'succeeded') return current;
+      await delay(10);
+    }
+    assert.fail('Operation did not finish');
+  }
+  return { controller, services, registry, directory, fleet, definition, record, closed, started, operation, finish };
+}
+
+test('rosters are strict, disjoint and bounded; empty stopped fleets and persistent work areas are valid', () => {
+  const roster = { fleet: 'team', coordination: { adapter: 'crossfire', server: 'https://example.test', owner: '@owner:test' }, instances: [] };
+  assert(validateRoster(roster).ok);
+  assert.equal(validateRoster({ ...roster, extra: true }).ok, false);
+  const instance = { key: 'one', name: 'one', definition: 'new-role', workarea: 'agents/original/workarea/one' };
+  assert(validateRoster({ ...roster, instances: [instance] }).ok);
+  for (const workarea of ['../escape', '/escape', 'agents/original/workarea/../escape', 'agents/original/workarea']) assert.equal(validateRoster({ ...roster, instances: [{ ...instance, workarea }] }).ok, false);
+  assert.equal(validateRoster({ ...roster, instances: [instance, { ...instance, key: 'two', name: 'two', workarea: instance.workarea + '/nested' }] }).ok, false);
+  assert.equal(parseToml('fleet = "one"\nfleet = "two"', validateRoster).ok, false);
+});
+
+test('controller owns runtimes, rejects duplicates and operation reuse with different input', async scope => {
+  const fixture = fixtureController(); scope.after(() => fixture.controller.close());
+  assert.equal(fixture.controller.add(fixture.fleet).ok, false);
+  const start = await fixture.operation('start'); assert.equal((await fixture.finish(start)).status, 'succeeded');
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).phase, 'running');
+  const { operationId, target, action, expectedRevision } = start;
+  assert.equal(value(await fixture.controller.operate({ expectedRevision, action, target, operationId })).operationId, operationId);
+  assert.equal((await fixture.controller.operate({ expectedRevision, action: 'stop', target, operationId })).ok, false);
+  assert.equal((await fixture.finish(await fixture.operation('start'))).status, 'succeeded'); assert.equal(fixture.started.length, 1);
+  writeFileSync(join(fixture.definition, 'AGENTS.md'), 'Updated role while running.');
+  assert.equal((await fixture.finish(await fixture.operation('stop'))).status, 'succeeded', 'Disk edits cannot prevent stopping the running deployment');
+  assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+});
+const fixtureController = fixture;
+
+test('approval waiting is model-free and stop cancels a pending start', async scope => {
+  const fixture = fixtureController({ prepare: async (_config, _controller, signal, approval) => {
+    approval({ url: 'http://127.0.0.1/manage/enrollments/test', code: 'ABCDEF123456' });
+    await new Promise<void>(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true }); });
+    return failure('unavailable', 'Cancelled');
+  } }); scope.after(() => fixture.controller.close());
+  const start = await fixture.operation('start');
+  await delay(10); assert.equal(value(fixture.controller.operation(start.operationId)).status, 'awaiting-approval');
+  const stop = await fixture.operation('stop'); assert.equal((await fixture.finish(stop)).status, 'succeeded');
+  assert.equal((await fixture.finish(start)).status, 'failed'); assert.deepEqual(fixture.started, []);
+});
+
+test('roster edits serialize native detachment and retain files when removing the last instance', async scope => {
+  let release!: () => void;
+  const fixture = fixtureController({ detach: async () => { await new Promise<void>(resolve => { release = resolve; }); return success(undefined); } });
+  scope.after(() => fixture.controller.close());
+  const pending = fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'remove', instanceKey: 'analyst' });
+  assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 })).ok, false);
+  assert.equal(fixture.controller.rename(fixture.record.fleetId, 0, 'Raced').ok, false);
+  release(); assert.deepEqual(value(await pending).instances, []);
+  assert.equal(value(fixture.registry.load(fixture.fleet)).roster.instances.length, 0);
+  const rebooted = value(createController(fixture.services)); scope.after(() => rebooted.close());
+  assert.equal(value(rebooted.list()).length, 1); assert.deepEqual(value(rebooted.view(fixture.record.fleetId)).instances, []);
+});
+
+test('per-instance failure retains successful peers; startup history survives controller restart', async scope => {
+  const fixture = fixtureController({ prepare: async () => success({ failed: [{ instanceKey: 'analyst', code: 'name_collision', message: 'Name is taken' }] }) });
+  scope.after(() => fixture.controller.close());
+  value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
+  const operation = await fixture.operation('start'); const result = await fixture.finish(operation);
+  assert.equal(result.status, 'failed'); assert.equal(result.errors[0]?.code, 'name_collision'); assert.deepEqual(fixture.started, ['peer']);
+  await fixture.controller.close(); assert.deepEqual(fixture.closed, ['peer']);
+  const reopened = value(createController(fixture.services)); scope.after(() => reopened.close());
+  assert.equal(value(reopened.operation(operation.operationId)).status, 'failed');
+  assert(value(reopened.view(fixture.record.fleetId)).instances.every(instance => instance.phase === 'stopped'));
+});

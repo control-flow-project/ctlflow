@@ -1,0 +1,8 @@
+{
+  "name": "@fleetd/daemon", "version": "0.1.0", "private": true, "type": "module",
+  "dependencies": {
+    "@fleetd/contracts": "0.1.0", "@fleetd/domain": "0.1.0", "@fleetd/storage": "0.1.0",
+    "@crossfire/contracts": "0.1.0", "@crossfire/kernel": "0.1.0", "@crossfire/agent-core": "0.1.0",
+    "@crossfire/adapter-crossfire": "0.1.0", "@crossfire/adapter-filesystem": "0.1.0", "@crossfire/adapter-codex": "0.1.0"
+  }
+}
