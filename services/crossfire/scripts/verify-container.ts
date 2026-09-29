@@ -3,16 +3,17 @@ import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, expect } from '@playwright/test';
 import { main, imageName, runArguments } from '../apps/server/src/operator.js';
-import { readJson } from '../packages/files/src/index.js';
-import { ARTIFACTS } from '../packages/contracts/src/release.js';
-import { messageContent } from '../packages/matrix/src/message.js';
-import { onboardingUrl } from '../packages/contracts/src/onboarding.js';
+import { readJson } from '@crossfire/adapter-filesystem/index';
+import { ARTIFACTS } from '@crossfire/contracts/release';
+import { messageContent } from '@crossfire/adapter-matrix/message';
+import { onboardingUrl } from '@crossfire/contracts/onboarding';
 
 const root = process.cwd();
+const repository = resolve(root, '../..');
 const portProbe = createServer();
 portProbe.listen(0, '127.0.0.1'); await once(portProbe, 'listening');
 const address = portProbe.address(); assert(address && typeof address === 'object');
@@ -23,13 +24,13 @@ mkdirSync(join(root, '.temp'), { recursive: true });
 const directory = mkdtempSync(join(root, '.temp/container-verification-'));
 await main(['init', '--directory', directory, '--instance', 'verification', '--origin', origin,
   '--server-name', 'verification.localhost', '--administrator', 'admin']);
-const image = imageName(root);
+const image = imageName(repository);
 const arguments_ = runArguments(directory, image, port);
 const name = arguments_[arguments_.indexOf('--name') + 1]!;
 const secrets = readJson<{ administratorPassword: string }>(join(directory, 'bootstrap.json'));
 if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) {
   console.log('Building the verification image: ' + image);
-  const build = spawnSync('docker', ['build', '--tag', image, root], { stdio: 'inherit', timeout: 1_800_000 });
+  const build = spawnSync('docker', ['build', '--file', join(root, 'Dockerfile'), '--tag', image, repository], { stdio: 'inherit', timeout: 1_800_000 });
   assert.equal(build.status, 0, 'Verification image build failed');
 }
 
@@ -56,7 +57,7 @@ async function start() {
     for (;;) {
       assert.equal(child.exitCode, null, output);
       try {
-        const health = await fetch(origin + '/_coord/health', { signal: AbortSignal.timeout(2000) });
+        const health = await fetch(origin + '/api/health', { signal: AbortSignal.timeout(2000) });
         if (health.ok) break;
       } catch {}
       assert(Date.now() < deadline, 'Container readiness timed out: ' + output);
@@ -83,10 +84,12 @@ try {
       for (const path of ['/config.json/../bootstrap.json', '/manage/assets/%2e%2e%2fpackage.json', '/_coord/install.mjs']) {
         assert.equal((await fetch(origin + path)).status, 404);
       }
-      const health = await (await fetch(origin + '/_coord/health')).json() as { instance: string; version: string; release: string; runtime: string; startedAt: string };
+      const health = (await (await fetch(origin + '/api/health')).json() as { data: { instance: string; version: string; release: string; startedAt: number } }).data;
       assert.equal(health.instance, 'verification');
-      assert.match(health.runtime, /^node 26\./u);
-      assert(Number.isFinite(Date.parse(health.startedAt)));
+      const nodeVersion = spawnSync('docker', ['exec', name, 'node', '--version'], { encoding: 'utf8' });
+      assert.equal(nodeVersion.status, 0);
+      assert.match(nodeVersion.stdout, /^v26\./u);
+      assert(Number.isSafeInteger(health.startedAt) && health.startedAt > 0 && health.startedAt <= Date.now());
       for (const suffix of ['manifest.json', ...ARTIFACTS]) {
         assert.equal((await fetch(origin + '/onboarding/' + health.release + '/' + suffix)).status, 200);
       }
@@ -190,7 +193,7 @@ try {
         assert.equal(copied.includes(additionalInstructions), iteration === 1);
         await context.grantPermissions(['clipboard-read', 'clipboard-write']);
         await page.getByRole('button', { name: 'Copy instructions', exact: true }).click();
-        await expect(page.getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
+        await expect(page.getByRole('region', { name: 'Paste into your coding agent' }).getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
         assert.equal(await page.evaluate<string>('navigator.clipboard.readText()'), copied);
         await page.screenshot({ path: join(directory, 'connect-' + iteration + '.png'), fullPage: true });
         await page.goto(origin + '/manage/policy');

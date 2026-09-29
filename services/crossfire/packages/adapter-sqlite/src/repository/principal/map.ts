@@ -1,4 +1,4 @@
-import type { Principal } from '../../../../domain/src/identity/types.js';
+import type { Principal } from '@crossfire/domain/identity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapPrincipal(row: Tables['principal']): Principal {
   return {

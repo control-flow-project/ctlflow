@@ -1,9 +1,10 @@
 import { authority, type Config } from './account/authority.js';
 import { joined, roomFacts } from './room/facts.js';
-import { failure, success, type Result } from '../../kernel/src/result.js';
-import type { MatrixAuthority, RoomFacts, RoomMembership } from '../../domain/src/port/matrix-authority.js';
-import { API, nativeOk, nativeRequest, nativeState, segment } from '../../matrix/src/http.js';
-import { object, roomId, text, userId } from '../../contracts/src/management.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
+import type { MatrixAuthority, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';
+import { API, segment } from '@crossfire/contracts/matrix';
+import { nativeOk, nativeRequest, nativeState } from './http.js';
+import { object, roomId, text, userId } from '@crossfire/contracts/validation';
 
 export function createMatrixAuthority(config: Config): MatrixAuthority {
   const accounts = authority(config);

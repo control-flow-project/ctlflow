@@ -1,58 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AGENT_INSTRUCTIONS_MAX_BYTES, DEFAULT_AGENT_INSTRUCTIONS, authorityChanged, grants, policy, roomId } from "../packages/contracts/src/management.js";
-import { agentFilters } from "../packages/contracts/src/agent-filters.js";
-import { page } from "../apps/server/src/http.js";
-import { deliveryPolicy } from '../packages/contracts/src/delivery.js';
-import { WAKE_POLICIES, resolveWake } from '../packages/contracts/src/wake.js';
+import { AGENT_INSTRUCTIONS_MAX_BYTES, DEFAULT_AGENT_INSTRUCTIONS } from "@crossfire/contracts/policy";
+import { roomId } from "@crossfire/contracts/validation";
+import { deliveryGrant, policy, deliveryPolicy } from "@crossfire/contracts/schema/response";
+import { agents as agentFilters } from "@crossfire/contracts/schema/query";
+import { page } from "@crossfire/contracts/schema/query";
+
 
 test("native room identities remain opaque, including version 12 IDs", () => {
   const room = "!Z1lqALvgesu1ZL4m19nCNHXvw5TCMT8Os8gljGrpmug";
   assert.equal(roomId(room), true);
   assert.equal(roomId("!native:example.org"), true);
   for (const invalid of ["", "!", "room", "!room id", "!room\n"]) assert.equal(roomId(invalid), false);
-  assert.equal(grants([{ room, access: "read", muted: false }]).ok, true);
+  assert.equal(deliveryGrant({ roomId: room, accessMode: "read", powerLevel: null, muted: false }).ok, true);
 });
 
 test('listener policy is explicit and rejects missing authority, self triggers and competing fields', () => {
-  const policy = { id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', owner: '@owner:test.localhost', userId: '@agent:test.localhost',
-    status: 'active', ownerStatus: 'active', grants: [], wakePolicy: 'owner', senders: ['@owner:test.localhost'] };
+  const policy = { agentId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', ownerMatrixId: '@owner:test.localhost', matrixUserId: '@agent:test.localhost',
+    status: 'active', ownerStatus: 'active', roomGrants: [], wakeMode: 'owner', senderMatrixIds: ['@owner:test.localhost'] };
   assert(deliveryPolicy(policy).ok);
-  assert(deliveryPolicy({ ...policy, wakePolicy: 'nobody', senders: [] }).ok);
-  assert.equal(deliveryPolicy({ ...policy, wakePolicy: 'nobody' }).ok, false);
-  for (const invalid of [{ ...policy, wakePolicy: 'all' }, { ...policy, senders: [] }, { ...policy, senders: ['@owner:test.localhost', '@agent:test.localhost'] },
-    { ...policy, senders: ['@owner:test.localhost', '@owner:test.localhost'] }, { ...policy, senders: ['Alice'] }, { ...policy, wake: true }]) {
+  assert(deliveryPolicy({ ...policy, wakeMode: 'nobody', senderMatrixIds: [] }).ok);
+  assert.equal(deliveryPolicy({ ...policy, wakeMode: 'nobody' }).ok, false);
+  for (const invalid of [{ ...policy, wakeMode: 'all' }, { ...policy, senderMatrixIds: [] }, { ...policy, senderMatrixIds: ['@owner:test.localhost', '@agent:test.localhost'] },
+    { ...policy, senderMatrixIds: ['@owner:test.localhost', '@owner:test.localhost'] }, { ...policy, senderMatrixIds: ['Alice'] }, { ...policy, wake: true }]) {
     assert.equal(deliveryPolicy(invalid).ok, false);
   }
-  const { wakePolicy, ...missing } = policy;
-  assert.equal(wakePolicy, 'owner'); assert.equal(deliveryPolicy(missing).ok, false);
+  const { wakeMode, ...missing } = policy;
+  assert.equal(wakeMode, 'owner'); assert.equal(deliveryPolicy(missing).ok, false);
 });
 
-test('nobody is the least wake-up authority and never a default substitution', () => {
-  assert.deepEqual(WAKE_POLICIES, ['nobody', 'owner', 'owner-agents', 'humans', 'everyone', 'selected']);
-  const owner = { id: '@owner:test', label: 'Owner', kind: 'human' as const, owner: '@owner:test' };
-  const peer = { id: '@peer:test', label: 'Peer', kind: 'agent' as const, owner: owner.id };
-  assert.deepEqual(resolveWake('nobody', [owner.id], owner.id, '@self:test', [owner, peer]), []);
-  assert.deepEqual(resolveWake('selected', [peer.id], owner.id, '@self:test', [owner, peer]), [peer.id]);
-  assert.deepEqual(resolveWake('selected', [], owner.id, '@self:test', [owner, peer]), []);
-  assert.deepEqual(resolveWake('selected', [peer.id], owner.id, peer.id, [owner, peer]), []);
-});
-
-test("cursor filtering and sorting use the same native ID order", () => {
-  const rows = [{ id: "!a:example.org" }, { id: "!A:example.org" }];
-  const first = page(rows, new URL("https://example.org/?limit=1"));
-  assert(first.ok);
-  assert.equal(first.value.items[0]!.id, "!A:example.org");
-  const second = page(rows, new URL("https://example.org/?limit=1&after=" + encodeURIComponent(first.value.next!)));
-  assert(second.ok);
-  assert.deepEqual(second.value.items, [{ id: "!a:example.org" }]);
-  assert.equal(second.value.next, null);
-  assert.equal(page(rows, new URL("https://example.org/?limit=1&limit=2")).ok, false);
-});
-
-test("notification settings do not create new access authority", () => {
-  assert.equal(authorityChanged([{ room: "!native", access: "read", muted: false }], [{ room: "!native", access: "read", muted: true }]), false);
-  assert.equal(authorityChanged([{ room: "!native", access: "read", muted: false }], [{ room: "!native", access: "reply", muted: false }]), true);
+test("pagination rejects duplicate parameters and unbounded pages", () => {
+  assert.deepEqual(page(new URLSearchParams('page=2&pageSize=1')), { ok: true, value: { page: 2, pageSize: 1 } });
+  for (const query of ['page=0', 'pageSize=101', 'pageSize=1&pageSize=2', 'after=old']) assert.equal(page(new URLSearchParams(query)).ok, false);
 });
 
 test('administrator instructions are required plain text with an exact UTF-8 bound', () => {
@@ -77,10 +56,10 @@ test('administrator instructions are required plain text with an exact UTF-8 bou
 
 test('agent filter contract separates account status and listener activity', () => {
   const parse = (query: string) => agentFilters(new URLSearchParams(query));
-  assert.deepEqual(parse(''), { ok: true, value: { statuses: ['active', 'suspended'], listener: 'all' } });
-  assert.deepEqual(parse('status=revoked,active&listener=offline'), { ok: true, value: { statuses: ['active', 'revoked'], listener: 'offline' } });
-  assert.deepEqual(parse('status='), { ok: true, value: { statuses: [], listener: 'all' } });
-  assert(parse('status=active&listener=online&limit=1&after=native-id').ok);
+  assert.deepEqual(parse(''), { ok: true, value: { page: 1, pageSize: 20, search: '', statuses: ['active', 'suspended'], listener: 'all' } });
+  assert.deepEqual(parse('status=revoked,active&listener=offline'), { ok: true, value: { page: 1, pageSize: 20, search: '', statuses: ['revoked', 'active'], listener: 'offline' } });
+  assert.deepEqual(parse('status='), { ok: true, value: { page: 1, pageSize: 20, search: '', statuses: [], listener: 'all' } });
+  assert(parse('status=active&listener=online&pageSize=1&page=2').ok);
   for (const query of ['status=all', 'status=active,active', 'status=active&status=revoked', 'listener=busy',
     'listener=online&listener=offline', 'listener=', 'owner=@other:server', 'status=active,', 'unknown=true']) {
     assert.equal(parse(query).ok, false, query);

@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapInstancePolicy } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '../../../../kernel/src/result.js';
-import type { InstancePolicyRepository } from '../../../../domain/src/port/repositories.js';
+import { failure, success } from '@crossfire/kernel/result';
+import type { InstancePolicyRepository } from '@crossfire/domain/port/repositories';
 
 export function createInstancePolicyRepository(database: Database.Database): InstancePolicyRepository {
   return {

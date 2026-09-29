@@ -1,10 +1,11 @@
 import { createHmac, createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { failure, success, type Result } from "../../../kernel/src/result.js";
-import { object, text, userId } from "../../../contracts/src/management.js";
-import { API, nativeOk, nativeRequest, segment, type Native } from "../../../matrix/src/http.js";
+import { failure, success, type Result } from "@crossfire/kernel/result";
+import { object, text, userId } from "@crossfire/contracts/validation";
+import { API, segment } from '@crossfire/contracts/matrix';
+import { nativeOk, nativeRequest, type Native } from "../http.js";
 export type Config = { matrixOrigin: string; serverName: string; jwtSecret: string; registrationSecret: string; serviceMatrixId: string };
-import { account, type Account } from "../../../contracts/src/client.js";
+import { account, type Account } from "@crossfire/contracts/client";
 
 export type Credentials = Account;
 export type Authority = ReturnType<typeof authority>;

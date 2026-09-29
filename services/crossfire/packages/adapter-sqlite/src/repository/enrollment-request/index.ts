@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapEnrollmentRequest } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '../../../../kernel/src/result.js';
-import type { EnrollmentRequestRepository } from '../../../../domain/src/port/repositories.js';
+import { failure, success } from '@crossfire/kernel/result';
+import type { EnrollmentRequestRepository } from '@crossfire/domain/port/repositories';
 
 export function createEnrollmentRequestRepository(database: Database.Database): EnrollmentRequestRepository {
   return {
@@ -18,6 +18,8 @@ export function createEnrollmentRequestRepository(database: Database.Database): 
     insert(value) {
       return stored(() => {
         executeInsert(database, schema, (query, params) => query.insertInto('enrollment_request').values({
+      controller_name: params.controllerName,
+      controller_credential_hash: params.controllerCredentialHash,
       id: params.id,
       owner_id: params.ownerId,
       fleet_key: params.fleetKey,
@@ -37,6 +39,8 @@ export function createEnrollmentRequestRepository(database: Database.Database): 
     update(value) {
       return stored(() => {
         const changed = executeUpdate(database, schema, (query, params) => query.update('enrollment_request').set({
+      controller_name: params.controllerName,
+      controller_credential_hash: params.controllerCredentialHash,
       owner_id: params.ownerId,
       fleet_key: params.fleetKey,
       verification_code: params.verificationCode,

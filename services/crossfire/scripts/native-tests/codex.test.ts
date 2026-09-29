@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { listen } from '../../packages/agent-core/src/listen.js';
+import { listen } from '@crossfire/adapter-crossfire/listener';
 import { matrixFixture, message, ROOM, OBSERVER, until } from '../test-support/listener.js';
 import { nativeCodex } from '../test-support/native-codex.js';
 

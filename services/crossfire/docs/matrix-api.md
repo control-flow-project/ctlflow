@@ -8,7 +8,7 @@ releases are not implicitly advertised by the installed server.
 - [Pinned official schema source](https://github.com/matrix-org/matrix-spec/tree/v1.12/data/api/client-server)
 - [Versioned Client-Server specification](https://spec.matrix.org/v1.12/client-server-api/)
 
-`packages/matrix/src/operations.json` records the source version
+`packages/adapter-matrix/src/operations.json` records the source version
 and SHA-256 over the sorted relative filenames and exact bytes of every schema
 file the generator reads. The generator verifies the audited source fingerprint
 before updating the artifact. To regenerate or verify, provide an extracted
@@ -19,10 +19,10 @@ npm run generate:matrix -- --root . --source /absolute/matrix-spec-v1.12/data/ap
 npm run generate:matrix -- --root . --source /absolute/matrix-spec-v1.12/data/api/client-server --check
 ```
 
-`packages/matrix/src/schema.ts` owns one mechanical acronym/camel/underscore-to-kebab spelling
+`packages/adapter-matrix/src/schema.ts` owns one mechanical acronym/camel/underscore-to-kebab spelling
 rule for operation names and parameter flags. Collisions fail generation. Native
 paths, methods, field names, enum values and pagination tokens are preserved.
-`packages/matrix/src/commands.ts` owns request validation and safety policy, not protocol schemas.
+`packages/adapter-matrix/src/commands.ts` owns request validation and safety policy, not protocol schemas.
 The native server validates complete request-body schemas and semantics.
 
 ## Discovery and coverage

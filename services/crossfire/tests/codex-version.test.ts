@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { localEndpoint } from '../packages/adapter-codex/src/protocol.js';
+import { localEndpoint } from '@crossfire/adapter-codex/protocol';
 
 test('the runtime connection accepts only explicit authenticated loopback WS destinations', () => {
   for (const endpoint of ['ws://127.0.0.1:1234', 'ws://localhost:1234', 'wss://[::1]:1234']) {

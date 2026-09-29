@@ -9,8 +9,13 @@
   },
   "dependencies": {
     "@crossfire/contracts": "0.1.0",
-    "@crossfire/files": "0.1.0",
-    "@crossfire/matrix": "0.1.0",
-    "proper-lockfile": "4.1.2"
+    "@crossfire/kernel": "0.1.0"
+  },
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "source": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
   }
 }

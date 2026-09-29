@@ -7,11 +7,11 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { matrix } from '../packages/matrix/src/http.js';
-import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '../packages/matrix/src/commands.js';
-import { kebab } from '../packages/matrix/src/schema.js';
-import { encodeOutput, outputBytes } from '../packages/contracts/src/limits.js';
-import { uploadStream, saveStream } from '../packages/matrix/src/files.js';
+import { matrix } from '@crossfire/adapter-matrix/http';
+import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '@crossfire/adapter-matrix/commands';
+import { kebab } from '@crossfire/adapter-matrix/schema';
+import { encodeOutput, outputBytes } from '@crossfire/contracts/limits';
+import { uploadStream, saveStream } from '@crossfire/adapter-matrix/files';
 import { matrixFixture, temporary, ROOM } from './test-support/listener.js';
 import { buildClient } from './build-client.js';
 
@@ -114,7 +114,7 @@ test('CLI exposes the native manifest and rejects every superseded top-level com
   const result = await execute(process.execPath, [script, 'matrix', 'get-room-events', '--help']);
   assert.equal(JSON.parse(result.stdout).id, 'getRoomEvents');
   for (const command of ['init', 'read', 'listen', 'send', 'history', 'rooms', 'who', 'upload', 'download']) {
-    await assert.rejects(execute(process.execPath, [script, command]), /superseded top-level commands/);
+    await assert.rejects(execute(process.execPath, [script, command]), /Use agent, room or matrix/);
   }
 });
 

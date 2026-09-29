@@ -1,44 +1,30 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { HEARTBEAT_MS } from '../../contracts/src/activity.js';
-import { fields } from '../../contracts/src/management.js';
-import { nativeRequest, type Native } from '../../matrix/src/http.js';
-import { manifest, updateNotice, type Manifest } from '../../contracts/src/release.js';
+import { HEARTBEAT_MS } from '@crossfire/contracts/activity';
+import type { Manifest } from '@crossfire/contracts/release';
+import type { Coordination } from './coordination.js';
 
-export async function reportActivity(client: Native, agent: string, installed: Manifest, stop: AbortSignal) {
+export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal) {
   const run = randomUUID();
-  const failed = new AbortController();
-  const lifetime = new AbortController();
+  const failed = new AbortController(), lifetime = new AbortController();
   const signal = AbortSignal.any([stop, failed.signal, lifetime.signal]);
-  let messages = 0;
-  let unavailable = false;
+  let messages = 0, unavailable = false;
   let warnedRelease: string | undefined;
   async function report(stopped: boolean, initial = false): Promise<void> {
-    const response = await nativeRequest({ base: client.base, ...(client.token ? { token: client.token } : {}),
-      timeoutMs: 5000, ...(!stopped ? { signal } : {}) }, 'POST', '/_coord/agents/' + agent + '/heartbeat', { run, release: installed.release, messages, stopped });
-    if (!response.ok || response.value.status >= 300) {
-      const detail = response.ok ? response.value.body.error : undefined;
-      const message = detail && typeof detail === 'object' && !Array.isArray(detail) && typeof detail.message === 'string'
-        ? detail.message : response.ok ? 'Listener reporting rejected: HTTP ' + response.value.status : response.error.message;
-      if (initial) throw new Error(message);
-      if (!stopped && response.ok && [400, 401, 403, 404, 409].includes(response.value.status)) failed.abort(new Error(message));
+    const response = await client.report(agent, run, { release: installed.release, messagesDelivered: messages, stopped }, stopped ? undefined : signal);
+    if (!response.ok) {
+      if (initial) throw new Error(response.error.message);
+      if (!stopped && ['invalid', 'unauthorized', 'forbidden', 'missing', 'conflict'].includes(response.error.code)) failed.abort(new Error(response.error.message));
       if (!signal.aborted && !unavailable) process.stderr.write('Crossfire heartbeat unavailable; management will show offline when it expires.\n');
-      unavailable = true;
-      return;
+      unavailable = true; return;
     }
-    const parsed = fields(response.value.body, ['disconnect', 'current']);
-    if (!parsed.ok || typeof parsed.value.disconnect !== 'boolean') {
-      failed.abort(new Error('Invalid Crossfire heartbeat response')); return;
-    }
-    const current = manifest(parsed.value.current);
-    if (!current.ok) { failed.abort(new Error('Invalid Crossfire release in heartbeat')); return; }
-    if (!stopped && current.value.release !== installed.release && current.value.release !== warnedRelease) {
-      warnedRelease = current.value.release;
-      process.stderr.write('A Crossfire update is available for the next connection. This listener remains running.\n'
-        + updateNotice(client.base, installed.release, current.value, installed.artifacts['SKILL.md'].sha256) + '\n');
+    const current = response.value.currentRelease;
+    if (!stopped && current !== installed.release && current !== warnedRelease) {
+      warnedRelease = current;
+      process.stderr.write('Crossfire release ' + current + ' is available. Reconnect to update the project client and skill; this listener remains running.\n');
     }
     unavailable = false;
-    if (parsed.value.disconnect && !stopped) failed.abort(new Error('The owner requested this listener to disconnect'));
+    if (response.value.disconnect && !stopped) failed.abort(new Error('The owner requested this listener to disconnect'));
   }
   await report(false, true);
   const running = (async () => {

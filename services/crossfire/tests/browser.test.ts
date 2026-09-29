@@ -6,23 +6,36 @@ import test from 'node:test';
 import { chromium, expect, type Page } from '@playwright/test';
 import { conduitFixture } from '../scripts/architecture-proof/conduit-fixture.js';
 import { bootstrap } from '../apps/server/src/bootstrap.js';
-import { context, secret } from '../apps/server/src/context.js';
-import { openStore } from '../apps/server/src/data/database.js';
-import * as queries from '../apps/server/src/data/queries.js';
-import { reconciler } from '../apps/server/src/reconcile.js';
-import { httpService } from '../apps/server/src/http.js';
+import { secret, value } from './support/application.js';
+import { createApplication } from '../apps/server/src/composition.js';
+
+
+import { createWorker } from '../apps/server/src/worker.js';
+import { createHttpServer } from '../apps/server/src/http/create-server.js';
+import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
+import { createSession } from '@crossfire/domain/session/create-session';
+import { authenticateMember } from '@crossfire/domain/session/authenticate';
+import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
+import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
+import { changeAgent } from '@crossfire/domain/agent/change-agent';
+import { randomUUID } from 'node:crypto';
 import { publicRouter } from '../apps/server/src/router.js';
 import { releaseFixture, updatedRelease } from './release-fixture.js';
 import { enroll, connect } from '../apps/client/src/enrollment.js';
-import { paths, readProfile } from '../packages/agent-core/src/state.js';
-import { API, nativeOk, segment } from '../packages/matrix/src/http.js';
+import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
+import { API, segment } from '@crossfire/contracts/matrix';
+import { nativeOk } from '@crossfire/adapter-matrix/http';
 import { nativeProvider } from '../scripts/test-support/native-provider.js';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { connectCodex } from '../packages/adapter-codex/src/connection.js';
-import { listen } from '../packages/agent-core/src/listen.js';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
+import { listen } from '@crossfire/adapter-crossfire/listener';
 import { until } from '../scripts/test-support/listener.js';
-import { ARTIFACTS } from '../packages/contracts/src/release.js';
-import { onboardingUrl } from '../packages/contracts/src/onboarding.js';
+import { ARTIFACTS } from '@crossfire/contracts/release';
+import { onboardingUrl } from '@crossfire/contracts/onboarding';
+
+async function submit(page: Page, name: string): Promise<void> {
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name, exact: true }).click()]);
+}
 
 async function checkEnrollmentInstructions(page: Page, origin: string, owner: string): Promise<string> {
   await page.goto(origin + '/manage/connect');
@@ -30,7 +43,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await expect(field).toBeVisible();
   await expect(field).toHaveAttribute('readonly', '');
   const instructions = await field.inputValue();
-  const health = await (await page.request.get(origin + '/_coord/health')).json() as { release: string };
+  const health = (await (await page.request.get(origin + '/api/health')).json() as { data: { release: string } }).data;
   const base = origin + '/onboarding/' + health.release + '/';
   assert(instructions.includes('Connect this project to Crossfire for ' + owner));
   const setupUrl = onboardingUrl(origin, owner);
@@ -71,7 +84,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.bringToFront();
   await page.getByRole('button', { name: 'Copy instructions', exact: true }).click();
-  await expect(page.getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
+  await expect(page.getByRole('region', { name: 'Paste into your coding agent' }).getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
   assert.equal(await page.evaluate<string>('navigator.clipboard.readText()'), instructions);
   return instructions;
 }
@@ -121,11 +134,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const password = secret();
   const initialized = await bootstrap(config, { servicePassword: secret(), administratorPassword: password });
   assert(initialized.ok, JSON.stringify(initialized));
-  const store = openStore(join(directory, 'management.sqlite'));
-  const ctx = context(store, config);
-  const worker = reconciler(ctx);
+  const application = createApplication(join(directory, 'management.sqlite'), config), { services } = application;
+  const worker = createWorker(services);
   const release = await releaseFixture();
-  const service = httpService(ctx, worker, release);
+  const service = createHttpServer(application, worker, release);
   service.listen(0, '127.0.0.1'); await once(service, 'listening');
   const address = service.address(); assert(address && typeof address === 'object');
   const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
@@ -134,10 +146,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   router.listen(0, '127.0.0.1'); await once(router, 'listening');
   const publicAddress = router.address(); assert(publicAddress && typeof publicAddress === 'object');
   const origin = 'http://127.0.0.1:' + publicAddress.port;
-  routes.publicOrigin = origin; config.publicOrigin = origin;
-  scope.after(async () => { ctx.native.close(); router.closeAllConnections(); service.closeAllConnections();
+  routes.publicOrigin = origin; config.publicOrigin = origin; services.instance.publicOrigin = origin;
+  scope.after(async () => { services.matrix.close(); router.closeAllConnections(); service.closeAllConnections();
     await new Promise<void>(resolve => router.close(() => resolve())); await new Promise<void>(resolve => service.close(() => resolve()));
-    await worker.stop(); store.close(); });
+    await worker.stop(); application.close(); });
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
   scope.after(() => browser.close());
   const errors: string[] = [];
@@ -171,57 +183,60 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert(loggedIn.ok && typeof loggedIn.value.access_token === 'string');
   const human = { base: origin, token: loggedIn.value.access_token };
   assert((await nativeOk(human, 'POST', API + '/rooms/' + segment(room) + '/join', {})).ok);
+  const roomAlias = '#engineering' + 'w'.repeat(80) + ':architecture.localhost';
+  assert((await nativeOk(human, 'PUT', API + '/directory/room/' + segment(roomAlias), { room_id: room })).ok);
+  assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/state/m.room.canonical_alias', { alias: roomAlias })).ok);
   const workspace = join(directory, 'project'); mkdirSync(workspace);
   const destination = paths(workspace, 'holmes');
-  const enrolled = await enroll(destination, origin, config.administrator, 'Holmes', release.manifest);
+  const enrolled = await enroll(destination, origin, config.administrator, 'holmes', release.manifest);
   assert(enrolled.ok);
   const request = enrolled.value as { code: string; approvalUrl: string };
   await page.goto(request.approvalUrl);
   await page.getByLabel('Verification code').fill(request.code);
-  await page.getByRole('button', { name: 'Approve agent', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Manage room access' })).toBeVisible();
+  await page.getByRole('button', { name: 'Approve roster', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Agent details →' })).toBeVisible();
   await worker.drain();
   assert((await connect(destination, release.manifest)).ok);
   const profile = readProfile(destination.profile);
-  assert.equal(queries.agent(store, profile.id)!.grants, '[]');
-  await page.getByRole('link', { name: 'Manage room access' }).click();
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+  await page.getByRole('link', { name: 'Agent details →' }).click();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue('owner');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
-  await expect(page.getByRole('combobox', { name: 'Wake-up authority' }).locator('option')).toHaveCount(5);
-  await expect(page.getByText('Nobody disables all chat-triggered input', { exact: false })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Wake-up authority' }).locator('option')).toHaveCount(6);
+  await expect(page.getByText('Nobody disables chat-triggered input', { exact: false })).toBeVisible();
   for (const policy of ['nobody', 'owner-agents', 'humans', 'everyone', 'owner']) {
     await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption(policy);
-    await page.getByRole('button', { name: 'Save wake-up policy' }).click();
+    await submit(page, 'Save wake-up policy');
     await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
     await page.reload();
     await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue(policy);
-    assert.equal(queries.agent(store, profile.id)!.wakePolicy, policy);
-    assert.equal(queries.agent(store, profile.id)!.grantRevision, 0);
+    assert.equal(value(services.directory.agent(profile.id))!.agent.wakeMode, policy);
+    assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
   }
   await expect(page.getByRole('link', { name: 'Engineering', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('read');
-  await page.getByRole('button', { name: 'Save access' }).click();
+  await submit(page, 'Save access');
   await expect(page.getByRole('button', { name: 'Save access' })).toBeEnabled();
   await worker.drain();
   const agent = { base: origin, token: profile.account.access_token };
   assert(!(await nativeOk(agent, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/denied', { msgtype: 'm.text', body: 'Denied' })).ok);
   await page.reload();
   await page.getByLabel('Configured display name').fill('Holmes');
-  await page.getByRole('button', { name: 'Save name', exact: true }).click();
+  await submit(page, 'Save name');
   await expect(page.getByRole('heading', { name: 'Holmes', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Engineering', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Matrix permission levels', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Native Matrix permissions', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Engineering', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('custom');
-  await page.getByLabel('Matrix power level', { exact: true }).fill('50');
-  await page.getByRole('button', { name: 'Save access' }).click();
-  await expect(page.getByText('Level 50', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await page.getByLabel('Power level', { exact: true }).fill('50');
+  await submit(page, 'Save access');
+  await expect(page.getByText('Custom power level', { exact: true }).last()).toBeVisible({ timeout: 15_000 });
   await worker.drain();
-  assert.equal(JSON.parse(queries.agent(store, profile.id)!.grants)[0].level, 50);
-  await page.getByRole('link', { name: '← Agent rooms & activity' }).click();
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: room }))!.powerLevel, 50);
+  await page.getByRole('link', { name: '← Agent details' }).click();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('reply');
-  await page.getByRole('button', { name: 'Save access' }).click();
+  await submit(page, 'Save access');
   await page.waitForLoadState('load'); await worker.drain();
   await page.goto(origin + '/manage/agents');
   await expect(page.getByRole('heading', { name: 'Holmes', exact: true })).toBeVisible();
@@ -232,12 +247,12 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await materialize(engine, provider);
   await page.goto(origin + '/manage/agents/' + profile.id);
   await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('nobody');
-  await page.getByRole('button', { name: 'Save wake-up policy' }).click();
+  await submit(page, 'Save wake-up policy');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
   const stop = new AbortController();
   let listenerFailure: unknown;
   let listenerReady = false;
-  const receiving = listen({ release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile: join(destination.state, 'cursors.json'),
+  const receiving = listen({ coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile: join(destination.state, 'cursors.json'),
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
     runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, hooks }, signal),
   }, stop.signal).catch(error => { listenerFailure = error; });
@@ -256,7 +271,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await until(() => engine.notifications.some(notice => notice.method === 'turn/completed'));
   provider.hold();
   await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('owner');
-  await page.getByRole('button', { name: 'Save wake-up policy' }).click();
+  await submit(page, 'Save wake-up policy');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
   await until(() => provider.requests.some(value => JSON.stringify(value).includes('Crossfire integrated native delivery')) || listenerFailure !== undefined);
   assert.equal(listenerFailure, undefined, String(listenerFailure));
@@ -276,7 +291,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(activity.getByText('online', { exact: true })).toBeVisible();
   assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Version discovery must not call the model');
   await page.getByLabel('Configured display name').fill('Unsaved name');
-  await page.waitForResponse(response => response.url().endsWith('/_coord/agents/' + profile.id) && response.request().method() === 'GET');
+  await page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
   await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
   const requestsBeforeDisconnect = provider.requests.length;
   page.removeAllListeners('dialog');
@@ -296,9 +311,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await receiving;
   assert.match(String(listenerFailure), /requested.*disconnect/);
   assert.equal(provider.requests.length, requestsBeforeDisconnect, 'Heartbeat and disconnect must not call the model');
-  const report = await page.request.get(origin + '/_coord/agents/' + profile.id);
-  const status = await report.json() as { activity: { messages: number; activeMs: number } };
-  assert(status.activity.messages >= 1);
+  const report = await page.request.get(origin + '/api/agents/' + profile.id);
+  const status = (await report.json() as { data: { activity: { messagesDelivered: number; activeMs: number } } }).data;
+  assert(status.activity.messagesDelivered >= 1);
   assert(status.activity.activeMs > 0);
   assert.equal(engine.child.exitCode, null, 'Stopping the listener must not stop the external engine');
   await page.getByRole('link', { name: 'Invitations', exact: true }).click();
@@ -321,10 +336,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await memberPage.getByLabel('Matrix username').fill('@alice:architecture.localhost');
   await memberPage.getByLabel('Password', { exact: true }).fill('browser-fixture-only-password');
   await memberPage.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(memberPage.getByRole('heading', { name: 'My agents', exact: true })).toBeVisible();
+  await expect(memberPage.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible();
   await expect(memberPage.getByRole('link', { name: 'Members', exact: true })).toHaveCount(0);
-  assert.equal((await memberPage.request.get(origin + '/_coord/members')).status(), 403);
-  assert.equal((await memberPage.request.get(origin + '/_coord/managed-rooms')).status(), 403);
+  assert.equal((await memberPage.request.get(origin + '/api/members')).status(), 403);
+  assert.equal((await memberPage.request.get(origin + '/api/rooms')).status(), 200);
   await memberPage.setViewportSize({ width: 390, height: 844 });
   await checkEnrollmentInstructions(memberPage, origin, '@alice:architecture.localhost');
   await expect(memberPage.getByRole('link', { name: 'Manage rooms →', exact: true })).toHaveCount(0);
@@ -349,7 +364,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(memberPage.getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Reset to default', exact: true }).click();
   await expect(instructionsField).toHaveValue('');
-  assert.equal(queries.readPolicy(store)!.agentInstructions, guidance, 'Reset is a draft until Save settings');
+  assert.equal(value(services.repositories.instancePolicy.find({ id: 'instance' }))!.agentInstructions, guidance, 'Reset is a draft until Save settings');
   await expect(page.getByLabel('Agents per owner')).toHaveValue('8');
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save settings' }).click()]);
   await expect(instructionsField).toHaveValue('');
@@ -359,26 +374,36 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await page.goto(origin + '/manage/members');
   await expect(page.getByText('Alice', { exact: true })).toBeVisible();
   await page.goto(origin + '/manage/rooms/' + encodeURIComponent(room));
-  await expect(page.getByRole('row').filter({ hasText: '@crossfire-browser:architecture.localhost' }).getByRole('button', { name: 'Remove' })).toBeDisabled();
-  await page.getByLabel('Member Matrix ID').fill('@alice:architecture.localhost');
-  await page.getByRole('button', { name: 'Invite member', exact: true }).click();
+  await page.getByLabel('Find people or agents').fill('Alice');
+  await page.getByLabel('Identity', { exact: true }).selectOption({ label: 'Alice · @alice:architecture.localhost' });
+  await submit(page, 'Apply membership');
   const invited = page.getByRole('row').filter({ hasText: '@alice:architecture.localhost' });
   await expect(invited.getByText('invite', { exact: true })).toBeVisible();
-  await invited.getByRole('button', { name: 'Remove', exact: true }).click();
-  await expect(invited).toHaveCount(0);
-  await Promise.all([page.waitForResponse(response => response.url().endsWith('/members') && response.request().method() === 'POST'),
-    page.getByRole('row').filter({ hasText: profile.account.user_id }).getByRole('button', { name: 'Remove', exact: true }).click()]);
+  await page.getByLabel('Identity', { exact: true }).selectOption({ label: 'Alice · @alice:architecture.localhost' });
+  await page.getByLabel('Action', { exact: true }).selectOption('kick');
+  await submit(page, 'Apply membership');
+  await expect(invited.getByText('leave', { exact: true })).toBeVisible();
+  await page.getByLabel('Find people or agents').fill('Holmes');
+  await page.getByLabel('Identity', { exact: true }).selectOption({ label: 'Holmes · ' + profile.account.user_id });
+  await page.getByLabel('Action', { exact: true }).selectOption('kick');
+  await submit(page, 'Apply membership');
   await worker.drain();
   await page.reload();
-  await expect(page.getByRole('row').filter({ hasText: profile.account.user_id })).toHaveCount(0);
-  assert.equal(queries.agent(store, profile.id)!.grants, '[]');
+  await expect(page.getByRole('row').filter({ hasText: profile.account.user_id }).getByText('leave', { exact: true })).toBeVisible();
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none'), []);
   await page.goto(origin + '/manage/audit');
-  await expect(page.getByText('policy.change', { exact: true })).toHaveCount(2);
-  const fixtureAgent = queries.agent(store, profile.id)!;
-  queries.insertAgent(store, { ...fixtureAgent, id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', userId: '@archived:architecture.localhost',
-    name: 'Archived agent', override: null, status: 'revoked', token: null });
-  queries.insertAgent(store, { ...fixtureAgent, id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', userId: '@alice-agent:architecture.localhost',
-    owner: '@alice:architecture.localhost', name: 'Alice agent', override: null, token: null });
+  await expect(page.getByText('instance-policy.configure', { exact: true })).toHaveCount(2);
+  const adminSession = value(await createSession(services, human.token)), adminActor = value(await authenticateMember(services, adminSession.secret)).actor;
+  const aliceAccount = value(await nativeOk({ base: origin }, 'POST', API + '/login', { type: 'm.login.password', identifier: { type: 'm.id.user', user: '@alice:architecture.localhost' }, password: 'browser-fixture-only-password' }));
+  const aliceSession = value(await createSession(services, String(aliceAccount.access_token))), aliceActor = value(await authenticateMember(services, aliceSession.secret)).actor;
+  for (const [name, actor, ownerMatrixId] of [['archived', adminActor, config.administrator], ['alice-agent', aliceActor, '@alice:architecture.localhost']] as const) {
+    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: null, instances: [{ instanceKey: name, name }] };
+    const introduced = value(await introduceEnrollment(services, input));
+    value(decideEnrollment(services, actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
+    const id = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!.agentId!;
+    if (name === 'archived') value(changeAgent(services, actor, id, { expectedRevision: 0, status: 'revoked' }, randomUUID()));
+  }
+  await worker.drain();
   await page.goto(origin + '/manage/agents');
   await expect(page.getByLabel('Show active', { exact: true })).toBeChecked();
   await expect(page.getByLabel('Show suspended', { exact: true })).toBeChecked();
@@ -392,10 +417,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(page.getByLabel('Show revoked', { exact: true })).toBeChecked();
   await page.getByLabel('Listener status', { exact: true }).selectOption('online');
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Apply filters', exact: true }).click()]);
-  await expect(page.getByRole('heading', { name: 'No agents match these filters', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No matching agents', exact: true })).toBeVisible();
   await memberPage.goto(origin + '/manage/agents?status=active,suspended,revoked');
   await expect(memberPage.locator('.agent-card')).toHaveCount(1);
-  await expect(memberPage.locator('.agent-card')).toContainText('Alice agent');
+  await expect(memberPage.locator('.agent-card')).toContainText('alice-agent');
   await reviewLayouts(page, origin, directory, ['/manage/agents', '/manage/agents/' + profile.id,
     '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room), '/manage/connect', '/manage/enrollments',
     new URL(request.approvalUrl).pathname, '/manage/members', '/manage/invitations', '/manage/rooms',

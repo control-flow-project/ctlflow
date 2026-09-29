@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import type { RoomMembership } from '../port/matrix-authority.js';
 import { requestedPower } from './authorize-change.js';

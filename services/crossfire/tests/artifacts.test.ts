@@ -5,8 +5,8 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } fro
 import { join } from "node:path";
 import test from "node:test";
 import { buildRelease } from "../scripts/build-release.js";
-import { ARTIFACTS, manifest } from "../packages/contracts/src/release.js";
-import { artifactHash, loadRelease } from "../packages/files/src/release.js";
+import { ARTIFACTS, manifest } from "@crossfire/contracts/release";
+import { artifactHash, loadRelease } from "@crossfire/adapter-filesystem/release";
 import { serveArtifact } from "../apps/server/src/artifacts.js";
 
 test("published project-local release is immutable, bounded, standalone and publicly inspectable", async context => {

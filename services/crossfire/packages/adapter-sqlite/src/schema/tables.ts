@@ -1,6 +1,23 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  enrollment_controller_metadata: {
+    enrollment_id: string;
+    key: string;
+    value: string;
+  };
+  fleet_controller_metadata: {
+    fleet_id: string;
+    key: string;
+    value: string;
+  };
+  fleet_credential: {
+    id: string;
+    fleet_id: string;
+    secret_hash: string;
+    created_at: number;
+    revoked_at: number | null;
+  };
   principal: {
     id: string;
     matrix_user_id: string;
@@ -62,6 +79,8 @@ export type Tables = {
     assigned_at: number;
   };
   enrollment_request: {
+    controller_name: string | null;
+    controller_credential_hash: string | null;
     id: string;
     owner_id: string;
     fleet_key: string | null;
@@ -90,6 +109,11 @@ export type Tables = {
     agent_id: string | null;
   };
   fleet: {
+    id: string;
+    label: string;
+    controller_name: string;
+    revision: number;
+    updated_at: number;
     owner_id: string;
     fleet_key: string;
     created_at: number;
@@ -199,7 +223,8 @@ export type Tables = {
   audit_event: {
     id: string;
     request_id: string;
-    actor_kind: 'human' | 'agent' | 'system' | 'anonymous';
+    actor_credential_id: string | null;
+    actor_kind: 'human' | 'agent' | 'controller' | 'system' | 'anonymous';
     actor_principal_id: string | null;
     owner_id: string | null;
     target_kind: string;

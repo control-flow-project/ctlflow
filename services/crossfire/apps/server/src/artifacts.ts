@@ -1,6 +1,6 @@
 import type { ServerResponse } from 'node:http';
-import { artifactName } from '../../../packages/contracts/src/release.js';
-import type { Release } from '../../../packages/files/src/release.js';
+import { artifactName } from '@crossfire/contracts/release';
+import type { Release } from '@crossfire/adapter-filesystem/release';
 
 export function serveArtifact(release: Release, method: string, path: string, response: ServerResponse): boolean {
   if (method !== 'GET' && method !== 'HEAD') return false;

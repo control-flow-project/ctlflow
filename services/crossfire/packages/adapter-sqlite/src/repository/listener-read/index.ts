@@ -1,8 +1,8 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
-import { success } from '../../../../kernel/src/result.js';
-import type { ListenerReadRepository } from '../../../../domain/src/port/listener-read.js';
+import { success } from '@crossfire/kernel/result';
+import type { ListenerReadRepository } from '@crossfire/domain/port/listener-read';
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapListenerRun } from '../listener-run/map.js';

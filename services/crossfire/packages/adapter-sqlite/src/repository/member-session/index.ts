@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapMemberSession } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '../../../../kernel/src/result.js';
-import type { MemberSessionRepository } from '../../../../domain/src/port/repositories.js';
+import { failure, success } from '@crossfire/kernel/result';
+import type { MemberSessionRepository } from '@crossfire/domain/port/repositories';
 
 export function createMemberSessionRepository(database: Database.Database): MemberSessionRepository {
   return {

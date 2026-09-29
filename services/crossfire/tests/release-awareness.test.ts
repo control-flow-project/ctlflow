@@ -7,9 +7,9 @@ import test from 'node:test';
 import { fakeCodex, matrixFixture, THREAD } from '../scripts/test-support/listener.js';
 import { builtRelease, installTestRelease } from '../scripts/test-support/release.js';
 import { updatedRelease } from './release-fixture.js';
-import { updateNotice } from '../packages/contracts/src/release.js';
-import { listen } from '../packages/agent-core/src/listen.js';
-import { discoverCodex } from '../packages/adapter-codex/src/discovery.js';
+import { updateNotice } from '@crossfire/contracts/release';
+import { listen } from '@crossfire/adapter-crossfire/listener';
+import { discoverCodex } from '@crossfire/adapter-codex/discovery';
 
 const execute = promisify(execFile);
 
@@ -25,7 +25,7 @@ test('one connect installs, starts, reuses, upgrades and disconnects the existin
   for (const option of ['--session', '--endpoint', '--token-file', '--token-env']) {
     await assert.rejects(executeClient('agent', 'connect', option, 'not-a-connection'), /Unknown option|Unsupported option/);
   }
-  await assert.rejects(executeClient('agent', 'enroll'), /Unknown agent command/);
+  await assert.rejects(executeClient('agent', 'enroll'), /Unknown command/);
   const first = await executeClient('agent', 'connect');
   const started = JSON.parse(first.stdout.slice(first.stdout.lastIndexOf('\n{\n') + 1)) as { status: string; listener: { ready: boolean } };
   assert.equal(started.status, 'listening');

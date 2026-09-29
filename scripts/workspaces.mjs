@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 const action = process.argv[2];
 if (!['typecheck', 'build', 'test'].includes(action)) throw new Error('Expected typecheck, build or test');
 const root = fileURLToPath(new URL('../', import.meta.url));
+if (action === 'test') execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit' });
 for (const workspace of ['@crossfire/service', '@fleetd/service', '@fleet/service']) {
   execFileSync('npm', ['run', action, '--workspace=' + workspace], { cwd: root, stdio: 'inherit' });
 }
+if (action === 'test') execFileSync('npm', ['run', 'test:integration', '--workspace=@crossfire/service'], { cwd: root, stdio: 'inherit' });

@@ -1,7 +1,7 @@
-import { fields, object, text } from '../../contracts/src/management.js';
-import { failure, success, type Result } from '../../kernel/src/result.js';
-import type { Json } from '../../contracts/src/json.js';
-import type { Permission } from '../../agent-core/src/runtime.js';
+import { fields, object, text } from '@crossfire/contracts/validation';
+import { failure, success, type Result } from '@crossfire/kernel/result';
+import type { Json } from '@crossfire/contracts/json';
+import type { Permission } from '@crossfire/agent-core/runtime';
 import type { NativeRequest } from './protocol.js';
 
 const choices = new Map<string, string>([

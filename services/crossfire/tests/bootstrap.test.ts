@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
 import { bootstrap } from "../apps/server/src/bootstrap.js";
-import { authority } from "../apps/server/src/native.js";
-import { secret } from "../apps/server/src/context.js";
-import { API, nativeOk, nativeRequest } from "../packages/matrix/src/http.js";
+import { authority } from "@crossfire/adapter-matrix/account/authority";
+import { secret } from "./support/application.js";
+import { serviceUser } from '../apps/server/src/config.js';
+import { API } from '@crossfire/contracts/matrix';
+import { nativeOk, nativeRequest } from '@crossfire/adapter-matrix/http';
 import type { Config } from "../apps/server/src/config.js";
-import type { Result } from "../packages/kernel/src/result.js";
+import type { Result } from "@crossfire/kernel/result";
 
 function value<T>(result: Result<T>): T {
   assert(result.ok, result.ok ? "" : result.error.message);
@@ -20,7 +22,8 @@ test("private service bootstrap survives a human password change without resetti
     matrixOrigin: fixture.base, administrator: "@admin:architecture.localhost", registrationSecret: fixture.registrationToken, jwtSecret };
   const credentials = { servicePassword: secret(), administratorPassword: secret() };
   value(await bootstrap(config, credentials));
-  const native = authority(config);
+  const native = authority({ ...config, serviceMatrixId: serviceUser(config) });
+  scope.after(() => native.close());
   const human = value(await native.provision(config.administrator, credentials.administratorPassword, "CROSSFIRE_HUMAN"));
   const client = { base: fixture.base, token: human.access_token };
   assert.deepEqual(value(await nativeOk(client, "GET", API + "/joined_rooms")).joined_rooms, []);

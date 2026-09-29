@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { closeSync, constants, fstatSync, openSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { privateDir } from '../../files/src/index.js';
+import { privateDir } from '@crossfire/adapter-filesystem/index';
 import { createSchema } from './schema/create-schema.js';
 
 export function openStore(path: string): Database.Database {

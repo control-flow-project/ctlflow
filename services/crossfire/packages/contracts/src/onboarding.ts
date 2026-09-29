@@ -3,7 +3,7 @@ import type { Manifest } from './release.js';
 function quote(value: string): string { return "'" + value.replaceAll("'", "'\\''") + "'"; }
 
 export function onboardingUrl(origin: string, owner: string): string {
-  return origin + '/_coord/setup?owner=' + encodeURIComponent(owner);
+  return origin + '/onboarding/setup?ownerMatrixId=' + encodeURIComponent(owner);
 }
 
 export function onboardingGuide(origin: string, owner: string, release: Manifest): string {

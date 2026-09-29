@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapWakeNotice } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '../../../../kernel/src/result.js';
-import type { WakeNoticeRepository } from '../../../../domain/src/port/repositories.js';
+import { failure, success } from '@crossfire/kernel/result';
+import type { WakeNoticeRepository } from '@crossfire/domain/port/repositories';
 
 export function createWakeNoticeRepository(database: Database.Database): WakeNoticeRepository {
   return {

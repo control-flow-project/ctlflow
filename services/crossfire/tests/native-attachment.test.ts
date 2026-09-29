@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { connectCodex } from '../packages/adapter-codex/src/connection.js';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
 import { nativeProvider } from '../scripts/test-support/native-provider.js';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { until } from '../scripts/test-support/listener.js';

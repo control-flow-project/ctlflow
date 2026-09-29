@@ -1,4 +1,4 @@
-import type { Agent } from '../../../../domain/src/identity/types.js';
+import type { Agent } from '@crossfire/domain/identity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapAgent(row: Tables['agent']): Agent {
   return {

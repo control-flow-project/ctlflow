@@ -23,6 +23,7 @@ CREATE TABLE instance_policy (
 CREATE TABLE audit_event (
   id TEXT NOT NULL,
   request_id TEXT NOT NULL,
+  actor_credential_id TEXT,
   actor_kind TEXT NOT NULL,
   actor_principal_id TEXT,
   owner_id TEXT,
@@ -43,8 +44,9 @@ CREATE TABLE audit_event (
   FOREIGN KEY(authorizer_id) REFERENCES principal(id),
   FOREIGN KEY(added_by_id) REFERENCES principal(id),
   FOREIGN KEY(permission_code) REFERENCES permission(code),
-  CHECK(actor_kind IN ('human','agent','system','anonymous')),
+  CHECK(actor_kind IN ('human','agent','controller','system','anonymous')),
   CHECK((actor_kind IN ('human','agent')) = (actor_principal_id IS NOT NULL)),
+  CHECK((actor_kind = 'controller') = (actor_credential_id IS NOT NULL)),
   CHECK(outcome IN ('accepted','rejected','applied','failed'))
 ) STRICT;
 CREATE INDEX ix_audit_event_created ON audit_event(created_at DESC, id DESC);

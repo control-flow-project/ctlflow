@@ -1,16 +1,16 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { openStore } from '../../../packages/adapter-sqlite/src/open-store.js';
-import { createRepositories } from '../../../packages/adapter-sqlite/src/create-repositories.js';
-import { createDirectoryRepository } from '../../../packages/adapter-sqlite/src/repository/directory/index.js';
-import { createCollectionRepository } from '../../../packages/adapter-sqlite/src/repository/collection/index.js';
-import { createListenerReadRepository } from '../../../packages/adapter-sqlite/src/repository/listener-read/index.js';
-import { createDiscoveryRepository } from '../../../packages/adapter-sqlite/src/repository/discovery/index.js';
-import { createRoomGrantReadRepository } from '../../../packages/adapter-sqlite/src/repository/room-grant-read/index.js';
-import { createUnitOfWork } from '../../../packages/adapter-sqlite/src/unit-of-work.js';
-import { createMatrixAuthority } from '../../../packages/adapter-matrix/src/create-authority.js';
-import { initializeInstance } from '../../../packages/domain/src/principal/register.js';
-import type { Services } from '../../../packages/domain/src/port/services.js';
-import type { MatrixAuthority } from '../../../packages/domain/src/port/matrix-authority.js';
+import { openStore } from '@crossfire/adapter-sqlite/open-store';
+import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
+import { createDirectoryRepository } from '@crossfire/adapter-sqlite/repository/directory/index';
+import { createCollectionRepository } from '@crossfire/adapter-sqlite/repository/collection/index';
+import { createListenerReadRepository } from '@crossfire/adapter-sqlite/repository/listener-read/index';
+import { createDiscoveryRepository } from '@crossfire/adapter-sqlite/repository/discovery/index';
+import { createRoomGrantReadRepository } from '@crossfire/adapter-sqlite/repository/room-grant-read/index';
+import { createUnitOfWork } from '@crossfire/adapter-sqlite/unit-of-work';
+import { createMatrixAuthority } from '@crossfire/adapter-matrix/create-authority';
+import { initializeInstance } from '@crossfire/domain/principal/register';
+import type { Services } from '@crossfire/domain/port/services';
+import type { MatrixAuthority } from '@crossfire/domain/port/matrix-authority';
 import { serviceUser, type Config } from './config.js';
 export type Application = { services: Services; config: Config; close(): void };
 export function createApplication(path: string, config: Config, options: { now?: () => number; matrix?: MatrixAuthority } = {}): Application {

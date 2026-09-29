@@ -1,4 +1,4 @@
-import type { WakeNotice } from '../../../../domain/src/activity/types.js';
+import type { WakeNotice } from '@crossfire/domain/activity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapWakeNotice(row: Tables['wake_notice']): WakeNotice {
   return {

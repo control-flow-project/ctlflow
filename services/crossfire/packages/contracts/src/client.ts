@@ -1,5 +1,5 @@
-import { fields, text, userId } from "./management.js";
-import { failure, success, type Result } from "../../kernel/src/result.js";
+import { fields, text, userId } from "./validation.js";
+import { failure, success, type Result } from "@crossfire/kernel/result";
 import type { JsonObject } from "./json.js";
 
 export type Account = { user_id: string; access_token: string; device_id: string };

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": { "fleet": "./dist/apps/cli/src/main.js" },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"

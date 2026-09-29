@@ -5,13 +5,13 @@ import { once } from 'node:events';
 import { createHttpServer } from '../apps/server/src/http/create-server.js';
 import { applicationFixture, secret } from './support/application.js';
 import { contractRelease } from './support/release.js';
-import { operations } from '../packages/contracts/src/rest/operations.js';
+import { operations } from '@crossfire/contracts/rest/operations';
 import { bind } from '../apps/server/src/http/bind.js';
-import { success } from '../packages/kernel/src/result.js';
+import { success } from '@crossfire/kernel/result';
 
 test('operation declarations match exactly one current path and validate parameters', async () => {
   for (const operation of Object.values(operations)) {
-    const endpoint = bind(operation, () => success({ data: {} }));
+    const endpoint = bind<unknown, unknown, unknown, unknown>(operation, () => success({ data: {} }));
     const path = operation.path.replace(/\{([A-Za-z]+)\}/gu, (_match, key: string) => encodeURIComponent(
       key === 'roomId' ? '!opaque:server' : key === 'eventId' ? '$opaque' : key === 'fleetKey' ? 'research' : randomUUID()));
     assert(endpoint.match(path), operation.path);
@@ -59,7 +59,7 @@ test('canonical HTTP has scoped REST resources, strict envelopes, CSRF and no cr
   const content = await listed.text();
   assert(!content.includes(invitation.data.claimSecret) && !content.includes('claimHash') && !content.includes('nativeAccessToken'));
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: fixture.application.config.administrator,
-    fleetKey: 'research', instances: [{ instanceKey: 'analyst', name: 'analyst' }] };
+    fleetKey: 'research', controller: { name: 'desktop' }, instances: [{ instanceKey: 'analyst', name: 'analyst' }] };
   const introduced = await request('/api/enrollments', 'POST', input);
   assert.equal(introduced.status, 201, await introduced.clone().text());
   const intro = await introduced.json() as { data: { enrollment: { enrollment: { verificationCode: string } }; approvalUrl: string } };

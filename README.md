@@ -9,9 +9,12 @@ Applications, packages and tests live inside their owning service. Shared behavi
 has one owner and is reused through explicit workspace exports. There is no global
 package pool, system service installer or duplicate listener.
 
-Read [the specification](docs/specification.md) and [repository instructions](AGENTS.md).
-Service documentation lives with each product. This branch is under implementation;
-checkpoint commits are not release certification.
+Product guides:
+- [Crossfire coordination and management](services/crossfire/README.md)
+- [fleetd controller](services/fleetd/README.md)
+- [fleet CLI and first-run workflow](services/fleet/README.md)
+- [Canonical specification](docs/specification.md)
+- [Repository instructions](AGENTS.md)
 
 ## Development
 Node.js 26 and npm 11.17 or newer are required.
@@ -31,3 +34,6 @@ npm run verify:container
 
 No production or paid model credentials are required for the disposable verification
 fixtures. Starting a fleet does not require a model turn for enrollment or connection.
+Native tests require stock Codex 0.158.0+, Git, Linux `flock`, OpenSSH client/server,
+Chrome, and Docker. All fixtures use private temporary state and loopback listeners;
+no system service, host configuration, real provider login or production data is changed.

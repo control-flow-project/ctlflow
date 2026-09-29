@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapAuditEvent } from './map.js';
 import { stored } from '../stored.js';
-import { success } from '../../../../kernel/src/result.js';
-import type { AuditEventRepository } from '../../../../domain/src/port/repositories.js';
+import { success } from '@crossfire/kernel/result';
+import type { AuditEventRepository } from '@crossfire/domain/port/repositories';
 
 export function createAuditEventRepository(database: Database.Database): AuditEventRepository {
   return {
@@ -20,6 +20,7 @@ export function createAuditEventRepository(database: Database.Database): AuditEv
         executeInsert(database, schema, (query, params) => query.insertInto('audit_event').values({
       id: params.id,
       request_id: params.requestId,
+      actor_credential_id: params.actorCredentialId,
       actor_kind: params.actorKind,
       actor_principal_id: params.actorPrincipalId,
       owner_id: params.ownerId,

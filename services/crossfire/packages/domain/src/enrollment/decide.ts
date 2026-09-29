@@ -1,8 +1,10 @@
-import { failure, success } from '../../../kernel/src/result.js';
+import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { authorize } from '../authorization/authorize.js';
 import { registerPrincipal } from '../principal/register.js';
 import { recordEvent } from '../audit/record-event.js';
+import { bindRoster } from '../fleet/bind-roster.js';
+import { approveFleet } from '../fleet/approve-fleet.js';
 import { expireEnrollments } from './expire.js';
 
 export function decideEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'instance'>,
@@ -31,11 +33,7 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
       const pending = services.collection.pendingIdentityCount(), ownedPending = services.collection.pendingIdentityCount(request.ownerId);
       if (!policy.ok) return policy; if (!active.ok) return active; if (!owned.ok) return owned; if (!pending.ok) return pending; if (!ownedPending.ok) return ownedPending;
       if (!policy.value || active.value + pending.value > policy.value.maxAgents || owned.value + ownedPending.value > policy.value.maxOwnerAgents) return failure('limit', 'Agent capacity changed; adjust the instance limits');
-      if (request.fleetKey !== null) {
-        const fleet = services.repositories.fleet.find({ ownerId: request.ownerId, fleetKey: request.fleetKey });
-        if (!fleet.ok) return fleet;
-        if (!fleet.value) { const saved = services.repositories.fleet.insert({ ownerId: request.ownerId, fleetKey: request.fleetKey, createdAt: now }); if (!saved.ok) return saved; }
-      }
+      const fleet = approveFleet(services, request); if (!fleet.ok) return fleet;
       for (const item of items.value) {
         if (item.outcome === 'failed') continue;
         let agentId = item.agentId;
@@ -56,12 +54,10 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
           const assigned = services.repositories.enrollmentItem.update({ ...item, agentId });
           if (!assigned.ok) return assigned;
         }
-        if (request.fleetKey !== null && agentId !== null) {
-          const binding = services.repositories.fleetInstance.find({ ownerId: request.ownerId, fleetKey: request.fleetKey, instanceKey: item.instanceKey });
-          if (!binding.ok) return binding;
-          if (binding.value && binding.value.agentId !== agentId) return failure('conflict', 'Fleet instance identity changed: ' + item.instanceKey);
-          if (!binding.value) { const bound = services.repositories.fleetInstance.insert({ ownerId: request.ownerId, fleetKey: request.fleetKey, instanceKey: item.instanceKey, agentId }); if (!bound.ok) return bound; }
-        }
+      }
+      if (request.fleetKey !== null) {
+        const approved = services.collection.enrollmentItems({ requestId: enrollmentId }); if (!approved.ok) return approved;
+        const bound = bindRoster(services, request.ownerId, request.fleetKey, approved.value); if (!bound.ok) return bound;
       }
     } else {
       const names = services.collection.agentNamesByRequest({ requestId: enrollmentId });

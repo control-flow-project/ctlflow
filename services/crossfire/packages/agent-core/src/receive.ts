@@ -1,12 +1,12 @@
-import { existsSync, unlinkSync } from 'node:fs';
-import { API, segment, json, type Matrix } from '../../matrix/src/http.js';
-import type { JsonObject } from '../../contracts/src/json.js';
-import { selectRoom } from './state.js';
-import { readJson, writeJson } from '../../files/src/index.js';
-import type { Account, Event, Settings } from '../../contracts/src/client.js';
-import { roomId, userId } from '../../contracts/src/management.js';
-import { DEFAULT_EVENTS, DEFAULT_OUTPUT_BYTES, MAX_EVENTS, MAX_OUTPUT_BYTES, MAX_JSON_BYTES } from '../../contracts/src/limits.js';
-import { isListenerNotice } from '../../contracts/src/notices.js';
+import type { LocalState } from './port.js';
+import { API, segment, json } from '@crossfire/contracts/matrix';
+import type { Matrix } from './port.js';
+import type { JsonObject } from '@crossfire/contracts/json';
+import { selectRoom } from '@crossfire/contracts/validation';
+import type { Account, Event, Settings } from '@crossfire/contracts/client';
+import { roomId, userId } from '@crossfire/contracts/validation';
+import { DEFAULT_EVENTS, DEFAULT_OUTPUT_BYTES, MAX_EVENTS, MAX_OUTPUT_BYTES, MAX_JSON_BYTES } from '@crossfire/contracts/limits';
+import { isListenerNotice } from '@crossfire/contracts/notices';
 
 type Page = { chunk: Event[]; start?: string; end?: string };
 export type Sync = {
@@ -125,16 +125,16 @@ export async function membershipResets(client: Matrix, sync: Sync, account: Acco
   return reset;
 }
 
-export function loadSyncCursor(cursorFile: string): string | undefined {
-  if (!existsSync(cursorFile + '.sync')) return undefined;
-  const since = readJson<unknown>(cursorFile + '.sync');
+export function loadSyncCursor(storage: LocalState, cursorFile: string): string | undefined {
+  if (!storage.exists(cursorFile + '.sync')) return undefined;
+  const since = storage.read<unknown>(cursorFile + '.sync');
   if (typeof since !== 'string' || !since) throw new Error('Invalid saved Matrix sync cursor');
   return since;
 }
 
-export function checkpointSync(cursorFile: string, since: string): void {
+export function checkpointSync(storage: LocalState, cursorFile: string, since: string): void {
   if (!since) throw new Error('Missing Matrix sync continuation');
-  if (loadSyncCursor(cursorFile) !== since) writeJson(cursorFile + '.sync', since);
+  if (loadSyncCursor(storage, cursorFile) !== since) storage.write(cursorFile + '.sync', since);
 }
 
 export async function joinedRooms(client: Matrix): Promise<string[]> {
@@ -144,24 +144,24 @@ export async function joinedRooms(client: Matrix): Promise<string[]> {
   return joined as string[];
 }
 
-export function loadCursors(path: string): Record<string, string> {
-  const cursors = existsSync(path) ? readJson<Record<string, string>>(path) : {};
+export function loadCursors(storage: LocalState, path: string): Record<string, string> {
+  const cursors = storage.exists(path) ? storage.read<Record<string, string>>(path) : {};
   if (!cursors || Array.isArray(cursors) || typeof cursors !== 'object' || !Object.keys(cursors).every(roomId)
       || Object.values(cursors).some(value => typeof value !== 'string' || !value)) throw new Error('Invalid saved read cursors');
   return cursors;
 }
 
-export function retainJoinedCursors(path: string, joined: ReadonlySet<string>): void {
-  if (!existsSync(path)) return;
-  const cursors = loadCursors(path);
+export function retainJoinedCursors(storage: LocalState, path: string, joined: ReadonlySet<string>): void {
+  if (!storage.exists(path)) return;
+  const cursors = loadCursors(storage, path);
   const retained = Object.fromEntries(Object.entries(cursors).filter(([room]) => joined.has(room)));
   if (Object.keys(retained).length === Object.keys(cursors).length) return;
-  if (existsSync(path + '.ack')) {
-    const pending = readJson<{ cursors: Record<string, string>; receipts: Record<string, string> }>(path + '.ack');
-    writeJson(path + '.ack', { cursors: retained,
+  if (storage.exists(path + '.ack')) {
+    const pending = storage.read<{ cursors: Record<string, string>; receipts: Record<string, string> }>(path + '.ack');
+    storage.write(path + '.ack', { cursors: retained,
       receipts: Object.fromEntries(Object.entries(pending.receipts).filter(([room]) => joined.has(room))) });
   }
-  writeJson(path, retained);
+  storage.write(path, retained);
 }
 
 export function validatePage(page: Page, limit: number, from: string | undefined): void {
@@ -170,7 +170,7 @@ export function validatePage(page: Page, limit: number, from: string | undefined
   if (page.chunk.length > 0 && (!page.end || page.end === from)) throw new Error('Matrix message page does not advance its cursor');
 }
 
-export async function readUnread(client: Matrix, settings: Settings, cursorFile: string, limit = DEFAULT_EVENTS,
+export async function readUnread(storage: LocalState, client: Matrix, settings: Settings, cursorFile: string, limit = DEFAULT_EVENTS,
   selector?: string, maximum = DEFAULT_OUTPUT_BYTES, boundary?: string, allowed?: ReadonlySet<string>,
   window?: { cursors: Record<string, string>; ends: Record<string, HistoryEnd> }): Promise<ReadBatch> {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_EVENTS || !Number.isSafeInteger(maximum)
@@ -178,7 +178,7 @@ export async function readUnread(client: Matrix, settings: Settings, cursorFile:
   const joined = await joinedRooms(client);
   const selected = (selector ? [selectRoom(selector)] : joined).filter(room => !allowed || allowed.has(room));
   if (selected.some(room => !joined.includes(room))) throw new Error('The selected agent is not joined to this room');
-  const cursors = { ...(window?.cursors ?? loadCursors(cursorFile)) };
+  const cursors = { ...(window?.cursors ?? loadCursors(storage, cursorFile)) };
   for (const room of Object.keys(cursors)) if (!joined.includes(room)) delete cursors[room];
   const events: ReceivedEvent[] = [];
   let recent: ReceivedEvent[] = [];
@@ -241,27 +241,27 @@ export async function readUnread(client: Matrix, settings: Settings, cursorFile:
   return { events, cursors, more_rooms, latest };
 }
 
-export async function acknowledge(client: Matrix, cursorFile: string, batch: ReadBatch): Promise<void> {
+export async function acknowledge(storage: LocalState, client: Matrix, cursorFile: string, batch: ReadBatch): Promise<void> {
   const receipts = Object.fromEntries(Object.entries(batch.latest)
     .filter(([room, event]) => batch.events.some(item => item.room_id === room && item.event_id === event)));
-  if (existsSync(cursorFile) && JSON.stringify(loadCursors(cursorFile)) === JSON.stringify(batch.cursors) && !Object.keys(receipts).length) return;
-  writeJson(cursorFile + '.ack', { cursors: batch.cursors, receipts });
-  writeJson(cursorFile, batch.cursors);
-  await flushAcknowledgements(client, cursorFile);
+  if (storage.exists(cursorFile) && JSON.stringify(loadCursors(storage, cursorFile)) === JSON.stringify(batch.cursors) && !Object.keys(receipts).length) return;
+  storage.write(cursorFile + '.ack', { cursors: batch.cursors, receipts });
+  storage.write(cursorFile, batch.cursors);
+  await flushAcknowledgements(storage, client, cursorFile);
 }
 
-export async function flushAcknowledgements(client: Matrix, cursorFile: string): Promise<void> {
+export async function flushAcknowledgements(storage: LocalState, client: Matrix, cursorFile: string): Promise<void> {
   const file = cursorFile + '.ack';
-  if (!existsSync(file)) return;
-  const pending = readJson<{ cursors: Record<string, string>; receipts: Record<string, string> }>(file);
+  if (!storage.exists(file)) return;
+  const pending = storage.read<{ cursors: Record<string, string>; receipts: Record<string, string> }>(file);
   if (!pending || !pending.cursors || !pending.receipts || Object.values(pending.cursors).some(value => typeof value !== 'string')
       || Object.values(pending.receipts).some(value => typeof value !== 'string')) throw new Error('Invalid receive acknowledgement');
-  writeJson(cursorFile, pending.cursors);
+  storage.write(cursorFile, pending.cursors);
   const joined = await joinedRooms(client);
   for (const [room, event] of Object.entries(pending.receipts)) {
     if (joined.includes(room)) await client.post(`${API}/rooms/${segment(room)}/read_markers`, { 'm.fully_read': event, 'm.read.private': event });
   }
-  unlinkSync(file);
+  storage.remove(file);
 }
 
 export function inbox(sync: Sync) {

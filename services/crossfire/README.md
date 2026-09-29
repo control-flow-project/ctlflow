@@ -2,7 +2,7 @@
 
 Human-led Matrix coordination for coding agents. A React management application
 controls enrollment, ownership and explicit access. Element handles conversation.
-A project-local listener connects an agent to its existing coding session.
+One shared listener connects existing coding sessions and controller-owned fleets.
 
 ## Structure
 
@@ -12,11 +12,15 @@ apps/
   web/                React member/admin screens
   client/             Project-local enrollment and command-line client
 packages/
-  contracts/          Shared schemas, bounds and Result types
+  contracts/          Validated REST schemas and operation contracts
+  kernel/             Result, clocks and identity contracts
+  domain/             Authorization and coordination use cases
   agent-core/         Receiver, cursors, receipts, human controls and approvals
   adapter-codex/      Authenticated local WebSocket / native Codex protocol
-  matrix/             Native Matrix operations, Markdown and files
-  files/              Private atomic state
+  adapter-matrix/      Native Matrix operations, Markdown and files
+  adapter-crossfire/   Typed coordination REST client
+  adapter-filesystem/  Private atomic state and process locks
+  adapter-sqlite/      Normalized singular tables and Tinqer repositories
 skills/conduit-chat/  Project-local coordination instructions
 scripts/              Build, generation and verification
 tests/                Contract, native, browser and packaging verification
@@ -38,10 +42,12 @@ The same policy applies to the image. Native SQLite is built explicitly.
 ## Run a new instance
 
 ```sh
+cd /absolute/path/to/crossfire
 npm ci --ignore-scripts
 npm rebuild better-sqlite3 --build-from-source
 npm run typecheck
 npm run build
+cd services/crossfire
 node crossfire init --directory /absolute/path/crossfire-state \
   --instance team --origin http://127.0.0.1:8098 \
   --server-name team.localhost --administrator admin
@@ -91,6 +97,21 @@ its Host header. Crossfire makes no firewall, DNS or certificate changes.
    Other messages wait as context and arrive together when an allowed sender
    speaks. The listener groups bursts without extra model calls; input size
    limits alone split large collections. Settings refresh during reconciliation.
+   **Selected people and agents** offers searchable, paginated identity checkboxes.
+   A directly mentioned agent can explain a blocked wake-up once per sender per
+   ten minutes, naming its owner. This response never reaches the model.
+8. Open **Fleets** to review grouped ordinary agents and their last reported
+   controller. Paste a room plan, review the full diff and explicitly confirm it.
+   Fleet grouping does not grant permissions or start/stop runtimes.
+9. A room's agent access page can delegate invitation permission. Authorized
+   agents may invite registered agents across owners and remove memberships they
+   introduced. Membership provenance and native authority are enforced by the
+   same domain use cases used by the management UI.
+
+For headless agents use the fleet CLI guide; there is no per-agent connection
+banner or model-driven enrollment in this workflow.
+
+- [Fleet CLI workflow](../fleet/README.md)
 
 The setup page explains approval, zero-room defaults, granting access and
 automatic listener connection. Connection details and release downloads are

@@ -1,10 +1,11 @@
+import { controller } from './controller.js';
 import * as check from './validation.js';
 import type { Parser } from './validation.js';
-import { failure, success } from '../../../kernel/src/result.js';
+import { failure, success } from '@crossfire/kernel/result';
 const revision = check.integer();
 const accountProof = check.object({ agentId: check.identifier, accessToken: check.text(8192) });
 const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof) });
-const roster = { ownerMatrixId: check.matrixUserId, fleetKey: check.nullable(check.name), instances: check.list(instance, 100, 1) };
+const roster = { controller: check.optional(controller), controllerCredential: check.optional(check.text(200)), ownerMatrixId: check.matrixUserId, fleetKey: check.nullable(check.name), instances: check.list(instance, 100, 1) };
 export const preflight = check.object(roster);
 export const enrollment = check.object({ ...roster, enrollmentId: check.identifier, claimSecret: check.secret });
 export const enrollmentDecision = check.object({ expectedRevision: revision, decision: check.choice('approve', 'reject'), verificationCode: check.text(12, 12) });
@@ -26,7 +27,7 @@ export const membership = check.object({ targetId: check.identifier, action: che
 export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean });
 export const disconnection = check.object({ expectedRevision: revision, runIds: check.list(check.identifier, 100, 1) });
 export const wakeNotice = check.object({ roomId: check.roomId });
-export const plan = check.object({ fleetKey: check.name, agents: check.list(check.object({ instanceKey: check.name, grants: check.list(grantIntent, 100) }), 100, 1) });
+export const plan = check.object({ fleetId: check.identifier, agents: check.list(check.object({ instanceKey: check.name, grants: check.list(grantIntent, 100) }), 100, 1) });
 export const planPreview = check.object({ plan });
 export const planChange = check.object({ plan, digest: check.text(64, 64), snapshots: check.list(check.object({ agentId: check.identifier, revision,
   grants: check.list(check.object({ roomId: check.roomId, generation: check.identifier, revision }), 100) }), 100, 1) });
@@ -45,3 +46,8 @@ export function pagination(input: URLSearchParams) {
   return Number.isSafeInteger(page) && page >= 1 && page <= 100000 && Number.isSafeInteger(pageSize) && pageSize >= 1 && pageSize <= 100
     ? success({ page, pageSize }) : failure('invalid', 'Use page ≥ 1 and pageSize 1–100');
 }
+
+export const fleetChange = check.object({ expectedRevision: revision, label: check.text(100), controller });
+export const fleetRemoval = check.object({ expectedRevision: revision });
+export const fleetBinding = check.object({ expectedRevision: revision, instanceKey: check.name, accessToken: check.optional(check.text(8192)) });
+export const fleetUnbinding = check.object({ expectedRevision: revision, instanceKey: check.name });

@@ -1,6 +1,6 @@
-import { fields, text, userId } from "../../../packages/contracts/src/management.js";
-import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
-import { endpoint } from "../../../packages/matrix/src/http.js";
+import { fields, text, userId } from "@crossfire/contracts/validation";
+import { failure, success, type Result } from "@crossfire/kernel/result";
+import { endpoint } from '@crossfire/contracts/origin';
 
 export type Config = {
   instance: string; serverName: string; publicOrigin: string; matrixOrigin: string;

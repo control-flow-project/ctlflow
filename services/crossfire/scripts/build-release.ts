@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { buildClient } from "./build-client.js";
 import { buildWeb } from "./build-web.js";
-import { ARTIFACTS, type ArtifactName, type Manifest } from "../packages/contracts/src/release.js";
-import { artifactHash, releaseHash, loadRelease } from "../packages/files/src/release.js";
+import { ARTIFACTS, type ArtifactName, type Manifest } from "@crossfire/contracts/release";
+import { artifactHash, releaseHash, loadRelease } from "@crossfire/adapter-filesystem/release";
 
 export async function buildRelease(root: string, output = join(root, "dist")): Promise<Manifest> {
   const package_: unknown = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));

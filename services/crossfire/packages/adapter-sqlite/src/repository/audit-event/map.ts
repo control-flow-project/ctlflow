@@ -1,9 +1,10 @@
-import type { AuditEvent } from '../../../../domain/src/audit/types.js';
+import type { AuditEvent } from '@crossfire/domain/audit/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapAuditEvent(row: Tables['audit_event']): AuditEvent {
   return {
     id: row.id,
     requestId: row.request_id,
+    actorCredentialId: row.actor_credential_id,
     actorKind: row.actor_kind,
     actorPrincipalId: row.actor_principal_id,
     ownerId: row.owner_id,

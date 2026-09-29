@@ -1,10 +1,11 @@
+import { localState as storage } from '@crossfire/adapter-filesystem/state';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import { listen } from "../packages/agent-core/src/listen.js";
-import { readJson } from "../packages/files/src/index.js";
-import { loadControl } from "../packages/agent-core/src/control.js";
+import { listen } from '@crossfire/adapter-crossfire/listener';
+import { readJson } from "@crossfire/adapter-filesystem/index";
+import { loadControl } from "@crossfire/agent-core/control";
 import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD, until } from "./test-support/listener.js";
 
 test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", async scope => {
@@ -46,12 +47,12 @@ test("reconciliation respects human pause, mute and suspension without empty mod
   scope.after(async () => { stop.abort(); await result; });
   await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   matrix.add(ROOM, message("$pause", OBSERVER, "!!"));
-  await until(() => loadControl(matrix.cursorFile + ".control", THREAD).paused);
+  await until(() => loadControl(storage, matrix.cursorFile + ".control", THREAD).paused);
   matrix.syncUpdates.enabled = false;
   matrix.add(ROOM, message("$paused-backlog"));
   await delay(1100);
   assert.equal(native.requests().filter(request => request.method === "turn/start").length, 0);
-  assert(loadControl(matrix.cursorFile + ".control", THREAD).paused);
+  assert(loadControl(storage, matrix.cursorFile + ".control", THREAD).paused);
   matrix.muted.add(ROOM);
   matrix.access.status = "suspended";
   assert.match(String(await result), /no longer active/);

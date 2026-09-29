@@ -1,8 +1,8 @@
-import { operations } from '../../../../../packages/contracts/src/rest/operations.js';
-import { readMember, listMembers, readInvitation, listInvitations } from '../../../../../packages/domain/src/member/read-member.js';
-import { changeMember } from '../../../../../packages/domain/src/member/change-member.js';
-import { createMemberInvitation, revokeMemberInvitation } from '../../../../../packages/domain/src/member/invitation.js';
-import { acceptMemberInvitation } from '../../../../../packages/domain/src/member/accept-invitation.js';
+import { operations } from '@crossfire/contracts/rest/operations';
+import { readMember, listMembers, readInvitation, listInvitations } from '@crossfire/domain/member/read-member';
+import { changeMember } from '@crossfire/domain/member/change-member';
+import { createMemberInvitation, revokeMemberInvitation } from '@crossfire/domain/member/invitation';
+import { acceptMemberInvitation } from '@crossfire/domain/member/accept-invitation';
 import { bind, reply, paged, actor, acknowledged } from '../bind.js';
 import { member } from '../representation/identity.js';
 import { invitation } from '../representation/enrollment.js';
@@ -20,7 +20,7 @@ export function memberRoutes() {
     }),
     bind(operations.createInvitation, (context, _params, _query, input) => reply(createMemberInvitation(context.services, actor(context), input, context.requestId),
       value => ({ invitationId: value.invitationId, claimSecret: value.claimSecret, expiresAt: value.expiresAt,
-        signupUrl: context.services.instance.publicOrigin + '/manage/signup/' + value.invitationId + '#' + value.claimSecret }))),
+        signupUrl: context.services.instance.publicOrigin + '/manage/join/' + value.invitationId + '#' + value.claimSecret }))),
     bind(operations.invitations, (context, _params, query) => paged(listInvitations(context.services, actor(context), query), invitation)),
     bind(operations.invitation, (context, params) => reply(readInvitation(context.services, actor(context), params.invitationId), invitation)),
     bind(operations.revokeInvitation, (context, params) => acknowledged(revokeMemberInvitation(context.services, actor(context), params.invitationId, context.requestId))),

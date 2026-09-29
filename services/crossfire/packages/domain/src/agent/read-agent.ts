@@ -1,13 +1,13 @@
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
-import type { DirectoryFilter, AgentRecord, Page } from '../port/directory.js';
+import type { DirectoryFilter, AgentRecord, Page, DeploymentSummary } from '../port/directory.js';
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import { readActivity, type AgentActivity } from '../listener/activity.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'listenerRead' | 'clock'>;
-export type AgentDetails = { record: AgentRecord; activity: AgentActivity; allowedActions: string[] };
+export type AgentDetails = { record: AgentRecord; activity: AgentActivity; deployment: DeploymentSummary | null; allowedActions: string[] };
 export type AgentFilter = DirectoryFilter & { listener: 'all' | 'online' | 'offline' | 'disconnecting' };
-function actions(actor: Actor, record: AgentRecord, permissions: string[]): string[] {
+export function agentActions(actor: Actor, record: AgentRecord, permissions: string[]): string[] {
   return ['configure', 'room-grant.manage', 'listener.disconnect'].filter(action =>
     permissions.includes('agent.' + action + '.any') || actor.principalId === record.agent.ownerId && permissions.includes('agent.' + action + '.owned'));
 }
@@ -16,7 +16,8 @@ export function readAgent(services: Dependencies, actor: Actor, agentId: string)
   if (!record.ok) return record;
   const activity = readActivity(services, [agentId]), permissions = services.directory.permissions(actor.principalId);
   if (!activity.ok) return activity; if (!permissions.ok) return permissions;
-  return success({ record: record.value, activity: activity.value.get(agentId)!, allowedActions: actions(actor, record.value, permissions.value) });
+  const deployment = services.directory.deployments([agentId]); if (!deployment.ok) return deployment;
+  return success({ record: record.value, activity: activity.value.get(agentId)!, deployment: deployment.value[0] ?? null, allowedActions: agentActions(actor, record.value, permissions.value) });
 }
 export function listAgents(services: Dependencies, actor: Actor, filter: AgentFilter): Result<Page<AgentDetails>> {
   const current = activeActor(services, actor);
@@ -39,6 +40,9 @@ export function listAgents(services: Dependencies, actor: Actor, filter: AgentFi
   if (!records.ok) return records;
   const activity = readActivity(services, records.value.items.map(record => record.principal.id));
   if (!activity.ok) return activity;
+  const deployments = services.directory.deployments(records.value.items.map(record => record.principal.id)); if (!deployments.ok) return deployments;
+  const byAgent = new Map(deployments.value.map(deployment => [deployment.agentId, deployment]));
   return success({ ...records.value, items: records.value.items.map(record => ({ record, activity: activity.value.get(record.principal.id)!,
-    allowedActions: actions(actor, record, permissions.value) })) });
+    deployment: byAgent.get(record.principal.id) ?? null,
+    allowedActions: agentActions(actor, record, permissions.value) })) });
 }

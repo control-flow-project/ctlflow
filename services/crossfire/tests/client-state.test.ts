@@ -3,10 +3,10 @@ import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { paths } from "../packages/agent-core/src/state.js";
-import { privateDir, readJson, writeJson } from "../packages/files/src/index.js";
-import { MAX_JSON_BYTES } from "../packages/contracts/src/limits.js";
-import { account } from "../packages/contracts/src/client.js";
+import { paths } from '@crossfire/adapter-filesystem/project';
+import { privateDir, readJson, writeJson } from "@crossfire/adapter-filesystem/index";
+import { MAX_JSON_BYTES } from "@crossfire/contracts/limits";
+import { account } from "@crossfire/contracts/client";
 
 function directory(): string {
   mkdirSync(join(process.cwd(), ".temp"), { recursive: true });

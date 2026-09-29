@@ -12,7 +12,8 @@ export type InstancePolicy = {
 export type AuditEvent = {
   id: string;
   requestId: string;
-  actorKind: 'human' | 'agent' | 'system' | 'anonymous';
+  actorCredentialId: string | null;
+  actorKind: 'human' | 'agent' | 'controller' | 'system' | 'anonymous';
   actorPrincipalId: string | null;
   ownerId: string | null;
   targetKind: string;

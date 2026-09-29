@@ -1,10 +1,10 @@
-import { operations } from '../../../../../packages/contracts/src/rest/operations.js';
-import { readRoom, listRooms, listRoomMembers, createRoom } from '../../../../../packages/domain/src/room/read-room.js';
-import { changeMembership } from '../../../../../packages/domain/src/room/change-membership.js';
-import { readRoomGrant, listRoomGrants } from '../../../../../packages/domain/src/room-access/read-grants.js';
-import { changeRoomGrant } from '../../../../../packages/domain/src/room-access/change-grant.js';
-import { setRoomPermission } from '../../../../../packages/domain/src/room-access/set-permission.js';
-import { previewGrantPlan, applyGrantPlan } from '../../../../../packages/domain/src/room-access/grant-plan.js';
+import { operations } from '@crossfire/contracts/rest/operations';
+import { readRoom, listRooms, listRoomMembers, createRoom } from '@crossfire/domain/room/read-room';
+import { changeMembership } from '@crossfire/domain/room/change-membership';
+import { readRoomGrant, listRoomGrants } from '@crossfire/domain/room-access/read-grants';
+import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
+import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
+import { previewGrantPlan, applyGrantPlan } from '@crossfire/domain/room-access/grant-plan';
 import { bind, reply, paged, actor, acknowledged } from '../bind.js';
 import * as view from '../representation/room.js';
 export function roomRoutes() {

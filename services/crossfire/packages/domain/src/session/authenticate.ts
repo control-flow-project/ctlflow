@@ -1,4 +1,4 @@
-import { failure, success } from '../../../kernel/src/result.js';
+import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { activeActor } from '../authorization/authorize.js';
 export async function authenticateMember(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'clock'>,

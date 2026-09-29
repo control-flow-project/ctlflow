@@ -3,14 +3,15 @@ import { execFile } from "node:child_process";
 import { once } from "node:events";
 import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { join } from "node:path";
+import { join, resolve, basename } from "node:path";
 import { promisify } from "node:util";
 import { imageName } from "../../apps/server/src/operator.js";
 import test from "node:test";
 
 const execute = promisify(execFile);
 const installer = process.env.npm_execpath;
-const root = process.cwd();
+const root = resolve(process.cwd(), '../..');
+const service = join(root, 'services/crossfire');
 const policy = readFileSync(join(root, ".npmrc"), "utf8");
 const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
   engines: { node: string; npm: string };
@@ -56,10 +57,10 @@ test("one native install policy governs host, Docker context and image identity"
   assert.deepEqual(policy.split("\n").filter(line => line.startsWith("min-release-age-exclude")),
     ["min-release-age-exclude[]=@tinqerjs/tinqer", "min-release-age-exclude[]=@tinqerjs/better-sqlite3-adapter"]);
   assert.match(readFileSync(join(root, ".dockerignore"), "utf8"), /^!\.npmrc$/m);
-  assert.match(readFileSync(join(root, "Dockerfile"), "utf8"),
-    /COPY \.npmrc package\.json package-lock\.json \.\//);
-  assert.match(readFileSync(join(root, "Dockerfile"), "utf8"), /RUN npm ci --ignore-scripts/);
-  assert.match(readFileSync(join(root, "apps/server/src/operator.ts"), "utf8"), /\x27.npmrc\x27/);
+  assert.match(readFileSync(join(service, "Dockerfile"), "utf8"),
+    /COPY \.npmrc package\.json package-lock\.json tsconfig\.base\.json \.\//);
+  assert.match(readFileSync(join(service, "Dockerfile"), "utf8"), /RUN npm ci --ignore-scripts/);
+  assert.match(readFileSync(join(service, "apps/server/src/operator.ts"), "utf8"), /\x27.npmrc\x27/);
   const { directory, environment } = fixture();
   writeProject(directory);
   assert.equal((await npm(directory, environment, ["config", "get", "min-release-age"])).stdout.trim(), "7");
@@ -96,14 +97,18 @@ test("an actual pre-exemption npm is rejected before installation even with scri
 
 test("changing only policy bytes invalidates the real runtime image fingerprint", async () => {
   const { directory } = fixture();
-  for (const file of ["Dockerfile", ".dockerignore", ".npmrc", "package.json", "package-lock.json", "tsconfig.core.json"]) {
+  for (const file of [".dockerignore", ".npmrc", "package.json", "package-lock.json", "tsconfig.base.json"]) {
     copyFileSync(join(root, file), join(directory, file));
   }
-  for (const folder of ["scripts", "skills", "apps", "packages", "docs", "third-party"]) cpSync(join(root, folder), join(directory, folder), { recursive: true });
+  for (const folder of ["scripts", "services"]) cpSync(join(root, folder), join(directory, folder), { recursive: true,
+    filter: path => !['node_modules', 'dist', '.temp', '.analysis', '.git'].includes(basename(path)) });
   const original = imageName(directory);
   assert.match(original, /^crossfire-runtime:[a-f0-9]{20}$/);
   writeFileSync(join(directory, ".npmrc"), policy.replace("min-release-age=7", "min-release-age=8"));
   assert.notEqual(imageName(directory), original);
+  const changedPolicy = imageName(directory);
+  writeFileSync(join(directory, "tsconfig.base.json"), readFileSync(join(directory, "tsconfig.base.json"), 'utf8') + '\n');
+  assert.notEqual(imageName(directory), changedPolicy);
 });
 
 test("native age policy admits aged third parties and only the named owned exemptions", { timeout: 90_000 }, async context => {

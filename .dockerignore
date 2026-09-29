@@ -2,9 +2,11 @@ node_modules
 **/node_modules
 .git
 .analysis
+**/.analysis
 .temp
 **/.temp
 **/dist
 private
 instances
 verification
+!.npmrc

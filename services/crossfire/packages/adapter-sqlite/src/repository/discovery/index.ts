@@ -1,14 +1,31 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
-import type { DiscoveryRepository, PrincipalSummary } from '../../../../domain/src/port/discovery.js';
+import type { DiscoveryRepository, PrincipalSummary } from '@crossfire/domain/port/discovery';
 import { schema } from '../../schema/tables.js';
-import { success } from '../../../../kernel/src/result.js';
+import { success } from '@crossfire/kernel/result';
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapRole } from '../role/map.js';
 import { mapPermission } from '../permission/map.js';
 export function createDiscoveryRepository(database: Database.Database): DiscoveryRepository {
   return {
+    selected(principalIds) {
+      return stored(() => {
+        const humans = executeSelect(database, schema, (query, params) => query.from('member')
+          .join(query.from('principal'), member => member.principal_id, principal => principal.id, (member, principal) => ({ member, principal }))
+          .where(row => params.principalIds.includes(row.principal.id)).orderBy(row => row.principal.id)
+          .select(row => ({ principalId: row.principal.id, matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind,
+            displayName: row.member.display_name, ownerId: row.principal.id, ownerMatrixId: row.principal.matrix_user_id })), { principalIds });
+        const agents = executeSelect(database, schema, (query, params) => query.from('agent')
+          .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+          .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
+          .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id, (row, owner) => ({ ...row, owner }))
+          .where(row => params.principalIds.includes(row.principal.id)).orderBy(row => row.principal.id)
+          .select(row => ({ principalId: row.principal.id, matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind,
+            displayName: row.agent.display_name_override ?? row.name.name, ownerId: row.agent.owner_id, ownerMatrixId: row.owner.matrix_user_id })), { principalIds });
+        return success([...humans, ...agents].sort((left, right) => left.principalId.localeCompare(right.principalId)));
+      });
+    },
     principals(input) {
       return stored(() => {
         const parameters = { search: input.search.toLowerCase(), excludeId: input.excludeId ?? '' };

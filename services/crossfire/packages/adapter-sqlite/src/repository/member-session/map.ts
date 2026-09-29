@@ -1,4 +1,4 @@
-import type { MemberSession } from '../../../../domain/src/activity/types.js';
+import type { MemberSession } from '@crossfire/domain/activity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapMemberSession(row: Tables['member_session']): MemberSession {
   return {

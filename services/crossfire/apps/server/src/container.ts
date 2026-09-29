@@ -2,14 +2,16 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { join } from 'node:path';
 import { readdirSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { serve } from './main.js';
 import { config } from './config.js';
 import { publicRouter } from './router.js';
-import { readJson, privateDir } from '../../../packages/files/src/index.js';
+import { readJson, privateDir } from '@crossfire/adapter-filesystem/index';
 
 process.umask(0o077);
 const directory = '/runtime';
+const artifacts = fileURLToPath(new URL('../../../', import.meta.url));
 const parsed = config(readJson(join(directory, 'config.json')));
 if (!parsed.ok) throw new Error(parsed.error.message);
 if (parsed.value.matrixOrigin !== 'http://127.0.0.1:6167') throw new Error('Container Matrix origin must use its private loopback port');
@@ -40,11 +42,11 @@ try {
     if (Date.now() >= deadline) throw new Error('Homeserver readiness timed out');
     await delay(100, undefined, { signal: stop.signal });
   }
-  const releases = readdirSync('/app/dist/onboarding');
+  const releases = readdirSync(join(artifacts, 'onboarding'));
   if (releases.length !== 1) throw new Error('Image must contain exactly one onboarding release');
-  service = await serve(directory, join('/app/dist/onboarding', releases[0]!), 8081);
+  service = await serve(directory, join(artifacts, 'onboarding', releases[0]!), 8081);
   router = publicRouter({ publicOrigin: parsed.value.publicOrigin, matrixOrigin: parsed.value.matrixOrigin,
-    serviceOrigin: 'http://127.0.0.1:8081', web: '/app/dist/web', element: '/app/element' });
+    serviceOrigin: 'http://127.0.0.1:8081', web: join(artifacts, 'web'), element: '/app/element' });
   router.listen(8080, '0.0.0.0');
   await once(router, 'listening');
   console.log('Crossfire ready: ' + parsed.value.publicOrigin + '/ | Management: ' + parsed.value.publicOrigin + '/manage/');

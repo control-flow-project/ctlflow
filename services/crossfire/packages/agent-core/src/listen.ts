@@ -1,19 +1,21 @@
+import type { LocalState, Transport } from './port.js';
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { API, matrix, segment, type Matrix } from '../../matrix/src/http.js';
-import { selectRoom } from './state.js';
-import type { Account, Settings, Event } from '../../contracts/src/client.js';
-import { deliveryPolicy } from '../../contracts/src/delivery.js';
+import { API, segment } from '@crossfire/contracts/matrix';
+import type { Matrix } from './port.js';
+import { selectRoom } from '@crossfire/contracts/validation';
+import type { Account, Settings, Event } from '@crossfire/contracts/client';
+import type { Coordination } from './coordination.js';
 import { synchronize, loadSyncCursor, checkpointSync, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, deliveryText, eventView, joinedRooms, type ReceivedEvent } from './receive.js';
 import { captureWake, collectBatch, pendingBatch, wakeEvent, loadWake, saveWake, retireSnapshot } from './delivery.js';
 import type { RuntimeAdapter } from './runtime.js';
-import { DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES } from '../../contracts/src/limits.js';
+import { DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES } from '@crossfire/contracts/limits';
 import { loadControl, saveControl, humanEvents, humanText, isControl } from './control.js';
 import { permissions } from './permissions.js';
 import { reportActivity } from './activity.js';
 import { requireCurrentRelease } from './release.js';
-import type { Manifest } from '../../contracts/src/release.js';
-import { isListenerNotice, mentionsAgent } from '../../contracts/src/notices.js';
+import type { Manifest } from '@crossfire/contracts/release';
+import { isListenerNotice, mentionsAgent } from '@crossfire/contracts/notices';
 import { incrementalEvents } from './receive.js';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string, maximum = DEFAULT_OUTPUT_BYTES) {
@@ -38,8 +40,11 @@ export function deliveryBatches(events: readonly ReceivedEvent[], settings: Sett
 }
 
 export type ListenerOptions = {
+  storage: LocalState;
+  transport: Transport;
   ready?: () => void;
   release: Manifest;
+  coordination: Coordination;
   settings: Settings;
   account: Account;
   cursorFile: string;
@@ -61,16 +66,17 @@ function retryable(error: unknown): boolean {
 }
 
 export async function listen(options: ListenerOptions, stop: AbortSignal): Promise<void> {
+  const storage = options.storage;
   if (!Number.isSafeInteger(options.reconcileMs) || options.reconcileMs < 1000 || options.reconcileMs > 600_000) {
     throw new Error('Listener reconciliation interval must be 1000..600000 ms');
   }
-  const current = await requireCurrentRelease({ base: options.settings.homeserver, signal: stop }, options.release);
+  const current = await requireCurrentRelease(options.coordination, options.release, stop);
   if (!current.ok) throw new Error(current.error.message);
   const failed = new AbortController();
   const lifetime = AbortSignal.any([stop, failed.signal]);
   const approval = options.approvalRoom ? permissions({
-    client: matrix({ base: options.settings.homeserver, token: options.account.access_token, signal: lifetime, timeoutMs: 45_000 }),
-    settings: options.settings, account: options.account, agent: options.id, room: options.approvalRoom, expiresMs: 300_000,
+    client: options.transport(lifetime, 45_000),
+    coordination: options.coordination, settings: options.settings, account: options.account, agent: options.id, room: options.approvalRoom, expiresMs: 300_000,
   }, lifetime) : undefined;
   let destination: Awaited<ReturnType<RuntimeAdapter>>;
   try {
@@ -82,16 +88,16 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     });
   } catch (error) { failed.abort(error); approval?.close(); throw error; }
   const signal = AbortSignal.any([stop, destination.signal, failed.signal]);
-  const client = matrix({ base: options.settings.homeserver, token: options.account.access_token, signal, timeoutMs: 45_000 });
+  const client = options.transport(signal, 45_000);
   const maximum = options.maximumBytes ?? DEFAULT_OUTPUT_BYTES;
   const controlFile = options.cursorFile + '.control';
-  const state = loadControl(controlFile, destination.sessionId);
-  let since = loadSyncCursor(options.cursorFile);
+  const state = loadControl(storage, controlFile, destination.sessionId);
+  let since = loadSyncCursor(storage, options.cursorFile);
   let synchronized = false;
   let allowed = new Set<string>();
   let senders = new Set<string>();
   const urgentControl = () => senders.has(options.settings.owner) ? state.controls.findLast(control => control.status === 'interrupted') : undefined;
-  let cycle = loadWake(options.cursorFile);
+  let cycle = loadWake(storage, options.cursorFile);
   let windowEnd = 0;
   let lastAccess = -Infinity;
   let wake: (() => void) | undefined;
@@ -120,8 +126,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const cancel = () => failed.abort(new Error('Listener acquisition exceeded its reconciliation deadline'));
     deadline.addEventListener('abort', cancel, { once: true });
     try {
-      return await operation(matrix({ base: options.settings.homeserver, token: options.account.access_token,
-        signal: scope, timeoutMs: Math.min(45_000, options.reconcileMs) }), scope);
+      return await operation(options.transport(scope, Math.min(45_000, options.reconcileMs)), scope);
     } finally { deadline.removeEventListener('abort', cancel); }
   }
   async function wait(previous: number, milliseconds = options.reconcileMs, control = false): Promise<void> {
@@ -171,19 +176,19 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   }
   let acquisition: Promise<void> | undefined;
   const backstop = setInterval(changed, options.reconcileMs);
-  async function access(client: Matrix): Promise<boolean> {
-    const parsed = deliveryPolicy(await client.get('/_coord/agents/' + options.id + '/delivery'));
+  async function access(): Promise<boolean> {
+    const parsed = await options.coordination.delivery(options.id, signal);
     if (!parsed.ok) throw new Error(parsed.error.message);
     const view = parsed.value;
-    if (view.id !== options.id || view.userId !== options.account.user_id || view.owner !== options.settings.owner
+    if (view.agentId !== options.id || view.matrixUserId !== options.account.user_id || view.ownerMatrixId !== options.settings.owner
       || view.status !== 'active' || view.ownerStatus !== 'active') throw new Error('Agent or owner access is no longer active');
-    const next = new Set(view.grants.filter(grant => !grant.muted).map(grant => grant.room));
-    const nextSenders = new Set(view.senders);
+    const next = new Set(view.roomGrants.filter(grant => !grant.muted).map(grant => grant.roomId));
+    const nextSenders = new Set(view.senderMatrixIds);
     const different = next.size !== allowed.size || [...allowed].some(room => !next.has(room))
       || nextSenders.size !== senders.size || [...senders].some(sender => !nextSenders.has(sender));
     if (different) {
       await cancelDelivery();
-      retireSnapshot(options.cursorFile, new Set([...allowed].filter(room => !next.has(room))));
+      retireSnapshot(storage, options.cursorFile, new Set([...allowed].filter(room => !next.has(room))));
       allowed = next;
       senders = nextSenders;
       membershipRevision++;
@@ -192,18 +197,18 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     return different;
   }
   try {
-    await work(client => access(client));
-    await flushAcknowledgements(client, options.cursorFile);
+    await work(() => access());
+    await flushAcknowledgements(storage, client, options.cursorFile);
     for (const control of state.controls.filter(control => control.status === 'interrupting')) {
       if (control.turn) await destination.interrupt(control.turn, true);
       control.status = control.stop ? 'delivered' : 'interrupted';
       state.paused = control.stop;
-      saveControl(controlFile, state);
+      saveControl(storage, controlFile, state);
     }
     const selected = options.room ? selectRoom(options.room) : undefined;
     let joined = new Set(await joinedRooms(client));
-    retainJoinedCursors(options.cursorFile, joined);
-    activity = await reportActivity({ base: options.settings.homeserver, token: options.account.access_token }, options.id, options.release, signal);
+    retainJoinedCursors(storage, options.cursorFile, joined);
+    activity = await reportActivity(options.coordination, options.id, options.release, signal);
     activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
     signal.throwIfAborted();
@@ -216,18 +221,18 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         controlling = true;
         const membership = new Set(await joinedRooms(client));
         const membershipChanged = membership.size !== joined.size || [...joined].some(room => !membership.has(room));
-        const accessChanged = membershipChanged || performance.now() - lastAccess >= options.reconcileMs ? await retry(() => access(client), scope) : false;
+        const accessChanged = membershipChanged || performance.now() - lastAccess >= options.reconcileMs ? await retry(() => access(), scope) : false;
         const humans = (await retry(() => humanEvents(client, options.settings, synced, since, selected), scope))
           .filter(event => allowed.has(event.room_id));
         const reset = await retry(() => membershipResets(client, synced, options.account, since), scope);
         for (const room of joined) if (!membership.has(room)) reset.add(room);
         if (reset.size) {
-          if (cycle && reset.has(cycle.room)) { cycle = undefined; saveWake(options.cursorFile); windowEnd = 0; }
+          if (cycle && reset.has(cycle.room)) { cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0; }
           membershipRevision++;
           for (const room of reset) retiredRooms.add(room);
           await cancelDelivery();
-          retireSnapshot(options.cursorFile, reset);
-          retainJoinedCursors(options.cursorFile, new Set([...membership].filter(room => !reset.has(room))));
+          retireSnapshot(storage, options.cursorFile, reset);
+          retainJoinedCursors(storage, options.cursorFile, new Set([...membership].filter(room => !reset.has(room))));
           state.controls = state.controls.filter(control => !reset.has(control.room));
         }
         for (const event of humans) {
@@ -245,12 +250,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
             const control = { room: event.room_id, event: event.event_id, stop: String(event.content.body).trim() === '!!',
               turn, status: 'interrupting' as const };
             state.controls.push(control);
-            saveControl(controlFile, state);
+            saveControl(storage, controlFile, state);
             if (turn) await destination.interrupt(turn);
             const saved = state.controls.at(-1)!;
             saved.status = saved.stop ? 'delivered' : 'interrupted';
             state.paused = saved.stop;
-            saveControl(controlFile, state);
+            saveControl(storage, controlFile, state);
           }
         }
         joined = membership;
@@ -258,11 +263,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           if (!allowed.has(room) || reset.has(room) || selected && selected !== room) continue;
           const events = await incrementalEvents(client, synced, since, room, { types: ['m.room.message'] });
           for (const event of events) if (!senders.has(event.sender) && mentionsAgent(event, options.account.user_id)) {
-            await client.post('/_coord/agents/' + options.id + '/blocked-mention', { room, event: event.event_id });
+            const notice = await options.coordination.notice(options.id, room, event.event_id, scope);
+            if (!notice.ok) throw Object.assign(new Error(notice.error.message), { code: notice.error.code });
           }
         }
-        saveControl(controlFile, state);
-        checkpointSync(options.cursorFile, synced.next_batch);
+        saveControl(storage, controlFile, state);
+        checkpointSync(storage, options.cursorFile, synced.next_batch);
         since = synced.next_batch;
         const initial = !synchronized;
         synchronized = true;
@@ -278,22 +284,23 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (controlling) { await wait(previous, options.reconcileMs, true); continue; }
       const urgent = urgentControl();
       if (urgent) {
-        if (!joined.has(urgent.room) || !allowed.has(urgent.room)) { urgent.status = 'superseded'; saveControl(controlFile, state); continue; }
+        if (!joined.has(urgent.room) || !allowed.has(urgent.room)) { urgent.status = 'superseded'; saveControl(storage, controlFile, state); continue; }
         const event = await client.get<Event>(`${API}/rooms/${segment(urgent.room)}/event/${segment(urgent.event)}`);
         if (event.event_id !== urgent.event || event.sender !== options.settings.owner) throw new Error('Urgent event identity changed');
         if (controlling || state.paused) continue;
         if (await deliver([eventView(event, urgent.room)]) || await settle()) {
           urgent.status = 'delivered';
-          saveControl(controlFile, state);
+          saveControl(storage, controlFile, state);
+          destination.acknowledge(deliveryBatches([eventView(event, urgent.room)], options.settings, options.account.user_id, maximum).map(batch => batch.messageId));
         }
         continue;
       }
       retiredRooms.clear();
       if (cycle && (!allowed.has(cycle.room) || !joined.has(cycle.room) || !senders.has(cycle.sender))) {
-        cycle = undefined; saveWake(options.cursorFile); windowEnd = 0;
+        cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0;
       }
       const membershipAtRead = membershipRevision;
-      let batch = await work((client, scope) => retry(() => pendingBatch(client, options.settings, options.cursorFile, options.limit,
+      let batch = await work((client, scope) => retry(() => pendingBatch(storage, client, options.settings, options.cursorFile, options.limit,
         selected, maximum, since, allowed, cycle), scope));
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       if (!senders.size) { windowEnd = 0; await wait(previous); continue; }
@@ -313,24 +320,25 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           if (now < windowEnd) { await wait(previous, Math.ceil(windowEnd - now)); continue; }
           cycle = await work(client => captureWake(client, trigger,
             new Set(Object.keys(batch.cursors).filter(room => allowed.has(room) && (!selected || room === selected))), since!));
-          saveWake(options.cursorFile, cycle); windowEnd = 0;
+          saveWake(storage, options.cursorFile, cycle); windowEnd = 0;
         } else if (pending.length) { windowEnd = 0; await wait(previous); continue; }
       }
-      if (cycle) batch = await work(client => collectBatch(client, options.settings, options.cursorFile, batch, options.limit,
+      if (cycle) batch = await work(client => collectBatch(storage, client, options.settings, options.cursorFile, batch, options.limit,
         selected, maximum, cycle!, allowed));
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       const events: ReceivedEvent[] = [];
       for (const event of batch.events) if (await accept(event)) events.push(event);
       if (!await deliver(events) && !await settle()) continue;
       await work((client, scope) => retry(async () => {
-        await acknowledge(client, options.cursorFile, { ...batch,
+        await acknowledge(storage, client, options.cursorFile, { ...batch,
           cursors: Object.fromEntries(Object.entries(batch.cursors).filter(([room]) => !retiredRooms.has(room))),
           latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => !retiredRooms.has(room))) });
       }, scope));
+      destination.acknowledge(deliveryBatches(events, options.settings, options.account.user_id, maximum).map(batch => batch.messageId));
       if (membershipAtRead !== membershipRevision) continue;
       state.controls = state.controls.filter(control => !batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
-      saveControl(controlFile, state);
-      if (!batch.more_rooms.length) { cycle = undefined; saveWake(options.cursorFile); }
+      saveControl(storage, controlFile, state);
+      if (!batch.more_rooms.length) { cycle = undefined; saveWake(storage, options.cursorFile); }
       if (!batch.more_rooms.length) await wait(previous);
     }
     signal.throwIfAborted();

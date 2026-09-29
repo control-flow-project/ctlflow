@@ -1,16 +1,18 @@
-import type { Result } from '../../../kernel/src/result.js';
+import type { Result } from '@crossfire/kernel/result';
 import type { Principal, Member, Agent, PrincipalApplication } from '../identity/types.js';
 import type { PrincipalRole } from '../authorization/types.js';
 export type PageRequest = { page: number; pageSize: number };
 export type Page<T> = { items: T[]; page: number; pageSize: number; totalItems: number; totalPages: number };
 export type MemberRecord = { principal: Principal; member: Member; role: PrincipalRole; application: PrincipalApplication };
 export type AgentRecord = { principal: Principal; agent: Agent; name: string; application: PrincipalApplication; owner: Principal; ownerMember: Member };
-export type DirectoryFilter = PageRequest & { ownerId?: string; statuses: Principal['status'][]; search: string; activity?: { mode: 'include' | 'exclude'; agentIds: string[] } };
+export type DeploymentSummary = { agentId: string; fleetId: string; fleetKey: string; label: string; controllerName: string; reportedAt: number; instanceKey: string };
+export type DirectoryFilter = PageRequest & { agentIds?: string[]; ownerId?: string; statuses: Principal['status'][]; search: string; activity?: { mode: 'include' | 'exclude'; agentIds: string[] } };
 export type DirectoryRepository = {
   principalByMatrixId(matrixUserId: string): Result<Principal | null>;
   member(principalId: string): Result<MemberRecord | null>;
   agent(principalId: string): Result<AgentRecord | null>;
   agents(filter: DirectoryFilter): Result<Page<AgentRecord>>;
+  deployments(agentIds: string[]): Result<DeploymentSummary[]>;
   members(filter: PageRequest): Result<Page<MemberRecord>>;
   permissions(principalId: string): Result<string[]>;
   activeAdministratorCount(): Result<number>;

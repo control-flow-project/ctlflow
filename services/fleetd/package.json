@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": { "fleetd": "./dist/apps/daemon/src/main.js" },
+  "exports": { "./executable": "./dist/apps/daemon/src/main.js" },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"

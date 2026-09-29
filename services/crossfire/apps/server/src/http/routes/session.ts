@@ -1,7 +1,7 @@
-import { operations } from '../../../../../packages/contracts/src/rest/operations.js';
-import { createSession } from '../../../../../packages/domain/src/session/create-session.js';
-import { endSession } from '../../../../../packages/domain/src/session/authenticate.js';
-import { success } from '../../../../../packages/kernel/src/result.js';
+import { operations } from '@crossfire/contracts/rest/operations';
+import { createSession } from '@crossfire/domain/session/create-session';
+import { endSession } from '@crossfire/domain/session/authenticate';
+import { success } from '@crossfire/kernel/result';
 import { bind, missingSession } from '../bind.js';
 import { member } from '../representation/identity.js';
 export function sessionRoutes() {

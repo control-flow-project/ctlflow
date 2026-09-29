@@ -1,4 +1,4 @@
-import type { InstancePolicy } from '../../../../domain/src/audit/types.js';
+import type { InstancePolicy } from '@crossfire/domain/audit/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapInstancePolicy(row: Tables['instance_policy']): InstancePolicy {
   return {

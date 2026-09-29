@@ -4,11 +4,11 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import { API } from '../packages/matrix/src/http.js';
-import { readJson } from '../packages/files/src/index.js';
-import { listen, type ListenerOptions } from '../packages/agent-core/src/listen.js';
-import type { ReceivedEvent } from '../packages/agent-core/src/receive.js';
-import type { WakePolicy } from '../packages/contracts/src/wake.js';
+import { API } from '@crossfire/contracts/matrix';
+import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
+import { listen, type ListenerOptions } from '@crossfire/adapter-crossfire/listener';
+import type { ReceivedEvent } from '@crossfire/agent-core/receive';
+import type { WakePolicy } from '@crossfire/contracts/wake';
 import { builtClient } from './test-support/release.js';
 import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD, until } from './test-support/listener.js';
 
@@ -32,10 +32,12 @@ function content(native: Awaited<ReturnType<typeof fakeCodex>>) {
 }
 
 async function fixture(context: TestContext,
-  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner') {
+  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner',
+  prepare?: (matrix: Awaited<ReturnType<typeof matrixFixture>>) => void) {
   const native = await fakeCodex(context);
   const matrix = await matrixFixture(context, native.directory);
   matrix.waking.policy = initialAuthority; matrix.waking.senders = initialAuthority === 'nobody' ? [] : [OBSERVER];
+  prepare?.(matrix);
   const stop = new AbortController();
   const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 120,
     ...controls, runtime: native.runtime };
@@ -88,7 +90,7 @@ test('nobody retains every author’s context across restart and delivers it onl
   matrix.add(ROOM, ...senders.map((sender, index) => message('$waiting-' + index, sender)));
   await delay(1200);
   assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
-  assert(matrix.requests.some(request => request.path.endsWith('/heartbeat')));
+  assert(matrix.requests.some(request => request.path.includes('/listener-runs/')));
   assert.equal(matrix.requests.filter(request => request.path.endsWith('/read_markers')).length, 0);
   stop.abort(); await result;
   const restarted = new AbortController();
@@ -165,8 +167,10 @@ test('continuous traffic does not extend the fixed collection window or wake a s
 
 test('pending context is chronological across rooms while explicit selection excludes other rooms', async context => {
   for (const room of [undefined, ROOM]) await context.test(room ?? 'all rooms', async child => {
-    const { native, matrix, cursors } = await fixture(child, { ...(room ? { room } : {}), debounceMs: 100 });
-    matrix.subscribe(PLANNING);
+    const { native, matrix, cursors } = await fixture(child, { ...(room ? { room } : {}), debounceMs: 100 }, 'owner', matrix => {
+      matrix.subscribe(PLANNING);
+      writeJson(matrix.cursorFile, { [ROOM]: '0', [PLANNING]: '0' });
+    });
     matrix.add(ROOM, { ...message('$later'), origin_server_ts: 200 });
     matrix.add(PLANNING, { ...message('$earlier'), origin_server_ts: 100 });
     matrix.add(ROOM, { ...message('$wake', OBSERVER), origin_server_ts: 300 });
@@ -195,6 +199,35 @@ test('an initial recent snapshot stays pinned while waiting and across listener 
   await until(() => existsSync(matrix.cursorFile) && readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '12');
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)),
     [[...Array.from({ length: 5 }, (_, index) => '$initial-' + index), ...Array.from({ length: 6 }, (_, index) => '$new-' + index), '$wake']]);
+});
+
+test('membership reset retires an initial snapshot and resumes delivery from the current membership', async context => {
+  const { native, matrix, cursors } = await fixture(context, { debounceMs: 0, limit: 2 }, 'owner', matrix => {
+    matrix.add(ROOM, message('$old-context'));
+  });
+  assert(existsSync(matrix.cursorFile + '.snapshot'));
+  matrix.add(ROOM, { ...message('$rejoin', SELF), type: 'm.room.member', state_key: SELF,
+    content: { membership: 'join' }, unsigned: { prev_content: { membership: 'invite' } } });
+  await until(() => existsSync(matrix.cursorFile + '.snapshot') && readJson<{ batch: { events: ReceivedEvent[] } }>(matrix.cursorFile + '.snapshot')
+    .batch.events.some(event => event.event_id === '$rejoin'));
+  matrix.add(ROOM, message('$current-owner', OBSERVER));
+  await until(() => cursors()[ROOM] === '3');
+  assert.equal(submissions(native).length, 1);
+  assert(content(native)[0]!.some(event => event.event_id === '$current-owner'));
+});
+
+test('a newly granted room can wake the listener without replacing another room’s pinned context', async context => {
+  const { native, matrix, cursors } = await fixture(context, { debounceMs: 0, limit: 2 }, 'owner', matrix => {
+    matrix.add(ROOM, message('$pinned-first'), message('$pinned-second'));
+  });
+  assert(existsSync(matrix.cursorFile + '.snapshot'));
+  matrix.add(ROOM, message('$later-first'), message('$later-second'));
+  matrix.joined.add(PLANNING);
+  matrix.add(PLANNING, message('$new-context'), message('$new-owner', OBSERVER));
+  await until(() => cursors()[PLANNING] === '2' && cursors()[ROOM] === '4');
+  assert.equal(submissions(native).length, 1);
+  assert.deepEqual(content(native)[0]!.map(event => event.event_id).sort(),
+    ['$pinned-first', '$pinned-second', '$later-first', '$later-second', '$new-context', '$new-owner'].sort());
 });
 
 test('self echoes and owner room-state changes cannot wake but notices join the next authorized input', async context => {

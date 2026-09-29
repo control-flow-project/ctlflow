@@ -1,4 +1,4 @@
-import { success, type Result } from '../../../kernel/src/result.js';
+import { success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import { expireEnrollments } from '../enrollment/expire.js';
 import { reconcilePrincipal } from '../principal/reconcile.js';

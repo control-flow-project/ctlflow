@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { codexPermission } from '../packages/adapter-codex/src/approval.js';
-import type { NativeRequest } from '../packages/adapter-codex/src/protocol.js';
+import { codexPermission } from '@crossfire/adapter-codex/approval';
+import type { NativeRequest } from '@crossfire/adapter-codex/protocol';
 
 const request: NativeRequest = { id: 'request', method: 'item/commandExecution/requestApproval', params: {
   threadId: 'session', turnId: 'turn', itemId: 'item', command: 'npm install', cwd: '/work',

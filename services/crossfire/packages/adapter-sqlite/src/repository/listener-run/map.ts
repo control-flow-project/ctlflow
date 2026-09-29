@@ -1,4 +1,4 @@
-import type { ListenerRun } from '../../../../domain/src/activity/types.js';
+import type { ListenerRun } from '@crossfire/domain/activity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapListenerRun(row: Tables['listener_run']): ListenerRun {
   return {

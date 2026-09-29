@@ -1,4 +1,4 @@
-import { failure, type Result } from '../../../kernel/src/result.js';
+import { failure, type Result } from '@crossfire/kernel/result';
 export function stored<T>(operation: () => Result<T>): Result<T> {
   try { return operation(); }
   catch (error) {

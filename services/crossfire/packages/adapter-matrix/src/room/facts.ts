@@ -1,7 +1,8 @@
-import { object, roomId, userId } from "../../../contracts/src/management.js";
-import { failure, success, type Result } from "../../../kernel/src/result.js";
-import { API, nativeOk, nativeState, segment, type Native } from "../../../matrix/src/http.js";
-import type { JsonObject } from "../../../contracts/src/json.js";
+import { object, roomId, userId } from "@crossfire/contracts/validation";
+import { failure, success, type Result } from "@crossfire/kernel/result";
+import { API, segment } from '@crossfire/contracts/matrix';
+import { nativeOk, nativeState, type Native } from "../http.js";
+import type { JsonObject } from "@crossfire/contracts/json";
 
 export type RoomFacts = { room: string; name: string; topic: string; alias: string | null; ownerLevel: number; ownerCreator: boolean; creators: string[]; ceiling: number; ordinary: number; message: number; reaction: number; powers: JsonObject };
 

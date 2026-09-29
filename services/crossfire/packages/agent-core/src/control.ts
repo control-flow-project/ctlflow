@@ -1,9 +1,9 @@
-import { existsSync } from 'node:fs';
-import { API, segment, type Matrix } from '../../matrix/src/http.js';
-import { readJson, writeJson } from '../../files/src/index.js';
-import type { Settings, Account, Event } from '../../contracts/src/client.js';
+import type { LocalState } from './port.js';
+import { API, segment } from '@crossfire/contracts/matrix';
+import type { Matrix } from './port.js';
+import type { Settings, Account, Event } from '@crossfire/contracts/client';
 import { eventView, incrementalEvents, type ReceivedEvent, type Sync } from './receive.js';
-import { MAX_JSON_BYTES } from '../../contracts/src/limits.js';
+import { MAX_JSON_BYTES } from '@crossfire/contracts/limits';
 
 export type Control = {
   room: string;
@@ -19,9 +19,9 @@ export function humanText(event: Event | ReceivedEvent, observer: string): boole
     && typeof event.content.body === 'string' && !event.content['m.relates_to'] && !event.content['m.new_content'];
 }
 
-export function loadControl(path: string, thread: string): ControlState {
-  if (!existsSync(path)) return { thread, paused: false, controls: [] };
-  const state = readJson<ControlState>(path);
+export function loadControl(storage: LocalState, path: string, thread: string): ControlState {
+  if (!storage.exists(path)) return { thread, paused: false, controls: [] };
+  const state = storage.read<ControlState>(path);
   if (!state || state.thread !== thread || typeof state.paused !== 'boolean' || !Array.isArray(state.controls)
       || state.controls.length > 1000
       || state.controls.some(control => !control || typeof control.room !== 'string' || typeof control.event !== 'string'
@@ -60,8 +60,8 @@ export async function isControl(client: Matrix, settings: Settings, account: Acc
   return members.length === 2 && members.includes(settings.owner) && members.includes(account.user_id);
 }
 
-export function saveControl(file: string, state: ControlState): void {
+export function saveControl(storage: LocalState, file: string, state: ControlState): void {
   if (state.controls.length > 1000) throw new Error('Uncheckpointed human controls exceed 1000; drain acknowledged history before continuing');
-  if (existsSync(file) && JSON.stringify(readJson<unknown>(file)) === JSON.stringify(state)) return;
-  writeJson(file, state);
+  if (storage.exists(file) && JSON.stringify(storage.read<unknown>(file)) === JSON.stringify(state)) return;
+  storage.write(file, state);
 }

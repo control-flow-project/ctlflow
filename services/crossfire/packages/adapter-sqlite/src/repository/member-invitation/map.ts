@@ -1,4 +1,4 @@
-import type { MemberInvitation } from '../../../../domain/src/activity/types.js';
+import type { MemberInvitation } from '@crossfire/domain/activity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapMemberInvitation(row: Tables['member_invitation']): MemberInvitation {
   return {

@@ -1,8 +1,9 @@
 import { serviceUser, type Config } from "./config.js";
-import { authority } from "../../../packages/adapter-matrix/src/account/authority.js";
-import { API, nativeOk, segment } from "../../../packages/matrix/src/http.js";
-import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
-import { fields, text } from "../../../packages/contracts/src/management.js";
+import { authority } from "@crossfire/adapter-matrix/account/authority";
+import { API, segment } from '@crossfire/contracts/matrix';
+import { nativeOk } from '@crossfire/adapter-matrix/http';
+import { failure, success, type Result } from "@crossfire/kernel/result";
+import { fields, text } from "@crossfire/contracts/validation";
 
 export type Bootstrap = { servicePassword: string; administratorPassword: string };
 

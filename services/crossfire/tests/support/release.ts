@@ -1,5 +1,5 @@
-import { ARTIFACTS, type Manifest, type ArtifactName } from '../../packages/contracts/src/release.js';
-import { artifactHash, releaseHash, type Release } from '../../packages/files/src/release.js';
+import { ARTIFACTS, type Manifest, type ArtifactName } from '@crossfire/contracts/release';
+import { artifactHash, releaseHash, type Release } from '@crossfire/adapter-filesystem/release';
 export function contractRelease(): Release {
   const files = Object.fromEntries(ARTIFACTS.map(name => [name, Buffer.from('contract-fixture:' + name)])) as Record<ArtifactName, Buffer>;
   const manifest: Manifest = { version: '0.1.0', release: '0.1.0-' + releaseHash(files),

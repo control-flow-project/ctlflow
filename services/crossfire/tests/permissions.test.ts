@@ -3,11 +3,11 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 import test, { type TestContext } from 'node:test';
-import { permissions } from '../packages/agent-core/src/permissions.js';
-import type { Permission } from '../packages/agent-core/src/runtime.js';
-import { matrix } from '../packages/matrix/src/http.js';
-import type { ReceivedEvent } from '../packages/agent-core/src/receive.js';
-import { emptyActivity } from '../packages/contracts/src/activity.js';
+import { permissions } from '@crossfire/agent-core/permissions';
+import type { Permission } from '@crossfire/agent-core/runtime';
+import { matrix } from '@crossfire/adapter-matrix/http';
+import type { ReceivedEvent } from '@crossfire/agent-core/receive';
+import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 
 const owner = '@alice:tests.localhost', self = '@agent-holmes:tests.localhost', room = '!native';
 const permission: Permission = { runtime: 'codex', session: 'session', request: 'native-request', action: 'command',
@@ -25,11 +25,10 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url!, 'http://localhost').pathname);
     let body: unknown;
-    if (path.startsWith('/_coord/agents/')) body = { id: 'agent', owner, userId: self, name: 'Holmes', nativeName: null,
-      status: access.status, ownerStatus: access.ownerStatus, wakePolicy: 'everyone', wakeSenders: [], revision: 0, grantRevision: 0,
-      grants: access.grant ? [{ room, access: 'reply', muted: false }] : [], applied: [], appliedRevision: null,
-      appliedGrantRevision: null, lastSuccess: null, error: null,
-      activity: emptyActivity() };
+    if (path.startsWith('/api/agents/')) body = { data: { agentId: '11111111-1111-4111-8111-111111111111', ownerMatrixId: owner, matrixUserId: self,
+      status: access.status, ownerStatus: access.ownerStatus, wakeMode: 'owner', senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? [owner] : [],
+      roomGrants: access.grant ? [{ roomId: room, accessMode: 'reply', powerLevel: null, muted: false }] : [] },
+      meta: { requestId: '11111111-1111-4111-8111-111111111111' } };
     else if (path.endsWith('/joined_members')) body = { joined: { [self]: {}, ...(access.ownerJoined ? { [owner]: {} } : {}) } };
     else if (path.includes('/send/')) {
       const chunks: Buffer[] = [];
@@ -48,9 +47,9 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
     await new Promise<void>(resolve => server.close(() => resolve()));
   });
   const address = server.address(); assert(address && typeof address === 'object');
-  const broker = permissions({ client: matrix({ base: 'http://127.0.0.1:' + address.port, token: 'fixture-only', signal: stop.signal }),
+  const broker = permissions({ coordination: createCoordination({ origin: 'http://127.0.0.1:' + address.port, token: 'fixture-only' }), client: matrix({ base: 'http://127.0.0.1:' + address.port, token: 'fixture-only', signal: stop.signal }),
     settings: { instance: 'tests', homeserver: 'http://127.0.0.1:' + address.port, server_name: 'tests.localhost', owner, max_upload_bytes: 1024 },
-    account: { user_id: self, access_token: 'fixture-only', device_id: 'fixture' }, agent: 'agent', room, expiresMs }, stop.signal);
+    account: { user_id: self, access_token: 'fixture-only', device_id: 'fixture' }, agent: '11111111-1111-4111-8111-111111111111', room, expiresMs }, stop.signal);
   async function announced() {
     const deadline = Date.now() + 2000;
     while (!announcements.length) { assert(Date.now() < deadline); await delay(5); }

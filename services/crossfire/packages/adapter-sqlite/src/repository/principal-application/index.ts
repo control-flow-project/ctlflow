@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapPrincipalApplication } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '../../../../kernel/src/result.js';
-import type { PrincipalApplicationRepository } from '../../../../domain/src/port/repositories.js';
+import { failure, success } from '@crossfire/kernel/result';
+import type { PrincipalApplicationRepository } from '@crossfire/domain/port/repositories';
 
 export function createPrincipalApplicationRepository(database: Database.Database): PrincipalApplicationRepository {
   return {

@@ -1,5 +1,8 @@
+import { createEnrollmentControllerMetadataRepository } from './repository/enrollment-controller-metadata/index.js';
+import { createFleetControllerMetadataRepository } from './repository/fleet-controller-metadata/index.js';
+import { createFleetCredentialRepository } from './repository/fleet-credential/index.js';
 import type Database from 'better-sqlite3';
-import type { Repositories } from '../../domain/src/port/repositories.js';
+import type { Repositories } from '@crossfire/domain/port/repositories';
 import { createPrincipalRepository } from './repository/principal/index.js';
 import { createMemberRepository } from './repository/member/index.js';
 import { createAgentRepository } from './repository/agent/index.js';
@@ -27,6 +30,9 @@ import { createAuditEventRepository } from './repository/audit-event/index.js';
 
 export function createRepositories(database: Database.Database): Repositories {
   return {
+    enrollmentControllerMetadata: createEnrollmentControllerMetadataRepository(database),
+    fleetControllerMetadata: createFleetControllerMetadataRepository(database),
+    fleetCredential: createFleetCredentialRepository(database),
     principal: createPrincipalRepository(database),
     member: createMemberRepository(database),
     agent: createAgentRepository(database),

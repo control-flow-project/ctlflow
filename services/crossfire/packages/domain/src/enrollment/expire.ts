@@ -1,4 +1,4 @@
-import { success, type Result } from '../../../kernel/src/result.js';
+import { success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 export function expireEnrollments(services: Pick<Services, 'repositories' | 'collection' | 'clock'>): Result<void> {
   const expired = services.collection.expiredEnrollments({ now: services.clock.now() });

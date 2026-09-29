@@ -2,31 +2,31 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value, secret } from './support/application.js';
-import { introduceEnrollment } from '../packages/domain/src/enrollment/introduce.js';
-import { preflightEnrollment } from '../packages/domain/src/enrollment/preflight.js';
-import { decideEnrollment } from '../packages/domain/src/enrollment/decide.js';
-import { exchangeEnrollment } from '../packages/domain/src/enrollment/exchange.js';
-import { changeRoomGrant } from '../packages/domain/src/room-access/change-grant.js';
-import { setRoomPermission } from '../packages/domain/src/room-access/set-permission.js';
-import { reconcileRoomGrant } from '../packages/domain/src/room-access/reconcile-grant.js';
-import { previewGrantPlan, applyGrantPlan } from '../packages/domain/src/room-access/grant-plan.js';
-import { changeWakePolicy } from '../packages/domain/src/wake/change-policy.js';
-import { deliveryPolicy } from '../packages/domain/src/agent/delivery-policy.js';
-import { requestWakeNotice } from '../packages/domain/src/notice/request-notice.js';
-import { publishWakeNotice } from '../packages/domain/src/notice/publish-notice.js';
-import { reportListener } from '../packages/domain/src/listener/report.js';
-import { disconnectListeners } from '../packages/domain/src/listener/disconnect.js';
-import { listAgents } from '../packages/domain/src/agent/read-agent.js';
-import { changeAgent } from '../packages/domain/src/agent/change-agent.js';
-import { reconcilePrincipal } from '../packages/domain/src/principal/reconcile.js';
-import { failure } from '../packages/kernel/src/result.js';
+import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
+import { preflightEnrollment } from '@crossfire/domain/enrollment/preflight';
+import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
+import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
+import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
+import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
+import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
+import { previewGrantPlan, applyGrantPlan } from '@crossfire/domain/room-access/grant-plan';
+import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
+import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
+import { requestWakeNotice } from '@crossfire/domain/notice/request-notice';
+import { publishWakeNotice } from '@crossfire/domain/notice/publish-notice';
+import { reportListener } from '@crossfire/domain/listener/report';
+import { disconnectListeners } from '@crossfire/domain/listener/disconnect';
+import { listAgents } from '@crossfire/domain/agent/read-agent';
+import { changeAgent } from '@crossfire/domain/agent/change-agent';
+import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
+import { failure } from '@crossfire/kernel/result';
 
 test('one enrollment pipeline preserves identity, name reservations, ownership and fleet bindings', async scope => {
   const fixture = await applicationFixture(scope);
   const { services, admin } = fixture;
   const other = await fixture.member('other');
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
-    fleetKey: 'research', instances: [{ instanceKey: 'first', name: 'first' }, { instanceKey: 'second', name: 'second' }] };
+    fleetKey: 'research', controller: { name: 'desktop', metadata: { zone: 'local' } }, instances: [{ instanceKey: 'first', name: 'first' }, { instanceKey: 'second', name: 'second' }] };
   value(await preflightEnrollment(services, input));
   const introduced = value(await introduceEnrollment(services, input));
   assert.deepEqual(value(await introduceEnrollment(services, input)), introduced);
@@ -44,7 +44,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   const ready = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
   assert.equal(ready.status, 'ready');
   assert.equal(exchangeEnrollment(services, input.enrollmentId, secret()).ok, false);
-  const restored = { ...input, enrollmentId: randomUUID(), claimSecret: secret(),
+  const restored = { ...input, controllerCredential: ready.fleet!.controllerCredential!, enrollmentId: randomUUID(), claimSecret: secret(),
     instances: ready.instances.map(item => ({ instanceKey: item.instanceKey, name: item.name, identity: { agentId: item.agentId!, accessToken: item.account!.accessToken } })) };
   value(await preflightEnrollment(services, restored));
   assert.equal(value(await introduceEnrollment(services, restored)).request.status, 'approved');
@@ -95,10 +95,11 @@ test('room invitation capabilities cross owners but never transfer provenance or
 test('bulk room review is complete, revision-bound and atomic', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const agents = [await fixture.agent(admin.actor, 'alpha'), await fixture.agent(admin.actor, 'beta')];
-  value(services.repositories.fleet.insert({ ownerId: admin.actor.principalId, fleetKey: 'team', createdAt: fixture.now() }));
+  const fleetId = randomUUID();
+  value(services.repositories.fleet.insert({ id: fleetId, label: 'Team', controllerName: 'desktop', revision: 0, updatedAt: fixture.now(), ownerId: admin.actor.principalId, fleetKey: 'team', createdAt: fixture.now() }));
   for (const [index, agent] of agents.entries()) value(services.repositories.fleetInstance.insert({ ownerId: admin.actor.principalId, fleetKey: 'team', instanceKey: 'worker-' + index, agentId: agent.id }));
   const roomId = value(await fixture.native.matrix.createRoom(admin.member.principal.matrixUserId, 'Team')).roomId;
-  const plan = { fleetKey: 'team', agents: agents.map((_agent, index) => ({ instanceKey: 'worker-' + index,
+  const plan = { fleetId, agents: agents.map((_agent, index) => ({ instanceKey: 'worker-' + index,
     grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
   value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: 0, displayName: 'Beta' }, randomUUID()));

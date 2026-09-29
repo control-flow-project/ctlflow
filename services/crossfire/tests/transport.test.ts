@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { createServer, type RequestListener } from "node:http";
 import { once } from "node:events";
 import test, { type TestContext } from "node:test";
-import { collect, endpoint, json, nativeJson, nativeOpen } from "../packages/matrix/src/http.js";
-import { MAX_JSON_BYTES } from "../packages/contracts/src/limits.js";
+import { json } from '@crossfire/contracts/matrix';
+import { endpoint } from '@crossfire/contracts/origin';
+import { collect, nativeJson, nativeOpen } from '@crossfire/adapter-matrix/http';
+import { MAX_JSON_BYTES } from "@crossfire/contracts/limits";
 
 async function fixture(scope: TestContext, listener: RequestListener): Promise<string> {
   const server = createServer(listener);

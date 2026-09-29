@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import { resolveWakePolicy } from '../wake/resolve-policy.js';
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'clock' | 'identity' | 'matrix'>;

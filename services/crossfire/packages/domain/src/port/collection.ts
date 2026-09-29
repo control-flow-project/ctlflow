@@ -1,4 +1,4 @@
-import type { Result } from '../../../kernel/src/result.js';
+import type { Result } from '@crossfire/kernel/result';
 import type { Page, PageRequest } from './directory.js';
 import type { EnrollmentItem } from '../enrollment/types.js';
 import type { FleetInstance } from '../enrollment/types.js';
@@ -17,6 +17,8 @@ import type { Fleet } from '../enrollment/types.js';
 import type { AuditEvent } from '../audit/types.js';
 
 export type CollectionRepository = {
+  enrollmentMetadata(enrollmentId: string): Result<{ key: string; value: string }[]>;
+  fleetMetadata(fleetIds: string[]): Result<{ fleetId: string; key: string; value: string }[]>;
   enrollmentItems(input: { requestId: string }): Result<EnrollmentItem[]>;
   fleetInstances(input: { ownerId: string; fleetKey: string }): Result<FleetInstance[]>;
   roomGrants(input: { agentId: string }): Result<AgentRoomGrant[]>;
@@ -33,7 +35,7 @@ export type CollectionRepository = {
   claimedInvitations(input: { now: number }): Result<MemberInvitation[]>;
   rolePermissions(input: { roleCode: string }): Result<RolePermission[]>;
   enrollments(input: PageRequest & { ownerId?: string }): Result<Page<EnrollmentRequest>>;
-  fleets(input: PageRequest & { ownerId?: string }): Result<Page<Fleet>>;
+  fleets(input: PageRequest & { ownerId?: string; search?: string }): Result<Page<Fleet>>;
   invitations(input: PageRequest): Result<Page<MemberInvitation>>;
   audits(input: PageRequest & { ownerId?: string }): Result<Page<AuditEvent>>;
   pendingEnrollmentCount(ownerId?: string): Result<number>;

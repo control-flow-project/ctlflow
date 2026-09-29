@@ -123,10 +123,21 @@ credentials or failed native resume produces a concrete error, not a fresh sessi
 A second live owner of the same local instance is denied. Portable-directory
 proof is explicitly outside this task; portability remains the storage contract.
 
+Linux native `flock` owns each daemon, fleet directory and receiver lifetime.
+Locks are private retained inodes, held by an open file descriptor rather than
+expiring leases. Suspension cannot create another owner; process exit releases
+ownership without a stale-PID detector or deleting a shared lock inode.
+
 Native settings (model, reasoning, sandbox, approval policy and cwd) are validated
 and applied by the runtime adapter. Only stock Codex 0.158.0 or newer is supported.
 Daemon orchestration contains no Codex-specific option translation. Native
 authentication stays private and uses the user's authorized provider login.
+The Codex adapter creates each work area's private `.codex` home. On first use,
+it copies the user's private native login if the home has none; subsequent starts
+retain that home's authentication. No controller credential enters model context.
+Native thread creation and resumption receive the validated model, reasoning,
+permission and instruction configuration. An initial native history read persists
+an empty session without a dummy prompt, allowing zero-turn resumption.
 Normal stop closes the listener and owned Codex process. Descendant-process
 supervision and crash-proof tool cleanup are not product guarantees.
 
@@ -424,8 +435,10 @@ untouched. For a listed agent, omitted grants are removals. An explicit
 `grants = []` removes all its grants. Unknown identities are errors, not
 enrollment requests.
 
-The authenticated owner plus `fleet` and `instance` resolve the immutable agent
-ID. The human does not transcribe account UUIDs. This file contains no local
+The selected fleet's immutable UUID plus `instance` resolve the immutable agent
+ID; the TOML `fleet` key must match that selected fleet. An administrator can
+therefore review identically named fleets belonging to different owners without
+ambiguity. The human does not transcribe account UUIDs. This file contains no local
 paths, native settings, commands or credentials. Wake policies and invitation
 delegation are independent management settings, not implied by room grants.
 
@@ -578,7 +591,7 @@ TOML is an input format, not another database representation.
 Owners may add/remove their own agents. Administrators may add/remove any agent.
 An explicitly authorized agent may add another agent, including another owner's
 agent, and remove only membership additions attributed to that inviting agent.
-All entrypoints use the room-access authorization in section 8.
+All entrypoints use the room-access authorization in this section.
 
 Single-agent, bulk and delegated invitation actions share authorization and
 grant normalization. Each grant records its authorizing principal and addition
@@ -626,6 +639,12 @@ Successful authorization must produce a durable permitted outcome. It cannot
 report success after a native invite that the grant reconciler immediately
 undoes. Desired authorization, native invitation, target acceptance and joined
 membership remain distinguishable statuses.
+
+The project client exposes `agent directory`, `room agent-access`,
+`room invite-agent` and `room remove-agent`. The coordination adapter reads the
+current grant and submits its exact revision/generation through the same REST
+resource used by management. Native Matrix invites alone do not replace that
+durable permission operation.
 
 ### Authority invariants
 
@@ -701,6 +720,22 @@ Each instance uses one bounded receiver with persisted ordering, cursor and
 native receipt handling. Idle polls do not enter model context. Receipt-confirmed
 publication owns advancement; an uncertain failed send cannot silently consume
 unread messages.
+
+Initial recent history remains pinned while waiting for wake authority. A room
+membership reset retires that room's initial boundary, not other rooms' context.
+Newly granted rooms establish their boundaries without replacing already pinned
+messages. Pinned context still uses the shared bounded batch and receipt path.
+
+The runtime adapter durably journals the exact input identity/content and native
+history boundary before publication. A confirmed receipt remains durable until
+the shared receiver commits its cursor/control checkpoint and acknowledges it.
+Restarting the native engine cannot replay a confirmed input. A lost RPC response
+is resolved only against the captured native history interval and exact receipt;
+an unprovable publication stops explicitly with unread positions unchanged.
+Native client IDs are correlation, not an assumed native deduplication guarantee.
+The private per-session journal allows one pending publication and at most 128
+unacknowledged confirmations; it refuses excess rather than silently evicting
+unsettled evidence. This is runtime state, not a second Matrix cursor owner.
 
 Allowed wake authors are configured in management:
 
@@ -789,7 +824,7 @@ operator configuration, external credentials and other projects remain intact.
 
 ### Relational conventions
 
-All twenty-four application tables have singular snake_case names. Tables are
+All twenty-seven application tables have singular snake_case names. Tables are
 STRICT and foreign keys remain enabled. Timestamps/durations use integer
 milliseconds; revisions/counters are checked nonnegative integers. Boolean
 data properties use checked integers, but delegated capabilities are permission
@@ -858,13 +893,13 @@ repository methods serve issuance and native account operations only.
 
 | Table | Complete logical columns and keys |
 | --- | --- |
-| `enrollment_request` | `id PK`, `owner_id FK member`, `fleet_key?`, `verification_code UQ`, `claim_hash`, `controller_name?`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. |
+| `enrollment_request` | `id PK`, `owner_id FK member`, `fleet_key?`, `verification_code UQ`, `claim_hash`, `controller_name?`, `controller_credential_hash?`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. |
 | `enrollment_item` | `request_id FK enrollment_request`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. |
 | `agent_name` | `name PK`, `request_id?`, `instance_key?`, `agent_id? UQ/FK agent`; pending-item composite FK; `UQ(request_id, instance_key)`. |
-| `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `display_name`, `controller_name`, `revision`, `created_at`, `updated_at`; `PK(owner_id, fleet_key)`. |
-| `fleet_controller_metadata` | `owner_id`, `fleet_key`, `key`, `value`; `PK(owner_id, fleet_key, key)`, composite FK fleet. |
-| `fleet_credential` | `secret_hash PK`, `owner_id`, `fleet_key`, `created_at`, `revoked_at?`; composite FK fleet. Fleet-scoped authority, not a human login. |
-| `enrollment_controller_metadata` | `request_id FK enrollment_request`, `key`, `value`; `PK(request_id, key)`. Exact approval snapshot. |
+| `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `revision`, `created_at`, `updated_at`; `PK(owner_id, fleet_key)`. |
+| `fleet_controller_metadata` | `fleet_id FK fleet(id)`, `key`, `value`; `PK(fleet_id, key)`. |
+| `fleet_credential` | `id PK`, `fleet_id FK fleet(id)`, `secret_hash`, `created_at`, `revoked_at?`. Fleet-scoped authority, not a human login. |
+| `enrollment_controller_metadata` | `enrollment_id FK enrollment_request`, `key`, `value`; `PK(enrollment_id, key)`. Exact approval snapshot. |
 | `fleet_instance` | `owner_id`, `fleet_key`, `instance_key`, `agent_id UQ`; `PK(owner_id, fleet_key, instance_key)`; composite FKs to `fleet(owner_id, fleet_key)` and `agent(principal_id, owner_id)`. |
 
 One item or many items use the same request/decision/provisioning pipeline.
@@ -930,7 +965,7 @@ authority. Every policy uses the same wake resolver and buffered-context path.
 | `listener_run` | `id PK`, `agent_id FK agent`, `release?`, `started_at`, `last_seen_at`, `active_ms`, `messages_delivered`, `stopped_at?`, `disconnect_requested_at?`. |
 | `wake_notice` | `receiver_agent_id FK agent`, `event_id`, `sender_matrix_id`, `room_id`, `reserved_at`, `message_body`, `status`, `sent_at?`, `native_event_id?`, `next_attempt_at?`, `last_error?`; `PK(receiver_agent_id, event_id)`. |
 | `instance_policy` | `id PK = instance`, `revision`, `max_owner_agents`, `max_agents`, `max_pending`, `enrollment_seconds`, `reconcile_seconds`, `agent_instructions`. |
-| `audit_event` | `id PK`, `request_id`, `actor_kind`, `actor_principal_id? FK principal`, `owner_id? FK member`, `target_kind`, `target_id`, `room_id?`, `membership_generation?`, `authorizer_id? FK principal`, `added_by_id? FK principal`, `permission_code? FK permission`, `action`, `outcome`, `message`, `created_at`. |
+| `audit_event` | `id PK`, `request_id`, `actor_kind`, `actor_principal_id? FK principal`, `actor_credential_id?`, `owner_id? FK member`, `target_kind`, `target_id`, `room_id?`, `membership_generation?`, `authorizer_id? FK principal`, `added_by_id? FK principal`, `permission_code? FK permission`, `action`, `outcome`, `message`, `created_at`. |
 
 Known signup-claim components are all present or all absent. The human-role
 restriction on `member_invitation` is enforced in storage as well as validation.
@@ -949,7 +984,9 @@ Crossfire, so `sender_matrix_id` is deliberately an external identifier.
 Audit events are append-only, attributed facts. Bulk operations emit the
 necessary per-target records under one request ID in the same transaction.
 Actor kind distinguishes authenticated principals, private enrollment claims
-and system operations. Queryable actor/owner/target/room/generation/provenance/
+and system operations, including a fleet controller's credential identity. The
+historical credential identifier is not a live FK: deleting a fleet cannot erase
+its audit attribution. Queryable actor/owner/target/room/generation/provenance/
 permission facts are columns; `message` is readable audit copy, never serialized
 permission or roster state. No generic JSON `detail` or untyped property bag.
 Historical target identifiers may describe expired requests or external rooms;
@@ -979,6 +1016,8 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `principal_application` | `(next_check_at, principal_id)` | Bounded reconciliation. |
 | `enrollment_request` | `(owner_id, created_at, id)`, `(created_at, id)`, `(status, expires_at, id)` | Review lists and pending expiry/capacity. |
 | `enrollment_item` | `(agent_id, request_id, instance_key)` | Existing identity and provisioning references. |
+| `fleet` | `(created_at, fleet_key)` | Global fleet list. Owner lists use the composite primary-key prefix. |
+| `fleet_credential` | `(fleet_id, revoked_at)` | Fleet credential lifecycle. |
 | `agent_room_grant` | `(room_id, agent_id)`, `(authorizer_id, agent_id, room_id)`, `(added_by_id, agent_id, room_id)` | Room views, authority loss, provenance. |
 | `agent_room_permission` | `(permission_code, room_id, agent_id)`, `(granted_by_member_id, agent_id, room_id)` | Effective delegation and delegator lifecycle. |
 | `room_grant_application` | `(next_check_at, agent_id, room_id)` | Bounded grant application. |
@@ -998,6 +1037,11 @@ Owner-scoped queries do not contain a parameterized administrator-OR-owner
 condition that prevents an owner seek. Distinct authorized scopes select
 explicit query shapes inside one repository implementation. Activity summaries
 are page-wide aggregate projections, never several queries per agent.
+
+Room-grant collections accept an optional `roomIds` query value: a JSON array of
+at most 100 distinct opaque native room IDs, bounded to 16 KiB before parsing.
+Filtering precedes counting and paging. The agent room table requests grants for
+its displayed room page, never assumes the first grant page contains every room.
 
 Indexes do not make arbitrary substring search constant-time. Directory search
 is bounded by supported policy capacity. Verification uses actual Tinqer SQL,
@@ -1138,6 +1182,9 @@ not opaque IDs. Owners see their scope; administrators may filter all owners.
 Lists have useful status/search filters and pagination. Revoked entries are
 explicitly included by filter. Fleet controller labels are visible in fleet
 summaries and agent deployment context, without implying heartbeat freshness.
+Selected-author responses retain display labels for all selected principals,
+independently of the current search/page. Empty optional UI filters are omitted
+from URLs; an empty identifier is not a separate API meaning.
 
 Room access offers native read/reply/custom levels up to the verified actor's
 authority, with compact aligned controls and meaningful pending/applied errors.

@@ -7,11 +7,11 @@ import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
 import { buildRelease } from "../scripts/build-release.js";
-import { authority } from "../apps/server/src/native.js";
+import { authority } from "@crossfire/adapter-matrix/account/authority";
 import { serve } from "../apps/server/src/main.js";
-import { secret } from "../apps/server/src/context.js";
+import { secret } from "./support/application.js";
 import type { Config } from "../apps/server/src/config.js";
-import { writeJson } from "../packages/files/src/index.js";
+import { writeJson } from "@crossfire/adapter-filesystem/index";
 
 test("native authority shutdown aborts reads and serialized provisioning without replay", { timeout: 10_000 }, async scope => {
   const paths: string[] = [];
@@ -21,9 +21,9 @@ test("native authority shutdown aborts reads and serialized provisioning without
   scope.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
   const address = server.address();
   assert(address && typeof address === "object");
-  const native = authority({ instance: "shutdown", serverName: "tests.localhost", publicOrigin: "http://127.0.0.1",
-    matrixOrigin: "http://127.0.0.1:" + address.port, administrator: "@admin:tests.localhost",
-    registrationSecret: secret(), jwtSecret: secret() });
+  const native = authority({ serverName: "tests.localhost",
+    matrixOrigin: "http://127.0.0.1:" + address.port,
+    registrationSecret: secret(), jwtSecret: secret(), serviceMatrixId: '@crossfire-shutdown:tests.localhost' });
   const reads = [native.identify("bounded-test-credential"), native.asUser("@admin:tests.localhost"),
     native.profileName("@agent:tests.localhost")];
   const provisioning = [native.provision("@agent:tests.localhost", secret()), native.provision("@agent:tests.localhost", secret())];
@@ -62,15 +62,15 @@ test("private service starts with real native bootstrap and shuts down idempoten
   const release = await buildRelease(process.cwd(), output);
   const service = await serve(directory, join(output, "onboarding", release.release), port);
   scope.after(service.close);
-  const health = await fetch(config.publicOrigin + "/_coord/health", { signal: AbortSignal.timeout(5000) });
+  const health = await fetch(config.publicOrigin + "/api/health", { signal: AbortSignal.timeout(5000) });
   assert.equal(health.status, 200);
-  const identity = await health.json() as { startedAt: string; runtime: string };
-  assert(Number.isFinite(Date.parse(identity.startedAt)));
+  const identity = (await health.json() as { data: { startedAt: number } }).data;
+  assert(Number.isFinite(identity.startedAt));
   assert.deepEqual(identity, { instance: config.instance, version: release.version, release: release.release,
-    runtime: 'node ' + process.versions.node, startedAt: identity.startedAt });
+    startedAt: identity.startedAt });
   await service.worker.drain();
   await Promise.all([service.close(), service.close()]);
   assert.equal(service.server.listening, false);
-  assert.equal((await service.context.native.identify("closed")).ok, false);
-  assert.throws(() => service.context.store.prepare("SELECT 1"), /not open|closed/);
+  assert.equal((await service.application.services.matrix.identify("closed")).ok, false);
+  assert.throws(() => service.application.services.repositories.instancePolicy.find({ id: 'instance' }), /database connection is not open/);
 });

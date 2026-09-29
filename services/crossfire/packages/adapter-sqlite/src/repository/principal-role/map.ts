@@ -1,4 +1,4 @@
-import type { PrincipalRole } from '../../../../domain/src/authorization/types.js';
+import type { PrincipalRole } from '@crossfire/domain/authorization/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapPrincipalRole(row: Tables['principal_role']): PrincipalRole {
   return {

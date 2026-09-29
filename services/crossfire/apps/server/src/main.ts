@@ -5,8 +5,8 @@ import { bootstrap, bootstrapSecrets } from "./bootstrap.js";
 import { createApplication } from './composition.js';
 import { createHttpServer } from './http/create-server.js';
 import { createWorker } from './worker.js';
-import { readJson } from "../../../packages/files/src/index.js";
-import { loadRelease } from "../../../packages/files/src/release.js";
+import { readJson } from "@crossfire/adapter-filesystem/index";
+import { loadRelease } from "@crossfire/adapter-filesystem/release";
 
 export async function serve(directory: string, releaseDirectory: string, port = 8080) {
   if (process.platform !== "linux" || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire requires Linux and Node.js 26+");

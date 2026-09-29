@@ -6,5 +6,16 @@
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"
+  },
+  "dependencies": {
+    "@crossfire/agent-core": "0.1.0",
+    "@crossfire/contracts": "0.1.0"
+  },
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "source": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
   }
 }

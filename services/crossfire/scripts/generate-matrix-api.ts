@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { parse } from 'yaml';
 import { fileURLToPath } from 'node:url';
-import { kebab, type MatrixSchema, type Operation, type Parameter } from '../packages/matrix/src/schema.js';
+import { kebab, type MatrixSchema, type Operation, type Parameter } from '@crossfire/adapter-matrix/schema';
 
 type ObjectValue = Record<string, unknown>;
 const disabled = new Set(['old_sync', 'room_initial_sync', 'peeking_events', 'third_party_lookup', 'third_party_membership',

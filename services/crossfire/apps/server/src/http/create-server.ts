@@ -1,12 +1,13 @@
+import { authenticateController } from '@crossfire/domain/fleet/authority';
 import { createServer, type IncomingMessage } from 'node:http';
-import { failure, success, type Result } from '../../../../packages/kernel/src/result.js';
-import { HTTP_LIMITS } from '../../../../packages/contracts/src/rest/limits.js';
-import { matrixUserId } from '../../../../packages/contracts/src/schema/validation.js';
-import { onboardingGuide } from '../../../../packages/contracts/src/onboarding.js';
-import { authenticateMember, authenticateAgent } from '../../../../packages/domain/src/session/authenticate.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
+import { HTTP_LIMITS } from '@crossfire/contracts/rest/limits';
+import { matrixUserId } from '@crossfire/contracts/schema/validation';
+import { onboardingGuide } from '@crossfire/contracts/onboarding';
+import { authenticateMember, authenticateAgent } from '@crossfire/domain/session/authenticate';
 import type { Application } from '../composition.js';
 import type { createWorker } from '../worker.js';
-import type { Release } from '../../../../packages/files/src/release.js';
+import type { Release } from '@crossfire/adapter-filesystem/release';
 import { serveArtifact } from '../artifacts.js';
 import { type Context, type Endpoint, type Reply } from './bind.js';
 import { readBody, send, cookie, setCookie } from './transport.js';
@@ -41,6 +42,10 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
     }
     if (authorization !== undefined) {
       if (endpoint.auth === 'human' || !/^Bearer [^\s]+$/u.test(authorization)) return failure('unauthorized', 'This operation requires the correct authentication kind');
+      if (endpoint.auth === 'fleet') {
+        const controller = authenticateController(services, authorization.slice(7));
+        return controller.ok ? success({ ...context, controller: controller.value }) : controller;
+      }
       const result = await authenticateAgent(services, authorization.slice(7));
       return result.ok ? success({ ...context, actor: result.value }) : result;
     }
@@ -59,12 +64,15 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       const method = request.method ?? 'GET';
       if (serveArtifact(release, method, url.pathname, response)) return;
       if (url.pathname === '/onboarding/setup') {
+        if (method !== 'GET' && method !== 'HEAD') {
+          response.setHeader('Allow', 'GET, HEAD'); send(response, requestId, failure('method_not_allowed', 'Method not allowed')); return;
+        }
         const owner = matrixUserId(url.searchParams.get('ownerMatrixId'));
-        if (!owner.ok || url.searchParams.size !== 1 || method !== 'GET') { send(response, requestId, failure('invalid', 'GET requires exactly one ownerMatrixId')); return; }
+        if (!owner.ok || url.searchParams.size !== 1) { send(response, requestId, failure('invalid', 'Exactly one ownerMatrixId is required')); return; }
         const guide = Buffer.from(onboardingGuide(config.publicOrigin, owner.value, release.manifest));
         response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': guide.length, 'Cache-Control': 'no-store',
           'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'" });
-        response.end(guide); return;
+        response.end(method === 'HEAD' ? undefined : guide); return;
       }
       let endpoint: Endpoint | undefined, params: Record<string, string> | undefined;
       const allowed = new Set<string>();

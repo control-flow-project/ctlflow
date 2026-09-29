@@ -1,7 +1,9 @@
-import type { EnrollmentRequest } from '../../../../domain/src/enrollment/types.js';
+import type { EnrollmentRequest } from '@crossfire/domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapEnrollmentRequest(row: Tables['enrollment_request']): EnrollmentRequest {
   return {
+    controllerName: row.controller_name,
+    controllerCredentialHash: row.controller_credential_hash,
     id: row.id,
     ownerId: row.owner_id,
     fleetKey: row.fleet_key,

@@ -1,4 +1,4 @@
-import { failure, success } from '../../../kernel/src/result.js';
+import { failure, success } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 export async function createSession(services: Pick<Services, 'matrix' | 'directory' | 'repositories' | 'collection' | 'unitOfWork' | 'identity' | 'clock'>, nativeAccessToken: string) {
   const identity = await services.matrix.identify(nativeAccessToken);

@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import test, { type TestContext } from 'node:test';
 import { WebSocketServer } from 'ws';
 import { setTimeout as delay } from 'node:timers/promises';
-import { codexProtocol, type NativeRequest } from '../packages/adapter-codex/src/protocol.js';
+import { codexProtocol, type NativeRequest } from '@crossfire/adapter-codex/protocol';
 
 async function fixture(scope: TestContext, mode: string, approval = async (_request: NativeRequest, _signal: AbortSignal): Promise<unknown> => {
   throw new Error('Unexpected approval request');

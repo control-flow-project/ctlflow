@@ -1,4 +1,4 @@
-import { failure, success } from '../../../kernel/src/result.js';
+import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { Agent } from '../identity/types.js';
 import { authorizeAgent } from '../authorization/authorize.js';

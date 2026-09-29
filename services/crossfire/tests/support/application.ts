@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import { createApplication } from '../../apps/server/src/composition.js';
-import { createSession } from '../../packages/domain/src/session/create-session.js';
-import { authenticateMember } from '../../packages/domain/src/session/authenticate.js';
-import { registerPrincipal } from '../../packages/domain/src/principal/register.js';
-import { introduceEnrollment } from '../../packages/domain/src/enrollment/introduce.js';
-import { decideEnrollment } from '../../packages/domain/src/enrollment/decide.js';
-import { reconcilePrincipal } from '../../packages/domain/src/principal/reconcile.js';
-import { exchangeEnrollment } from '../../packages/domain/src/enrollment/exchange.js';
-import { success, type Result } from '../../packages/kernel/src/result.js';
-import type { Actor } from '../../packages/domain/src/port/services.js';
+import { createSession } from '@crossfire/domain/session/create-session';
+import { authenticateMember } from '@crossfire/domain/session/authenticate';
+import { registerPrincipal } from '@crossfire/domain/principal/register';
+import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
+import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
+import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
+import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
+import { success, type Result } from '@crossfire/kernel/result';
+import type { Actor } from '@crossfire/domain/port/services';
 import { matrixAuthorityFixture } from './matrix-authority.js';
 export function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.code + ': ' + result.error.message); return result.value; }
 export function secret(): string { return randomBytes(32).toString('base64url'); }

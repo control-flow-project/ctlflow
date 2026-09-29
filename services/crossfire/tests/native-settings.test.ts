@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { nativeProvider } from '../scripts/test-support/native-provider.js';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { connectCodex } from '../packages/adapter-codex/src/connection.js';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
 
 test('external app-server owns model, reasoning and workspace settings', async scope => {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });

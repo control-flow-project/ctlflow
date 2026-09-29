@@ -1,4 +1,4 @@
-import type { FleetInstance } from '../../../../domain/src/enrollment/types.js';
+import type { FleetInstance } from '@crossfire/domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapFleetInstance(row: Tables['fleet_instance']): FleetInstance {
   return {

@@ -1,7 +1,7 @@
-import type { MemberRecord } from '../../../../../packages/domain/src/port/directory.js';
-import type { PrincipalApplication } from '../../../../../packages/domain/src/identity/types.js';
-import type { AgentDetails } from '../../../../../packages/domain/src/agent/read-agent.js';
-import type { ListenerRun } from '../../../../../packages/domain/src/activity/types.js';
+import type { MemberRecord } from '@crossfire/domain/port/directory';
+import type { PrincipalApplication } from '@crossfire/domain/identity/types';
+import type { AgentDetails } from '@crossfire/domain/agent/read-agent';
+import type { ListenerRun } from '@crossfire/domain/activity/types';
 export function application(value: PrincipalApplication) {
   return { appliedRevision: value.appliedRevision, appliedStatus: value.appliedStatus, nativeDisplayName: value.nativeDisplayName,
     lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt, errorCode: value.errorCode, errorMessage: value.errorMessage };
@@ -23,5 +23,7 @@ export function agent(value: AgentDetails) {
     status: record.principal.status, revision: record.principal.revision, createdAt: record.principal.createdAt,
     application: application(record.application), activity: { status: activity.status, activeMs: activity.activeMs,
       messagesDelivered: activity.messagesDelivered, lastSeenAt: activity.lastSeenAt, activeRuns: activity.activeRuns.map(listenerRun) },
+    deployment: value.deployment ? { fleetId: value.deployment.fleetId, fleetKey: value.deployment.fleetKey, label: value.deployment.label,
+      controllerName: value.deployment.controllerName, reportedAt: value.deployment.reportedAt, instanceKey: value.deployment.instanceKey } : null,
     allowedActions: value.allowedActions };
 }

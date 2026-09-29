@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { failure, success, type Result } from '../../packages/kernel/src/result.js';
-import type { MatrixAuthority, MatrixEvent, RoomFacts, RoomMembership } from '../../packages/domain/src/port/matrix-authority.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
+import type { MatrixAuthority, MatrixEvent, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';
 export function matrixAuthorityFixture() {
   const accounts = new Map<string, { token: string; displayName: string; active: boolean; password: string }>();
   const rooms = new Map<string, { name: string; creator: string; members: Map<string, RoomMembership> }>();

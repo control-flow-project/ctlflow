@@ -1,13 +1,12 @@
 import { realpathSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeConnection, RuntimeHooks } from '../../agent-core/src/runtime.js';
+import type { RuntimeConnection, RuntimeHooks } from '@crossfire/agent-core/runtime';
 import { connectSession, type CodexOptions, type CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
+import { deliveryState, type HistoryBoundary, type Delivery } from './delivery-state.js';
 
 export type { CodexOptions } from './session.js';
 export type CodexConnection = RuntimeConnection & { verify: () => Promise<void>; event: (event: NativeEvent) => void };
-type HistoryBoundary = { position: number; key: string };
-type Delivery = { turn: string; text: string; messageId: string; boundary: HistoryBoundary | null; initializing: boolean };
 
 function pollInterval(milliseconds: number): number {
   if (!Number.isInteger(milliseconds) || milliseconds < 100 || milliseconds > 30_000) throw new Error('Codex receipt poll interval must be 100..30000 ms');
@@ -19,12 +18,13 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-export function codexDelivery(session: CodexSession, options: { pollMs: number; timeoutMs: number }): CodexConnection {
+export function codexDelivery(session: CodexSession, options: { pollMs: number; timeoutMs: number; receiptFile: string }): CodexConnection {
   const { sessionId, request } = session;
   const pollMs = pollInterval(options.pollMs), timeoutMs = options.timeoutMs;
   const failure = { signal: session.signal };
   let receiveDelivery: ((message: NativeEvent) => void) | undefined;
-  let pendingDelivery: Delivery | undefined;
+  const journal = deliveryState(options.receiptFile, sessionId);
+  let pendingDelivery: Delivery | undefined = journal.pending() ?? undefined;
   async function verify(): Promise<void> {
     const response = object(await request('thread/read', { threadId: sessionId, includeTurns: false }));
     const thread = object(response.thread);
@@ -158,7 +158,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     }
   }
 
-  async function receipt(turnId: string, text: string, messageId: string, boundary: HistoryBoundary | null): Promise<{
+  async function receipt(turnId: string | null, text: string, messageId: string, boundary: HistoryBoundary | null): Promise<{
     status: 'received' | 'pending' | 'interrupted' | 'missing' | 'unavailable'; boundary: HistoryBoundary | null;
   }> {
     let cursor: string | undefined;
@@ -183,10 +183,10 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
         if (boundary && value.boundary.key === boundary.key) return { status: completion ?? 'pending', boundary: newest };
         if (boundary && value.boundary.position < boundary.position) throw new Error('Codex input history lost its verification boundary');
         if (entry.type === 'item' && isReceipt(entry.item, text, messageId)) {
-          if (entry.turnId !== turnId) throw new Error('Codex input receipt belongs to a different turn');
+          if (turnId !== null && entry.turnId !== turnId) throw new Error('Codex input receipt belongs to a different turn');
           return { status: 'received', boundary: newest };
         }
-        if (entry.turnId !== turnId) continue;
+        if (turnId === null || entry.turnId !== turnId) continue;
         if (entry.type === 'turnCompleted') {
           completion = entry.status === 'interrupted' ? 'interrupted' : 'missing';
         } else if (entry.type === 'turnStarted') started = true;
@@ -249,6 +249,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
         delivery.initializing = false;
         status = checked.status;
         if (status === 'received') return true;
+        if (delivery.turn === null) throw new Error('Native input publication is uncertain; retained delivery journal prevents resubmission');
         delivery.boundary = checked.boundary;
         if (status === 'unavailable') {
           if (++unavailable >= 3) throw new Error('Codex did not retain the accepted turn; read positions were not advanced');
@@ -269,18 +270,26 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
   async function settle(): Promise<boolean> {
     if (!pendingDelivery) return false;
     const received = await waitForReceipt(pendingDelivery, failure.signal);
+    journal.complete(pendingDelivery, received);
     pendingDelivery = undefined;
     return received;
   }
 
   async function deliver(text: string, messageId: string, cancelled?: AbortSignal): Promise<void> {
-    if (pendingDelivery || receiveDelivery) throw new Error('Codex input delivery must be sequential; settle the preceding delivery before submitting another');
+    if (receiveDelivery) throw new Error('Codex input delivery must be sequential; settle the preceding delivery before submitting another');
+    if (pendingDelivery) {
+      if (pendingDelivery.messageId !== messageId || pendingDelivery.text !== text) throw new Error('Settle the preceding native delivery before submitting different input');
+      if (await settle()) return;
+    }
+    if (journal.confirmed(text, messageId)) return;
     const deliverySignal = cancelled ? AbortSignal.any([failure.signal, cancelled]) : failure.signal;
     for (;;) {
       deliverySignal.throwIfAborted();
       await verify();
       const history = await historyBoundary();
       deliverySignal.throwIfAborted();
+      pendingDelivery = { turn: null, text, messageId, ...history };
+      journal.prepare(pendingDelivery);
       const result = object(await request('turn/start', {
         threadId: sessionId, clientUserMessageId: messageId,
         input: [{ type: 'text', text, text_elements: [] }],
@@ -288,13 +297,15 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
       const turn = object(result.turn);
       if (typeof turn.id !== 'string' || !turn.id) throw new Error('Codex did not acknowledge a turn; delivery may be uncertain');
       pendingDelivery = { turn: turn.id, text, messageId, ...history };
+      journal.prepare(pendingDelivery);
       const received = await waitForReceipt(pendingDelivery, deliverySignal);
+      journal.complete(pendingDelivery, received);
       pendingDelivery = undefined;
       if (received) return;
     }
   }
 
-  return { sessionId, signal: session.signal, verify, close: session.close, deliver, settle, activeTurn, interrupt,
+  return { sessionId, signal: session.signal, verify, close: session.close, deliver, settle, acknowledge: journal.acknowledge, activeTurn, interrupt,
     event: message => {
       if (message.method === 'thread/closed' && message.params.threadId === sessionId) {
         throw new Error('The selected Codex thread closed; listener delivery stopped');
@@ -309,7 +320,7 @@ export async function connectCodex(options: CodexOptions & { hooks: RuntimeHooks
   let delivery: CodexConnection | undefined;
   const session = await connectSession(options, stop, options.hooks, event => delivery?.event(event));
   try {
-    delivery = codexDelivery(session, { pollMs, timeoutMs: options.timeoutMs ?? 30_000 });
+    delivery = codexDelivery(session, { pollMs, timeoutMs: options.timeoutMs ?? 30_000, receiptFile: options.receiptFile });
     await delivery.verify();
     return delivery;
   } catch (error) { await session.close(); throw error; }

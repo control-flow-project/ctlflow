@@ -1,11 +1,26 @@
 import * as check from './validation.js';
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 import { pagination, listQuery } from './request.js';
 export type PageQuery = { page: number; pageSize: number };
 function checked(input: unknown, allowed: readonly string[]): Result<URLSearchParams> { return listQuery(['page', 'pageSize', ...allowed])(input); }
 export function page(input: unknown) {
   const parsed = checked(input, []);
   return parsed.ok ? pagination(parsed.value) : parsed;
+}
+export function roomGrants(input: unknown): Result<PageQuery & { roomIds?: string[] }> {
+  const parsed = checked(input, ['roomIds']);
+  if (!parsed.ok) return parsed;
+  const bounds = pagination(parsed.value);
+  if (!bounds.ok) return bounds;
+  const source = parsed.value.get('roomIds');
+  if (source === null) return bounds;
+  if (new TextEncoder().encode(source).length > 16384) return failure('invalid', 'Room filter exceeds its size bound');
+  let decoded: unknown;
+  try { decoded = JSON.parse(source); } catch { return failure('invalid', 'roomIds must be a JSON array'); }
+  const roomIds = check.list(check.roomId, 100)(decoded);
+  if (!roomIds.ok) return roomIds;
+  if (new Set(roomIds.value).size !== roomIds.value.length) return failure('invalid', 'Duplicate room filter');
+  return success({ ...bounds.value, roomIds: roomIds.value });
 }
 export function scoped(input: unknown) {
   const parsed = checked(input, ['ownerId']);
@@ -25,7 +40,8 @@ export function agents(input: unknown) {
   if (!bounds.ok) return bounds;
   if (ownerId !== null) { const valid = check.identifier(ownerId); if (!valid.ok) return valid; }
   const statuses: ('active' | 'suspended' | 'revoked')[] = [];
-  for (const value of (params.get('status') ?? 'active,suspended').split(',')) {
+  const selection = params.get('status') ?? 'active,suspended';
+  for (const value of selection === '' ? [] : selection.split(',')) {
     const parsedStatus = check.status(value);
     if (!parsedStatus.ok) return parsedStatus;
     if (statuses.includes(parsedStatus.value)) return failure('invalid', 'Duplicate account status');
@@ -35,6 +51,13 @@ export function agents(input: unknown) {
   if (!listener.ok) return listener;
   if (!check.text(200, 0)(search).ok) return failure('invalid', 'Invalid search');
   return success({ ...bounds.value, statuses, search, listener: listener.value, ...(ownerId === null ? {} : { ownerId }) });
+}
+export function fleets(input: unknown) {
+  const parsed = checked(input, ['ownerId', 'search']); if (!parsed.ok) return parsed;
+  const params = new URLSearchParams(parsed.value), search = params.get('search') ?? ''; params.delete('search');
+  if (!check.text(200, 0)(search).ok) return failure('invalid', 'Invalid search');
+  const scope = scoped(params);
+  return scope.ok ? success({ ...scope.value, search }) : scope;
 }
 export function principals(input: unknown) {
   const parsed = checked(input, ['kind', 'search', 'excludeId']);

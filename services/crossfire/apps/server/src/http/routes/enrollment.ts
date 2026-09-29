@@ -1,11 +1,12 @@
-import { operations } from '../../../../../packages/contracts/src/rest/operations.js';
-import { preflightEnrollment } from '../../../../../packages/domain/src/enrollment/preflight.js';
-import { introduceEnrollment } from '../../../../../packages/domain/src/enrollment/introduce.js';
-import { decideEnrollment } from '../../../../../packages/domain/src/enrollment/decide.js';
-import { exchangeEnrollment } from '../../../../../packages/domain/src/enrollment/exchange.js';
-import { listEnrollments, readEnrollment } from '../../../../../packages/domain/src/enrollment/read-enrollment.js';
-import { listFleets, readFleet } from '../../../../../packages/domain/src/fleet/read-fleet.js';
-import { bind, reply, paged, actor } from '../bind.js';
+import { operations } from '@crossfire/contracts/rest/operations';
+import { preflightEnrollment } from '@crossfire/domain/enrollment/preflight';
+import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
+import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
+import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
+import { listEnrollments, readEnrollment } from '@crossfire/domain/enrollment/read-enrollment';
+import { listFleets, readFleet, listFleetAgents } from '@crossfire/domain/fleet/read-fleet';
+import { changeFleet, removeFleet, bindFleetAgent } from '@crossfire/domain/fleet/change-fleet';
+import { bind, reply, paged, actor, fleetActor, acknowledged } from '../bind.js';
 import * as view from '../representation/enrollment.js';
 import { agent } from '../representation/identity.js';
 export function enrollmentRoutes() {
@@ -18,7 +19,12 @@ export function enrollmentRoutes() {
     bind(operations.decideEnrollment, (context, params, _query, input) => reply(decideEnrollment(context.services, actor(context), params.enrollmentId, input, context.requestId))),
     bind(operations.exchangeEnrollment, (context, params, _query, input) => reply(exchangeEnrollment(context.services, params.enrollmentId, input.claimSecret))),
     bind(operations.fleets, (context, _params, query) => paged(listFleets(context.services, actor(context), query), view.fleet)),
-    bind(operations.fleet, (context, params) => reply(readFleet(context.services, actor(context), params.ownerId, params.fleetKey),
-      value => ({ fleet: view.fleet(value.fleet), instances: value.instances.map(instance => ({ instanceKey: instance.instanceKey, agent: agent(instance.agent) })) }))),
+    bind(operations.fleet, (context, params) => reply(readFleet(context.services, fleetActor(context), params.fleetId), view.fleet)),
+    bind(operations.changeFleet, (context, params, _query, input) => reply(changeFleet(context.services, fleetActor(context), params.fleetId, input, context.requestId), view.fleet)),
+    bind(operations.removeFleet, (context, params, _query, input) => acknowledged(removeFleet(context.services, actor(context), params.fleetId, input.expectedRevision, context.requestId))),
+    bind(operations.fleetAgents, (context, params, query) => paged(listFleetAgents(context.services, fleetActor(context), params.fleetId, query),
+      value => ({ instanceKey: value.instanceKey, agent: agent(value.agent) }))),
+    bind(operations.bindFleetAgent, async (context, params, _query, input) => acknowledged(await bindFleetAgent(context.services, fleetActor(context), params.fleetId, params.agentId, { ...input, remove: false }, context.requestId))),
+    bind(operations.unbindFleetAgent, async (context, params, _query, input) => acknowledged(await bindFleetAgent(context.services, fleetActor(context), params.fleetId, params.agentId, { ...input, remove: true }, context.requestId))),
   ];
 }

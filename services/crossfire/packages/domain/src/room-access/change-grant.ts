@@ -1,4 +1,4 @@
-import { failure, success } from '../../../kernel/src/result.js';
+import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { authorizeGrantChange, type GrantChange } from './authorize-change.js';
 import { commitGrantChange, recheckGrantAuthorization } from './commit-change.js';

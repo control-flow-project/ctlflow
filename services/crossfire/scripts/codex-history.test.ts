@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { connectCodex } from '../packages/adapter-codex/src/connection.js';
-import { listen } from '../packages/agent-core/src/listen.js';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
+import { listen } from '@crossfire/adapter-crossfire/listener';
 import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, THREAD, until } from './test-support/listener.js';
 
 function oldHistory(count: number, completed = true) {

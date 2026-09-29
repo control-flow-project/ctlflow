@@ -3,10 +3,10 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { nativeProvider } from './native-provider.js';
-import { codexDelivery, type CodexConnection } from '../../packages/adapter-codex/src/connection.js';
-import { connectSession } from '../../packages/adapter-codex/src/session.js';
+import { codexDelivery, type CodexConnection } from '@crossfire/adapter-codex/connection';
+import { connectSession } from '@crossfire/adapter-codex/session';
 import { nativeEngine, materialize } from './native-engine.js';
-import type { NativeEvent } from '../../packages/adapter-codex/src/protocol.js';
+import type { NativeEvent } from '@crossfire/adapter-codex/protocol';
 
 type Rpc = { method: string; params: Record<string, unknown> };
 
@@ -39,7 +39,7 @@ export async function nativeCodex(context: TestContext) {
     if (method === 'turn/start') acknowledgements.push({ params: input, turn: (result as { turn: { id: string } }).turn });
     if (method.endsWith('/list')) historyQueries.push({ method, params, result });
     return result;
-  } }, { pollMs: 100, timeoutMs: 10_000 });
+  } }, { pollMs: 100, timeoutMs: 10_000, receiptFile: fixture.receiptFile });
   await adapter.verify();
   const connection = adapter;
   const call = async (method: string, params: unknown) => await session.request(method, params) as Record<string, unknown>;

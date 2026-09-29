@@ -1,5 +1,5 @@
-import type { Services } from '../../../packages/domain/src/port/services.js';
-import { reconcile } from '../../../packages/domain/src/maintenance/reconcile.js';
+import type { Services } from '@crossfire/domain/port/services';
+import { reconcile } from '@crossfire/domain/maintenance/reconcile';
 export function createWorker(services: Services) {
   let running: Promise<void> | undefined, timer: ReturnType<typeof setTimeout> | undefined;
   let pending = false, stopped = false;

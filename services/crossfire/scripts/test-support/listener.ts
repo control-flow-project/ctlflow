@@ -6,15 +6,15 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
-import { API } from '../../packages/matrix/src/http.js';
-import { writeJson, readJson } from '../../packages/files/src/index.js';
-import type { Account, Event, Settings } from '../../packages/contracts/src/client.js';
-import { connectCodex } from '../../packages/adapter-codex/src/connection.js';
-import type { RuntimeHooks } from '../../packages/agent-core/src/runtime.js';
+import { API } from '@crossfire/contracts/matrix';
+import { writeJson, readJson } from '@crossfire/adapter-filesystem/index';
+import type { Account, Event, Settings } from '@crossfire/contracts/client';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
+import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
 import { builtRelease } from './release.js';
-import { emptyActivity } from '../../packages/contracts/src/activity.js';
+import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { serveArtifact } from '../../apps/server/src/artifacts.js';
-import type { WakePolicy } from '../../packages/contracts/src/wake.js';
+import type { WakePolicy } from '@crossfire/contracts/wake';
 
 export const THREAD = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 export const OBSERVER = '@human:test.localhost';
@@ -132,9 +132,9 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   return {
     directory, update, notify, publish: () => { for (const publish of publications.splice(0)) publish(); },
     disconnect: () => { for (const client of server.clients) client.terminate(); },
-    options: { session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', timeoutMs: 2000, pollMs: 100,
+    options: { session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs: 2000, pollMs: 100,
       hooks: { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } },
-    runtime: (signal: AbortSignal, pollMs: number, hooks?: RuntimeHooks, timeoutMs = 2000) => connectCodex({ session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', timeoutMs, pollMs,
+    runtime: (signal: AbortSignal, pollMs: number, hooks?: RuntimeHooks, timeoutMs = 2000) => connectCodex({ session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs, pollMs,
       hooks: hooks ?? { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } }, signal),
     requests: () => requests,
   };
@@ -185,9 +185,10 @@ export async function matrixFixture(t: TestContext, workspace: string) {
     response.writeHead(status, { 'Content-Type': 'application/json' });
     response.end(JSON.stringify(body));
   }
+  function api(response: ServerResponse, data: unknown): void { send(response, { data, meta: { requestId: AGENT_ID } }); }
   const server = createServer(async (request, response) => {
     if (serveArtifact(publication.release, request.method ?? 'GET', request.url ?? '', response)) return;
-    if (request.url !== '/_coord/release' && request.headers.authorization !== 'Bearer ' + account.access_token) {
+    if (request.url !== '/api/releases/current' && request.headers.authorization !== 'Bearer ' + account.access_token) {
       send(response, { errcode: 'M_UNAUTHORIZED' }, 401); return;
     }
     const url = new URL(request.url!, 'http://127.0.0.1');
@@ -199,19 +200,23 @@ export async function matrixFixture(t: TestContext, workspace: string) {
     if (gate) { gates.delete(path); gate.entered(); await gate.wait; }
     const failure = failures.get(path)?.shift();
     if (failure) { send(response, { errcode: 'M_TEST', error: 'Fixture failure' }, failure); return; }
-    if (path === '/_coord/release') {
-      send(response, reporting.current);
-    } else if (path === '/_coord/agents/' + AGENT_ID + '/delivery') {
-      send(response, { id: AGENT_ID, owner: OBSERVER, userId: SELF, ...access, wakePolicy: waking.policy,
-        senders: waking.senders, grants: [...joined].map(room => ({ room, access: 'reply', muted: muted.has(room) })) });
-    } else if (path === '/_coord/agents/' + AGENT_ID) {
-      const grants = [...joined].map(room => ({ room, access: 'reply', muted: muted.has(room) }));
-      send(response, { id: AGENT_ID, owner: OBSERVER, userId: SELF, name: 'Watson (Human)', nativeName: null,
-        ...access, wakePolicy: waking.policy, wakeSenders: [], revision: 0, grantRevision: 0, grants, applied: grants,
-        appliedGrantRevision: 0, appliedRevision: 0, lastSuccess: Date.now(), error: null,
-        activity: emptyActivity() });
-    } else if (path === '/_coord/agents/' + AGENT_ID + '/heartbeat' && request.method === 'POST') {
-      send(response, reporting);
+    if (path === '/api/releases/current') {
+      api(response, reporting.current);
+    } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
+      api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, wakeMode: waking.policy,
+        senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
+        roomGrants: [...joined].map(room => ({ roomId: room, accessMode: 'reply', powerLevel: null, muted: muted.has(room) })) });
+    } else if (path === '/api/agents/' + AGENT_ID) {
+      api(response, { agentId: AGENT_ID, matrixUserId: SELF, name: 'watson', displayName: 'Watson (Human)',
+        owner: { memberId: AGENT_ID, matrixUserId: OBSERVER, displayName: 'Human', status: access.ownerStatus },
+        status: access.status, revision: 0, createdAt: 1,
+        application: { appliedRevision: 0, appliedStatus: 'active', nativeDisplayName: 'Watson (Human)',
+          lastAttemptAt: 1, lastSuccessAt: 1, errorCode: null, errorMessage: null },
+        activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, deployment: null, allowedActions: [] });
+    } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && request.method === 'PUT') {
+      api(response, { disconnect: reporting.disconnect, currentRelease: reporting.current.release });
+    } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
+      send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
     } else if (path === API + '/joined_rooms') {
       send(response, { joined_rooms: [...joined] });
     } else if (path === API + '/sync') {
@@ -277,7 +282,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, access, waking, syncUpdates, failures,
+  return { coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, access, waking, syncUpdates, failures,
     env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
     wake, waiting: () => waiters.size,
     hold: (path: string) => {

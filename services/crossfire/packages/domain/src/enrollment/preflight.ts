@@ -1,15 +1,25 @@
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import type { EnrollmentRoster } from './input.js';
+import { authenticateController } from '../fleet/authority.js';
 import { validateRoster } from './input.js';
 
 export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; revision: number }[] };
-export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'matrix'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
+export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
   const valid = validateRoster(input);
   if (!valid.ok) return valid;
   const owner = services.directory.principalByMatrixId(input.ownerMatrixId);
   if (!owner.ok) return owner;
   if (!owner.value || owner.value.kind !== 'human' || owner.value.status !== 'active') return failure('forbidden', 'An active human owner is required');
+  if (input.fleetKey !== null) {
+    const fleet = services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey: input.fleetKey });
+    if (!fleet.ok) return fleet;
+    if (fleet.value) {
+      const controller = authenticateController(services, input.controllerCredential ?? '');
+      if (!controller.ok) return controller;
+      if (controller.value.fleetId !== fleet.value.id) return failure('forbidden', 'Controller credential belongs to another fleet');
+    } else if (input.controllerCredential !== undefined) return failure('invalid', 'Controller credential has no fleet');
+  }
   const existing: VerifiedRoster['existing'] = [];
   for (const item of input.instances) {
     if (input.fleetKey !== null) {
@@ -34,7 +44,7 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
   return success({ ownerId: owner.value.id, ownerRevision: owner.value.revision, existing });
 }
 
-export async function preflightEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'matrix'>, input: EnrollmentRoster) {
+export async function preflightEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster) {
   const verified = await verifyRoster(services, input);
   if (!verified.ok) return verified;
   const collisions: string[] = [];
@@ -48,5 +58,12 @@ export async function preflightEnrollment(services: Pick<Services, 'repositories
       if (binding.value && !verified.value.existing.some(existing => existing.instanceKey === item.instanceKey && existing.agentId === binding.value!.agentId)) return failure('conflict', 'Missing private credentials for saved fleet instance ' + item.instanceKey);
     }
   }
-  return collisions.length ? failure('conflict', 'Name collision: ' + collisions.join(', ')) : success({ available: true, instances: input.instances.length });
+  if (collisions.length) return failure('name_collision', 'Name collision: ' + collisions.join(', '));
+  const policy = services.repositories.instancePolicy.find({ id: 'instance' });
+  const active = services.directory.activeAgentCount(), owned = services.directory.activeAgentCount(verified.value.ownerId);
+  const pending = services.collection.pendingIdentityCount(), ownedPending = services.collection.pendingIdentityCount(verified.value.ownerId);
+  if (!policy.ok) return policy; if (!active.ok) return active; if (!owned.ok) return owned; if (!pending.ok) return pending; if (!ownedPending.ok) return ownedPending;
+  const additional = input.instances.length - verified.value.existing.length;
+  if (!policy.value || active.value + pending.value + additional > policy.value.maxAgents || owned.value + ownedPending.value + additional > policy.value.maxOwnerAgents) return failure('capacity', 'Agent capacity is insufficient; ask the administrator to adjust instance limits');
+  return success({ available: true, instances: input.instances.length });
 }

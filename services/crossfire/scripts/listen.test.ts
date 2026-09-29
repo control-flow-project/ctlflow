@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import assert from 'node:assert/strict';
 import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
@@ -6,9 +7,9 @@ import { promisify } from 'node:util';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { API } from '../packages/matrix/src/http.js';
-import { writeJson } from '../packages/files/src/index.js';
-import { listen, type ListenerOptions } from '../packages/agent-core/src/listen.js';
+import { API } from '@crossfire/contracts/matrix';
+import { writeJson } from '@crossfire/adapter-filesystem/index';
+import { listen, type ListenerOptions } from '@crossfire/adapter-crossfire/listener';
 import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, SELF, THREAD, until } from './test-support/listener.js';
 import { builtClient, installTestRelease } from './test-support/release.js';
 
@@ -184,9 +185,9 @@ test('foreground CLI emits one session record, stays quiet on idle polls, reject
   t.after(async () => { child.kill('SIGTERM'); await stopped; });
   await until(() => matrix.waiting() === 1, errors);
   for (const command of ['read']) {
-    await assert.rejects(execute(process.execPath, [...base, 'agent', command], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already being held/);
+    await assert.rejects(execute(process.execPath, [...base, 'agent', command], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already owns this private state/);
   }
-  await assert.rejects(execute(process.execPath, args, { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already being held/);
+  await assert.rejects(execute(process.execPath, args, { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already owns this private state/);
   const who = await execute(process.execPath, [...base, 'matrix', 'get-joined-members-by-room', '--room-id', ROOM], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } });
   assert(JSON.parse(who.stdout).joined[SELF]);
   matrix.add(ROOM, message('$one'));
@@ -209,7 +210,7 @@ test('CLI validates listener-only controls before network use', async scope => {
     ['read', '--debounce-ms', '10000'], ['listen', '--runtime', 'codex', '--thread', THREAD],
     ['listen', '--runtime', 'codex', '--codex-socket', '/private/socket'], ['listen', '--runtime', 'codex', '--', '--listen', 'ws://0.0.0.0:1234'],
     ...['', ' ', 'NaN', 'Infinity', '-1', '0.5', '60001'].map(value => ['listen', '--runtime', 'codex', '--debounce-ms=' + value])]) {
-    await assert.rejects(execute(process.execPath, [...base, 'agent', ...args], { env: { ...fixture.env, RUNCODEX_CONNECTION_FILE: '', CODEX_THREAD_ID: '' } }), /Unsupported option|Unknown agent|[Ss]upported|must be|Unknown option|Expected one namespace|runcodex/);
+    await assert.rejects(execute(process.execPath, [...base, 'agent', ...args], { env: { ...fixture.env, RUNCODEX_CONNECTION_FILE: '', CODEX_THREAD_ID: '' } }), /Unsupported option|Unknown command|[Ss]upported|must be|Unknown option|Expected one namespace|runcodex/);
   }
 });
 
@@ -225,7 +226,7 @@ test('foreground SIGINT and SIGHUP close only their attached connection and rece
     await until(() => matrix.waiting() > 0);
     child.kill(signal);
     assert.deepEqual(await stopped, [0, null]);
-    assert.equal(existsSync(join(matrix.workspace, '.crossfire/state/watson/receiver.lock')), false);
+    await (await acquireProcessLock(join(matrix.workspace, '.crossfire/state/watson/receiver')))();
     assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
   }

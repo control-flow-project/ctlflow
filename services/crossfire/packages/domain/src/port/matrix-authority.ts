@@ -1,4 +1,4 @@
-import type { Result } from '../../../kernel/src/result.js';
+import type { Result } from '@crossfire/kernel/result';
 export type MatrixAccount = { userId: string; accessToken: string; deviceId: string };
 export type RoomFacts = {
   roomId: string; name: string; topic: string; alias: string | null;

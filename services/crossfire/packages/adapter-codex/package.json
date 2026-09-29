@@ -8,9 +8,17 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
+    "ws": "8.21.3",
     "@crossfire/contracts": "0.1.0",
+    "@crossfire/kernel": "0.1.0",
     "@crossfire/agent-core": "0.1.0",
-    "@crossfire/files": "0.1.0",
-    "ws": "8.21.3"
+    "@crossfire/adapter-filesystem": "0.1.0"
+  },
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "source": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
   }
 }

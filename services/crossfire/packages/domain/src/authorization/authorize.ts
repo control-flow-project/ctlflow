@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { PermissionCode } from './catalog.js';
 import type { Actor, Services } from '../port/services.js';
 import type { Principal } from '../identity/types.js';

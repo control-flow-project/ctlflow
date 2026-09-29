@@ -1,4 +1,4 @@
-import type { Member } from '../../../../domain/src/identity/types.js';
+import type { Member } from '@crossfire/domain/identity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapMember(row: Tables['member']): Member {
   return {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
-import { connectCodex } from '../packages/adapter-codex/src/connection.js';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
 import { fakeCodex, inputReceipt, THREAD, until } from './test-support/listener.js';
 
 test('native delivery verifies the selected workspace and uses only start-or-steer without policy overrides', async t => {
@@ -109,7 +109,7 @@ test('another native thread closing does not stop the selected connection', asyn
 test('invalid destinations and credentials fail before native requests', async t => {
   const fixture = await fakeCodex(t);
   const signal = new AbortController().signal;
-  await assert.rejects(connectCodex({ ...fixture.options, session: 'latest' }, signal), /exact loaded Codex session UUID/);
+  await assert.rejects(connectCodex({ ...fixture.options, session: 'latest' }, signal), /exact Codex session UUID/);
   await assert.rejects(connectCodex({ ...fixture.options, endpoint: 'ws://public:1234' }, signal), /loopback/);
   await assert.rejects(connectCodex({ ...fixture.options, token: '' }, signal), /bearer token/);
   for (const pollMs of [0, 99, 30_001, NaN, Infinity]) {

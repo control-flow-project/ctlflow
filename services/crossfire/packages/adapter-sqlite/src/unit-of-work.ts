@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
-import type { Result } from '../../kernel/src/result.js';
-import type { UnitOfWork } from '../../domain/src/port/unit-of-work.js';
+import type { Result } from '@crossfire/kernel/result';
+import type { UnitOfWork } from '@crossfire/domain/port/unit-of-work';
 
 export function createUnitOfWork(database: Database.Database): UnitOfWork {
   return {

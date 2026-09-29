@@ -1,5 +1,7 @@
 export const enrollmentSchema = `
 CREATE TABLE enrollment_request (
+  controller_name TEXT,
+  controller_credential_hash TEXT,
   id TEXT NOT NULL,
   owner_id TEXT NOT NULL,
   fleet_key TEXT,
@@ -16,6 +18,7 @@ CREATE TABLE enrollment_request (
   FOREIGN KEY(owner_id) REFERENCES member(principal_id),
   FOREIGN KEY(decided_by_member_id) REFERENCES member(principal_id),
   UNIQUE(verification_code),
+  CHECK((fleet_key IS NULL AND controller_name IS NULL AND controller_credential_hash IS NULL) OR (fleet_key IS NOT NULL AND controller_name IS NOT NULL AND controller_credential_hash IS NOT NULL)),
   CHECK(status IN ('pending','approved','rejected','expired')),
   CHECK(revision >= 0),
   CHECK(expires_at > created_at),
@@ -56,6 +59,11 @@ CREATE TABLE agent_name (
 
 
 CREATE TABLE fleet (
+  id TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  controller_name TEXT NOT NULL,
+  revision INTEGER NOT NULL CHECK(revision >= 0),
+  updated_at INTEGER NOT NULL,
   owner_id TEXT NOT NULL,
   fleet_key TEXT NOT NULL,
   created_at INTEGER NOT NULL,
@@ -71,8 +79,36 @@ CREATE TABLE fleet_instance (
   agent_id TEXT NOT NULL,
   PRIMARY KEY (owner_id, fleet_key, instance_key),
   UNIQUE(agent_id),
-  FOREIGN KEY(owner_id, fleet_key) REFERENCES fleet(owner_id, fleet_key),
+  FOREIGN KEY(owner_id, fleet_key) REFERENCES fleet(owner_id, fleet_key) ON DELETE CASCADE,
   FOREIGN KEY(agent_id, owner_id) REFERENCES agent(principal_id, owner_id)
 ) STRICT;
 
+CREATE TABLE fleet_credential (
+  id TEXT NOT NULL,
+  fleet_id TEXT NOT NULL,
+  secret_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  revoked_at INTEGER,
+  PRIMARY KEY (id),
+  FOREIGN KEY(fleet_id) REFERENCES fleet(id) ON DELETE CASCADE
+) STRICT;
+
+CREATE TABLE fleet_controller_metadata (
+  fleet_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (fleet_id, key),
+  FOREIGN KEY(fleet_id) REFERENCES fleet(id) ON DELETE CASCADE
+) STRICT;
+
+CREATE TABLE enrollment_controller_metadata (
+  enrollment_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (enrollment_id, key),
+  FOREIGN KEY(enrollment_id) REFERENCES enrollment_request(id) ON DELETE CASCADE
+) STRICT;
+
+CREATE INDEX ix_fleet_credential_fleet ON fleet_credential(fleet_id, revoked_at);
+CREATE INDEX ix_fleet_created ON fleet(created_at, fleet_key);
 `;

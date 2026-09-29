@@ -1,4 +1,4 @@
-import { success } from '../../../kernel/src/result.js';
+import { success } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import type { AgentRecord } from '../port/directory.js';
 

@@ -1,4 +1,4 @@
-import type { AgentName } from '../../../../domain/src/enrollment/types.js';
+import type { AgentName } from '@crossfire/domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapAgentName(row: Tables['agent_name']): AgentName {
   return {

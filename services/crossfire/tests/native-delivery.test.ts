@@ -1,12 +1,14 @@
+import { localState as storage } from '@crossfire/adapter-filesystem/state';
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
-import { API, matrix, segment } from "../packages/matrix/src/http.js";
-import { acknowledge, loadCursors, readUnread, synchronize } from "../packages/agent-core/src/receive.js";
-import type { Settings } from "../packages/contracts/src/client.js";
-import { captureWake, collectBatch, pendingBatch, wakeEvent } from '../packages/agent-core/src/delivery.js';
+import { API, segment } from '@crossfire/contracts/matrix';
+import { matrix } from '@crossfire/adapter-matrix/http';
+import { acknowledge, loadCursors, readUnread, synchronize } from "@crossfire/agent-core/receive";
+import type { Settings } from "@crossfire/contracts/client";
+import { captureWake, collectBatch, pendingBatch, wakeEvent } from '@crossfire/agent-core/delivery';
 
 test("native unread recovery delivers selected state notices once and keeps receipts private", { timeout: 120_000 }, async scope => {
   mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
@@ -26,8 +28,8 @@ test("native unread recovery delivers selected state notices once and keeps rece
   const room = created.room_id;
   const path = API + "/rooms/" + segment(room);
   await agent.post(path + "/join", {});
-  const first = await readUnread(agent, settings, cursorFile, 100);
-  await acknowledge(agent, cursorFile, first);
+  const first = await readUnread(storage, agent, settings, cursorFile, 100);
+  await acknowledge(storage, agent, cursorFile, first);
   assert.equal(existsSync(cursorFile + ".ack"), false);
   const ownerSync = await owner.get<{ next_batch: string }>(API + "/sync", { timeout: 0 });
   const expected: { event_id: string; type: string; content: unknown }[] = [];
@@ -46,7 +48,7 @@ test("native unread recovery delivers selected state notices once and keeps rece
   await owner.put(path + "/state/m.room.avatar/", { url: "mxc://architecture.localhost/not-a-real-file" });
   const message = await owner.put<{ event_id: string }>(path + "/send/m.room.message/one", { msgtype: "m.text", body: "Live message" });
   expected.push({ event_id: message.event_id, type: "m.room.message", content: { msgtype: "m.text", body: "Live message" } });
-  const batch = await readUnread(agent, settings, cursorFile, 100);
+  const batch = await readUnread(storage, agent, settings, cursorFile, 100);
   for (const event of expected) {
     const received = batch.events.filter(candidate => candidate.event_id === event.event_id);
     assert.equal(received.length, 1);
@@ -57,11 +59,11 @@ test("native unread recovery delivers selected state notices once and keeps rece
   }
   assert(batch.events.some(event => event.type === "m.room.member" && event.state_key === guestAccount.id && event.content.membership === "invite"));
   assert.equal(batch.events.some(event => event.type === "m.room.avatar"), false);
-  assert.deepEqual((await readUnread(agent, settings, cursorFile, 100)).events, batch.events);
-  await acknowledge(agent, cursorFile, batch);
-  assert.deepEqual(loadCursors(cursorFile), batch.cursors);
+  assert.deepEqual((await readUnread(storage, agent, settings, cursorFile, 100)).events, batch.events);
+  await acknowledge(storage, agent, cursorFile, batch);
+  assert.deepEqual(loadCursors(storage, cursorFile), batch.cursors);
   assert.equal(existsSync(cursorFile + ".ack"), false);
-  assert.deepEqual((await readUnread(agent, settings, cursorFile, 100)).events, []);
+  assert.deepEqual((await readUnread(storage, agent, settings, cursorFile, 100)).events, []);
   const readState = await agent.get<{ event_id: string }>(API + "/user/" + segment(agentAccount.id)
     + "/rooms/" + segment(room) + "/account_data/m.fully_read");
   assert.equal(readState.event_id, message.event_id);
@@ -75,29 +77,29 @@ test("native unread recovery delivers selected state notices once and keeps rece
     "m.room.power_levels", "m.room.member", "m.room.message"].includes(event.type)));
   const guest = matrix({ base: fixture.base, token: guestAccount.token });
   await guest.post(path + '/join', {});
-  await acknowledge(agent, cursorFile, await readUnread(agent, settings, cursorFile, 100));
+  await acknowledge(storage, agent, cursorFile, await readUnread(storage, agent, settings, cursorFile, 100));
   const contextIds: string[] = [];
   for (let index = 0; index < 5; index++) {
     const sent = await guest.put<{ event_id: string }>(path + '/send/m.room.message/context-' + index, { msgtype: 'm.text', body: 'Pending context ' + index });
     contextIds.push(sent.event_id);
   }
   const allowed = new Set([room]), senders = new Set([ownerAccount.id]);
-  const before = loadCursors(cursorFile);
-  const waiting = await pendingBatch(agent, settings, cursorFile, 2, undefined, 65536, undefined, allowed);
+  const before = loadCursors(storage, cursorFile);
+  const waiting = await pendingBatch(storage, agent, settings, cursorFile, 2, undefined, 65536, undefined, allowed);
   assert.equal(await wakeEvent(agent, waiting, senders, allowed, undefined, async () => true), undefined);
-  assert.deepEqual(loadCursors(cursorFile), before);
+  assert.deepEqual(loadCursors(storage, cursorFile), before);
   const waking = await owner.put<{ event_id: string }>(path + '/send/m.room.message/wake', { msgtype: 'm.text', body: 'Owner wake' });
   assert.equal(await wakeEvent(agent, waiting, new Set(), allowed, undefined, async () => true), undefined);
-  assert.deepEqual(loadCursors(cursorFile), before);
+  assert.deepEqual(loadCursors(storage, cursorFile), before);
   const trigger = await wakeEvent(agent, waiting, senders, allowed, undefined, async () => true);
   assert.equal(trigger?.event_id, waking.event_id);
   const cycle = await captureWake(agent, trigger!, allowed, filtered.next_batch);
   const later = await guest.put<{ event_id: string }>(path + '/send/m.room.message/after-window', { msgtype: 'm.text', body: 'Wait for the next wake' });
-  const collection = await collectBatch(agent, settings, cursorFile, waiting, 2, undefined, 65536, cycle, allowed);
+  const collection = await collectBatch(storage, agent, settings, cursorFile, waiting, 2, undefined, 65536, cycle, allowed);
   assert.deepEqual(collection.events.map(event => event.event_id), [...contextIds, waking.event_id]);
-  assert.deepEqual(loadCursors(cursorFile), before);
-  await acknowledge(agent, cursorFile, collection);
-  const pending = await pendingBatch(agent, settings, cursorFile, 2, undefined, 65536, filtered.next_batch, allowed);
+  assert.deepEqual(loadCursors(storage, cursorFile), before);
+  await acknowledge(storage, agent, cursorFile, collection);
+  const pending = await pendingBatch(storage, agent, settings, cursorFile, 2, undefined, 65536, filtered.next_batch, allowed);
   assert.deepEqual(pending.events.map(event => event.event_id), [later.event_id]);
   assert.equal(await wakeEvent(agent, pending, senders, allowed, undefined, async () => true), undefined);
 });

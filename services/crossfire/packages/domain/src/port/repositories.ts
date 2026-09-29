@@ -1,7 +1,7 @@
-import type { Result } from '../../../kernel/src/result.js';
+import type { Result } from '@crossfire/kernel/result';
 import type { Principal, Member, Agent, AgentCredential, PrincipalApplication } from '../identity/types.js';
 import type { Permission, Role, RolePermission, PrincipalRole } from '../authorization/types.js';
-import type { EnrollmentRequest, EnrollmentItem, AgentName, Fleet, FleetInstance } from '../enrollment/types.js';
+import type { FleetControllerMetadata, EnrollmentControllerMetadata, FleetCredential, EnrollmentRequest, EnrollmentItem, AgentName, Fleet, FleetInstance } from '../enrollment/types.js';
 import type { AgentRoomGrant, AgentRoomPermission, RoomGrantApplication, AgentWakeSender } from '../room-access/types.js';
 import type { MemberInvitation, MemberSession, ListenerRun, WakeNotice } from '../activity/types.js';
 import type { InstancePolicy, AuditEvent } from '../audit/types.js';
@@ -90,6 +90,8 @@ export type AgentNameRepository = {
 
 export type FleetKey = { ownerId: string; fleetKey: string };
 export type FleetRepository = {
+  findById(id: string): Result<Fleet | null>;
+  remove(key: FleetKey): Result<void>;
   find(key: FleetKey): Result<Fleet | null>;
   insert(value: Fleet): Result<void>;
   update(value: Fleet): Result<void>;
@@ -97,6 +99,7 @@ export type FleetRepository = {
 
 export type FleetInstanceKey = { ownerId: string; fleetKey: string; instanceKey: string };
 export type FleetInstanceRepository = {
+  remove(key: FleetInstanceKey): Result<void>;
   find(key: FleetInstanceKey): Result<FleetInstance | null>;
   insert(value: FleetInstance): Result<void>;
   update(value: FleetInstance): Result<void>;
@@ -174,7 +177,31 @@ export type AuditEventRepository = {
   insert(value: AuditEvent): Result<void>;
 };
 
+export type FleetCredentialRepository = {
+  find(key: { id: string }): Result<FleetCredential | null>;
+  insert(value: FleetCredential): Result<void>;
+  update(value: FleetCredential): Result<void>;
+  remove(key: { id: string }): Result<void>;
+};
+
+export type FleetControllerMetadataRepository = {
+  find(key: { fleetId: string; key: string }): Result<FleetControllerMetadata | null>;
+  insert(value: FleetControllerMetadata): Result<void>;
+  update(value: FleetControllerMetadata): Result<void>;
+  remove(key: { fleetId: string; key: string }): Result<void>;
+};
+
+export type EnrollmentControllerMetadataRepository = {
+  find(key: { enrollmentId: string; key: string }): Result<EnrollmentControllerMetadata | null>;
+  insert(value: EnrollmentControllerMetadata): Result<void>;
+  update(value: EnrollmentControllerMetadata): Result<void>;
+  remove(key: { enrollmentId: string; key: string }): Result<void>;
+};
+
 export type Repositories = {
+  enrollmentControllerMetadata: EnrollmentControllerMetadataRepository;
+  fleetControllerMetadata: FleetControllerMetadataRepository;
+  fleetCredential: FleetCredentialRepository;
   principal: PrincipalRepository;
   member: MemberRepository;
   agent: AgentRepository;

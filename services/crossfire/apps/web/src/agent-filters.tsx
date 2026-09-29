@@ -1,18 +1,28 @@
 import { useState } from 'react';
-import { AGENT_STATUSES, LISTENER_STATUSES, DEFAULT_AGENT_STATUSES, type AgentFilters } from '../../../packages/contracts/src/agent-filters.js';
-
-export function AgentDirectoryFilters({ initial, administrator }: { initial: AgentFilters; administrator: boolean }) {
-  const [value, setValue] = useState(initial);
-  function apply() {
-    const query = new URLSearchParams();
-    if (value.statuses.join(',') !== DEFAULT_AGENT_STATUSES.join(',')) query.set('status', value.statuses.join(','));
-    if (value.listener !== 'all') query.set('listener', value.listener);
-    location.assign('/manage/agents' + (query.size ? '?' + query : ''));
-  }
-  return <form className="directory-filters" aria-label="Filter agents" onSubmit={event => { event.preventDefault(); apply(); }}>
-    <fieldset className="filter-accounts"><legend>Account access</legend><div>{AGENT_STATUSES.map(status => <label className="check" key={status}><input type="checkbox" checked={value.statuses.includes(status)} onChange={event => setValue({ ...value, statuses: AGENT_STATUSES.filter(item => item === status ? event.target.checked : value.statuses.includes(item)) })}/>{'Show ' + status}</label>)}</div></fieldset>
-    <div className="filter-listener"><label htmlFor="listener-status">Listener status</label><select id="listener-status" value={value.listener} onChange={event => setValue({ ...value, listener: event.target.value as AgentFilters['listener'] })}>{LISTENER_STATUSES.map(status => <option key={status} value={status}>{status === 'all' ? 'All listeners' : status[0]!.toUpperCase() + status.slice(1)}</option>)}</select></div>
-    <div className="filter-actions"><button type="submit">Apply filters</button><a href="/manage/agents">Reset filters</a></div>
-    <p className="filter-scope">{administrator ? 'All owners · administrator view' : 'Only agents you own'} · account access and listener activity are separate.</p>
+import { useSession } from './session.js';
+import { operations, useResource } from './api.js';
+import { Field, Loaded } from './ui.js';
+import { filterQuery } from './form.js';
+export function OwnerFilter() {
+  const [number, setNumber] = useState(1), [selected, setSelected] = useState(new URLSearchParams(location.search).get('ownerId') ?? '');
+  const [label, setLabel] = useState(selected), resource = useResource(operations.members, {}, 'pageSize=50&page=' + number);
+  return <div className="owner-filter"><Loaded {...resource} retry={resource.refresh}>{page => <><Field label="Owner">{id => <select id={id} name="ownerId" value={selected} onChange={event => {
+    setSelected(event.target.value); setLabel(event.target.selectedOptions[0]?.textContent ?? '');
+  }}><option value="">All owners</option>{selected && !page.data.some(member => member.memberId === selected) && <option value={selected}>{label}</option>}
+    {page.data.map(member => <option value={member.memberId} key={member.memberId}>{member.displayName} · {member.matrixUserId}</option>)}</select>}</Field>
+    {(page.meta.totalPages ?? 0) > 1 && <div className="pagination"><button type="button" disabled={number <= 1} onClick={() => setNumber(number - 1)}>Previous owners</button><span>Page {number}</span>
+      <button type="button" disabled={number >= (page.meta.totalPages ?? 0)} onClick={() => setNumber(number + 1)}>Next owners</button></div>}</>}</Loaded></div>;
+}
+export function AgentFilters() {
+  const viewer = useSession(), query = new URLSearchParams(location.search);
+  const [statuses, setStatuses] = useState((query.get('status') ?? 'active,suspended').split(',').filter(Boolean));
+  return <form className="filter-bar" onSubmit={event => {
+    event.preventDefault(); const next = filterQuery(event.currentTarget);
+    next.set('status', ['active', 'suspended', 'revoked'].filter(status => statuses.includes(status)).join(',')); location.assign('/manage/agents?' + next);
+  }}><label>Search agents<input name="search" type="search" defaultValue={query.get('search') ?? ''}/></label>
+    <Field label="Listener status">{id => <select id={id} name="listener" defaultValue={query.get('listener') ?? 'all'}><option value="all">All listeners</option><option value="online">Online</option><option value="offline">Offline</option><option value="disconnecting">Disconnecting</option></select>}</Field>
+    {viewer.permissions.includes('agent.read.any') && <OwnerFilter/>}
+    <fieldset className="filter-accounts"><legend>Account status</legend><div>{['active', 'suspended', 'revoked'].map(status => <label key={status} className="check"><input type="checkbox" checked={statuses.includes(status)} onChange={event => setStatuses(previous => event.target.checked ? [...previous, status] : previous.filter(value => value !== status))}/>Show {status}</label>)}</div></fieldset>
+    <div className="filter-actions"><button>Apply filters</button><a href="/manage/agents">Reset</a></div>
   </form>;
 }

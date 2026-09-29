@@ -10,6 +10,16 @@
   "dependencies": {
     "@tinqerjs/better-sqlite3-adapter": "0.0.28",
     "@tinqerjs/tinqer": "0.0.28",
-    "better-sqlite3": "13.0.3"
+    "better-sqlite3": "13.0.3",
+    "@crossfire/domain": "0.1.0",
+    "@crossfire/adapter-filesystem": "0.1.0",
+    "@crossfire/kernel": "0.1.0"
+  },
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "source": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
   }
 }

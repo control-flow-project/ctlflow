@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { realpathSync, openSync, closeSync, fstatSync, readFileSync, constants } from 'node:fs';
-import { fields } from '../../contracts/src/management.js';
-import { UUID } from '../../contracts/src/client.js';
-import { readJson } from '../../files/src/index.js';
+import { fields } from '@crossfire/contracts/validation';
+import { UUID } from '@crossfire/contracts/client';
+import { readJson } from '@crossfire/adapter-filesystem/index';
 import { connectCodex } from './connection.js';
-import type { RuntimeAdapter } from '../../agent-core/src/runtime.js';
+import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
 
 export function discoverCodex(workspace: string, environment: NodeJS.ProcessEnv = process.env) {
   const file = environment.RUNCODEX_CONNECTION_FILE;
@@ -27,6 +27,7 @@ export function discoverCodex(workspace: string, environment: NodeJS.ProcessEnv 
     if (!token || /\s/u.test(token)) throw new Error('Invalid launcher credential');
   } finally { closeSync(descriptor); }
   const binding = createHash('sha256').update(JSON.stringify([realpathSync(file), endpoint, session, realpathSync(workspace), token])).digest('hex');
-  const runtime: RuntimeAdapter = (stop, pollMs, hooks) => connectCodex({ workspace, session, endpoint, token, pollMs, timeoutMs: 30_000, hooks }, stop);
+  const receiptFile = join(workspace, '.crossfire', 'runtime', session + '.receipt');
+  const runtime: RuntimeAdapter = (stop, pollMs, hooks) => connectCodex({ workspace, session, endpoint, token, receiptFile, pollMs, timeoutMs: 30_000, hooks }, stop);
   return { name: 'codex', session, binding, runtime };
 }

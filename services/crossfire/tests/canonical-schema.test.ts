@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openStore } from '../packages/adapter-sqlite/src/open-store.js';
-import { createRepositories } from '../packages/adapter-sqlite/src/create-repositories.js';
-import { createDirectoryRepository } from '../packages/adapter-sqlite/src/repository/directory/index.js';
-import { createUnitOfWork } from '../packages/adapter-sqlite/src/unit-of-work.js';
-import { createDiscoveryRepository } from '../packages/adapter-sqlite/src/repository/discovery/index.js';
-import { createListenerReadRepository } from '../packages/adapter-sqlite/src/repository/listener-read/index.js';
-import { failure, success, type Result } from '../packages/kernel/src/result.js';
+import { openStore } from '@crossfire/adapter-sqlite/open-store';
+import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
+import { createDirectoryRepository } from '@crossfire/adapter-sqlite/repository/directory/index';
+import { createUnitOfWork } from '@crossfire/adapter-sqlite/unit-of-work';
+import { createDiscoveryRepository } from '@crossfire/adapter-sqlite/repository/discovery/index';
+import { createListenerReadRepository } from '@crossfire/adapter-sqlite/repository/listener-read/index';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 
 function value<T>(result: Result<T>): T { if (!result.ok) assert.fail(result.error.message); return result.value; }
 
@@ -17,7 +17,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     const directory = createDirectoryRepository(database);
     const unit = createUnitOfWork(database);
     const tables = database.prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string; sql: string }[];
-    assert.equal(tables.length, 24);
+    assert.equal(tables.length, 27);
     assert(tables.every(table => !/json_valid/iu.test(table.sql)));
     assert.deepEqual(database.pragma('foreign_key_check'), []);
     assert.deepEqual(database.pragma('integrity_check'), [{ integrity_check: 'ok' }]);

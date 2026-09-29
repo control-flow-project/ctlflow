@@ -1,6 +1,6 @@
-import type { AgentRoomGrant, RoomGrantApplication } from '../../../../../packages/domain/src/room-access/types.js';
-import type { RoomDetails } from '../../../../../packages/domain/src/room/read-room.js';
-import type { GrantPlanPreview } from '../../../../../packages/domain/src/room-access/grant-plan.js';
+import type { AgentRoomGrant, RoomGrantApplication } from '@crossfire/domain/room-access/types';
+import type { RoomDetails } from '@crossfire/domain/room/read-room';
+import type { GrantPlanPreview } from '@crossfire/domain/room-access/grant-plan';
 export function grant(value: AgentRoomGrant) {
   return { agentId: value.agentId, roomId: value.roomId, generation: value.generation, authorizerId: value.authorizerId, addedById: value.addedById,
     accessMode: value.accessMode, powerLevel: value.powerLevel, muted: value.muted, revision: value.revision, accessRevision: value.accessRevision, updatedAt: value.updatedAt };
@@ -25,7 +25,8 @@ export function plan(value: GrantPlanPreview) {
   return { digest: value.digest, snapshots: value.snapshots.map(snapshot => ({ agentId: snapshot.agentId, revision: snapshot.revision,
     grants: snapshot.grants.map(item => ({ roomId: item.roomId, generation: item.generation, revision: item.revision })) })),
     changes: value.changes.map(change => ({ agentId: change.input.agentId, roomId: change.input.roomId,
+      agentName: change.agentName, instanceKey: change.instanceKey, roomName: change.roomName, roomAlias: change.roomAlias,
       before: change.previous ? grant(change.previous) : null,
       after: change.input.accessMode === 'none' ? null : { roomId: change.input.roomId, accessMode: change.input.accessMode, powerLevel: change.input.powerLevel, muted: change.input.muted },
-      changed: change.changed, authorizerId: change.authorizerId, nativePowerLevel: change.native?.powerLevel ?? null })) };
+      changed: change.changed, authorizerId: change.authorizerId, nativePowerLevel: change.native?.powerLevel ?? null, nativeCreator: change.native?.creator ?? false })) };
 }

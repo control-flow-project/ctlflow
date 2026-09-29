@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { buildRelease } from "../scripts/build-release.js";
-import { artifactHash, releaseHash, loadRelease, type Release } from "../packages/files/src/release.js";
-import { ARTIFACTS, type ArtifactName, type Manifest } from '../packages/contracts/src/release.js';
+import { artifactHash, releaseHash, loadRelease, type Release } from "@crossfire/adapter-filesystem/release";
+import { ARTIFACTS, type ArtifactName, type Manifest } from '@crossfire/contracts/release';
 
 export function updatedRelease(release: Release, name: ArtifactName, content: string): Release {
   const files = { ...release.files, [name]: Buffer.from(content) };

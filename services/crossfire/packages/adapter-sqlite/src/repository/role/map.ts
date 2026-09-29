@@ -1,4 +1,4 @@
-import type { Role } from '../../../../domain/src/authorization/types.js';
+import type { Role } from '@crossfire/domain/authorization/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapRole(row: Tables['role']): Role {
   return {

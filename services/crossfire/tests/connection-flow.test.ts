@@ -1,23 +1,17 @@
+import { nativeServer } from './support/native-server.js';
+import { value } from './support/application.js';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { once } from 'node:events';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { conduitFixture } from '../scripts/architecture-proof/conduit-fixture.js';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { nativeProvider } from '../scripts/test-support/native-provider.js';
 import { until } from '../scripts/test-support/listener.js';
 import { builtRelease } from '../scripts/test-support/release.js';
-import { openStore } from '../apps/server/src/data/database.js';
-import * as queries from '../apps/server/src/data/queries.js';
-import { context, secret } from '../apps/server/src/context.js';
-import { httpService } from '../apps/server/src/http.js';
-import { publicRouter } from '../apps/server/src/router.js';
-import { reconciler } from '../apps/server/src/reconcile.js';
-import { readJson } from '../packages/files/src/index.js';
-import { onboardingCommand, onboardingUrl } from '../packages/contracts/src/onboarding.js';
+import { readJson } from '@crossfire/adapter-filesystem/index';
+import { onboardingCommand, onboardingUrl } from '@crossfire/contracts/onboarding';
 
 const execute = promisify(execFile);
 
@@ -29,27 +23,9 @@ test('published bootstrap connects a real Codex session after native human appro
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, project, ['-c', 'sandbox_mode="danger-full-access"']);
   await materialize(engine, provider);
-  const jwtSecret = secret();
-  const native = await conduitFixture(scope, { jwtSecret });
-  await native.register('crossfire-onboarding');
-  const human = await native.register('admin');
-  const store = openStore(':memory:');
-  const ctx = context(store, { instance: 'onboarding', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1',
-    matrixOrigin: native.base, administrator: human.id, registrationSecret: native.registrationToken, jwtSecret });
-  const worker = reconciler(ctx);
-  const release = builtRelease().release;
-  const server = httpService(ctx, worker, release);
-  server.listen(0, '127.0.0.1'); await once(server, 'listening');
-  const address = server.address(); assert(address && typeof address === 'object');
-  const routes = { publicOrigin: ctx.config.publicOrigin, matrixOrigin: native.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
-    web: join(process.cwd(), 'dist/web'), element: join(process.cwd(), 'dist/web') };
-  const router = publicRouter(routes);
-  router.listen(0, '127.0.0.1'); await once(router, 'listening');
-  const publicAddress = router.address(); assert(publicAddress && typeof publicAddress === 'object');
-  const origin = 'http://127.0.0.1:' + publicAddress.port;
-  routes.publicOrigin = origin;
-  ctx.config.publicOrigin = origin;
-  scope.after(async () => { ctx.native.close(); router.closeAllConnections(); server.closeAllConnections(); await new Promise<void>(resolve => router.close(() => resolve())); await new Promise<void>(resolve => server.close(() => resolve())); await worker.stop(); store.close(); });
+  const release = builtRelease().release, fixture = await nativeServer(scope, release);
+  const { services, origin, worker, admin } = fixture;
+  const human = { id: admin.member.principal.matrixUserId, token: admin.token };
   const environment = { ...process.env, RUNCODEX_CONNECTION_FILE: join(home, 'connection.json'), CODEX_THREAD_ID: engine.session, CROSSFIRE_AGENT_NAME: 'holmes' };
   const guide = await fetch(onboardingUrl(origin, human.id));
   assert.equal(guide.status, 200);
@@ -60,18 +36,18 @@ test('published bootstrap connects a real Codex session after native human appro
   const connection = execute('bash', ['-c', command], { cwd: project, env: environment, timeout: 60_000, maxBuffer: 256 * 1024 });
   void connection.catch(() => {});
   const pendingFile = join(project, '.crossfire/profiles/holmes.pending.json');
-  await until(() => existsSync(pendingFile));
+  await until(() => existsSync(pendingFile) && readJson<{ code: string }>(pendingFile).code.length === 12);
   const pending = readJson<{ code: string; request: string }>(pendingFile);
-  assert.equal(queries.agents(store, '', true).length, 0);
+  assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 0);
   assert.equal(provider.requests.length, 0);
-  const login = await fetch(origin + '/_coord/session', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: human.token }) });
-  assert.equal(login.status, 200);
-  const session = await login.json() as { csrf: string };
+  const login = await fetch(origin + '/api/sessions', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ nativeAccessToken: human.token }) });
+  assert.equal(login.status, 201);
+  const session = await login.json() as { data: { csrfSecret: string } };
   const cookie = login.headers.get('set-cookie')!.split(';', 1)[0]!;
-  const approval = await fetch(origin + '/_coord/enrollments/' + pending.request + '/decision', { method: 'POST',
-    headers: { Origin: origin, Cookie: cookie, 'X-Crossfire-CSRF': session.csrf, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ decision: 'approve', code: pending.code }) });
-  assert.equal(approval.status, 200);
+  const approval = await fetch(origin + '/api/enrollments/' + pending.request + '/decision', { method: 'POST',
+    headers: { Origin: origin, Cookie: cookie, 'X-Crossfire-CSRF': session.data.csrfSecret, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedRevision: 0, decision: 'approve', verificationCode: pending.code }) });
+  assert.equal(approval.status, 202);
   await worker.drain();
   const result = await connection;
   assert(result.stdout.includes('"status": "listening"'));
@@ -85,7 +61,7 @@ test('published bootstrap connects a real Codex session after native human appro
   assert(repeated.stdout.includes('"status": "listening"'));
   assert.deepEqual(readFileSync(join(project, '.crossfire/profiles/holmes.json')), profile);
   assert.deepEqual(readFileSync(join(project, '.crossfire/state/holmes/listener.json')), lease);
-  assert.equal(queries.agents(store, '', true).length, 1);
+  assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1);
   assert.equal(provider.requests.length, 0, 'Setup and reconnect must not submit model input');
   assert(readFileSync(join(project, '.gitignore'), 'utf8').includes('.crossfire/'));
   await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: environment });

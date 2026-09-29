@@ -1,22 +1,13 @@
-import type { ActivityView } from '../../../packages/contracts/src/activity.js';
-import { HEARTBEAT_MS } from '../../../packages/contracts/src/activity.js';
-import { manifest } from '../../../packages/contracts/src/release.js';
-import { useResource } from './api.js';
-import { Loaded, Panel, Status, timestamp } from './ui.js';
-
-export function ReleaseStatus({ installed, current }: { installed: string | null; current: string }) {
-  return <Status value={installed === null ? 'Not reported' : installed === current ? 'Current' : 'Update available'}/>;
-}
-
-export function ListenerVersions({ activity }: { activity: ActivityView }) {
-  const current = useResource('/_coord/release', manifest, HEARTBEAT_MS);
-  return <Panel title="Listener software"><Loaded {...current} retry={current.refresh}>{release => <>
-    <p>Current server release: <code className="release-id">{release.release}</code></p>
-    {activity.runs.length ? <div className="table-wrap"><table><thead><tr><th>Listener run</th><th>Installed release</th><th>Version status</th><th>Started</th></tr></thead><tbody>{activity.runs.map(run => <tr key={run.id}>
-      <td><code title={run.id}>{run.id.slice(0, 8)}</code>{run.disconnectRequested && <span className="subline">Disconnect requested</span>}</td>
-      <td><code className="release-id">{run.release ?? 'Not reported'}</code></td><td><ReleaseStatus installed={run.release} current={release.release}/></td><td>{timestamp(run.started)}</td>
-    </tr>)}</tbody></table></div> : <p>No reporting listeners. Last reported release: <code className="release-id">{activity.lastRelease ?? 'Not reported'}</code>.</p>}
-    <p className="support">The release covers the client, skill and documentation. Reporting a version does not prove that the model read the skill. Updates never replace a running listener automatically.</p>
-    <ul aria-label="Current release downloads"><li><a href={'/onboarding/' + release.release + '/README.md'}>Update instructions for this server</a></li><li><a href={'/onboarding/' + release.release + '/manifest.json'}>Current manifest and verification hashes</a></li></ul>
+import { operations, useResource } from './api.js';
+import { Loaded, Panel, Pagination, Status, timestamp } from './ui.js';
+export function ListenerVersions({ agentId }: { agentId: string }) {
+  const release = useResource(operations.release, {}, '', 30000), runs = useResource(operations.listenerRuns, { agentId }, location.search, 30000);
+  return <Panel title="Listener software"><Loaded {...release} retry={release.refresh}>{current => <>
+    <p>Current server release: <code className="release-id">{current.data.release}</code></p>
+    <Loaded {...runs} retry={runs.refresh}>{page => <><div className="table-wrap"><table><thead><tr><th>Listener run</th><th>Installed release</th><th>Version status</th><th>Started</th><th>Stopped</th></tr></thead>
+      <tbody>{page.data.map(run => <tr key={run.runId}><td><code title={run.runId}>{run.runId.slice(0, 8)}</code></td><td><code className="release-id">{run.release ?? 'Not reported'}</code></td>
+        <td><Status value={run.release === current.data.release ? 'Current' : run.release ? 'Update available' : 'Not reported'}/></td><td>{timestamp(run.startedAt)}</td><td>{run.stoppedAt === null ? '—' : timestamp(run.stoppedAt)}</td></tr>)}</tbody></table></div><Pagination meta={page.meta}/></>}</Loaded>
+    <p className="support">The release covers the client, skill and documentation. Version reporting does not prove the model read a skill. Reconnect to update; a running listener is never silently replaced.</p>
+    <a href={'/onboarding/' + current.data.release + '/README.md'}>Update instructions for this server</a>
   </>}</Loaded></Panel>;
 }

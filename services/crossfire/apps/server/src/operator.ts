@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { config } from './config.js';
-import { privateDir, readJson, writeJson } from '../../../packages/files/src/index.js';
+import { privateDir, readJson, writeJson } from '@crossfire/adapter-filesystem/index';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const repository = resolve(root, '../..');
@@ -20,8 +20,8 @@ export function imageName(source: string): string {
       else throw new Error('Build input cannot be a symlink');
     }
   }
-  for (const file of ['.dockerignore', '.npmrc', 'package.json', 'package-lock.json', 'services/crossfire/Dockerfile', 'services/crossfire/package.json', 'services/crossfire/tsconfig.core.json']) hash.update(file).update(readFileSync(join(source, file)));
-  for (const directory of ['apps', 'packages', 'scripts', 'skills', 'docs', 'third-party']) add(join(source, 'services/crossfire', directory));
+  for (const file of ['.dockerignore', '.npmrc', 'package.json', 'package-lock.json', 'tsconfig.base.json']) hash.update(file).update(readFileSync(join(source, file)));
+  for (const directory of ['services', 'scripts']) add(join(source, directory));
   return 'crossfire-runtime:' + hash.digest('hex').slice(0, 20);
 }
 async function command(args: string[]): Promise<void> {

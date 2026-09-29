@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { failure, success, type FailureCode, type Result } from '../../../../packages/kernel/src/result.js';
-import { HTTP_LIMITS } from '../../../../packages/contracts/src/rest/limits.js';
+import { failure, success, type FailureCode, type Result } from '@crossfire/kernel/result';
+import { HTTP_LIMITS } from '@crossfire/contracts/rest/limits';
 import type { Reply } from './bind.js';
 export const COOKIE_NAME = 'crossfire';
 const failureStatus: Record<FailureCode, number> = { invalid: 400, unauthorized: 401, forbidden: 403, missing: 404, conflict: 409, limit: 413, native: 502, unavailable: 503,

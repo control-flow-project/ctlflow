@@ -1,15 +1,17 @@
-import { failure, success, type Result } from '../../../../packages/kernel/src/result.js';
-import type { Operation } from '../../../../packages/contracts/src/rest/operation.js';
-import type { Page } from '../../../../packages/domain/src/port/directory.js';
-import type { Actor, Services } from '../../../../packages/domain/src/port/services.js';
-import type { Manifest } from '../../../../packages/contracts/src/release.js';
-import type { MemberRecord } from '../../../../packages/domain/src/port/directory.js';
+import type { FleetActor } from '@crossfire/domain/fleet/authority';
+import { failure, success, type Result } from '@crossfire/kernel/result';
+import type { Operation } from '@crossfire/contracts/rest/operation';
+import type { Page } from '@crossfire/domain/port/directory';
+import type { Actor, Services } from '@crossfire/domain/port/services';
+import type { Manifest } from '@crossfire/contracts/release';
+import type { MemberRecord } from '@crossfire/domain/port/directory';
 export type Metadata = { page: number; pageSize: number; totalItems: number; totalPages: number };
 export type Reply = { data: unknown; pagination?: Metadata; cookie?: string | null };
 export type Context = { services: Services; requestId: string; actor: Actor | null; manifest: Manifest;
+  controller?: Extract<FleetActor, { kind: 'controller' }>;
   session: { member: MemberRecord; csrfSecret: string; permissions: string[] } | null; credential: string };
 export type Endpoint = {
-  method: string; path: string; auth: 'public' | 'human' | 'agent' | 'either'; status: number; collection: boolean;
+  method: string; path: string; auth: 'public' | 'human' | 'agent' | 'either' | 'fleet'; status: number; collection: boolean;
   match(pathname: string): Record<string, string> | null;
   invoke(context: Context, params: unknown, query: URLSearchParams, input: unknown): Promise<Result<Reply>>;
 };
@@ -56,3 +58,5 @@ export function paged<Value>(result: Result<Page<Value>>, map: (value: Value) =>
 }
 export function acknowledged(result: Result<unknown>): Result<Reply> { return reply(result, () => ({ accepted: true })); }
 export function missingSession(): Result<Reply> { return failure('unauthorized', 'Management session required'); }
+
+export function fleetActor(context: Context): FleetActor { return context.controller ?? actor(context); }

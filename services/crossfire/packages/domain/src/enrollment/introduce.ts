@@ -1,6 +1,8 @@
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import type { EnrollmentIntroduction } from './input.js';
+import { controllerToken } from '../fleet/authority.js';
+import { bindRoster } from '../fleet/bind-roster.js';
 import { verifyRoster } from './preflight.js';
 import { expireEnrollments } from './expire.js';
 import type { EnrollmentRequest, EnrollmentItem } from './types.js';
@@ -9,10 +11,17 @@ type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' |
 export type EnrollmentReceipt = { request: EnrollmentRequest; instances: EnrollmentItem[] };
 export async function introduceEnrollment(services: Dependencies, input: EnrollmentIntroduction): Promise<Result<EnrollmentReceipt>> {
   if (!/^[a-f0-9-]{36}$/u.test(input.enrollmentId) || !/^[A-Za-z0-9_-]{43}$/u.test(input.claimSecret)) return failure('invalid', 'Persist a request UUID and private 32-byte claim before enrollment');
+  const rosterDigest = services.identity.hash(JSON.stringify({ owner: input.ownerMatrixId, fleet: input.fleetKey,
+    controller: input.controller ? { name: input.controller.name, metadata: Object.entries(input.controller.metadata ?? {}).sort(([left], [right]) => left.localeCompare(right)) } : null,
+    items: input.instances.map(item => [item.instanceKey, item.name, item.identity?.agentId ?? null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))) }));
+  const prior = services.repositories.enrollmentRequest.find({ id: input.enrollmentId }); if (!prior.ok) return prior;
+  if (prior.value) {
+    if (prior.value.expiresAt <= services.clock.now() || prior.value.rosterDigest !== rosterDigest || !services.identity.matches(input.claimSecret, prior.value.claimHash)) return failure('conflict', 'Enrollment request belongs to different credentials or roster, or has expired');
+    const items = services.collection.enrollmentItems({ requestId: input.enrollmentId });
+    return items.ok ? success({ request: prior.value, instances: items.value }) : items;
+  }
   const verified = await verifyRoster(services, input);
   if (!verified.ok) return verified;
-  const rosterDigest = services.identity.hash(JSON.stringify({ owner: input.ownerMatrixId, fleet: input.fleetKey,
-    items: input.instances.map(item => [item.instanceKey, item.name, item.identity?.agentId ?? null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))) }));
   return services.unitOfWork.run(() => {
     const expired = expireEnrollments(services);
     if (!expired.ok) return expired;
@@ -42,11 +51,15 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
     if (!active.ok) return active; if (!owned.ok) return owned; if (!pending.ok) return pending; if (!ownedPending.ok) return ownedPending;
     let remaining = Math.min(policy.value.maxAgents - active.value - pending.value, policy.value.maxOwnerAgents - owned.value - ownedPending.value);
     const now = services.clock.now();
-    const request: EnrollmentRequest = { id: input.enrollmentId, ownerId: owner.value.id, fleetKey: input.fleetKey,
+    const request: EnrollmentRequest = { controllerName: input.controller?.name ?? null,
+      controllerCredentialHash: input.controller ? services.identity.hash(controllerToken(services, input.enrollmentId, input.claimSecret)) : null, id: input.enrollmentId, ownerId: owner.value.id, fleetKey: input.fleetKey,
       verificationCode: services.identity.verificationCode(), claimHash: services.identity.hash(input.claimSecret), rosterDigest,
       status: 'pending', revision: 0, createdAt: now, expiresAt: now + policy.value.enrollmentSeconds * 1000, decidedByMemberId: null, decidedAt: null };
     const saved = services.repositories.enrollmentRequest.insert(request);
     if (!saved.ok) return saved;
+    for (const [key, value] of Object.entries(input.controller?.metadata ?? {})) {
+      const saved = services.repositories.enrollmentControllerMetadata.insert({ enrollmentId: request.id, key, value }); if (!saved.ok) return saved;
+    }
     const instances: EnrollmentItem[] = [];
     for (const item of input.instances) {
       const existing = verified.value.existing.find(proof => proof.instanceKey === item.instanceKey);
@@ -64,23 +77,13 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       }
       instances.push(record);
     }
-    if (!instances.some(item => item.outcome === 'claimed')) {
-      if (input.fleetKey !== null && verified.value.existing.length > 0) {
-        const fleetKey = input.fleetKey;
-        const fleet = services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey });
-        if (!fleet.ok) return fleet;
-        if (!fleet.value) {
-          const created = services.repositories.fleet.insert({ ownerId: owner.value.id, fleetKey, createdAt: now });
-          if (!created.ok) return created;
-        }
-        for (const proof of verified.value.existing) {
-          const key = { ownerId: owner.value.id, fleetKey, instanceKey: proof.instanceKey };
-          const binding = services.repositories.fleetInstance.find(key);
-          if (!binding.ok) return binding;
-          if (binding.value && binding.value.agentId !== proof.agentId) return failure('conflict', 'Fleet identity changed');
-          if (!binding.value) { const bound = services.repositories.fleetInstance.insert({ ...key, agentId: proof.agentId }); if (!bound.ok) return bound; }
-        }
-      }
+    const existingFleet = input.fleetKey === null ? success(null) : services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey: input.fleetKey });
+    if (!existingFleet.ok) return existingFleet;
+    if (existingFleet.value) {
+      const bound = bindRoster(services, owner.value.id, existingFleet.value.fleetKey, instances.filter(item => item.outcome === 'existing'));
+      if (!bound.ok) return bound;
+    }
+    if ((input.fleetKey === null || existingFleet.value) && !instances.some(item => item.outcome === 'claimed')) {
       const finished = services.repositories.enrollmentRequest.update({ ...request, status: 'approved', revision: 1 });
       if (!finished.ok) return finished;
       request.status = 'approved'; request.revision = 1;

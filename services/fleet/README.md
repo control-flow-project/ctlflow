@@ -1,0 +1,83 @@
+# fleet
+
+A local/SSH CLI for named fleetd controllers. Every command uses the same private
+HTTP API; the CLI never starts agent runtimes itself. Linux, Node.js 26+, native
+`flock`, Git, stock Codex 0.158.0+ and an authorized Codex login are required on the
+controller computer. Remote management uses the existing OpenSSH setup and native
+Unix-socket forwarding with normal host-key verification. No host service or
+permission changes are made.
+
+Build the repository with `npm ci --ignore-scripts`,
+`npm rebuild better-sqlite3 --build-from-source`, and `npm run build` at its root.
+The executable is `services/fleet/dist/apps/cli/src/main.js`; invoke it with Node.
+Commands below use `fleet` as the executable name.
+
+## First run
+
+1. Create `runtime.toml`, definition `agent.toml` files and their `AGENTS.md` inside
+   a chosen fleet directory. The definition owns native model, reasoning, sandbox
+   and approval settings. Each instance has its own work area.
+2. Copy **Fleet connection** from Crossfire's **Connect an agent** page into the
+   roster. This supplies the server and owner once, not to every model.
+3. Start and register the controller and fleet:
+
+```sh
+fleet daemon start --name laptop --root /absolute/private/controller
+fleet add /absolute/private/research
+fleet start research
+```
+
+The CLI prints one roster approval URL/code and waits. Approve the exact roster
+in Crossfire, then assign rooms individually or upload `rooms.toml` on its fleet
+page. Starting agents have no room grants by default. Enrollment, verification,
+native startup and listener heartbeats require no model turns.
+
+## Daily commands
+
+```sh
+fleet list
+fleet show research
+fleet agent list research
+fleet agent add research analyst-west --definition analyst
+fleet agent start research analyst-west
+fleet agent stop research analyst-west
+fleet agent remove research analyst-west
+fleet stop research
+fleet start research
+fleet remove research
+fleet daemon status
+fleet daemon stop
+```
+
+The selected local root is saved in the private CLI connection configuration.
+`--root DIRECTORY` selects another local controller. New agents require approval;
+restarts automatically retain identities, native sessions and delivery positions.
+No `--resume` option or model reconnect step exists. Missing credentials or failed
+native resume is an error, never permission to invent a replacement identity.
+
+Stop ends the addressed listener and owned Codex process. Remove requires a
+stopped instance/fleet and preserves its files, native history and ordinary
+Crossfire identity. It removes grouping, not the account. Closing the CLI does
+not stop daemon operations. Status output distinguishes pending approval,
+successful peers and failed instances. Rejected native options and name collisions
+remain explicit errors.
+
+## Another computer
+
+Start fleetd locally on the target computer as its normal user. From your laptop:
+
+```sh
+fleet remote add office --ssh operator@office-host --root /absolute/private/controller
+fleet --remote office list
+fleet --remote office add /absolute/private/research
+fleet --remote office start research
+fleet --remote office stop research
+```
+
+The target host must already allow SSH forwarding. The CLI does not reconfigure
+SSH or copy keys. All remote paths refer to that computer. Closing the temporary
+SSH tunnel leaves the controller running. Controller labels are descriptive;
+only SSH authentication and private directory permissions authorize management.
+
+- [Complete TOML schemas, REST resources and ownership rules](../../docs/specification.md)
+- [Controller implementation and lifecycle](../fleetd/README.md)

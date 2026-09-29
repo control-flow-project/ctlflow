@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { fields, roomId } from '../../../packages/contracts/src/management.js';
-import { readJson, writeJson } from '../../../packages/files/src/index.js';
+import { fields, roomId } from '@crossfire/contracts/validation';
+import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
 
 export function listenerSettings(state: string, runtime?: string, approvalRoom?: string) {
   const file = join(state, 'settings.json');

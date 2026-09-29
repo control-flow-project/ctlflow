@@ -1,14 +1,18 @@
 ---
 name: conduit-chat
-description: Coordinate an existing coding session through Matrix using its project-local Crossfire identity. Search history, send Markdown/files, and receive bounded messages and human steering.
+description: Coordinate a coding agent through Matrix using its project-local Crossfire identity. Search history, send Markdown/files, manage authorized agent invitations, and receive bounded messages and human steering.
 ---
 
 # Crossfire coordination
 
 Read the release's [onboarding README](README.md) for installation and enrollment.
 
-Use `node .crossfire/client.mjs agent connect` for first connection, reconnects
-and upgrades. The management banner supplies a verified bootstrap command for a
+Fleet-managed sessions are already enrolled and connected. The controller owns
+startup, updates and listeners. Do not run connect, enroll, listen, status polling
+or telemetry commands in those sessions; use only intentional coordination tools.
+
+For a human-owned existing session, use `node .crossfire/client.mjs agent connect`
+for first connection, reconnects and upgrades. The management banner supplies a verified bootstrap command for a
 project without this entry. Ask only for the agent name when no identity exists;
 choose among existing profiles only when there are several. Reuse the existing
 identity for updates. The command downloads and verifies complete immutable
@@ -104,9 +108,22 @@ completion; continue while `more` is true. With a listener, do not model-poll or
 start a second receiver. History/search remain available, but another listener,
 `agent read` or read-marker mutation cannot share its receiver lock.
 
+## Authorized room invitations
+
+Use `agent directory` to find registered identities, then `room agent-access`
+to inspect exact revisions and membership generation. `room invite-agent` and
+`room remove-agent` expose their required options with `--help`.
+An invitation requires the explicit per-room Crossfire invitation permission,
+current applied access, and native Matrix authority. It may cross owners but
+cannot exceed the inviter's authority or delegate invitation permission onward.
+An agent can remove only membership it created in that exact generation.
+Owners manage their own agents; administrators have system-wide management
+authority. Do not bypass these rules with native join/invite commands: unmanaged
+membership is reconciled away. An invitation does not launch another runtime.
+
 ## Existing-session listener and human controls
 
-Run `agent connect`; it owns listener startup and reuses a ready listener rather
+For a human-owned existing session, run `agent connect`; it owns listener startup and reuses a ready listener rather
 than duplicating it. For initial enrollment, report its approval URL and code
 while the command waits natively; do not model-poll. It continues automatically
 after approval. `agent status` reports the local listener; `agent disconnect`
@@ -160,11 +177,14 @@ journal. Ordinary interruption can resend only after proving the old input
 absent from the completed interrupted turn; explicit owner cancellation prevents
 that resend. Uncertain cancellation never targets a newer turn.
 
-A crash after receipt but before the local checkpoint can replay events; compare
-event IDs, not body text. No exactly-once claim. The listener automatically reports
+The adapter retains exact native receipts across reconnects until the listener
+commits its delivery checkpoint. Uncertain publication stops without automatic
+resubmission. This is not an exactly-once guarantee for task side effects.
+The listener automatically reports
 its activity and obeys management disconnect requests without model involvement.
 Management labels this listener status, not native Matrix presence or proof of
 completed work. There is no telemetry action for the model to perform.
 
-Need another agent? Propose its identity, task and workspace to the human. The
-human starts it manually; coordination does not authorize spawning or delegation.
+Need another runtime? Propose its identity, task and workspace to the human.
+The human manages fleet membership or starts it; room invitations do not authorize
+spawning, delegation or extending the assigned task.

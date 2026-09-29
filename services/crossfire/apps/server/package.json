@@ -9,10 +9,10 @@
   },
   "dependencies": {
     "@crossfire/contracts": "0.1.0",
-    "@crossfire/files": "0.1.0",
-    "@crossfire/matrix": "0.1.0",
-    "@tinqerjs/better-sqlite3-adapter": "0.0.28",
-    "@tinqerjs/tinqer": "0.0.28",
-    "better-sqlite3": "13.0.3"
+    "@crossfire/kernel": "0.1.0",
+    "@crossfire/adapter-filesystem": "0.1.0",
+    "@crossfire/adapter-matrix": "0.1.0",
+    "@crossfire/adapter-sqlite": "0.1.0",
+    "@crossfire/domain": "0.1.0"
   }
 }

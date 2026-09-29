@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
-import { codexProtocol, type NativeEvent } from '../../packages/adapter-codex/src/protocol.js';
+import { codexProtocol, type NativeEvent } from '@crossfire/adapter-codex/protocol';
 import type { nativeProvider } from './native-provider.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -57,5 +57,5 @@ export async function nativeEngine(scope: TestContext, home: string, workspace: 
   const started = await call('thread/start', { cwd: workspace });
   const thread = started.thread as { id: string; cwd: string; model: string; reasoningEffort: string };
   assert.equal(typeof thread.id, 'string');
-  return { endpoint, token, workspace, session: thread.id, thread, call, notifications, child, ended };
+  return { endpoint, token, workspace, session: thread.id, receiptFile: join(home, 'receipt.json'), thread, call, notifications, child, ended };
 }

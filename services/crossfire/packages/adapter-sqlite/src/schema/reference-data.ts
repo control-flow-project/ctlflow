@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { executeInsert } from '@tinqerjs/better-sqlite3-adapter';
-import { permissionCatalog, roleCatalog } from '../../../domain/src/authorization/catalog.js';
+import { permissionCatalog, roleCatalog } from '@crossfire/domain/authorization/catalog';
 import { schema } from './tables.js';
 export function seedReferenceData(database: Database.Database): void {
   for (const role of roleCatalog) executeInsert(database, schema, (query, params) => query.insertInto('role')

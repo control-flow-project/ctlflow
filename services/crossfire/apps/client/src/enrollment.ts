@@ -1,82 +1,91 @@
-import { existsSync, realpathSync } from "node:fs";
-import { fields, text, userId, parseAgent } from "../../../packages/contracts/src/management.js";
-import { account, profileName, UUID, MAX_UPLOAD_BYTES, type PendingEnrollment } from "../../../packages/contracts/src/client.js";
-import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
-import { endpoint, nativeOk } from "../../../packages/matrix/src/http.js";
-import { readProfile, type paths } from "../../../packages/agent-core/src/state.js";
-import { readJson, writeJson } from "../../../packages/files/src/index.js";
-import type { Manifest } from '../../../packages/contracts/src/release.js';
-import { requireCurrentRelease } from '../../../packages/agent-core/src/release.js';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { existsSync, realpathSync } from 'node:fs';
+import { fields, text, userId } from '@crossfire/contracts/validation';
+import { profileName, UUID, MAX_UPLOAD_BYTES, type PendingEnrollment } from '@crossfire/contracts/client';
+import { failure, success, type Result } from '@crossfire/kernel/result';
+import { endpoint } from '@crossfire/contracts/origin';
+import { readProfile, type paths } from '@crossfire/adapter-filesystem/project';
+import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
+import type { Manifest } from '@crossfire/contracts/release';
+import { requireCurrentRelease } from '@crossfire/agent-core/release';
+import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
+import { createClient } from '@crossfire/adapter-crossfire/client';
+import { operations } from '@crossfire/contracts/rest/operations';
+
+async function introduce(destination: ReturnType<typeof paths>, pending: PendingEnrollment): Promise<Result<PendingEnrollment>> {
+  const client = createClient({ origin: pending.server });
+  const introduced = await client.call(operations.introduceEnrollment, {}, { enrollmentId: pending.request, claimSecret: pending.secret,
+    ownerMatrixId: pending.owner, fleetKey: null, instances: [{ instanceKey: pending.name, name: pending.name }] });
+  if (!introduced.ok) return introduced;
+  const { enrollment, instances } = introduced.value.data.enrollment;
+  const item = instances[0];
+  if (!item || item.outcome === 'failed') return failure('name_collision', 'Agent name is unavailable: ' + pending.name);
+  const saved = { ...pending, code: enrollment.verificationCode, expires: enrollment.expiresAt };
+  writeJson(destination.pending, saved);
+  return success(saved);
+}
 
 export async function enroll(destination: ReturnType<typeof paths>, server: string, owner: string, name: string, installed: Manifest): Promise<Result<unknown>> {
   const origin = endpoint(server);
   if (!origin.ok) return origin;
-  if (!userId(owner) || !text(name, 80)) return failure("invalid", "Supply the exact human owner ID and proposed agent name");
-  if (existsSync(destination.profile) || existsSync(destination.pending)) return failure("conflict", "This local profile already exists; do not overwrite its identity");
-  const current = await requireCurrentRelease({ base: origin.value }, installed);
+  if (!userId(owner) || !profileName(name)) return failure('invalid', 'Supply the exact human owner ID and lowercase agent name');
+  if (existsSync(destination.profile) || existsSync(destination.pending)) return failure('conflict', 'This local profile already exists; reconnect its identity');
+  const current = await requireCurrentRelease(createCoordination({ origin: origin.value }), installed);
   if (!current.ok) return current;
-  const response = await nativeOk({ base: origin.value }, "POST", "/_coord/enrollments", { owner, name });
-  if (!response.ok) return response;
-  const parsed = fields(response.value, ["id", "owner", "name", "code", "expires", "secret", "approvalUrl"]);
-  if (!parsed.ok) return parsed;
-  const data = parsed.value;
-  if (typeof data.id !== "string" || !UUID.test(data.id) || data.owner !== owner || data.name !== name
-    || !text(data.secret, 100) || !text(data.code, 12) || typeof data.expires !== "number"
-    || !Number.isSafeInteger(data.expires) || data.expires <= Date.now()
-    || data.approvalUrl !== origin.value + "/manage/enrollments/" + data.id) return failure("native", "Invalid enrollment response");
   const pending: PendingEnrollment = { server: origin.value, owner, name, workspace: destination.workspace,
-    request: data.id, secret: data.secret, code: data.code, expires: data.expires };
+    request: randomUUID(), secret: randomBytes(32).toString('base64url'), code: '', expires: Date.now() + 86_400_000 };
   writeJson(destination.pending, pending);
-  return success({ status: "pending", owner, name, code: pending.code, expires: pending.expires,
-    approvalUrl: data.approvalUrl });
+  const introduced = await introduce(destination, pending);
+  return introduced.ok ? success({ status: 'pending', owner, name, code: introduced.value.code, expires: introduced.value.expires,
+    approvalUrl: origin.value + '/manage/enrollments/' + pending.request }) : introduced;
 }
 
 async function connected(destination: ReturnType<typeof paths>, installed: Manifest): Promise<Result<unknown>> {
   const profile = readProfile(destination.profile);
   if (realpathSync(profile.workspace) !== destination.workspace) return failure('invalid', 'Profile belongs to another project');
-  const current = await requireCurrentRelease({ base: profile.settings.homeserver }, installed);
+  const coordination = createCoordination({ origin: profile.settings.homeserver, token: profile.account.access_token });
+  const current = await requireCurrentRelease(coordination, installed);
   if (!current.ok) return current;
-  const response = await nativeOk({ base: profile.settings.homeserver, token: profile.account.access_token }, 'GET', '/_coord/agents/' + profile.id);
+  const response = await createClient({ origin: profile.settings.homeserver, token: profile.account.access_token }).call(operations.agent, { agentId: profile.id }, {});
   if (!response.ok) return response;
-  const parsed = parseAgent(response.value);
-  if (!parsed.ok) return parsed;
-  const agent = parsed.value;
-  if (agent.id !== profile.id || agent.owner !== profile.settings.owner || agent.userId !== profile.account.user_id
-    || agent.status !== 'active' || agent.ownerStatus !== 'active') return failure('forbidden', 'Agent or owner access is not active');
-  return success({ status: 'connected', id: profile.id, owner: agent.owner, user_id: agent.userId,
+  const agent = response.value.data;
+  if (agent.agentId !== profile.id || agent.owner.matrixUserId !== profile.settings.owner || agent.matrixUserId !== profile.account.user_id
+    || agent.status !== 'active' || agent.owner.status !== 'active') return failure('forbidden', 'Agent or owner access is not active');
+  return success({ status: 'connected', id: profile.id, owner: agent.owner.matrixUserId, user_id: agent.matrixUserId,
     release: installed.release, skillSha256: installed.artifacts['SKILL.md'].sha256, activity: agent.activity,
     managementUrl: profile.settings.homeserver + '/manage/agents/' + profile.id });
 }
 
 export async function connect(destination: ReturnType<typeof paths>, installed: Manifest): Promise<Result<unknown>> {
   if (existsSync(destination.profile)) return connected(destination, installed);
-  if (!existsSync(destination.pending)) return failure("missing", "Request enrollment for this project profile first");
-  const parsed = fields(readJson<unknown>(destination.pending), ["server", "owner", "name", "workspace", "request", "secret", "code", "expires"]);
+  if (!existsSync(destination.pending)) return failure('missing', 'Request enrollment for this project profile first');
+  const parsed = fields(readJson<unknown>(destination.pending), ['server', 'owner', 'name', 'workspace', 'request', 'secret', 'code', 'expires']);
   if (!parsed.ok) return parsed;
   const input = parsed.value;
-  if (!text(input.server, 2048) || !userId(input.owner) || !text(input.name, 80) || !text(input.workspace, 4096)
-    || typeof input.request !== "string" || !UUID.test(input.request) || !text(input.secret, 100)
-    || !text(input.code, 12) || typeof input.expires !== "number" || !Number.isSafeInteger(input.expires)
-    || input.expires <= Date.now() || realpathSync(input.workspace) !== destination.workspace) return failure("invalid", "Invalid, expired or different-project enrollment");
-  const origin = endpoint(input.server);
-  if (!origin.ok) return origin;
-  const current = await requireCurrentRelease({ base: origin.value }, installed);
+  if (!text(input.server, 2048) || !userId(input.owner) || !profileName(input.name) || !text(input.workspace, 4096)
+    || typeof input.request !== 'string' || !UUID.test(input.request) || !text(input.secret, 100)
+    || typeof input.code !== 'string' || !/^([A-F0-9]{12})?$/u.test(input.code) || typeof input.expires !== 'number'
+    || !Number.isSafeInteger(input.expires) || input.expires <= Date.now()
+    || realpathSync(input.workspace) !== destination.workspace) return failure('invalid', 'Invalid, expired or different-project enrollment');
+  const pending = input as PendingEnrollment;
+  const current = await requireCurrentRelease(createCoordination({ origin: pending.server }), installed);
   if (!current.ok) return current;
-  const response = await nativeOk({ base: origin.value }, "POST", "/_coord/enrollments/" + input.request + "/exchange", { secret: input.secret });
+  if (!pending.code) { const introduced = await introduce(destination, pending); if (!introduced.ok) return introduced; }
+  const client = createClient({ origin: pending.server });
+  const response = await client.call(operations.exchangeEnrollment, { enrollmentId: pending.request }, { claimSecret: pending.secret });
   if (!response.ok) return response;
-  if (["pending", "rejected", "provisioning"].includes(String(response.value.status))) return success({ status: response.value.status });
-  const ready = fields(response.value, ["status", "id", "owner", "account"]);
-  if (!ready.ok) return ready;
-  const identity = account(ready.value.account);
-  if (!identity.ok) return identity;
-  const serverName = input.owner.slice(input.owner.indexOf(":") + 1);
-  if (ready.value.status !== "ready" || typeof ready.value.id !== "string" || !UUID.test(ready.value.id)
-    || ready.value.owner !== input.owner || identity.value.user_id !== "@agent-" + ready.value.id + ":" + serverName) return failure("native", "Enrollment identity does not match the approved owner");
-  const health = await nativeOk({ base: origin.value }, "GET", "/_coord/health");
+  const result = response.value.data;
+  if (result.status !== 'ready') return success({ status: result.status });
+  const ready = result.instances[0];
+  if (!ready || ready.instanceKey !== pending.name || !ready.agentId || !ready.account || result.ownerMatrixId !== pending.owner) {
+    return failure('native', 'Enrollment identity does not match the approved roster');
+  }
+  const serverName = pending.owner.slice(pending.owner.indexOf(':') + 1);
+  const health = await client.call(operations.health, {}, {});
   if (!health.ok) return health;
-  if (!profileName(health.value.instance)) return failure("native", "Invalid instance identity");
-  writeJson(destination.profile, { workspace: destination.workspace, id: ready.value.id, account: identity.value,
-    settings: { instance: health.value.instance, homeserver: origin.value, server_name: serverName,
-      owner: input.owner, max_upload_bytes: MAX_UPLOAD_BYTES } });
+  writeJson(destination.profile, { workspace: destination.workspace, id: ready.agentId, account: {
+    user_id: ready.account.matrixUserId, access_token: ready.account.accessToken, device_id: ready.account.deviceId },
+    settings: { instance: health.value.data.instance, homeserver: pending.server, server_name: serverName,
+      owner: pending.owner, max_upload_bytes: MAX_UPLOAD_BYTES } });
   return connected(destination, installed);
 }

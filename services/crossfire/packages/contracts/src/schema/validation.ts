@@ -1,6 +1,9 @@
-import { failure, success, type Result } from '../../../kernel/src/result.js';
+import { failure, success, type Result } from '@crossfire/kernel/result';
 export type Parser<T> = (input: unknown) => Result<T>;
 export type Parsed<Check> = Check extends Parser<infer Value> ? Value : never;
+export function refine<Value>(parse: Parser<Value>, accepts: (value: Value) => boolean, message: string): Parser<Value> {
+  return input => { const parsed = parse(input); return !parsed.ok || accepts(parsed.value) ? parsed : failure('invalid', message); };
+}
 export function text(maximum = 255, minimum = 1): Parser<string> {
   return input => typeof input === 'string' && input.length >= minimum && input.length <= maximum && !/[\u0000-\u001f\u007f]/u.test(input)
     ? success(input) : failure('invalid', 'Expected text of ' + minimum + '–' + maximum + ' characters');

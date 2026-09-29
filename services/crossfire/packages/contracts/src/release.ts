@@ -1,5 +1,5 @@
-import { fields, text } from "./management.js";
-import { failure, success, type Result } from "../../kernel/src/result.js";
+import { fields, text } from "./validation.js";
+import { failure, success, type Result } from "@crossfire/kernel/result";
 
 export const ARTIFACTS = ["README.md", "SKILL.md", "crossfire-client.mjs", "matrix-spec-LICENSE.txt"] as const;
 export type ArtifactName = typeof ARTIFACTS[number];

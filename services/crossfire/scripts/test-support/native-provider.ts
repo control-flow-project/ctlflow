@@ -3,7 +3,7 @@ import type { TestContext } from "node:test";
 import { createServer, type ServerResponse } from "node:http";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { collect } from "../../packages/matrix/src/http.js";
+import { collect } from '@crossfire/adapter-matrix/http';
 
 export async function nativeProvider(context: TestContext, home: string) {
   const requests: unknown[] = [];

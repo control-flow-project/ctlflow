@@ -1,14 +1,15 @@
+import { localState as storage } from '@crossfire/adapter-filesystem/state';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import { matrix as nativeMatrix } from '../packages/matrix/src/http.js';
-import { readJson } from '../packages/files/src/index.js';
-import type { Event } from '../packages/contracts/src/client.js';
-import { listen } from '../packages/agent-core/src/listen.js';
-import { connectCodex } from '../packages/adapter-codex/src/connection.js';
-import { isControl, loadControl, type ControlState } from '../packages/agent-core/src/control.js';
-import { eventView } from '../packages/agent-core/src/receive.js';
+import { matrix as nativeMatrix } from '@crossfire/adapter-matrix/http';
+import { readJson } from '@crossfire/adapter-filesystem/index';
+import type { Event } from '@crossfire/contracts/client';
+import { listen } from '@crossfire/adapter-crossfire/listener';
+import { connectCodex } from '@crossfire/adapter-codex/connection';
+import { isControl, loadControl, type ControlState } from '@crossfire/agent-core/control';
+import { eventView } from '@crossfire/agent-core/receive';
 import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD, until, temporary } from './test-support/listener.js';
 
 async function fixture(context: TestContext) {
@@ -171,7 +172,7 @@ test('historical initial snapshots and edited or quoted messages have no cancell
   matrix.add(ROOM, { ...message('$edit', OBSERVER, '!!'), content: { msgtype: 'm.text', body: '!!', 'm.relates_to': { rel_type: 'm.replace', event_id: '$old' } } }, message('$quote', OBSERVER, '> !!'));
   await until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '3');
   assert(!native.requests().some(request => request.method === 'turn/interrupt'));
-  assert.equal(loadControl(matrix.cursorFile + '.control', THREAD).paused, false);
+  assert.equal(loadControl(storage, matrix.cursorFile + '.control', THREAD).paused, false);
 });
 
 test('native cancellation confirms the captured turn only and never retargets a later turn', async context => {

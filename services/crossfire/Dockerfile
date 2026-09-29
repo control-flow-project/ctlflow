@@ -3,7 +3,8 @@ FROM vectorim/element-web:v1.12.29@sha256:da32e88c8dafe2c3d4f40ca5e90ab2f43a7c9a
 FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
-COPY .npmrc package.json package-lock.json ./
+COPY .npmrc package.json package-lock.json tsconfig.base.json ./
+COPY scripts ./scripts
 COPY services ./services
 RUN npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source
 RUN npm run build --workspace=@crossfire/service && npm prune --omit=dev --ignore-scripts

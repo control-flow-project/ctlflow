@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import { listen } from '../packages/agent-core/src/listen.js';
-import type { RuntimeHooks, Permission } from '../packages/agent-core/src/runtime.js';
-import { readJson } from '../packages/files/src/index.js';
+import { listen } from '@crossfire/adapter-crossfire/listener';
+import type { RuntimeHooks, Permission } from '@crossfire/agent-core/runtime';
+import { readJson } from '@crossfire/adapter-filesystem/index';
 import { matrixFixture, temporary, until, message, ROOM, OBSERVER, SELF, THREAD } from './test-support/listener.js';
 
 const permission: Permission = { runtime: 'codex', session: THREAD, request: 'fixture-request', action: 'command',
@@ -21,7 +21,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   const receiving = listen({ ...fixture, approvalRoom: ROOM, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
-      return { sessionId: THREAD, signal, deliver: async text => { delivered.push(text); }, settle: async () => false,
+      return { sessionId: THREAD, signal, deliver: async text => { delivered.push(text); }, settle: async () => false, acknowledge: () => {},
         activeTurn: async () => null, interrupt: async () => {}, close: () => { closed = true; } };
     },
   }, stop.signal).catch(error => error);
@@ -61,7 +61,7 @@ test('a runtime permission without a selected authorized conversation fails clos
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
-      return { sessionId: THREAD, signal, deliver: async () => {}, settle: async () => false, activeTurn: async () => null,
+      return { sessionId: THREAD, signal, deliver: async () => {}, settle: async () => false, acknowledge: () => {}, activeTurn: async () => null,
         interrupt: async () => {}, close: () => {} };
     },
   }, stop.signal).catch(error => error);

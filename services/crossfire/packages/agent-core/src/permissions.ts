@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { API, segment, type Matrix } from '../../matrix/src/http.js';
-import type { Json } from '../../contracts/src/json.js';
-import { parseAgent, roomId, text } from '../../contracts/src/management.js';
-import type { Account, Event, Settings } from '../../contracts/src/client.js';
+import { API, segment } from '@crossfire/contracts/matrix';
+import type { Matrix } from './port.js';
+import type { Json } from '@crossfire/contracts/json';
+import { roomId, text } from '@crossfire/contracts/validation';
+import type { Account, Event, Settings } from '@crossfire/contracts/client';
 import type { ReceivedEvent } from './receive.js';
-import { markdownMessage } from '../../matrix/src/message.js';
 import type { Permission } from './runtime.js';
+
+import type { Coordination } from './coordination.js';
 
 type Pending = {
   request: string; session: string; expires: number; choices: Permission['choices'];
@@ -28,7 +30,7 @@ function decisionBody(body: string): string {
     ? body.slice(boundary + 2).trim().toLowerCase() : body.trim().toLowerCase();
 }
 
-export function permissions(options: { client: Matrix; settings: Settings; account: Account; agent: string;
+export function permissions(options: { client: Matrix; coordination: Coordination; settings: Settings; account: Account; agent: string;
   room: string; expiresMs: number }, stop: AbortSignal) {
   if (!roomId(options.room) || !Number.isInteger(options.expiresMs) || options.expiresMs < 1000 || options.expiresMs > 300_000) {
     throw new Error('An explicit approval room and a 1000..300000 ms expiry are required');
@@ -43,12 +45,12 @@ export function permissions(options: { client: Matrix; settings: Settings; accou
   const base = API + '/rooms/' + segment(options.room);
   async function authorize(): Promise<void> {
     stop.throwIfAborted();
-    const parsed = parseAgent(await options.client.get('/_coord/agents/' + options.agent));
+    const parsed = await options.coordination.delivery(options.agent, stop);
     if (!parsed.ok) throw new Error(parsed.error.message);
     const agent = parsed.value;
-    if (agent.id !== options.agent || agent.owner !== options.settings.owner || agent.userId !== options.account.user_id
+    if (agent.agentId !== options.agent || agent.ownerMatrixId !== options.settings.owner || agent.matrixUserId !== options.account.user_id
       || agent.status !== 'active' || agent.ownerStatus !== 'active'
-      || !agent.grants.some(grant => grant.room === options.room && grant.access !== 'read' && !grant.muted)) {
+      || !agent.roomGrants.some(grant => grant.roomId === options.room && grant.accessMode !== 'read' && !grant.muted)) {
       throw new Error('Approval conversation is not currently authorized');
     }
     const members = await options.client.get<{ joined: Record<string, unknown> }>(base + '/joined_members');
@@ -86,7 +88,7 @@ export function permissions(options: { client: Matrix; settings: Settings; accou
         request: permission.request, action: permission.action, scope: permission.scope,
         choices: permission.choices }, null, 2).split('\n').map(line => '    ' + line).join('\n');
       const sent = await options.client.put<{ event_id: string }>(base + '/send/m.room.message/' + randomUUID(),
-        markdownMessage('**Permission needed.** Reply to this exact message with one choice. Silence is not approval.\n\n'
+        options.client.message('**Permission needed.** Reply to this exact message with one choice. Silence is not approval.\n\n'
           + description + '\n\nChoices: ' + permission.choices.map(choice => '`' + choice.label + '`').join(', ')));
       if (!text(sent.event_id, 255) || !sent.event_id.startsWith('$')) throw new Error('Invalid permission announcement identity');
       eventId = sent.event_id;

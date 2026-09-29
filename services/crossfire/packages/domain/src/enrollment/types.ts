@@ -1,4 +1,6 @@
 export type EnrollmentRequest = {
+  controllerName: string | null;
+  controllerCredentialHash: string | null;
   id: string;
   ownerId: string;
   fleetKey: string | null;
@@ -30,6 +32,11 @@ export type AgentName = {
 };
 
 export type Fleet = {
+  id: string;
+  label: string;
+  controllerName: string;
+  revision: number;
+  updatedAt: number;
   ownerId: string;
   fleetKey: string;
   createdAt: number;
@@ -40,4 +47,24 @@ export type FleetInstance = {
   fleetKey: string;
   instanceKey: string;
   agentId: string;
+};
+
+export type FleetCredential = {
+  id: string;
+  fleetId: string;
+  secretHash: string;
+  createdAt: number;
+  revokedAt: number | null;
+};
+
+export type FleetControllerMetadata = {
+  fleetId: string;
+  key: string;
+  value: string;
+};
+
+export type EnrollmentControllerMetadata = {
+  enrollmentId: string;
+  key: string;
+  value: string;
 };
