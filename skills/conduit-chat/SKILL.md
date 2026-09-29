@@ -137,6 +137,8 @@ process discovery or tool-descendant supervision is part of Crossfire.
 The listener enforces the management wake-up policy without model calls. By
 default only the owner wakes this agent. Other messages wait as context and
 arrive together with an authorized message after the fixed collection window.
+Nobody disables chat-triggered input, including urgent owner text; direct native
+input remains available. Do not bypass that choice by polling pending messages.
 Do not poll or implement wake-up filtering yourself. Reconciliation, activity
 reporting and bulk delivery are automatic; pause and revocation remain enforced.
 
@@ -144,7 +146,7 @@ The verified owner can steer this agent with native mentions in a shared room
 or unambiguously in a human-agent conversation:
 
 - `!! Only inspect the configuration.` cancels the captured turn, confirms its
-  terminal status, then delivers the attributed redirect.
+  terminal status, then delivers the attributed redirect when automatic delivery is enabled.
 - `!!` stops and pauses delivery until a later owner text message.
 
 Agent senders, display names, edits, quotations, code fences and historical

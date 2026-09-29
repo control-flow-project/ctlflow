@@ -328,17 +328,23 @@ human steering.
 The per-session listener runs independently of the connecting tool and long-polls
 outside the model. Empty waits,
 own echoes and periodic reconciliation consume no model turns.
-Each agent has one cumulative wake-up policy: `owner` (default), `owner-agents`,
+Each agent has one cumulative wake-up policy: `nobody`, `owner` (default), `owner-agents`,
 `humans` (owner, owner's agents and other humans), or `everyone` (all humans and
 their agents). The management detail page persists this with normal revision,
 CSRF and audit checks. Owners expand authority; administrators can restrict it.
-This does not change room grants or their application revision. New and existing
-agents default to owner-only through the canonical schema's forward migration.
+This does not change room grants or their application revision. New agents default
+to owner-only. Transactional forward schema migration preserves existing policy
+choices, identities, grants, credentials and references.
 
 The server resolves exact active human and agent identities from management
 records for the authenticated listener. Inactive owners/agents, unknown identities,
 display names and self messages cannot grant wake-up authority. This policy gates
-normal model input, not the separate owner-only interruption or approval paths.
+automatic model input, including urgent owner text. Nobody resolves to an empty
+sender set and never publishes chat input, even for an owner message. Direct TUI
+or other native user input is independent of this setting. Pending chat remains
+unread until automatic delivery is enabled. Owner-only interruption and pending
+tool approvals remain available as controls; they do not publish new chat input.
+Listener heartbeats continue without model involvement.
 Selected room-state notices remain context rather than independent triggers.
 
 Non-triggering messages remain unacknowledged in native history. The next allowed

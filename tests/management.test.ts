@@ -66,6 +66,12 @@ test('wake policy defaults to owner, resolves active verified identities and kee
     assert.deepEqual(senders(), [alice.id]);
     const record = queries.audit(ctx.store, alice.id, true, Number.MAX_SAFE_INTEGER).find(entry => entry.target === agent.id);
     assert.equal(JSON.parse(record!.detail).wakePolicy, 'owner');
+    value(changeAgent(ctx, admin, agent.id, { revision: current().revision, wakePolicy: 'nobody' }));
+    assert.deepEqual(senders(), []);
+    assert.equal(changeAgent(ctx, bob, agent.id, { revision: current().revision, wakePolicy: 'nobody' }).ok, false);
+    assert.equal(changeAgent(ctx, admin, agent.id, { revision: current().revision, wakePolicy: 'owner' }).ok, false);
+    assert.equal(current().grantRevision, agent.grantRevision); assert.equal(current().grants, agent.grants);
+    change('owner'); assert.deepEqual(senders(), [alice.id]);
     value(changeMember(ctx, admin, alice.id, { revision: 0, status: 'suspended' }));
     assert.deepEqual(senders(), []);
     assert.equal(changeAgent(ctx, alice, agent.id, { revision: current().revision, wakePolicy: 'everyone' }).ok, false);

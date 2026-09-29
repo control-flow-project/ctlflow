@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { listen } from '../packages/agent-core/src/listen.js';
 import type { RuntimeHooks, Permission } from '../packages/agent-core/src/runtime.js';
 import { readJson } from '../packages/files/src/index.js';
@@ -10,8 +11,9 @@ const permission: Permission = { runtime: 'codex', session: THREAD, request: 'fi
   scope: { command: 'npm install', cwd: '/work/project' },
   choices: [{ label: 'approve once', value: { decision: 'accept' } }, { label: 'deny', value: { decision: 'decline' } }] };
 
-test('the single paused receiver handles owner approval without resuming delivery or sending it to the model', async scope => {
+for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' receiver handles owner approval without model input', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope));
+  if (mode === 'nobody') { fixture.waking.policy = 'nobody'; fixture.waking.senders = []; }
   const stop = new AbortController();
   let hooks: RuntimeHooks | undefined;
   const delivered: string[] = [];
@@ -25,8 +27,10 @@ test('the single paused receiver handles owner approval without resuming deliver
   }, stop.signal).catch(error => error);
   scope.after(async () => { stop.abort(); await receiving; });
   await until(() => fixture.waiting() > 0);
-  fixture.add(ROOM, message('$pause', OBSERVER, '!!'));
-  await until(() => existsSync(fixture.cursorFile + '.control') && readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused);
+  if (mode === 'paused') {
+    fixture.add(ROOM, message('$pause', OBSERVER, '!!'));
+    await until(() => existsSync(fixture.cursorFile + '.control') && readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused);
+  }
   assert(hooks);
   const pending = hooks.requestPermission(permission, stop.signal);
   await until(() => fixture.rooms.get(ROOM)!.some(event => event.sender === SELF && String(event.content.body).includes('Permission needed')));
@@ -36,9 +40,13 @@ test('the single paused receiver handles owner approval without resuming deliver
   fixture.add(ROOM, { ...reply, event_id: '$outsider', sender: '@administrator:elsewhere' });
   fixture.add(ROOM, reply);
   assert.deepEqual(await pending, { decision: 'accept' });
-  assert.equal(readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused, true);
+  assert.equal(readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused, mode === 'paused');
   assert.equal(delivered.length, 0);
   fixture.add(ROOM, message('$resume', OBSERVER, 'Continue the project'));
+  if (mode === 'nobody') {
+    await delay(150); assert.equal(delivered.length, 0);
+    fixture.waking.policy = 'owner'; fixture.waking.senders = [OBSERVER];
+  }
   await until(() => delivered.some(text => text.includes('$resume')));
   assert(delivered.every(text => !text.includes('$approval') && !text.includes('$outsider')));
   stop.abort(new Error('Owner ended the foreground run'));

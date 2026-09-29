@@ -15,7 +15,8 @@ export function deliveryPolicy(value: unknown): Result<DeliveryPolicy> {
     || !status(data.status) || !status(data.ownerStatus) || !wakePolicy(data.wakePolicy)
     || !Array.isArray(data.senders) || data.senders.length > 2000 || !data.senders.every(userId)
     || new Set(data.senders).size !== data.senders.length || data.senders.includes(data.userId)
-    || data.status === 'active' && data.ownerStatus === 'active' && !data.senders.includes(data.owner)) {
+    || (data.wakePolicy === 'nobody' ? data.senders.length !== 0
+      : data.status === 'active' && data.ownerStatus === 'active' && !data.senders.includes(data.owner))) {
     return failure('invalid', 'Invalid listener delivery policy');
   }
   return success({ ...data, grants: access.value } as DeliveryPolicy);

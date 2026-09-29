@@ -9,7 +9,7 @@ export function AgentWake({ agent, refresh }: { agent: AgentView; refresh: () =>
   const viewer = useSession();
   const action = useAction();
   const [selection, setSelection] = useState(agent.wakePolicy);
-  return <Panel title="Who can wake this agent?" description="Other messages wait as context. No model calls are made until an allowed sender speaks.">
+  return <Panel title="Who can wake this agent?" description="Choose who can trigger automatic chat delivery. Other messages wait as context.">
     <form className="bounded-form" onSubmit={event => {
       event.preventDefault();
       void action.run(() => request('/_coord/agents/' + agent.id, 'PATCH', { revision: agent.revision, wakePolicy: selection }, viewer.csrf), refresh);
@@ -17,7 +17,8 @@ export function AgentWake({ agent, refresh }: { agent: AgentView; refresh: () =>
       if (wakePolicy(event.target.value)) setSelection(event.target.value);
     }}>{WAKE_POLICIES.map(policy => <option key={policy} value={policy} disabled={viewer.human.id !== agent.owner && expandsWake(agent.wakePolicy, policy)}>{WAKE_LABELS[policy]}</option>)}</select>
       <p className="support">An allowed message delivers all pending context together, including other senders’ messages and room notices. Bursts are grouped within the listener’s debounce window. Large collections split only at the input size limit.</p>
-      <p className="support">Uses verified, active identities in this Crossfire instance. The agent never wakes itself. Room access, mute, owner interruption and tool approvals are unchanged. Active listeners refresh this setting during reconciliation.</p>
+      <p className="support">Nobody disables all chat-triggered input, including owner and urgent messages. Use the agent’s TUI directly or another native input method. Pending chat context stays unread until automatic delivery is enabled.</p>
+      <p className="support">Uses verified, active identities in this Crossfire instance. The agent never wakes itself. Room access, mute, owner interruption, tool approvals and listener heartbeats are unchanged. Active listeners refresh this setting during reconciliation.</p>
       {viewer.human.id !== agent.owner && <p className="support">Only the owner can expand wake-up authority. Administrators can restrict it.</p>}
       <Alert>{action.error}</Alert><div className="actions"><button disabled={agent.status === 'revoked' || action.pending || selection === agent.wakePolicy}>Save wake-up policy</button></div>
     </form>
