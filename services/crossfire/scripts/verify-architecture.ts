@@ -11,7 +11,7 @@ assert(selection.length === 0 || (selection.length === 1 && selection[0] === "in
 const scratch = join(root, ".temp");
 mkdirSync(scratch, { recursive: true });
 const output = mkdtempSync(join(scratch, "architecture-build-"));
-execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
+execFileSync(process.execPath, [fileURLToPath(import.meta.resolve("typescript/bin/tsc")),
   "-p", "tsconfig.architecture.json", "--outDir", output], {
   cwd: root, stdio: "inherit", timeout: 60_000,
 });

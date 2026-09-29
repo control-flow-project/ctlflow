@@ -1,0 +1,15 @@
+{
+  "name": "@fleetd/service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.0.0",
+    "npm": ">=11.17.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "node ../../scripts/build-service.mjs fleetd",
+    "test": "node ../../scripts/test-service.mjs fleetd"
+  }
+}

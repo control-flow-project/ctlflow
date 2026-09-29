@@ -8,19 +8,20 @@ import { config } from './config.js';
 import { privateDir, readJson, writeJson } from '../../../packages/files/src/index.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
+const repository = resolve(root, '../..');
 export function imageName(source: string): string {
   const hash = createHash('sha256');
   function add(path: string): void {
     for (const item of readdirSync(path, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
-      if (item.name === 'node_modules') continue;
+      if (['node_modules', 'dist', '.temp', '.analysis'].includes(item.name)) continue;
       const file = join(path, item.name);
       if (item.isDirectory()) add(file);
       else if (item.isFile()) hash.update(relative(source, file)).update(readFileSync(file));
       else throw new Error('Build input cannot be a symlink');
     }
   }
-  for (const file of ['Dockerfile', '.dockerignore', '.npmrc', 'package.json', 'package-lock.json', 'tsconfig.core.json']) hash.update(file).update(readFileSync(join(source, file)));
-  for (const directory of ['apps', 'packages', 'scripts', 'skills', 'docs', 'third-party']) add(join(source, directory));
+  for (const file of ['.dockerignore', '.npmrc', 'package.json', 'package-lock.json', 'services/crossfire/Dockerfile', 'services/crossfire/package.json', 'services/crossfire/tsconfig.core.json']) hash.update(file).update(readFileSync(join(source, file)));
+  for (const directory of ['apps', 'packages', 'scripts', 'skills', 'docs', 'third-party']) add(join(source, 'services/crossfire', directory));
   return 'crossfire-runtime:' + hash.digest('hex').slice(0, 20);
 }
 async function command(args: string[]): Promise<void> {
@@ -69,8 +70,8 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Port must be 1024..65535');
   const docker = spawnSync('docker', ['info', '--format', '{{json .SecurityOptions}}'], { encoding: 'utf8' });
   if (docker.status !== 0 || !docker.stdout.includes('rootless')) throw new Error('A working rootless Docker engine is required; no host changes are made by Crossfire');
-  const image = imageName(root);
-  if (parsed.values.compile || spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) await command(['build', '--tag', image, root]);
+  const image = imageName(repository);
+  if (parsed.values.compile || spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) await command(['build', '--file', join(root, 'Dockerfile'), '--tag', image, repository]);
   const options = runArguments(directory, image, port);
   const name = options[options.indexOf('--name') + 1]!;
   let stopping = false;
