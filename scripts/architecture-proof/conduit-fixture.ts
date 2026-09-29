@@ -16,7 +16,7 @@ async function docker(args: string[]): Promise<string> {
   return result.stdout.trim();
 }
 
-export async function conduitFixture(context: TestContext, options: { allowRoomCreation?: boolean } = {}) {
+export async function conduitFixture(context: TestContext, options: { jwtSecret?: string } = {}) {
   const name = "crossfire-architecture-" + randomUUID();
   const registrationToken = randomUUID();
   const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-conduit-"));
@@ -32,7 +32,8 @@ port = 6167
 allow_federation = false
 allow_registration = true
 registration_token = "${registrationToken}"
-allow_room_creation = ${options.allowRoomCreation ?? true}
+${options.jwtSecret ? "jwt_secret = " + JSON.stringify(options.jwtSecret) : ""}
+allow_room_creation = true
 allow_encryption = false
 allow_check_for_updates = false
 trusted_servers = []
@@ -86,7 +87,7 @@ log = "warn"
       });
     }
     assert.equal(response.status, 200, "Isolated registration did not finish");
-    return { id: string(response.body.user_id), token: string(response.body.access_token) };
+    return { id: string(response.body.user_id), token: string(response.body.access_token), password: input.password };
   }
-  return { base, register };
+  return { base, register, registrationToken };
 }

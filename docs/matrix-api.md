@@ -8,28 +8,28 @@ releases are not implicitly advertised by the installed server.
 - [Pinned official schema source](https://github.com/matrix-org/matrix-spec/tree/v1.12/data/api/client-server)
 - [Versioned Client-Server specification](https://spec.matrix.org/v1.12/client-server-api/)
 
-`skills/conduit-chat/scripts/matrix-operations.json` records the source version
+`packages/matrix/src/operations.json` records the source version
 and SHA-256 over the sorted relative filenames and exact bytes of every schema
 file the generator reads. The generator verifies the audited source fingerprint
 before updating the artifact. To regenerate or verify, provide an extracted
 official v1.12 checkout, not a mutable latest schema:
 
 ```sh
-npm run generate:matrix -- --source /absolute/matrix-spec-v1.12/data/api/client-server
-npm run generate:matrix -- --source /absolute/matrix-spec-v1.12/data/api/client-server --check
+npm run generate:matrix -- --root . --source /absolute/matrix-spec-v1.12/data/api/client-server
+npm run generate:matrix -- --root . --source /absolute/matrix-spec-v1.12/data/api/client-server --check
 ```
 
-`matrix-schema.ts` owns one mechanical acronym/camel/underscore-to-kebab spelling
+`packages/matrix/src/schema.ts` owns one mechanical acronym/camel/underscore-to-kebab spelling
 rule for operation names and parameter flags. Collisions fail generation. Native
 paths, methods, field names, enum values and pagination tokens are preserved.
-`matrix-api.ts` owns request validation and safety policy, not protocol schemas.
+`packages/matrix/src/commands.ts` owns request validation and safety policy, not protocol schemas.
 The native server validates complete request-body schemas and semantics.
 
 ## Discovery and coverage
 
-Run `chat.mjs matrix --help` for all command/access rows and
-`chat.mjs matrix COMMAND --help` for that operation's exact contract.
-All commands except help require `--instance` and `--agent`.
+Run `node crossfire-client.mjs matrix --help` for all command/access rows and
+`node crossfire-client.mjs matrix COMMAND --help` for that operation's exact contract.
+Account operations select the project-local identity with `--project` and `--profile`.
 
 | Purpose | Representative commands |
 | --- | --- |
@@ -80,8 +80,11 @@ Use smaller pages, projections, filters or explicit file output instead.
 
 Fresh identities get a recent snapshot bounded across rooms, followed by native
 forward continuation. Existing acknowledged cursors remain intact. Membership
-is authoritative: catalog reads do not join; enrollment joins once; a new human
-invitation or explicit native join restores membership. Native read markers and
+is authoritative: catalog reads do not join; enrollment grants no rooms; an
+explicit approved room grant establishes native membership. All authenticated
+accounts can also create rooms; native public-room admission still applies.
+Agent memberships outside explicit grants are removed by reconciliation.
+Native read markers and
 notification counts are exposed honestly; notifications are not an exact count
 of unread messages, and no total room-message count is invented.
 Native membership transitions also invalidate the old receive position when a
@@ -89,15 +92,15 @@ leave and rejoin both occur between polls. Profile changes do not reset it.
 
 ## Receive and interruption ownership
 
-- `receive.ts`: native history/cursors, projections, bounded snapshot/read and
+- `packages/agent-core/src/receive.ts`: native history/cursors, projections, bounded snapshot/read and
   acknowledgement publication; no Codex dependency.
-- `control.ts`: authenticated human intent and bounded native catch-up, minimal
+- `packages/agent-core/src/control.ts`: authenticated human intent and bounded native catch-up, minimal
   durable event/target-turn evidence; no message database.
-- `listen.ts`: one acquisition loop independent of receipt waiting, batching,
+- `packages/agent-core/src/listen.ts`: one acquisition loop independent of receipt waiting, batching,
   delivery ordering and checkpoint lifecycle.
-- `codex.ts`: exact existing-thread/workspace verification, native receipts,
+- `packages/adapter-codex/src/connection.ts`: exact existing-thread/workspace verification, native receipts,
   exact captured-turn cancellation with terminal proof.
-- `chat.ts`: argument namespace/dispatch and receiver locking.
+- `apps/client/src/main.ts`: argument namespace/dispatch and receiver locking.
 
 The human's `!!` control cannot come from historical search, edited messages,
 quotes, another agent or an unmentioned shared-room broadcast. A bare stop
@@ -121,6 +124,6 @@ remains in Matrix. No exactly-once crash guarantee is claimed.
 
 The operation metadata is derived from the Matrix specification, distributed
 under the Apache License 2.0. The original license is included with this source
-and installed in `licenses/matrix-spec.txt` with the agent skill.
+and distributed as `matrix-spec-LICENSE.txt` beside the client and agent skill.
 
 - [Matrix specification license](../third-party/matrix-spec-LICENSE)

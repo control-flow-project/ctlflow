@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
@@ -7,13 +7,15 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Matrix } from '../skills/conduit-chat/scripts/lib.ts';
-import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '../skills/conduit-chat/scripts/matrix-api.ts';
-import { kebab } from '../skills/conduit-chat/scripts/matrix-schema.ts';
-import { encodeOutput, outputBytes } from '../skills/conduit-chat/scripts/limits.ts';
-import { uploadStream, saveStream } from '../skills/conduit-chat/scripts/files.ts';
-import { matrixFixture, temporary, ROOM } from './test-support/listener.ts';
-import { ROOT } from './instance.ts';
+import { matrix } from '../packages/matrix/src/http.js';
+import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '../packages/matrix/src/commands.js';
+import { kebab } from '../packages/matrix/src/schema.js';
+import { encodeOutput, outputBytes } from '../packages/contracts/src/limits.js';
+import { uploadStream, saveStream } from '../packages/matrix/src/files.js';
+import { matrixFixture, temporary, ROOM } from './test-support/listener.js';
+import { buildClient } from './build-client.js';
+
+before(() => buildClient(process.cwd()));
 
 test('all 157 official operations have one mechanically derived spelling and exact native path', () => {
   assert.equal(operations.length, 157);
@@ -60,14 +62,14 @@ test('context bounds cover the entire output and never truncate native continuat
 
 test('native policy rejects privileged operations, foreign identities, remote routes, and unused flags before mutation', async context => {
   const fixture = await matrixFixture(context, temporary(context));
-  const client = new Matrix(fixture.settings.homeserver, fixture.account.access_token);
+  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
   for (const operation of operations.filter(operation => operation.access !== 'agent')) {
     await assert.rejects(executeOperation(client, fixture.settings, fixture.account, operation, {}), /not an enabled/);
   }
   assert.equal(fixture.requests.length, 0);
   for (const [command, args] of [
-    ['set-display-name', { 'user-id': fixture.settings.observer, body: '{"displayname":"wrong"}' }],
-    ['get-account-data', { 'user-id': fixture.settings.observer, type: 'm.direct' }],
+    ['set-display-name', { 'user-id': fixture.settings.owner, body: '{"displayname":"wrong"}' }],
+    ['get-account-data', { 'user-id': fixture.settings.owner, type: 'm.direct' }],
     ['join-room', { 'room-id-or-alias': '#room:elsewhere', body: '{}' }],
     ['join-room', { 'room-id-or-alias': ROOM, via: 'elsewhere', body: '{}' }],
     ['get-joined-rooms', { markdown: 'ignored' }],
@@ -75,8 +77,9 @@ test('native policy rejects privileged operations, foreign identities, remote ro
   ] as const) await assert.rejects(executeOperation(client, fixture.settings, fixture.account, selectOperation(command), args));
   assert(!fixture.requests.some(request => request.method !== 'GET'));
   fixture.missingObserver.add(ROOM);
-  await assert.rejects(executeOperation(client, fixture.settings, fixture.account, selectOperation('get-room-events'), { 'room-id': ROOM, dir: 'b' }), /observer/);
-  await assert.rejects(executeOperation(client, fixture.settings, fixture.account, selectOperation('get-notifications'), {}), /observer/);
+  const result = await executeOperation(client, fixture.settings, fixture.account, selectOperation('get-room-events'), { 'room-id': ROOM, dir: 'b' });
+  assert.deepEqual((result as { chunk: unknown[] }).chunk, []);
+  assert(!fixture.requests.some(request => request.path.endsWith('/joined_members')));
 });
 
 test('native bodies support Markdown once and reject ambiguous, excessive or malformed inputs', context => {
@@ -107,7 +110,7 @@ test('binary streams are bounded, exclusive, hashed and remove partial files', a
 });
 
 test('CLI exposes the native manifest and rejects every superseded top-level command', async () => {
-  const execute = promisify(execFile), script = join(ROOT, 'skills/conduit-chat/scripts/chat.ts');
+  const execute = promisify(execFile), script = join(process.cwd(), 'dist/crossfire-client.mjs');
   const result = await execute(process.execPath, [script, 'matrix', 'get-room-events', '--help']);
   assert.equal(JSON.parse(result.stdout).id, 'getRoomEvents');
   for (const command of ['init', 'read', 'listen', 'send', 'history', 'rooms', 'who', 'upload', 'download']) {
@@ -120,5 +123,5 @@ test('large JSON transport fails independently of the smaller context budget', a
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   context.after(() => new Promise<void>(resolve => server.close(() => resolve())));
   const address = server.address(); assert(address && typeof address === 'object');
-  await assert.rejects(new Matrix('http://127.0.0.1:' + address.port).get('/probe'), /size limit/);
+  await assert.rejects(matrix({base: 'http://127.0.0.1:' + address.port}).get('/probe'), /size bound/);
 });

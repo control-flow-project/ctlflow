@@ -1,32 +1,36 @@
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { createServer, type ServerResponse } from 'node:http';
-import { copyFileSync, chmodSync, mkdtempSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
-import { API, writeJson, readJson, type Account, type Event, type Settings } from '../../skills/conduit-chat/scripts/lib.ts';
-import type { CodexOptions } from '../../skills/conduit-chat/scripts/codex.ts';
+import { API } from '../../packages/matrix/src/http.js';
+import { writeJson, readJson } from '../../packages/files/src/index.js';
+import type { Account, Event, Settings } from '../../packages/contracts/src/client.js';
+import { connectCodex } from '../../packages/adapter-codex/src/connection.js';
+import type { RuntimeHooks } from '../../packages/agent-core/src/runtime.js';
+import { builtRelease } from './release.js';
+import { emptyActivity } from '../../packages/contracts/src/activity.js';
+import { serveArtifact } from '../../apps/server/src/artifacts.js';
+import type { WakePolicy } from '../../packages/contracts/src/wake.js';
 
 export const THREAD = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 export const OBSERVER = '@human:test.localhost';
-export const SELF = '@agent-watson:test.localhost';
+export const AGENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeef';
+export const SELF = '@agent-' + AGENT_ID + ':test.localhost';
 export const ROOM = '!coordination:test.localhost';
 
-export function temporary(t: TestContext): string {
-  const directory = mkdtempSync(join(tmpdir(), 'crossfire-listener-'));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
+export function temporary(_context: TestContext): string {
+  mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
+  const directory = mkdtempSync(join(process.cwd(), '.temp/crossfire-listener-'));
   return directory;
 }
 
 export async function fakeCodex(t: TestContext, config: Record<string, unknown> = {}) {
   const directory = temporary(t);
-  const binary = join(directory, 'codex.mjs');
-  copyFileSync(new URL('codex-proxy.mjs', import.meta.url), binary);
-  chmodSync(binary, 0o700);
-  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  const server = new WebSocketServer({ host: '127.0.0.1', port: 0, verifyClient: (info: { req: import('node:http').IncomingMessage }) => info.req.headers.authorization === 'Bearer fixture-only' });
   await once(server, 'listening');
   t.after(() => new Promise<void>(resolve => {
     for (const client of server.clients) client.terminate();
@@ -65,11 +69,15 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       if (mode === 'unexpected-id') { send({ id: -1, result: {} }); return; }
       if (mode === 'oversized') { socket.send('x'.repeat(8 * 1024 * 1024 + 1)); return; }
       send({ id: request.id, result: { userAgent: 'protocol fixture' } });
-    } else if (request.method === 'thread/read') {
+    } else if (['thread/start', 'thread/resume', 'thread/read'].includes(request.method)) {
       send({ id: request.id, result: { thread: { id: configuration.thread, cwd: configuration.workspace,
         status: { type: configuration.status ?? 'idle' },
         canAcceptDirectInput: 'directInput' in configuration ? configuration.directInput : true } } });
     } else if (request.method === 'thread/turns/list') {
+      if (configuration.unmaterialized && turns.size === 0) {
+        send({ id: request.id, error: { code: -32600, message: `thread ${THREAD} is not materialized yet; thread/turns/list is unavailable before first user message` } });
+        return;
+      }
       const all = [...turns].reverse().map(id => ({ id, status: [...history].reverse().find(entry => entry.type === 'turnCompleted' && entry.turnId === id)?.status ?? 'inProgress' }));
       const start = Number(request.params.cursor ?? 0), end = start + Number(request.params.limit);
       send({ id: request.id, result: { data: all.slice(start, end), nextCursor: end < all.length ? String(end) : null } });
@@ -117,15 +125,17 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       send({ id: request.id, result: pages?.shift() ?? { data: history.slice(start, end), nextCursor: start ? String(start) : null } });
     } else send({ id: request.id, error: { code: -32601, message: 'Forbidden method in fixture' } });
   }));
-  const update = (changes: Record<string, unknown>) => {
-    Object.assign(configuration, changes);
-    writeJson(join(directory, 'codex.json'), configuration);
-  };
+  const update = (changes: Record<string, unknown>) => { Object.assign(configuration, changes); };
   update({});
+  writeJson(join(directory, 'connection.json'), { version: 1, endpoint: `ws://127.0.0.1:${address.port}`, tokenFile: 'token' });
+  writeFileSync(join(directory, 'token'), 'fixture-only', { mode: 0o600 });
   return {
     directory, update, notify, publish: () => { for (const publish of publications.splice(0)) publish(); },
     disconnect: () => { for (const client of server.clients) client.terminate(); },
-    options: { thread: THREAD, workspace: directory, binary, timeoutMs: 2000, pollMs: 100 } satisfies CodexOptions,
+    options: { session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', timeoutMs: 2000, pollMs: 100,
+      hooks: { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } },
+    runtime: (signal: AbortSignal, pollMs: number, hooks?: RuntimeHooks, timeoutMs = 2000) => connectCodex({ session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', timeoutMs, pollMs,
+      hooks: hooks ?? { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } }, signal),
     requests: () => requests,
   };
 }
@@ -148,19 +158,25 @@ export async function until(predicate: () => boolean, message = 'Condition did n
 }
 
 export async function matrixFixture(t: TestContext, workspace: string) {
-  const settings: Settings = { instance: 'test', label: 'Test', server_name: 'test.localhost',
-    homeserver: '', room_service: '', observer: OBSERVER, observer_label: 'Human',
-    registration_token: 'enrollment-only', max_upload_bytes: 1024,
-    default_room: 'coordination', rooms: [{ alias: 'coordination', room_id: ROOM, name: 'Coordination', purpose: 'Test' }] };
-  const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture', workspace };
+  const settings: Settings = { instance: 'test', server_name: 'test.localhost',
+    homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };
+  const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture' };
   const rooms = new Map<string, Event[]>([[ROOM, []]]);
   const joined = new Set([ROOM]);
   const invites: Record<string, { invite_state: { events: Event[] } }> = {};
   const missingObserver = new Set<string>();
   const failures = new Map<string, number[]>();
+  const gates = new Map<string, { wait: Promise<void>; entered: () => void }>();
   const requests: { path: string; query: URLSearchParams; method?: string; body?: unknown }[] = [];
   const eventPositions = new Map<string, number>();
   const extraMembers = new Set<string>();
+  const muted = new Set<string>();
+  const access = { ownerStatus: 'active', status: 'active' };
+  const waking: { policy: WakePolicy; senders: string[] } = { policy: 'owner-agents', senders: [OBSERVER, '@agent-holmes:test.localhost'] };
+  const release = builtRelease().release.manifest;
+  const publication = { release: builtRelease().release };
+  const reporting = { disconnect: false, current: release };
+  const syncUpdates = { enabled: true, hung: false };
   const waiters = new Set<() => void>();
   let revision = 0;
   let pageOverride: unknown;
@@ -170,27 +186,42 @@ export async function matrixFixture(t: TestContext, workspace: string) {
     response.end(JSON.stringify(body));
   }
   const server = createServer(async (request, response) => {
-    if (request.headers.authorization !== 'Bearer ' + account.access_token) {
+    if (serveArtifact(publication.release, request.method ?? 'GET', request.url ?? '', response)) return;
+    if (request.url !== '/_coord/release' && request.headers.authorization !== 'Bearer ' + account.access_token) {
       send(response, { errcode: 'M_UNAUTHORIZED' }, 401); return;
     }
     const url = new URL(request.url!, 'http://127.0.0.1');
     const path = decodeURIComponent(url.pathname);
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
-    requests.push({ path, query: url.searchParams, method: request.method, body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined });
+    requests.push({ path, query: url.searchParams, ...(request.method ? { method: request.method } : {}), body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined });
+    const gate = gates.get(path);
+    if (gate) { gates.delete(path); gate.entered(); await gate.wait; }
     const failure = failures.get(path)?.shift();
     if (failure) { send(response, { errcode: 'M_TEST', error: 'Fixture failure' }, failure); return; }
-    if (path === '/_coord/rooms') {
-      send(response, { default_room: settings.default_room, rooms: settings.rooms });
+    if (path === '/_coord/release') {
+      send(response, reporting.current);
+    } else if (path === '/_coord/agents/' + AGENT_ID + '/delivery') {
+      send(response, { id: AGENT_ID, owner: OBSERVER, userId: SELF, ...access, wakePolicy: waking.policy,
+        senders: waking.senders, grants: [...joined].map(room => ({ room, access: 'reply', muted: muted.has(room) })) });
+    } else if (path === '/_coord/agents/' + AGENT_ID) {
+      const grants = [...joined].map(room => ({ room, access: 'reply', muted: muted.has(room) }));
+      send(response, { id: AGENT_ID, owner: OBSERVER, userId: SELF, name: 'Watson (Human)', nativeName: null,
+        ...access, wakePolicy: waking.policy, revision: 0, grantRevision: 0, grants, applied: grants,
+        appliedGrantRevision: 0, appliedRevision: 0, lastSuccess: Date.now(), error: null,
+        activity: emptyActivity() });
+    } else if (path === '/_coord/agents/' + AGENT_ID + '/heartbeat' && request.method === 'POST') {
+      send(response, reporting);
     } else if (path === API + '/joined_rooms') {
       send(response, { joined_rooms: [...joined] });
     } else if (path === API + '/sync') {
+      if (syncUpdates.hung) return;
       let timer: NodeJS.Timeout | undefined;
       const complete = () => {
         clearTimeout(timer); waiters.delete(complete);
         const since = Number(url.searchParams.get('since')?.replace('sync-', '') ?? -1);
         const entries = [...joined].map(room => {
-          const events = (rooms.get(room) ?? []).filter(event => (eventPositions.get(event.event_id) ?? 0) > since);
+          const events = syncUpdates.enabled ? (rooms.get(room) ?? []).filter(event => (eventPositions.get(event.event_id) ?? 0) > since) : [];
           return [room, { timeline: { events: events.slice(-20), limited: events.length > 20 } }];
         });
         send(response, { next_batch: 'sync-' + revision, rooms: { invite: invites, join: Object.fromEntries(entries) } });
@@ -214,7 +245,8 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       const backwards = url.searchParams.get('dir') === 'b';
       const start = position(url.searchParams.get('from'), backwards ? events.length : 0)
         - (backwards && url.searchParams.has('from') ? 1 : 0);
-      const end = position(url.searchParams.get('to'), backwards ? 0 : events.length);
+      const end = position(url.searchParams.get('to'), backwards ? 0 : events.length)
+        - (url.searchParams.has('to') && !url.searchParams.get('to')!.startsWith('sync-') ? 1 : 0);
       const limit = Number(url.searchParams.get('limit'));
       const filter = JSON.parse(url.searchParams.get('filter') ?? '{}');
       const candidates = (backwards ? events.slice(end, start).reverse() : events.slice(start, end))
@@ -224,6 +256,12 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       send(response, pageOverride ?? { chunk: page, ...(page.length ? { end: String(next) } : {}) });
     } else if (path.endsWith('/read_markers')) {
       send(response, {});
+    } else if (path.includes('/send/m.room.message/')) {
+      const room = path.slice((API + '/rooms/').length, path.indexOf('/send/'));
+      const event = { ...message('$sent-' + revision, SELF), content: requests.at(-1)!.body as Event['content'] };
+      const events = rooms.get(room) ?? [];
+      events.push(event); rooms.set(room, events);
+      eventPositions.set(event.event_id, revision + 1); wake(); send(response, { event_id: event.event_id });
     } else if (path.endsWith('/leave')) {
       const room = path.slice((API + '/rooms/').length, -'/leave'.length);
       joined.delete(room); delete invites[room]; wake(); send(response, {});
@@ -236,22 +274,26 @@ export async function matrixFixture(t: TestContext, workspace: string) {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
   const address = server.address(); assert(address && typeof address === 'object');
-  settings.homeserver = settings.room_service = `http://127.0.0.1:${address.port}`;
-  const root = temporary(t);
-  const cursorFile = join(root, 'state/test/watson/cursors.json');
-  const config = join(root, 'config');
-  writeJson(join(config, 'instances/test.json'), settings);
-  writeJson(join(config, 'accounts/test/watson.json'), account);
-  mkdirSync(join(root, 'state/test/watson'), { recursive: true });
-  return { settings, account, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, failures,
-    env: { ...process.env, CROSSFIRE_CLIENT_CONFIG_DIR: config, CROSSFIRE_CLIENT_STATE_DIR: join(root, 'state') },
+  settings.homeserver = `http://127.0.0.1:${address.port}`;
+  const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
+  writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
+  return { settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, access, waking, syncUpdates, failures,
+    env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
     wake, waiting: () => waiters.size,
+    hold: (path: string) => {
+      let entered = false;
+      let release!: () => void;
+      const wait = new Promise<void>(resolve => { release = resolve; });
+      gates.set(path, { wait, entered: () => { entered = true; } });
+      t.after(release);
+      return { entered: () => entered, release };
+    },
     overridePage: (page: unknown) => { pageOverride = page; },
     subscribe: (room: string) => { joined.add(room); writeJson(cursorFile, { ...(existsSync(cursorFile) ? readJson<Record<string, string>>(cursorFile) : {}), [room]: '0' }); },
     add: (room: string, ...events: Event[]) => {
       for (const event of events) { eventPositions.set(event.event_id, ++revision); }
       rooms.set(room, [...rooms.get(room) ?? [], ...events]);
-      queueMicrotask(() => { for (const waiter of [...waiters]) waiter(); });
+      if (syncUpdates.enabled) queueMicrotask(() => { for (const waiter of [...waiters]) waiter(); });
     },
   };
 }

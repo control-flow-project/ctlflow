@@ -149,3 +149,7 @@ instances/
 verification/
 .client-paths.json
 .analysis/
+.secrets/
+.codex/
+.test/
+.tests/

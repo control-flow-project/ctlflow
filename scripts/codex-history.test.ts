@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { connectCodex } from '../skills/conduit-chat/scripts/codex.ts';
-import { listen } from '../skills/conduit-chat/scripts/listen.ts';
-import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, THREAD, until } from './test-support/listener.ts';
+import { connectCodex } from '../packages/adapter-codex/src/connection.js';
+import { listen } from '../packages/agent-core/src/listen.js';
+import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, THREAD, until } from './test-support/listener.js';
 
 function oldHistory(count: number, completed = true) {
   return [
@@ -42,7 +42,7 @@ test('a long active turn needs only its post-submission interval to prove interr
   await delivery;
   const starts = native.requests().filter(request => request.method === 'turn/start');
   assert.equal(starts.length, 2);
-  assert.deepEqual(starts[0].params, starts[1].params);
+  assert.deepEqual(starts[0]!.params, starts[1]!.params);
   assert(native.requests().filter(request => request.method === 'thread/timeline/list').every(request => !request.params!.cursor));
 });
 
@@ -83,11 +83,34 @@ test('an exact receipt published after a page snapshot is found on the next poll
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
 });
 
-test('fresh unavailable history is not mistaken for receipt or replay permission', async context => {
+test('unsupported history without native unmaterialized proof fails before input', async context => {
   const native = await fakeCodex(context, { boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601] });
   const connection = await connectCodex(native.options, new AbortController().signal);
   context.after(connection.close);
-  await connection.deliver('input', 'fresh');
+  await assert.rejects(connection.deliver('input', 'fresh'), /not supported yet/);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+  assert.equal(native.requests().filter(request => request.method === 'thread/timeline/list').length, 1);
+});
+
+test('native unmaterialized history permits one first input but never fabricates its receipt', async context => {
+  const native = await fakeCodex(context, { unmaterialized: true, boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601], deferHistory: true });
+  const connection = await connectCodex(native.options, new AbortController().signal);
+  context.after(connection.close);
+  let delivered = false;
+  const delivery = connection.deliver('input', 'fresh').then(() => { delivered = true; });
+  await until(() => native.requests().filter(request => request.method === 'thread/timeline/list').length === 3);
+  assert.equal(delivered, false);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
+  native.publish();
+  await delivery;
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
+});
+
+test('unmaterialized initialization is bounded and unsupported receipts never replay', async context => {
+  const native = await fakeCodex(context, { unmaterialized: true, boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601, -32601] });
+  const connection = await connectCodex(native.options, new AbortController().signal);
+  context.after(connection.close);
+  await assert.rejects(connection.deliver('input', 'fresh'), /not supported yet/);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
   assert.equal(native.requests().filter(request => request.method === 'thread/timeline/list').length, 4);
 });
@@ -180,7 +203,7 @@ test('Matrix cursors remain unread during native publication lag and later drain
   matrix.add(ROOM, message('$first'));
   matrix.add(other, message('$second'));
   const stop = new AbortController();
-  const receiving = listen({ ...matrix, limit: 50, pollMs: 100, debounceMs: 0, codex: native.options }, stop.signal).catch(error => error);
+  const receiving = listen({ ...matrix, reconcileMs: 1000, limit: 50, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   context.after(async () => { stop.abort(new Error('test complete')); await receiving; });
   await until(() => native.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length >= 2);
   assert.throws(() => readFileSync(matrix.cursorFile));

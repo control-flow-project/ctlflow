@@ -5,7 +5,7 @@ import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSy
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { pathToFileURL } from "node:url";
+import { imageName } from "../../apps/server/src/operator.js";
 import test from "node:test";
 
 const execute = promisify(execFile);
@@ -57,9 +57,9 @@ test("one native install policy governs host, Docker context and image identity"
     ["min-release-age-exclude[]=@tinqerjs/tinqer", "min-release-age-exclude[]=@tinqerjs/better-sqlite3-adapter"]);
   assert.match(readFileSync(join(root, ".dockerignore"), "utf8"), /^!\.npmrc$/m);
   assert.match(readFileSync(join(root, "Dockerfile"), "utf8"),
-    /COPY \.npmrc package\.json package-lock\.json \.\/\nRUN npm ci --omit=dev --ignore-scripts/);
-  assert.match(readFileSync(join(root, "scripts/manage.ts"), "utf8"),
-    /const runtimeFiles = \[[^\]]*'\.npmrc'/);
+    /COPY \.npmrc package\.json package-lock\.json \.\//);
+  assert.match(readFileSync(join(root, "Dockerfile"), "utf8"), /RUN npm ci --ignore-scripts/);
+  assert.match(readFileSync(join(root, "apps/server/src/operator.ts"), "utf8"), /\x27.npmrc\x27/);
   const { directory, environment } = fixture();
   writeProject(directory);
   assert.equal((await npm(directory, environment, ["config", "get", "min-release-age"])).stdout.trim(), "7");
@@ -95,19 +95,15 @@ test("an actual pre-exemption npm is rejected before installation even with scri
 });
 
 test("changing only policy bytes invalidates the real runtime image fingerprint", async () => {
-  const { directory, environment } = fixture();
-  for (const file of ["Dockerfile", ".dockerignore", "package.json", "package-lock.json"]) {
+  const { directory } = fixture();
+  for (const file of ["Dockerfile", ".dockerignore", ".npmrc", "package.json", "package-lock.json", "tsconfig.core.json"]) {
     copyFileSync(join(root, file), join(directory, file));
   }
-  for (const folder of ["scripts", "skills"]) cpSync(join(root, folder), join(directory, folder), { recursive: true });
-  const module = pathToFileURL(join(directory, "scripts/manage.ts")).href;
-  const fingerprint = async () => (await execute(process.execPath, ["--input-type=module", "-e",
-    "const {imageName}=await import(process.argv[1]); console.log(imageName());", module],
-    { cwd: directory, env: environment, timeout: 10_000 })).stdout.trim();
-  const original = await fingerprint();
+  for (const folder of ["scripts", "skills", "apps", "packages", "docs", "third-party"]) cpSync(join(root, folder), join(directory, folder), { recursive: true });
+  const original = imageName(directory);
   assert.match(original, /^crossfire-runtime:[a-f0-9]{20}$/);
   writeFileSync(join(directory, ".npmrc"), policy.replace("min-release-age=7", "min-release-age=8"));
-  assert.notEqual(await fingerprint(), original);
+  assert.notEqual(imageName(directory), original);
 });
 
 test("native age policy admits aged third parties and only the named owned exemptions", { timeout: 90_000 }, async context => {

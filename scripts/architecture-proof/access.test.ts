@@ -5,7 +5,7 @@ import { conduitFixture } from "./conduit-fixture.js";
 import { object, request, requestBytes, string } from "./native-http.js";
 
 test("native admission and applied revocation boundaries", { timeout: 180_000 }, async context => {
-  const fixture = await conduitFixture(context, { allowRoomCreation: false });
+  const fixture = await conduitFixture(context);
   const admin = await fixture.register("access-admin");
   const agent = await fixture.register("access-agent");
   const outsider = await fixture.register("no-rooms");
@@ -28,17 +28,48 @@ test("native admission and applied revocation boundaries", { timeout: 180_000 },
     assert.equal(attempted.body.access_token, undefined);
   });
 
-  await context.test("roomless agent cannot create rooms, join uninvited or fetch room content", async () => {
+  await context.test("roomless agent has only accepted creation metadata, not membership or private content", async () => {
     const joined = await request(fixture.base, "GET", "/_matrix/client/v3/joined_rooms", undefined, outsider.token);
     assert.deepEqual(joined.body.joined_rooms, []);
-    const create = await request(fixture.base, "POST", "/_matrix/client/v3/createRoom", {}, outsider.token);
-    assert.equal(create.status, 403);
     const join = await request(fixture.base, "POST", path + "/join", {}, outsider.token);
     assert.equal(join.status, 403);
     const history = await request(fixture.base, "GET", path + "/messages?dir=b&limit=10", undefined, outsider.token);
     assert.equal(history.status, 200);
-    assert.deepEqual(history.body.chunk, []);
-    assert.deepEqual(history.body.state, []);
+    assert(Array.isArray(history.body.chunk));
+    assert.equal(history.body.chunk.length, 1);
+    const creation = object(history.body.chunk[0]);
+    assert.equal(creation.type, "m.room.create");
+    assert.equal(creation.sender, admin.id);
+    assert.equal(object(creation.content).room_version, "12");
+    assert(Array.isArray(history.body.state));
+    assert.equal(history.body.state.length, 1);
+    const creatorProfile = object(history.body.state[0]);
+    assert.equal(creatorProfile.type, "m.room.member");
+    assert.equal(creatorProfile.sender, admin.id);
+    assert.equal(creatorProfile.state_key, admin.id);
+    assert.equal(object(creatorProfile.content).membership, "join");
+  });
+
+  await context.test("public and private room creation is available to authenticated accounts, not anonymous callers", async () => {
+    const anonymous = await request(fixture.base, "POST", "/_matrix/client/v3/createRoom", {
+      visibility: "public", preset: "public_chat",
+    });
+    assert.equal(anonymous.status, 401);
+    for (const creator of [agent, outsider]) {
+      for (const visibility of ["public", "private"] as const) {
+        const created = await request(fixture.base, "POST", "/_matrix/client/v3/createRoom", {
+          visibility, preset: visibility === "public" ? "public_chat" : "private_chat",
+        }, creator.token);
+        assert.equal(created.status, 200, JSON.stringify(created.body));
+        const createdPath = "/_matrix/client/v3/rooms/" + encodeURIComponent(string(created.body.room_id));
+        const rules = await request(fixture.base, "GET", createdPath + "/state/m.room.join_rules", undefined, creator.token);
+        assert.equal(rules.status, 200);
+        assert.equal(rules.body.join_rule, visibility === "public" ? "public" : "invite");
+        const left = await request(fixture.base, "POST", createdPath + "/leave", {}, creator.token);
+        assert.equal(left.status, 200);
+      }
+    }
+    assert.deepEqual((await request(fixture.base, "GET", "/_matrix/client/v3/joined_rooms", undefined, outsider.token)).body.joined_rooms, []);
   });
 
   const invite = await request(fixture.base, "POST", path + "/invite", { user_id: agent.id }, admin.token);
@@ -54,6 +85,12 @@ test("native admission and applied revocation boundaries", { timeout: 180_000 },
   assert.equal(readable.status, 200);
   const outsiderEvent = await request(fixture.base, "GET", eventPath, undefined, outsider.token);
   assert.equal(outsiderEvent.status, 403);
+  const outsiderHistory = await request(fixture.base, "GET", path + "/messages?dir=b&limit=100", undefined, outsider.token);
+  assert.equal(outsiderHistory.status, 200);
+  assert(Array.isArray(outsiderHistory.body.chunk));
+  assert.deepEqual(outsiderHistory.body.chunk.map(event => object(event).type), ["m.room.create"]);
+  assert(Array.isArray(outsiderHistory.body.state));
+  assert.deepEqual(outsiderHistory.body.state.map(event => object(event).state_key), [admin.id]);
 
   const file = "private-room-attachment-" + randomUUID();
   const uploaded = await requestBytes(fixture.base, "POST", "/_matrix/media/v3/upload?filename=private.txt",
@@ -79,7 +116,7 @@ test("native admission and applied revocation boundaries", { timeout: 180_000 },
       undefined, outsider.token);
     assert.equal(downloaded.status, 200);
     assert.equal(downloaded.body.toString("utf8"), file);
-    console.log("UNRESOLVED media boundary: zero-room identity reads known private-room attachment.");
+    console.log("ACCEPTED native media: authenticated exact-link access does not require room membership.");
   });
 
   await context.test("native unauthenticated media routes deny this authenticated upload", async () => {
@@ -114,6 +151,26 @@ test("native admission and applied revocation boundaries", { timeout: 180_000 },
       undefined, agent.token);
     assert.equal(mediaRead.status, 200);
     assert.equal(mediaRead.body.toString("utf8"), file);
-    console.log("UNRESOLVED revocation boundary: old server-side history/media remain readable after kick.");
+    console.log("ACCEPTED room removal: earlier authorized history and authenticated media links remain readable.");
+  });
+
+  await context.test("account deactivation blocks the old token and password login, unlike room removal", async () => {
+    const challenge = await request(fixture.base, "POST", "/_matrix/client/v3/account/deactivate", {}, agent.token);
+    assert.equal(challenge.status, 401);
+    const deactivated = await request(fixture.base, "POST", "/_matrix/client/v3/account/deactivate", {
+      auth: { type: "m.login.password", session: string(challenge.body.session),
+        identifier: { type: "m.id.user", user: agent.id }, password: agent.password },
+    }, agent.token);
+    assert.equal(deactivated.status, 200, JSON.stringify(deactivated.body));
+    const history = await request(fixture.base, "GET", eventPath, undefined, agent.token);
+    assert.equal(history.status, 401);
+    const mediaRead = await requestBytes(fixture.base, "GET", "/_matrix/client/v1/media/download/" + mediaPath,
+      undefined, agent.token);
+    assert.equal(mediaRead.status, 401);
+    const login = await request(fixture.base, "POST", "/_matrix/client/v3/login", {
+      type: "m.login.password", identifier: { type: "m.id.user", user: agent.id }, password: agent.password,
+    });
+    assert.equal(login.status, 403);
+    assert.equal(login.body.errcode, "M_USER_DEACTIVATED");
   });
 });

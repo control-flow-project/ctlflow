@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "lib": ["ES2023"], "module": "NodeNext",
+    "moduleResolution": "NodeNext", "strict": true, "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true, "noUnusedLocals": true, "noUnusedParameters": true, "erasableSyntaxOnly": true,
+    "noEmitOnError": true, "rootDir": ".", "types": ["node"], "skipLibCheck": true
+  },
+  "include": ["apps/client/**/*.ts", "apps/server/**/*.ts", "packages/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["scripts/architecture-proof/*.test.ts", "scripts/verify-architecture.ts"]
+}

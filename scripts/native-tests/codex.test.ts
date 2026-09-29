@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { connectCodex } from '../../skills/conduit-chat/scripts/codex.ts';
-import { listen } from '../../skills/conduit-chat/scripts/listen.ts';
-import { matrixFixture, message, ROOM, OBSERVER, until } from '../test-support/listener.ts';
-import { nativeCodex } from '../test-support/native-codex.ts';
+import { listen } from '../../packages/agent-core/src/listen.js';
+import { matrixFixture, message, ROOM, OBSERVER, until } from '../test-support/listener.js';
+import { nativeCodex } from '../test-support/native-codex.js';
 
-test('installed Codex receipts, interruption recovery, original controller, and Matrix integration', { timeout: 60_000 }, async context => {
+test('owned native Codex receipts, interruption recovery, commands and Matrix integration', { timeout: 60_000 }, async context => {
   const native = await nativeCodex(context);
-  const adapter = await connectCodex(native.options, new AbortController().signal);
+  assert(Array.isArray((await native.call('thread/timeline/list', { threadId: native.thread.id, limit: 1 })).data));
+  assert.equal(native.requests.length, 0, 'Attaching must not submit model input');
+  const adapter = native.adapter;
   context.after(adapter.close);
   await adapter.deliver('idle fixture input', 'fixture-idle');
   await until(() => native.held() !== undefined);
@@ -28,9 +29,10 @@ test('installed Codex receipts, interruption recovery, original controller, and 
   assert(users().some(event => (event.params.item as { clientId: string }).clientId === 'fixture-busy'));
 
   const beforeTool = native.completed();
-  native.tool();
+  native.tool('exec_command', { cmd: 'printf fixture-output', max_output_tokens: 100, yield_time_ms: 1000 });
   await adapter.deliver('tool routing fixture', 'fixture-tool');
-  await until(() => native.toolCalls() === 1 && native.completed() > beforeTool);
+  await until(() => native.completed() > beforeTool);
+  assert(native.notifications.some(event => event.method === 'item/completed' && (event.params.item as { type: string }).type === 'commandExecution'));
   assert(native.requests.some(request => JSON.stringify(request).includes('fixture-output')));
 
   native.hold();
@@ -47,8 +49,8 @@ test('installed Codex receipts, interruption recovery, original controller, and 
   await until(() => native.completed() >= beforeTool + 3);
   const replay = native.acknowledgements().filter(value => value.params.clientUserMessageId === 'fixture-interrupted');
   assert.equal(replay.length, 2, JSON.stringify({ replay, history: native.historyQueries, users: users().map(event => event.params) }));
-  assert.notEqual(replay[0].turn.id, replay[1].turn.id);
-  assert.deepEqual(replay[0].params, replay[1].params);
+  assert.notEqual(replay[0]!.turn.id, replay[1]!.turn.id);
+  assert.deepEqual(replay[0]!.params, replay[1]!.params);
   assert(native.relayRequests.some(request => request.method === 'thread/timeline/list'));
   assert.equal(users().filter(event => (event.params.item as { clientId: string }).clientId === 'fixture-interrupted').length, 1);
   assert(native.requests.some(request => JSON.stringify(request).includes('must survive interruption')));
@@ -63,14 +65,10 @@ test('installed Codex receipts, interruption recovery, original controller, and 
   await native.call('turn/interrupt', { threadId: native.thread.id, turnId: native.acknowledgements().at(-1)!.turn.id });
   await until(() => native.completed() > beforeReceivedInterrupt);
   assert.equal(native.acknowledgements().filter(value => value.params.clientUserMessageId === 'fixture-recorded').length, 1);
-  adapter.close();
-
-  const beforeManual = native.completed();
-  await native.call('turn/start', { threadId: native.thread.id, input: [{ type: 'text', text: 'owner still controls session', text_elements: [] }] });
-  await until(() => native.completed() > beforeManual);
   const matrix = await matrixFixture(context, native.workspace);
   const stop = new AbortController();
-  const receiving = listen({ ...matrix, limit: 2, pollMs: 100, debounceMs: 100, codex: native.options }, stop.signal).catch(error => error);
+  const receiving = listen({ ...matrix, reconcileMs: 120_000, limit: 2, pollMs: 100, debounceMs: 100, runtime: native.runtime }, stop.signal)
+    .catch(error => error);
   context.after(async () => { stop.abort(new Error('verification complete')); await receiving; });
   await until(() => matrix.waiting() === 1);
   native.hold();
@@ -91,7 +89,7 @@ test('installed Codex receipts, interruption recovery, original controller, and 
   assert.match(String(await receiving), /verification complete/);
   assert(!native.relayRequests.some(request => ['turn/interrupt', 'thread/start', 'thread/resume', 'thread/fork'].includes(request.method ?? '')));
   assert(native.notifications.every(event => !JSON.stringify(event).includes('api.openai.com')));
-  console.log('PASS native receipts, busy delivery, interrupted input, already-recorded cancellation, original tool control, relay disconnect, and Matrix burst recovery.');
+  console.log('PASS owned native receipts, busy delivery, interrupted input, actual command, cancellation and Matrix burst recovery.');
 });
 
 test('installed Codex verifies new input independently of previous turn history', { timeout: 60_000 }, async context => {
@@ -108,7 +106,7 @@ test('installed Codex verifies new input independently of previous turn history'
   const old = await native.call('thread/timeline/list', { threadId, limit: 100 });
   assert.equal((old.data as unknown[]).length, 100);
   assert.equal(typeof old.nextCursor, 'string');
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = native.adapter;
   context.after(connection.close);
   for (let index = 0; index < 60; index++) {
     const before = native.historyQueries.length;
@@ -125,18 +123,18 @@ test('installed Codex verifies new input independently of previous turn history'
   console.log('PASS 60 native deliveries over paginated prior history with bounded, non-historical receipt queries.');
 });
 
-test('a human Matrix control cancels through the noncontrolling native Codex connection during receipt wait', { timeout: 60_000 }, async context => {
+test('a human Matrix control cancels the owned native Codex run during receipt wait', { timeout: 60_000 }, async context => {
   const native = await nativeCodex(context);
   const matrix = await matrixFixture(context, native.workspace);
   const stop = new AbortController();
-  const result = listen({ ...matrix, limit: 20, pollMs: 100, debounceMs: 10000, codex: native.options }, stop.signal).catch(error => error);
+  const result = listen({ ...matrix, reconcileMs: 120_000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   context.after(async () => { stop.abort(new Error('verification complete')); await result; });
   await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   await native.call('turn/start', { threadId: native.thread.id, input: [{ type: 'text', text: 'human-owned work', text_elements: [] }] });
   await until(() => native.held() !== undefined);
   matrix.add(ROOM, message('$pending-native'));
   await until(() => native.acknowledgements().length === 1);
-  const captured = native.acknowledgements()[0].turn.id;
+  const captured = native.acknowledgements()[0]!.turn.id;
   matrix.add(ROOM, message('$stop-native', OBSERVER, '!!'));
   await until(() => {
     const state = JSON.parse(readFileSync(matrix.cursorFile + '.control', 'utf8'));
@@ -144,7 +142,7 @@ test('a human Matrix control cancels through the noncontrolling native Codex con
   });
   const interruptions = native.relayRequests.filter(request => request.method === 'turn/interrupt');
   assert.equal(interruptions.length, 1);
-  assert.deepEqual(interruptions[0].params, { threadId: native.thread.id, turnId: captured });
+  assert.deepEqual(interruptions[0]!.params, { threadId: native.thread.id, turnId: captured });
   assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
   assert.equal(native.acknowledgements().length, 1);
   assert(native.notifications.some(event => event.method === 'turn/completed' && (event.params.turn as { id: string; status: string }).id === captured));

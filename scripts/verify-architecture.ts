@@ -15,8 +15,9 @@ execFileSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
   "-p", "tsconfig.architecture.json", "--outDir", output], {
   cwd: root, stdio: "inherit", timeout: 60_000,
 });
-const tests = readdirSync(output).filter(name => name.endsWith(".test.js") &&
-  (selection.length === 0 || name === "installation.test.js")).sort().map(name => join(output, name));
+const directory = join(output, 'scripts/architecture-proof');
+const tests = readdirSync(directory).filter(name => name.endsWith(".test.js") &&
+  (selection.length === 0 || name === "installation.test.js")).sort().map(name => join(directory, name));
 assert(tests.length > 0, "Architecture build produced no tests");
 execFileSync(process.execPath, ["--test", ...tests], {
   cwd: root, stdio: "inherit", timeout: 300_000,

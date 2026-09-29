@@ -12,19 +12,19 @@
     "npm": ">=11.17.0"
   },
   "scripts": {
-    "build": "node scripts/build-client.ts",
-    "generate:matrix": "node scripts/generate-matrix-api.ts",
-    "test": "node --test scripts/*.test.ts",
+    "typecheck": "tsc -p tsconfig.core.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "build": "node scripts/build.mjs",
+    "test": "npm run build && node --test --test-concurrency=1 --test-timeout=180000 dist/tests/*.test.js dist/scripts/*.test.js dist/scripts/native-tests/*.test.js",
+    "test:browser": "npm run build && node --test dist/tests/browser.test.js",
+    "generate:matrix": "npm run build && node dist/scripts/generate-matrix-api.js",
+    "start": "node crossfire start",
     "crossfire": "node crossfire",
-    "typecheck": "tsc --noEmit",
-    "start": "node scripts/manage.ts start",
-    "verify": "node scripts/verify.ts",
-    "verify:codex": "node --test scripts/native-tests/codex.test.ts",
     "verify:architecture": "node scripts/verify-architecture.ts",
     "verify:installation": "node scripts/verify-architecture.ts installation",
-    "verify:startup": "node scripts/verify-startup.ts"
+    "verify:container": "npm run build && node dist/scripts/verify-container.js"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "^26.6.2",
     "@types/proper-lockfile": "4.1.4",
@@ -32,15 +32,11 @@
     "@types/ws": "8.18.1",
     "esbuild": "0.28.2",
     "typescript": "6.0.3",
+    "ws": "8.21.3",
     "yaml": "2.9.1"
   },
-  "dependencies": {
-    "@tinqerjs/better-sqlite3-adapter": "0.0.28",
-    "@tinqerjs/tinqer": "0.0.28",
-    "better-sqlite3": "13.0.3",
-    "marked": "18.0.13",
-    "proper-lockfile": "4.1.2",
-    "sanitize-html": "2.17.7",
-    "ws": "8.21.3"
-  }
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }
