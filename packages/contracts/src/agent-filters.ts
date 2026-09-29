@@ -1,6 +1,6 @@
 import type { ActivityView } from './activity.js';
 import type { Status } from './management.js';
-import { failure, success, type Result } from './result.js';
+import { failure, success, type Result } from '../../kernel/src/result.js';
 
 export const AGENT_STATUSES = ['active', 'suspended', 'revoked'] as const;
 export const LISTENER_STATUSES = ['all', 'online', 'offline', 'disconnecting'] as const;

@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 import * as queries from "./data/queries.js";
 import { authorityChanged, fields, grants, policy, revision, role, status, text, sameAccess, INVITATION_LIFETIME, type AgentView, type Grant } from "../../../packages/contracts/src/management.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
+import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
 import { actor, agentRecord, hash, record, secret, type Context, type Human } from "./context.js";
 import { eligible, grantLevel } from "./rooms.js";
 import { activity } from './activity.js';
 import { disconnectListeners } from './data/listeners.js';
 import { LISTENER_EXPIRY_MS } from '../../../packages/contracts/src/activity.js';
-import { wakePolicy, expandsWake } from '../../../packages/contracts/src/wake.js';
+import { wakePolicy } from '../../../packages/contracts/src/wake.js';
+import { wakeSenders, replaceWakeSenders } from './data/wake.js';
+import { activeIdentities } from './identities.js';
+import { userId } from '../../../packages/contracts/src/management.js';
 
 export function agentView(ctx: Context, agent: NonNullable<ReturnType<typeof queries.agent>>): AgentView {
   const desired = grants(JSON.parse(agent.grants));
@@ -15,7 +18,7 @@ export function agentView(ctx: Context, agent: NonNullable<ReturnType<typeof que
   if (!desired.ok || !applied.ok) throw new Error("Corrupt stored agent grants");
   const owner = queries.member(ctx.store, agent.owner);
   if (!owner) throw new Error("Agent owner is missing");
-  return { id: agent.id, owner: agent.owner, userId: agent.userId, wakePolicy: agent.wakePolicy,
+  return { id: agent.id, owner: agent.owner, userId: agent.userId, wakePolicy: agent.wakePolicy, wakeSenders: wakeSenders(ctx.store, agent.id),
     name: agent.override ?? agent.name + " (" + owner.label + ")", nativeName: null,
     status: agent.status, ownerStatus: owner.status, revision: agent.revision, grantRevision: agent.grantRevision,
     grants: desired.value, applied: applied.value, appliedGrantRevision: agent.appliedGrantRevision,
@@ -23,12 +26,15 @@ export function agentView(ctx: Context, agent: NonNullable<ReturnType<typeof que
 }
 
 export function changeAgent(ctx: Context, human: Human, id: string, value: unknown): Result<unknown> {
-  const parsed = fields(value, ["revision"], ["status", "name", 'wakePolicy']);
+  const parsed = fields(value, ["revision"], ["status", "name", 'wakePolicy', 'wakeSenders']);
   if (!parsed.ok) return parsed;
   const input = parsed.value;
   if (!revision(input.revision) || (input.status !== undefined && !status(input.status))
     || input.wakePolicy !== undefined && !wakePolicy(input.wakePolicy)
     || (input.name !== undefined && input.name !== null && !text(input.name, 200))) return failure("invalid", "Invalid agent change");
+  if (input.wakePolicy === 'selected' ? !Array.isArray(input.wakeSenders) || input.wakeSenders.length > 2000
+    || !input.wakeSenders.every(userId) || new Set(input.wakeSenders).size !== input.wakeSenders.length
+    : input.wakeSenders !== undefined) return failure('invalid', 'Selected wake policy requires a complete unique list of Matrix identities');
   return ctx.store.transaction(() => {
     const current = actor(ctx, human, input.name !== undefined);
     if (!current.ok) return current;
@@ -39,11 +45,15 @@ export function changeAgent(ctx: Context, human: Human, id: string, value: unkno
     if (agent.status === "revoked") return failure("conflict", "Revocation is permanent; enroll a new identity");
     const nextStatus = status(input.status) ? input.status : agent.status;
     const nextWake = wakePolicy(input.wakePolicy) ? input.wakePolicy : agent.wakePolicy;
-    if (human.id !== agent.owner && expandsWake(agent.wakePolicy, nextWake)) return failure('forbidden', 'Only the owner expands wake-up authority');
+    if (input.wakePolicy === 'selected') {
+      const available = new Set(activeIdentities(ctx).filter(identity => identity.id !== agent.userId).map(identity => identity.id));
+      if (!(input.wakeSenders as string[]).every(sender => available.has(sender))) return failure('invalid', 'Choose active people or agents other than this agent');
+    }
     const override = input.name === undefined ? agent.override : input.name as string | null;
     if (queries.changeAgent(ctx.store, id, agent.revision, nextStatus, override, agent.grants, agent.grantRevision, nextWake) !== 1) return failure("conflict", "Agent revision changed");
+    if (input.wakePolicy !== undefined) replaceWakeSenders(ctx.store, id, nextWake === 'selected' ? input.wakeSenders as string[] : []);
     if (nextStatus !== 'active') disconnectListeners(ctx.store, id, ctx.now() - LISTENER_EXPIRY_MS);
-    record(ctx, human.id, agent.owner, id, "agent.change", { status: nextStatus, name: override, wakePolicy: nextWake });
+    record(ctx, human.id, agent.owner, id, "agent.change", { status: nextStatus, name: override, wakePolicy: nextWake, wakeSenders: wakeSenders(ctx.store, id) });
     return success(agentView(ctx, queries.agent(ctx.store, id)!));
   }).immediate();
 }

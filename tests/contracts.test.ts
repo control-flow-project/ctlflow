@@ -4,7 +4,7 @@ import { AGENT_INSTRUCTIONS_MAX_BYTES, DEFAULT_AGENT_INSTRUCTIONS, authorityChan
 import { agentFilters } from "../packages/contracts/src/agent-filters.js";
 import { page } from "../apps/server/src/http.js";
 import { deliveryPolicy } from '../packages/contracts/src/delivery.js';
-import { WAKE_POLICIES, expandsWake } from '../packages/contracts/src/wake.js';
+import { WAKE_POLICIES, resolveWake } from '../packages/contracts/src/wake.js';
 
 test("native room identities remain opaque, including version 12 IDs", () => {
   const room = "!Z1lqALvgesu1ZL4m19nCNHXvw5TCMT8Os8gljGrpmug";
@@ -29,11 +29,13 @@ test('listener policy is explicit and rejects missing authority, self triggers a
 });
 
 test('nobody is the least wake-up authority and never a default substitution', () => {
-  assert.deepEqual(WAKE_POLICIES, ['nobody', 'owner', 'owner-agents', 'humans', 'everyone']);
-  for (const policy of WAKE_POLICIES) {
-    assert.equal(expandsWake(policy, 'nobody'), false);
-    assert.equal(expandsWake('nobody', policy), policy !== 'nobody');
-  }
+  assert.deepEqual(WAKE_POLICIES, ['nobody', 'owner', 'owner-agents', 'humans', 'everyone', 'selected']);
+  const owner = { id: '@owner:test', label: 'Owner', kind: 'human' as const, owner: '@owner:test' };
+  const peer = { id: '@peer:test', label: 'Peer', kind: 'agent' as const, owner: owner.id };
+  assert.deepEqual(resolveWake('nobody', [owner.id], owner.id, '@self:test', [owner, peer]), []);
+  assert.deepEqual(resolveWake('selected', [peer.id], owner.id, '@self:test', [owner, peer]), [peer.id]);
+  assert.deepEqual(resolveWake('selected', [], owner.id, '@self:test', [owner, peer]), []);
+  assert.deepEqual(resolveWake('selected', [peer.id], owner.id, peer.id, [owner, peer]), []);
 });
 
 test("cursor filtering and sorting use the same native ID order", () => {

@@ -1,7 +1,7 @@
 import { serviceUser, type Config } from "./config.js";
-import { authority } from "./native.js";
+import { authority } from "../../../packages/adapter-matrix/src/account/authority.js";
 import { API, nativeOk, segment } from "../../../packages/matrix/src/http.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
+import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
 import { fields, text } from "../../../packages/contracts/src/management.js";
 
 export type Bootstrap = { servicePassword: string; administratorPassword: string };
@@ -17,7 +17,8 @@ export function bootstrapSecrets(value: unknown): Result<Bootstrap> {
 }
 
 export async function bootstrap(config: Config, secrets: Bootstrap): Promise<Result<void>> {
-  const native = authority(config);
+  const native = authority({ ...config, serviceMatrixId: serviceUser(config) });
+  try {
   const service = await native.provision(serviceUser(config), secrets.servicePassword, "CROSSFIRE_CONTROL");
   if (!service.ok) return service;
   const serviceClient = { base: config.matrixOrigin, token: service.value.access_token };
@@ -38,4 +39,5 @@ export async function bootstrap(config: Config, secrets: Bootstrap): Promise<Res
     if (!administrator.ok) return administrator;
   }
   return success(undefined);
+  } finally { native.close(); }
 }

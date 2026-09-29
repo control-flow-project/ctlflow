@@ -26,7 +26,7 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
     const path = decodeURIComponent(new URL(request.url!, 'http://localhost').pathname);
     let body: unknown;
     if (path.startsWith('/_coord/agents/')) body = { id: 'agent', owner, userId: self, name: 'Holmes', nativeName: null,
-      status: access.status, ownerStatus: access.ownerStatus, wakePolicy: 'everyone', revision: 0, grantRevision: 0,
+      status: access.status, ownerStatus: access.ownerStatus, wakePolicy: 'everyone', wakeSenders: [], revision: 0, grantRevision: 0,
       grants: access.grant ? [{ room, access: 'reply', muted: false }] : [], applied: [], appliedRevision: null,
       appliedGrantRevision: null, lastSuccess: null, error: null,
       activity: emptyActivity() };

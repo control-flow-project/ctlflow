@@ -1,5 +1,5 @@
 import { fields, text, userId } from "../../../packages/contracts/src/management.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
+import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
 import { endpoint } from "../../../packages/matrix/src/http.js";
 
 export type Config = {

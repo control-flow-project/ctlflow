@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import type { Result } from '../../../packages/contracts/src/result.js';
+import type { Result } from '../../../packages/kernel/src/result.js';
 
 export function Alert({ children }: { children?: ReactNode }) {
   return children ? <div className="alert" role="alert">{children}</div> : null;

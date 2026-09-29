@@ -1,4 +1,4 @@
-import { failure, success, type Result } from './result.js';
+import { failure, success, type Result } from '../../kernel/src/result.js';
 import { releaseName } from './release.js';
 
 export const HEARTBEAT_MS = 30_000;

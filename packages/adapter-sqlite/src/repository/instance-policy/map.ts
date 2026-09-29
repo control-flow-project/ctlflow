@@ -1,0 +1,14 @@
+import type { InstancePolicy } from '../../../../domain/src/audit/types.js';
+import type { Tables } from '../../schema/tables.js';
+export function mapInstancePolicy(row: Tables['instance_policy']): InstancePolicy {
+  return {
+    id: row.id,
+    revision: row.revision,
+    maxOwnerAgents: row.max_owner_agents,
+    maxAgents: row.max_agents,
+    maxPending: row.max_pending,
+    enrollmentSeconds: row.enrollment_seconds,
+    reconcileSeconds: row.reconcile_seconds,
+    agentInstructions: row.agent_instructions,
+  };
+}

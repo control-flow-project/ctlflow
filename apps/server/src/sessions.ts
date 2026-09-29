@@ -1,6 +1,6 @@
 import * as queries from "./data/queries.js";
 import { HUMAN_SIGNUP, fields, text, type MemberView } from "../../../packages/contracts/src/management.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
+import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
 import { actor, hash, matches, record, secret, type Context, type Human } from "./context.js";
 import { serviceUser } from "./config.js";
 

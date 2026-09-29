@@ -1,10 +1,10 @@
 import { createHmac, createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
-import { object, text, userId } from "../../../packages/contracts/src/management.js";
-import { API, nativeOk, nativeRequest, segment, type Native } from "../../../packages/matrix/src/http.js";
-import { serviceUser, type Config } from "./config.js";
-import { account, type Account } from "../../../packages/contracts/src/client.js";
+import { failure, success, type Result } from "../../../kernel/src/result.js";
+import { object, text, userId } from "../../../contracts/src/management.js";
+import { API, nativeOk, nativeRequest, segment, type Native } from "../../../matrix/src/http.js";
+export type Config = { matrixOrigin: string; serverName: string; jwtSecret: string; registrationSecret: string; serviceMatrixId: string };
+import { account, type Account } from "../../../contracts/src/client.js";
 
 export type Credentials = Account;
 export type Authority = ReturnType<typeof authority>;
@@ -137,13 +137,13 @@ export function authority(config: Config) {
   }
 
   async function remove(id: string): Promise<Result<void>> {
-    if (!userId(id) || !id.endsWith(":" + config.serverName) || id === serviceUser(config) || id === "@conduit:" + config.serverName) {
+    if (!userId(id) || !id.endsWith(":" + config.serverName) || id === config.serviceMatrixId || id === "@conduit:" + config.serverName) {
       return failure("forbidden", "Protected or invalid native account");
     }
     const checked = await deactivated(id);
     if (!checked.ok) return checked;
     if (checked.value) return success(undefined);
-    const administrator = await asUser(serviceUser(config));
+    const administrator = await asUser(config.serviceMatrixId);
     if (!administrator.ok) return administrator;
     const room = await nativeOk(administrator.value, "GET", API + "/directory/room/" + segment("#admins:" + config.serverName));
     if (!room.ok) return room;

@@ -1,7 +1,7 @@
 import { existsSync, realpathSync } from "node:fs";
 import { fields, text, userId, parseAgent } from "../../../packages/contracts/src/management.js";
 import { account, profileName, UUID, MAX_UPLOAD_BYTES, type PendingEnrollment } from "../../../packages/contracts/src/client.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
+import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
 import { endpoint, nativeOk } from "../../../packages/matrix/src/http.js";
 import { readProfile, type paths } from "../../../packages/agent-core/src/state.js";
 import { readJson, writeJson } from "../../../packages/files/src/index.js";

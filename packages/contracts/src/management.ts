@@ -1,4 +1,4 @@
-import { failure, success, type Result } from "./result.js";
+import { failure, success, type Result } from "../../kernel/src/result.js";
 import { parseActivity, type ActivityView } from './activity.js';
 import { wakePolicy, type WakePolicy } from './wake.js';
 
@@ -13,6 +13,7 @@ export type Policy = {
 };
 export type AgentView = {
   wakePolicy: WakePolicy;
+  wakeSenders: string[];
   id: string; owner: string; userId: string; name: string; nativeName: string | null;
   status: Status; ownerStatus: Status; revision: number; grantRevision: number; grants: Grant[]; applied: Grant[];
   appliedGrantRevision: number | null;
@@ -94,7 +95,7 @@ export function sameAccess(left: Grant, right: Grant): boolean {
 
 export function parseAgent(value: unknown): Result<AgentView> {
   const input = fields(value, ["id", "owner", "userId", "name", "nativeName", "status", "ownerStatus", "revision",
-    "grantRevision", "grants", "applied", "appliedGrantRevision", "appliedRevision", "lastSuccess", "error", "activity", "wakePolicy"]);
+    "grantRevision", "grants", "applied", "appliedGrantRevision", "appliedRevision", "lastSuccess", "error", "activity", "wakePolicy", "wakeSenders"]);
   if (!input.ok) return input;
   const data = input.value;
   const desired = grants(data.grants), applied = grants(data.applied);
@@ -102,7 +103,10 @@ export function parseAgent(value: unknown): Result<AgentView> {
   if (!applied.ok) return applied;
   const activity = parseActivity(data.activity);
   if (!activity.ok) return activity;
-  if (!wakePolicy(data.wakePolicy) || !text(data.id, 36) || !userId(data.owner) || !userId(data.userId) || !text(data.name)
+  if (!wakePolicy(data.wakePolicy) || !Array.isArray(data.wakeSenders) || data.wakeSenders.length > 2000
+    || !data.wakeSenders.every(userId) || new Set(data.wakeSenders).size !== data.wakeSenders.length
+    || data.wakeSenders.includes(String(data.userId)) || data.wakePolicy !== 'selected' && data.wakeSenders.length !== 0
+    || !text(data.id, 36) || !userId(data.owner) || !userId(data.userId) || !text(data.name)
     || data.nativeName !== null && !text(data.nativeName, 255) || !status(data.status) || !status(data.ownerStatus)
     || !revision(data.revision) || !revision(data.grantRevision)
     || data.appliedGrantRevision !== null && !revision(data.appliedGrantRevision)

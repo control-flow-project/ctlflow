@@ -6,7 +6,7 @@ import { openStore } from "../apps/server/src/data/database.js";
 import * as queries from "../apps/server/src/data/queries.js";
 import { context, hash, secret } from "../apps/server/src/context.js";
 import { decide, requestEnrollment } from "../apps/server/src/enrollment.js";
-import type { Result } from "../packages/contracts/src/result.js";
+import type { Result } from "../packages/kernel/src/result.js";
 
 function value<T>(result: Result<T>): T {
   assert(result.ok, result.ok ? "" : result.error.message);

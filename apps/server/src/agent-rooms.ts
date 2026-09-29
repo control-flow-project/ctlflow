@@ -1,6 +1,6 @@
 import { object } from '../../../packages/contracts/src/management.js';
 import type { AgentRoomView } from '../../../packages/contracts/src/views.js';
-import { failure, success, type Result } from '../../../packages/contracts/src/result.js';
+import { failure, success, type Result } from '../../../packages/kernel/src/result.js';
 import { agentRecord, type Context, type Human } from './context.js';
 import { eligible, grantLevel, roomFacts, joined, type RoomFacts } from './rooms.js';
 

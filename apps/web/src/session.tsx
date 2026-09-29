@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type FormEvent, type ReactNode } from 'react';
 import { session, type SessionView } from '../../../packages/contracts/src/views.js';
-import { failure } from '../../../packages/contracts/src/result.js';
+import { failure } from '../../../packages/kernel/src/result.js';
 import { request, useAction, useResource } from './api.js';
 import { Alert } from './ui.js';
 

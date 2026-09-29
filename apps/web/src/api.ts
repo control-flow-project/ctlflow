@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { failure, success, type Result, type Failure } from '../../../packages/contracts/src/result.js';
+import { failure, success, type Result, type Failure } from '../../../packages/kernel/src/result.js';
 
 export async function request(path: string, method = 'GET', input?: unknown, csrf?: string, signal?: AbortSignal): Promise<Result<unknown>> {
   try {

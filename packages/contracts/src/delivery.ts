@@ -1,5 +1,5 @@
 import { fields, grants, status, userId, type Grant, type Status } from './management.js';
-import { failure, success, type Result } from './result.js';
+import { failure, success, type Result } from '../../kernel/src/result.js';
 import { wakePolicy, type WakePolicy } from './wake.js';
 export type DeliveryPolicy = {
   id: string; owner: string; userId: string; status: Status; ownerStatus: Status;
@@ -16,7 +16,7 @@ export function deliveryPolicy(value: unknown): Result<DeliveryPolicy> {
     || !Array.isArray(data.senders) || data.senders.length > 2000 || !data.senders.every(userId)
     || new Set(data.senders).size !== data.senders.length || data.senders.includes(data.userId)
     || (data.wakePolicy === 'nobody' ? data.senders.length !== 0
-      : data.status === 'active' && data.ownerStatus === 'active' && !data.senders.includes(data.owner))) {
+      : data.wakePolicy !== 'selected' && data.status === 'active' && data.ownerStatus === 'active' && !data.senders.includes(data.owner))) {
     return failure('invalid', 'Invalid listener delivery policy');
   }
   return success({ ...data, grants: access.value } as DeliveryPolicy);

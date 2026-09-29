@@ -13,6 +13,8 @@ import { permissions } from './permissions.js';
 import { reportActivity } from './activity.js';
 import { requireCurrentRelease } from './release.js';
 import type { Manifest } from '../../contracts/src/release.js';
+import { isListenerNotice, mentionsAgent } from '../../contracts/src/notices.js';
+import { incrementalEvents } from './receive.js';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string, maximum = DEFAULT_OUTPUT_BYTES) {
   if (!Number.isSafeInteger(maximum) || maximum < 1024 || maximum > MAX_OUTPUT_BYTES) throw new Error('Invalid Codex input budget');
@@ -26,7 +28,7 @@ export function deliveryBatches(events: readonly ReceivedEvent[], settings: Sett
     current = [];
   }
   for (const event of events) {
-    if (event.sender === self && event.type === 'm.room.message') continue;
+    if (event.sender === self && event.type === 'm.room.message' || isListenerNotice(event)) continue;
     if (Buffer.byteLength(deliveryText([event], settings)) > maximum) throw new Error(`A chat event exceeds the ${maximum}-byte Codex input limit; retrieve it explicitly`);
     if (Buffer.byteLength(deliveryText([...current, event], settings)) > maximum) flush();
     current.push(event);
@@ -252,6 +254,13 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           }
         }
         joined = membership;
+        if (since) for (const room of membership) {
+          if (!allowed.has(room) || reset.has(room) || selected && selected !== room) continue;
+          const events = await incrementalEvents(client, synced, since, room, { types: ['m.room.message'] });
+          for (const event of events) if (!senders.has(event.sender) && mentionsAgent(event, options.account.user_id)) {
+            await client.post('/_coord/agents/' + options.id + '/blocked-mention', { room, event: event.event_id });
+          }
+        }
         saveControl(controlFile, state);
         checkpointSync(options.cursorFile, synced.next_batch);
         since = synced.next_batch;
@@ -289,6 +298,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       if (!senders.size) { windowEnd = 0; await wait(previous); continue; }
       async function accept(event: ReceivedEvent): Promise<boolean> {
+        if (isListenerNotice(event)) return false;
         if (event.sender === options.account.user_id && event.type === 'm.room.message') return false;
         if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id && control.status === 'delivered')) return false;
         return !await approval?.consume(event);

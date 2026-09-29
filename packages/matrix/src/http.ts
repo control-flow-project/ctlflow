@@ -1,4 +1,4 @@
-import { failure, success, type Result } from "../../contracts/src/result.js";
+import { failure, success, type Result } from "../../kernel/src/result.js";
 import { object } from "../../contracts/src/management.js";
 import type { Readable } from "node:stream";
 import { MAX_JSON_BYTES } from "../../contracts/src/limits.js";

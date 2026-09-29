@@ -6,6 +6,7 @@ import { readJson, writeJson } from '../../files/src/index.js';
 import type { Account, Event, Settings } from '../../contracts/src/client.js';
 import { roomId, userId } from '../../contracts/src/management.js';
 import { DEFAULT_EVENTS, DEFAULT_OUTPUT_BYTES, MAX_EVENTS, MAX_OUTPUT_BYTES, MAX_JSON_BYTES } from '../../contracts/src/limits.js';
+import { isListenerNotice } from '../../contracts/src/notices.js';
 
 type Page = { chunk: Event[]; start?: string; end?: string };
 export type Sync = {
@@ -209,7 +210,7 @@ export async function readUnread(client: Matrix, settings: Settings, cursorFile:
       if (!fresh && end && ordered.length < pageLimit && end.event
         && !ordered.some(event => event.event_id === end.event!.event_id)) ordered.push(end.event);
       const completed = !fresh && end && (!end.event || ordered.some(event => event.event_id === end.event!.event_id));
-      const messages = ordered.filter(event => IMPORTANT_EVENTS.includes(event.type))
+      const messages = ordered.filter(event => IMPORTANT_EVENTS.includes(event.type) && !isListenerNotice(event))
         .map(event => eventView(event, room));
       const proposed = fresh ? messages : [...events, ...messages];
       if (Buffer.byteLength(deliveryText(proposed, settings)) > maximum - 1024) {

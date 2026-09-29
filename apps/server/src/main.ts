@@ -2,10 +2,9 @@ import { once } from "node:events";
 import { join } from "node:path";
 import { config } from "./config.js";
 import { bootstrap, bootstrapSecrets } from "./bootstrap.js";
-import { context } from "./context.js";
-import { httpService } from "./http.js";
-import { reconciler } from "./reconcile.js";
-import { openStore } from "./data/database.js";
+import { createApplication } from './composition.js';
+import { createHttpServer } from './http/create-server.js';
+import { createWorker } from './worker.js';
 import { readJson } from "../../../packages/files/src/index.js";
 import { loadRelease } from "../../../packages/files/src/release.js";
 
@@ -19,25 +18,24 @@ export async function serve(directory: string, releaseDirectory: string, port = 
   if (!secrets.ok) throw new Error(secrets.error.message);
   const initialized = await bootstrap(configuration.value, secrets.value);
   if (!initialized.ok) throw new Error(initialized.error.message);
-  const store = openStore(join(directory, "management.sqlite"));
-  const ctx = context(store, configuration.value);
-  const worker = reconciler(ctx);
-  const server = httpService(ctx, worker, release);
+  const application = createApplication(join(directory, 'management.sqlite'), configuration.value);
+  const worker = createWorker(application.services);
+  const server = createHttpServer(application, worker, release);
   try {
     server.listen(port, "127.0.0.1");
     await once(server, "listening");
     worker.wake();
-  } catch (error) { ctx.native.close(); await worker.stop(); store.close(); throw error; }
+  } catch (error) { application.services.matrix.close(); await worker.stop(); application.close(); throw error; }
   let closing: Promise<void> | undefined;
   function close(): Promise<void> {
     closing ??= (async () => {
-      ctx.native.close();
+      application.services.matrix.close();
       server.closeAllConnections();
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
       await worker.stop();
-      store.close();
+      application.close();
     })();
     return closing;
   }
-  return { close, context: ctx, server, worker };
+  return { close, application, server, worker };
 }

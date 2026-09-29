@@ -7,6 +7,12 @@ import { privateDir } from "../../../../packages/files/src/index.js";
 import { WAKE_POLICIES, type WakePolicy } from '../../../../packages/contracts/src/wake.js';
 
 export type Tables = {
+  name_claims: { name: string; enrollment: string | null; agent: string | null };
+  fleet_bindings: { owner: string; fleet: string; instance: string; agent: string };
+  fleet_enrollments: { id: string; owner: string; fleet: string; code: string; secretHash: string; digest: string;
+    outcomes: string; status: 'pending' | 'approved' | 'rejected'; expires: number };
+  blocked_notices: { agent: string; sender: string; event: string; room: string; reserved: number; content: string; sent: number };
+  wake_senders: { agent: string; sender: string };
   members: MemberView & { created: number };
   agents: {
     wakePolicy: WakePolicy;
@@ -16,6 +22,7 @@ export type Tables = {
     lastSuccess: number | null; error: string | null; created: number;
   };
   enrollments: {
+    batch: string | null;
     id: string; owner: string; name: string; code: string; secretHash: string;
     status: "pending" | "approved" | "rejected"; expires: number; agent: string | null;
   };
@@ -69,7 +76,7 @@ export function openStore(path: string): Store {
 
 function initializeStore(database: Store): void {
   const version = database.pragma('user_version', { simple: true });
-  if (version !== 0 && version !== 1) throw new Error('Unsupported management schema version');
+  if (version !== 0 && version !== 1 && version !== 2) throw new Error('Unsupported management schema version');
   const tables: unknown = database.pragma('table_list');
   if (!Array.isArray(tables)) throw new Error('Cannot inspect management schema');
   const hasAgents = tables.some(table => table !== null && typeof table === 'object' && 'name' in table && table.name === 'agents');
@@ -83,11 +90,34 @@ function initializeStore(database: Store): void {
       lastSuccess INTEGER, error TEXT
     ) STRICT;
     CREATE TABLE IF NOT EXISTS agents (${agentDefinition}) STRICT;
+    CREATE TABLE IF NOT EXISTS wake_senders (
+      agent TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE, sender TEXT NOT NULL,
+      PRIMARY KEY (agent, sender)
+    ) STRICT;
+    CREATE TABLE IF NOT EXISTS blocked_notices (
+      agent TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE, sender TEXT NOT NULL,
+      event TEXT NOT NULL, room TEXT NOT NULL, reserved INTEGER NOT NULL,
+      content TEXT NOT NULL CHECK(json_valid(content)), sent INTEGER NOT NULL CHECK(sent IN (0,1)),
+      PRIMARY KEY (agent, sender)
+    ) STRICT;
     CREATE TABLE IF NOT EXISTS enrollments (
       id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES members(id), name TEXT NOT NULL,
       code TEXT NOT NULL UNIQUE, secretHash TEXT NOT NULL,
       status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected')),
-      expires INTEGER NOT NULL, agent TEXT UNIQUE REFERENCES agents(id)
+      expires INTEGER NOT NULL, agent TEXT UNIQUE REFERENCES agents(id), batch TEXT
+    ) STRICT;
+    CREATE TABLE IF NOT EXISTS name_claims (
+      name TEXT PRIMARY KEY, enrollment TEXT UNIQUE REFERENCES enrollments(id) ON DELETE CASCADE,
+      agent TEXT UNIQUE REFERENCES agents(id), CHECK((enrollment IS NULL) != (agent IS NULL))
+    ) STRICT;
+    CREATE TABLE IF NOT EXISTS fleet_bindings (
+      owner TEXT NOT NULL REFERENCES members(id), fleet TEXT NOT NULL, instance TEXT NOT NULL,
+      agent TEXT NOT NULL UNIQUE REFERENCES agents(id), PRIMARY KEY(owner, fleet, instance)
+    ) STRICT;
+    CREATE TABLE IF NOT EXISTS fleet_enrollments (
+      id TEXT PRIMARY KEY, owner TEXT NOT NULL REFERENCES members(id), fleet TEXT NOT NULL,
+      code TEXT NOT NULL, secretHash TEXT NOT NULL, digest TEXT NOT NULL, outcomes TEXT NOT NULL CHECK(json_valid(outcomes)),
+      status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected')), expires INTEGER NOT NULL
     ) STRICT;
     CREATE TABLE IF NOT EXISTS invitations (
       id TEXT PRIMARY KEY, secretHash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('member','administrator')),
@@ -129,6 +159,7 @@ function initializeStore(database: Store): void {
     { table: 'listeners', name: 'release', declaration: 'release TEXT' },
     { table: 'policy', name: 'agentInstructions', declaration: instructionsColumn },
     { table: 'agents', name: 'wakePolicy', declaration: wakeColumn },
+    { table: 'enrollments', name: 'batch', declaration: 'batch TEXT' },
   ]) {
     const columns: unknown = database.pragma('table_info(' + addition.table + ')');
     if (!Array.isArray(columns)) throw new Error('Cannot inspect ' + addition.table + ' schema');
@@ -136,7 +167,7 @@ function initializeStore(database: Store): void {
       database.exec('ALTER TABLE ' + addition.table + ' ADD COLUMN ' + addition.declaration);
     }
   }
-  if (version === 0 && hasAgents) {
+  if (version !== 2 && hasAgents) {
     const columns = 'id, owner, userId, name, override, wakePolicy, status, revision, grantRevision, grants, applied, password, token, appliedRevision, appliedGrantRevision, lastSuccess, error, created';
     database.exec(`
       CREATE TABLE agents_migration (${agentDefinition}) STRICT;
@@ -148,5 +179,9 @@ function initializeStore(database: Store): void {
   }
   const violations: unknown = database.pragma('foreign_key_check');
   if (!Array.isArray(violations) || violations.length) throw new Error('Management schema has invalid foreign keys');
-  database.pragma('user_version = 1');
+  if (version !== 2) database.exec(`
+    INSERT INTO name_claims(name, agent) SELECT name, id FROM agents;
+    INSERT INTO name_claims(name, enrollment) SELECT name, id FROM enrollments WHERE status = 'pending';
+  `);
+  database.pragma('user_version = 2');
 }

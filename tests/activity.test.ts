@@ -11,7 +11,7 @@ import { requestEnrollment, decide } from '../apps/server/src/enrollment.js';
 import { changeAgent, agentView } from '../apps/server/src/management.js';
 import { activity, heartbeat, disconnect } from '../apps/server/src/activity.js';
 import { LISTENER_EXPIRY_MS, parseActivity, emptyActivity } from '../packages/contracts/src/activity.js';
-import { success, failure, type Result } from '../packages/contracts/src/result.js';
+import { success, failure, type Result } from '../packages/kernel/src/result.js';
 import { httpService } from '../apps/server/src/http.js';
 import { releaseFixture, updatedRelease } from './release-fixture.js';
 import { builtRelease } from '../scripts/test-support/release.js';

@@ -4,7 +4,7 @@ import { request as httpRequest } from 'node:http';
 import test from "node:test";
 import { openStore } from "../apps/server/src/data/database.js";
 import { context, secret, type Context } from "../apps/server/src/context.js";
-import { success } from "../packages/contracts/src/result.js";
+import { success } from "../packages/kernel/src/result.js";
 import { httpService } from "../apps/server/src/http.js";
 import { releaseFixture } from "./release-fixture.js";
 import { onboardingCommand, onboardingUrl } from '../packages/contracts/src/onboarding.js';

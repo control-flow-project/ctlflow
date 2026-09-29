@@ -1,8 +1,7 @@
-import { object, roomId, userId, type Grant } from "../../../packages/contracts/src/management.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
-import { API, nativeOk, nativeState, segment, type Native } from "../../../packages/matrix/src/http.js";
-import type { JsonObject } from "../../../packages/contracts/src/json.js";
-import type { Context } from "./context.js";
+import { object, roomId, userId } from "../../../contracts/src/management.js";
+import { failure, success, type Result } from "../../../kernel/src/result.js";
+import { API, nativeOk, nativeState, segment, type Native } from "../../../matrix/src/http.js";
+import type { JsonObject } from "../../../contracts/src/json.js";
 
 export type RoomFacts = { room: string; name: string; topic: string; alias: string | null; ownerLevel: number; ownerCreator: boolean; creators: string[]; ceiling: number; ordinary: number; message: number; reaction: number; powers: JsonObject };
 
@@ -64,29 +63,4 @@ export async function roomFacts(client: Native, owner: string, room: string): Pr
     topic: typeof topic === 'string' ? topic.slice(0, 4096) : '', alias: typeof alias === 'string' ? alias.slice(0, 255) : null,
     ownerLevel: ownerLevel.value, ownerCreator: creators.includes(owner), creators,
     ceiling, ordinary: ordinary.value, message: message.value, reaction: reaction.value, powers });
-}
-
-export function grantLevel(facts: RoomFacts, grant: Grant): Result<number> {
-  const maximum = facts.ownerCreator ? Number.MAX_SAFE_INTEGER : facts.ownerLevel;
-  if (grant.access === "read") {
-    const result = Math.min(maximum, facts.ceiling, facts.ordinary - 1, facts.message - 1, facts.reaction - 1);
-    return Number.isSafeInteger(result) ? success(result) : failure("native", "Native read-only level cannot be represented");
-  }
-  const requested = grant.access === 'custom' ? grant.level : Math.max(facts.message, facts.reaction);
-  return Number.isSafeInteger(requested) && requested <= maximum
-    ? success(requested) : failure("forbidden", "The requested Matrix power level exceeds the owner's room permissions");
-}
-
-export async function eligible(ctx: Context, owner: string): Promise<Result<RoomFacts[]>> {
-  const client = await ctx.native.asUser(owner);
-  if (!client.ok) return client;
-  const rooms = await joined(client.value);
-  if (!rooms.ok) return rooms;
-  const result: RoomFacts[] = [];
-  for (const room of rooms.value) {
-    const facts = await roomFacts(client.value, owner, room);
-    if (!facts.ok) return facts;
-    result.push(facts.value);
-  }
-  return success(result);
 }

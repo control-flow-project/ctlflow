@@ -13,7 +13,7 @@ import { serviceUser } from "../apps/server/src/config.js";
 import { API, nativeOk, nativeRequest, segment, type Native } from "../packages/matrix/src/http.js";
 import { joined } from "../apps/server/src/rooms.js";
 import { agentRooms } from '../apps/server/src/agent-rooms.js';
-import type { Result } from "../packages/contracts/src/result.js";
+import type { Result } from "../packages/kernel/src/result.js";
 
 function value<T>(result: Result<T>): T {
   assert(result.ok, result.ok ? "" : result.error.message);

@@ -32,7 +32,7 @@ export function publicRouter(routes: Routes) {
     }
     const path = url.pathname;
     const native = path.startsWith('/_matrix/');
-    const management = path.startsWith('/_coord/') || path.startsWith('/onboarding/');
+    const management = path.startsWith('/api/') || path.startsWith('/onboarding/');
     if (native || management) {
       const target = new URL(native ? routes.matrixOrigin : routes.serviceOrigin);
       const headers: IncomingHttpHeaders = { ...request.headers, host: new URL(routes.publicOrigin).host };

@@ -207,7 +207,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
     } else if (path === '/_coord/agents/' + AGENT_ID) {
       const grants = [...joined].map(room => ({ room, access: 'reply', muted: muted.has(room) }));
       send(response, { id: AGENT_ID, owner: OBSERVER, userId: SELF, name: 'Watson (Human)', nativeName: null,
-        ...access, wakePolicy: waking.policy, revision: 0, grantRevision: 0, grants, applied: grants,
+        ...access, wakePolicy: waking.policy, wakeSenders: [], revision: 0, grantRevision: 0, grants, applied: grants,
         appliedGrantRevision: 0, appliedRevision: 0, lastSuccess: Date.now(), error: null,
         activity: emptyActivity() });
     } else if (path === '/_coord/agents/' + AGENT_ID + '/heartbeat' && request.method === 'POST') {

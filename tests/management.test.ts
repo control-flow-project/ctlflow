@@ -8,7 +8,7 @@ import { context, hash, secret, type Context, type Human } from "../apps/server/
 import { authenticate, endSession } from "../apps/server/src/sessions.js";
 import { changeAgent, changeGrants, changeMember, changePolicy, createInvitation } from "../apps/server/src/management.js";
 import { decide, exchange, requestEnrollment } from "../apps/server/src/enrollment.js";
-import { success, type Result } from "../packages/contracts/src/result.js";
+import { success, type Result } from "../packages/kernel/src/result.js";
 import type { Native } from "../packages/matrix/src/http.js";
 import { deliverySettings } from '../apps/server/src/delivery.js';
 import { deliveryPolicy } from '../packages/contracts/src/delivery.js';
@@ -49,7 +49,8 @@ test('wake policy defaults to owner, resolves active verified identities and kee
     const change = (wakePolicy: string) => value(changeAgent(ctx, alice, agent.id, { revision: current().revision, wakePolicy }));
     assert.equal(current().wakePolicy, 'owner'); assert.deepEqual(senders(), [alice.id]);
     assert.equal(changeAgent(ctx, bob, agent.id, { revision: 0, wakePolicy: 'everyone' }).ok, false);
-    assert.equal(changeAgent(ctx, admin, agent.id, { revision: 0, wakePolicy: 'everyone' }).ok, false);
+    value(changeAgent(ctx, admin, agent.id, { revision: current().revision, wakePolicy: 'everyone' }));
+    assert(senders().includes(foreign.userId));
     for (const wakePolicy of ['all', '', null, 1]) assert.equal(changeAgent(ctx, alice, agent.id, { revision: 0, wakePolicy }).ok, false);
     change('owner-agents'); assert.deepEqual(senders(), [alice.id, peer.userId].sort());
     assert.equal(changeAgent(ctx, alice, agent.id, { revision: 0, wakePolicy: 'everyone' }).ok, false);
@@ -69,7 +70,7 @@ test('wake policy defaults to owner, resolves active verified identities and kee
     value(changeAgent(ctx, admin, agent.id, { revision: current().revision, wakePolicy: 'nobody' }));
     assert.deepEqual(senders(), []);
     assert.equal(changeAgent(ctx, bob, agent.id, { revision: current().revision, wakePolicy: 'nobody' }).ok, false);
-    assert.equal(changeAgent(ctx, admin, agent.id, { revision: current().revision, wakePolicy: 'owner' }).ok, false);
+    value(changeAgent(ctx, admin, agent.id, { revision: current().revision, wakePolicy: 'owner' }));
     assert.equal(current().grantRevision, agent.grantRevision); assert.equal(current().grants, agent.grants);
     change('owner'); assert.deepEqual(senders(), [alice.id]);
     value(changeMember(ctx, admin, alice.id, { revision: 0, status: 'suspended' }));

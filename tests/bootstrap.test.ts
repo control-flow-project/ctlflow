@@ -6,7 +6,7 @@ import { authority } from "../apps/server/src/native.js";
 import { secret } from "../apps/server/src/context.js";
 import { API, nativeOk, nativeRequest } from "../packages/matrix/src/http.js";
 import type { Config } from "../apps/server/src/config.js";
-import type { Result } from "../packages/contracts/src/result.js";
+import type { Result } from "../packages/kernel/src/result.js";
 
 function value<T>(result: Result<T>): T {
   assert(result.ok, result.ok ? "" : result.error.message);

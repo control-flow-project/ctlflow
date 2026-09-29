@@ -1,6 +1,6 @@
 import * as queries from "./data/queries.js";
 import { authorityChanged, grants, object, sameAccess, type Grant } from "../../../packages/contracts/src/management.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
+import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
 import { API, nativeOk, segment, type Native } from "../../../packages/matrix/src/http.js";
 import { record, type Context } from "./context.js";
 import { agentView } from "./management.js";

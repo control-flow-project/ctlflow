@@ -1,0 +1,29 @@
+import { executeSelect, executeInsert } from '@tinqerjs/better-sqlite3-adapter';
+import type Database from 'better-sqlite3';
+import { schema } from '../../schema/tables.js';
+import { mapRole } from './map.js';
+import { stored } from '../stored.js';
+import { success } from '../../../../kernel/src/result.js';
+import type { RoleRepository } from '../../../../domain/src/port/repositories.js';
+
+export function createRoleRepository(database: Database.Database): RoleRepository {
+  return {
+    find(key) {
+      return stored(() => {
+        const row = executeSelect(database, schema, (query, params) => query.from('role')
+          .where(row => row.code === params.code).firstOrDefault(), key);
+        return success(row ? mapRole(row) : null);
+      });
+    },
+    insert(value) {
+      return stored(() => {
+        executeInsert(database, schema, (query, params) => query.insertInto('role').values({
+      code: params.code,
+      principal_kind: params.principalKind,
+      label: params.label,
+        }), value);
+        return success(undefined);
+      });
+    },
+  };
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { member, invitation, audit, pageOf, type InvitationView } from '../../../packages/contracts/src/views.js';
 import { policy, type MemberView, type Policy, type Role, object, text, POLICY_LIMITS, INVITATION_LIFETIME, DEFAULT_AGENT_INSTRUCTIONS, AGENT_INSTRUCTIONS_MAX_BYTES } from '../../../packages/contracts/src/management.js';
-import { failure, success } from '../../../packages/contracts/src/result.js';
+import { failure, success } from '../../../packages/kernel/src/result.js';
 import { request, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Loaded, Page, Panel, Pagination, Status, applied, timestamp } from './ui.js';

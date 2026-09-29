@@ -3,7 +3,7 @@ import * as queries from "./data/queries.js";
 import type { Store, Tables } from "./data/database.js";
 import { authority } from "./native.js";
 import type { Config } from "./config.js";
-import { failure, success, type Result } from "../../../packages/contracts/src/result.js";
+import { failure, success, type Result } from "../../../packages/kernel/src/result.js";
 import { DEFAULT_AGENT_INSTRUCTIONS } from '../../../packages/contracts/src/management.js';
 
 export type Context = {

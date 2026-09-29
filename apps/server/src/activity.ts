@@ -1,6 +1,6 @@
 import { fields, revision } from '../../../packages/contracts/src/management.js';
 import { LISTENER_EXPIRY_MS, type ActivityView } from '../../../packages/contracts/src/activity.js';
-import { failure, success, type Result } from '../../../packages/contracts/src/result.js';
+import { failure, success, type Result } from '../../../packages/kernel/src/result.js';
 import { type Context, type Human, record, agentRecord } from './context.js';
 import * as queries from './data/queries.js';
 import * as listeners from './data/listeners.js';

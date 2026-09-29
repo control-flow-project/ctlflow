@@ -1,5 +1,5 @@
 import { object, userId, roomId, text, revision, role, status, type MemberView } from './management.js';
-import { failure, success, type Result } from './result.js';
+import { failure, success, type Result } from '../../kernel/src/result.js';
 
 export type SessionView = { human: MemberView; csrf: string };
 export type EnrollmentView = { id: string; owner: string; name: string; code: string; status: 'pending' | 'approved' | 'rejected'; expires: number; agent: string | null };

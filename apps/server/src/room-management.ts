@@ -1,7 +1,7 @@
 import { actor, record, type Context, type Human } from './context.js';
 import { serviceUser } from './config.js';
 import { fields, roomId, text, userId } from '../../../packages/contracts/src/management.js';
-import { failure, success, type Result } from '../../../packages/contracts/src/result.js';
+import { failure, success, type Result } from '../../../packages/kernel/src/result.js';
 import { nativeOk, nativeState, API, segment } from '../../../packages/matrix/src/http.js';
 import { joined } from './rooms.js';
 import * as queries from './data/queries.js';

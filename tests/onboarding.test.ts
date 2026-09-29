@@ -12,7 +12,7 @@ import { reconciler } from "../apps/server/src/reconcile.js";
 import { paths, readProfile } from "../packages/agent-core/src/state.js";
 import { enroll, connect } from "../apps/client/src/enrollment.js";
 import { API, nativeOk } from "../packages/matrix/src/http.js";
-import type { Result } from "../packages/contracts/src/result.js";
+import type { Result } from "../packages/kernel/src/result.js";
 import { releaseFixture } from "./release-fixture.js";
 
 function value<T>(result: Result<T>): T {

@@ -87,6 +87,7 @@ export function enrollments(store: Store, owner: string, administrator: boolean,
 export function insertEnrollment(store: Store, input: Tables["enrollments"]): void {
   executeInsert(store, schema, (query, params) => query.insertInto("enrollments").values({
     id: params.id, owner: params.owner, name: params.name, code: params.code,
+    batch: params.batch,
     secretHash: params.secretHash, status: params.status, expires: params.expires, agent: params.agent,
   }), input);
 }

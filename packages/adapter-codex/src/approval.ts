@@ -1,5 +1,5 @@
 import { fields, object, text } from '../../contracts/src/management.js';
-import { failure, success, type Result } from '../../contracts/src/result.js';
+import { failure, success, type Result } from '../../kernel/src/result.js';
 import type { Json } from '../../contracts/src/json.js';
 import type { Permission } from '../../agent-core/src/runtime.js';
 import type { NativeRequest } from './protocol.js';

@@ -8,7 +8,7 @@ import { context, hash, secret, type Human } from '../apps/server/src/context.js
 import { decide, requestEnrollment } from '../apps/server/src/enrollment.js';
 import { heartbeat, disconnect } from '../apps/server/src/activity.js';
 import { httpService } from '../apps/server/src/http.js';
-import { success, type Result } from '../packages/contracts/src/result.js';
+import { success, type Result } from '../packages/kernel/src/result.js';
 import type { AgentView, Status } from '../packages/contracts/src/management.js';
 import { releaseFixture } from './release-fixture.js';
 import { deliveryPolicy } from '../packages/contracts/src/delivery.js';
