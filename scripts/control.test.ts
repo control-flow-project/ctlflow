@@ -2,18 +2,20 @@ import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import { Matrix, readJson, type Event } from '../skills/conduit-chat/scripts/lib.ts';
-import { listen } from '../skills/conduit-chat/scripts/listen.ts';
-import { connectCodex } from '../skills/conduit-chat/scripts/codex.ts';
-import { isControl, loadControl, type ControlState } from '../skills/conduit-chat/scripts/control.ts';
-import { eventView } from '../skills/conduit-chat/scripts/receive.ts';
-import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD, until, temporary } from './test-support/listener.ts';
+import { matrix as nativeMatrix } from '../packages/matrix/src/http.js';
+import { readJson } from '../packages/files/src/index.js';
+import type { Event } from '../packages/contracts/src/client.js';
+import { listen } from '../packages/agent-core/src/listen.js';
+import { connectCodex } from '../packages/adapter-codex/src/connection.js';
+import { isControl, loadControl, type ControlState } from '../packages/agent-core/src/control.js';
+import { eventView } from '../packages/agent-core/src/receive.js';
+import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD, until, temporary } from './test-support/listener.js';
 
 async function fixture(context: TestContext) {
   const native = await fakeCodex(context, { mode: 'accepted' });
   const matrix = await matrixFixture(context, native.directory);
   const stop = new AbortController();
-  const options = { ...matrix, limit: 20, pollMs: 100, debounceMs: 10000, codex: native.options };
+  const options = { ...matrix, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime };
   const result = listen(options, stop.signal).catch(error => error);
   context.after(async () => { stop.abort(new Error('test complete')); await result; });
   await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
@@ -56,14 +58,14 @@ test('urgent redirect precedes unread ordinary input and cannot advance its cont
   await until(() => starts().length === 1);
   matrix.add(ROOM, message('$redirect', OBSERVER, '!! Inspect configuration instead.'));
   await until(() => starts().length === 2);
-  const urgent = starts()[1].params!;
+  const urgent = starts()[1]!.params!;
   assert(JSON.stringify(urgent.input).includes('$redirect'));
   assert(!JSON.stringify(urgent.input).includes('$ordinary'));
   assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(urgent.clientUserMessageId), urgent.input) });
   await until(() => starts().length === 3);
-  assert(JSON.stringify(starts()[2].params!.input).includes('$ordinary'));
-  assert(!JSON.stringify(starts()[2].params!.input).includes('$redirect'));
+  assert(JSON.stringify(starts()[2]!.params!.input).includes('$ordinary'));
+  assert(!JSON.stringify(starts()[2]!.params!.input).includes('$redirect'));
   assert(!matrix.requests.some(request => request.path.endsWith('/read_markers')));
   assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
 });
@@ -73,7 +75,7 @@ test('a receipt published during human interruption is acknowledged without repl
   native.update({ delayInterrupt: true });
   matrix.add(ROOM, message('$ordinary'));
   await until(() => starts().length === 1);
-  const original = starts()[0].params!;
+  const original = starts()[0]!.params!;
   matrix.add(ROOM, message('$redirect', OBSERVER, '!! Inspect configuration instead.'));
   await until(() => native.requests().some(request => request.method === 'turn/interrupt'));
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(original.clientUserMessageId), original.input) });
@@ -81,13 +83,13 @@ test('a receipt published during human interruption is acknowledged without repl
   native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
   await until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '2');
   assert.equal(starts().length, 2);
-  assert(JSON.stringify(starts()[1].params!.input).includes('$redirect'));
-  assert(!JSON.stringify(starts()[1].params!.input).includes('$ordinary'));
+  assert(JSON.stringify(starts()[1]!.params!.input).includes('$redirect'));
+  assert(!JSON.stringify(starts()[1]!.params!.input).includes('$ordinary'));
 });
 
 test('human control authority uses exact identity and shared-room native mentions, never display names', async context => {
   const matrix = await matrixFixture(context, temporary(context));
-  const client = new Matrix(matrix.settings.homeserver, matrix.account.access_token);
+  const client = nativeMatrix({base: matrix.settings.homeserver, token: matrix.account.access_token});
   const check = (event: Event) => isControl(client, matrix.settings, matrix.account, eventView(event, ROOM));
   assert(await check(message('$human', OBSERVER, '!! stop')));
   for (const sender of [SELF, '@human:elsewhere', '@agent-human:test.localhost']) assert.equal(await check(message('$spoof', sender, '!! stop')), false);
@@ -128,7 +130,7 @@ test('leaving during a human pause discards the old cursor without resuming deli
   const { matrix, starts, controls } = await fixture(context);
   matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
   await until(() => controls().paused);
-  const client = new Matrix(matrix.settings.homeserver, matrix.account.access_token);
+  const client = nativeMatrix({base: matrix.settings.homeserver, token: matrix.account.access_token});
   await client.post('/_matrix/client/v3/rooms/' + encodeURIComponent(ROOM) + '/leave', {});
   await until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === undefined);
   assert(controls().paused);
@@ -147,9 +149,9 @@ test('leaving one room while a mixed-room delivery settles does not replay the o
   matrix.add(ROOM, message('$leaving'), message('$also-leaving'));
   matrix.add(other, message('$retained'));
   await until(() => starts().length === 1);
-  assert(JSON.stringify(starts()[0].params!.input).includes('$retained'));
-  const original = starts()[0].params!;
-  const client = new Matrix(matrix.settings.homeserver, matrix.account.access_token);
+  assert(JSON.stringify(starts()[0]!.params!.input).includes('$retained'));
+  const original = starts()[0]!.params!;
+  const client = nativeMatrix({base: matrix.settings.homeserver, token: matrix.account.access_token});
   await client.post('/_matrix/client/v3/rooms/' + encodeURIComponent(ROOM) + '/leave', {});
   await until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === undefined);
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(original.clientUserMessageId), original.input) });
@@ -163,7 +165,7 @@ test('historical initial snapshots and edited or quoted messages have no cancell
   const matrix = await matrixFixture(context, native.directory);
   matrix.add(ROOM, message('$old', OBSERVER, '!!'));
   const stop = new AbortController();
-  const result = listen({ ...matrix, limit: 20, pollMs: 100, debounceMs: 0, codex: native.options }, stop.signal).catch(error => error);
+  const result = listen({ ...matrix, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   context.after(async () => { stop.abort(); await result; });
   await until(() => existsSync(matrix.cursorFile));
   matrix.add(ROOM, { ...message('$edit', OBSERVER, '!!'), content: { msgtype: 'm.text', body: '!!', 'm.relates_to': { rel_type: 'm.replace', event_id: '$old' } } }, message('$quote', OBSERVER, '> !!'));

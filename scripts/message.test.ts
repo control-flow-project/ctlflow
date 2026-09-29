@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownMessage, messageContent, MAX_MESSAGE_BYTES } from '../skills/conduit-chat/scripts/message.ts';
+import { markdownMessage, messageContent, MAX_MESSAGE_BYTES } from '../packages/matrix/src/message.js';
+
+test('native file attachments retain their filename, MIME type, size and MXC URL without text formatting', () => {
+  const content = { body: 'nifty-october-2026-top-options.csv', info: { mimetype: 'text/csv', size: 7798 },
+    msgtype: 'm.file', url: 'mxc://preview.localhost/d6yN6XbDo0kfN668F7ZXhLYKZPpgbdta' };
+  const rendered = messageContent(content);
+  assert.deepEqual(rendered, content);
+  assert.notEqual(rendered, content);
+  assert(!('formatted_body' in rendered));
+  assert(!('format' in rendered));
+});
 
 test('formatted Matrix messages retain the exact original Markdown', () => {
   const body = 'Status: **complete**\r\nUnicode: 日本語 🦀\n';

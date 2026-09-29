@@ -3,8 +3,8 @@ import { resolve, dirname, join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { parse } from 'yaml';
-import { ROOT } from './instance.ts';
-import { kebab, type MatrixSchema, type Operation, type Parameter } from '../skills/conduit-chat/scripts/matrix-schema.ts';
+import { fileURLToPath } from 'node:url';
+import { kebab, type MatrixSchema, type Operation, type Parameter } from '../packages/matrix/src/schema.js';
 
 type ObjectValue = Record<string, unknown>;
 const disabled = new Set(['old_sync', 'room_initial_sync', 'peeking_events', 'third_party_lookup', 'third_party_membership',
@@ -33,7 +33,7 @@ export function generate(source: string): MatrixSchema {
     let value = object(input);
     const visited = new Set<string>();
     while (typeof value.$ref === 'string') {
-      const [path, pointer = ''] = value.$ref.split('#');
+      const [path = '', pointer = ''] = value.$ref.split('#');
       if (path.includes(':')) throw new Error('Remote schema reference is not permitted');
       file = path ? resolve(dirname(file), path) : file;
       const key = file + '#' + pointer;
@@ -68,8 +68,12 @@ export function generate(source: string): MatrixSchema {
           const schema = reference(parameter.schema, file);
           const type = schema.type;
           if (!['string', 'integer', 'number', 'boolean', 'object', 'array'].includes(String(type))) throw new Error('Unsupported parameter type');
+          if (schema.enum !== undefined && (!Array.isArray(schema.enum) || schema.enum.some(value =>
+            typeof value !== 'string' && typeof value !== 'boolean' && !(typeof value === 'number' && Number.isFinite(value))))) {
+            throw new Error('Invalid native parameter enumeration');
+          }
           parameters.push({ name: parameter.name, location: parameter.in as Parameter['location'], required: parameter.required === true,
-            type: type as Parameter['type'], ...(Array.isArray(schema.enum) ? { values: schema.enum as Parameter['values'] } : {}),
+            type: type as Parameter['type'], ...(Array.isArray(schema.enum) ? { values: schema.enum as NonNullable<Parameter['values']> } : {}),
             ...(typeof schema.minimum === 'number' ? { minimum: schema.minimum } : {}),
             ...(typeof schema.maximum === 'number' ? { maximum: schema.maximum } : {}) });
         }
@@ -95,14 +99,15 @@ export function generate(source: string): MatrixSchema {
   return { version: 'v1.12', sourceSha256: hash.digest('hex'), operations };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === join(ROOT, 'scripts/generate-matrix-api.ts')) {
-  const { values } = parseArgs({ options: { source: { type: 'string' }, check: { type: 'boolean' } } });
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const { values } = parseArgs({ options: { root: { type: 'string' }, source: { type: 'string' }, check: { type: 'boolean' } } });
+  if (!values.root) throw new Error('--root must name the exact Crossfire source directory');
   if (!values.source) throw new Error('--source must name the official v1.12 data/api/client-server directory');
   const text = JSON.stringify(generate(values.source), null, 2) + '\n';
   if (JSON.parse(text).sourceSha256 !== '037337015f765c9d96a0561888ea15c870d34ea327dac94bab6884e33a0b30cd') {
     throw new Error('Source files differ from the audited official v1.12 schema snapshot');
   }
-  const output = join(ROOT, 'skills/conduit-chat/scripts/matrix-operations.json');
+  const output = join(resolve(values.root), 'packages/matrix/src/operations.json');
   if (values.check) {
     if (readFileSync(output, 'utf8') !== text) throw new Error('Generated Matrix operation catalog is stale');
   } else writeFileSync(output, text);

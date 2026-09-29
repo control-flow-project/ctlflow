@@ -1,14 +1,19 @@
 import { build } from 'esbuild';
-import { join } from 'node:path';
-import { ROOT } from './instance.ts';
-import { requireNode } from './version.ts';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
-requireNode();
-await build({ entryPoints: [join(ROOT, 'skills/conduit-chat/scripts/chat.ts')],
-  outfile: join(ROOT, 'dist/chat.mjs'), bundle: true, platform: 'node',
-  format: 'esm', target: 'node26', banner: { js: "import { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" },
-});
-await build({ entryPoints: [join(ROOT, 'scripts/install-client.ts')],
-  outfile: join(ROOT, 'dist/install.mjs'), bundle: true, platform: 'node', format: 'esm', target: 'node26',
-});
-console.log('Built the standalone agent client and installer.');
+export async function buildClient(root: string, destination = join(root, 'dist/crossfire-client.mjs')): Promise<void> {
+  if (Number(process.versions.node.split('.')[0]) < 26) throw new Error('Crossfire requires Node.js 26+');
+  await build({ entryPoints: [join(root, 'apps/client/src/entry.ts')], outfile: destination,
+    bundle: true, platform: 'node', format: 'esm', target: 'node26',
+    banner: { js: "import { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" },
+  });
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const { values } = parseArgs({ options: { root: { type: 'string' } } });
+  if (!values.root) throw new Error('Supply the exact source --root directory');
+  await buildClient(resolve(values.root));
+  console.log('Built the standalone project-local agent client.');
+}

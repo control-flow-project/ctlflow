@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
-import { connectCodex } from '../skills/conduit-chat/scripts/codex.ts';
-import { fakeCodex, inputReceipt, THREAD, until } from './test-support/listener.ts';
+import { connectCodex } from '../packages/adapter-codex/src/connection.js';
+import { fakeCodex, inputReceipt, THREAD, until } from './test-support/listener.js';
 
 test('native delivery verifies the selected workspace and uses only start-or-steer without policy overrides', async t => {
   const fixture = await fakeCodex(t);
@@ -12,7 +12,7 @@ test('native delivery verifies the selected workspace and uses only start-or-ste
   fixture.update({ status: 'active' });
   await connection.deliver('active input', 'second');
   assert.deepEqual(fixture.requests().map(request => request.method),
-    ['initialize', 'initialized', 'thread/read', 'thread/read', 'thread/timeline/list', 'turn/start', 'thread/timeline/list',
+    ['initialize', 'initialized', 'thread/read', 'thread/resume', 'thread/read', 'thread/read', 'thread/timeline/list', 'turn/start', 'thread/timeline/list',
       'thread/read', 'thread/timeline/list', 'turn/start', 'thread/timeline/list']);
   const starts = fixture.requests().filter(request => request.method === 'turn/start');
   assert.deepEqual(starts.map(request => request.params), ['idle input', 'active input'].map((text, index) => ({
@@ -21,13 +21,14 @@ test('native delivery verifies the selected workspace and uses only start-or-ste
   })));
 });
 
-test('delivery rejects absent, foreign, or noninteractive threads without resuming them', async t => {
+test('explicit attachment rejects foreign or unavailable native sessions before delivering input', async t => {
   for (const configuration of [{ status: 'notLoaded' }, { status: 'systemError' }, { directInput: false },
     { directInput: null }, { thread: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee' }, { workspace: '/missing-workspace' }]) {
     const fixture = await fakeCodex(t, configuration);
     await assert.rejects(connectCodex(fixture.options, new AbortController().signal).then(connection => { connection.close(); return connection; }));
     assert(!fixture.requests().some(request => request.method?.startsWith('turn/')));
-    assert(!fixture.requests().some(request => ['thread/start', 'thread/resume', 'thread/fork'].includes(request.method ?? '')));
+    assert.equal(fixture.requests().filter(request => request.method === 'thread/resume').length, 0);
+    assert(!fixture.requests().some(request => ['thread/start', 'thread/fork'].includes(request.method ?? '')));
   }
 });
 
@@ -40,12 +41,11 @@ test('the thread is checked again before each input', async t => {
   assert(!fixture.requests().some(request => request.method === 'turn/start'));
 });
 
-test('protocol notifications and approval requests are never answered by the chat client', async t => {
+test('invalid native permission requests fail closed rather than being answered or delegated to the model', async t => {
   const fixture = await fakeCodex(t, { mode: 'server-requests' });
   const connection = await connectCodex(fixture.options, new AbortController().signal);
   t.after(connection.close);
-  await connection.deliver('input', 'input');
-  await connection.verify();
+  await assert.rejects(connection.deliver('input', 'input'), /invalid native session/);
   assert(!fixture.requests().some(request => request.id === 'approval' || !request.method));
 });
 
@@ -79,12 +79,39 @@ test('cancellation stops a pending native request', async t => {
   connection.close();
 });
 
-test('invalid destinations and unavailable executables fail before native requests', async t => {
+test('selected native thread closure cancels hung requests and receipt waits without replay', async context => {
+  for (const mode of ['timeout', 'accepted']) {
+    const fixture = await fakeCodex(context, { mode });
+    const connection = await connectCodex({ ...fixture.options, timeoutMs: 30_000 }, new AbortController().signal);
+    context.after(connection.close);
+    const rejected = assert.rejects(connection.deliver('input', 'closed-input'), /selected Codex thread closed/);
+    await until(() => fixture.requests().some(request => request.method === 'turn/start'));
+    fixture.notify('thread/closed', { threadId: THREAD });
+    await rejected;
+    assert.equal(connection.signal.aborted, true);
+    assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+    assert.equal(fixture.requests().filter(request => request.method === 'thread/resume').length, 1);
+    assert(!fixture.requests().some(request => ['thread/start', 'thread/fork', 'turn/interrupt'].includes(request.method ?? '')));
+  }
+});
+
+test('another native thread closing does not stop the selected connection', async context => {
+  const fixture = await fakeCodex(context);
+  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  context.after(connection.close);
+  fixture.notify('thread/closed', { threadId: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee' });
+  await connection.verify();
+  assert.equal(connection.signal.aborted, false);
+  await connection.deliver('input', 'selected-input');
+  assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+});
+
+test('invalid destinations and credentials fail before native requests', async t => {
   const fixture = await fakeCodex(t);
   const signal = new AbortController().signal;
-  await assert.rejects(connectCodex({ ...fixture.options, thread: 'latest' }, signal), /exact Codex thread UUID/);
-  await assert.rejects(connectCodex({ ...fixture.options, socket: 'relative.sock' }, signal), /absolute path/);
-  await assert.rejects(connectCodex({ ...fixture.options, binary: '/no-such-codex' }, signal), /Cannot connect/);
+  await assert.rejects(connectCodex({ ...fixture.options, session: 'latest' }, signal), /exact loaded Codex session UUID/);
+  await assert.rejects(connectCodex({ ...fixture.options, endpoint: 'ws://public:1234' }, signal), /loopback/);
+  await assert.rejects(connectCodex({ ...fixture.options, token: '' }, signal), /bearer token/);
   for (const pollMs of [0, 99, 30_001, NaN, Infinity]) {
     await assert.rejects(connectCodex({ ...fixture.options, pollMs }, signal), /poll interval/);
   }
@@ -150,7 +177,7 @@ test('interrupted input is retried only after complete bounded history proves it
   await delivery;
   const starts = fixture.requests().filter(request => request.method === 'turn/start');
   assert.equal(starts.length, 2);
-  assert.deepEqual(starts[0].params, starts[1].params);
+  assert.deepEqual(starts[0]!.params, starts[1]!.params);
   const reads = fixture.requests().filter(request => request.method === 'thread/timeline/list');
   const paged = reads.findIndex(request => request.params!.cursor === 'next');
   assert(paged > 0);
@@ -242,14 +269,13 @@ test('missing or malformed turn history never proves interruption or permits rep
   }
 });
 
-test('new-thread history initialization permits only bounded read-only retries, never another input', async context => {
+test('an unsupported native history contract fails without another input or compatibility retry', async context => {
   for (const count of [2, 3]) {
     const fixture = await fakeCodex(context, { historyUnavailable: Array.from({ length: count }, () => -32601) });
     const connection = await connectCodex(fixture.options, new AbortController().signal);
     context.after(connection.close);
-    if (count === 2) await connection.deliver('input', 'input');
-    else await assert.rejects(connection.deliver('input', 'input'), /not supported yet/);
-    assert.equal(fixture.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length, 3);
+    await assert.rejects(connection.deliver('input', 'input'), /not supported yet/);
+    assert.equal(fixture.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length, 1);
     assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
   }
 });
