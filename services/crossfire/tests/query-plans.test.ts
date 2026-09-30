@@ -110,3 +110,39 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   assert.equal(roomGrants(new URLSearchParams('roomIds=[]&roomIds=[]')).ok, false);
   assert.deepEqual(database.pragma('foreign_key_check'), []);
 });
+
+test('sender identity batches seek exact Matrix indexes across large human and agent populations', scope => {
+  let statements: string[] = [];
+  const database = new Database(':memory:', { verbose(statement) {
+    if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
+  } });
+  scope.after(() => database.close());
+  database.pragma('foreign_keys = ON');
+  createSchema(database);
+  const repositories = createRepositories(database), discovery = createDiscoveryRepository(database);
+  database.transaction(() => {
+    for (let index = 0; index < 1000; index++) {
+      const ownerId = 'human-' + index, agentId = 'agent-' + index;
+      value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+      value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
+      value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
+      value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
+    }
+  })();
+  database.exec('ANALYZE');
+  for (const count of [1, 20, 100]) {
+    statements = [];
+    const ids = Array.from({ length: count }, (_, index) => '@' + (index % 2 ? 'agent-' : 'human-') + index + ':test');
+    const resolved = value(discovery.identities(ids));
+    assert.equal(resolved.length, count);
+    assert.equal(statements.length, 2, 'Sender kinds and owners use two batch queries, never per-message lookups');
+    for (const identity of resolved) assert.equal(identity.ownerMatrixId, identity.kind === 'agent'
+      ? identity.matrixUserId.replace('@agent-', '@human-') : null);
+    for (const statement of statements) {
+      const plan = (database.prepare('EXPLAIN QUERY PLAN ' + statement).all() as { detail: string }[]).map(row => row.detail).join('\n');
+      assert.match(plan, /SEARCH .*matrix_user_id=/u);
+      assert(!plan.includes('SCAN '), 'Exact sender resolution must not scan the principal or agent tables');
+    }
+  }
+  assert.deepEqual(database.pragma('foreign_key_check'), []);
+});

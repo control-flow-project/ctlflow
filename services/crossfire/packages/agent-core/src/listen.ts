@@ -17,22 +17,24 @@ import { requireCurrentRelease } from './release.js';
 import type { Manifest } from '@crossfire/contracts/release';
 import { isListenerNotice, mentionsAgent } from '@crossfire/contracts/notices';
 import { incrementalEvents } from './receive.js';
+import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
+import { deliveryEvents, resolveSenders } from './senders.js';
 
-export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string, maximum = DEFAULT_OUTPUT_BYTES) {
+export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
+  identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
   if (!Number.isSafeInteger(maximum) || maximum < 1024 || maximum > MAX_OUTPUT_BYTES) throw new Error('Invalid Codex input budget');
   const batches: { text: string; messageId: string; messages: number }[] = [];
   let current: ReceivedEvent[] = [];
   function flush(): void {
     if (!current.length) return;
-    batches.push({ text: deliveryText(current, settings), messageId: 'crossfire-' + createHash('sha256')
+    batches.push({ text: deliveryText(current, settings, identities), messageId: 'crossfire-' + createHash('sha256')
       .update(JSON.stringify([settings.instance, ...current.map(event => [event.room_id, event.event_id])])).digest('hex'),
     messages: current.filter(event => event.type === 'm.room.message').length });
     current = [];
   }
-  for (const event of events) {
-    if (event.sender === self && event.type === 'm.room.message' || isListenerNotice(event)) continue;
-    if (Buffer.byteLength(deliveryText([event], settings)) > maximum) throw new Error(`A chat event exceeds the ${maximum}-byte Codex input limit; retrieve it explicitly`);
-    if (Buffer.byteLength(deliveryText([...current, event], settings)) > maximum) flush();
+  for (const event of deliveryEvents(events, self)) {
+    if (Buffer.byteLength(deliveryText([event], settings, identities)) > maximum) throw new Error(`A chat event exceeds the ${maximum}-byte Codex input limit; retrieve it explicitly`);
+    if (Buffer.byteLength(deliveryText([...current, event], settings, identities)) > maximum) flush();
     current.push(event);
   }
   flush();
@@ -141,12 +143,17 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     });
     signal.throwIfAborted();
   }
-  async function deliver(events: readonly ReceivedEvent[]): Promise<boolean> {
-    if (!senders.size) return false;
+  async function deliver(events: readonly ReceivedEvent[]): Promise<{ accepted: boolean; messageIds: string[] }> {
+    if (!senders.size) return { accepted: false, messageIds: [] };
     const cancel = new AbortController();
+    let messageIds: string[] = [];
     const done = (async () => {
       try {
-        for (const batch of deliveryBatches(events, options.settings, options.account.user_id, maximum)) {
+        const emitted = deliveryEvents(events, options.account.user_id);
+        const identities = await resolveSenders(options.coordination, emitted, AbortSignal.any([cancel.signal, signal]));
+        const batches = deliveryBatches(emitted, options.settings, options.account.user_id, identities, maximum);
+        messageIds = batches.map(batch => batch.messageId);
+        for (const batch of batches) {
           pendingMessages = batch.messages;
           await destination.deliver(batch.text, batch.messageId, AbortSignal.any([cancel.signal, signal]));
           activity?.delivered(pendingMessages);
@@ -160,7 +167,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       }
     })();
     sending = { cancel, done };
-    try { return await done; }
+    try { return { accepted: await done, messageIds }; }
     finally { sending = undefined; }
   }
   async function cancelDelivery(): Promise<void> {
@@ -288,10 +295,11 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         const event = await client.get<Event>(`${API}/rooms/${segment(urgent.room)}/event/${segment(urgent.event)}`);
         if (event.event_id !== urgent.event || event.sender !== options.settings.owner) throw new Error('Urgent event identity changed');
         if (controlling || state.paused) continue;
-        if (await deliver([eventView(event, urgent.room)]) || await settle()) {
+        const attempt = await deliver([eventView(event, urgent.room)]);
+        if (attempt.accepted || await settle()) {
           urgent.status = 'delivered';
           saveControl(storage, controlFile, state);
-          destination.acknowledge(deliveryBatches([eventView(event, urgent.room)], options.settings, options.account.user_id, maximum).map(batch => batch.messageId));
+          destination.acknowledge(attempt.messageIds);
         }
         continue;
       }
@@ -328,13 +336,14 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       const events: ReceivedEvent[] = [];
       for (const event of batch.events) if (await accept(event)) events.push(event);
-      if (!await deliver(events) && !await settle()) continue;
+      const attempt = await deliver(events);
+      if (!attempt.accepted && !await settle()) continue;
       await work((client, scope) => retry(async () => {
         await acknowledge(storage, client, options.cursorFile, { ...batch,
           cursors: Object.fromEntries(Object.entries(batch.cursors).filter(([room]) => !retiredRooms.has(room))),
           latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => !retiredRooms.has(room))) });
       }, scope));
-      destination.acknowledge(deliveryBatches(events, options.settings, options.account.user_id, maximum).map(batch => batch.messageId));
+      destination.acknowledge(attempt.messageIds);
       if (membershipAtRead !== membershipRevision) continue;
       state.controls = state.controls.filter(control => !batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
       saveControl(storage, controlFile, state);

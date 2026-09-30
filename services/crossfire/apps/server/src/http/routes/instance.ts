@@ -1,5 +1,6 @@
 import { operations } from '@crossfire/contracts/rest/operations';
 import { discoverPrincipals, readRoles, readPermissions } from '@crossfire/domain/authorization/discover';
+import { resolvePrincipals } from '@crossfire/domain/identity/resolve-principals';
 import { readPolicy } from '@crossfire/domain/policy/read-policy';
 import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
 import { readAuditEvents } from '@crossfire/domain/audit/read-events';
@@ -9,6 +10,7 @@ import * as view from '../representation/instance.js';
 export function instanceRoutes(instance: string, startedAt: number) {
   return [
     bind(operations.principals, (context, _params, query) => paged(discoverPrincipals(context.services, actor(context), query))),
+    bind(operations.resolvePrincipals, (context, _params, _query, input) => reply(resolvePrincipals(context.services, actor(context), input.matrixUserIds))),
     bind(operations.roles, context => reply(readRoles(context.services, actor(context)))),
     bind(operations.permissions, context => reply(readPermissions(context.services, actor(context)))),
     bind(operations.policy, context => reply(readPolicy(context.services, actor(context)), view.policy)),

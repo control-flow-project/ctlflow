@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { matrix } from '@crossfire/adapter-matrix/http';
 import { writeJson } from '@crossfire/adapter-filesystem/index';
 import type { Event } from '@crossfire/contracts/client';
-import { eventView, readUnread, synchronize, loadSyncCursor, checkpointSync, incrementalEvents, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, deliveryText, type Sync } from '@crossfire/agent-core/receive';
+import { eventView, readUnread, synchronize, loadSyncCursor, checkpointSync, incrementalEvents, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, acquisitionBytes, type Sync } from '@crossfire/agent-core/receive';
 import { deliveryBatches } from '@crossfire/agent-core/listen';
 import { matrixFixture, message, OBSERVER, ROOM, SELF, temporary } from './test-support/listener.js';
 
@@ -75,7 +75,7 @@ test('delivery retains attribution and attachments, excludes self echoes, and bo
     view(message('$large', OBSERVER, '😀'.repeat(12_000))),
     view(message('$large2', OBSERVER, '😀'.repeat(12_000))),
     view({ ...message('$redacted', SELF), type: 'm.room.redaction' })];
-  const batches = deliveryBatches(events, fixture.settings, SELF);
+  const batches = deliveryBatches(events, fixture.settings, SELF, fixture.identities);
   assert.equal(batches.length, 2);
   assert.equal(batches.reduce((count, batch) => count + batch.messages, 0), 3);
   const decoded = batches.flatMap(batch => {
@@ -87,9 +87,9 @@ test('delivery retains attribution and attachments, excludes self echoes, and bo
     return data.events;
   });
   assert.deepEqual(decoded, events.slice(1));
-  assert.deepEqual(deliveryBatches(events, fixture.settings, SELF), batches);
-  assert.deepEqual(deliveryBatches([events[0]!], fixture.settings, SELF), []);
-  assert.throws(() => deliveryBatches([view(message('$oversized', OBSERVER, 'x'.repeat(128 * 1024)))], fixture.settings, SELF),
+  assert.deepEqual(deliveryBatches(events, fixture.settings, SELF, fixture.identities), batches);
+  assert.deepEqual(deliveryBatches([events[0]!], fixture.settings, SELF, fixture.identities), []);
+  assert.throws(() => deliveryBatches([view(message('$oversized', OBSERVER, 'x'.repeat(128 * 1024)))], fixture.settings, SELF, fixture.identities),
     /exceeds the 65536-byte/);
 });
 
@@ -119,7 +119,7 @@ test('byte-budget retries preserve every unread event and do not duplicate HTML'
     assert.equal(batch.events.length, 1);
     assert.equal(batch.events[0]!.content.formatted_body, undefined);
     assert.deepEqual(batch.events[0]!.omitted, ['content.formatted_body']);
-    assert(Buffer.byteLength(deliveryText(batch.events, fixture.settings)) <= 65536);
+    assert(acquisitionBytes(batch.events, fixture.settings) <= 65536);
     ids.push(batch.events[0]!.event_id);
     await acknowledge(storage, client, fixture.cursorFile, batch);
   }

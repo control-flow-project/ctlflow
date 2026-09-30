@@ -9,6 +9,19 @@ import { mapRole } from '../role/map.js';
 import { mapPermission } from '../permission/map.js';
 export function createDiscoveryRepository(database: Database.Database): DiscoveryRepository {
   return {
+    identities(matrixUserIds) {
+      return stored(() => {
+        const humans = executeSelect(database, schema, (query, params) => query.from('principal')
+          .where(principal => principal.kind === 'human' && params.matrixUserIds.includes(principal.matrix_user_id))
+          .select(principal => ({ matrixUserId: principal.matrix_user_id, kind: principal.kind, ownerMatrixId: null })), { matrixUserIds });
+        const agents = executeSelect(database, schema, (query, params) => query.from('agent')
+          .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+          .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id, (row, owner) => ({ ...row, owner }))
+          .where(row => params.matrixUserIds.includes(row.principal.matrix_user_id))
+          .select(row => ({ matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind, ownerMatrixId: row.owner.matrix_user_id })), { matrixUserIds });
+        return success([...humans, ...agents]);
+      });
+    },
     selected(principalIds) {
       return stored(() => {
         const humans = executeSelect(database, schema, (query, params) => query.from('member')

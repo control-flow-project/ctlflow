@@ -15,6 +15,7 @@ import { builtRelease } from './release.js';
 import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { serveArtifact } from '../../apps/server/src/artifacts.js';
 import type { WakePolicy } from '@crossfire/contracts/wake';
+import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
 
 export const THREAD = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 export const OBSERVER = '@human:test.localhost';
@@ -161,6 +162,11 @@ export async function matrixFixture(t: TestContext, workspace: string) {
   const settings: Settings = { instance: 'test', server_name: 'test.localhost',
     homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };
   const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture' };
+  const identities = new Map<string, PrincipalIdentity>([
+    [OBSERVER, { matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null }],
+    [SELF, { matrixUserId: SELF, kind: 'agent', ownerMatrixId: OBSERVER }],
+    ['@agent-holmes:test.localhost', { matrixUserId: '@agent-holmes:test.localhost', kind: 'agent', ownerMatrixId: OBSERVER }],
+  ]);
   const rooms = new Map<string, Event[]>([[ROOM, []]]);
   const joined = new Set([ROOM]);
   const invites: Record<string, { invite_state: { events: Event[] } }> = {};
@@ -195,13 +201,17 @@ export async function matrixFixture(t: TestContext, workspace: string) {
     const path = decodeURIComponent(url.pathname);
     const chunks: Buffer[] = [];
     for await (const chunk of request) chunks.push(Buffer.from(chunk));
-    requests.push({ path, query: url.searchParams, ...(request.method ? { method: request.method } : {}), body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined });
+    const body: unknown = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined;
+    requests.push({ path, query: url.searchParams, ...(request.method ? { method: request.method } : {}), body });
     const gate = gates.get(path);
     if (gate) { gates.delete(path); gate.entered(); await gate.wait; }
     const failure = failures.get(path)?.shift();
     if (failure) { send(response, { errcode: 'M_TEST', error: 'Fixture failure' }, failure); return; }
     if (path === '/api/releases/current') {
       api(response, reporting.current);
+    } else if (path === '/api/principal-resolutions' && request.method === 'POST') {
+      const input = body as { matrixUserIds: string[] };
+      api(response, input.matrixUserIds.map(matrixUserId => identities.get(matrixUserId) ?? { matrixUserId, kind: 'unknown', ownerMatrixId: null }));
     } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
       api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, wakeMode: waking.policy,
         senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
@@ -263,7 +273,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       send(response, {});
     } else if (path.includes('/send/m.room.message/')) {
       const room = path.slice((API + '/rooms/').length, path.indexOf('/send/'));
-      const event = { ...message('$sent-' + revision, SELF), content: requests.at(-1)!.body as Event['content'] };
+      const event = { ...message('$sent-' + revision, SELF), content: body as Event['content'] };
       const events = rooms.get(room) ?? [];
       events.push(event); rooms.set(room, events);
       eventPositions.set(event.event_id, revision + 1); wake(); send(response, { event_id: event.event_id });
@@ -282,7 +292,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, access, waking, syncUpdates, failures,
+  return { coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, access, waking, syncUpdates, failures, identities,
     env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
     wake, waiting: () => waiters.size,
     hold: (path: string) => {

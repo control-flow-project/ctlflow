@@ -7,6 +7,7 @@ import type { Account, Event, Settings } from '@crossfire/contracts/client';
 import { roomId, userId } from '@crossfire/contracts/validation';
 import { DEFAULT_EVENTS, DEFAULT_OUTPUT_BYTES, MAX_EVENTS, MAX_OUTPUT_BYTES, MAX_JSON_BYTES } from '@crossfire/contracts/limits';
 import { isListenerNotice } from '@crossfire/contracts/notices';
+import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
 
 type Page = { chunk: Event[]; start?: string; end?: string };
 export type Sync = {
@@ -61,8 +62,21 @@ export function projectMessages(value: unknown, depth = 0): unknown {
   return Object.fromEntries(Object.entries(object).map(([key, item]) => [key, projectMessages(item, depth + 1)]));
 }
 
-export function deliveryText(events: readonly ReceivedEvent[], settings: Settings): string {
-  return PREFIX + JSON.stringify({ instance: settings.instance, owner: settings.owner, events });
+function eventEnvelope(events: readonly ReceivedEvent[], settings: Settings) {
+  return { instance: settings.instance, owner: settings.owner, events };
+}
+
+export function acquisitionBytes(events: readonly ReceivedEvent[], settings: Settings): number {
+  return Buffer.byteLength(PREFIX) + Buffer.byteLength(JSON.stringify(eventEnvelope(events, settings)));
+}
+
+export function deliveryText(events: readonly ReceivedEvent[], settings: Settings, identities: ReadonlyMap<string, PrincipalIdentity>): string {
+  const senders = Object.fromEntries([...new Set(events.map(event => event.sender))].map(sender => {
+    const identity = identities.get(sender);
+    if (!identity || identity.matrixUserId !== sender) throw new Error('Missing verified sender identity');
+    return [sender, identity.kind === 'agent' ? { kind: identity.kind, owner: identity.ownerMatrixId } : { kind: identity.kind }];
+  }));
+  return PREFIX + JSON.stringify({ ...eventEnvelope(events, settings), senders });
 }
 
 export async function synchronize(client: Matrix,
@@ -213,7 +227,7 @@ export async function readUnread(storage: LocalState, client: Matrix, settings: 
       const messages = ordered.filter(event => IMPORTANT_EVENTS.includes(event.type) && !isListenerNotice(event))
         .map(event => eventView(event, room));
       const proposed = fresh ? messages : [...events, ...messages];
-      if (Buffer.byteLength(deliveryText(proposed, settings)) > maximum - 1024) {
+      if (acquisitionBytes(proposed, settings) > maximum - 1024) {
         if (pageLimit > 1) { pageLimit = Math.max(1, Math.floor(pageLimit / 2)); continue; }
         if (!fresh && events.length) { more_rooms.push(room); remaining = 0; break; }
         throw new Error(`A Matrix event exceeds the ${maximum}-byte input budget; retrieve it explicitly or increase --max-output-bytes up to ${MAX_OUTPUT_BYTES}. Read positions are unchanged.`);
@@ -221,7 +235,7 @@ export async function readUnread(storage: LocalState, client: Matrix, settings: 
       cursors[room] = fresh ? from : completed ? end.cursor : page.end ?? from;
       if (fresh) {
         recent = [...recent, ...messages].sort((left, right) => (left.timestamp ?? '').localeCompare(right.timestamp ?? '')).slice(-limit);
-        while (recent.length && Buffer.byteLength(deliveryText(recent, settings)) > maximum - 1024) recent.shift();
+        while (recent.length && acquisitionBytes(recent, settings) > maximum - 1024) recent.shift();
       }
       else {
         events.push(...messages);
@@ -235,7 +249,7 @@ export async function readUnread(storage: LocalState, client: Matrix, settings: 
   }
   const candidates = remaining ? recent.slice(-remaining) : [];
   for (const event of candidates) {
-    if (events.length >= limit || Buffer.byteLength(deliveryText([...events, event], settings)) > maximum - 1024) break;
+    if (events.length >= limit || acquisitionBytes([...events, event], settings) > maximum - 1024) break;
     events.push(event);
   }
   return { events, cursors, more_rooms, latest };

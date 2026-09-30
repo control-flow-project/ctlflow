@@ -1,5 +1,5 @@
 export const permissionCatalog = [
-  { code: 'principal.read', grantScope: 'role', description: 'Search registered active identities', roles: ['member', 'administrator', 'agent'] },
+  { code: 'principal.read', grantScope: 'role', description: 'Search active identities and resolve sender ownership', roles: ['member', 'administrator', 'agent'] },
   { code: 'agent.read.self', grantScope: 'role', description: 'Read own agent identity', roles: ['agent'] },
   { code: 'agent.read.owned', grantScope: 'role', description: 'Read owned agents', roles: ['member', 'administrator'] },
   { code: 'agent.read.any', grantScope: 'role', description: 'Read every agent', roles: ['administrator'] },

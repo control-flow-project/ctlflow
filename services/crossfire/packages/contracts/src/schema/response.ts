@@ -3,6 +3,11 @@ import * as check from './validation.js';
 import type { Parsed } from './validation.js';
 export const principal = check.object({ principalId: check.identifier, matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent'),
   displayName: check.text(255), ownerId: check.identifier, ownerMatrixId: check.matrixUserId });
+export const principalIdentity = check.refine(check.object({ matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent', 'unknown'),
+  ownerMatrixId: check.nullable(check.matrixUserId) }), identity => (identity.kind === 'agent') === (identity.ownerMatrixId !== null),
+  'Only registered agents have an owner');
+export const principalIdentities = check.refine(check.list(principalIdentity, 100, 1),
+  identities => new Set(identities.map(identity => identity.matrixUserId)).size === identities.length, 'Resolved identities must be unique');
 export const role = check.object({ code: check.text(100), principalKind: check.choice('human', 'agent'), label: check.text(100) });
 export const permission = check.object({ code: check.text(100), grantScope: check.choice('role', 'agent_room'), description: check.text(300) });
 export const application = check.object({ appliedRevision: check.nullable(check.integer()), appliedStatus: check.nullable(check.status),
@@ -81,6 +86,7 @@ export const acknowledged = check.object({ accepted: check.boolean });
 export const report = check.object({ disconnect: check.boolean, currentRelease: check.text(200) });
 export const notice = check.object({ outcome: check.choice('pending', 'sent', 'denied', 'not-applicable', 'not-permitted', 'rate-limited') });
 export type AgentView = Parsed<typeof agent>;
+export type PrincipalIdentity = Parsed<typeof principalIdentity>;
 export type MemberView = Parsed<typeof member>;
 export type SessionView = Parsed<typeof session>;
 export type RoomView = Parsed<typeof room>;
