@@ -7,6 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { serve } from './main.js';
 import { config } from './config.js';
 import { publicRouter } from './router.js';
+import { readElementPresentation } from './element-configuration.js';
 import { readJson, privateDir } from '@crossfire/adapter-filesystem/index';
 
 process.umask(0o077);
@@ -44,7 +45,7 @@ try {
   }
   const releases = readdirSync(join(artifacts, 'onboarding'));
   if (releases.length !== 1) throw new Error('Image must contain exactly one onboarding release');
-  service = await serve(directory, join(artifacts, 'onboarding', releases[0]!), 8081);
+  service = await serve(directory, join(artifacts, 'onboarding', releases[0]!), 8081, readElementPresentation('/app/element', parsed.value.publicOrigin));
   router = publicRouter({ publicOrigin: parsed.value.publicOrigin, matrixOrigin: parsed.value.matrixOrigin,
     serviceOrigin: 'http://127.0.0.1:8081', web: join(artifacts, 'web'), element: '/app/element' });
   router.listen(8080, '0.0.0.0');

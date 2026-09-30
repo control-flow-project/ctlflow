@@ -123,6 +123,12 @@ export function createCollectionRepository(database: Database.Database): Collect
     invitations(input) {
       return stored(() => {
         const params = { offset: (input.page - 1) * input.pageSize, limit: input.pageSize };
+        if (input.createdByMemberId !== undefined) {
+          const scoped = { ...params, createdByMemberId: input.createdByMemberId };
+          const total = executeSelect(database, schema, (query, params) => query.from('member_invitation').where(row => row.created_by_member_id === params.createdByMemberId).count(), scoped);
+          const rows = executeSelect(database, schema, (query, params) => query.from('member_invitation').where(row => row.created_by_member_id === params.createdByMemberId).orderByDescending(row => row.created_at).thenBy(row => row.id).skip(params.offset).take(params.limit), scoped);
+          return success(page(rows.map(mapMemberInvitation), total, input));
+        }
         const total = executeSelect(database, schema, query => query.from('member_invitation').count());
         const rows = executeSelect(database, schema, (query, params) => query.from('member_invitation').orderByDescending(row => row.created_at).thenBy(row => row.id).skip(params.offset).take(params.limit), params);
         return success(page(rows.map(mapMemberInvitation), total, input));

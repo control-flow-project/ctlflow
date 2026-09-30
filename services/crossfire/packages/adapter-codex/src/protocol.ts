@@ -1,4 +1,6 @@
 import WebSocket from 'ws';
+import { lstatSync, realpathSync } from 'node:fs';
+import { dirname, isAbsolute } from 'node:path';
 
 export type NativeRequest = { id: number | string; method: string; params: Record<string, unknown> };
 export type NativeEvent = { method: string; params: Record<string, unknown> };
@@ -11,6 +13,15 @@ function object(value: unknown): Record<string, unknown> {
 }
 
 export function localEndpoint(value: string): string {
+  if (value.startsWith('unix://')) {
+    const requested = value.slice(7);
+    if (!isAbsolute(requested) || requested.includes('\0')) throw new Error('Codex requires an exact private Unix socket path');
+    const path = realpathSync(requested);
+    const socket = lstatSync(path), directory = lstatSync(dirname(path));
+    if (!socket.isSocket() || socket.uid !== process.getuid!() || socket.mode & 0o077
+      || !directory.isDirectory() || directory.uid !== process.getuid!() || directory.mode & 0o077) throw new Error('Codex socket must be private and owned by the current user');
+    return 'unix://' + path;
+  }
   const url = new URL(value);
   if (!['ws:', 'wss:'].includes(url.protocol) || !['127.0.0.1', '[::1]', 'localhost'].includes(url.hostname)
     || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
@@ -23,9 +34,10 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
   event: (event: NativeEvent) => void; approval: (request: NativeRequest, signal: AbortSignal) => Promise<unknown> }, stop: AbortSignal) {
   stop.throwIfAborted();
   const endpoint = localEndpoint(options.endpoint);
-  if (!options.token || options.token.length > 4096 || /[\s\x00-\x1f\x7f]/u.test(options.token)) throw new Error('Supply a private Codex bearer token');
+  const unix = endpoint.startsWith('unix://');
+  if (!unix && !options.token || options.token.length > 4096 || /[\s\x00-\x1f\x7f]/u.test(options.token)) throw new Error('Supply a private Codex bearer token');
   if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 100 || options.timeoutMs > 300_000) throw new Error('Invalid native request deadline');
-  const socket = new WebSocket(endpoint, { headers: { Authorization: 'Bearer ' + options.token },
+  const socket = new WebSocket(unix ? 'ws+unix://' + endpoint.slice(7) + ':/rpc' : endpoint, { headers: unix ? {} : { Authorization: 'Bearer ' + options.token },
     perMessageDeflate: false, maxPayload: MAX_FRAME_BYTES, handshakeTimeout: options.timeoutMs, followRedirects: false });
   const failure = new AbortController();
   const pending = new Map<number, Pending>();

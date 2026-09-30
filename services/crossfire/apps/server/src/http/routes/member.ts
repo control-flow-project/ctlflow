@@ -2,7 +2,8 @@ import { operations } from '@crossfire/contracts/rest/operations';
 import { readMember, listMembers, readInvitation, listInvitations } from '@crossfire/domain/member/read-member';
 import { changeMember } from '@crossfire/domain/member/change-member';
 import { createMemberInvitation, revokeMemberInvitation } from '@crossfire/domain/member/invitation';
-import { acceptMemberInvitation } from '@crossfire/domain/member/accept-invitation';
+import { verifyInvitation } from '@crossfire/domain/member/registration';
+import { success, failure } from '@crossfire/kernel/result';
 import { bind, reply, paged, actor, acknowledged } from '../bind.js';
 import { member } from '../representation/identity.js';
 import { invitation } from '../representation/enrollment.js';
@@ -24,6 +25,14 @@ export function memberRoutes() {
     bind(operations.invitations, (context, _params, query) => paged(listInvitations(context.services, actor(context), query), invitation)),
     bind(operations.invitation, (context, params) => reply(readInvitation(context.services, actor(context), params.invitationId), invitation)),
     bind(operations.revokeInvitation, (context, params) => acknowledged(revokeMemberInvitation(context.services, actor(context), params.invitationId, context.requestId))),
-    bind(operations.acceptInvitation, async (context, params, _query, input) => reply(await acceptMemberInvitation(context.services, params.invitationId, input, context.requestId))),
+    bind(operations.claimInvitation, (context, params, _query, input) => {
+      const verified = verifyInvitation(context.services, params.invitationId, input.claimSecret);
+      return verified.ok ? success({ data: { accepted: true }, invitationCookie: params.invitationId + '.' + input.claimSecret }) : verified;
+    }),
+    bind(operations.registrationPolicy, context => {
+      const policy = context.services.repositories.instancePolicy.find({ id: 'instance' });
+      if (!policy.ok) return policy;
+      return policy.value ? success({ data: { signupMode: policy.value.signupMode } }) : failure('unavailable', 'Instance policy unavailable');
+    }),
   ];
 }

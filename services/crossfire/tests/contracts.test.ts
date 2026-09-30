@@ -5,6 +5,8 @@ import { roomId } from "@crossfire/contracts/validation";
 import { deliveryGrant, policy, deliveryPolicy } from "@crossfire/contracts/schema/response";
 import { agents as agentFilters } from "@crossfire/contracts/schema/query";
 import { page } from "@crossfire/contracts/schema/query";
+import { memberChange } from '@crossfire/contracts/schema/request';
+import { owner } from '@crossfire/contracts/schema/response';
 
 
 test("native room identities remain opaque, including version 12 IDs", () => {
@@ -13,6 +15,17 @@ test("native room identities remain opaque, including version 12 IDs", () => {
   assert.equal(roomId("!native:example.org"), true);
   for (const invalid of ["", "!", "room", "!room id", "!room\n"]) assert.equal(roomId(invalid), false);
   assert.equal(deliveryGrant({ roomId: room, accessMode: "read", powerLevel: null, muted: false }).ok, true);
+});
+
+test('member labels retain every accepted signup username across requests and owner views', () => {
+  const identity = { memberId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', matrixUserId: '@member:test.localhost', status: 'active' };
+  const displayName = 'x'.repeat(100);
+  assert(memberChange({ expectedRevision: 0, displayName }).ok);
+  assert(owner({ ...identity, displayName }).ok);
+  for (const invalid of ['', displayName + 'x', 'invalid\u0000label']) {
+    assert.equal(memberChange({ expectedRevision: 0, displayName: invalid }).ok, false);
+    assert.equal(owner({ ...identity, displayName: invalid }).ok, false);
+  }
 });
 
 test('listener policy is explicit and rejects missing authority, self triggers and competing fields', () => {
@@ -36,7 +49,7 @@ test("pagination rejects duplicate parameters and unbounded pages", () => {
 
 test('administrator instructions are required plain text with an exact UTF-8 bound', () => {
   const input = { revision: 0, maxOwnerAgents: 10, maxAgents: 100, maxPending: 100,
-    enrollmentSeconds: 300, reconcileSeconds: 300, agentInstructions: DEFAULT_AGENT_INSTRUCTIONS };
+    enrollmentSeconds: 300, reconcileSeconds: 300, agentInstructions: DEFAULT_AGENT_INSTRUCTIONS, signupMode: 'invitation', invitationIssuers: 'administrators' };
   assert(policy(input).ok);
   for (const instructions of ['Keep replies concise.\nUse project tickets.\t東京', '<script>alert("plain text")</script>',
     'a'.repeat(AGENT_INSTRUCTIONS_MAX_BYTES), 'é'.repeat(AGENT_INSTRUCTIONS_MAX_BYTES / 2)]) {

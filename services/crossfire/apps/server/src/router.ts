@@ -32,9 +32,12 @@ export function publicRouter(routes: Routes) {
     }
     const path = url.pathname;
     const native = path.startsWith('/_matrix/');
-    const management = path.startsWith('/api/') || path.startsWith('/onboarding/');
+    const registration = /^\/_matrix\/client\/[^/]+\/register\/?$/u.test(path);
+    const registrationAuthentication = /^\/_matrix\/client\/[^/]+\/auth\/org\.crossfire\.login\.registration\/fallback\/web\/?$/u.test(path);
+    const elementConfiguration = path === '/config.json' || path === '/config.' + new URL(routes.publicOrigin).hostname + '.json';
+    const management = registration || registrationAuthentication || elementConfiguration || path.startsWith('/api/') || path.startsWith('/onboarding/');
     if (native || management) {
-      const target = new URL(native ? routes.matrixOrigin : routes.serviceOrigin);
+      const target = new URL(management ? routes.serviceOrigin : routes.matrixOrigin);
       const headers: IncomingHttpHeaders = { ...request.headers, host: new URL(routes.publicOrigin).host };
       delete headers['forwarded']; delete headers['x-forwarded-for']; delete headers['x-forwarded-host'];
       const upstream = forward({ hostname: target.hostname, port: target.port, method: request.method,
@@ -50,12 +53,10 @@ export function publicRouter(routes: Routes) {
     if (!['GET', 'HEAD'].includes(request.method ?? '')) { response.writeHead(405); response.end(); return; }
     response.setHeader('Referrer-Policy', 'no-referrer');
     response.setHeader('X-Frame-Options', 'DENY');
-    if (path === '/.well-known/matrix/client' || path === '/config.json') {
+    if (path === '/.well-known/matrix/client') {
       response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       const homeserver = { base_url: routes.publicOrigin };
-      response.end(JSON.stringify(path === '/config.json' ? { default_server_config: { 'm.homeserver': homeserver },
-        brand: 'Crossfire', disable_custom_urls: true, disable_guests: true, disable_login_language_selector: true,
-        disable_3pid_login: true, default_theme: 'light', room_directory: { servers: [] } } : { 'm.homeserver': homeserver })); return;
+      response.end(JSON.stringify({ 'm.homeserver': homeserver })); return;
     }
     if (path === '/manage' || path.startsWith('/manage/')) {
       response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");

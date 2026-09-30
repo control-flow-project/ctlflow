@@ -9,7 +9,8 @@ node services/fleetd/dist/apps/daemon/src/main.js --name laptop --root /absolute
 
 The controller root contains its private descriptor, registry, operation state,
 log and `fleetd.sock`. The API binds only this Unix socket, not a public port.
-Native `flock` owns the daemon and each active fleet/receiver; no timeout lease or
+Private SQLite exclusive transactions own the daemon and each active fleet/receiver;
+OS locks survive suspension and release on process exit. No timeout lease or
 process-name scanning decides ownership. One root has one stable controller name.
 Optional descriptor metadata is descriptive only and contains no credentials.
 

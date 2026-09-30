@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSession } from './session.js';
 import { operations, useResource } from './api.js';
-import { Field, Loaded } from './ui.js';
+import { Field, Loaded, Pagination } from './ui.js';
 import { filterQuery } from './form.js';
 export function OwnerFilter() {
   const [number, setNumber] = useState(1), [selected, setSelected] = useState(new URLSearchParams(location.search).get('ownerId') ?? '');
@@ -10,8 +10,7 @@ export function OwnerFilter() {
     setSelected(event.target.value); setLabel(event.target.selectedOptions[0]?.textContent ?? '');
   }}><option value="">All owners</option>{selected && !page.data.some(member => member.memberId === selected) && <option value={selected}>{label}</option>}
     {page.data.map(member => <option value={member.memberId} key={member.memberId}>{member.displayName} · {member.matrixUserId}</option>)}</select>}</Field>
-    {(page.meta.totalPages ?? 0) > 1 && <div className="pagination"><button type="button" disabled={number <= 1} onClick={() => setNumber(number - 1)}>Previous owners</button><span>Page {number}</span>
-      <button type="button" disabled={number >= (page.meta.totalPages ?? 0)} onClick={() => setNumber(number + 1)}>Next owners</button></div>}</>}</Loaded></div>;
+    {(page.meta.totalPages ?? 0) > 1 && <Pagination key={number} meta={{ page: number, totalPages: page.meta.totalPages ?? 1 }} onPage={setNumber}/>}</>}</Loaded></div>;
 }
 export function AgentFilters() {
   const viewer = useSession(), query = new URLSearchParams(location.search);

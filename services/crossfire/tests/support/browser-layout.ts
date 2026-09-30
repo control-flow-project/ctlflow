@@ -31,6 +31,23 @@ export async function checkPaperLayout(page: Page): Promise<void> {
     '.page-frame input:not([type=checkbox]), .page-frame select, .page-frame textarea, .page-frame .alert'
   )).filter(element => element.getBoundingClientRect().width > 0).map(element => getComputedStyle(element).borderLeftWidth)`);
   for (const border of controls) assert.equal(border, '1px', 'Input and alert boundaries remain visible');
+  const rows = await page.evaluate<{ alignment: string; controls: { margin: string; offset: number }[] }[]>(`Array.from(document.querySelectorAll('table td')).map(cell => ({
+    alignment: getComputedStyle(cell).verticalAlign,
+    controls: Array.from(cell.querySelectorAll(':scope > select, :scope > .actions, :scope > .status')).filter(control => control.getBoundingClientRect().height > 0).map(control => {
+      const outer = cell.getBoundingClientRect(), inner = control.getBoundingClientRect();
+      return { margin: getComputedStyle(control).marginTop, offset: Math.abs((inner.top + inner.bottom - outer.top - outer.bottom) / 2) };
+    })
+  }))`);
+  for (const row of rows) {
+    assert.equal(row.alignment, 'middle', 'Every table cell uses one vertical alignment');
+    for (const control of row.controls) {
+      assert.equal(control.margin, '0px', 'Table controls do not carry surrounding form margins');
+      assert(control.offset <= 1, 'Table controls share the row’s vertical center: ' + control.offset);
+    }
+  }
+  const paginationLabels = await page.evaluate<string[]>(`Array.from(document.querySelectorAll('.pagination label'))
+    .filter(label => label.getBoundingClientRect().width > 0).map(label => getComputedStyle(label).flexDirection)`);
+  for (const direction of paginationLabels) assert.equal(direction, 'row', 'Pagination labels and controls remain horizontally aligned');
   await expect(page.locator('.eyebrow, .empty-mark, .sidebar-note, .page-footer')).toHaveCount(0);
   const copy = await page.locator('body').innerText();
   for (const slogan of ['YOUR COORDINATION SPACE', 'Your team, under your control', 'HUMANS IN CHARGE',

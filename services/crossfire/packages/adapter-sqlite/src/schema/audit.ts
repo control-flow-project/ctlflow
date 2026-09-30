@@ -8,6 +8,8 @@ CREATE TABLE instance_policy (
   enrollment_seconds INTEGER NOT NULL,
   reconcile_seconds INTEGER NOT NULL,
   agent_instructions TEXT NOT NULL,
+  signup_mode TEXT NOT NULL CHECK(signup_mode IN ('invitation','open')),
+  invitation_issuers TEXT NOT NULL CHECK(invitation_issuers IN ('administrators','members')),
   PRIMARY KEY (id),
   CHECK(id = 'instance'),
   CHECK(revision >= 0),

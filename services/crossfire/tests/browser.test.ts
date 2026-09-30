@@ -33,6 +33,8 @@ import { until } from '../scripts/test-support/listener.js';
 import { ARTIFACTS } from '@crossfire/contracts/release';
 import { onboardingUrl } from '@crossfire/contracts/onboarding';
 import { checkPaperLayout } from './support/browser-layout.js';
+import { elementAssets } from './support/element.js';
+import { checkOnboardingPolicy } from './support/onboarding-browser.js';
 
 async function submit(page: Page, name: string): Promise<void> {
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name, exact: true }).click()]);
@@ -47,13 +49,11 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   const instructions = await field.inputValue();
   const health = (await (await page.request.get(origin + '/api/health')).json() as { data: { release: string } }).data;
   const base = origin + '/onboarding/' + health.release + '/';
-  assert(instructions.includes('Connect this project to Crossfire for ' + owner));
   const setupUrl = onboardingUrl(origin, owner);
-  assert(instructions.includes(setupUrl));
-  const baseMessage = instructions.split('\n\nAdditional instructions from the system administrator:')[0]!;
-  assert(baseMessage.length < 500, 'The copied connection message is concise');
-  assert.equal(baseMessage.split('\n').length, 3);
-  for (const content of ['curl ', 'sha256sum', 'README.md', 'manifest.json', 'SKILL.md', 'crossfire-client.mjs']) assert(!baseMessage.includes(content));
+  assert.equal(instructions, 'Follow the setup instructions at ' + setupUrl + '.');
+  assert(instructions.length < 500, 'The copied connection message is concise');
+  assert.equal(instructions.split('\n').length, 1);
+  for (const content of ['curl ', 'sha256sum', 'README.md', 'manifest.json', 'SKILL.md', 'crossfire-client.mjs']) assert(!instructions.includes(content));
   assert(!instructions.includes('$SERVER'));
   assert(!instructions.includes('$OWNER'));
   const details = page.locator('details.setup-details');
@@ -61,26 +61,30 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   const guideResponse = await fetch(setupUrl);
   assert.equal(guideResponse.status, 200, 'An agent can read the guide without a human session cookie');
   const guide = await guideResponse.text();
-  assert(guide.includes('sha256sum --check --status'));
+  assert(guide.includes('createHash("sha256")'));
   assert(guide.includes('node .crossfire/client.mjs agent connect'));
+  assert(guide.includes('node .crossfire/client.mjs agent test'));
+  assert(guide.includes('Linux or macOS'));
+  assert(guide.includes('runcodex.sh download is NOT required'));
+  assert(guide.includes('https://nodejs.org/en/download'));
+  assert(guide.includes(owner));
   assert(guide.includes(base + 'crossfire-client.mjs'));
-  await expect(page.getByRole('link', { name: 'Inspect the agent’s setup guide →', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('link', { name: 'Read the full guide for your account →', exact: true })).not.toBeVisible();
   await details.locator('summary').click();
-  await expect(page.getByRole('link', { name: 'Inspect the agent’s setup guide →', exact: true })).toHaveAttribute('href', setupUrl);
-  const downloads = page.getByRole('list', { name: 'Release downloads' }).getByRole('link');
+  await expect(page.getByRole('link', { name: 'Read the full guide for your account →', exact: true })).toHaveAttribute('href', setupUrl);
+  await expect(page.getByRole('link', { name: 'Download optional runcodex.sh' })).toHaveAttribute('href', '/onboarding/' + health.release + '/runcodex.sh');
   const names = ['manifest.json', ...ARTIFACTS];
-  await expect(downloads).toHaveCount(names.length);
-  for (const [index, name] of names.entries()) {
-    await expect(downloads.nth(index)).toHaveAttribute('href', base + name);
+  for (const name of names) {
     assert.equal((await fetch(base + name)).status, 200);
   }
-  await expect(page.getByRole('link', { name: 'Review enrollment requests →', exact: true })).toHaveAttribute('href', origin + '/manage/enrollments');
-  await expect(page.getByRole('heading', { name: '2. Approve and choose rooms', exact: true })).toBeVisible();
-  await expect(page.getByText('no joined rooms', { exact: true })).toBeVisible();
-  await expect(page.getByText("Create and configure rooms in Element. Assign agent access from the agent's management page.", { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Review enrollment requests →', exact: true })).toHaveAttribute('href', '/manage/enrollments');
+  await expect(page.getByRole('heading', { name: 'Approve your agent', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose where it can listen', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'One agent', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: 'Fleet · advanced', exact: true })).toHaveAttribute('href', '/manage/connect/fleet');
   await expect(page.getByRole('link', { name: 'Rooms', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Manage rooms →', exact: true })).toHaveCount(0);
-  await expect(page.getByText('Once approved, the listener connects automatically. Its online status appears on the agent’s page.')).toBeVisible();
+  await expect(page.getByText('Approval creates its account, not room access.', { exact: false })).toBeVisible();
   assert(!instructions.includes('--session'));
   assert(!instructions.includes('--token-file'));
   await page.reload();
@@ -89,7 +93,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.bringToFront();
   await page.getByRole('button', { name: 'Copy instructions', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Paste into your coding agent' }).getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
+  await expect(page.locator('.copy-text').getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
   assert.equal(await page.evaluate<string>('navigator.clipboard.readText()'), instructions);
   return instructions;
 }
@@ -105,11 +109,9 @@ async function reviewLayouts(page: Page, origin: string, directory: string, role
       await checkPaperLayout(page);
       if (viewport.width === 1920) {
         if (route === '/manage/connect') {
-          const bounds = await page.locator('.setup-grid > .panel').evaluateAll(elements => elements.map(element => ({
-            top: element.getBoundingClientRect().top, bottom: element.getBoundingClientRect().bottom,
-          })));
-          assert.equal(bounds.length, 2);
-          assert.deepEqual(bounds[0], bounds[1], 'Connection steps share aligned section bounds');
+          const gutters = await page.locator('.setup-step > div').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().left));
+          assert.equal(gutters.length, 3);
+          assert(gutters.every(left => left === gutters[0]), 'All illustrated steps share one text gutter');
         }
       }
       await page.screenshot({ path: join(directory, 'review-' + role + '-' + viewport.width + '-' + index + '.png'), fullPage: true });
@@ -134,7 +136,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   service.listen(0, '127.0.0.1'); await once(service, 'listening');
   const address = service.address(); assert(address && typeof address === 'object');
   const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
-    web: join(process.cwd(), 'dist/web'), element: join(process.cwd(), 'dist/web') };
+    web: join(process.cwd(), 'dist/web'), element: elementAssets(directory) };
   const router = publicRouter(routes);
   router.listen(0, '127.0.0.1'); await once(router, 'listening');
   const publicAddress = router.address(); assert(publicAddress && typeof publicAddress === 'object');
@@ -330,27 +332,43 @@ test('real browser member/admin flows and project listener span native Conduit, 
   incompleteInvitation.hash = '';
   const incompletePage = await memberContext.newPage(); incompletePage.on('pageerror', error => errors.push(error.message));
   await incompletePage.goto(incompleteInvitation.href);
-  await expect(incompletePage.getByRole('alert')).toHaveText('The invitation secret is missing. Open the complete private link you received.');
-  await expect(incompletePage.getByRole('button', { name: 'Create account', exact: true })).toBeDisabled();
+  await expect(incompletePage.getByRole('alert')).toHaveText('Open the complete private invitation link you received.');
+  await expect(incompletePage.getByRole('button', { name: 'Continue to Element →', exact: true })).toBeDisabled();
   await checkPaperLayout(incompletePage);
   await incompletePage.screenshot({ path: join(directory, 'invitation-incomplete.png'), fullPage: true });
   await incompletePage.close();
   await memberPage.goto(invitation);
-  await expect(memberPage.getByLabel('Username', { exact: true })).toBeVisible();
-  await expect(memberPage.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+  await expect(memberPage.getByRole('heading', { name: 'You’re invited', exact: true })).toBeVisible();
+  await expect(memberPage.getByLabel('Username', { exact: true })).toHaveCount(0);
   await checkPaperLayout(memberPage);
   await memberPage.screenshot({ path: join(directory, 'invitation-join.png'), fullPage: true });
   await memberPage.setViewportSize({ width: 390, height: 844 });
   assert(await memberPage.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
   await checkPaperLayout(memberPage);
   await memberPage.screenshot({ path: join(directory, 'invitation-join-mobile.png'), fullPage: true });
+  await memberPage.getByRole('button', { name: 'Continue to Element →', exact: true }).click();
+  await memberPage.waitForURL(origin + '/#/register');
+  await expect(memberPage.getByLabel('Username', { exact: true })).toBeVisible();
   await memberPage.getByLabel('Username', { exact: true }).fill('alice');
-  await memberPage.getByLabel('Display name').fill('Alice');
   await memberPage.getByLabel('Password', { exact: true }).fill('browser-fixture-only-password');
-  await memberPage.getByRole('button', { name: 'Create account', exact: true }).click();
-  await expect(memberPage.getByRole('heading', { name: 'Account created' })).toBeVisible();
-  await checkPaperLayout(memberPage);
-  await memberPage.getByRole('link', { name: 'Sign in' }).click();
+  await memberPage.getByLabel('Confirm password', { exact: true }).fill('browser-fixture-only-password');
+  await memberPage.getByRole('button', { name: 'Register', exact: true }).click();
+  const invitationPopup = memberPage.waitForEvent('popup');
+  await memberPage.getByRole('button', { name: 'Start authentication', exact: true }).click();
+  const confirmation = await invitationPopup;
+  await expect(confirmation.getByRole('heading', { name: 'Confirm your invitation', exact: true })).toBeVisible();
+  await expect(confirmation.getByText('@alice:architecture.localhost', { exact: true })).toBeVisible();
+  await confirmation.screenshot({ path: join(directory, 'element-invitation-confirmation.png'), fullPage: true });
+  const registration = memberPage.waitForResponse(response => response.request().method() === 'POST' && /^\/_matrix\/client\/(?:v3|r0)\/register$/u.test(new URL(response.url()).pathname));
+  await confirmation.getByRole('button', { name: 'Confirm invitation', exact: true }).click();
+  await expect(confirmation.getByRole('heading', { name: 'Account confirmed', exact: true })).toBeVisible();
+  assert.equal((await memberContext.cookies(origin)).filter(cookie => cookie.name === 'crossfire_invitation').length, 0, 'The browser stage clears its bound invitation before credential-omitting SDK requests');
+  const registered = await registration;
+  assert.equal(registered.status(), 200, await registered.text());
+  assert.equal((await registered.json() as { user_id: string }).user_id, '@alice:architecture.localhost');
+  await confirmation.close();
+  await memberPage.screenshot({ path: join(directory, 'element-registration.png'), fullPage: true });
+  await memberPage.goto(origin + '/manage/');
   await memberPage.getByLabel('Matrix username').fill('@alice:architecture.localhost');
   await memberPage.getByLabel('Password', { exact: true }).fill('browser-fixture-only-password');
   await memberPage.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -376,8 +394,8 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(page.getByLabel('Agents per owner')).toHaveValue('8');
   await expect(instructionsField).toHaveValue(guidance);
   const customized = await checkEnrollmentInstructions(memberPage, origin, '@alice:architecture.localhost');
-  assert(customized.endsWith('Additional instructions from the system administrator:\n' + guidance));
-  assert(!(await (await fetch(onboardingUrl(origin, '@alice:architecture.localhost'))).text()).includes(guidance), 'Private administrator guidance is not published in the public setup guide');
+  assert(!customized.includes(guidance), 'The pasted banner stays one line');
+  assert((await (await fetch(onboardingUrl(origin, '@alice:architecture.localhost'))).text()).includes(guidance), 'The linked guide owns the complete administrator instructions');
   await expect(memberPage.getByLabel('Additional agent instructions', { exact: true })).toHaveCount(0);
   await expect(memberPage.getByRole('link', { name: 'Settings', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Reset to default', exact: true }).click();
@@ -390,7 +408,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert(!reset.includes(guidance));
   assert(!reset.includes('Additional instructions from the system administrator:'));
   await page.goto(origin + '/manage/members');
-  await expect(page.getByText('Alice', { exact: true })).toBeVisible();
+  await expect(page.getByText('alice', { exact: true })).toBeVisible();
   await page.goto(origin + '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room));
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('none');
   await submit(page, 'Save access');
@@ -447,6 +465,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(rowSave).toBeVisible();
   await expect(rowSave).not.toHaveClass(/primary/u);
   assert.equal(await page.evaluate<string>('getComputedStyle(document.querySelector(".room-save")).backgroundColor'), 'rgb(251, 252, 253)');
+  await checkOnboardingPolicy(page, memberPage, origin, services, adminActor);
   assert.deepEqual(errors, []);
   console.log('Browser evidence: ' + directory);
 });

@@ -6,7 +6,7 @@ import { parseRoomPlan } from '@crossfire/contracts/room-plan';
 import { failure, success } from '@crossfire/kernel/result';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
-import { Alert, Empty, Field, Loaded, Page, Panel, Pagination, Status, timestamp } from './ui.js';
+import { Alert, Empty, Field, Loaded, Page, Panel, Pagination, PageItems, Status, timestamp, pagingQuery } from './ui.js';
 import { OwnerFilter } from './agent-filters.js';
 import { filterQuery } from './form.js';
 
@@ -37,11 +37,11 @@ function RoomPlan({ fleet }: { fleet: FleetView }) {
     <Field label="Room plan TOML">{id => <textarea id={id} rows={10} value={source} onChange={event => { setSource(event.target.value); setReview(undefined); }} spellCheck={false}/>}</Field>
     <div className="actions"><button disabled={action.pending || !source} onClick={() => { void action.run(inspect, setReview); }}>Preview room access</button>
       <button disabled={action.pending || !review} onClick={() => { if (confirm('Apply this exact room-access diff? Removed grants will lose access.')) void action.run(apply); }}>Apply reviewed plan</button></div><Alert>{action.error}</Alert>
-    {review && <div className="table-wrap"><table><thead><tr><th>Agent</th><th>Room</th><th>Current</th><th>Desired</th><th>Native authority</th><th>Change</th></tr></thead><tbody>{review.value.changes.map(change =>
+    {review && <PageItems items={review.value.changes} parameter="planPage">{changes => <div className="table-wrap"><table><thead><tr><th>Agent</th><th>Room</th><th>Current</th><th>Desired</th><th>Native authority</th><th>Change</th></tr></thead><tbody>{changes.map(change =>
       <tr key={change.agentId + change.roomId}><td><a href={'/manage/agents/' + change.agentId}>{change.agentName}</a><span className="subline">{change.instanceKey}</span></td><td><a href={'/manage/agents/' + change.agentId + '/rooms/' + encodeURIComponent(change.roomId)}>{change.roomName}</a><span className="subline">{change.roomAlias ?? change.roomId}</span></td>
         <td>{change.before?.accessMode ?? 'none'}{change.before?.powerLevel !== null && change.before?.powerLevel !== undefined ? ' · ' + change.before.powerLevel : ''}{change.before?.muted ? ' · muted' : ''}</td>
         <td>{change.after?.accessMode ?? 'none'}{change.after?.powerLevel !== null && change.after?.powerLevel !== undefined ? ' · ' + change.after.powerLevel : ''}{change.after?.muted ? ' · muted' : ''}</td>
-        <td>{change.nativeCreator ? 'Room creator' : change.nativePowerLevel === null ? 'No power change' : 'Level ' + change.nativePowerLevel}</td><td>{change.changed ? change.after === null ? 'Remove access' : 'Change access' : 'Unchanged'}</td></tr>)}</tbody></table></div>}
+        <td>{change.nativeCreator ? 'Room creator' : change.nativePowerLevel === null ? 'No power change' : 'Level ' + change.nativePowerLevel}</td><td>{change.changed ? change.after === null ? 'Remove access' : 'Change access' : 'Unchanged'}</td></tr>)}</tbody></table></div>}</PageItems>}
   </Panel>;
 }
 function FleetSettings({ fleet }: { fleet: FleetView }) {
@@ -53,7 +53,7 @@ function FleetSettings({ fleet }: { fleet: FleetView }) {
         <button type="button" className="danger" disabled={action.pending} onClick={() => { if (confirm('Remove this grouping and its controller access? Agent accounts, grants and native sessions are retained. Running processes are not stopped.')) void action.run(() => call(operations.removeFleet, { fleetId: fleet.fleetId }, { expectedRevision: fleet.revision }, viewer.csrfSecret), () => location.assign('/manage/fleets')); }}>Remove fleet grouping</button></div><Alert>{action.error}</Alert></form></Panel>;
 }
 export function FleetDetail({ id }: { id: string }) {
-  const resource = useResource(operations.fleet, { fleetId: id }), agents = useResource(operations.fleetAgents, { fleetId: id }, location.search, 30000);
+  const resource = useResource(operations.fleet, { fleetId: id }), agents = useResource(operations.fleetAgents, { fleetId: id }, pagingQuery(), 30000);
   return <Page title="Fleet details" description="Controller, agents and room access."><a className="back" href="/manage/fleets">← Fleets</a>
     <Loaded {...resource} retry={resource.refresh}>{result => <><FleetSettings fleet={result.data}/><Panel title="Agents"><Loaded {...agents} retry={agents.refresh}>{page => <>
       {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>

@@ -4,7 +4,7 @@ import { HEARTBEAT_MS } from '@crossfire/contracts/activity';
 import type { Manifest } from '@crossfire/contracts/release';
 import type { Coordination } from './coordination.js';
 
-export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal) {
+export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, onUpdate?: (release: string) => void) {
   const run = randomUUID();
   const failed = new AbortController(), lifetime = new AbortController();
   const signal = AbortSignal.any([stop, failed.signal, lifetime.signal]);
@@ -19,6 +19,7 @@ export async function reportActivity(client: Coordination, agent: string, instal
       unavailable = true; return;
     }
     const current = response.value.currentRelease;
+    if (!stopped) onUpdate?.(current);
     if (!stopped && current !== installed.release && current !== warnedRelease) {
       warnedRelease = current;
       process.stderr.write('Crossfire release ' + current + ' is available. Reconnect to update the project client and skill; this listener remains running.\n');

@@ -45,6 +45,7 @@ async function fixture(context: TestContext,
   context.after(async () => { stop.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1 && (existsSync(matrix.cursorFile) || existsSync(matrix.cursorFile + '.snapshot')));
   const cursors = () => existsSync(matrix.cursorFile) ? readJson<Record<string, string>>(matrix.cursorFile) : {};
+  if (!prepare && initialAuthority === 'owner') await until(() => cursors()[ROOM] === 'sync-0');
   return { native, matrix, stop, options, result, cursors };
 }
 
