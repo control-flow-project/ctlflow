@@ -18,12 +18,11 @@ export function AgentCard({ agent }: { agent: AgentView }) {
 }
 export function Agents() {
   const resource = useResource(operations.agents, {}, location.search, HEARTBEAT_MS);
-  return <Page title="Agents" description="Live listeners, explicit room access, and the people who own them."
-    action={<a className="button primary" href="/manage/connect">Connect an agent ↗</a>}>
-    <Panel title="Your team, under your control" action={<button onClick={resource.refresh}>Refresh</button>}>
+  return <Page title="Agents" description="Listener status, room access and agent owners."
+    action={<><button onClick={resource.refresh}>Refresh</button><a className="button primary" href="/manage/connect">Connect an agent ↗</a></>}>
       <AgentFilters/><Loaded {...resource} retry={resource.refresh}>{page => <>{page.data.length ? <div className="agent-grid">{page.data.map(agent => <AgentCard key={agent.agentId} agent={agent}/>)}</div>
-        : <Empty title="No matching agents">Connect an agent or adjust the filters.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel>
-    <div className="quiet-note"><strong>Online means a listener is reporting.</strong><p>Listeners ping every 30 seconds without model calls. After 90 seconds without a ping they show offline. Account access is separate.</p></div>
+        : <Empty title="No matching agents">Connect an agent or adjust the filters.</Empty>}<Pagination meta={page.meta}/></>}</Loaded>
+    <div className="quiet-note"><strong>Listener status</strong><p>Listeners ping every 30 seconds without model calls. They show offline after 90 seconds without a ping. Account access is separate.</p></div>
   </Page>;
 }
 function Activity({ agent }: { agent: AgentView }) {
@@ -61,7 +60,7 @@ function Lifecycle({ agent }: { agent: AgentView }) {
 }
 export function AgentDetail({ id }: { id: string }) {
   const resource = useResource(operations.agent, { agentId: id }, '', 5000);
-  return <Page title="Agent details" description="Live activity and room-by-room access, in one place." action={<button onClick={resource.refresh}>Refresh status</button>}>
+  return <Page title="Agent details" description="Listener activity, room access and account settings." action={<button onClick={resource.refresh}>Refresh status</button>}>
     <a className="back" href="/manage/agents">← Agents</a><Loaded {...resource} retry={resource.refresh}>{({ data: agent }) => <>
       <div className="detail-heading"><span className="avatar">{agent.displayName.slice(0, 1).toUpperCase()}</span><div><h2>{agent.displayName}</h2><span className="owner">{agent.owner.matrixUserId}</span> <Status value={applied(agent)}/></div></div>
       {agent.deployment && <Panel title="Fleet deployment"><dl><dt>Fleet</dt><dd><a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></dd>

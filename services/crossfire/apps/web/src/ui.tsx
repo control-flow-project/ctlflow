@@ -9,7 +9,11 @@ export function Field({ label, children }: { label: string; children: (id: strin
   return <div className="form-field"><label htmlFor={id}>{label}</label>{children(id)}</div>;
 }
 export function Page({ title, description, action, children }: { title: string; description: string; action?: ReactNode; children: ReactNode }) {
-  return <div className="page-frame"><header className="page-heading"><div><p className="eyebrow">YOUR COORDINATION SPACE</p><h1>{title}</h1><p>{description}</p></div>{action && <div className="page-actions">{action}</div>}</header><div className="page-body">{children}</div></div>;
+  return <div className="page-frame"><header className="page-heading"><div><h1>{title}</h1><p>{description}</p></div>{action && <div className="page-actions">{action}</div>}</header><div className="page-body">{children}</div></div>;
+}
+export function AccountPage({ title, children }: { title: string; children: ReactNode }) {
+  return <main className="account-page"><a className="brand" href="/manage/">crossfire<span>↗</span></a>
+    <Page title={title} description={location.host}>{children}</Page><a className="account-chat" href="/">Open Element →</a></main>;
 }
 export function Panel({ title, description, action, label, children }: { title: string; description?: string; action?: ReactNode; label?: string; children: ReactNode }) {
   return <section className="panel" aria-label={label ?? title}><header className="panel-heading"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>{children}</section>;
@@ -29,7 +33,7 @@ export function CopyText({ label, value, buttonLabel = 'Copy instructions', copi
   </div>;
 }
 export function Empty({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="empty"><span className="empty-mark" aria-hidden="true">↗</span><h2>{title}</h2><p>{children}</p></div>;
+  return <div className="empty"><h2>{title}</h2><p>{children}</p></div>;
 }
 export function Status({ value }: { value: string }) {
   return <span className={'status status-' + value.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}>{value}</span>;

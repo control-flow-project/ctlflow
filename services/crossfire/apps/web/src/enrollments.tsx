@@ -28,20 +28,20 @@ function Approval({ item }: { item: EnrollmentView }) {
 export function Enrollments({ id }: { id?: string }) { return id ? <EnrollmentDetail id={id}/> : <EnrollmentList/>; }
 function EnrollmentDetail({ id }: { id: string }) {
   const resource = useResource(operations.enrollment, { enrollmentId: id });
-  return <Page title="Review enrollment" description="One human decision for this exact roster."><Loaded {...resource} retry={resource.refresh}>{result => <Approval item={result.data}/>}</Loaded></Page>;
+  return <Page title="Review enrollment" description="Verify the agent names and code before approving."><Loaded {...resource} retry={resource.refresh}>{result => <Approval item={result.data}/>}</Loaded></Page>;
 }
 function EnrollmentList() {
   const resource = useResource(operations.enrollments, {}, location.search);
   return <Page title="Enrollment requests" description="Only the named owner can approve a roster." action={<button onClick={resource.refresh}>Refresh</button>}><Loaded {...resource} retry={resource.refresh}>{page => <>
-    {page.data.length ? <div className="panel table-wrap"><table><thead><tr><th>Request</th><th>Controller</th><th>Owner ID</th><th>Status</th><th>Expires</th></tr></thead><tbody>{page.data.map(item =>
+    {page.data.length ? <div className="table-wrap"><table><thead><tr><th>Request</th><th>Controller</th><th>Owner ID</th><th>Status</th><th>Expires</th></tr></thead><tbody>{page.data.map(item =>
       <tr key={item.enrollmentId}><td><a href={'/manage/enrollments/' + item.enrollmentId}>{item.fleetKey ?? 'Individual agent'} →</a></td><td>{item.controllerName ?? '—'}</td><td className="mono">{item.ownerId}</td><td><Status value={item.status}/></td><td>{timestamp(item.expiresAt)}</td></tr>)}</tbody></table></div>
-      : <Empty title="No enrollment requests yet">Use <a href="/manage/connect">Connect an agent</a> or introduce a fleet with its controller.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Page>;
+      : <Empty title="No enrollment requests">Use <a href="/manage/connect">Connect an agent</a> or start a fleet with its controller.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Page>;
 }
 
 export function Connect() {
   const resource = useResource(operations.release, {});
   const settings = useResource(operations.policy, {});
-  return <Page title="Connect an agent" description="Paste one message. Approve the agent. Choose its rooms."><Loaded {...resource} retry={resource.refresh}>{release => <Loaded {...settings} retry={settings.refresh}>{data => <EnrollmentSetup release={release.data} agentInstructions={data.data.agentInstructions}/>}</Loaded>}</Loaded></Page>;
+  return <Page title="Connect an agent" description="Setup instructions for a project or fleet."><Loaded {...resource} retry={resource.refresh}>{release => <Loaded {...settings} retry={settings.refresh}>{data => <EnrollmentSetup release={release.data} agentInstructions={data.data.agentInstructions}/>}</Loaded>}</Loaded></Page>;
 }
 
 function EnrollmentSetup({ release, agentInstructions }: { release: Manifest; agentInstructions: string }) {

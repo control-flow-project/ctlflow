@@ -32,6 +32,7 @@ import { listen } from '@crossfire/adapter-crossfire/listener';
 import { until } from '../scripts/test-support/listener.js';
 import { ARTIFACTS } from '@crossfire/contracts/release';
 import { onboardingUrl } from '@crossfire/contracts/onboarding';
+import { checkPaperLayout } from './support/browser-layout.js';
 
 async function submit(page: Page, name: string): Promise<void> {
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name, exact: true }).click()]);
@@ -41,6 +42,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await page.goto(origin + '/manage/connect');
   const field = page.getByLabel('Instructions for your agent', { exact: true });
   await expect(field).toBeVisible();
+  await checkPaperLayout(page);
   await expect(field).toHaveAttribute('readonly', '');
   const instructions = await field.inputValue();
   const health = (await (await page.request.get(origin + '/api/health')).json() as { data: { release: string } }).data;
@@ -89,7 +91,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   return instructions;
 }
 
-async function reviewLayouts(page: Page, origin: string, directory: string, routes: string[]) {
+async function reviewLayouts(page: Page, origin: string, directory: string, role: 'administrator' | 'member', routes: string[]) {
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
     for (const [index, route] of routes.entries()) {
@@ -97,29 +99,17 @@ async function reviewLayouts(page: Page, origin: string, directory: string, rout
       await expect(page.locator('h1')).toBeVisible();
       await expect(page.locator('.loading')).toHaveCount(0);
       await expect(page.getByRole('alert')).toHaveCount(0);
-      assert(await page.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'), route + ' must not overflow the viewport');
-      const geometry = await page.evaluate<{ border: string; headingPadding: string; bodyPadding: string; headingRight: number; bodyRight: number }>(`(() => {
-        const element = document.querySelector('.page-frame');
-        const frameStyle = getComputedStyle(element);
-        const heading = element.querySelector('.page-heading');
-        const body = element.querySelector('.page-body');
-        return { border: frameStyle.borderLeftWidth, headingPadding: getComputedStyle(heading).paddingLeft,
-          bodyPadding: getComputedStyle(body).paddingLeft, headingRight: heading.getBoundingClientRect().right,
-          bodyRight: body.getBoundingClientRect().right };
-      })()`);
+      await checkPaperLayout(page);
       if (viewport.width === 1920) {
-        assert.equal(geometry.border, '1px', route);
-        assert.equal(geometry.headingPadding, geometry.bodyPadding, route);
-        assert.equal(geometry.headingRight, geometry.bodyRight, route);
         if (route === '/manage/connect') {
           const bounds = await page.locator('.setup-grid > .panel').evaluateAll(elements => elements.map(element => ({
             top: element.getBoundingClientRect().top, bottom: element.getBoundingClientRect().bottom,
           })));
           assert.equal(bounds.length, 2);
-          assert.deepEqual(bounds[0], bounds[1], 'Connection steps share aligned top and bottom borders');
+          assert.deepEqual(bounds[0], bounds[1], 'Connection steps share aligned section bounds');
         }
       }
-      await page.screenshot({ path: join(directory, 'review-' + viewport.width + '-' + index + '.png'), fullPage: true });
+      await page.screenshot({ path: join(directory, 'review-' + role + '-' + viewport.width + '-' + index + '.png'), fullPage: true });
     }
   }
 }
@@ -157,17 +147,30 @@ test('real browser member/admin flows and project listener span native Conduit, 
   page.on('pageerror', error => errors.push(error.message));
   page.on('dialog', dialog => dialog.accept());
   await page.goto(origin + '/manage/');
-  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+  await checkPaperLayout(page);
   await page.screenshot({ path: join(directory, 'login.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert(await page.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
-  await expect(page.locator('.login-intro h1')).toHaveText('A shared space. Your agents. Your say.');
+  await checkPaperLayout(page);
+  await page.getByLabel('Matrix username').focus();
+  await expect(page.getByLabel('Matrix username')).toHaveCSS('outline-style', 'solid');
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
   await page.screenshot({ path: join(directory, 'login-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByLabel('Matrix username').fill(config.administrator);
+  await page.getByLabel('Password', { exact: true }).fill('incorrect-fixture-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await checkPaperLayout(page);
+  await page.screenshot({ path: join(directory, 'login-error.png'), fullPage: true });
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No matching agents', exact: true })).toBeVisible();
+  await checkPaperLayout(page);
+  await page.screenshot({ path: join(directory, 'agents-empty.png'), fullPage: true });
   const instructions = await checkEnrollmentInstructions(page, origin, config.administrator);
   assert(!instructions.includes(password));
   assert(!instructions.includes(jwtSecret));
@@ -321,17 +324,30 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const invitation = await page.getByLabel('Share this private link once').inputValue();
   const memberContext = await browser.newContext();
   const memberPage = await memberContext.newPage(); memberPage.on('pageerror', error => errors.push(error.message));
+  const incompleteInvitation = new URL(invitation);
+  incompleteInvitation.hash = '';
+  const incompletePage = await memberContext.newPage(); incompletePage.on('pageerror', error => errors.push(error.message));
+  await incompletePage.goto(incompleteInvitation.href);
+  await expect(incompletePage.getByRole('alert')).toHaveText('The invitation secret is missing. Open the complete private link you received.');
+  await expect(incompletePage.getByRole('button', { name: 'Create account', exact: true })).toBeDisabled();
+  await checkPaperLayout(incompletePage);
+  await incompletePage.screenshot({ path: join(directory, 'invitation-incomplete.png'), fullPage: true });
+  await incompletePage.close();
   await memberPage.goto(invitation);
   await expect(memberPage.getByLabel('Username', { exact: true })).toBeVisible();
+  await expect(memberPage.getByRole('heading', { name: 'Create account', exact: true })).toBeVisible();
+  await checkPaperLayout(memberPage);
   await memberPage.screenshot({ path: join(directory, 'invitation-join.png'), fullPage: true });
   await memberPage.setViewportSize({ width: 390, height: 844 });
   assert(await memberPage.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
+  await checkPaperLayout(memberPage);
   await memberPage.screenshot({ path: join(directory, 'invitation-join-mobile.png'), fullPage: true });
   await memberPage.getByLabel('Username', { exact: true }).fill('alice');
   await memberPage.getByLabel('Display name').fill('Alice');
   await memberPage.getByLabel('Password', { exact: true }).fill('browser-fixture-only-password');
   await memberPage.getByRole('button', { name: 'Create account', exact: true }).click();
-  await expect(memberPage.getByRole('heading', { name: 'You’re in.' })).toBeVisible();
+  await expect(memberPage.getByRole('heading', { name: 'Account created' })).toBeVisible();
+  await checkPaperLayout(memberPage);
   await memberPage.getByRole('link', { name: 'Sign in' }).click();
   await memberPage.getByLabel('Matrix username').fill('@alice:architecture.localhost');
   await memberPage.getByLabel('Password', { exact: true }).fill('browser-fixture-only-password');
@@ -421,10 +437,11 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await memberPage.goto(origin + '/manage/agents?status=active,suspended,revoked');
   await expect(memberPage.locator('.agent-card')).toHaveCount(1);
   await expect(memberPage.locator('.agent-card')).toContainText('alice-agent');
-  await reviewLayouts(page, origin, directory, ['/manage/agents', '/manage/agents/' + profile.id,
+  await reviewLayouts(page, origin, directory, 'administrator', ['/manage/agents', '/manage/agents/' + profile.id,
     '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room), '/manage/connect', '/manage/enrollments',
     new URL(request.approvalUrl).pathname, '/manage/members', '/manage/invitations', '/manage/rooms',
-    '/manage/rooms/' + encodeURIComponent(room), '/manage/policy', '/manage/audit']);
+    '/manage/rooms/' + encodeURIComponent(room), '/manage/policy', '/manage/audit', '/manage/not-a-page']);
+  await reviewLayouts(memberPage, origin, directory, 'member', ['/manage/agents', '/manage/fleets', '/manage/rooms', '/manage/enrollments', '/manage/connect', '/manage/policy']);
   await page.goto(origin + '/manage/agents/' + profile.id);
   const rowSave = page.getByRole('button', { name: 'Save access', exact: true });
   await expect(rowSave).toBeVisible();
