@@ -21,9 +21,6 @@ export const grantIntent = check.object({ roomId: check.roomId, accessMode: chec
 export const roomGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier), accessMode: check.choice('read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
 export const removeGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier) });
 export const roomPermissions = check.object({ expectedRevision: revision, expectedGeneration: check.identifier, permissions: check.list(check.choice('room.agent.invite'), 1) });
-export const room = check.object({ name: check.text(100) });
-export const membership = check.object({ targetId: check.identifier, action: check.choice('invite', 'kick'),
-  expectedRevision: check.optional(revision), expectedGeneration: check.optional(check.nullable(check.identifier)) });
 export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean });
 export const disconnection = check.object({ expectedRevision: revision, runIds: check.list(check.identifier, 100, 1) });
 export const wakeNotice = check.object({ roomId: check.roomId });

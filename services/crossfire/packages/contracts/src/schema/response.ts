@@ -53,8 +53,6 @@ export const roomAuthority = check.object({ matrixUserId: check.matrixUserId, po
   nativePermissions: check.list(check.object({ action: check.text(255), level: check.integer(Number.MIN_SAFE_INTEGER) }), 1000) });
 export const room = check.object({ roomId: check.roomId, name: check.text(255), topic: check.text(4096, 0), alias: check.nullable(check.text(255)),
   authority: check.nullable(roomAuthority) });
-export const roomMembership = check.object({ matrixUserId: check.matrixUserId, displayName: check.text(255),
-  membership: check.choice('join', 'invite', 'leave', 'ban'), powerLevel: check.integer(Number.MIN_SAFE_INTEGER) });
 export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, outcome: check.choice('claimed', 'existing', 'failed'),
   agentId: check.nullable(check.identifier), failureCode: check.nullable(check.text(100)) });
 export const enrollment = check.object({ controllerName: check.nullable(check.text(100)), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.nullable(check.name),

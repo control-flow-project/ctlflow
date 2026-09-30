@@ -76,9 +76,10 @@ its Host header. Crossfire makes no firewall, DNS or certificate changes.
 ## Use the management app
 
 1. Sign in with the same Matrix account you use in Element.
-2. Administrators create private rooms, invite members and manage account access.
-   All signed-in accounts, including agents, can also create public or private
-   rooms directly in Element. Accept room invitations there.
+2. Create and configure rooms, invite people and accept room invitations in
+   Element. All signed-in Matrix accounts, including agents, can create public
+   or private rooms. Crossfire manages agent access to existing rooms and
+   administrators manage Crossfire account access.
 3. Open **Connect an agent** and copy its short message. It names your owner ID
    and this instance's setup guide; the agent fetches the verified bootstrap there.
 4. Paste into your coding agent in the intended project. It asks for a name only

@@ -3,8 +3,8 @@ import { joined, roomFacts } from './room/facts.js';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { MatrixAuthority, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';
 import { API, segment } from '@crossfire/contracts/matrix';
-import { nativeOk, nativeRequest, nativeState } from './http.js';
-import { object, roomId, text, userId } from '@crossfire/contracts/validation';
+import { nativeOk, nativeRequest } from './http.js';
+import { object, text, userId } from '@crossfire/contracts/validation';
 
 export function createMatrixAuthority(config: Config): MatrixAuthority {
   const accounts = authority(config);
@@ -52,10 +52,10 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
     const response = await nativeOk(client.value, 'POST', API + '/rooms/' + segment(roomId) + '/leave', {});
     return response.ok ? success(undefined) : response;
   }
-  async function changeMembership(matrixUserId: string, roomId: string, targetMatrixId: string, action: 'invite' | 'kick'): Promise<Result<void>> {
+  async function inviteToRoom(matrixUserId: string, roomId: string, targetMatrixId: string): Promise<Result<void>> {
     const client = await accounts.asUser(matrixUserId);
     if (!client.ok) return client;
-    const changed = await nativeOk(client.value, 'POST', API + '/rooms/' + segment(roomId) + '/' + action, { user_id: targetMatrixId });
+    const changed = await nativeOk(client.value, 'POST', API + '/rooms/' + segment(roomId) + '/invite', { user_id: targetMatrixId });
     return changed.ok ? success(undefined) : changed;
   }
   return {
@@ -71,7 +71,7 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
       return response.ok ? success(undefined) : response;
     },
     async joined(matrixUserId) { const client = await accounts.asUser(matrixUserId); return client.ok ? joined(client.value) : client; },
-    room, membership, leave, changeMembership,
+    room, membership, leave,
     async setRoomAccess(authorizerMatrixId, targetMatrixId, roomId, powerLevel, admit) {
       const facts = await room(authorizerMatrixId, roomId);
       if (!facts.ok) return facts;
@@ -92,7 +92,7 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
         if (!result.ok) return result;
       }
       if (current.value.membership !== 'join') {
-        const invited = await changeMembership(authorizerMatrixId, roomId, targetMatrixId, 'invite');
+        const invited = await inviteToRoom(authorizerMatrixId, roomId, targetMatrixId);
         if (!invited.ok) return invited;
         const target = await accounts.asUser(targetMatrixId);
         if (!target.ok) return target;
@@ -129,33 +129,6 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
       if (!result.ok) return result;
       if (result.value.status === 403) return failure('forbidden', 'Native room rules do not permit this notice');
       return result.value.status === 200 && typeof result.value.body.event_id === 'string' ? success(result.value.body.event_id) : failure('native', 'Notice publication remains unconfirmed');
-    },
-    async createRoom(matrixUserId, name) {
-      const client = await accounts.asUser(matrixUserId);
-      if (!client.ok) return client;
-      const created = await nativeOk(client.value, 'POST', API + '/createRoom', { name, preset: 'private_chat', visibility: 'private',
-        initial_state: [{ type: 'm.room.history_visibility', state_key: '', content: { history_visibility: 'joined' } }] });
-      if (!created.ok) return created;
-      return roomId(created.value.room_id) ? success({ roomId: created.value.room_id, name }) : failure('native', 'Invalid native room identity');
-    },
-    async members(matrixUserId, roomId) {
-      const client = await accounts.asUser(matrixUserId);
-      if (!client.ok) return client;
-      const state = await nativeState(client.value, roomId);
-      if (!state.ok) return state;
-      const power = state.value.find(event => event.type === 'm.room.power_levels' && event.state_key === '')?.content;
-      const users = object(power?.users ?? {});
-      if (!users.ok) return users;
-      const result: RoomMembership[] = [];
-      for (const event of state.value) {
-        if (event.type !== 'm.room.member' || !userId(event.state_key)) continue;
-        const membership = event.content.membership;
-        if (membership !== 'join' && membership !== 'invite' && membership !== 'leave' && membership !== 'ban') continue;
-        const level = users.value[event.state_key] ?? power?.users_default ?? 0;
-        if (typeof level !== 'number' || !Number.isSafeInteger(level)) return failure('native', 'Invalid native power level');
-        result.push({ matrixUserId: event.state_key, displayName: text(event.content.displayname, 255) ? event.content.displayname : event.state_key, membership, powerLevel: level });
-      }
-      return success(result);
     },
   };
 }

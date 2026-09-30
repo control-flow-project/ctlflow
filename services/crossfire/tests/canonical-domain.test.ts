@@ -58,7 +58,7 @@ test('room invitation capabilities cross owners but never transfer provenance or
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const other = await fixture.member('other');
   const inviter = await fixture.agent(admin.actor, 'inviter'), target = await fixture.agent(other.actor, 'target'), stranger = await fixture.agent(admin.actor, 'stranger');
-  const room = value(await native.matrix.createRoom(admin.member.principal.matrixUserId, 'Coordination')).roomId;
+  const room = value(await native.createRoom(admin.member.principal.matrixUserId, 'Coordination')).roomId;
   async function grant(agentId: string) {
     const record = value(services.directory.agent(agentId))!;
     const previous = value(services.repositories.agentRoomGrant.find({ agentId, roomId: room }));
@@ -98,7 +98,7 @@ test('bulk room review is complete, revision-bound and atomic', async scope => {
   const fleetId = randomUUID();
   value(services.repositories.fleet.insert({ id: fleetId, label: 'Team', controllerName: 'desktop', revision: 0, updatedAt: fixture.now(), ownerId: admin.actor.principalId, fleetKey: 'team', createdAt: fixture.now() }));
   for (const [index, agent] of agents.entries()) value(services.repositories.fleetInstance.insert({ ownerId: admin.actor.principalId, fleetKey: 'team', instanceKey: 'worker-' + index, agentId: agent.id }));
-  const roomId = value(await fixture.native.matrix.createRoom(admin.member.principal.matrixUserId, 'Team')).roomId;
+  const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Team')).roomId;
   const plan = { fleetId, agents: agents.map((_agent, index) => ({ instanceKey: 'worker-' + index,
     grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
@@ -113,8 +113,8 @@ test('bulk room review is complete, revision-bound and atomic', async scope => {
 test('selected wake and explicit blocked mentions use durable sender cooldown without model involvement', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const outsider = await fixture.member('outsider'), receiver = await fixture.agent(admin.actor, 'receiver');
-  const roomIds = [value(await native.matrix.createRoom(admin.member.principal.matrixUserId, 'First')).roomId,
-    value(await native.matrix.createRoom(admin.member.principal.matrixUserId, 'Second')).roomId];
+  const roomIds = [value(await native.createRoom(admin.member.principal.matrixUserId, 'First')).roomId,
+    value(await native.createRoom(admin.member.principal.matrixUserId, 'Second')).roomId];
   for (const roomId of roomIds) value(await changeRoomGrant(services, admin.actor, { agentId: receiver.id, roomId,
     expectedRevision: value(services.directory.agent(receiver.id))!.principal.revision, expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
   function event(roomId: string, mentions = [receiver.matrixUserId]) {

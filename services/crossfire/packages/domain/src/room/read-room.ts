@@ -2,7 +2,7 @@ import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { Page, PageRequest } from '../port/directory.js';
 import type { RoomFacts } from '../port/matrix-authority.js';
-import { activeActor, authorize, authorizeAgent } from '../authorization/authorize.js';
+import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 export type RoomDetails = { roomId: string; name: string; topic: string; alias: string | null; authority: RoomFacts | null };
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'clock'>;
 export async function readRoom(services: Dependencies, actor: Actor, roomId: string, agentId?: string): Promise<Result<RoomDetails>> {
@@ -43,17 +43,4 @@ export async function listRooms(services: Dependencies, actor: Actor, input: Pag
   const totalItems = rooms.length;
   return success({ items: rooms.slice((input.page - 1) * input.pageSize, input.page * input.pageSize),
     page: input.page, pageSize: input.pageSize, totalItems, totalPages: Math.ceil(totalItems / input.pageSize) });
-}
-export async function listRoomMembers(services: Dependencies, actor: Actor, roomId: string, input: PageRequest) {
-  const current = activeActor(services, actor);
-  if (!current.ok) return current;
-  const native = await services.matrix.members(current.value.matrixUserId, roomId);
-  if (!native.ok) return native;
-  const rows = [...native.value].sort((left, right) => left.matrixUserId.localeCompare(right.matrixUserId));
-  return success({ items: rows.slice((input.page - 1) * input.pageSize, input.page * input.pageSize), page: input.page,
-    pageSize: input.pageSize, totalItems: rows.length, totalPages: Math.ceil(rows.length / input.pageSize) });
-}
-export async function createRoom(services: Dependencies, actor: Actor, name: string) {
-  const current = authorize(services, actor, 'room.manage.native');
-  return current.ok ? services.matrix.createRoom(current.value.matrixUserId, name) : current;
 }

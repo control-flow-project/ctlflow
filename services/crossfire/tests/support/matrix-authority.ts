@@ -14,6 +14,11 @@ export function matrixAuthorityFixture() {
       creatorIds: [room.creator], readLevel: -1, replyLevel: 0, inviteLevel: 0, kickLevel: 50, changePowerLevel: 50,
       nativePermissions: [{ action: 'm.room.message', level: 0 }, { action: 'invite', level: 0 }] });
   }
+  async function createRoom(id: string, name: string) {
+    const roomId = '!' + randomUUID() + ':test.localhost';
+    rooms.set(roomId, { name, creator: id, members: new Map([[id, { matrixUserId: id, displayName: id, membership: 'join', powerLevel: 100 }]]) });
+    return success({ roomId, name });
+  }
   const matrix: MatrixAuthority = {
     async identify(token) {
       const account = [...accounts].find(([, value]) => value.token === token && value.active);
@@ -62,20 +67,7 @@ export function matrixAuthorityFixture() {
       notices.set(transaction, existing);
       return success(existing.eventId);
     },
-    async createRoom(id, name) {
-      const roomId = '!' + randomUUID() + ':test.localhost';
-      rooms.set(roomId, { name, creator: id, members: new Map([[id, { matrixUserId: id, displayName: id, membership: 'join', powerLevel: 100 }]]) });
-      return success({ roomId, name });
-    },
-    async members(id, roomId) { const permission = facts(id, roomId); return permission.ok ? success([...rooms.get(roomId)!.members.values()]) : permission; },
-    async changeMembership(id, roomId, targetId, action) {
-      const permission = facts(id, roomId);
-      if (!permission.ok) return permission;
-      const room = rooms.get(roomId)!;
-      room.members.set(targetId, { matrixUserId: targetId, displayName: targetId, membership: action === 'invite' ? 'invite' : 'leave', powerLevel: 0 });
-      return success(undefined);
-    },
     close() {},
   };
-  return { matrix, accounts, rooms, events, notices, setNoticeFailure(value: Result<string> | null) { noticeFailure = value; } };
+  return { matrix, accounts, rooms, events, notices, createRoom, setNoticeFailure(value: Result<string> | null) { noticeFailure = value; } };
 }
