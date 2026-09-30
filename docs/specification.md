@@ -1176,8 +1176,18 @@ paths and payloads, not a second documentation-only model.
 
 ## 13. Management experience
 
-React management uses the existing restrained visual treatment and shared
-components. Fleet list/detail and durable agent/room routes show names first,
+React management uses one outer page frame and shared paper-like layouts.
+Within that frame, typography, aligned gutters, whitespace and light separators
+establish hierarchy. Sections, filters, tables, result lists, empty states and
+supporting notes have no enclosing decorative boxes. Borders remain on controls
+and meaningful alerts; focus, status and destructive-action cues stay explicit.
+Account, onboarding, directory, detail and administration screens follow the
+same treatment at desktop and mobile widths. Copy names the resource, state or
+action directly: no slogans, promotional eyebrows, filler headings or decorative
+empty-state illustrations. Necessary permission, lifecycle and security
+explanations remain visible.
+
+Fleet list/detail and durable agent/room routes show names first,
 not opaque IDs. Owners see their scope; administrators may filter all owners.
 Lists have useful status/search filters and pagination. Revoked entries are
 explicitly included by filter. Fleet controller labels are visible in fleet

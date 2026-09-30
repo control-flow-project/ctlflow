@@ -22,23 +22,23 @@ function MemberRow({ item }: { item: MemberView }) {
 export function Members() {
   const resource = useResource(operations.members, {}, location.search);
   return <Page title="Members" description="People, roles and account access across this instance." action={<a className="button" href="/manage/invitations">Invite a member ↗</a>}>
-    <Loaded {...resource} retry={resource.refresh}>{page => <><div className="panel table-wrap"><table><thead><tr><th>Member</th><th>Role</th><th>Account</th><th>Enforcement</th><th>Actions</th></tr></thead>
+    <Loaded {...resource} retry={resource.refresh}>{page => <><div className="table-wrap"><table><thead><tr><th>Member</th><th>Role</th><th>Account</th><th>Enforcement</th><th>Actions</th></tr></thead>
       <tbody>{page.data.map(item => <MemberRow key={item.memberId} item={item}/>)}</tbody></table></div><Pagination meta={page.meta}/></>}</Loaded></Page>;
 }
 export function Invitations() {
   const viewer = useSession(), resource = useResource(operations.invitations, {}, location.search), action = useAction();
   const [roleCode, setRole] = useState<'member' | 'administrator'>('member'), [lifetime, setLifetime] = useState(86400), [link, setLink] = useState('');
-  return <Page title="Invitations" description="One-use links for people you want in this space."><Panel title="Invite someone"><form onSubmit={event => {
+  return <Page title="Invitations" description="One-use account signup links."><Panel title="Create an invitation"><form onSubmit={event => {
     event.preventDefault(); void action.run(() => call(operations.createInvitation, {}, { roleCode, expiresSeconds: lifetime }, viewer.csrfSecret), value => { setLink(value.signupUrl); resource.refresh(); });
   }}><div className="form-row"><Field label="Role">{id => <select id={id} value={roleCode} onChange={event => setRole(event.target.value === 'administrator' ? 'administrator' : 'member')}><option value="member">Member</option><option value="administrator">Administrator</option></select>}</Field>
     <label>Expires in seconds<input type="number" min={60} max={604800} required value={lifetime} onChange={event => setLifetime(Number(event.target.value))}/></label><button disabled={action.pending}>Create invitation</button></div><Alert>{action.error}</Alert></form>
     {link && <label className="secret-link">Share this private link once<input readOnly value={link} onFocus={event => event.target.select()}/><span className="support">Send it privately to the intended person.</span></label>}</Panel>
-    <Loaded {...resource} retry={resource.refresh}>{page => <>{page.data.length ? <div className="panel table-wrap"><table><thead><tr><th>Invitation</th><th>Role</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead><tbody>{page.data.map(item => {
+    <Loaded {...resource} retry={resource.refresh}>{page => <>{page.data.length ? <div className="table-wrap"><table><thead><tr><th>Invitation</th><th>Role</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead><tbody>{page.data.map(item => {
       const state = item.revokedAt !== null ? 'Revoked' : item.consumedByMemberId ? 'Used' : item.expiresAt <= Date.now() ? 'Expired' : 'Active';
       return <tr key={item.invitationId}><td className="mono">{item.invitationId}</td><td>{item.roleCode}</td><td>{timestamp(item.expiresAt)}</td><td><Status value={state}/></td><td>{state === 'Active' && <button disabled={action.pending} onClick={() => {
         if (confirm('Revoke this signup invitation?')) void action.run(() => call(operations.revokeInvitation, { invitationId: item.invitationId }, {}, viewer.csrfSecret));
       }}>Revoke</button>}</td></tr>;
-    })}</tbody></table></div> : <Empty title="No invitations yet">Create a private link to welcome your first teammate.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Page>;
+    })}</tbody></table></div> : <Empty title="No invitations">Create an invitation to let someone register on this server.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Page>;
 }
 function PolicyForm({ initial }: { initial: PolicyView }) {
   const viewer = useSession(), [value, setValue] = useState(initial), action = useAction();
@@ -58,12 +58,12 @@ function PolicyForm({ initial }: { initial: PolicyView }) {
 }
 export function Settings() {
   const resource = useResource(operations.policy, {});
-  return <Page title="Instance settings" description="Enrollment, permission reconciliation and administrator-owned agent guidance."><Loaded {...resource} retry={resource.refresh}>{result => <PolicyForm initial={result.data}/>}</Loaded></Page>;
+  return <Page title="Instance settings" description="Account limits, permission reconciliation and agent instructions."><Loaded {...resource} retry={resource.refresh}>{result => <PolicyForm initial={result.data}/>}</Loaded></Page>;
 }
 export function Audit() {
   const resource = useResource(operations.audit, {}, location.search);
-  return <Page title="Activity" description="Management decisions, their owners and results." action={<button onClick={resource.refresh}>Refresh</button>}><Loaded {...resource} retry={resource.refresh}>{page => <>
-    {page.data.length ? <div className="panel table-wrap"><table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead><tbody>{page.data.map(item => <tr key={item.auditId}>
+  return <Page title="Activity" description="Recorded management actions and results." action={<button onClick={resource.refresh}>Refresh</button>}><Loaded {...resource} retry={resource.refresh}>{page => <>
+    {page.data.length ? <div className="table-wrap"><table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead><tbody>{page.data.map(item => <tr key={item.auditId}>
       <td>{timestamp(item.createdAt)}</td><td className="mono">{item.actorPrincipalId ?? item.actorCredentialId ?? item.actorKind}</td><td><strong>{item.action}</strong><span className="subline"><Status value={item.outcome}/></span></td><td><details><summary className="mono">{item.targetKind}: {item.targetId}</summary><p>{item.message}</p><dl><dt>Request</dt><dd>{item.requestId}</dd><dt>Permission</dt><dd>{item.permissionCode ?? '—'}</dd><dt>Room</dt><dd>{item.roomId ?? '—'}</dd></dl></details></td>
-    </tr>)}</tbody></table></div> : <Empty title="A fresh start">Management decisions will appear here.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Page>;
+    </tr>)}</tbody></table></div> : <Empty title="No activity">Management actions will appear here.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Page>;
 }

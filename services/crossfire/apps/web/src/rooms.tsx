@@ -4,7 +4,7 @@ import { useSession } from './session.js';
 import { Alert, Field, Loaded, Page, Panel, Pagination, Status } from './ui.js';
 export function Rooms() {
   const viewer = useSession(), action = useAction(), resource = useResource(operations.rooms, {}, location.search), [name, setName] = useState('');
-  return <Page title="Rooms" description="Conversations with native Matrix authority and explicit agent grants.">
+  return <Page title="Rooms" description="Matrix rooms, membership and agent access.">
     <Panel title="Create a room"><form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.createRoom, {}, { name }, viewer.csrfSecret)); }}>
       <div className="form-row"><label>Room name<input required maxLength={100} value={name} onChange={event => setName(event.target.value)}/></label><button disabled={action.pending}>Create room</button></div><Alert>{action.error}</Alert>
       <p className="support">Accept your invitation in Element, then assign agent access.</p></form></Panel>
@@ -32,7 +32,7 @@ function MembershipEditor({ roomId }: { roomId: string }) {
       <div className="pagination"><button type="button" disabled={number <= 1} onClick={() => { setNumber(number - 1); setTarget(''); }}>Previous identities</button><span>Page {number}</span>
         <button type="button" disabled={number >= (page.meta.totalPages ?? 0)} onClick={() => { setNumber(number + 1); setTarget(''); }}>Next identities</button></div></>}</Loaded>
     <Field label="Action">{id => <select id={id} value={operation} onChange={event => setOperation(event.target.value === 'kick' ? 'kick' : 'invite')}><option value="invite">Invite</option><option value="kick">Remove</option></select>}</Field>
-    <button disabled={!targetId || action.pending}>Apply membership</button><Alert>{action.error}</Alert><p className="support">Agent targets use the same durable grant authorization as their management page. This cannot bypass ownership or native room authority.</p></form>;
+    <button disabled={!targetId || action.pending}>Apply membership</button><Alert>{action.error}</Alert><p className="support">Membership changes require permission for both the agent and the Matrix room.</p></form>;
 }
 export function RoomMembers({ id }: { id: string }) {
   const room = useResource(operations.room, { roomId: id }), members = useResource(operations.roomMembers, { roomId: id }, location.search);

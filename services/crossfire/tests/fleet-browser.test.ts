@@ -10,6 +10,7 @@ import { value, secret } from './support/application.js';
 import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
 import { API } from '@crossfire/contracts/matrix';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
+import { checkPaperLayout } from './support/browser-layout.js';
 
 test('browser fleet review, room-plan confirmation, invitation delegation and selected wake identities share canonical APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
@@ -76,18 +77,20 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
     for (const route of ['/manage/fleets', '/manage/fleets/' + fleet.id, agentUrl, agentUrl + '/rooms/' + encodeURIComponent(roomId)]) {
       await page.goto(origin + route); await expect(page.locator('h1')).toBeVisible(); await expect(page.locator('.loading')).toHaveCount(0);
       await expect(page.getByRole('alert')).toHaveCount(0);
-      assert(await page.evaluate('document.documentElement.scrollWidth <= innerWidth'), route);
+      await checkPaperLayout(page);
       if (route.includes('/rooms/')) await expect(page.getByText('Reply requires native level 0.', { exact: true })).toHaveCSS('display', 'block');
       await page.screenshot({ path: join(directory, width + '-' + route.split('/').filter(Boolean).join('-') + '.png'), fullPage: true });
     }
   }
   const otherContext = await browser.newContext(); await otherContext.addCookies([{ name: 'crossfire', value: other.secret, url: origin }]);
   const otherPage = await otherContext.newPage(); await otherPage.goto(origin + '/manage/fleets');
-  await expect(otherPage.getByRole('heading', { name: 'No fleets yet' })).toBeVisible();
+  await expect(otherPage.getByRole('heading', { name: 'No fleets' })).toBeVisible();
+  await checkPaperLayout(otherPage);
   assert.equal((await otherPage.request.get(origin + '/api/fleets/' + fleet.id)).status(), 403);
   await page.goto(origin + '/manage/fleets/' + fleet.id);
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Remove fleet grouping' }).click();
-  await expect(page.getByRole('heading', { name: 'No fleets yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No fleets' })).toBeVisible();
+  await checkPaperLayout(page);
   assert.equal(value(services.directory.agent(alpha.agentId))!.principal.status, 'active');
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: alpha.agentId, roomId }))!.accessMode, 'reply');
   assert.deepEqual(errors, []);
