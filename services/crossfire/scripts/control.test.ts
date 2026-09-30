@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { matrix as nativeMatrix } from '@crossfire/adapter-matrix/http';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import type { Event } from '@crossfire/contracts/client';
+import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { connectCodex } from '@crossfire/adapter-codex/connection';
 import { isControl, loadControl, type ControlState } from '@crossfire/agent-core/control';
@@ -51,6 +52,34 @@ test('a human stop interrupts a pending receipt without replay, remains paused, 
   matrix.add(ROOM, message('$resume', OBSERVER, 'Continue with the new instruction.'));
   await until(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '4');
   assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
+});
+
+test('a runtime without native interruption pauses delivery and reports the limitation without model input', async context => {
+  const native = await fakeCodex(context);
+  const matrix = await matrixFixture(context, native.directory);
+  const stop = new AbortController();
+  const runtime: RuntimeAdapter = async (signal, pollMs, hooks) => {
+    const connection = await native.runtime(signal, pollMs, hooks);
+    const { turnControl: _control, ...delivery } = connection;
+    return delivery;
+  };
+  const result = listen({ ...matrix, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime }, stop.signal).catch(error => error);
+  context.after(async () => { stop.abort(); await result; });
+  await until(() => matrix.waiting() === 1);
+  const controls = () => readJson<ControlState>(matrix.cursorFile + '.control');
+  matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
+  await until(() => controls().paused && matrix.requests.some(request => request.path.includes('/send/m.room.message/')));
+  const notice = matrix.requests.find(request => request.path.includes('/send/m.room.message/'))!.body as { msgtype: string; body: string };
+  assert.equal(notice.msgtype, 'm.notice');
+  assert.match(notice.body, /cannot interrupt the current turn/);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start' || request.method === 'turn/interrupt').length, 0);
+  matrix.add(ROOM, message('$buffered'));
+  await delay(200);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+  matrix.add(ROOM, message('$resume', OBSERVER, 'Continue.'));
+  await until(() => existsSync(matrix.cursorFile) && readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '4');
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
+  assert(!JSON.stringify(native.requests().find(request => request.method === 'turn/start')?.params?.input).includes('$stop'));
 });
 
 test('urgent redirect precedes unread ordinary input and cannot advance its contiguous read marker', async context => {
@@ -179,16 +208,16 @@ test('native cancellation confirms the captured turn only and never retargets a 
   const native = await fakeCodex(context);
   const connection = await connectCodex(native.options, new AbortController().signal);
   context.after(connection.close);
-  assert.equal(await connection.activeTurn(), null);
+  assert.equal(await connection.turnControl.activeTurn(), null);
   await connection.deliver('first', 'first');
-  const first = await connection.activeTurn(); assert(first);
-  await connection.interrupt(first);
+  const first = await connection.turnControl.activeTurn(); assert(first);
+  await connection.turnControl.interrupt(first);
   await connection.deliver('second', 'second');
-  const second = await connection.activeTurn(); assert(second); assert.notEqual(second, first);
-  await connection.interrupt(first);
-  assert.equal(await connection.activeTurn(), second);
+  const second = await connection.turnControl.activeTurn(); assert(second); assert.notEqual(second, first);
+  await connection.turnControl.interrupt(first);
+  assert.equal(await connection.turnControl.activeTurn(), second);
   assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
-  await assert.rejects(connection.interrupt(second, true), /uncertain/);
+  await assert.rejects(connection.turnControl.interrupt(second, true), /uncertain/);
   assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
 });
 
@@ -197,6 +226,6 @@ test('an interruption acknowledgement without terminal proof cannot admit replac
   const connection = await connectCodex({ ...native.options, timeoutMs: 200 }, new AbortController().signal);
   context.after(connection.close);
   await connection.deliver('original', 'original');
-  await assert.rejects(connection.interrupt((await connection.activeTurn())!), /uncertain/);
+  await assert.rejects(connection.turnControl.interrupt((await connection.turnControl.activeTurn())!), /uncertain/);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
 });

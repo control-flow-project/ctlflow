@@ -107,7 +107,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   await observe(() => terminal!.exitCode !== null || terminal!.signalCode !== null);
   assert.deepEqual(await terminalEnded, [0, null], terminalOutput);
   assert.equal(nativeRuntime.signal.aborted, false);
-  assert.equal(await nativeRuntime.activeTurn(), null);
+  assert.equal(await nativeRuntime.turnControl.activeTurn(), null);
   assert.equal(modelCalls, 0, 'Real SSH TUI attachment and exit make no model calls: ' + JSON.stringify(requests));
   await nativeRuntime.close(); nativeRuntime = undefined;
   assert((await createDaemonClient(join(root, 'fleetd.sock')).call(operations.status, {}, {})).ok);

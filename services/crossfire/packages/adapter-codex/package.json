@@ -12,7 +12,8 @@
     "@crossfire/contracts": "0.1.0",
     "@crossfire/kernel": "0.1.0",
     "@crossfire/agent-core": "0.1.0",
-    "@crossfire/adapter-filesystem": "0.1.0"
+    "@crossfire/adapter-filesystem": "0.1.0",
+    "@crossfire/adapter-runtime": "0.1.0"
   },
   "exports": {
     "./*": {

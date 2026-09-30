@@ -17,6 +17,7 @@ export async function buildRelease(root: string, output = join(root, "dist")): P
     "README.md": readFileSync(join(root, "docs/onboarding/README.md")),
     "SKILL.md": readFileSync(join(root, "skills/conduit-chat/SKILL.md")),
     "crossfire-client.mjs": readFileSync(join(output, "crossfire-client.mjs")),
+    "crossfire-pi.mjs": readFileSync(join(output, "crossfire-pi.mjs")),
     "matrix-spec-LICENSE.txt": readFileSync(join(root, "third-party/matrix-spec-LICENSE")),
   };
   const manifest: Manifest = { version: package_.version, release: package_.version + "-" + releaseHash(files),

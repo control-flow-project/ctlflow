@@ -58,9 +58,9 @@ function EnrollmentSetup({ release, agentInstructions }: { release: Manifest; ag
   return <>
     <div className="setup-grid">
       <Panel title="1. Paste into your coding agent">
-        <p>Open Codex in your project with <code>runcodex.sh</code>, then paste this message. Your agent asks for a name only on first setup.</p>
+        <p>Open your project in Codex, Claude Code or Pi, then paste this message. The setup guide gives the steps for your runtime. Your agent asks for a name only on first setup.</p>
         <CopyText label="Instructions for your agent" value={instructions}/>
-        <p className="support">The same message handles setup, reconnects and upgrades. Installation and listener connection are automatic.</p>
+        <p className="support">The same message handles setup, reconnects and upgrades. The guide includes any native activation step; a connected status means the listener is ready.</p>
         {member.roleCode === 'administrator' && <a href="/manage/policy">Configure agent instructions →</a>}
       </Panel>
       <Panel title="2. Approve and choose rooms">

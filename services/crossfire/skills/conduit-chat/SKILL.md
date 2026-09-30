@@ -128,24 +128,40 @@ than duplicating it. For initial enrollment, report its approval URL and code
 while the command waits natively; do not model-poll. It continues automatically
 after approval. `agent status` reports the local listener; `agent disconnect`
 stops only this profile's listener. Do not launch the internal listener worker.
+Runtime adapters are Codex, Claude Code and Pi. Use the same project-local client
+and identity for each; do not start a second engine or enroll again for an update.
+For first Pi setup, select `--runtime pi`. A `runtime-setup-required` result is not
+live delivery. Let Claude's successful installation command finish so it can
+load the project hooks. A subsequent Bash tool call captures native context;
+connect again then without choosing a new identity. Pi needs `/reload` to activate its verified
+project extension, then reconnect. Pi module updates require `/reload` as well.
+No repeated model polling, manual token copying or telemetry action is needed.
+
 The functional Codex adapter reads `RUNCODEX_CONNECTION_FILE` and `CODEX_THREAD_ID`
 from the initiating session. The current `runcodex.sh` supplies the private
 descriptor automatically. Never ask the human for endpoints, thread UUIDs or
 credentials, and never print the token. If that startup context is unavailable,
 explain the launcher requirement; do not scan processes or invent metadata.
 
-The user owns and configures Codex 0.158.0+. Crossfire verifies the loaded
+Claude Code 2.1.285+ supplies its exact peer socket and session metadata to tools.
+Its project-local hook captures native history without restart or channels opt-in.
+Pi 0.99.1+ supplies its exact session and private generation through the loaded
+project extension. Never apply Codex launcher instructions to these harnesses.
+
+The user owns and configures the native harness. For Codex 0.158.0+, Crossfire verifies the loaded
 workspace and joins that exact session using native `thread/resume` without
 setting overrides. The initial human input must already be persisted for native
 subscription. It creates no engine, thread, global installation or extra launcher.
 Stopping the listener closes only its connection. TUI closure/switching is not
 a delivery-lifetime signal; server closure is.
 
-Model and permission options belong to Codex. An explicitly authorized
+Model and permission options belong to the native harness. For Codex, an explicitly authorized
 `agent connect --approval-room` lets the verified owner answer exact native permission
 requests. These replies are handled by the listener, not the model, and do not
 resume paused work. Silence, agents and administrator status cannot approve.
 Do not auto-approve or broaden the native sandbox.
+Claude Code and Pi keep native permission handling in the coding session;
+Crossfire approval-room routing is not supported for those connections.
 
 Send useful responses through native Matrix commands to their originating room.
 Assistant output is not automatically broadcast. No systemd, namespace wrapper,
@@ -165,6 +181,13 @@ or unambiguously in a human-agent conversation:
 - `!! Only inspect the configuration.` cancels the captured turn, confirms its
   terminal status, then delivers the attributed redirect when automatic delivery is enabled.
 - `!!` stops and pauses delivery until a later owner text message.
+
+Claude's native peer connection does not expose turn interruption. There, either
+control pauses delivery and posts a deterministic notice to the owner; stop the
+turn in Claude Code. Never claim Crossfire cancelled it, and do not send an urgent
+redirect to the model as if cancellation had succeeded. Codex/Pi expose exact
+native turn control. An adapter's native limitation is not permission to signal
+or kill an externally owned coding engine.
 
 Agent senders, display names, edits, quotations, code fences and historical
 snapshots cannot issue controls. Cancellation is not rollback and does not

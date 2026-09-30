@@ -12,7 +12,8 @@ import { operations, option, selectOperation, executeOperation, operationOptions
 import { DEFAULT_EVENTS, MAX_EVENTS, integerOption, outputBytes } from "@crossfire/contracts/limits";
 import { readUnread, synchronize, loadSyncCursor, checkpointSync, membershipResets, retainJoinedCursors,
   acknowledge, flushAcknowledgements, inbox, projectMessages, joinedRooms, type Sync } from "@crossfire/agent-core/receive";
-import { discoverRuntime } from './adapters.js';
+import { discoverRuntime, runtimeName } from './adapters.js';
+import { recordClaudeHook } from '@crossfire/adapter-claude/hook';
 import { connectProject, selectProfile } from './connect.js';
 import { localListener, runListener } from './listener-process.js';
 import { listenerSettings, listenerBinding } from './settings.js';
@@ -27,6 +28,16 @@ const localOptions: Record<string, readonly string[]> = {
 
 export async function main(arguments_: string[], installation: () => Manifest, file: string): Promise<void> {
   if (process.platform !== "linux" || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire requires Linux and Node.js 26+");
+  if (arguments_.length === 2 && arguments_[0] === 'runtime' && arguments_[1] === 'claude-hook') {
+    const buffers: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of process.stdin) {
+      const bytes = Buffer.from(chunk as Uint8Array); size += bytes.length;
+      if (size > 128 * 1024) throw new Error('Claude hook context exceeds its byte bound');
+      buffers.push(bytes);
+    }
+    recordClaudeHook(JSON.parse(Buffer.concat(buffers).toString()) as unknown); return;
+  }
   const options: Record<string, { type: "string" | "boolean"; multiple?: boolean }> = { help: { type: "boolean" } };
   for (const name of [...globals, ...Object.values(localOptions).flat(), ...Object.values(roomOptions).flat(), ...operations.flatMap(operation => operationOptions(operation))]) {
     options[name] = { type: "string", multiple: true };
@@ -70,7 +81,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   const project = realpathSync(option(values, 'project') ?? process.cwd());
   const destination = paths(project, selectProfile(project, option(values, 'profile')));
   const installed = installation();
-  const settings = listener ? listenerSettings(destination.state, option(values, 'runtime'), option(values, 'approval-room')) : undefined;
+  const settings = listener ? listenerSettings(destination.state, runtimeName(option(values, 'runtime')), option(values, 'approval-room')) : undefined;
   const runtime = settings ? discoverRuntime(settings.runtime, project) : undefined;
   if (group === 'agent' && ['disconnect', 'status'].includes(command)) {
     const unlock = await acquireProcessLock(join(destination.state, 'connection'), 35);

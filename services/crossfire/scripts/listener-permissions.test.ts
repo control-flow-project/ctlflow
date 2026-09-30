@@ -22,7 +22,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
       return { sessionId: THREAD, signal, deliver: async text => { delivered.push(text); }, settle: async () => false, acknowledge: () => {},
-        activeTurn: async () => null, interrupt: async () => {}, close: () => { closed = true; } };
+        turnControl: { activeTurn: async () => null, interrupt: async () => {} }, close: () => { closed = true; } };
     },
   }, stop.signal).catch(error => error);
   scope.after(async () => { stop.abort(); await receiving; });
@@ -61,8 +61,8 @@ test('a runtime permission without a selected authorized conversation fails clos
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
-      return { sessionId: THREAD, signal, deliver: async () => {}, settle: async () => false, acknowledge: () => {}, activeTurn: async () => null,
-        interrupt: async () => {}, close: () => {} };
+      return { sessionId: THREAD, signal, deliver: async () => {}, settle: async () => false, acknowledge: () => {},
+        turnControl: { activeTurn: async () => null, interrupt: async () => {} }, close: () => {} };
     },
   }, stop.signal).catch(error => error);
   scope.after(async () => { stop.abort(); await receiving; });

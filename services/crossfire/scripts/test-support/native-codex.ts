@@ -30,7 +30,7 @@ export async function nativeCodex(context: TestContext) {
     requestPermission: async () => { throw new Error('Unexpected permission in inert native delivery fixture'); },
   }, notice => { notifications.push(notice); adapter?.event(notice); });
   context.after(async () => {
-    stop.abort(); await session.close();
+    stop.abort(); if (adapter) await adapter.close(); else await session.close();
   });
   adapter = codexDelivery({ ...session, request: async (method, params) => {
     const input = params as Record<string, unknown>;

@@ -1,11 +1,15 @@
+export type TurnControl = {
+  activeTurn: () => Promise<string | null>;
+  interrupt: (turnId: string, recovery?: boolean) => Promise<void>;
+};
+
 export type RuntimeConnection = {
   sessionId: string;
   signal: AbortSignal;
   deliver: (text: string, messageId: string, cancelled?: AbortSignal) => Promise<void>;
   settle: () => Promise<boolean>;
   acknowledge: (messageIds: readonly string[]) => void;
-  activeTurn: () => Promise<string | null>;
-  interrupt: (turnId: string, recovery?: boolean) => Promise<void>;
+  turnControl?: TurnControl;
   close: () => void | Promise<void>;
 };
 

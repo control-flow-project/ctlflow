@@ -150,8 +150,8 @@ export function message(id: string, sender = '@agent-holmes:test.localhost', bod
     content: { msgtype: 'm.text', body } };
 }
 
-export async function until(predicate: () => boolean, message = 'Condition did not become true'): Promise<void> {
-  const deadline = Date.now() + 5000;
+export async function until(predicate: () => boolean, message = 'Condition did not become true', timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
     if (Date.now() >= deadline) assert.fail(message);
     await delay(10);
