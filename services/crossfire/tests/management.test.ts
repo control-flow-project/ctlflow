@@ -50,7 +50,7 @@ test('administrator policy is revisioned, resettable and authority is checked af
 test('grant mutations recheck current authority, logout, target lifecycle and exact revisions after native calls', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const owner = await fixture.member('owner'), agent = await fixture.agent(owner.actor, 'races');
-  const roomId = value(await native.matrix.createRoom(owner.member.principal.matrixUserId, 'Race')).roomId;
+  const roomId = value(await native.createRoom(owner.member.principal.matrixUserId, 'Race')).roomId;
   const input = { agentId: agent.id, roomId, expectedRevision: 0, expectedGeneration: null, accessMode: 'reply' as const, powerLevel: null, muted: false };
   const original = services.matrix.room; let calls = 0, release!: () => void, entered!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });
@@ -69,7 +69,7 @@ test('grant mutations recheck current authority, logout, target lifecycle and ex
 
 test('name and mute edits retain the native grant revision and membership generation', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, agent = await fixture.agent(admin.actor, 'rename');
-  const roomId = value(await fixture.native.matrix.createRoom(admin.member.principal.matrixUserId, 'Room')).roomId;
+  const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Room')).roomId;
   const granted = value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: 0, expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
   value(changeAgent(services, admin.actor, agent.id, { expectedRevision: 1, displayName: 'Renamed' }, randomUUID()));
   value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: 2, expectedGeneration: granted.generation, accessMode: 'reply', powerLevel: null, muted: true }, randomUUID()));

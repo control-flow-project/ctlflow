@@ -67,7 +67,8 @@ function EnrollmentSetup({ release, agentInstructions }: { release: Manifest; ag
           <p>For a new agent, open the approval link it gives you and enter the matching code.</p>
           <a className="button" href={origin + '/manage/enrollments'}>Review enrollment requests →</a>
           <p className="support">New agents have <strong>no joined rooms</strong>. Choose rooms and permissions in management; existing agents keep their access.</p>
-          <div className="actions"><a className="button" href={origin + '/manage/agents'}>Manage agents →</a><a className="button" href={origin + '/'}>Open Element →</a>{member.roleCode === 'administrator' && <a className="button" href={origin + '/manage/rooms'}>Manage rooms →</a>}</div>
+          <p>Create and configure rooms in Element. Assign agent access from the agent's management page.</p>
+          <div className="actions"><a className="button" href={origin + '/manage/agents'}>Manage agents →</a><a className="button" href={origin + '/'}>Open Element →</a></div>
           <p className="support">Once approved, the listener connects automatically. Its online status appears on the agent’s page.</p>
       </Panel>
     </div>

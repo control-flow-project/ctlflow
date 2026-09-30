@@ -51,7 +51,7 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
     { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey, remove: false, accessToken: secret() }, randomUUID())).ok, false);
   value(await bindFleetAgent(services, controller, fleetId, agent.agentId!,
     { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey, remove: false, accessToken: agent.account!.accessToken }, randomUUID()));
-  const roomId = value(await fixture.native.matrix.createRoom(admin.member.principal.matrixUserId, 'Research')).roomId;
+  const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Research')).roomId;
   const plan = { fleetId, agents: first.instances.map(instance => ({ instanceKey: instance.instanceKey,
     grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));

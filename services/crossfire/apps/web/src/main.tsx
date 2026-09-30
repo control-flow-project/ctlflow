@@ -7,7 +7,6 @@ import { Enrollments, Connect } from './enrollments.js';
 import { Members, Invitations, Settings, Audit } from './administration.js';
 import { Fleets, FleetDetail } from './fleets.js';
 import { Join } from './join.js';
-import { Rooms, RoomMembers } from './rooms.js';
 import { Alert, Page } from './ui.js';
 import { call, operations, useAction } from './api.js';
 import './style.css';
@@ -16,7 +15,6 @@ const path = location.pathname.replace(/\/$/u, '');
 const sections = [
   { path: '/manage/agents', label: 'Agents', icon: '◉' },
   { path: '/manage/fleets', label: 'Fleets', icon: '▦' },
-  { path: '/manage/rooms', label: 'Rooms', icon: '#' },
   { path: '/manage/enrollments', label: 'Enrollments', icon: '↗' },
   { path: '/manage/connect', label: 'Connect an agent', icon: '+' },
   { path: '/manage/audit', label: 'Activity', icon: '≡' },
@@ -41,9 +39,6 @@ function Route() {
   if (path === '/manage/fleets') return <Fleets/>;
   const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})$/u.exec(path);
   if (fleet) return <FleetDetail id={fleet[1]!}/>;
-  if (path === '/manage/rooms') return <Rooms/>;
-  const room = /^\/manage\/rooms\/([^/]+)$/u.exec(path);
-  if (room) return <RoomMembers id={decodeURIComponent(room[1]!)}/>;
   if (viewer.member.roleCode === 'administrator') {
     if (path === '/manage/members') return <Members/>;
     if (path === '/manage/invitations') return <Invitations/>;

@@ -23,8 +23,5 @@ export type MatrixAuthority = {
   leave(matrixUserId: string, roomId: string): Promise<Result<void>>;
   event(matrixUserId: string, roomId: string, eventId: string): Promise<Result<MatrixEvent>>;
   sendNotice(matrixUserId: string, roomId: string, transactionId: string, body: string, senderMatrixId: string): Promise<Result<string>>;
-  createRoom(matrixUserId: string, name: string): Promise<Result<{ roomId: string; name: string }>>;
-  members(matrixUserId: string, roomId: string): Promise<Result<RoomMembership[]>>;
-  changeMembership(matrixUserId: string, roomId: string, targetMatrixId: string, action: 'invite' | 'kick'): Promise<Result<void>>;
   close(): void;
 };

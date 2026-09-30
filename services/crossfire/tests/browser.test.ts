@@ -77,6 +77,9 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await expect(page.getByRole('link', { name: 'Review enrollment requests →', exact: true })).toHaveAttribute('href', origin + '/manage/enrollments');
   await expect(page.getByRole('heading', { name: '2. Approve and choose rooms', exact: true })).toBeVisible();
   await expect(page.getByText('no joined rooms', { exact: true })).toBeVisible();
+  await expect(page.getByText("Create and configure rooms in Element. Assign agent access from the agent's management page.", { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Rooms', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Manage rooms →', exact: true })).toHaveCount(0);
   await expect(page.getByText('Once approved, the listener connects automatically. Its online status appears on the agent’s page.')).toBeVisible();
   assert(!instructions.includes('--session'));
   assert(!instructions.includes('--token-file'));
@@ -175,17 +178,16 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert(!instructions.includes(password));
   assert(!instructions.includes(jwtSecret));
   await page.screenshot({ path: join(directory, 'connect-admin.png'), fullPage: true });
-  await page.getByRole('link', { name: 'Rooms', exact: true }).click();
-  await page.getByLabel('Room name', { exact: true }).fill('Engineering');
-  await page.getByRole('button', { name: 'Create room', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Engineering', exact: true })).toBeVisible();
-  const roomLink = await page.getByRole('link').filter({ has: page.getByRole('heading', { name: 'Engineering' }) }).getAttribute('href');
-  const room = decodeURIComponent(roomLink!.slice('/manage/rooms/'.length));
   const loggedIn = await nativeOk({ base: origin }, 'POST', API + '/login', { type: 'm.login.password',
     identifier: { type: 'm.id.user', user: config.administrator }, password });
   assert(loggedIn.ok && typeof loggedIn.value.access_token === 'string');
   const human = { base: origin, token: loggedIn.value.access_token };
-  assert((await nativeOk(human, 'POST', API + '/rooms/' + segment(room) + '/join', {})).ok);
+  const created = value(await nativeOk(human, 'POST', API + '/createRoom', {
+    name: 'Engineering', preset: 'private_chat', visibility: 'private',
+    initial_state: [{ type: 'm.room.history_visibility', state_key: '', content: { history_visibility: 'joined' } }],
+  }));
+  assert(typeof created.room_id === 'string');
+  const room = created.room_id;
   const roomAlias = '#engineering' + 'w'.repeat(80) + ':architecture.localhost';
   assert((await nativeOk(human, 'PUT', API + '/directory/room/' + segment(roomAlias), { room_id: room })).ok);
   assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/state/m.room.canonical_alias', { alias: roomAlias })).ok);
@@ -389,23 +391,13 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert(!reset.includes('Additional instructions from the system administrator:'));
   await page.goto(origin + '/manage/members');
   await expect(page.getByText('Alice', { exact: true })).toBeVisible();
-  await page.goto(origin + '/manage/rooms/' + encodeURIComponent(room));
-  await page.getByLabel('Find people or agents').fill('Alice');
-  await page.getByLabel('Identity', { exact: true }).selectOption({ label: 'Alice · @alice:architecture.localhost' });
-  await submit(page, 'Apply membership');
-  const invited = page.getByRole('row').filter({ hasText: '@alice:architecture.localhost' });
-  await expect(invited.getByText('invite', { exact: true })).toBeVisible();
-  await page.getByLabel('Identity', { exact: true }).selectOption({ label: 'Alice · @alice:architecture.localhost' });
-  await page.getByLabel('Action', { exact: true }).selectOption('kick');
-  await submit(page, 'Apply membership');
-  await expect(invited.getByText('leave', { exact: true })).toBeVisible();
-  await page.getByLabel('Find people or agents').fill('Holmes');
-  await page.getByLabel('Identity', { exact: true }).selectOption({ label: 'Holmes · ' + profile.account.user_id });
-  await page.getByLabel('Action', { exact: true }).selectOption('kick');
-  await submit(page, 'Apply membership');
+  await page.goto(origin + '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room));
+  await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('none');
+  await submit(page, 'Save access');
   await worker.drain();
   await page.reload();
-  await expect(page.getByRole('row').filter({ hasText: profile.account.user_id }).getByText('leave', { exact: true })).toBeVisible();
+  await expect(page.locator('.status').filter({ hasText: /^No access$/u })).toBeVisible();
+  assert.equal(value(await services.matrix.membership(config.administrator, profile.account.user_id, room)).membership, 'leave');
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none'), []);
   await page.goto(origin + '/manage/audit');
   await expect(page.getByText('instance-policy.configure', { exact: true })).toHaveCount(2);
@@ -439,9 +431,17 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(memberPage.locator('.agent-card')).toContainText('alice-agent');
   await reviewLayouts(page, origin, directory, 'administrator', ['/manage/agents', '/manage/agents/' + profile.id,
     '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room), '/manage/connect', '/manage/enrollments',
-    new URL(request.approvalUrl).pathname, '/manage/members', '/manage/invitations', '/manage/rooms',
-    '/manage/rooms/' + encodeURIComponent(room), '/manage/policy', '/manage/audit', '/manage/not-a-page']);
-  await reviewLayouts(memberPage, origin, directory, 'member', ['/manage/agents', '/manage/fleets', '/manage/rooms', '/manage/enrollments', '/manage/connect', '/manage/policy']);
+    new URL(request.approvalUrl).pathname, '/manage/members', '/manage/invitations', '/manage/policy', '/manage/audit', '/manage/not-a-page']);
+  await reviewLayouts(memberPage, origin, directory, 'member', ['/manage/agents', '/manage/fleets', '/manage/enrollments', '/manage/connect', '/manage/policy']);
+  for (const viewer of [page, memberPage]) {
+    for (const route of ['/manage/rooms', '/manage/rooms/' + encodeURIComponent(room)]) {
+      await viewer.goto(origin + route);
+      await expect(viewer.getByRole('heading', { name: 'Page unavailable', exact: true })).toBeVisible();
+      await expect(viewer.getByRole('link', { name: 'Rooms', exact: true })).toHaveCount(0);
+      await expect(viewer.getByRole('button', { name: 'Create room', exact: true })).toHaveCount(0);
+      await expect(viewer.getByRole('button', { name: 'Apply membership', exact: true })).toHaveCount(0);
+    }
+  }
   await page.goto(origin + '/manage/agents/' + profile.id);
   const rowSave = page.getByRole('button', { name: 'Save access', exact: true });
   await expect(rowSave).toBeVisible();

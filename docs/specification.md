@@ -655,9 +655,18 @@ unrelated membership rejoin or power elevation. Owner-ceiling reconciliation
 uses the configured interval, default 300 seconds, with pending/failed restrictions
 visible.
 
-Room import neither enrolls identities nor creates rooms. Existing room
-management is the human room-creation entrypoint. Agent bearer credentials
-cannot apply a human bulk room plan.
+Matrix clients such as Element own room creation, room configuration and human
+membership management. Crossfire manages agents' participation in existing rooms;
+enrollment, fleet startup and room plans never create rooms. Agent bearer
+credentials cannot apply a human bulk room plan.
+
+Existing-room reads support the agent assignment editor and fleet plan review.
+The directory contains the authenticated human's joined rooms and, with authorized
+agent context, that agent's assigned room IDs. It is not a public-room directory
+or administrator access to every private room. Native room metadata, stable IDs
+and current authority are read from Matrix. Crossfire has no standalone room
+directory, generic membership roster or human invite/remove UI. Agent grant
+responses retain their observed native membership and power level.
 
 
 ### Required capability
@@ -1215,9 +1224,6 @@ ownership. The management website remains under `/manage`.
 | `GET, PUT /api/agents/{agentId}/wake-policy` | One complete mode/selected-sender configuration. |
 | `GET /api/agents/{agentId}/delivery-policy` | This authenticated agent's resolved native delivery policy. |
 | `GET /api/rooms`, `GET /api/rooms/{roomId}` | Authorized native room directory/details; optional agent context for the assignment editor. |
-| `POST /api/rooms` | Authorized human native room creation. |
-| `GET /api/rooms/{roomId}/members` | Authorized native membership view. |
-| `POST /api/rooms/{roomId}/membership-changes` | Authorized human invite/remove operations; agent targets go through the shared grant use case. |
 | `GET /api/agents/{agentId}/room-grants` | Desired grants with their observed application and allowed actions. |
 | `GET, PUT, DELETE /api/agents/{agentId}/room-grants/{roomId}` | One shared owner/admin/delegated-agent access resource; removal rechecks addition provenance and generation. |
 | `GET, PUT /api/agents/{agentId}/room-grants/{roomId}/permissions` | Owner/admin reads/replaces this generation's complete scoped permission set. |
@@ -1232,10 +1238,10 @@ ownership. The management website remains under `/manage`.
 | `GET /api/releases/current` | Public current manifest/protocol requirements for deterministic installation/update checks. |
 | `GET /api/health` | Bounded public readiness metadata without secrets. |
 
-Single-agent and bulk routes are transport representations of the same domain
-operations, not competing implementations. Native membership actions targeting
-registered agents cannot bypass the durable grant model. Scope-changing routes
-must declare their actor kinds and permission codes in the operation catalog.
+Single-agent, bulk and delegated-agent routes are transport representations of
+the same grant domain, not competing implementations. Agent additions/removals
+use the durable room-grant resources exclusively. Scope-changing routes must
+declare their actor kinds and permission codes in the operation catalog.
 
 The complete change includes server, management UI, CLI, runtime/coordination
 adapters, bootstrap/onboarding copy, released client bundles, routing/deployment
@@ -1271,6 +1277,11 @@ from URLs; an empty identifier is not a separate API meaning.
 
 Room access offers native read/reply/custom levels up to the verified actor's
 authority, with compact aligned controls and meaningful pending/applied errors.
+Room selection and details live within agent management at
+`/manage/agents/{agentId}/rooms/{roomId}`; fleet room plans link to those same
+details. The navigation has no standalone Rooms section. The Connect page directs
+humans to Element for room creation/configuration and to agent management for
+access assignment.
 Delegated invitations, provenance-limited removal and selected wake senders have
 explicit controls; principal selection supports search and checkboxes. Bulk room
 TOML has a full diff/confirmation and revision validation. Destructive operations
