@@ -6,8 +6,7 @@ import { parseRoomPlan } from '@crossfire/contracts/room-plan';
 import { failure, success } from '@crossfire/kernel/result';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
-import { AgentCard } from './agents.js';
-import { Alert, Empty, Field, Loaded, Page, Panel, Pagination, timestamp } from './ui.js';
+import { Alert, Empty, Field, Loaded, Page, Panel, Pagination, Status, timestamp } from './ui.js';
 import { OwnerFilter } from './agent-filters.js';
 import { filterQuery } from './form.js';
 
@@ -57,5 +56,7 @@ export function FleetDetail({ id }: { id: string }) {
   const resource = useResource(operations.fleet, { fleetId: id }), agents = useResource(operations.fleetAgents, { fleetId: id }, location.search, 30000);
   return <Page title="Fleet details" description="Controller, agents and room access."><a className="back" href="/manage/fleets">← Fleets</a>
     <Loaded {...resource} retry={resource.refresh}>{result => <><FleetSettings fleet={result.data}/><Panel title="Agents"><Loaded {...agents} retry={agents.refresh}>{page => <>
-      <div className="agent-grid">{page.data.map(instance => <div key={instance.instanceKey}><p className="support">Instance: {instance.instanceKey}</p><AgentCard agent={instance.agent}/></div>)}</div><Pagination meta={page.meta}/></>}</Loaded></Panel><RoomPlan fleet={result.data}/></>}</Loaded></Page>;
+      {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>
+        <tr key={instance.instanceKey}><td><a href={'/manage/agents/' + instance.agent.agentId}>{instance.agent.displayName}</a></td><td>{instance.instanceKey}</td><td><Status value={instance.agent.activity.status}/></td><td><Status value={instance.agent.status}/></td></tr>)}</tbody></table></div>
+        : <Empty title="No agents">There are no agents on this page.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel><RoomPlan fleet={result.data}/></>}</Loaded></Page>;
 }

@@ -1192,6 +1192,9 @@ not opaque IDs. Owners see their scope; administrators may filter all owners.
 Lists have useful status/search filters and pagination. Revoked entries are
 explicitly included by filter. Fleet controller labels are visible in fleet
 summaries and agent deployment context, without implying heartbeat freshness.
+Each fleet's agents appear in a compact paginated table: linked agent name,
+instance key, listener status and account status. Agent details are reached through
+the name link; fleet rosters have no per-agent cards or duplicated detail controls.
 Selected-author responses retain display labels for all selected principals,
 independently of the current search/page. Empty optional UI filters are omitted
 from URLs; an empty identifier is not a separate API meaning.

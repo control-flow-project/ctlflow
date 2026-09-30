@@ -79,7 +79,26 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       await expect(page.getByRole('alert')).toHaveCount(0);
       await checkPaperLayout(page);
       if (route.includes('/rooms/')) await expect(page.getByText('Reply requires native level 0.', { exact: true })).toHaveCSS('display', 'block');
+      if (route === '/manage/fleets/' + fleet.id) {
+        const roster = page.getByRole('region', { name: 'Agents', exact: true });
+        const table = roster.getByRole('table', { name: 'Fleet agents', exact: true });
+        await expect(table.getByRole('columnheader')).toHaveText(['Agent', 'Instance', 'Listener', 'Account']);
+        await expect(table.locator('tbody tr')).toHaveCount(instances.length);
+        await expect(roster.locator('.agent-card, .agent-grid')).toHaveCount(0);
+        for (const instance of instances) {
+          const row = table.getByRole('row').filter({ has: page.getByRole('cell', { name: instance.instanceKey, exact: true }) });
+          await expect(row.getByRole('link')).toHaveAttribute('href', '/manage/agents/' + instance.agentId);
+          await expect(row.getByRole('link')).toHaveText(instance.instanceKey + ' (' + admin.member.member.displayName + ')');
+          await expect(row.getByRole('cell').nth(2)).toHaveText('offline');
+          await expect(row.getByRole('cell').nth(3)).toHaveText('active');
+        }
+      }
       await page.screenshot({ path: join(directory, width + '-' + route.split('/').filter(Boolean).join('-') + '.png'), fullPage: true });
+      if (route === '/manage/fleets/' + fleet.id) {
+        await page.getByRole('table', { name: 'Fleet agents', exact: true }).locator('a[href="' + agentUrl + '"]').click();
+        await expect(page).toHaveURL(origin + agentUrl);
+        await expect(page.getByRole('heading', { name: 'Agent details', exact: true })).toBeVisible();
+      }
     }
   }
   const otherContext = await browser.newContext(); await otherContext.addCookies([{ name: 'crossfire', value: other.secret, url: origin }]);
