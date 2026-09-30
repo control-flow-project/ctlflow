@@ -4,9 +4,11 @@ import { mkdtempSync, lstatSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { validateHost } from './host.js';
 
 export async function openTunnel(host: string, root: string, signal: AbortSignal) {
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*(?:@[a-zA-Z0-9][a-zA-Z0-9_.-]*)?$/u.test(host)) throw new Error('Use an SSH hostname or user@hostname from your SSH configuration');
+  signal.throwIfAborted();
+  validateHost(host);
   if (!root.startsWith('/') || /[:\x00-\x1f\x7f]/u.test(root)) throw new Error('Remote root must be an absolute Unix path without colon or control characters');
   const directory = mkdtempSync(join(tmpdir(), 'fleet-ssh-')), socketPath = join(directory, 'daemon.sock');
   const child = spawn('ssh', ['-N', '-T', '-o', 'ExitOnForwardFailure=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'StreamLocalBindUnlink=no',

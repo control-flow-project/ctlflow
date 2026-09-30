@@ -1,5 +1,6 @@
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services, Running } from './port.js';
+import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
 import type { Configuration, Registration, FleetState, InstanceState, Operation, OperationInput, Instance } from './model.js';
 
 export function createController(services: Services) {
@@ -59,6 +60,15 @@ export function createController(services: Services) {
       values.push(result.ok ? result.value : { ...record, controller: services.controller, phase: 'failed', error: result.error.message, instances: [] });
     }
     return success(values);
+  }
+  function attachment(fleetId: string, instanceKey: string): Result<RuntimeAttachment> {
+    const current = view(fleetId);
+    if (!current.ok) return current;
+    const instance = current.value.instances.find(value => value.instance.key === instanceKey);
+    if (!instance) return failure('missing', 'Instance not found');
+    const runtime = running.get(key(fleetId, instanceKey));
+    if (stopping || instance.phase !== 'running' || !runtime || runtime.signal.aborted) return failure('conflict', 'Start this agent before attaching its terminal');
+    return success(structuredClone(runtime.attachment));
   }
   function add(directory: string): Result<FleetState> {
     if (stopping) return failure('unavailable', 'Controller is stopping');
@@ -232,7 +242,7 @@ export function createController(services: Services) {
     for (const process of running.values()) await process.close();
     running.clear(); lifetime.abort(new Error('Controller stopped'));
   }
-  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), list, view, add, rename, remove, editInstance, operate, close,
+  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), list, view, attachment, add, rename, remove, editInstance, operate, close,
     operation(id: string): Result<Operation> { const operation = operations.find(item => item.operationId === id); return operation ? success(structuredClone(operation)) : failure('missing', 'Operation not found'); } });
 }
 export type FleetController = Extract<ReturnType<typeof createController>, { ok: true }>['value'];

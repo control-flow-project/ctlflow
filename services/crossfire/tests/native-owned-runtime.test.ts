@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
 import { nativeProvider } from '../scripts/test-support/native-provider.js';
 import { until } from '../scripts/test-support/listener.js';
 import { value } from './support/application.js';
+import { codexTerminal } from '@crossfire/adapter-codex/terminal';
+import { openTerminal } from '../scripts/test-support/terminal.js';
 
 test('owned stock Codex has zero-model startup and resumes the same private native session', { timeout: 60000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/owned-codex-'));
@@ -21,7 +23,9 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   scope.after(() => runtime.close());
   assert.equal(provider.requests.length, 0);
   const sessionId = runtime.sessionId;
+  const firstPointer = runtime.attachment;
   await runtime.close();
+  assert.equal(existsSync(firstPointer.connection.tokenFile!), false);
   runtime = value(await adapter.start(input, stop.signal));
   assert.equal(runtime.sessionId, sessionId);
   assert.equal(provider.requests.length, 0);
@@ -36,4 +40,26 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   assert.equal(runtime.sessionId, sessionId);
   await runtime.deliver('Native owned runtime proof', 'owned-native-proof-1', stop.signal);
   assert.equal(provider.requests.length, 1, 'Exact receipt prevents replay across engine restart');
+  await runtime.close();
+  input.options = { model: 'gpt-5.1', model_reasoning_effort: 'medium', sandbox_mode: 'danger-full-access', approval_policy: 'never' };
+  runtime = value(await adapter.start(input, stop.signal));
+  assert.equal(runtime.sessionId, sessionId);
+  assert.notEqual(runtime.attachment.connection.tokenFile, firstPointer.connection.tokenFile);
+  const command = value(codexTerminal().command(runtime.attachment));
+  assert(!command.includes(readFileSync(runtime.attachment.connection.tokenFile!, 'utf8')));
+  const terminal = openTerminal(scope, command, { ...process.env, CODEX_HOME: home });
+  await terminal.until(output => output.includes('Folder access'));
+  terminal.write('\r');
+  await terminal.until(output => output.includes('gpt-5.1'));
+  assert.equal(provider.requests.length, 1, 'Opening the native TUI does not call the model');
+  await terminal.quit();
+  assert.equal(runtime.signal.aborted, false, 'Closing the TUI leaves the owned session/listener connection alive');
+  const outside = join(directory, 'outside-workspace.txt');
+  provider.tool('exec_command', { cmd: 'printf full-access-confirmed > ' + JSON.stringify(outside), yield_time_ms: 1000, max_output_tokens: 1024 });
+  await runtime.deliver('Inert full-access native tool control', 'owned-native-proof-2', stop.signal);
+  await until(() => existsSync(outside));
+  assert.equal(readFileSync(outside, 'utf8'), 'full-access-confirmed');
+  while (await runtime.activeTurn() !== null) await delay(50);
+  const changed = provider.requests[1] as { model: string; reasoning: { effort: string } };
+  assert.equal(changed.model, 'gpt-5.1'); assert.equal(changed.reasoning.effort, 'medium');
 });

@@ -60,6 +60,7 @@ export function createDaemonHttp(controller: FleetController, stopped: () => voi
     bind(operations.removeFleet, (params, _query, input) => acknowledged(controller.remove(params.fleetId, input.expectedRevision))),
     bind(operations.agents, (params, query) => { const fleet = controller.view(params.fleetId); return paged(fleet.ok ? success(fleet.value.instances) : fleet, query); }),
     bind(operations.agent, params => { const fleet = controller.view(params.fleetId); if (!fleet.ok) return fleet; const instance = fleet.value.instances.find(instance => instance.instance.key === params.instanceKey); return instance ? reply(success(instance)) : failure('missing', 'Instance not found'); }),
+    bind(operations.attachment, params => reply(controller.attachment(params.fleetId, params.instanceKey))),
     bind(operations.addAgent, async (params, _query, input) => reply(await controller.editInstance(params.fleetId, input.expectedRevision, { kind: 'add', instance: input.instance }))),
     bind(operations.changeAgent, async (params, _query, input) => reply(await controller.editInstance(params.fleetId, input.expectedRevision, { kind: 'definition', instanceKey: params.instanceKey, definition: input.definition }))),
     bind(operations.removeAgent, async (params, _query, input) => reply(await controller.editInstance(params.fleetId, input.expectedRevision, { kind: 'remove', instanceKey: params.instanceKey }))),

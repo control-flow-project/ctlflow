@@ -11,6 +11,7 @@ import { privateDir, readJson, writeJson } from '@crossfire/adapter-filesystem/i
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import { createRegistry } from '@fleetd/storage/registry';
 import { createController } from '@fleetd/domain/controller';
+import { codexRuntime } from '@crossfire/adapter-codex/owned';
 import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
 
@@ -44,7 +45,7 @@ export async function startDaemon(root: string, name: string) {
       if (current.ino !== information.ino || current.dev !== information.dev) throw new Error('Controller socket changed during startup');
       unlinkSync(socketPath);
     }
-    const created = createController({ registry: createRegistry(root), execution: createExecution(), controller: parsed.value, id: randomUUID, now: Date.now });
+    const created = createController({ registry: createRegistry(root), execution: createExecution({ codex: codexRuntime() }), controller: parsed.value, id: randomUUID, now: Date.now });
     if (!created.ok) throw new Error(created.error.message);
     const controller = created.value;
     let closing: Promise<void> | undefined;

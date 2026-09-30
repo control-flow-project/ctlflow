@@ -1,4 +1,5 @@
 import type { Result } from '@crossfire/kernel/result';
+import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
 import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller } from './model.js';
 export type Registry = {
   registrations(): Result<Registration[]>;
@@ -8,7 +9,7 @@ export type Registry = {
   load(directory: string): Result<Configuration>;
   writeRoster(configuration: Configuration, roster: Roster): Result<Configuration>;
 };
-export type Running = { sessionId: string; signal: AbortSignal; close(): Promise<void> };
+export type Running = { sessionId: string; signal: AbortSignal; attachment: RuntimeAttachment; close(): Promise<void> };
 export type Execution = {
   validate(configuration: Configuration): Result<void>;
   prepare(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (approval: Approval) => void): Promise<Result<{ failed: { instanceKey: string; code: string; message: string }[] }>>;

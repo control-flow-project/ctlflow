@@ -50,7 +50,8 @@ Only concrete, supported capabilities have packages.
   assembling runtime/coordination/listener adapters.
 - fleet owns commands, presentation and local/SSH connections to fleetd. It calls
   the daemon API even locally. It neither launches agent runtimes nor independently
-  applies orchestration rules.
+  applies orchestration rules. A shared runtime terminal adapter prepares the
+  interactive-client command for an already running daemon-owned session.
 - Controller and fleet execution are ordinary user processes. No systemd unit,
   privileged service, machine-wide skill/configuration, global permission change,
   public controller port or external execution scheduler is installed.
@@ -83,6 +84,7 @@ The CLI supports:
 - fleet agent add KEY INSTANCE --definition DEFINITION
 - fleet agent start KEY INSTANCE; fleet agent stop KEY INSTANCE
 - fleet agent remove KEY INSTANCE
+- fleet agent attach KEY INSTANCE
 
 Local commands identify their controller root explicitly or through the selected
 CLI connection profile. Remote paths refer to the daemon's computer. SSH uses
@@ -146,6 +148,37 @@ delivery. The model chooses intentional replies/attachments through Crossfire's
 messaging capability; arbitrary model output is never automatically broadcast.
 Agent account, runtime state, reporting listener and applied room access remain
 distinct observations. A zero-room agent is not advertised as receiving room tasks.
+
+`fleet agent attach` prints a ready-to-run terminal command containing the exact
+running-session endpoint, native session ID and workspace. It does not start an engine,
+create/fork a session, enroll an agent, open a TUI or add a listener. The human
+runs that command in their terminal. Stopped, starting, failed and stopping
+instances cannot be attached. Closing the native TUI leaves the fleet, engine
+and listener running. Explicit fleet/agent stop ends the owned engine.
+
+The runtime port owns a private attachment descriptor with runtime, session ID,
+workspace and bounded adapter-owned connection fields. Runtime session IDs remain
+opaque bounded strings throughout daemon views; native format validation belongs
+only to the runtime adapter. The Codex adapter supplies
+its loopback endpoint, native home, executable/search path and the engine's private
+token-file path. Its owner
+produces it from the current live process, never from scans or guessed state.
+Only the dedicated private attachment resource returns it. Ordinary fleet/agent
+views, logs and Crossfire responses contain no connection fields.
+No response or copied command contains the authentication token itself. The
+command reads the existing 0600 token file into the native client's environment.
+The TUI uses the instance's private native home, not machine-wide configuration.
+Its native executable/search path comes from the running engine, so SSH attachment
+does not depend on the remote shell initializing software such as NVM.
+Engine stop removes that run-local file; restarting needs a fresh pointer, not
+a descriptor persisted as restart authority.
+
+Only composition roots select concrete runtime adapters. Native terminal
+arguments, authentication and session selection live in
+`services/crossfire/packages/adapter-codex`, reused through declared exports.
+For remote fleets, the SSH adapter wraps the same native command so it runs on
+the controller computer through the user's verified SSH connection. The engine
+remains loopback-only; no public port or additional forwarding server is needed.
 
 ## 3. Controller descriptor and fleet authority
 
@@ -293,6 +326,7 @@ not another operation implementation. Unknown fields/routes/methods fail.
 | GET, PATCH, DELETE /api/fleets/{fleetId} | Inspect, update allowed metadata/configuration or unregister. |
 | GET, POST /api/fleets/{fleetId}/agents | List or add an instance using a validated existing definition. |
 | GET, PATCH, DELETE /api/fleets/{fleetId}/agents/{instanceKey} | Inspect/update/remove an instance. |
+| GET /api/fleets/{fleetId}/agents/{instanceKey}/attachment | Private current running-session pointer; no lifecycle mutation or model turn. |
 | POST /api/operations | Idempotent start/stop request for a fleet, instance or daemon shutdown. |
 | GET /api/operations/{operationId} | Observe accepted/running/awaiting-approval/succeeded/failed results. |
 
@@ -398,6 +432,11 @@ The runtime adapter owns the typed `runtime_options` schema and native settings
 translation. Model/reasoning settings reach the headless native session directly.
 The roster's work area supplies native cwd. Permission settings retain native
 semantics; unsupported settings fail rather than being ignored or elevated.
+For Codex, `sandbox_mode = "danger-full-access"` and `approval_policy = "never"`
+are explicit supported choices. On the next stopped-to-running transition, the
+definition's current model, reasoning and permissions apply to the same saved
+session. No TUI resume permission flags or new identity are required. Editing
+definition files does not silently reconfigure an already running engine.
 
 Instances sharing a definition share its settings and instructions, not mutable
 session state. Different settings require a different definition. Secrets and
@@ -1234,9 +1273,13 @@ Required banks:
   reporting without model turns; no duplicated receivers after restart.
 - Real stock Codex headless startup/options, private-home state, native
   input/receipt/output and same-session resumption, isolated inert provider,
+  changed model/reasoning/full-access settings, actual native tool execution,
   normal owned-engine shutdown, no production or paid-provider calls.
 - Daemon HTTP/Unix ownership, typed operation idempotency, local/SSH transport,
   CLI error/status contracts, disconnected CLI survival and explicit stop.
+- Native TUI pointers to the exact session locally and through SSH, no extra
+  model call/receiver/engine, TUI exit leaves the fleet running, stopped-run
+  refusal, shell quoting and exclusion of authentication tokens from output.
 - React browser flows for every management route, fleet/controller views,
   grants, principal selection, confirmations, auth boundaries and attachments.
 - Repository typecheck/build/test, architecture/import boundary and package-export
