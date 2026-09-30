@@ -3,7 +3,7 @@ import test from 'node:test';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync, readFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,9 +18,11 @@ const entry = fileURLToPath(new URL('../apps/cli/src/main.js', import.meta.url))
 
 test('CLI manages a private named daemon through its typed Unix API and survives CLI disconnect', { timeout: 40000 }, async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleet-cli-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
+  const binaryDirectory = join(directory, 'bin'); mkdirSync(binaryDirectory, { mode: 0o700 });
+  const installed = join(binaryDirectory, 'fleet'); symlinkSync(entry, installed);
   const home = join(directory, 'home'); mkdirSync(home, { mode: 0o700 });
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
-  const cli = (...args: string[]) => execute(process.execPath, [entry, ...args], { env, timeout: 15000 });
+  const cli = (...args: string[]) => execute(process.execPath, [installed, ...args], { env, timeout: 15000 });
   const client = createDaemonClient(join(root, 'fleetd.sock'));
   scope.after(async () => {
     await client.call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 });

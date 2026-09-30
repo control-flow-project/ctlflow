@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { resolve, join } from 'node:path';
-import { existsSync, lstatSync, unlinkSync, chmodSync } from 'node:fs';
+import { existsSync, lstatSync, unlinkSync, chmodSync, realpathSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createConnection } from 'node:net';
@@ -63,7 +63,7 @@ export async function startDaemon(root: string, name: string) {
     return { controller, close, socketPath };
   } catch (error) { await cleanup(); throw error; }
 }
-const invoked = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const invoked = process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invoked) {
   const { values } = parseArgs({ options: { root: { type: 'string' }, name: { type: 'string' } } });
   if (!values.root || !values.name) throw new Error('fleetd --root ABSOLUTE_DIRECTORY --name NAME');

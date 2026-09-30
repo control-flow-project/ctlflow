@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDaemonClient, operations } from '@fleet/daemon-client/client';
 import { openTunnel } from '@fleet/ssh-transport/tunnel';
@@ -95,7 +96,7 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     }
   } finally { await tunnel?.close(); }
 }
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const stop = new AbortController();
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => stop.abort(new Error('CLI disconnected; daemon operations continue')));
   void run(process.argv.slice(2), stop.signal).catch(error => { console.error(error instanceof Error ? error.message : 'Fleet command failed'); process.exitCode = 1; });
