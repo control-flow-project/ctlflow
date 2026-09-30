@@ -7,8 +7,9 @@ import { createHttpServer } from './http/create-server.js';
 import { createWorker } from './worker.js';
 import { readJson } from "@crossfire/adapter-filesystem/index";
 import { loadRelease } from "@crossfire/adapter-filesystem/release";
+import type { ElementPresentation } from './element-configuration.js';
 
-export async function serve(directory: string, releaseDirectory: string, port = 8080) {
+export async function serve(directory: string, releaseDirectory: string, port = 8080, presentation: ElementPresentation = {}) {
   if (process.platform !== "linux" || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire requires Linux and Node.js 26+");
   if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) throw new Error("Invalid private service port");
   const release = loadRelease(releaseDirectory);
@@ -20,7 +21,7 @@ export async function serve(directory: string, releaseDirectory: string, port = 
   if (!initialized.ok) throw new Error(initialized.error.message);
   const application = createApplication(join(directory, 'management.sqlite'), configuration.value);
   const worker = createWorker(application.services);
-  const server = createHttpServer(application, worker, release);
+  const server = createHttpServer(application, worker, release, presentation);
   try {
     server.listen(port, "127.0.0.1");
     await once(server, "listening");

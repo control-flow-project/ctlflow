@@ -11,20 +11,29 @@ export function cookie(request: IncomingMessage): string {
   const value = parts[0]!.slice(COOKIE_NAME.length + 1);
   return /^[A-Za-z0-9_-]{43}$/u.test(value) ? value : '';
 }
-export async function readBody(request: IncomingMessage): Promise<Result<unknown>> {
-  if (request.headers['content-type']?.split(';', 1)[0] !== 'application/json') return failure('invalid', 'Expected application/json');
+async function readText(request: IncomingMessage, contentType: string, limit: number): Promise<Result<string>> {
+  if (request.headers['content-type']?.split(';', 1)[0] !== contentType) return failure('invalid', 'Expected ' + contentType);
   const length = Number(request.headers['content-length']);
-  if (Number.isFinite(length) && length > HTTP_LIMITS.requestBytes) return failure('body_too_large', 'Request body exceeds the configured bound');
+  if (Number.isFinite(length) && length > limit) return failure('body_too_large', 'Request body exceeds the configured bound');
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
     const buffer = Buffer.from(chunk);
     size += buffer.length;
-    if (size > HTTP_LIMITS.requestBytes) return failure('body_too_large', 'Request body exceeds the configured bound');
+    if (size > limit) return failure('body_too_large', 'Request body exceeds the configured bound');
     chunks.push(buffer);
   }
-  try { return success(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
+  return success(Buffer.concat(chunks).toString('utf8'));
+}
+export async function readBody(request: IncomingMessage): Promise<Result<unknown>> {
+  const body = await readText(request, 'application/json', HTTP_LIMITS.requestBytes);
+  if (!body.ok) return body;
+  try { return success(JSON.parse(body.value)); }
   catch { return failure('invalid', 'Invalid JSON'); }
+}
+export async function readForm(request: IncomingMessage): Promise<Result<URLSearchParams>> {
+  const body = await readText(request, 'application/x-www-form-urlencoded', 1024);
+  return body.ok ? success(new URLSearchParams(body.value)) : body;
 }
 export function send(response: ServerResponse, requestId: string, result: Result<Reply>, status = 200): void {
   let serialized = JSON.stringify(result.ok ? { data: result.value.data, meta: { requestId, ...result.value.pagination } }

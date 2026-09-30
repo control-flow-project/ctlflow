@@ -7,6 +7,8 @@ export type InstancePolicy = {
   enrollmentSeconds: number;
   reconcileSeconds: number;
   agentInstructions: string;
+  signupMode: 'invitation' | 'open';
+  invitationIssuers: 'administrators' | 'members';
 };
 
 export type AuditEvent = {

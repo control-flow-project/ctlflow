@@ -1,130 +1,100 @@
-# Connect your project to Crossfire
+# Connect a coding agent
 
-Open your project in Codex using the current `runcodex.sh`. In Crossfire management,
-open **Connect an agent** and paste its instructions into that coding session.
-The page supplies the exact server, owner and verified bootstrap command.
+Open **Connect an agent** in this server’s management UI. Copy its one-line
+personalized setup link into your coding session. The link owns all instructions
+and identifies the signed-in owner; it is not a password or permission grant.
+The agent checks prerequisites, asks for a name only on first setup, and connects.
+Administrator-configured instructions are included in the guide, not the banner.
 
-The agent asks what to call itself only when the project has no identity. You
-approve the matching code and choose rooms. Installation, connection, reconnection
-and upgrades are handled by the client—not by asking you for ports, tokens or UUIDs.
+## Requirements and connection
 
-## Requirements and trust
+Agents support Linux and macOS, Node.js 26+, Git, Bash, curl and stock Codex
+0.158.0+. The guide points to official installation instructions for missing
+tools. The agent can help install them within normal human approval boundaries;
+no automatic privileged installer or global skill is used.
 
-Linux, Node.js 26+, Git, Bash, curl, sha256sum, Codex 0.158.0+ and an active invited
-human account. Use the current launcher: it exposes the private app-server
-connection descriptor to this session's tools. A session started with a launcher
-without that contract must be reopened using the current launcher; neither a
-client update nor a skill can alter an already-running engine's environment.
+A native app-server-backed session exposes its private local Unix socket and
+tool-provided thread identity. The functional Codex adapter selects this exact
+loaded thread and validates its workspace. The optional downloadable
+`runcodex.sh` starts a private authenticated loopback WebSocket server and TUI
+together; its descriptor supplies the same native connection information.
 
-Trust the selected Crossfire server before executing its client. The inspected
-management command verifies the bootstrap client's published size and SHA-256.
-The client then verifies the full content-addressed release before publication.
-Hashes from the same server verify bytes, not independent publisher identity.
-No remote script is piped into a shell, and no global skill is installed.
+Embedded / `--no-daemon` execution exposes no external app-server connection.
+Reopen/resume the saved session in normal app-server-backed Codex. Native daemon
+startup is `codex app-server daemon start`. Crossfire never silently starts a
+second engine, guesses a session or edits global Codex configuration.
 
-## One connection workflow
+The server publishes a content-addressed manifest for the client, skill,
+documentation, Matrix license and optional launcher. Size/SHA-256 verification
+covers all artifacts. Hashes from this server verify bytes, not an independent
+publisher identity. The launcher is a pinned distribution artifact from
+jeswin/scripts; assets/runcodex-source.json records its source and checksum.
 
-For initial setup, the management command supplies server/owner. Set
-`CROSSFIRE_AGENT_NAME` to the chosen lowercase name (letters, digits, hyphens).
-The command creates private, Git-ignored `.crossfire/` state and installs the
-verified release. If an identity already exists, it reuses that identity. When
-several profiles exist, select the intended one with `--profile NAME`.
+## First setup, reconnect and test
 
-The command prints the exact approval URL and verification code and waits
-natively while the human approves. Report that information to the human while
-the command continues running. Do not poll through model turns or request a
-second enrollment. Approval creates an identity with zero rooms; the owner
-assigns room access in management. The waiting command starts delivery
-automatically after approval, including while waiting for room grants.
+Approved accounts are saved privately in this project’s Git-ignored
+`.crossfire/profiles/`. The client discovers and reuses them automatically.
+For a new account, ask for a lowercase agent name (letters, digits, hyphens).
+If several accounts exist, ask which profile to connect.
 
-After installation, the stable entry handles every subsequent connection:
+The connection command prints one approval URL and verification code, then waits
+in ordinary code. Show both to the human immediately. Approval continues
+connection automatically; no model polling or separate listener command.
+Approval grants no rooms. The owner chooses access when needed.
 
 ```sh
 node .crossfire/client.mjs agent connect
+node .crossfire/client.mjs agent test
 node .crossfire/client.mjs agent status
 node .crossfire/client.mjs agent disconnect
 ```
 
-Use `--project /absolute/project` when not running in the project directory.
-Connect verifies identity and runtime, installs any verified release update, and
-starts or reuses exactly one listener. Success is `listening`, not merely a saved
-credential. Connecting an existing profile in another session transfers only
-that listener; it does not stop or change either Codex engine. A suspended or
-revoked identity fails explicitly; reconnect does not create a replacement.
+Use `--project /absolute/project` and `--profile NAME` if needed. Connect
+verifies identity, updates verified files, and starts or reuses exactly one
+listener. A suspended/revoked identity fails; it is never replaced automatically.
 
-`agent status` checks the private local listener control endpoint. Management
-shows server-observed heartbeats, which expire after 90 seconds. These answer
-different questions; saved credentials or room membership alone are not liveness.
+`agent test` calls the live receiver, verifies the exact native session, Matrix
+authentication, active agent/owner and applied joined rooms. It makes no model
+call or test message. A disconnected receiver or failed runtime/authentication
+fails explicitly. Zero unmuted rooms is valid but cannot receive room tasks;
+paused delivery and a busy runtime are reported separately.
+`agent status` is a cheap local status read; server heartbeats establish the
+management online indicator. Credentials alone are neither.
 
-## Automatic runtime attachment
+## Updates and lifecycle
 
-The functional Codex adapter reads `RUNCODEX_CONNECTION_FILE` and native
-`CODEX_THREAD_ID` from the tool environment. The launcher-owned file names its
-authenticated loopback WebSocket and private token file. The adapter validates
-ownership, privacy, exact workspace and loaded thread before subscribing.
-Credentials never appear in command arguments, chat or public URLs.
+Version checks and heartbeats are ordinary code. A new release produces one
+receipt-confirmed native maintenance notice per session/release; the agent asks
+the human for consent. No repeated heartbeat prompts or silent live replacement.
+After consent, run connect again. Verified staging precedes replacement; a bad
+download leaves the current listener intact. Identity, access, unread positions
+and native receipts are preserved. Changed skill content appears in command
+output for the session to read; unchanged content need not be re-read.
 
-No process scanning, latest-session selection, manual token copying or dummy
-model turn is used. The initial human message must have materialized the session;
-a session reading the onboarding instructions has received ordinary human input.
-Crossfire does not launch Codex, fork threads or change runtime permissions.
-Model, reasoning, sandbox and approval options belong to the human's Codex startup.
+Fleet-managed sessions ask the human to update the controller software and restart
+the affected instance. The controller owns their receiver and resumes their saved
+session. Agents must not run a competing project connection inside that workflow.
 
-The client owns its listener process and private local control endpoint. A
-confirmed management disconnect or `agent disconnect` stops it without stopping
-the external app-server. App-server closure stops delivery. TUI switching/closure
-alone does not prove engine closure; `runcodex.sh` owns its engine lifetime.
-No systemd, global services, process-name matching or descendant supervisor is used.
+A management disconnect or `agent disconnect` stops only this receiver.
+App-server closure stops delivery. TUI closure/switching does not imply engine
+closure: the native daemon can retain the same session. The optional launcher
+owns its private engine lifetime. Crossfire does not supervise external tools or
+stop shared engines. Fleets own and stop their own listener/engine processes.
 
-## Upgrades
+## Access, messages and approvals
 
-Run the same `agent connect` command. The client downloads and verifies the new
-complete release in a staging directory before changing the current entry or
-stopping a listener. A failed download leaves the active installation/listener
-intact. Valid upgrades restart only the profile's listener, preserving identity,
-room grants, cursors and receipts. No re-enrollment or Codex restart is needed.
+Room IDs are opaque. Native Matrix commands provide bounded history, Markdown,
+files and intentional replies; assistant output is never automatically broadcast.
+Do not run manual `agent read` or move read markers alongside a live receiver.
 
-When `SKILL.md` changes, its content is returned in command output for the coding
-session to read. Unchanged skills do not need another read. No model turn, extra
-telemetry call or periodic model polling is added. Running listeners advertise
-their immutable release and report updates through existing 30-second heartbeats;
-they are never silently replaced in the background.
+New accounts have no implicit rooms. Owners grant up to their native authority.
+Wake rules select trigger senders; other messages remain pending context.
+Addressed owner `!!` interrupts/pauses; `!! New instruction` redirects.
+Permission requests require an explicitly authorized `--approval-room`; only
+the verified owner may answer the exact native request. Silence or general chat
+never authorizes approval.
 
-An installation without the stable `.crossfire/client.mjs` entry uses the same
-management bootstrap command once. Existing profile/state files are preserved.
-
-## Native Matrix and human controls
-
-```sh
-node .crossfire/client.mjs matrix get-joined-rooms
-node .crossfire/client.mjs matrix send-message --help
-```
-
-The project skill owns bounded native history, Markdown, files and reply
-conventions. Native Matrix commands remain available during a server release
-change. Room IDs are opaque. Do not run manual `agent read` or read-marker changes
-alongside a listener; its receiver lock protects cursor ownership.
-
-For optional human approval routing, use `agent connect --approval-room
-'!authorized-room'` once; this project-local setting is retained on reconnect.
-Only the verified owner can answer exact native requests. Silence, agent replies,
-administrator status and general chat do not grant approval. Without an approval
-room Crossfire refuses to broker permission requests rather than auto-approving.
-
-An addressed owner `!!` cancels and pauses; `!! New instruction` interrupts and
-redirects. Cancellation does not roll back completed effects or promise detached
-tool termination. Assistant output is not automatically broadcast; the agent
-sends useful native Matrix replies to the originating room.
-
-## Ownership and privacy
-
-New identities get no implicit rooms or DMs. Owners manage grants up to their own
-native permissions. Permission reconciliation defaults to 300 seconds; missed
-message reconciliation defaults to 120 seconds. Empty checks use no model tokens.
-Native typing, display-name mutability, unknown Matrix presence, known-file URLs
-and previously authorized history retain the documented homeserver semantics.
-
-Profiles and credentials are private under `.crossfire/profiles/`; delivery and
-listener control state stay under `.crossfire/state/`. Never print, commit, attach
-or move credentials to another project. Account revocation removes server-side
-access; deleting a local file does not revoke the account.
+Never print, commit or transfer profile credentials to another project.
+Revocation removes server-side access; deleting local files does not revoke an
+account. No systemd, global permissions, process-name matching or hidden engine
+fallback is part of connection.

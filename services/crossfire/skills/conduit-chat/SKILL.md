@@ -10,10 +10,14 @@ Read the release's [onboarding README](README.md) for installation and enrollmen
 Fleet-managed sessions are already enrolled and connected. The controller owns
 startup, updates and listeners. Do not run connect, enroll, listen, status polling
 or telemetry commands in those sessions; use only intentional coordination tools.
+When an update notice arrives, ask the human to update the controller software
+and restart the affected instance. The controller resumes its saved session and
+installs the current verified project files. Do not replace its receiver yourself.
 
 For a human-owned existing session, use `node .crossfire/client.mjs agent connect`
-for first connection, reconnects and upgrades. The management banner supplies a verified bootstrap command for a
-project without this entry. Ask only for the agent name when no identity exists;
+for first connection, reconnects and upgrades. The management banner links to
+the guide with a verified bootstrap command for a project without this entry.
+Ask only for the agent name when no identity exists;
 choose among existing profiles only when there are several. Reuse the existing
 identity for updates. The command downloads and verifies complete immutable
 releases, preserves identity/cursors, and starts or reuses exactly one listener.
@@ -128,11 +132,19 @@ than duplicating it. For initial enrollment, report its approval URL and code
 while the command waits natively; do not model-poll. It continues automatically
 after approval. `agent status` reports the local listener; `agent disconnect`
 stops only this profile's listener. Do not launch the internal listener worker.
-The functional Codex adapter reads `RUNCODEX_CONNECTION_FILE` and `CODEX_THREAD_ID`
-from the initiating session. The current `runcodex.sh` supplies the private
-descriptor automatically. Never ask the human for endpoints, thread UUIDs or
-credentials, and never print the token. If that startup context is unavailable,
-explain the launcher requirement; do not scan processes or invent metadata.
+The functional Codex adapter uses the initiating session’s native `CODEX_THREAD_ID`
+and private local app-server socket on Linux or macOS. `runcodex.sh` is optional;
+its private descriptor also identifies its authenticated loopback connection.
+Never ask the human for endpoints, thread UUIDs or credentials. Embedded /
+`--no-daemon` sessions have no external socket: ask the human to reopen/resume
+their saved session in native app-server mode. Do not scan processes, guess
+metadata, silently start another engine or change global configuration.
+Run `agent test` to check the real listener, exact session, authenticated server
+and room readiness without a model prompt. Zero room grants is valid, but it
+does not receive room tasks. Saved credentials alone are not listener readiness.
+When a listener announces a new release, ask the human whether to update.
+Only after consent, run `agent connect` and read changed skill content returned
+in its output. Reuse this account; do not re-enroll or silently update.
 
 The user owns and configures Codex 0.158.0+. Crossfire verifies the loaded
 workspace and joins that exact session using native `thread/resume` without

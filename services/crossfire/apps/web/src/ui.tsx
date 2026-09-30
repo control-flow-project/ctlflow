@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { Result } from '@crossfire/kernel/result';
 
 export function Alert({ children }: { children?: ReactNode }) {
@@ -18,7 +18,7 @@ export function AccountPage({ title, children }: { title: string; children: Reac
 export function Panel({ title, description, action, label, children }: { title: string; description?: string; action?: ReactNode; label?: string; children: ReactNode }) {
   return <section className="panel" aria-label={label ?? title}><header className="panel-heading"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>{children}</section>;
 }
-export function CopyText({ label, value, buttonLabel = 'Copy instructions', copiedMessage = 'Copied. Paste into your coding agent.' }: { label: string; value: string; buttonLabel?: string; copiedMessage?: string }) {
+export function CopyText({ label, value, rows = 7, buttonLabel = 'Copy instructions', copiedMessage = 'Copied. Paste into your coding agent.' }: { label: string; value: string; rows?: number; buttonLabel?: string; copiedMessage?: string }) {
   const id = useId();
   const [state, setState] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');
   async function copy() {
@@ -27,7 +27,7 @@ export function CopyText({ label, value, buttonLabel = 'Copy instructions', copi
     catch { setState('failed'); }
   }
   return <div className="copy-text">
-    <label htmlFor={id}>{label}</label><textarea id={id} readOnly value={value} rows={7} spellCheck={false}/>
+    <label htmlFor={id}>{label}</label><textarea id={id} readOnly value={value} rows={rows} spellCheck={false}/>
     <div className="actions"><button className="primary" type="button" disabled={state === 'copying'} onClick={() => { void copy(); }}>{buttonLabel}</button><span role="status">{state === 'copied' ? copiedMessage : ''}</span></div>
     <Alert>{state === 'failed' ? 'Clipboard access was blocked. Select the instructions above and copy them manually.' : ''}</Alert>
   </div>;
@@ -43,10 +43,36 @@ export function Loaded<T>({ result, children, retry }: { result: Result<T> | und
   if (!result.ok) return <><Alert>{result.error.message}</Alert><button onClick={retry}>Retry</button>{result.error.code === 'unauthorized' && <a className="button" href="/manage/">Sign in</a>}</>;
   return <>{children(result.value)}</>;
 }
-export function Pagination({ meta }: { meta: { page?: number; totalPages?: number } }) {
-  const current = meta.page ?? 1, total = meta.totalPages ?? 0;
-  function link(page: number) { const query = new URLSearchParams(location.search); query.set('page', String(page)); return location.pathname + '?' + query; }
-  return <nav className="pagination" aria-label="Pagination">{current > 1 && <a href={link(current - 1)}>← Previous</a>}<span>Page {current} of {Math.max(1, total)}</span>{current < total && <a href={link(current + 1)}>Next →</a>}</nav>;
+export function Pagination({ meta, parameter = 'page', onPage }: { meta: { page?: number; totalPages?: number; totalItems?: number; pageSize?: number }; parameter?: string; onPage?: (page: number) => void }) {
+  const total = Math.max(1, meta.totalPages ?? 1), current = Math.max(1, Math.min(meta.page ?? 1, total));
+  const [requested, setRequested] = useState(String(current));
+  useEffect(() => { setRequested(String(current)); }, [current]);
+  function link(page: number, size?: number) { const query = new URLSearchParams(location.search); query.set(parameter, String(page)); if (size !== undefined) query.set('pageSize', String(size)); return location.pathname + '?' + query; }
+  function go(page: number) { if (Number.isSafeInteger(page) && page >= 1 && page <= total) { if (onPage) onPage(page); else location.assign(link(page)); } }
+  function control(label: string, page: number, disabled: boolean) { return onPage ? <button type="button" disabled={disabled} onClick={() => go(page)}>{label}</button> : disabled ? <span className="pagination-disabled" aria-disabled="true">{label}</span> : <a className="pagination-button" href={link(page)}>{label}</a>; }
+  return <nav className="pagination" aria-label="Pagination"><div className="pagination-count">{meta.totalItems !== undefined && <span>{meta.totalItems} items</span>}
+    {meta.pageSize !== undefined && parameter === 'page' && <label>Rows per page<select aria-label="Rows per page" value={meta.pageSize} onChange={event => location.assign(link(1, Number(event.target.value)))}>{[...new Set([10, 20, 50, 100, meta.pageSize])].sort((left, right) => left - right).map(size => <option key={size} value={size}>{size}</option>)}</select></label>}</div>
+    <div className="pagination-controls">{control('First', 1, current === 1)}{control('Previous', current - 1, current === 1)}
+      <label>Page<input type="number" aria-label="Page number" min={1} max={total} value={requested} onChange={event => setRequested(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); go(Number(requested)); } }} disabled={total === 1}/><span>of {total}</span></label>
+      {control('Next', current + 1, current === total)}{control('Last', total, current === total)}</div></nav>;
+}
+export function pagingQuery(parameter = 'page'): string {
+  const source = new URLSearchParams(location.search), query = new URLSearchParams();
+  const page = source.get(parameter), size = source.get('pageSize');
+  if (page !== null) query.set('page', page);
+  if (size !== null) query.set('pageSize', size);
+  return query.toString();
+}
+export function PageItems<Item>({ items, parameter, children }: { items: readonly Item[]; parameter: string; children: (page: readonly Item[]) => ReactNode }) {
+  const total = Math.max(1, Math.ceil(items.length / 20)), requested = Number(new URLSearchParams(location.search).get(parameter) ?? 1);
+  const [selected, setSelected] = useState(Number.isSafeInteger(requested) ? Math.max(1, requested) : 1);
+  const page = Math.min(selected, total);
+  function go(next: number) {
+    const query = new URLSearchParams(location.search); query.set(parameter, String(next));
+    history.replaceState(null, '', location.pathname + '?' + query);
+    setSelected(next);
+  }
+  return <>{children(items.slice((page - 1) * 20, page * 20))}<Pagination parameter={parameter} meta={{ page, totalPages: total, totalItems: items.length }} onPage={go}/></>;
 }
 export function timestamp(value: number | null): string { return value === null ? 'Not yet applied' : new Date(value).toLocaleString(); }
 export function applied(record: { revision: number; application: { errorMessage: string | null; appliedRevision: number | null } }): string {

@@ -7,9 +7,10 @@ import { nativeApplication } from './native-application.js';
 import { createHttpServer } from '../../apps/server/src/http/create-server.js';
 import { createWorker } from '../../apps/server/src/worker.js';
 import { publicRouter } from '../../apps/server/src/router.js';
-export async function nativeServer(scope: TestContext, release: Release) {
+import type { ElementPresentation } from '../../apps/server/src/element-configuration.js';
+export async function nativeServer(scope: TestContext, release: Release, presentation: ElementPresentation = {}) {
   const fixture = await nativeApplication(scope), worker = createWorker(fixture.services);
-  const server = createHttpServer(fixture.application, worker, release);
+  const server = createHttpServer(fixture.application, worker, release, presentation);
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const address = server.address(); assert(address && typeof address !== 'string');
   const routes = { publicOrigin: fixture.application.config.publicOrigin, matrixOrigin: fixture.native.base,

@@ -20,12 +20,12 @@ export function privateDir(path: string): string {
   return path;
 }
 
-export function readJson<T>(path: string): T {
+export function readPrivateBytes(path: string, maximum: number): Buffer {
   if (realpathSync(dirname(path)) !== resolve(dirname(path))) throw new Error("Private state cannot traverse symlink directories");
   const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const info = fstatSync(descriptor);
-    if (!info.isFile() || info.uid !== process.getuid!() || info.size > MAX_JSON_BYTES
+    if (!info.isFile() || info.uid !== process.getuid!() || info.size > maximum
       || (info.mode & 0o077) !== 0) throw new Error("State must be a private, bounded, owned regular file");
     const bytes = Buffer.alloc(info.size + 1);
     let size = 0;
@@ -35,8 +35,12 @@ export function readJson<T>(path: string): T {
       if (size > info.size) throw new Error("Private state changed during its bounded read");
       if (!count) break;
     }
-    return JSON.parse(bytes.subarray(0, size).toString("utf8")) as T;
+    if (size !== info.size || fstatSync(descriptor).size !== info.size) throw new Error('Private state changed during its bounded read');
+    return bytes.subarray(0, size);
   } finally { closeSync(descriptor); }
+}
+export function readJson<T>(path: string): T {
+  return JSON.parse(readPrivateBytes(path, MAX_JSON_BYTES).toString('utf8')) as T;
 }
 
 export function writeJson(path: string, value: unknown): void {

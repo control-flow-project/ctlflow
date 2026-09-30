@@ -1,8 +1,8 @@
 # fleet
 
 A local/SSH CLI for named fleetd controllers. Every command uses the same private
-HTTP API; the CLI never starts agent runtimes itself. Linux, Node.js 26+, native
-`flock`, Git, stock Codex 0.158.0+ and an authorized Codex login are required on the
+HTTP API; the CLI never starts agent runtimes itself. Linux, Node.js 26+,
+Git, stock Codex 0.158.0+ and an authorized Codex login are required on the
 controller computer. Remote management uses the existing OpenSSH setup and native
 Unix-socket forwarding with normal host-key verification. No host service or
 permission changes are made.
@@ -17,7 +17,7 @@ Commands below use `fleet` as the executable name.
 1. Create `runtime.toml`, definition `agent.toml` files and their `AGENTS.md` inside
    a chosen fleet directory. The definition owns native model, reasoning, sandbox
    and approval settings. Each instance has its own work area.
-2. Copy **Fleet connection** from Crossfire's **Connect an agent** page into the
+2. Copy the configuration from Crossfire's **Fleet · advanced** connection tab into the
    roster. This supplies the server and owner once, not to every model.
 3. Start and register the controller and fleet:
 

@@ -227,6 +227,8 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       api(response, { disconnect: reporting.disconnect, currentRelease: reporting.current.release });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
       send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
+    } else if (path === API + '/account/whoami') {
+      send(response, { user_id: SELF });
     } else if (path === API + '/joined_rooms') {
       send(response, { joined_rooms: [...joined] });
     } else if (path === API + '/sync') {

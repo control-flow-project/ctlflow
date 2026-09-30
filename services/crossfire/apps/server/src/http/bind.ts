@@ -6,7 +6,7 @@ import type { Actor, Services } from '@crossfire/domain/port/services';
 import type { Manifest } from '@crossfire/contracts/release';
 import type { MemberRecord } from '@crossfire/domain/port/directory';
 export type Metadata = { page: number; pageSize: number; totalItems: number; totalPages: number };
-export type Reply = { data: unknown; pagination?: Metadata; cookie?: string | null };
+export type Reply = { data: unknown; pagination?: Metadata; cookie?: string | null; invitationCookie?: string };
 export type Context = { services: Services; requestId: string; actor: Actor | null; manifest: Manifest;
   controller?: Extract<FleetActor, { kind: 'controller' }>;
   session: { member: MemberRecord; csrfSecret: string; permissions: string[] } | null; credential: string };

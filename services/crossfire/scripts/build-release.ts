@@ -18,7 +18,10 @@ export async function buildRelease(root: string, output = join(root, "dist")): P
     "SKILL.md": readFileSync(join(root, "skills/conduit-chat/SKILL.md")),
     "crossfire-client.mjs": readFileSync(join(output, "crossfire-client.mjs")),
     "matrix-spec-LICENSE.txt": readFileSync(join(root, "third-party/matrix-spec-LICENSE")),
+    "runcodex.sh": readFileSync(join(root, 'assets/runcodex.sh')),
   };
+  const launcher: unknown = JSON.parse(readFileSync(join(root, 'assets/runcodex-source.json'), 'utf8'));
+  if (!launcher || typeof launcher !== 'object' || !('sha256' in launcher) || launcher.sha256 !== artifactHash(files['runcodex.sh'])) throw new Error('Optional launcher distribution differs from its canonical source hash');
   const manifest: Manifest = { version: package_.version, release: package_.version + "-" + releaseHash(files),
     artifacts: Object.fromEntries(ARTIFACTS.map(name => [name, { bytes: files[name].length, sha256: artifactHash(files[name]) }])) as Manifest["artifacts"] };
   const directory = join(output, "onboarding", manifest.release);
