@@ -13,6 +13,7 @@ export function createCoordination(options: ClientOptions): Coordination {
   return { origin: options.origin,
     release: signal => data(client.call(operations.release, {}, {}, undefined, signal)),
     delivery: (agentId, signal) => data(client.call(operations.deliveryPolicy, { agentId }, {}, undefined, signal)),
+    identities: (matrixUserIds, signal) => data(client.call(operations.resolvePrincipals, {}, { matrixUserIds: [...matrixUserIds] }, undefined, signal)),
     report: (agentId, runId, input, signal) => data(client.call(operations.reportListener, { agentId, runId }, input, undefined, signal)),
     notice: (agentId, roomId, eventId, signal) => data(client.call(operations.wakeNotice, { agentId, eventId }, { roomId }, undefined, signal)),
   };

@@ -109,6 +109,13 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await terminal.quit();
   assert(providers.every(provider => provider.requests.length === 0), 'TUI pointer and native attachment make no model calls');
   assert((JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.every(instance => instance.phase === 'running'));
+  value(await invitations.change(guest.id, roomId, { accessMode: 'reply', powerLevel: null })); await worker.drain();
+  value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'PUT', roomPath + '/send/m.room.message/foreign-context',
+    { msgtype: 'm.text', body: 'Context from another owner’s agent' }));
+  value(await nativeOk(ownerNative, 'POST', roomPath + '/invite', { user_id: other.member.principal.matrixUserId }));
+  value(await nativeOk({ base: fixture.native.base, token: other.token }, 'POST', roomPath + '/join', {}));
+  value(await nativeOk({ base: fixture.native.base, token: other.token }, 'PUT', roomPath + '/send/m.room.message/human-context',
+    { msgtype: 'm.text', body: 'Context from another registered human' }));
   const outsider = await fixture.native.register('visitor');
   value(await nativeOk(ownerNative, 'POST', roomPath + '/invite', { user_id: outsider.id }));
   value(await nativeOk({ base: fixture.native.base, token: outsider.token }, 'POST', roomPath + '/join', {}));
@@ -116,9 +123,21 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await delay(1400); assert(providers.every(provider => provider.requests.length === 0));
   value(await nativeOk(ownerNative, 'PUT', roomPath + '/send/m.room.message/task', { msgtype: 'm.text', body: 'Authorized owner task' }));
   await until(() => providers[0]!.requests.length === 1);
-  const request = providers[0]!.requests[0] as { model: string; reasoning: { effort: string } };
+  const request = providers[0]!.requests[0] as { model: string; reasoning: { effort: string };
+    input: { type: string; role?: string; content?: { type: string; text?: string }[] }[] };
   assert.equal(request.model, 'gpt-5.1'); assert.equal(request.reasoning.effort, 'medium');
   assert(JSON.stringify(request).includes('Context from visitor')); assert(JSON.stringify(request).includes('Authorized owner task'));
+  const input = request.input.filter(item => item.type === 'message' && item.role === 'user')
+    .flatMap(item => item.content ?? []).find(item => item.text?.startsWith('Crossfire messages from the selected coordination instance.'))?.text;
+  assert(input, 'The actual native provider request contains the listener envelope');
+  const deliveredContext = JSON.parse(input.slice(input.indexOf('\n') + 1)) as { owner: string;
+    senders: Record<string, { kind: 'human' | 'agent' | 'unknown'; owner?: string }> };
+  assert.equal(deliveredContext.owner, admin.member.principal.matrixUserId);
+  assert.deepEqual(deliveredContext.senders[admin.member.principal.matrixUserId], { kind: 'human' });
+  assert.deepEqual(deliveredContext.senders[other.member.principal.matrixUserId], { kind: 'human' });
+  assert.deepEqual(deliveredContext.senders[guest.matrixUserId], { kind: 'agent', owner: other.member.principal.matrixUserId });
+  assert.deepEqual(deliveredContext.senders[outsider.id], { kind: 'unknown' });
+  assert(!input.includes(north.account.access_token) && !input.includes(guest.token));
   assert.equal(providers[1]!.requests.length, 0); providers[0]!.finish();
   await delay(300);
   const outside = join(directory, 'full-access.txt');

@@ -723,6 +723,36 @@ outcomes remain independently verified rather than assumed from a database write
 
 ## 10. Listener delivery and human interaction
 
+### Sender provenance
+
+Each model-visible input contains `instance`, the verified receiving agent's
+`owner` Matrix ID, native `events`, and a `senders` directory keyed by the exact
+event sender Matrix ID. Each distinct sender appears once per emitted batch.
+Registered humans have `{ kind: "human" }`; registered agents have
+`{ kind: "agent", owner: "@verified-owner:server" }`; unregistered senders have
+`{ kind: "unknown" }`. Human and unknown entries contain no agent owner field.
+The model can compare an event's sender and its directory entry against the
+envelope owner to distinguish the owner, the owner's agents and other senders.
+
+The domain resolves kind and ownership from canonical indexed principal/agent
+relations, never from display names, Matrix ID prefixes, message content or wake
+authorization. Historical suspended/revoked senders retain their registered kind
+and owner; this metadata grants no present wake authority or room permissions.
+The coordination adapter uses authenticated `POST /api/principal-resolutions`
+with 1–100 unique `matrixUserIds`. It returns one bounded
+`{ matrixUserId, kind, ownerMatrixId }` entry for each requested ID; unknown IDs
+are explicit and only registered agents have a non-null owner. The existing
+`principal.read` permission owns this minimal identity projection. Credentials,
+workspaces, runtime bindings and other private account details are absent.
+
+The listener resolves only senders of events actually eligible for delivery,
+after an authorized wake, using bounded bulk queries without model/tool calls.
+Self-chat, automatic notices and idle/blocked traffic require no lookup. Missing,
+substituted, duplicate, malformed or unavailable resolution fails before native
+publication, with unread positions unchanged. The final byte budget includes
+the directory, and split batches include only their own senders. Native event
+identity/content, ordering, batching and receipt ownership remain unchanged.
+
 ### Blocked-mention notices
 
 An explicit native Matrix user mention of a receiving agent, from a sender
@@ -1168,6 +1198,7 @@ ownership. The management website remains under `/manage`.
 | `POST /api/sessions` | Human login; establish private cookie and CSRF state. |
 | `GET, DELETE /api/sessions/current` | Read/end this human session. |
 | `GET /api/principals` | Authorized, bounded identity discovery for wake selection and invitation targets; minimal directory projection. |
+| `POST /api/principal-resolutions` | Authorized bulk resolution of exact Matrix sender IDs to registered kind and agent owner; unknown IDs are explicit. |
 | `GET /api/roles`, `GET /api/permissions` | Read the fixed catalog, filtered by appropriate human/agent applicability. |
 | `GET /api/members`, `GET, PATCH /api/members/{memberId}` | Authorized human directory/lifecycle management. |
 | `PUT /api/members/{memberId}/role` | Explicit administrator assignment of one valid human role. |

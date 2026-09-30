@@ -27,6 +27,8 @@ export const membership = check.object({ targetId: check.identifier, action: che
 export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean });
 export const disconnection = check.object({ expectedRevision: revision, runIds: check.list(check.identifier, 100, 1) });
 export const wakeNotice = check.object({ roomId: check.roomId });
+export const principalResolution = check.object({ matrixUserIds: check.refine(check.list(check.matrixUserId, 100, 1),
+  ids => new Set(ids).size === ids.length, 'Resolve unique Matrix identities') });
 export const plan = check.object({ fleetId: check.identifier, agents: check.list(check.object({ instanceKey: check.name, grants: check.list(grantIntent, 100) }), 100, 1) });
 export const planPreview = check.object({ plan });
 export const planChange = check.object({ plan, digest: check.text(64, 64), snapshots: check.list(check.object({ agentId: check.identifier, revision,

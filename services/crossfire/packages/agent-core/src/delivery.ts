@@ -3,7 +3,7 @@ import { API, segment } from '@crossfire/contracts/matrix';
 import type { Matrix } from './port.js';
 import type { Settings, Event } from '@crossfire/contracts/client';
 import { roomId, userId } from '@crossfire/contracts/validation';
-import { deliveryText, eventView, joinedRooms, loadCursors, readUnread, validatePage, type HistoryEnd, type ReadBatch, type ReceivedEvent } from './receive.js';
+import { acquisitionBytes, eventView, joinedRooms, loadCursors, readUnread, validatePage, type HistoryEnd, type ReadBatch, type ReceivedEvent } from './receive.js';
 
 export type WakeCycle = { ends: Record<string, HistoryEnd>; sender: string; room: string };
 
@@ -67,7 +67,7 @@ export async function pendingBatch(storage: LocalState, client: Matrix, settings
         }
       }
       const batch = saved.batch;
-      if (batch.events.some(event => Buffer.byteLength(deliveryText([event], settings)) > maximum)) throw new Error('Pinned event exceeds the input byte limit');
+      if (batch.events.some(event => acquisitionBytes([event], settings) > maximum)) throw new Error('Pinned event exceeds the input byte limit');
       return { ...batch, events: batch.events.filter(event => included(event.room_id)),
         cursors: { ...base, ...Object.fromEntries(Object.entries(batch.cursors).filter(([room]) => included(room))) },
         latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => included(room))),
@@ -119,7 +119,7 @@ export async function collectBatch(storage: LocalState, client: Matrix, settings
     for (;;) {
       next = await readUnread(storage, client, settings, file, pageLimit, selected, maximum, undefined, allowed,
         { cursors: result.cursors, ends: cycle.ends });
-      if (Buffer.byteLength(deliveryText([...result.events, ...next.events], settings)) <= maximum - 1024) break;
+      if (acquisitionBytes([...result.events, ...next.events], settings) <= maximum - 1024) break;
       if (pageLimit === 1) return { ...result, more_rooms: [...allowed],
         events: result.events.sort((left, right) => (left.timestamp ?? '').localeCompare(right.timestamp ?? '')) };
       pageLimit = Math.max(1, Math.floor(pageLimit / 2));
