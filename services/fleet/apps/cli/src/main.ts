@@ -8,8 +8,10 @@ import { createDaemonClient, operations } from '@fleet/daemon-client/client';
 import { openTunnel } from '@fleet/ssh-transport/tunnel';
 import { name as nameParser } from '@crossfire/contracts/schema/validation';
 import type { Result } from '@crossfire/kernel/result';
+import { codexTerminal } from '@crossfire/adapter-codex/terminal';
 import { loadConnections, saveConnections } from './configuration.js';
 import { launchDaemon } from './daemon.js';
+import { terminalPointer } from './attachment.js';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message); return result.value; }
 function output(value: unknown): void { process.stdout.write(JSON.stringify(value, null, 2) + '\n'); }
@@ -20,7 +22,7 @@ fleet [--root DIRECTORY | --remote NAME] add DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] list|show|start|stop|remove [FLEET]
 fleet agent list FLEET
 fleet agent add FLEET INSTANCE --definition DEFINITION
-fleet agent start|stop|remove FLEET INSTANCE`;
+fleet agent start|stop|remove|attach FLEET INSTANCE`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, remote: { type: 'string' },
     name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, help: { type: 'boolean' } } });
@@ -78,6 +80,7 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
         workarea: 'agents/' + definition + '/workarea/' + instanceKey } })).data); return;
     }
     if (agentCommand && command === 'remove') { output(value(await client.call(operations.removeAgent, { ...params, instanceKey: instanceKey! }, { expectedRevision: fleet.revision })).data); return; }
+    if (agentCommand && command === 'attach') { const pointer = value(await terminalPointer(client, fleet.fleetId, instanceKey!, { codex: codexTerminal() }, remote?.ssh)); process.stdout.write(pointer.command + '\n'); return; }
     if (command !== 'start' && command !== 'stop') throw new Error(usage);
     const request = { operationId: randomUUID(), action: command as 'start' | 'stop', expectedRevision: fleet.revision,
       target: agentCommand ? { kind: 'agent' as const, fleetId: fleet.fleetId, instanceKey: instanceKey! } : { kind: 'fleet' as const, fleetId: fleet.fleetId } };

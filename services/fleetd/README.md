@@ -31,6 +31,11 @@ The private API exposes `/api/status`, `/api/fleets`, nested fleet `/agents`, an
 `/api/operations`. Operations have UUID idempotency keys and expected revisions;
 reusing a key with different input fails. Accepted operations are observed until
 completion, with per-instance outcomes. Closing a CLI does not cancel them.
+The private `/api/fleets/{fleetId}/agents/{instanceKey}/attachment` resource
+returns a current running-session pointer for the shared terminal adapter. It
+contains only the private token-file path, never the token itself. Connection
+metadata is absent from fleet views, logs and durable registry state. A pointer
+does not transfer runtime ownership or add a listener.
 
 Crossfire receives the fleet's reported controller name/metadata and ordinary
 agent activity. Its scoped controller credential cannot approve identities,

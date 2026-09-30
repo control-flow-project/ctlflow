@@ -1,9 +1,7 @@
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { failure, success } from '@crossfire/kernel/result';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import type { OwnedRuntimeAdapter } from '@crossfire/agent-core/owned-runtime';
-import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
+import type { OwnedRuntimeAdapter, OwnedRuntimeConnection } from '@crossfire/agent-core/owned-runtime';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { prepareProject, paths } from '@crossfire/adapter-filesystem/project';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
@@ -17,7 +15,7 @@ import { loadBinding, saveBinding, protectFleet } from '@fleetd/storage/binding'
 import type { Execution } from '@fleetd/domain/port';
 import { prepareEnrollment } from './enrollment.js';
 
-export function createExecution(adapters: Record<string, OwnedRuntimeAdapter> = { codex: codexRuntime() }): Execution {
+export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
   return {
     validate(configuration) {
       for (const definition of Object.values(configuration.definitions)) {
@@ -33,7 +31,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter> = 
       catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Fleet enrollment failed'); }
     },
     async start(configuration, instance, signal) {
-      let release: (() => Promise<void>) | undefined, destination: RuntimeConnection | undefined;
+      let release: (() => Promise<void>) | undefined, destination: OwnedRuntimeConnection | undefined;
       let done: Promise<void> | undefined;
       const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
       try {
@@ -73,7 +71,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter> = 
         let closing: Promise<void> | undefined;
         const unlock = release;
         const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; await destination?.close(); await unlock(); })();
-        return success({ sessionId: destination.sessionId, signal: stop.signal, close });
+        return success({ sessionId: destination.sessionId, signal: stop.signal, attachment: destination.attachment, close });
       } catch (error) { stop.abort(error); await done; await destination?.close(); await release?.(); return failure('native', error instanceof Error ? error.message : 'Instance startup failed'); }
     },
     async detach(configuration, instance) {

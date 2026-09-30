@@ -45,6 +45,8 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   assert.equal(rejected.ok, false);
   await cli('agent', 'add', 'research', 'analyst', '--definition', 'analyst');
   assert.equal((JSON.parse((await cli('agent', 'list', 'research')).stdout) as unknown[]).length, 1);
+  await assert.rejects(cli('agent', 'attach', 'research', 'analyst'), /Start this agent before attaching/);
+  assert.equal((await client.call(operations.attachment, { fleetId: added.fleetId, instanceKey: 'missing' }, {})).ok, false);
   const starter = spawn(process.execPath, [entry, 'start', 'research'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const ended = once(starter, 'close'); let output = '';
   starter.stdout.on('data', chunk => { output += String(chunk); }); starter.stderr.resume();

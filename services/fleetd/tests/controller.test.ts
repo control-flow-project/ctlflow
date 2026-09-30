@@ -10,6 +10,7 @@ import type { Execution } from '@fleetd/domain/port';
 import type { Operation } from '@fleetd/domain/model';
 import { createRegistry } from '@fleetd/storage/registry';
 import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
+import { fleetView, instanceView } from '@fleetd/contracts/api';
 import { success, failure, type Result } from '@crossfire/kernel/result';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
@@ -23,7 +24,9 @@ function fixture(execution?: Partial<Execution>) {
   const closed: string[] = [], started: string[] = [];
   const registry = createRegistry(root), services = { registry, controller: { name: 'desktop' }, now: Date.now, id: randomUUID,
     execution: { validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
-      start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(); return success({ sessionId: randomUUID(), signal: stop.signal, close: async () => { closed.push(instance.key); stop.abort(); } }); }, ...execution } satisfies Execution };
+      start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success({ sessionId, signal: stop.signal,
+        attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } },
+        close: async () => { closed.push(instance.key); stop.abort(); } }); }, ...execution } satisfies Execution };
   const controller = value(createController(services)), record = value(controller.add(fleet));
   async function operation(action: 'start' | 'stop', instanceKey?: string) {
     const current = value(controller.view(record.fleetId));
@@ -65,6 +68,30 @@ test('controller owns runtimes, rejects duplicates and operation reuse with diff
   assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
 });
 const fixtureController = fixture;
+
+test('terminal pointers exist only for live instances and never leak into registry views', async scope => {
+  const fixture = fixtureController(); scope.after(() => fixture.controller.close());
+  const fleetId = fixture.record.fleetId;
+  assert.equal(fixture.controller.attachment(fleetId, 'analyst').ok, false);
+  assert.equal(fixture.controller.attachment(fleetId, 'missing').ok, false);
+  assert.equal(fixture.controller.attachment(randomUUID(), 'analyst').ok, false);
+  await fixture.finish(await fixture.operation('start'));
+  const pointer = value(fixture.controller.attachment(fleetId, 'analyst'));
+  const current = value(fixture.controller.view(fleetId));
+  assert.equal(pointer.sessionId, current.instances[0]!.sessionId);
+  assert(fleetView(current).ok, 'Daemon views preserve opaque runtime-native session IDs');
+  for (const sessionId of ['', 'x'.repeat(201), 'unsafe\nidentity']) assert.equal(instanceView({ ...current.instances[0], sessionId }).ok, false);
+  pointer.connection.tokenFile = '/changed-by-caller';
+  assert.equal(value(fixture.controller.attachment(fleetId, 'analyst')).connection.tokenFile, '/fixture/private-token');
+  for (const view of [fixture.controller.list(), fixture.controller.view(fleetId), fixture.registry.registrations(), fixture.registry.operations()]) {
+    assert(!JSON.stringify(view).includes('/fixture/private-token'));
+    assert(!JSON.stringify(view).includes('ws://127.0.0.1:12345'));
+  }
+  await fixture.finish(await fixture.operation('stop'));
+  assert.equal(fixture.controller.attachment(fleetId, 'analyst').ok, false);
+  await fixture.finish(await fixture.operation('start'));
+  assert.notEqual(value(fixture.controller.attachment(fleetId, 'analyst')).sessionId, pointer.sessionId);
+});
 
 test('approval waiting is model-free and stop cancels a pending start', async scope => {
   const fixture = fixtureController({ prepare: async (_config, _controller, signal, approval) => {

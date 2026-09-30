@@ -10,6 +10,8 @@ export async function startProcess(home: string, workspace: string, stop: AbortS
   const version = execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 10000, maxBuffer: 4096 }).trim();
   const matched = /^codex-cli (\d+)\.(\d+)\.(\d+)$/u.exec(version);
   if (!matched || Number(matched[1]) === 0 && Number(matched[2]) < 158) throw new Error('Stock Codex 0.158.0 or newer is required');
+  const path = process.env.PATH;
+  if (!path || path.length > 4096 || /[\x00-\x1f\x7f]/u.test(path)) throw new Error('Codex requires a bounded native executable search path');
   const token = randomBytes(32).toString('hex'), tokenFile = join(privateDir(home), '.crossfire-token-' + randomBytes(12).toString('hex'));
   writeFileSync(tokenFile, token, { flag: 'wx', mode: 0o600 });
   const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: realpathSync(home) };
@@ -46,6 +48,6 @@ export async function startProcess(home: string, workspace: string, stop: AbortS
       void ended.then(() => finish(new Error('Codex exited before readiness')));
       if (stop.aborted) abort();
     });
-    return { endpoint, token, signal: lifetime.signal, close, pid: child.pid! };
+    return { endpoint, token, tokenFile, binary, path, signal: lifetime.signal, close, pid: child.pid! };
   } catch (error) { await close(); throw error; }
 }

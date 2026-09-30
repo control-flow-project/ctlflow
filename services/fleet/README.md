@@ -40,6 +40,7 @@ fleet show research
 fleet agent list research
 fleet agent add research analyst-west --definition analyst
 fleet agent start research analyst-west
+fleet agent attach research analyst-west
 fleet agent stop research analyst-west
 fleet agent remove research analyst-west
 fleet stop research
@@ -62,6 +63,32 @@ not stop daemon operations. Status output distinguishes pending approval,
 successful peers and failed instances. Rejected native options and name collisions
 remain explicit errors.
 
+## Open an agent terminal
+
+`fleet agent attach research analyst-west` prints a ready-to-run native TUI
+command for the running agent's exact session. Copy and run the printed command;
+no port, UUID or token needs to be assembled manually. The token stays in the
+existing private file and is read into the native client's environment. Its native
+home, executable and search path come from the running engine, including software
+installed through NVM. The command does not create an engine, session or listener.
+Closing the TUI leaves the fleet running; use `fleet agent stop` or `fleet stop`
+to stop execution.
+Request a fresh pointer after restarting the engine.
+
+Model, reasoning and permissions belong in the definition's `agent.toml`:
+
+```toml
+[runtime_options]
+model = "YOUR_SUPPORTED_MODEL"
+model_reasoning_effort = "high"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+```
+
+Stop and start the agent to apply changed settings to its saved session. Native
+provider/administrator restrictions still apply. Full access is explicit, not
+an automatic fleet default.
+
 ## Another computer
 
 Start fleetd locally on the target computer as its normal user. From your laptop:
@@ -71,6 +98,7 @@ fleet remote add office --ssh operator@office-host --root /absolute/private/cont
 fleet --remote office list
 fleet --remote office add /absolute/private/research
 fleet --remote office start research
+fleet --remote office agent attach research analyst-west
 fleet --remote office stop research
 ```
 
@@ -78,6 +106,10 @@ The target host must already allow SSH forwarding. The CLI does not reconfigure
 SSH or copy keys. All remote paths refer to that computer. Closing the temporary
 SSH tunnel leaves the controller running. Controller labels are descriptive;
 only SSH authentication and private directory permissions authorize management.
+Remote attachment prints an SSH-wrapped native command to run on the controller
+computer. It needs no additional public port or temporary forwarding service.
+Native terminal arguments come from the shared runtime adapter, not CLI/domain
+logic. Authentication tokens never appear in command text or API responses.
 
 - [Complete TOML schemas, REST resources and ownership rules](../../docs/specification.md)
 - [Controller implementation and lifecycle](../fleetd/README.md)

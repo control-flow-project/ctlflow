@@ -32,7 +32,8 @@ export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
       connection = codexDelivery({ ...session, close: async () => { await session.close(); await owner.close(); } },
         { pollMs: 1000, timeoutMs: 30000, receiptFile: stateFile + '.receipt' });
       await connection.verify();
-      return success(connection);
+      return success({ ...connection, attachment: { runtime: 'codex', sessionId: session.sessionId,
+        workspace: session.workspace, connection: { endpoint: owner.endpoint, tokenFile: owner.tokenFile, home, binary: owner.binary, path: owner.path } } });
     } catch (error) { await process?.close(); return failure('native', error instanceof Error ? error.message : 'Codex startup failed'); }
   } };
 }
