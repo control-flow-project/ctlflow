@@ -19,4 +19,5 @@ export type Services = {
   identity: { id(): string; secret(): string; verificationCode(): string; hash(value: string): string; matches(value: string, digest: string): boolean };
   instance: { serverName: string; publicOrigin: string; serviceMatrixId: string };
 };
-export type Actor = { principalId: string; kind: 'human' | 'agent'; sessionHash?: string };
+export type Actor = { principalId: string; kind: 'human' | 'agent'; authentication?:
+  { kind: 'management'; sessionHash: string } | { kind: 'native'; matrixUserId: string } };

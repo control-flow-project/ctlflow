@@ -1440,6 +1440,7 @@ ownership. The management website remains under `/manage`.
 | `POST /api/sessions` | Human login; establish private cookie and CSRF state. |
 | `GET, DELETE /api/sessions/current` | Read/end this human session. |
 | `GET /api/principals` | Authorized, bounded identity discovery for wake selection and invitation targets; minimal directory projection. |
+| `POST /_matrix/client/v3/user_directory/search` | Native Matrix bearer-authenticated projection of the same authorized active registered-principal directory, including zero-room agents. Standard `results`/`limited` response; no room admission or grant. |
 | `POST /api/principal-resolutions` | Authorized bulk resolution of exact Matrix sender IDs to registered kind and agent owner; unknown IDs are explicit. |
 | `GET /api/roles`, `GET /api/permissions` | Read the fixed catalog, filtered by appropriate human/agent applicability. |
 | `GET /api/members`, `GET, PATCH /api/members/{memberId}` | Authorized human directory/lifecycle management. |
@@ -1487,11 +1488,31 @@ paths and payloads, not a second documentation-only model.
 
 ## 13. Management experience
 
+Element invite search uses Crossfire's registered identity directory. It does
+not depend on an agent already sharing or joining a public room. Native tokens
+are verified with Matrix before registered principal/owner status and
+`principal.read` authorization. Management actors carry an explicit private
+session proof; native actors carry the exact verified Matrix identity proof.
+Native authentication does not replace browser cookie/CSRF requirements on
+management REST routes. Unregistered, inactive and inactive-owner identities
+cannot use this projection. Results contain only Matrix user IDs and display
+names, with the same owner-qualified agent naming as management and native
+profiles. Search requests accept only `search_term` (at most 200 characters)
+and optional integer `limit` 0–100 (default 10); no URL token authentication,
+unknown fields or hidden native-directory fallback. Errors use Matrix codes,
+responses are not cached, and all other native Matrix endpoints retain their
+normal native authority.
+
 React management uses one outer page frame and shared paper-like layouts.
 Within that frame, typography, aligned gutters, whitespace and light separators
 establish hierarchy. Sections, filters, tables, result lists, empty states and
 supporting notes have no enclosing decorative boxes. Borders remain on controls
 and meaningful alerts; focus, status and destructive-action cues stay explicit.
+Shared section headings use a muted flat tint and a narrow accent rule, with
+consistent spacing between tasks. Technical identifiers, provenance, connection
+metadata and longer explanations are inspectable disclosures, not the default
+information hierarchy. Permission ceilings, destructive effects, pending/failed
+enforcement and the consequences of replacing access remain immediately visible.
 Account, onboarding, directory, detail and administration screens follow the
 same treatment at desktop and mobile widths. Copy names the resource, state or
 action directly: no slogans, promotional eyebrows, filler headings or decorative
@@ -1500,13 +1521,44 @@ explanations remain visible.
 
 Fleet list/detail and durable agent/room routes show names first,
 not opaque IDs. Owners see their scope; administrators may filter all owners.
-Lists have useful status/search filters and pagination. Revoked entries are
+Agent and fleet directories use compact tables, not cards. Lists have useful
+status/search filters and pagination, except the fleet directory: it displays
+the complete authorized filtered collection without page controls, by reading
+bounded 100-row REST pages. Filters and failures retain their normal API
+authority; stale requests are cancelled and errors never masquerade as an empty
+or complete partial result. Refresh does not imply an atomic multi-page snapshot.
+Revoked entries are
 explicitly included by filter. Fleet controller labels are visible in fleet
 summaries and agent deployment context, without implying heartbeat freshness.
 Fleet views separately show observed controller connectivity and desired delivery
 state. Confirmed activation/deactivation and an explicit message composer use the
 same scoped REST contract as the CLI; neither starts nor stops native engines.
 Paginated message history shows recipient outcomes without claiming model completion.
+Long message bodies have compact previews with inspectable, exact full text;
+room topics and protocol details do not displace access controls.
+Fleet detail opens on its agent roster. Shared accessible navigation exposes
+durable URLs for agents (the fleet base path), `map`, `delivery`, `messages`,
+`rooms` (room-plan review) and `settings`. Agent detail opens on room access;
+its other durable views are `wake`, `activity`, `software` and `settings`.
+Only the selected task mounts and reads its resources. Links work with direct
+navigation, reload, browser history and keyboard navigation; unknown sections
+are unavailable, not aliases. Primary list pages link to the base detail path.
+The wake-up identity picker reads the directory only in selected-identity mode;
+selections survive searches and changes of mode. Native room permission thresholds
+remain available in an explicit disclosure, below the current authority summary.
+Empty software history explains how to begin reporting rather than showing an
+empty table.
+Identity/status context stays compact above navigation. Forms and explicit
+confirmations retain native permission checks, scoped REST mutations, revisions,
+CSRF and request idempotency. Policy sections distinguish signup, capacity,
+enrollment/reconciliation and onboarding, with one atomic settings save.
+Enrollment review includes the owner's current display identity. Activity shows
+recognizable actors, affected principals and readable action labels, with exact
+record identifiers and provenance in a disclosure. Domain read models hydrate
+these identities in one page-wide directory batch, only after resource-scope
+authorization. Stored enrollment/audit records remain normalized and audit
+identifiers remain immutable; display labels are current, not historical name
+snapshots. No per-row network requests or broader permission are introduced.
 Each fleet's agents appear in a compact paginated table: linked agent name,
 instance key, listener status and account status. Agent details are reached through
 the name link; fleet rosters have no per-agent cards or duplicated detail controls.

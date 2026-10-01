@@ -1,7 +1,13 @@
-export function FleetNavigation({ id, map = false }: { id: string; map?: boolean }) {
+import { ViewNavigation } from './ui.js';
+export type FleetSection = 'agents' | 'map' | 'delivery' | 'messages' | 'rooms' | 'settings';
+export function FleetNavigation({ id, section }: { id: string; section: FleetSection }) {
   const base = '/manage/fleets/' + id;
-  return <nav className="setup-tabs" aria-label="Fleet views">
-    <a href={base} aria-current={!map ? 'page' : undefined}>Overview</a>
-    <a href={base + '/map'} aria-current={map ? 'page' : undefined}>Connection map</a>
-  </nav>;
+  return <ViewNavigation label="Fleet views" items={[
+    { label: 'Agents', href: base, current: section === 'agents' },
+    { label: 'Connection map', href: base + '/map', current: section === 'map' },
+    { label: 'Delivery', href: base + '/delivery', current: section === 'delivery' },
+    { label: 'Messages', href: base + '/messages', current: section === 'messages' },
+    { label: 'Room plan', href: base + '/rooms', current: section === 'rooms' },
+    { label: 'Settings', href: base + '/settings', current: section === 'settings' },
+  ]}/>;
 }

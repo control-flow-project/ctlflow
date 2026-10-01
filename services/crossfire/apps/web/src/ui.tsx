@@ -18,6 +18,15 @@ export function AccountPage({ title, children }: { title: string; children: Reac
 export function Panel({ title, description, action, label, children }: { title: string; description?: string; action?: ReactNode; label?: string; children: ReactNode }) {
   return <section className="panel" aria-label={label ?? title}><header className="panel-heading"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>{children}</section>;
 }
+export function ViewNavigation({ label, items }: { label: string; items: readonly { label: string; href: string; current: boolean }[] }) {
+  return <nav className="view-navigation" aria-label={label}>{items.map(item => <a key={item.href} href={item.href} aria-current={item.current ? 'page' : undefined}>{item.label}</a>)}</nav>;
+}
+export function SubjectHeading({ name, description, children }: { name: string; description: ReactNode; children?: ReactNode }) {
+  return <div className="subject-heading"><span className="avatar" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span><div className="subject-identity"><h2>{name}</h2><div className="subject-description">{description}</div></div><div className="subject-status">{children}</div></div>;
+}
+export function Help({ title, children }: { title: string; children: ReactNode }) {
+  return <details className="context-help"><summary>{title}</summary><div>{children}</div></details>;
+}
 export function CopyText({ label, value, rows = 7, buttonLabel = 'Copy instructions', copiedMessage = 'Copied. Paste into your coding agent.' }: { label: string; value: string; rows?: number; buttonLabel?: string; copiedMessage?: string }) {
   const id = useId();
   const [state, setState] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');

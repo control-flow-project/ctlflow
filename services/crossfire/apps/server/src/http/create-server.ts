@@ -22,6 +22,7 @@ import { memberRoutes } from './routes/member.js';
 import { instanceRoutes } from './routes/instance.js';
 import { registrationTransport, invitationCookie, setInvitationCookie, registrationStage } from './registration.js';
 import { verifyInvitation } from '@crossfire/domain/member/registration';
+import { searchMatrixDirectory } from './matrix-directory.js';
 export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: ElementPresentation = {}) {
   const { services, config } = application;
   const register = registrationTransport(services);
@@ -71,6 +72,9 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (url.origin !== config.publicOrigin || request.headers.host !== new URL(config.publicOrigin).host) { send(response, requestId, failure('forbidden', 'Invalid request host')); return; }
       if (request.headers.origin !== undefined && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Invalid request origin')); return; }
       const method = request.method ?? 'GET';
+      if (url.pathname === '/_matrix/client/v3/user_directory/search') {
+        await searchMatrixDirectory(services, request, response, url, requestId); return;
+      }
       if (/^\/_matrix\/client\/(?:v3|r0)\/register$/u.test(url.pathname)) {
         if (!rate(request)) { response.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); response.end(JSON.stringify({ errcode: 'M_LIMIT_EXCEEDED', error: 'Too many signup requests' })); return; }
         await register.register(request, response, requestId); if (response.statusCode === 200) worker.wake(); return;

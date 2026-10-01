@@ -2,6 +2,7 @@ import type { MemberRecord } from '@crossfire/domain/port/directory';
 import type { PrincipalApplication } from '@crossfire/domain/identity/types';
 import type { AgentDetails } from '@crossfire/domain/agent/read-agent';
 import type { ListenerRun } from '@crossfire/domain/activity/types';
+import { agentDisplayName } from '@crossfire/domain/identity/display-name';
 export function application(value: PrincipalApplication) {
   return { appliedRevision: value.appliedRevision, appliedStatus: value.appliedStatus, nativeDisplayName: value.nativeDisplayName,
     lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt, errorCode: value.errorCode, errorMessage: value.errorMessage };
@@ -18,7 +19,7 @@ export function listenerRun(value: ListenerRun) {
 export function agent(value: AgentDetails) {
   const { record, activity } = value;
   return { agentId: record.principal.id, matrixUserId: record.principal.matrixUserId, name: record.name,
-    displayName: record.agent.displayNameOverride ?? record.name + ' (' + record.ownerMember.displayName + ')',
+    displayName: agentDisplayName(record.name, record.ownerMember.displayName, record.agent.displayNameOverride),
     owner: { memberId: record.owner.id, matrixUserId: record.owner.matrixUserId, displayName: record.ownerMember.displayName, status: record.owner.status },
     status: record.principal.status, revision: record.principal.revision, createdAt: record.principal.createdAt,
     application: application(record.application), activity: { status: activity.status, activeMs: activity.activeMs,
