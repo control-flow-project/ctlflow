@@ -7,10 +7,12 @@ import { Enrollments } from './enrollments.js';
 import { Connect } from './connect.js';
 import { Members, Invitations, Settings, Audit } from './administration.js';
 import { Fleets, FleetDetail } from './fleets.js';
+import { FleetMap } from './fleet-map/index.js';
 import { Join } from './join.js';
 import { Alert, Page } from './ui.js';
 import { call, operations, useAction, useResource } from './api.js';
 import './style.css';
+import './fleet-map/style.css';
 
 const path = location.pathname.replace(/\/$/u, '');
 const sections = [
@@ -40,6 +42,8 @@ function Route({ canInvite }: { canInvite: boolean }) {
   if (path === '/manage/invitations' && canInvite) return <Invitations/>;
   if (path === '/manage/audit') return <Audit/>;
   if (path === '/manage/fleets') return <Fleets/>;
+  const fleetMap = /^\/manage\/fleets\/([a-f0-9-]{36})\/map$/u.exec(path);
+  if (fleetMap) return <FleetMap id={fleetMap[1]!}/>;
   const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})$/u.exec(path);
   if (fleet) return <FleetDetail id={fleet[1]!}/>;
   if (viewer.member.roleCode === 'administrator') {

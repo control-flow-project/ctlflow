@@ -6,6 +6,7 @@ import * as query from '../schema/query.js';
 import * as plan from '../schema/plan.js';
 import { manifest } from '../release.js';
 import * as fleetControl from '../fleet-control.js';
+import { fleetMap } from '../schema/fleet-map.js';
 export const operations = {
   createSession: operation({ method: 'POST', path: '/api/sessions', auth: 'public',
     params: check.empty, query: query.none, input: req.session, output: res.session,
@@ -88,6 +89,9 @@ export const operations = {
   removeFleet: operation({ method: 'DELETE', path: '/api/fleets/{fleetId}', auth: 'human',
     params: check.object({ fleetId: check.identifier }), query: query.none, input: req.fleetRemoval, output: res.acknowledged,
     status: 200, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Remove grouping without revoking accounts' }),
+  fleetMap: operation({ method: 'GET', path: '/api/fleets/{fleetId}/map', auth: 'human',
+    params: check.object({ fleetId: check.identifier }), query: query.none, input: check.empty, output: fleetMap,
+    status: 200, collection: false, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Fleet connection map' }),
   fleetAgents: operation({ method: 'GET', path: '/api/fleets/{fleetId}/agents', auth: 'fleet',
     params: check.object({ fleetId: check.identifier }), query: query.page, input: check.empty, output: check.list(res.fleetAgent, 100),
     status: 200, collection: true, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Fleet members' }),

@@ -24,6 +24,7 @@ export type CollectionRepository = {
   roomGrants(input: { agentId: string }): Result<AgentRoomGrant[]>;
   roomPermissions(input: { agentId: string; roomId: string }): Result<AgentRoomPermission[]>;
   wakeSenders(input: { agentId: string }): Result<AgentWakeSender[]>;
+  wakeSendersForAgents(agentIds: string[]): Result<AgentWakeSender[]>;
   listenerRuns(input: { agentId: string }): Result<ListenerRun[]>;
   pendingNotices(input: { now: number }): Result<WakeNotice[]>;
   noticeHistory(input: { receiverAgentId: string; senderMatrixId: string; since: number }): Result<WakeNotice[]>;
