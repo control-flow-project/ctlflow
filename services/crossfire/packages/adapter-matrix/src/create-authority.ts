@@ -5,6 +5,7 @@ import type { MatrixAuthority, RoomFacts, RoomMembership } from '@crossfire/doma
 import { API, segment } from '@crossfire/contracts/matrix';
 import { nativeOk, nativeRequest } from './http.js';
 import { object, text, userId } from '@crossfire/contracts/validation';
+import { LISTENER_NOTICE, isListenerNotice } from '@crossfire/contracts/notices';
 
 export function createMatrixAuthority(config: Config): MatrixAuthority {
   const accounts = authority(config);
@@ -119,13 +120,13 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
         messageType: typeof content.value.msgtype === 'string' ? content.value.msgtype : null,
         body: typeof content.value.body === 'string' ? content.value.body : null, mentions: ids,
         edited: 'm.new_content' in content.value || relation.ok && relation.value.rel_type === 'm.replace',
-        control: content.value.msgtype === 'm.notice' && content.value['org.crossfire.wake_blocked'] === true });
+        control: isListenerNotice({ type: event.type, content: content.value }) });
     },
     async sendNotice(matrixUserId, roomId, transactionId, body, senderMatrixId) {
       const client = await accounts.asUser(matrixUserId);
       if (!client.ok) return client;
       const result = await nativeRequest(client.value, 'PUT', API + '/rooms/' + segment(roomId) + '/send/m.room.message/' + segment(transactionId),
-        { msgtype: 'm.notice', body, 'm.mentions': { user_ids: [senderMatrixId] }, 'org.crossfire.wake_blocked': true });
+        { msgtype: 'm.notice', body, 'm.mentions': { user_ids: [senderMatrixId] }, [LISTENER_NOTICE]: true });
       if (!result.ok) return result;
       if (result.value.status === 403) return failure('forbidden', 'Native room rules do not permit this notice');
       return result.value.status === 200 && typeof result.value.body.event_id === 'string' ? success(result.value.body.event_id) : failure('native', 'Notice publication remains unconfirmed');

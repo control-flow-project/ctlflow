@@ -11,6 +11,7 @@ export type Publication<Boundary> = {
   sessionId: string;
   signal: AbortSignal;
   verify: () => void | Promise<void>;
+  inspect: () => Promise<{ busy: boolean }>;
   boundary: () => Boundary | Promise<Boundary>;
   publish: (input: NativeInput<Boundary>) => void | Promise<void>;
   received: (input: NativeInput<Boundary>) => NativeReceipt | Promise<NativeReceipt>;
@@ -50,6 +51,7 @@ export function nativeDelivery<Boundary>(native: Publication<Boundary>, parseBou
   }
   return {
     sessionId: native.sessionId, signal: native.signal,
+    inspect: async () => { native.signal.throwIfAborted(); return native.inspect(); },
     close: async () => { try { await native.close(); } finally { journal.close(); } }, acknowledge: journal.acknowledge,
     settle: () => settle(),
     async deliver(text, messageId, cancelled) {

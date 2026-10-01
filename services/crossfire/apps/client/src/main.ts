@@ -22,12 +22,12 @@ import { roomOptions, runRoomCommand } from './room-access.js';
 
 const globals = ["project", "profile", "max-output-bytes"];
 const localOptions: Record<string, readonly string[]> = {
-  connect: ['server', 'owner', 'runtime', 'approval-room'], disconnect: [], status: [], read: ["room", "limit"], directory: ['search', 'page', 'page-size'],
+  connect: ['server', 'owner', 'runtime', 'approval-room'], disconnect: [], status: [], test: [], read: ["room", "limit"], directory: ['search', 'page', 'page-size'],
   listen: ["room", "limit", "runtime", "approval-room", "poll-ms", "debounce-ms", "reconcile-ms"],
 };
 
 export async function main(arguments_: string[], installation: () => Manifest, file: string): Promise<void> {
-  if (process.platform !== "linux" || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire requires Linux and Node.js 26+");
+  if (!['linux', 'darwin'].includes(process.platform) || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire agents require Linux or macOS and Node.js 26+: https://nodejs.org/en/download");
   if (arguments_.length === 2 && arguments_[0] === 'runtime' && arguments_[1] === 'claude-hook') {
     const buffers: Buffer[] = [];
     let size = 0;
@@ -50,7 +50,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   if (values.help) {
     if (group === "matrix" && command) emit(selectOperation(command), maximum);
     else if (group === "matrix") emit({ namespace: "matrix", schema: "v1.12", operations: operations.map(operation => ({ command: operation.command, access: operation.access })) }, maximum);
-    else emit({ usage: "node .crossfire/client.mjs [--project DIRECTORY] [--profile NAME] agent connect|disconnect|status|read|directory", agent: Object.fromEntries(Object.entries(localOptions).filter(([name]) => name !== 'listen')), room: roomOptions,
+    else emit({ usage: "node .crossfire/client.mjs [--project DIRECTORY] [--profile NAME] agent connect|disconnect|status|test|read|directory", agent: Object.fromEntries(Object.entries(localOptions).filter(([name]) => name !== 'listen')), room: roomOptions,
       matrix: "Native Matrix operation IDs converted to kebab-case; use matrix COMMAND --help.",
       output: "64 KiB default; finite --max-output-bytes 1024..98304",
       identity: "Project-local profiles; no implicit rooms. The runtime server remains user-owned." }, maximum);
@@ -83,9 +83,13 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   const installed = installation();
   const settings = listener ? listenerSettings(destination.state, runtimeName(option(values, 'runtime')), option(values, 'approval-room')) : undefined;
   const runtime = settings ? discoverRuntime(settings.runtime, project) : undefined;
-  if (group === 'agent' && ['disconnect', 'status'].includes(command)) {
+  if (group === 'agent' && ['disconnect', 'status', 'test'].includes(command)) {
     const unlock = await acquireProcessLock(join(destination.state, 'connection'), 35);
-    try { emit({ status: command === 'disconnect' ? 'disconnected' : 'status', listener: await localListener(destination, command === 'disconnect' ? 'stop' : 'status') }, maximum); }
+    try {
+      const listener = await localListener(destination, command === 'disconnect' ? 'stop' : command === 'test' ? 'test' : 'status');
+      if (command === 'test' && (!listener?.ready || !listener.test)) throw new Error('No working listener is attached. Run node .crossfire/client.mjs agent connect, then agent test again.');
+      emit({ status: command === 'disconnect' ? 'disconnected' : command === 'test' ? 'passed' : 'status', listener }, maximum);
+    }
     finally { await unlock(); }
     return;
   }

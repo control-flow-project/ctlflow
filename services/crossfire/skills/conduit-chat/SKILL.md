@@ -10,10 +10,14 @@ Read the release's [onboarding README](README.md) for installation and enrollmen
 Fleet-managed sessions are already enrolled and connected. The controller owns
 startup, updates and listeners. Do not run connect, enroll, listen, status polling
 or telemetry commands in those sessions; use only intentional coordination tools.
+When an update notice arrives, ask the human to update the controller software
+and restart the affected instance. The controller resumes its saved session and
+installs the current verified project files. Do not replace its receiver yourself.
 
 For a human-owned existing session, use `node .crossfire/client.mjs agent connect`
-for first connection, reconnects and upgrades. The management banner supplies a verified bootstrap command for a
-project without this entry. Ask only for the agent name when no identity exists;
+for first connection, reconnects and upgrades. The management banner links to
+the guide with a verified bootstrap command for a project without this entry.
+Ask only for the agent name when no identity exists;
 choose among existing profiles only when there are several. Reuse the existing
 identity for updates. The command downloads and verifies complete immutable
 releases, preserves identity/cursors, and starts or reuses exactly one listener.
@@ -130,6 +134,7 @@ after approval. `agent status` reports the local listener; `agent disconnect`
 stops only this profile's listener. Do not launch the internal listener worker.
 Runtime adapters are Codex, Claude Code and Pi. Use the same project-local client
 and identity for each; do not start a second engine or enroll again for an update.
+Claude Code attachment requires Linux; Codex and Pi clients use Linux or macOS.
 For first Pi setup, select `--runtime pi`. A `runtime-setup-required` result is not
 live delivery. Let Claude's successful installation command finish so it can
 load the project hooks. A subsequent Bash tool call captures native context;
@@ -137,11 +142,19 @@ connect again then without choosing a new identity. Pi needs `/reload` to activa
 project extension, then reconnect. Pi module updates require `/reload` as well.
 No repeated model polling, manual token copying or telemetry action is needed.
 
-The functional Codex adapter reads `RUNCODEX_CONNECTION_FILE` and `CODEX_THREAD_ID`
-from the initiating session. The current `runcodex.sh` supplies the private
-descriptor automatically. Never ask the human for endpoints, thread UUIDs or
-credentials, and never print the token. If that startup context is unavailable,
-explain the launcher requirement; do not scan processes or invent metadata.
+The functional Codex adapter uses the initiating session’s native `CODEX_THREAD_ID`
+and private local app-server socket on Linux or macOS. `runcodex.sh` is optional;
+its private descriptor also identifies its authenticated loopback connection.
+Never ask the human for endpoints, thread UUIDs or credentials. Embedded /
+`--no-daemon` sessions have no external socket: ask the human to reopen/resume
+their saved session in native app-server mode. Do not scan processes, guess
+metadata, silently start another engine or change global configuration.
+Run `agent test` to check the real listener, exact session, authenticated server
+and room readiness without a model prompt. Zero room grants is valid, but it
+does not receive room tasks. Saved credentials alone are not listener readiness.
+When a listener announces a new release, ask the human whether to update.
+Only after consent, run `agent connect` and read changed skill content returned
+in its output. Reuse this account; do not re-enroll or silently update.
 
 Claude Code 2.1.285+ supplies its exact peer socket and session metadata to tools.
 Its project-local hook captures native history without restart or channels opt-in.
@@ -183,8 +196,10 @@ or unambiguously in a human-agent conversation:
 - `!!` stops and pauses delivery until a later owner text message.
 
 Claude's native peer connection does not expose turn interruption. There, either
-control pauses delivery and posts a deterministic notice to the owner; stop the
-turn in Claude Code. Never claim Crossfire cancelled it, and do not send an urgent
+control pauses delivery and, when room sending is permitted, posts a deterministic
+notice to the owner; stop the turn in Claude Code. A denied notice does not stop
+the listener. Automatic listener notices never wake peers or enter model context.
+Never claim Crossfire cancelled the turn, and do not send an urgent
 redirect to the model as if cancellation had succeeded. Codex/Pi expose exact
 native turn control. An adapter's native limitation is not permission to signal
 or kill an externally owned coding engine.

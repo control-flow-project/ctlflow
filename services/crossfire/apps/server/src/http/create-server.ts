@@ -8,6 +8,7 @@ import { authenticateMember, authenticateAgent } from '@crossfire/domain/session
 import type { Application } from '../composition.js';
 import type { createWorker } from '../worker.js';
 import type { Release } from '@crossfire/adapter-filesystem/release';
+import type { ElementPresentation } from '../element-configuration.js';
 import { serveArtifact } from '../artifacts.js';
 import { type Context, type Endpoint, type Reply } from './bind.js';
 import { readBody, send, cookie, setCookie } from './transport.js';
@@ -17,8 +18,11 @@ import { agentRoutes } from './routes/agent.js';
 import { roomRoutes } from './routes/room.js';
 import { memberRoutes } from './routes/member.js';
 import { instanceRoutes } from './routes/instance.js';
-export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release) {
+import { registrationTransport, invitationCookie, setInvitationCookie, registrationStage } from './registration.js';
+import { verifyInvitation } from '@crossfire/domain/member/registration';
+export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: ElementPresentation = {}) {
   const { services, config } = application;
+  const register = registrationTransport(services);
   const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...agentRoutes(), ...roomRoutes(), ...memberRoutes(),
     ...instanceRoutes(config.instance, services.clock.now())];
   const limits = new Map<string, { count: number; expiresAt: number }>();
@@ -62,6 +66,25 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (url.origin !== config.publicOrigin || request.headers.host !== new URL(config.publicOrigin).host) { send(response, requestId, failure('forbidden', 'Invalid request host')); return; }
       if (request.headers.origin !== undefined && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Invalid request origin')); return; }
       const method = request.method ?? 'GET';
+      if (/^\/_matrix\/client\/(?:v3|r0)\/register$/u.test(url.pathname)) {
+        if (!rate(request)) { response.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); response.end(JSON.stringify({ errcode: 'M_LIMIT_EXCEEDED', error: 'Too many signup requests' })); return; }
+        await register.register(request, response, requestId); if (response.statusCode === 200) worker.wake(); return;
+      }
+      if (url.pathname === '/_matrix/client/v3/auth/' + registrationStage + '/fallback/web') {
+        if (method === 'POST' && !rate(request)) { response.writeHead(429, { 'Retry-After': '60' }); response.end('Too many signup requests'); return; }
+        await register.fallback(request, response, url); return;
+      }
+      if (url.pathname === '/config.json' || url.pathname === '/config.' + new URL(config.publicOrigin).hostname + '.json') {
+        if (method !== 'GET' && method !== 'HEAD') { response.writeHead(405, { Allow: 'GET, HEAD' }); response.end(); return; }
+        const policy = services.repositories.instancePolicy.find({ id: 'instance' });
+        const claim = invitationCookie(request);
+        const invited = claim && verifyInvitation(services, claim.id, claim.secret).ok;
+        response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        response.end(method === 'HEAD' ? undefined : JSON.stringify({ brand: 'Crossfire', default_theme: 'light', ...presentation,
+          default_server_config: { 'm.homeserver': { base_url: config.publicOrigin, server_name: config.serverName } },
+          disable_custom_urls: true, disable_guests: true, disable_login_language_selector: true, disable_3pid_login: true,
+          disable_registration: !invited && !(policy.ok && policy.value?.signupMode === 'open'), room_directory: { servers: [] } })); return;
+      }
       if (serveArtifact(release, method, url.pathname, response)) return;
       if (url.pathname === '/onboarding/setup') {
         if (method !== 'GET' && method !== 'HEAD') {
@@ -69,7 +92,9 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
         }
         const owner = matrixUserId(url.searchParams.get('ownerMatrixId'));
         if (!owner.ok || url.searchParams.size !== 1) { send(response, requestId, failure('invalid', 'Exactly one ownerMatrixId is required')); return; }
-        const guide = Buffer.from(onboardingGuide(config.publicOrigin, owner.value, release.manifest));
+        const policy = services.repositories.instancePolicy.find({ id: 'instance' });
+        if (!policy.ok || !policy.value) { send(response, requestId, failure('unavailable', 'Onboarding policy unavailable')); return; }
+        const guide = Buffer.from(onboardingGuide(config.publicOrigin, owner.value, release.manifest, policy.value.agentInstructions));
         response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': guide.length, 'Cache-Control': 'no-store',
           'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'" });
         response.end(method === 'HEAD' ? undefined : guide); return;
@@ -95,12 +120,14 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
         send(response, requestId, failure('rate_limit', 'Request rate exceeded')); return;
       }
       if (endpoint.path === '/api/sessions' && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin human login required')); return; }
+      if (endpoint.path.endsWith('/claim') && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }
       const authenticated = await authenticate(request, endpoint, requestId);
       if (!authenticated.ok) { send(response, requestId, authenticated); return; }
       const input = method === 'GET' ? success({}) : await readBody(request);
       if (!input.ok) { send(response, requestId, input); return; }
       const result: Result<Reply> = await endpoint.invoke(authenticated.value, params, url.searchParams, input.value);
       if (result.ok && result.value.cookie !== undefined) setCookie(response, result.value.cookie, config.publicOrigin);
+      if (result.ok && result.value.invitationCookie !== undefined) setInvitationCookie(response, result.value.invitationCookie, config.publicOrigin);
       send(response, requestId, result, endpoint.status);
       if (result.ok && method !== 'GET') worker.wake();
     } catch {

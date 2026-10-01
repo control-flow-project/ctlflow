@@ -9,7 +9,7 @@ import { codexProtocol, type NativeEvent } from '@crossfire/adapter-codex/protoc
 import type { nativeProvider } from './native-provider.js';
 import { setTimeout as delay } from 'node:timers/promises';
 
-export async function materialize(engine: Awaited<ReturnType<typeof nativeEngine>>, provider: Awaited<ReturnType<typeof nativeProvider>>) {
+export async function materialize(engine: Pick<Awaited<ReturnType<typeof nativeEngine>>, 'session' | 'call' | 'notifications'>, provider: Awaited<ReturnType<typeof nativeProvider>>) {
   await engine.call('turn/start', { threadId: engine.session, input: [{ type: 'text', text: 'Human opens this fixture session.', text_elements: [] }] });
   const deadline = Date.now() + 10_000;
   while (!provider.held()) { if (Date.now() > deadline) throw new Error('Initial native input timed out'); await delay(10); }

@@ -1,7 +1,7 @@
 import { fields, text } from "./validation.js";
 import { failure, success, type Result } from "@crossfire/kernel/result";
 
-export const ARTIFACTS = ["README.md", "SKILL.md", "crossfire-client.mjs", "crossfire-pi.mjs", "matrix-spec-LICENSE.txt"] as const;
+export const ARTIFACTS = ["README.md", "SKILL.md", "crossfire-client.mjs", "crossfire-pi.mjs", "matrix-spec-LICENSE.txt", "runcodex.sh"] as const;
 export type ArtifactName = typeof ARTIFACTS[number];
 export type Manifest = { release: string; version: string; artifacts: Record<ArtifactName, { bytes: number; sha256: string }> };
 export const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024;
@@ -21,10 +21,10 @@ export function updateNotice(origin: string, installed: string | null, current: 
     'Installed release: ' + (installed ?? 'not reported') + '. Current release: ' + current.release + '.',
     skillHash === current.artifacts['SKILL.md'].sha256 ? 'The skill content is unchanged; it does not need to be re-read.'
       : 'Read the updated SKILL.md in this coding session after verifying the files.',
-    'Inform the user. Run node .crossfire/client.mjs agent connect in this project. It verifies and installs the update, preserves identity/cursors and reconnects the listener. Do not enroll again.',
+    'Ask the human owner for consent before updating. Follow the installed skill’s lifecycle owner: an individual project runs node .crossfire/client.mjs agent connect; a fleet-managed session asks the human to update its owning controller and restart the affected instance, never to start a competing project listener. Verified updates preserve identity, cursors and the saved session. Do not enroll again.',
     'Manifest: ' + base + 'manifest.json',
     ...ARTIFACTS.map(name => name + ': ' + base + name + ' (' + current.artifacts[name].bytes + ' bytes; SHA-256 ' + current.artifacts[name].sha256 + ')'),
-    'If this project has no managed client entry, use the verified bootstrap command on the management Connect an agent page. Do not create another identity.',
+    'If this project has no managed client entry, follow the guide linked by the management Connect an agent page for the verified bootstrap command. Do not create another identity.',
   ].join('\n');
 }
 

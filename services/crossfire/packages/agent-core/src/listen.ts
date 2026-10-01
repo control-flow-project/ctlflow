@@ -10,7 +10,7 @@ import { synchronize, loadSyncCursor, checkpointSync, membershipResets, acknowle
 import { captureWake, collectBatch, pendingBatch, wakeEvent, loadWake, saveWake, retireSnapshot } from './delivery.js';
 import type { RuntimeAdapter } from './runtime.js';
 import { DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES } from '@crossfire/contracts/limits';
-import { loadControl, saveControl, humanEvents, humanText, isControl } from './control.js';
+import { loadControl, saveControl, humanEvents, humanText, isControl, publishControlNotice } from './control.js';
 import { permissions } from './permissions.js';
 import { reportActivity } from './activity.js';
 import { requireCurrentRelease } from './release.js';
@@ -19,6 +19,8 @@ import { isListenerNotice, mentionsAgent } from '@crossfire/contracts/notices';
 import { incrementalEvents } from './receive.js';
 import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
 import { deliveryEvents, resolveSenders } from './senders.js';
+import { testListener, type ListenerTest } from './diagnostic.js';
+import { releaseUpdates } from './updates.js';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
   identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
@@ -44,7 +46,7 @@ export function deliveryBatches(events: readonly ReceivedEvent[], settings: Sett
 export type ListenerOptions = {
   storage: LocalState;
   transport: Transport;
-  ready?: () => void;
+  ready?: (test: () => Promise<ListenerTest>) => void;
   release: Manifest;
   coordination: Coordination;
   settings: Settings;
@@ -89,6 +91,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       },
     });
   } catch (error) { failed.abort(error); approval?.close(); throw error; }
+  const updates = releaseUpdates(storage, options.cursorFile, options.release.release, options.settings.owner, destination.sessionId);
   const signal = AbortSignal.any([stop, destination.signal, failed.signal]);
   const client = options.transport(signal, 45_000);
   const maximum = options.maximumBytes ?? DEFAULT_OUTPUT_BYTES;
@@ -143,22 +146,11 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     });
     signal.throwIfAborted();
   }
-  async function deliver(events: readonly ReceivedEvent[]): Promise<{ accepted: boolean; messageIds: string[] }> {
-    if (!senders.size) return { accepted: false, messageIds: [] };
+  async function send(operation: (scope: AbortSignal) => Promise<void>): Promise<boolean> {
     const cancel = new AbortController();
-    let messageIds: string[] = [];
     const done = (async () => {
       try {
-        const emitted = deliveryEvents(events, options.account.user_id);
-        const identities = await resolveSenders(options.coordination, emitted, AbortSignal.any([cancel.signal, signal]));
-        const batches = deliveryBatches(emitted, options.settings, options.account.user_id, identities, maximum);
-        messageIds = batches.map(batch => batch.messageId);
-        for (const batch of batches) {
-          pendingMessages = batch.messages;
-          await destination.deliver(batch.text, batch.messageId, AbortSignal.any([cancel.signal, signal]));
-          activity?.delivered(pendingMessages);
-          pendingMessages = 0;
-        }
+        await operation(AbortSignal.any([cancel.signal, signal]));
         return true;
       } catch (error) {
         signal.throwIfAborted();
@@ -167,8 +159,25 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       }
     })();
     sending = { cancel, done };
-    try { return { accepted: await done, messageIds }; }
+    try { return await done; }
     finally { sending = undefined; }
+  }
+  async function deliver(events: readonly ReceivedEvent[]): Promise<{ accepted: boolean; messageIds: string[] }> {
+    if (!senders.size) return { accepted: false, messageIds: [] };
+    let messageIds: string[] = [];
+    const accepted = await send(async scope => {
+      const emitted = deliveryEvents(events, options.account.user_id);
+      const identities = await resolveSenders(options.coordination, emitted, scope);
+      const batches = deliveryBatches(emitted, options.settings, options.account.user_id, identities, maximum);
+      messageIds = batches.map(batch => batch.messageId);
+      for (const batch of batches) {
+        pendingMessages = batch.messages;
+        await destination.deliver(batch.text, batch.messageId, scope);
+        activity?.delivered(pendingMessages);
+        pendingMessages = 0;
+      }
+    });
+    return { accepted, messageIds };
   }
   async function cancelDelivery(): Promise<void> {
     if (!sending) return;
@@ -218,11 +227,15 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const selected = options.room ? selectRoom(options.room) : undefined;
     let joined = new Set(await joinedRooms(client));
     retainJoinedCursors(storage, options.cursorFile, joined);
-    activity = await reportActivity(options.coordination, options.id, options.release, signal);
+    activity = await reportActivity(options.coordination, options.id, options.release, signal, release => { updates.available(release); changed(); });
     activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
     signal.throwIfAborted();
-    options.ready?.();
+    options.ready?.(() => {
+      const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
+      return testListener({ coordination: options.coordination, runtime: destination, matrix: options.transport(deadline, 10000),
+        id: options.id, owner: options.settings.owner, matrixUserId: options.account.user_id, paused: state.paused, signal: deadline });
+    });
     acquisition = (async () => {
       for (;;) {
         signal.throwIfAborted();
@@ -259,8 +272,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
               state.paused = true;
               state.controls.push({ room: event.room_id, event: event.event_id, turn: null, stop: true, status: 'delivered' });
               saveControl(storage, controlFile, state);
-              await client.put(`${API}/rooms/${segment(event.room_id)}/send/m.room.message/${segment('crossfire-control-' + createHash('sha256').update(event.event_id).digest('hex'))}`,
-                { msgtype: 'm.notice', body: 'Listener delivery is paused. This runtime connection cannot interrupt the current turn; stop it in the coding session. A subsequent owner message resumes delivery.' });
+              await publishControlNotice(client, options.coordination, options.id, options.settings, options.account, event, scope);
               continue;
             }
             const turn = await destination.turnControl.activeTurn();
@@ -315,6 +327,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         continue;
       }
       retiredRooms.clear();
+      if (updates.pending()) { await send(scope => updates.publish(destination, scope)); continue; }
       if (cycle && (!allowed.has(cycle.room) || !joined.has(cycle.room) || !senders.has(cycle.sender))) {
         cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0;
       }

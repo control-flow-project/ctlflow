@@ -26,6 +26,8 @@ export function createInstancePolicyRepository(database: Database.Database): Ins
       enrollment_seconds: params.enrollmentSeconds,
       reconcile_seconds: params.reconcileSeconds,
       agent_instructions: params.agentInstructions,
+      signup_mode: params.signupMode,
+      invitation_issuers: params.invitationIssuers,
         }), value);
         return success(undefined);
       });
@@ -40,6 +42,8 @@ export function createInstancePolicyRepository(database: Database.Database): Ins
       enrollment_seconds: params.enrollmentSeconds,
       reconcile_seconds: params.reconcileSeconds,
       agent_instructions: params.agentInstructions,
+      signup_mode: params.signupMode,
+      invitation_issuers: params.invitationIssuers,
         }).where(row => row.id === params.id), value);
         return changed === 1 ? success(undefined) : failure('missing', 'InstancePolicy not found');
       });

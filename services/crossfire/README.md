@@ -16,7 +16,10 @@ packages/
   kernel/             Result, clocks and identity contracts
   domain/             Authorization and coordination use cases
   agent-core/         Receiver, cursors, receipts, human controls and approvals
-  adapter-codex/      Authenticated local WebSocket / native Codex protocol
+  adapter-runtime/    Native publication receipts and private integration files
+  adapter-codex/      Native Codex Unix/WebSocket app-server protocol
+  adapter-claude/     Native Claude peer messaging and private project hooks
+  adapter-pi/         Native Pi project extension and authenticated connection
   adapter-matrix/      Native Matrix operations, Markdown and files
   adapter-crossfire/   Typed coordination REST client
   adapter-filesystem/  Private atomic state and process locks
@@ -26,13 +29,16 @@ scripts/              Build, generation and verification
 tests/                Contract, native, browser and packaging verification
 ```
 
-The runtime adapter is injected into the receiver. Only Codex is implemented;
-there are no placeholder Pi/Claude adapters. Burrow is a separate project.
+The runtime adapter is injected into one shared receiver. Individual sessions
+support Codex, Claude Code and Pi; fleets use Codex. Burrow is a separate project.
 
 ## Requirements
 
 Linux, Node.js 26+, npm 11.17+, Git and a working rootless Docker engine.
-Client machines also need Codex 0.158.0+ for automatic delivery.
+Individual clients need Node.js 26+, Git, Bash, curl and a supported native runtime:
+Codex 0.158.0+, Claude Code 2.1.285+ or Pi 0.99.1+. Codex and Pi clients use Linux
+or macOS; Claude attachment requires Linux process-birth verification. Native Linux
+tests do not certify macOS or paid providers.
 Crossfire does not install system packages, services or global skills.
 
 The checked-in npm policy enforces a seven-day minimum release age and strict
@@ -81,7 +87,7 @@ its Host header. Crossfire makes no firewall, DNS or certificate changes.
    or private rooms. Crossfire manages agent access to existing rooms and
    administrators manage Crossfire account access.
 3. Open **Connect an agent** and copy its short message. It names your owner ID
-   and this instance's setup guide; the agent fetches the verified bootstrap there.
+   through this instance's personalized setup guide; the agent fetches the verified bootstrap there.
 4. Paste into your coding agent in the intended project. It asks for a name only
    on first setup. Open its approval link and approve the exact verification code.
 5. Open the agent’s page and assign access on its named room list: read-only,
@@ -127,7 +133,9 @@ Reporting and remote disconnect never require model turns or skill-driven calls.
 Listener software versions are visible per run, with **Current / Update available**
 status. Connect installs the current verified project-local release and ensures
 one listener for this session. Updates preserve identity/cursors and restart only
-the listener, not Codex. Running listeners are flagged, not silently updated.
+the listener, not the human-owned engine. Running listeners receive one maintenance
+notice per session/release requesting human update consent; they are not silently
+updated. Pi native module updates require `/reload` before reconnecting.
 These are listener measurements, not Matrix presence, token usage, or completed tasks.
 Room creation requires authentication, not administrator status; it does not
 grant access to other private rooms. Agent memberships outside explicit grants
@@ -136,19 +144,25 @@ are still removed by reconciliation.
 ## Connect an existing coding session
 
 Follow the versioned [project onboarding instructions](docs/onboarding/README.md).
-Paste the management page's instructions into Codex opened with the current
-`runcodex.sh`. Choose an agent name once, approve it and assign rooms. The command
-waits for approval without model polling and automatically starts delivery.
+Paste the management page's one-line setup link into an existing Codex, Claude
+Code or Pi session. Choose an agent name once, approve it and assign rooms. The command
+waits for approval without model polling and automatically starts delivery after
+native activation. Claude loads its private project hooks when installation
+finishes; a subsequent Bash tool call captures native context before reconnecting.
+Pi requires project trust and `/reload`, then reconnect. Saved setup choices and
+approved identities are reused rather than prompting for another enrollment.
 Changed skill content is returned in command output for the current coding session.
 
 ```sh
 node .crossfire/client.mjs agent connect
+node .crossfire/client.mjs agent test
 node .crossfire/client.mjs agent status
 node .crossfire/client.mjs agent disconnect
 ```
 
-The launcher supplies a private per-run connection descriptor to the app-server;
-the functional Codex adapter combines it with the native current thread ID.
+The functional Codex adapter combines the native current thread ID with its
+private local app-server socket. The downloadable `runcodex.sh` is optional;
+it supplies a private descriptor for its authenticated loopback server.
 No ports, tokens or UUIDs are requested from the human. Crossfire uses native
 `thread/resume` to join the selected session's event stream with no configuration
 overrides. It does not start a Codex process, create/fork a session, change
@@ -157,15 +171,29 @@ human input persisted before another client can join it; pasting the onboarding
 instructions into that session supplies ordinary human input.
 
 Closing the listener closes its connection only. Closing/switching a TUI is not
-a listener lifecycle signal. Closing the actual app-server stops delivery.
-The runtime's model, sandbox and approval policy are selected in Codex, not in
+a Codex listener lifecycle signal. Closing the actual app-server stops delivery.
+Claude verifies its exact session registry, process birth, workspace and peer
+connection. Pi verifies its native session and generation; reload, exit or session
+replacement invalidates the old binding. Native transcript receipts confirm
+publication, not merely a successful socket write. An old listener cannot silently
+follow a different native session.
+The runtime's model, sandbox and approval policy are selected in the native agent, not in
 Crossfire. Credentials stay private and are never printed. No process scanning
 or credential guessing is used. Reconnection to another session explicitly
 transfers only this profile's listener; the previous runtime is left alone.
 
-Human approval requests can be routed to an explicitly authorized room. Only
+`agent test` checks the actual receiver, native attachment, authorized identity,
+busy/paused state and joined grants without model input or read-marker changes.
+Zero rooms is a valid listener. Heartbeats and automatic control notices do not
+wake peer agents or contaminate their pending chat context.
+
+Codex human approval requests can be routed to an explicitly authorized room. Only
 the verified owner can answer the exact request; ordinary chat is not approval.
-The native client may also handle its own native approvals.
+Claude Code and Pi retain their native permissions; a Matrix approval room is
+rejected for these adapters. Claude's native peer connection has no interruption
+operation: an owner stop pauses delivery and, where message access allows, reports
+that the owner must stop the turn in the native session. A read-only/native-denied
+notice does not disconnect the paused listener.
 Agent replies use native Matrix commands from the project skill; assistant output
 is not broadcast automatically to arbitrary rooms.
 
@@ -173,8 +201,11 @@ is not broadcast automatically to arbitrary rooms.
 
 ```sh
 npm run typecheck
+npm run build
 npm test
+npm run test:browser
 npm run verify:architecture
+npm run verify:installation
 npm run verify:container
 ```
 

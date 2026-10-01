@@ -210,7 +210,7 @@ test('CLI validates listener-only controls before network use', async scope => {
     ['read', '--debounce-ms', '10000'], ['listen', '--runtime', 'codex', '--thread', THREAD],
     ['listen', '--runtime', 'codex', '--codex-socket', '/private/socket'], ['listen', '--runtime', 'codex', '--', '--listen', 'ws://0.0.0.0:1234'],
     ...['', ' ', 'NaN', 'Infinity', '-1', '0.5', '60001'].map(value => ['listen', '--runtime', 'codex', '--debounce-ms=' + value])]) {
-    await assert.rejects(execute(process.execPath, [...base, 'agent', ...args], { env: { ...fixture.env, RUNCODEX_CONNECTION_FILE: '', CODEX_THREAD_ID: '' } }), /Unsupported option|Unknown command|[Ss]upported|must be|Unknown option|Expected one namespace|runcodex/);
+    await assert.rejects(execute(process.execPath, [...base, 'agent', ...args], { env: { ...fixture.env, RUNCODEX_CONNECTION_FILE: '', CODEX_THREAD_ID: '' } }), /Unsupported option|Unknown command|[Ss]upported|must be|Unknown option|Expected one namespace|native thread identity/);
   }
 });
 

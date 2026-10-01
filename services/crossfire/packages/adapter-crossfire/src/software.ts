@@ -1,20 +1,23 @@
 import { existsSync, lstatSync, mkdtempSync, realpathSync, readlinkSync, renameSync, symlinkSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { ARTIFACTS, type Manifest } from '@crossfire/contracts/release';
+import { ARTIFACTS, MAX_ARTIFACT_BYTES } from '@crossfire/contracts/release';
 import { loadRelease, artifactHash } from '@crossfire/adapter-filesystem/release';
-import { privateDir, writeJson } from '@crossfire/adapter-filesystem/index';
+import { privateDir, writeJson, readPrivateBytes } from '@crossfire/adapter-filesystem/index';
 import { createCoordination } from './coordination.js';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 
-export function installedSoftware(root: string): Manifest | null {
+function installedClient(root: string): string | null {
   const entry = join(root, 'client.mjs');
   let information;
   try { information = lstatSync(entry); }
   catch (error) { if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null; throw error; }
   if (!information.isSymbolicLink() || information.uid !== process.getuid!()
     || !/^software\/\d+\.\d+\.\d+-[a-f0-9]{24}\/crossfire-client\.mjs$/u.test(readlinkSync(entry))) throw new Error('The project client entry is not a managed Crossfire installation');
-  return loadRelease(dirname(realpathSync(entry))).manifest;
+  const client = realpathSync(entry);
+  if (client !== join(root, readlinkSync(entry))) throw new Error('Installed software cannot traverse symlink directories');
+  privateDir(dirname(client));
+  return client;
 }
 
 export async function installSoftware(root: string, origin: string) {
@@ -27,7 +30,8 @@ async function prepareSoftware(root: string, origin: string) {
   const response = await createCoordination({ origin }).release();
   if (!response.ok) throw new Error(response.error.message);
   const current = response.value;
-  const previous = installedSoftware(root);
+  const previous = installedClient(root);
+  const previousSkillHash = previous ? artifactHash(readPrivateBytes(join(dirname(previous), 'SKILL.md'), MAX_ARTIFACT_BYTES)) : null;
   const software = privateDir(join(root, 'software'));
   const directory = join(software, current.release);
   if (!existsSync(directory)) {
@@ -55,12 +59,12 @@ async function prepareSoftware(root: string, origin: string) {
   }
   if (loadRelease(directory).manifest.release !== current.release) throw new Error('Installed release differs from the current manifest');
   const activate = () => {
-    installedSoftware(root);
+    installedClient(root);
     const temporary = join(root, '.client-' + randomUUID());
     symlinkSync('software/' + current.release + '/crossfire-client.mjs', temporary);
     try { renameSync(temporary, join(root, 'client.mjs')); }
     finally { if (existsSync(temporary)) rmSync(temporary); }
   };
   return { manifest: current, file: join(directory, 'crossfire-client.mjs'), activate,
-    skill: { path: join(directory, 'SKILL.md'), changed: previous?.artifacts['SKILL.md'].sha256 !== current.artifacts['SKILL.md'].sha256 } };
+    skill: { path: join(directory, 'SKILL.md'), changed: previousSkillHash !== current.artifacts['SKILL.md'].sha256 } };
 }

@@ -177,6 +177,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
   const eventPositions = new Map<string, number>();
   const extraMembers = new Set<string>();
   const muted = new Set<string>();
+  const accessModes = new Map<string, 'read' | 'reply' | 'custom'>();
   const access = { ownerStatus: 'active', status: 'active' };
   const waking: { policy: WakePolicy; senders: string[] } = { policy: 'owner-agents', senders: [OBSERVER, '@agent-holmes:test.localhost'] };
   const release = builtRelease().release.manifest;
@@ -184,6 +185,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
   const reporting = { disconnect: false, current: release };
   const syncUpdates = { enabled: true, hung: false };
   const waiters = new Set<() => void>();
+  let maximumWaiters = 0;
   let revision = 0;
   let pageOverride: unknown;
   function wake(): void { revision++; for (const waiter of [...waiters]) waiter(); }
@@ -215,7 +217,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
     } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
       api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, wakeMode: waking.policy,
         senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
-        roomGrants: [...joined].map(room => ({ roomId: room, accessMode: 'reply', powerLevel: null, muted: muted.has(room) })) });
+        roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', powerLevel: null, muted: muted.has(room) })) });
     } else if (path === '/api/agents/' + AGENT_ID) {
       api(response, { agentId: AGENT_ID, matrixUserId: SELF, name: 'watson', displayName: 'Watson (Human)',
         owner: { memberId: AGENT_ID, matrixUserId: OBSERVER, displayName: 'Human', status: access.ownerStatus },
@@ -227,6 +229,8 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       api(response, { disconnect: reporting.disconnect, currentRelease: reporting.current.release });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
       send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
+    } else if (path === API + '/account/whoami') {
+      send(response, { user_id: SELF });
     } else if (path === API + '/joined_rooms') {
       send(response, { joined_rooms: [...joined] });
     } else if (path === API + '/sync') {
@@ -243,6 +247,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       };
       if (url.searchParams.get('since') === 'sync-' + revision && Number(url.searchParams.get('timeout')) > 0) {
         waiters.add(complete);
+        maximumWaiters = Math.max(maximumWaiters, waiters.size);
         timer = setTimeout(complete, Number(url.searchParams.get('timeout')));
         response.on('close', () => { clearTimeout(timer); waiters.delete(complete); });
       } else complete();
@@ -292,9 +297,9 @@ export async function matrixFixture(t: TestContext, workspace: string) {
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, access, waking, syncUpdates, failures, identities,
+  return { coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities,
     env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
-    wake, waiting: () => waiters.size,
+    wake, waiting: () => waiters.size, maximumWaiting: () => maximumWaiters,
     hold: (path: string) => {
       let entered = false;
       let release!: () => void;

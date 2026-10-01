@@ -1,11 +1,11 @@
 import type { Event } from './client.js';
 
-export const BLOCKED_MENTION_NOTICE = 'org.crossfire.wake_blocked';
+export const LISTENER_NOTICE = 'org.crossfire.listener_notice';
 export const BLOCKED_MENTION_INTERVAL_MS = 600_000;
 
-export function isListenerNotice(event: Pick<Event, 'type' | 'content'>): boolean {
+export function isListenerNotice(event: { type: string; content: Record<string, unknown> }): boolean {
   return event.type === 'm.room.message' && event.content.msgtype === 'm.notice'
-    && event.content[BLOCKED_MENTION_NOTICE] === true;
+    && event.content[LISTENER_NOTICE] === true;
 }
 
 export function mentionsAgent(event: Pick<Event, 'type' | 'content' | 'sender'>, receiver: string): boolean {

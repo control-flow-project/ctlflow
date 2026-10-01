@@ -1,4 +1,5 @@
 import { controller } from './controller.js';
+import { HUMAN_SIGNUP } from '../policy.js';
 import * as check from './validation.js';
 import type { Parsed } from './validation.js';
 export const principal = check.object({ principalId: check.identifier, matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent'),
@@ -13,7 +14,7 @@ export const permission = check.object({ code: check.text(100), grantScope: chec
 export const application = check.object({ appliedRevision: check.nullable(check.integer()), appliedStatus: check.nullable(check.status),
   nativeDisplayName: check.nullable(check.text(255)), lastAttemptAt: check.nullable(check.integer()), lastSuccessAt: check.nullable(check.integer()),
   errorCode: check.nullable(check.text(100)), errorMessage: check.nullable(check.text(4096)) });
-export const member = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(80),
+export const member = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(HUMAN_SIGNUP.labelMax),
   roleCode: check.choice('member', 'administrator'), status: check.status, revision: check.integer(), createdAt: check.integer(), application });
 export const session = check.object({ member, csrfSecret: check.secret, permissions: check.list(check.text(100), 100) });
 export const listenerRun = check.object({ runId: check.identifier, agentId: check.identifier, release: check.nullable(check.text(200)),
@@ -21,7 +22,7 @@ export const listenerRun = check.object({ runId: check.identifier, agentId: chec
   stoppedAt: check.nullable(check.integer()), disconnectRequestedAt: check.nullable(check.integer()) });
 export const activity = check.object({ status: check.choice('online', 'offline', 'disconnecting'), activeMs: check.integer(),
   messagesDelivered: check.integer(), lastSeenAt: check.nullable(check.integer()), activeRuns: check.list(listenerRun, 100) });
-export const owner = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(80), status: check.status });
+export const owner = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(HUMAN_SIGNUP.labelMax), status: check.status });
 export const agent = check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, name: check.name, displayName: check.text(255),
   owner, status: check.status, revision: check.integer(), createdAt: check.integer(), application, activity,
   deployment: check.nullable(check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), controllerName: check.text(100), reportedAt: check.integer(), instanceKey: check.name })),
@@ -74,7 +75,8 @@ export const invitation = check.object({ invitationId: check.identifier, created
   createdAt: check.integer(), expiresAt: check.integer(), consumedByMemberId: check.nullable(check.identifier), revokedAt: check.nullable(check.integer()) });
 export const invitationCreated = check.object({ invitationId: check.identifier, claimSecret: check.secret, expiresAt: check.integer(), signupUrl: check.text(2048) });
 export const policy = check.object({ revision: check.integer(), maxOwnerAgents: check.integer(1, 100), maxAgents: check.integer(1, 1000),
-  maxPending: check.integer(1, 1000), enrollmentSeconds: check.integer(60, 3600), reconcileSeconds: check.integer(30, 3600), agentInstructions: check.multiline });
+  maxPending: check.integer(1, 1000), enrollmentSeconds: check.integer(60, 3600), reconcileSeconds: check.integer(30, 3600), agentInstructions: check.multiline,
+  signupMode: check.choice('invitation', 'open'), invitationIssuers: check.choice('administrators', 'members') });
 export const audit = check.object({ auditId: check.identifier, requestId: check.identifier, actorCredentialId: check.nullable(check.identifier), actorKind: check.choice('human', 'agent', 'controller', 'system', 'anonymous'),
   actorPrincipalId: check.nullable(check.identifier), ownerId: check.nullable(check.identifier), targetKind: check.text(100), targetId: check.text(255),
   roomId: check.nullable(check.roomId), membershipGeneration: check.nullable(check.identifier), authorizerId: check.nullable(check.identifier),

@@ -10,5 +10,7 @@ export function mapInstancePolicy(row: Tables['instance_policy']): InstancePolic
     enrollmentSeconds: row.enrollment_seconds,
     reconcileSeconds: row.reconcile_seconds,
     agentInstructions: row.agent_instructions,
+    signupMode: row.signup_mode,
+    invitationIssuers: row.invitation_issuers,
   };
 }

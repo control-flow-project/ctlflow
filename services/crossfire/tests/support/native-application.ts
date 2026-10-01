@@ -28,8 +28,7 @@ export async function nativeApplication(scope: TestContext) {
     const invitation = value(createMemberInvitation(services, admin.actor, { roleCode: 'member', expiresSeconds: 600 }, randomUUID()));
     const input = { claimSecret: invitation.claimSecret, username: name, password: secret(), displayName: name };
     const accepted = value(await acceptMemberInvitation(services, invitation.invitationId, input, randomUUID()));
-    const account = value(await services.matrix.provision('@' + name + ':' + config.serverName, input.password, 'CROSSFIRE_HUMAN'));
-    return { ...await login(account.accessToken), invitation, input, accepted };
+    return { ...await login(accepted.account.accessToken), invitation, input, accepted };
   }
   async function agent(owner: Actor, name: string) {
     const ownerRecord = value(services.directory.member(owner.principalId))!;

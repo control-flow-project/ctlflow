@@ -15,6 +15,7 @@ export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const action = useAction();
+  const signup = useResource(operations.registrationPolicy, {});
   function submit(event: FormEvent) {
     event.preventDefault();
     void action.run(async () => {
@@ -27,7 +28,8 @@ export function Login() {
     <form onSubmit={submit}><label>Matrix username<input autoComplete="username" required value={username} onChange={event => setUsername(event.target.value)} placeholder="@you:your-server"/></label>
       <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)}/></label>
       <Alert>{action.error}</Alert><button className="primary" disabled={action.pending}>{action.pending ? 'Signing in…' : 'Sign in'}</button></form>
-    <p className="support">An invitation from an administrator is required to create an account.</p></AccountPage>;
+    <p className="support">{signup.result?.ok && signup.result.value.data.signupMode === 'open'
+      ? <a href="/#/register">Create your account in Element →</a> : 'To create an account, open the private invitation link you received.'}</p></AccountPage>;
 }
 
 export function Session({ children }: { children: ReactNode }) {

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import type { RuntimeHooks, Permission } from '@crossfire/agent-core/runtime';
+import { isListenerNotice } from '@crossfire/contracts/notices';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import { matrixFixture, temporary, until, message, ROOM, OBSERVER, SELF, THREAD } from './test-support/listener.js';
 
@@ -21,7 +22,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   const receiving = listen({ ...fixture, approvalRoom: ROOM, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
-      return { sessionId: THREAD, signal, deliver: async text => { delivered.push(text); }, settle: async () => false, acknowledge: () => {},
+      return { sessionId: THREAD, signal, inspect: async () => ({ busy: false }), deliver: async text => { delivered.push(text); }, settle: async () => false, acknowledge: () => {},
         turnControl: { activeTurn: async () => null, interrupt: async () => {} }, close: () => { closed = true; } };
     },
   }, stop.signal).catch(error => error);
@@ -35,6 +36,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   const pending = hooks.requestPermission(permission, stop.signal);
   await until(() => fixture.rooms.get(ROOM)!.some(event => event.sender === SELF && String(event.content.body).includes('Permission needed')));
   const request = fixture.rooms.get(ROOM)!.find(event => event.sender === SELF && String(event.content.body).includes('Permission needed'))!;
+  assert(isListenerNotice(request), 'Automatic native approvals cannot wake peer models');
   const reply = { ...message('$approval', OBSERVER, 'approve once'), content: { msgtype: 'm.text', body: 'approve once',
     'm.relates_to': { 'm.in_reply_to': { event_id: request.event_id } } } };
   fixture.add(ROOM, { ...reply, event_id: '$outsider', sender: '@administrator:elsewhere' });
@@ -61,7 +63,7 @@ test('a runtime permission without a selected authorized conversation fails clos
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
-      return { sessionId: THREAD, signal, deliver: async () => {}, settle: async () => false, acknowledge: () => {},
+      return { sessionId: THREAD, signal, inspect: async () => ({ busy: false }), deliver: async () => {}, settle: async () => false, acknowledge: () => {},
         turnControl: { activeTurn: async () => null, interrupt: async () => {} }, close: () => {} };
     },
   }, stop.signal).catch(error => error);

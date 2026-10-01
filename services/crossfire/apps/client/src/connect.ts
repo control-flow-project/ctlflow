@@ -13,6 +13,7 @@ import { installSoftware } from '@crossfire/adapter-crossfire/software';
 import { discoverRuntime, prepareRuntime, runtimeName } from './adapters.js';
 import { localListener, startListener } from './listener-process.js';
 import { listenerSettings, listenerBinding } from './settings.js';
+import { connectionSetup } from './setup.js';
 
 export function selectProfile(workspace: string, requested?: string): string {
   if (requested) { if (!profileName(requested)) throw new Error('Choose a name using lowercase letters, numbers and hyphens'); return requested; }
@@ -34,8 +35,9 @@ export async function connectProject(input: { project: string; profile: string |
     const settings = listenerSettings(destination.state, runtimeName(input.runtime), input.approvalRoom);
     const profile = existsSync(destination.profile) ? readProfile(destination.profile) : undefined;
     const pending = !profile && existsSync(destination.pending) ? readJson<PendingEnrollment>(destination.pending) : undefined;
-    const server = profile?.settings.homeserver ?? pending?.server ?? input.server ?? settings.server;
-    const owner = profile?.settings.owner ?? pending?.owner ?? input.owner ?? settings.owner;
+    const setup = connectionSetup(destination.state);
+    const server = profile?.settings.homeserver ?? pending?.server ?? input.server ?? setup.value?.server;
+    const owner = profile?.settings.owner ?? pending?.owner ?? input.owner ?? setup.value?.owner;
     const origin = endpoint(server ?? '');
     if (!origin.ok || !userId(owner)) throw new Error('Use the Connect an agent instructions from your Crossfire management page; they supply the server and owner.');
     if (input.server && input.server !== origin.value || input.owner && input.owner !== owner) throw new Error('This profile belongs to a different server or owner; its identity is unchanged');
@@ -44,8 +46,9 @@ export async function connectProject(input: { project: string; profile: string |
     if (software.skill.changed) emit({ status: 'software-ready', release: software.manifest.release, skill: { ...software.skill, content: readFileSync(software.skill.path, 'utf8') },
       instructions: 'Read this updated project-local skill once in the current coding session. No re-enrollment is needed for existing identities.' }, input.maximum);
     if (realpathSync(input.file) !== realpathSync(software.file)) return { handoff: software.file };
+    if (!profile && !pending) setup.save(origin.value, owner);
+    settings.save();
     const activation = prepareRuntime(settings.runtime, workspace);
-    settings.save(origin.value, owner);
     if (activation) { emit({ status: 'runtime-setup-required', runtime: settings.runtime, instructions: activation }, input.maximum); return {}; }
     const runtime = discoverRuntime(settings.runtime, workspace);
     const binding = listenerBinding(runtime.binding, settings.approvalRoom);
@@ -55,6 +58,7 @@ export async function connectProject(input: { project: string; profile: string |
       const enrolled = await enroll(destination, origin.value, owner, name, software.manifest);
       if (!enrolled.ok) throw new Error(enrolled.error.message);
     }
+    setup.complete();
     if (!profile) {
       const request = readJson<PendingEnrollment>(destination.pending);
       emit({ status: 'awaiting-approval', code: request.code, approvalUrl: origin.value + '/manage/enrollments/' + request.request,

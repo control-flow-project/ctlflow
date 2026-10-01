@@ -111,11 +111,43 @@ test('published bootstrap, native Claude activation, approval, Matrix delivery a
     && readJson<{ confirmed: unknown[] }>(journal).confirmed.length === 0, 'Matrix acknowledgment must retire the native receipt', 30000);
   assert(readFileSync(join(project, '.gitignore'), 'utf8').includes('.claude/settings.local.json'));
   assert.equal(readJson<{ env: { FIXTURE_SETTING: string } }>(join(project, '.claude/settings.local.json')).env.FIXTURE_SETTING, 'preserved');
+  const appliedGrant = value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: room.room_id }));
+  assert(appliedGrant);
+  const agent = value(services.directory.agent(profile.id));
+  assert(agent);
+  const readonly = await fetch(origin + '/api/agents/' + profile.id + '/room-grants/' + segment(room.room_id), { method: 'PUT', headers,
+    body: JSON.stringify({ expectedRevision: agent.principal.revision, expectedGeneration: appliedGrant.generation,
+      accessMode: 'read', powerLevel: null, muted: false }) });
+  assert.equal(readonly.status, 202, await readonly.clone().text());
+  value(await reconcileRoomGrant(services, profile.id, room.room_id));
+  const denied = await fetch(origin + API + '/rooms/' + segment(room.room_id) + '/send/m.room.message/native-denial-proof', {
+    method: 'PUT', headers: { Authorization: 'Bearer ' + account.access_token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ msgtype: 'm.notice', body: 'Read-only proof: native denial is required.' }) });
+  assert.equal(denied.status, 403, await denied.clone().text());
   await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: nativeEnvironment });
   const reconnect = await execute(process.execPath, [client, 'agent', 'connect'], { cwd: project, env: nativeEnvironment, timeout: 30000 });
   assert(reconnect.stdout.includes('"status": "listening"'));
   assert.deepEqual(readFileSync(profilePath), profileBytes);
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1);
+  const cursor = join(project, '.crossfire/state/charlie/cursors.json');
+  const priorCursor = readJson<Record<string, string>>(cursor)[room.room_id];
+  const beforePause = provider.requests.length;
+  const paused = value(await nativeOk(ownerNative, 'PUT', API + '/rooms/' + segment(room.room_id) + '/send/m.room.message/claude-pause', { msgtype: 'm.text', body: '!!' }));
+  assert(typeof paused.event_id === 'string');
+  await until(() => existsSync(cursor + '.control') && readJson<{ paused: boolean }>(cursor + '.control').paused,
+    'Read-only native Claude must pause without disconnecting', 30000);
+  const tested = await execute(process.execPath, [client, 'agent', 'test'], { cwd: project, env: nativeEnvironment, timeout: 30000 });
+  const diagnostic = JSON.parse(tested.stdout) as { status: string; listener: { test: { deliveryPaused: boolean } } };
+  assert.equal(diagnostic.status, 'passed');
+  assert.equal(diagnostic.listener.test.deliveryPaused, true);
+  assert.equal(readJson<Record<string, string>>(cursor)[room.room_id], priorCursor);
+  assert.equal(provider.requests.length, beforePause, 'Native pause and inspection make no model request');
+  assert(!readFileSync(transcript, 'utf8').includes(paused.event_id));
+  const resumed = value(await nativeOk(ownerNative, 'PUT', API + '/rooms/' + segment(room.room_id) + '/send/m.room.message/claude-resume', {
+    msgtype: 'm.text', body: 'Resume authorized room delivery.' }));
+  assert(typeof resumed.event_id === 'string');
+  await until(() => readFileSync(transcript, 'utf8').includes(resumed.event_id as string), 'Read-only native Claude resumes through the same receiver', 30000);
+  assert.equal(readJson<{ paused: boolean }>(cursor + '.control').paused, false);
   child.stdin.end(); await once(child, 'exit');
   await until(() => !existsSync(join(project, '.crossfire/state/charlie/listener.json')));
   writeFileSync(join(directory, 'evidence.json'), JSON.stringify({ output, errors, requests: provider.requests }, null, 2));

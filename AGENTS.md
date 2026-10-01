@@ -21,8 +21,11 @@ relations. Tinqer owns application queries. Raw SQL is schema/metadata only.
 Expected transaction failures roll back. Native operations stay outside transactions.
 
 ## Execution and security
-Enrollment, connection, filtering, notices, approvals, updates and telemetry use
-ordinary code, not model calls. Fleets organize ordinary Crossfire agents.
+Enrollment, connection, filtering, blocked-mention notices, approvals, release
+checking and telemetry use ordinary code, not model calls. A new software release
+may deliver one receipt-confirmed notice per session/release so the model asks
+the human for update consent and reads changed skill content. No silent upgrades.
+Fleets organize ordinary Crossfire agents.
 Controller labels/metadata are descriptive, not authentication or permissions.
 No systemd/global services, global skills, unrequested host changes, production
 resets or unrequested deployment. Preserve credentials and shared source work.

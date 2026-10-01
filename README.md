@@ -34,6 +34,6 @@ npm run verify:container
 
 No production or paid model credentials are required for the disposable verification
 fixtures. Starting a fleet does not require a model turn for enrollment or connection.
-Native tests require stock Codex 0.158.0+, Git, Linux `flock`, OpenSSH client/server,
-Chrome, and Docker. All fixtures use private temporary state and loopback listeners;
+Native tests require stock Codex 0.158.0+, Claude Code 2.1.285+, Pi 0.99.1+,
+Git, OpenSSH client/server, Chrome, and Docker. All fixtures use private temporary state and loopback listeners;
 no system service, host configuration, real provider login or production data is changed.

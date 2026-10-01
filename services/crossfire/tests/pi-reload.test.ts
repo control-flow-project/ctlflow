@@ -69,6 +69,10 @@ test('native Pi reload activates installation and software upgrades without repl
   const identity = readFileSync(approvedProfile), old = piDescriptor(readJson<unknown>(descriptor));
   assert(old.ok);
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1);
+  const tested = await execute(process.execPath, [client, 'agent', 'test'], { cwd: project, env: environment, timeout: 30000 });
+  const diagnostic = JSON.parse(tested.stdout) as { status: string; listener: { test: { busy: boolean } } };
+  assert.equal(diagnostic.status, 'passed');
+  assert.equal(diagnostic.listener.test.busy, false);
   const updated = updatedRelease(release, 'crossfire-pi.mjs', release.files['crossfire-pi.mjs'].toString() + '\nexport const fixtureUpdated = true;\n');
   release.manifest = updated.manifest; release.files = updated.files;
   await assert.rejects(execute(process.execPath, [client, 'agent', 'connect'], { cwd: project, env: { ...environment, CROSSFIRE_PI_CONNECTION: descriptor }, timeout: 30000 }), /Pi native extension needs this verified update/);

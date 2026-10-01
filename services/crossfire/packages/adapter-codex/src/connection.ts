@@ -306,6 +306,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
   }
 
   return { sessionId, signal: session.signal, verify,
+    inspect: async () => ({ busy: await activeTurn() !== null }),
     close: async () => { try { await session.close(); } finally { journal.close(); } }, deliver, settle, acknowledge: journal.acknowledge, turnControl: { activeTurn, interrupt },
     event: message => {
       if (message.method === 'thread/closed' && message.params.threadId === sessionId) {

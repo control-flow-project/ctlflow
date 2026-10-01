@@ -219,6 +219,8 @@ export type Tables = {
     enrollment_seconds: number;
     reconcile_seconds: number;
     agent_instructions: string;
+    signup_mode: 'invitation' | 'open';
+    invitation_issuers: 'administrators' | 'members';
   };
   audit_event: {
     id: string;

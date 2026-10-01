@@ -69,6 +69,56 @@ explicit .js relative imports, validated boundaries, and semantic splits near
 
 ## 2. User experience and lifecycle
 
+### Individual agent connection
+
+The user opens an existing Codex, Claude Code or Pi session in a project and
+pastes one sentence directing it to the personalized setup URL. That guide owns
+all setup instructions, the verified owner ID, prerequisite installers and any
+administrator-authored agent instructions. Owner details are always dynamic.
+
+The client checks prerequisites and verifies downloaded artifacts with Node's
+SHA-256 implementation. Missing Node.js 26+, Git, Bash, curl or the selected native
+runtime produces
+actionable official installation guidance; installation follows the human's
+normal permission policy. No global skills or system settings are changed.
+Individual runtime minimums are Codex 0.158.0, Claude Code 2.1.285 and Pi 0.99.1.
+Native Linux evidence does not certify macOS or paid-provider behavior.
+Codex and Pi client transports use Linux or macOS. Claude attachment requires
+Linux procfs process-birth verification and rejects unsupported platforms before
+native integration or enrollment.
+
+The approved account, listener settings and temporary setup choices are private
+project-local records with distinct ownership. Runtime settings contain only the
+selected adapter and approval room. The approved account owns its server and
+owner; pre-enrollment setup retains those choices only until pending enrollment
+durably owns them. Neither reconnect nor an upgrade changes the settings format
+or requires another identity. A failed native activation preserves setup choices.
+First setup asks for a name; reconnects and upgrades reuse the existing account.
+Several saved profiles require a human selection. The client owns approval
+waiting, verified installation and starting/reusing exactly one listener.
+Approval creates an account, not room access. Zero rooms is a valid ready listener.
+
+The Codex adapter uses the tool-provided exact native thread ID and private
+native app-server Unix socket, or an explicit authenticated loopback WebSocket
+descriptor. It verifies the selected session's workspace and input capability.
+No process scanning, guessed IDs or hidden engine launch is permitted. Embedded
+or `--no-daemon` sessions have no external app-server transport: the guide asks
+the human to reopen/resume that saved session in native app-server mode.
+
+`runcodex.sh` is an optional Linux/macOS download. It starts a private loopback
+server and the normal terminal together. The Scripts repository owns its source;
+Crossfire distributes a commit- and SHA-256-pinned static artifact. It is never
+a prerequisite for connecting an existing app-server-backed session.
+The launcher publishes canonical private paths even when the platform's temporary
+directory uses symlink aliases. Its default shell syntax supports Bash 3.2.
+
+`agent test` uses the private listener control to check actual runtime readiness,
+native authentication, active owner/agent access and applied/joined room grants.
+It does not send a prompt or advance unread positions. Paused delivery and zero
+rooms are reported explicitly; saved credentials alone do not pass this test.
+
+### Fleet lifecycle
+
 The human starts a named daemon in a chosen controller root. The root holds
 controller configuration and a registry of explicit fleet directories. Directories
 may be under that root or elsewhere on the daemon's machine. There is no implicit
@@ -128,10 +178,10 @@ credentials or failed native resume produces a concrete error, not a fresh sessi
 A second live owner of the same local instance is denied. Portable-directory
 proof is explicitly outside this task; portability remains the storage contract.
 
-Linux native `flock` owns each daemon, fleet directory and receiver lifetime.
-Locks are private retained inodes, held by an open file descriptor rather than
-expiring leases. Suspension cannot create another owner; process exit releases
-ownership without a stale-PID detector or deleting a shared lock inode.
+Node's built-in SQLite exclusive transactions own each daemon, fleet directory
+and receiver lifetime. OS-backed locks use private retained inodes, not expiring
+leases. Suspension cannot create another owner; process exit releases ownership
+without a stale-PID detector, external lock executable or deleting a lock inode.
 
 Native settings (model, reasoning, sandbox, approval policy and cwd) are validated
 and applied by the runtime adapter. Only stock Codex 0.158.0 or newer is supported.
@@ -863,7 +913,7 @@ history, lifecycle and native controls live in functional `adapter-codex`,
 `adapter-claude` and `adapter-pi` directories. Shared bounded publication journals
 and native-file validation live in `adapter-runtime`; the listener contains no
 runtime-name dispatch or native protocol decoding.
-An exclusive native file lock owns each session's publication journal for the
+An exclusive native SQLite transaction owns each session's publication journal for the
 attachment lifetime. Different profiles cannot concurrently mutate one native
 journal. Close or process death releases that ownership; uncertainty remains
 durable for the next attachment, not another input submission.
@@ -872,14 +922,19 @@ turn-duration deadline or an early receipt. An idle, unconfirmed publication
 retains its finite uncertainty deadline; native operation deadlines and attachment
 closure still stop failed connections. Only the exact native receipt advances
 Matrix read positions.
+Every runtime exposes native attachment inspection independently of optional
+turn interruption. The model-free listener test verifies live binding and busy
+state without claiming a runtime can cancel a turn it cannot control.
 
 The composition root selects an explicit `--runtime` or exact native tool context.
 Ambiguous contexts require an explicit runtime, not process scanning. One saved
 project profile keeps its identity across reconnects, runtime selection and
 upgrades. A native setup/activation state is reported separately from a ready
 listener; enrollment or saved credentials cannot masquerade as delivery.
-Before enrollment, the private profile settings retain its chosen name, runtime,
-server and owner. Native activation never makes the user repeat those choices:
+Before enrollment, private runtime settings retain the selected runtime and
+approval room, while private setup state retains the chosen server and owner.
+The profile's directory binds the chosen name. Native activation never makes
+the user repeat those choices:
 the same option-free connect command continues the selected setup. Multiple
 saved profiles require an explicit selection; no latest-profile guess is used.
 
@@ -930,15 +985,20 @@ or marked absent by assumption. Captured native operation identities gate Pi
 interruption, so a stale control cannot cancel a newer operation.
 
 Runtime turn control is an explicit optional native capability. For an attachment
-without it, an owner `!!` control pauses listener delivery and posts a deterministic
-notice directing the owner to stop the native turn in the coding session. It does
+without it, an owner `!!` control pauses listener delivery and, only with current
+unmuted send access, posts a deterministic notice directing the owner to stop the
+native turn in the coding session. Native send denial leaves the receiver paused
+and connected, with unread positions unchanged. Generated control, approval and blocked-wake
+notices share one explicit wire marker and are excluded from both wake selection
+and later model context; legitimate unmarked notices remain eligible. It does
 not claim cancellation or send the redirect into the model. A later owner message
 resumes normal wake-eligible delivery. Codex and Pi expose exact native turn
 control. Native permission handling remains in Claude Code/Pi; selecting a
 Crossfire approval room for those adapters is rejected explicitly.
 
 The complete immutable release includes `crossfire-pi.mjs` alongside the client,
-skill, README and Matrix license. All artifacts are verified before activation.
+skill, README, Matrix license and optional Codex launcher. All artifacts are
+verified before activation.
 Project-only native integration files are separate from credentials and preserve
 unrelated project configuration. No new global installation, service, launcher,
 model-generated receipt or telemetry prompt is introduced.
@@ -949,6 +1009,9 @@ lost-response/reconnect safety, bounded native history, native interruption wher
 available, shared Matrix batching, session replacement, release activation and
 owner disconnect. These tests do not certify paid-provider behavior or an
 untested operating system. Fleet orchestration is not extended by this work.
+Acceptance also covers canonical approved-profile reconnects, first-activation
+choice retention and retirement, read-only/native-denied notices preserving the
+paused receiver, and peer automatic notices causing no model call or lost context.
 
 ### Native tool approvals
 
@@ -976,6 +1039,15 @@ mechanism, without requiring a separate model-led installation conversation.
 An incompatible client reports the required update and does not pretend to be
 connected. Running listeners are not silently hot-replaced. Updating software
 preserves identities, native sessions, grants and cursors.
+
+When a different release is reported, ordinary code queues one maintenance
+notice per native session/release. The shared runtime receipt owner publishes it
+with a stable ID; private durable notification state suppresses repeats across
+restarts. It does not consume chat unread positions or count as a chat message.
+Pause, interrupt and disconnect apply through the same delivery owner. The notice
+asks the model to obtain explicit human consent, then run the normal verified
+connection command and read changed skill content. Detection, installation and
+telemetry remain model-free. No automatic consent or silent replacement is inferred.
 
 Each listener reports release, run identity and heartbeat automatically, using
 the shared activity implementation: 30-second heartbeats and offline after
@@ -1140,7 +1212,7 @@ authority. Every policy uses the same wake resolver and buffered-context path.
 | `member_session` | `secret_hash PK`, `member_id FK member`, `csrf_secret`, `native_access_token`, `created_at`, `expires_at`. |
 | `listener_run` | `id PK`, `agent_id FK agent`, `release?`, `started_at`, `last_seen_at`, `active_ms`, `messages_delivered`, `stopped_at?`, `disconnect_requested_at?`. |
 | `wake_notice` | `receiver_agent_id FK agent`, `event_id`, `sender_matrix_id`, `room_id`, `reserved_at`, `message_body`, `status`, `sent_at?`, `native_event_id?`, `next_attempt_at?`, `last_error?`; `PK(receiver_agent_id, event_id)`. |
-| `instance_policy` | `id PK = instance`, `revision`, `max_owner_agents`, `max_agents`, `max_pending`, `enrollment_seconds`, `reconcile_seconds`, `agent_instructions`. |
+| `instance_policy` | `id PK = instance`, `revision`, `max_owner_agents`, `max_agents`, `max_pending`, `enrollment_seconds`, `reconcile_seconds`, `agent_instructions`, `signup_mode` (`invitation` or `open`), `invitation_issuers` (`administrators` or `members`). |
 | `audit_event` | `id PK`, `request_id`, `actor_kind`, `actor_principal_id? FK principal`, `actor_credential_id?`, `owner_id? FK member`, `target_kind`, `target_id`, `room_id?`, `membership_generation?`, `authorizer_id? FK principal`, `added_by_id? FK principal`, `permission_code? FK permission`, `action`, `outcome`, `message`, `created_at`. |
 
 Known signup-claim components are all present or all absent. The human-role
@@ -1198,7 +1270,7 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `agent_room_permission` | `(permission_code, room_id, agent_id)`, `(granted_by_member_id, agent_id, room_id)` | Effective delegation and delegator lifecycle. |
 | `room_grant_application` | `(next_check_at, agent_id, room_id)` | Bounded grant application. |
 | `agent_wake_sender` | `(sender_principal_id, agent_id)` | Sender lifecycle invalidation. |
-| `member_invitation` | `(created_at, id)`, `(expires_at, id)` | Admin listing/expiry. |
+| `member_invitation` | `(created_at, id)`, `(expires_at, id)`, `(created_by_member_id, created_at DESC, id)` | Instance-wide administrator and scoped issuer listings/expiry. |
 | `member_session` | `(member_id, expires_at)`, `(expires_at)` | Session limits/revocation/expiry. |
 | `listener_run` | `(agent_id, last_seen_at DESC, id)`; partial `(last_seen_at, agent_id, id)` for unstopped runs | History, totals and online selection. |
 | `wake_notice` | `(receiver_agent_id, sender_matrix_id, reserved_at DESC)`; partial UQ on receiver/sender for unresolved status; `(status, next_attempt_at)` | Ten-minute cooldown and retry ownership. |
@@ -1309,9 +1381,10 @@ ownership. The management website remains under `/manage`.
 | `GET /api/roles`, `GET /api/permissions` | Read the fixed catalog, filtered by appropriate human/agent applicability. |
 | `GET /api/members`, `GET, PATCH /api/members/{memberId}` | Authorized human directory/lifecycle management. |
 | `PUT /api/members/{memberId}/role` | Explicit administrator assignment of one valid human role. |
-| `POST, GET /api/member-invitations` | Administrator creates/lists human signup invitations. |
+| `POST, GET /api/member-invitations` | Eligible issuers create/list human signup invitations; member listings are issuer-scoped. |
 | `GET, DELETE /api/member-invitations/{invitationId}` | Authorized review/revocation. |
-| `POST /api/member-invitations/{invitationId}/acceptance` | Private signup claim; no agent or administrator credential impersonation. |
+| `POST /api/member-invitations/{invitationId}/claim` | Verify private invitation and establish a short-lived HttpOnly same-origin invitation capability for normal Element signup. |
+| `GET /api/registration-policy` | Public signup mode for the login/onboarding experience. |
 | `POST /api/enrollments/preflight` | Pure bounded roster/name/capacity check. |
 | `POST, GET /api/enrollments` | Introduce one/many identities; list requests under owner/admin visibility. |
 | `GET /api/enrollments/{enrollmentId}` | Exact reviewed roster and application outcomes. |
@@ -1385,11 +1458,54 @@ explicit controls; principal selection supports search and checkboxes. Bulk room
 TOML has a full diff/confirmation and revision validation. Destructive operations
 require confirmation; a disconnect targets observed listener run IDs only.
 
-The Connect page provides short usable per-server instructions and an inspectable
-detail area. Fleet connection configuration is copied once, not per agent. New
-fleet approvals show exact names, failures, owner and controller. Existing identity
-reconnection is never described as re-enrollment. Instructions and capabilities
-are updated in ordinary code; runtime delivery remains the only model input owner.
+The Connect page defaults to the single-agent flow, with three concise illustrated
+steps: paste one line, approve once, choose limited room access. Fleet setup has
+its own durable advanced tab. Requirements and the optional launcher live in a
+secondary inspectable area. New fleet approvals show exact names, failures,
+owner and controller. Reconnection is never described as re-enrollment.
+
+All data lists use one first/previous/page/next/last pagination treatment. Server
+queries are bounded and stably ordered with matching scoped counts. URL navigation
+preserves filters. Bounded snapshots and in-progress editor selections use the
+same controls without destroying unsaved form state. Table cells align vertically
+at their center, including multiline identities, selectors, badges and actions.
+
+Only administrators configure signup and invitation authority. Default signup
+requires an invitation and only administrators may issue links. The issuer
+policy may permit members too; members may invite only members and read/revoke
+only links they created. Administrators can invite either human role and review
+all links. Role-appropriate navigation and API authorization share this policy.
+
+Invitees open a private link and continue to Element's normal username/password
+registration. Crossfire has no second signup form. A short-lived HttpOnly cookie
+is verified by the `org.crossfire.login.registration` Matrix user-interactive
+browser stage: Element collects the username/password, opens the standard
+authentication page, and the person confirms the exact account there. No token
+copying, modified Element request code, or cookie-dependent Matrix JSON requests
+are required. The stage binds immutable signup details and uses a same-origin
+nonce-protected confirmation. The registration boundary consumes the invitation
+and registers the normalized human principal. Open Element signup
+is enabled only by policy and always assigns member authority. The public router
+routes registration and dynamic Element configuration to that single owner.
+Direct signup without a link cannot pass that stage in invitation mode. Open
+signup uses the same stage without requiring an invitation; it grants only the
+member role. Invitations retain their explicitly authorized role even when open
+signup is enabled. A policy change, revocation or expiry is rechecked before
+native account creation. UI-auth sessions are private, ten-minute, bounded
+in-memory state; account passwords never enter application tables or logs.
+Human usernames and configured names support 1–100 characters. The initial name
+retains the complete username; invited/open signup, member changes and member/owner
+representations share that bound without truncation.
+Element configuration for the current hostname is rendered through the same
+policy owner. Deployment-owned brand/theme assets remain presentation data and
+cannot override signup authority.
+Account creation and invitation claims are audited and preserve role boundaries.
+Release notices follow the installed skill's lifecycle ownership. A project
+connection updates through its verified client after consent; a fleet-managed
+session asks the human to update its controller and restart the affected instance.
+Neither mode starts a competing listener.
+Update notices bind an exact opaque runtime session and release. Native identifier
+formats remain adapter-owned; durable notice filenames use a hash of the session.
 
 System-wide agent message instructions are configurable only by the administrator,
 with reset-to-default. Attachment download uses native authenticated Matrix media.
@@ -1422,6 +1538,10 @@ Required banks:
   refusal, shell quoting and exclusion of authentication tokens from output.
 - React browser flows for every management route, fleet/controller views,
   grants, principal selection, confirmations, auth boundaries and attachments.
+- Real Element invited/open signup, issuer-policy scope, registration denial,
+  current-session Unix attachment without a launcher, model-free listener tests,
+  consent-notice receipts/restart deduplication, private-lock suspension/death,
+  and transactional schema migration preserving principals and audit records.
 - Repository typecheck/build/test, architecture/import boundary and package-export
   checks, installation/release verification and final container/browser checks.
   No gate is weakened or skipped to call the product complete.

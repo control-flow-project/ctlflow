@@ -60,6 +60,12 @@ export async function connectPi(descriptor: PiDescriptor, journal: string, pollM
   signal.addEventListener('abort', clear, { once: true });
   try {
     const connection = nativeDelivery({ sessionId: descriptor.session, signal, verify,
+      inspect: async () => {
+        await verify();
+        const active = await piCall(descriptor, { method: 'active' }, signal);
+        if (active !== null && typeof active !== 'string') throw new Error('Invalid Pi operation identity');
+        return { busy: active !== null };
+      },
       boundary: async () => { const parsed = piBoundary(await piCall(descriptor, { method: 'boundary' }, signal)); if (!parsed.ok) throw new Error('Invalid Pi publication boundary'); return parsed.value; },
       publish: input => piCall(descriptor, { method: 'publish', ...input }, signal).then(() => {}),
       received: async input => { const result = await piCall(descriptor, { method: 'received', ...input }, signal); if (typeof result !== 'boolean' && result !== 'cancelled' && result !== 'waiting') throw new Error('Invalid Pi native receipt'); return result; },

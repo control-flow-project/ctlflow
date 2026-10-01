@@ -26,6 +26,7 @@ function supportedVersion(value: unknown): boolean {
 }
 
 export function nativeClaude(environment: NodeJS.ProcessEnv, workspace: string) {
+  if (process.platform !== 'linux') throw new Error('The Claude Code adapter requires Linux native process-birth verification; this attachment is not supported on this platform');
   const session = environment.CLAUDE_CODE_SESSION_ID;
   const pid = Number(environment.CLAUDE_PID);
   const socket = environment.CLAUDE_CODE_MESSAGING_SOCKET;

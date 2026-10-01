@@ -9,6 +9,7 @@ import { installClaudeHook } from '@crossfire/adapter-claude/hook';
 import { installPiExtension } from '@crossfire/adapter-pi/discovery';
 import { selectProfile } from '../apps/client/src/connect.js';
 import { listenerSettings } from '../apps/client/src/settings.js';
+import { connectionSetup } from '../apps/client/src/setup.js';
 import { runtimeName, discoverRuntime } from '../apps/client/src/adapters.js';
 
 function project(): string {
@@ -21,18 +22,23 @@ function project(): string {
 test('native activation retains first-setup choices without another name, server or enrollment prompt', () => {
   const directory = project();
   const state = join(directory, '.crossfire/state/charlie');
-  listenerSettings(state, 'pi').save('https://crossfire.example', '@owner:example');
+  listenerSettings(state, 'pi').save();
+  connectionSetup(state).save('https://crossfire.example', '@owner:example');
   assert.equal(selectProfile(directory), 'charlie');
   const saved = listenerSettings(state);
   assert.equal(saved.runtime, 'pi');
-  assert.equal(saved.server, 'https://crossfire.example');
-  assert.equal(saved.owner, '@owner:example');
+  const setup = connectionSetup(state);
+  assert.deepEqual(setup.value, { server: 'https://crossfire.example', owner: '@owner:example' });
   assert.equal(statSync(join(state, 'settings.json')).mode & 0o777, 0o600);
-  assert.throws(() => saved.save('https://different.example', '@owner:example'), /different server or owner/);
-  assert.throws(() => saved.save('https://crossfire.example', '@other:example'), /different server or owner/);
-  listenerSettings(join(directory, '.crossfire/state/bea'), 'claude').save('https://crossfire.example', '@owner:example');
+  assert.equal(statSync(join(state, 'setup.json')).mode & 0o777, 0o600);
+  assert.throws(() => setup.save('https://different.example', '@owner:example'), /different server or owner/);
+  assert.throws(() => setup.save('https://crossfire.example', '@other:example'), /different server or owner/);
+  listenerSettings(join(directory, '.crossfire/state/bea'), 'claude').save();
   assert.throws(() => selectProfile(directory), /bea, charlie/);
   assert.equal(selectProfile(directory, 'charlie'), 'charlie');
+  setup.complete();
+  assert.equal(connectionSetup(state).value, undefined);
+  assert.equal(listenerSettings(state).runtime, 'pi');
 });
 
 test('native runtime selection and permissions fail explicitly without guessing or retaining another adapter policy', () => {
@@ -42,10 +48,30 @@ test('native runtime selection and permissions fail explicitly without guessing 
   assert.throws(() => runtimeName(undefined, { CLAUDE_CODE_SESSION_ID: 'native', CODEX_THREAD_ID: 'native' }), /Multiple runtime contexts/);
   assert.throws(() => discoverRuntime('opencode', directory), /Supported runtime adapters/);
   assert.throws(() => listenerSettings(state, 'pi', '!approval:example'), /native permission handling/);
-  listenerSettings(state, 'codex', '!approval:example').save('https://crossfire.example', '@owner:example');
+  listenerSettings(state, 'codex', '!approval:example').save();
   assert.equal(listenerSettings(state, 'claude').approvalRoom, null);
-  writeJson(join(state, 'settings.json'), { runtime: 'pi', approvalRoom: null, server: 'not-an-origin', owner: '@owner:example' });
+  writeJson(join(state, 'settings.json'), { runtime: 'pi', approvalRoom: null, server: 'https://crossfire.example', owner: '@owner:example' });
   assert.throws(() => listenerSettings(state), /Invalid listener settings/);
+  writeJson(join(state, 'setup.json'), { server: 'not-an-origin', owner: '@owner:example' });
+  assert.throws(() => connectionSetup(state), /Invalid project connection setup/);
+  writeJson(join(state, 'setup.json'), { server: 'https://crossfire.example/', owner: '@owner:example' });
+  assert.throws(() => connectionSetup(state), /Invalid project connection setup/);
+});
+
+test('approved project settings preserve their canonical shape across reconnect and adapter selection', () => {
+  const directory = project(), state = join(directory, '.crossfire/state/charlie');
+  const original = { runtime: 'codex', approvalRoom: '!approval:example' };
+  writeJson(join(state, 'settings.json'), original);
+  const codex = listenerSettings(state);
+  assert.equal(codex.runtime, 'codex');
+  assert.equal(codex.approvalRoom, original.approvalRoom);
+  codex.save();
+  assert.deepEqual(readJson(join(state, 'settings.json')), original);
+  assert.equal(connectionSetup(state).value, undefined);
+  const claude = listenerSettings(state, 'claude');
+  assert.equal(claude.approvalRoom, null);
+  claude.save();
+  assert.deepEqual(readJson(join(state, 'settings.json')), { runtime: 'claude', approvalRoom: null });
 });
 
 test('Claude project hooks are private, idempotent and preserve unrelated native configuration', () => {

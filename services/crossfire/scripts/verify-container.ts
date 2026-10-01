@@ -180,20 +180,17 @@ try {
         await expect(instructions).toBeVisible();
         const copied = await instructions.inputValue();
         const setupUrl = onboardingUrl(origin, '@admin:verification.localhost');
-        assert.equal(copied, [
-          'Connect this project to Crossfire for @admin:verification.localhost.',
-          'Follow the setup guide: ' + setupUrl,
-          'Reuse the existing project identity; if none exists, ask me for a name. Show me any approval link and code.',
-          ...(iteration === 1 ? ['', 'Additional instructions from the system administrator:', additionalInstructions] : []),
-        ].join('\n'));
+        assert.equal(copied, 'Follow the setup instructions at ' + setupUrl + '.');
         const guide = await fetch(setupUrl);
         assert.equal(guide.status, 200);
-        assert((await guide.text()).includes(origin + '/onboarding/' + health.release + '/crossfire-client.mjs'));
+        const guideText = await guide.text();
+        assert(guideText.includes(origin + '/onboarding/' + health.release + '/crossfire-client.mjs'));
         assert(!copied.includes(secrets.administratorPassword));
-        assert.equal(copied.includes(additionalInstructions), iteration === 1);
+        assert(!copied.includes(additionalInstructions));
+        assert.equal(guideText.includes(additionalInstructions), iteration === 1);
         await context.grantPermissions(['clipboard-read', 'clipboard-write']);
         await page.getByRole('button', { name: 'Copy instructions', exact: true }).click();
-        await expect(page.getByRole('region', { name: 'Paste into your coding agent' }).getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
+        await expect(page.locator('.copy-text').getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
         assert.equal(await page.evaluate<string>('navigator.clipboard.readText()'), copied);
         await page.screenshot({ path: join(directory, 'connect-' + iteration + '.png'), fullPage: true });
         await page.goto(origin + '/manage/policy');

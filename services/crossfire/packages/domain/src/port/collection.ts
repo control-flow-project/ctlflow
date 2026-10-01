@@ -36,7 +36,7 @@ export type CollectionRepository = {
   rolePermissions(input: { roleCode: string }): Result<RolePermission[]>;
   enrollments(input: PageRequest & { ownerId?: string }): Result<Page<EnrollmentRequest>>;
   fleets(input: PageRequest & { ownerId?: string; search?: string }): Result<Page<Fleet>>;
-  invitations(input: PageRequest): Result<Page<MemberInvitation>>;
+  invitations(input: PageRequest & { createdByMemberId?: string }): Result<Page<MemberInvitation>>;
   audits(input: PageRequest & { ownerId?: string }): Result<Page<AuditEvent>>;
   pendingEnrollmentCount(ownerId?: string): Result<number>;
   pendingIdentityCount(ownerId?: string): Result<number>;

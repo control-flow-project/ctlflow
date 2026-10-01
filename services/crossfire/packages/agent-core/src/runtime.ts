@@ -6,6 +6,7 @@ export type TurnControl = {
 export type RuntimeConnection = {
   sessionId: string;
   signal: AbortSignal;
+  inspect: () => Promise<{ busy: boolean }>;
   deliver: (text: string, messageId: string, cancelled?: AbortSignal) => Promise<void>;
   settle: () => Promise<boolean>;
   acknowledge: (messageIds: readonly string[]) => void;

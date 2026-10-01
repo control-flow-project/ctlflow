@@ -8,6 +8,7 @@ import type { ReceivedEvent } from './receive.js';
 import type { Permission } from './runtime.js';
 
 import type { Coordination } from './coordination.js';
+import { LISTENER_NOTICE } from '@crossfire/contracts/notices';
 
 type Pending = {
   request: string; session: string; expires: number; choices: Permission['choices'];
@@ -88,8 +89,9 @@ export function permissions(options: { client: Matrix; coordination: Coordinatio
         request: permission.request, action: permission.action, scope: permission.scope,
         choices: permission.choices }, null, 2).split('\n').map(line => '    ' + line).join('\n');
       const sent = await options.client.put<{ event_id: string }>(base + '/send/m.room.message/' + randomUUID(),
-        options.client.message('**Permission needed.** Reply to this exact message with one choice. Silence is not approval.\n\n'
-          + description + '\n\nChoices: ' + permission.choices.map(choice => '`' + choice.label + '`').join(', ')));
+        { ...options.client.message('**Permission needed.** Reply to this exact message with one choice. Silence is not approval.\n\n'
+          + description + '\n\nChoices: ' + permission.choices.map(choice => '`' + choice.label + '`').join(', ')),
+          msgtype: 'm.notice', [LISTENER_NOTICE]: true });
       if (!text(sent.event_id, 255) || !sent.event_id.startsWith('$')) throw new Error('Invalid permission announcement identity');
       eventId = sent.event_id;
       signal.throwIfAborted();

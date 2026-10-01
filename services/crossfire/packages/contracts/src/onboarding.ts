@@ -1,57 +1,56 @@
 import type { Manifest } from './release.js';
 
 function quote(value: string): string { return "'" + value.replaceAll("'", "'\\''") + "'"; }
-
 export function onboardingUrl(origin: string, owner: string): string {
   return origin + '/onboarding/setup?ownerMatrixId=' + encodeURIComponent(owner);
 }
-
-export function onboardingGuide(origin: string, owner: string, release: Manifest): string {
+export function onboardingGuide(origin: string, owner: string, release: Manifest, instructions = ''): string {
   return [
-    '# Connect this project to Crossfire',
+    '# Connect your current coding session to Crossfire',
     '',
-    'Server: ' + origin,
-    'Owner: ' + owner,
+    'Crossfire lets people chat with this agent through Matrix. This guide connects the current coding session, not a new agent engine. The listener handles delivery, wake rules and activity reporting in ordinary code.',
+    'Server: ' + origin, 'Owner requested for this setup: ' + owner,
     '',
-    'Crossfire delivers authorized Matrix messages into this existing coding session through a project-local listener. It does not create another agent or change your model/permissions. Supported individual runtimes are Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+. Requires Linux, Node.js 26+, Git, Bash, curl and sha256sum. Native connection details stay private; never request ports, session IDs, tokens or Matrix passwords.',
+    '## 1. Check this project and prerequisites',
+    'Work in the project directory selected by the human. Support: Linux or macOS, Node.js 26+, Git, Bash and curl. Supported individual runtimes: Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+. Inspect this trusted server’s client before running it. Never ask for Matrix passwords, administrator credentials, ports, UUIDs or tokens.',
+    'Check node --version, git --version, curl --version and the current runtime’s version. If a prerequisite is missing, explain what is needed and help install it within the human’s normal permission policy. Official installers: https://nodejs.org/en/download ; https://git-scm.com/downloads ; https://curl.se/download.html ; https://developers.openai.com/codex/cli ; https://code.claude.com/docs/en/setup ; https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent . Do not silently use sudo, change system settings or install global skills.',
+    'Codex’s native local app-server socket and tool-provided thread identity select this exact session automatically. The optional runcodex.sh download is NOT required. Embedded / --no-daemon sessions expose no app-server connection: explain the limitation and ask the human to reopen/resume their saved session in normal app-server-backed Codex. Native daemon start is codex app-server daemon start; never silently launch a second engine or guess another session.',
+    'Claude Code supplies its native peer connection automatically. Project-local hooks capture its exact history without channels opt-in, a launcher or a restart. Pi requires project trust and a verified project extension. For first Pi setup, set CROSSFIRE_RUNTIME=pi before the command below. Do not use Codex startup instructions for Claude Code or Pi.',
+    'Codex and Pi clients use Linux or macOS. This Claude Code adapter requires Linux native process-birth verification. Native Linux tests do not certify untested macOS or paid-provider behavior.',
     '',
-    'Codex uses its existing launcher-provided app-server context. Claude Code supplies its native peer connection automatically; no channels flag, launcher or restart is required. For Pi first setup, set CROSSFIRE_RUNTIME=pi before the command below. Pi must trust this project and load its verified project extension with /reload once. Do not use Codex startup instructions for Claude Code or Pi.',
+    '## 2. Connect or reuse the saved account',
+    'The client stores an approved Matrix account privately under this project’s Git-ignored .crossfire/profiles directory. That saved account is the agent’s identity. Runtime settings and temporary setup choices are also private. The client discovers and reuses the account for reconnects and upgrades. Do not propose a second identity.',
+    'Only when the client reports that no profile exists, ask what to call the agent. Set CROSSFIRE_AGENT_NAME to a lowercase name using letters, digits and hyphens, then rerun. If several profiles exist, ask which one to use. Do not ask the human to find technical connection details.',
+    'Inspect and run the following Bash command. Size and SHA-256 verify the downloaded bytes against this server, not an independent publisher identity.',
+    '', '```bash', onboardingCommand(origin, owner, release), '```', '',
+    'A runtime-setup-required result is not a connected listener. Let Claude’s successful installation command finish so native settings reload can activate its project hooks. The next Bash tool call captures exact native context; run agent connect again without repeating the name, server or owner. Pi first activation requires /reload, then the same option-free connect command. Pi native-module updates also require /reload; files are never silently hot-loaded.',
+    'If awaiting approval, show the exact approval URL and verification code immediately while the command continues waiting. A new account requires human approval once. The command resumes automatically after approval; never model-poll or start a separate listener.',
+    'Read changed skill content returned in the command output. Approval alone grants no rooms. The owner controls room access separately; zero rooms is a valid connected state. Never join rooms without an explicit grant.',
     '',
-    'Reuse the project identity. Only if none exists, ask for a lowercase name (letters, digits, hyphens) and set CROSSFIRE_AGENT_NAME. If several identities exist, ask which one and set that name. Do not create another identity for reconnects or upgrades.',
-    '',
-    'Inspect and run this Bash command. It verifies the bootstrap client and installs or updates private, Git-ignored project files. Hashes from this server verify bytes, not independent publisher identity.',
-    '',
-    '```bash',
-    onboardingCommand(origin, owner, release),
-    '```',
-    '',
-    'Read any changed skill returned in command output. If awaiting-approval, give the human the exact URL and code while the command continues waiting. Approval continues connection automatically; do not model-poll or start a separate listener. The owner chooses rooms in management; approval alone grants none.',
-    '',
-    'A runtime-setup-required result is not a connected listener. For Claude Code, let the successful installation command finish so native settings reload can activate the project hooks. A subsequent Bash tool call captures the exact native context; run agent connect again in that session without choosing another identity. For Pi, explain the one-time /reload activation to the user, then reconnect the same project identity. New Pi integration code also requires /reload on an upgrade; the native extension is never silently hot-replaced.',
-    '',
-    'Success is a ready listener, not just saved credentials. Later reconnects and upgrades use `node .crossfire/client.mjs agent connect`; no re-enrollment is needed.',
+    '## 3. Test the actual listener',
+    'Run node .crossfire/client.mjs agent test. It tests the live listener, exact native session, authenticated server access and granted/joined rooms without sending a model prompt. No listener, stale credentials or a closed session is a failed test, not a successful connection. Zero rooms is reported separately: it cannot receive room tasks yet.',
+    'Give the human the connection/test result and management URL. Later reconnects or approved upgrades use node .crossfire/client.mjs agent connect. No new enrollment is needed.',
+    'If the listener announces a new release, ask the human whether to update. Only after consent, run connect again and read any changed skill from its output. A running listener is never silently replaced.',
+    ...(instructions ? ['', '## Additional instructions from the system administrator', instructions] : []),
     '',
   ].join('\n');
 }
-
 export function onboardingCommand(origin: string, owner: string, release: Manifest): string {
   const client = release.artifacts['crossfire-client.mjs'];
   return [
-    'set -eu',
-    'umask 077',
+    'set -eu', 'umask 077',
+    'command -v node >/dev/null || { printf "%s\\n" "Install Node.js 26+: https://nodejs.org/en/download" >&2; exit 1; }',
+    'node -e \'if(Number(process.versions.node.split(".")[0]) < 26) { console.error("Install Node.js 26+: https://nodejs.org/en/download"); process.exit(1); }\'',
+    'command -v git >/dev/null || { printf "%s\\n" "Install Git: https://git-scm.com/downloads" >&2; exit 1; }',
     'options=()',
     'if [ -n "${CROSSFIRE_AGENT_NAME:-}" ]; then options=(--profile "$CROSSFIRE_AGENT_NAME"); fi',
-    'if [ -n "${CROSSFIRE_RUNTIME:-}" ]; then options+=(--runtime "$CROSSFIRE_RUNTIME"); fi',
-    'if [ -L .crossfire/client.mjs ]; then',
-    '  client="$PWD/.crossfire/client.mjs"',
-    'else',
-    '  temporary=$(mktemp -d)',
-    '  trap \'rm -f -- "$temporary/crossfire-client.mjs"; rmdir -- "$temporary"\' EXIT',
-    '  client="$temporary/crossfire-client.mjs"',
-    '  curl --fail --silent --show-error --max-time 30 --max-filesize ' + client.bytes + ' --output "$client" ' + quote(origin + '/onboarding/' + release.release + '/crossfire-client.mjs'),
-    '  test "$(wc -c < "$client")" -eq ' + client.bytes,
-    '  printf \'%s  %s\\n\' ' + quote(client.sha256) + ' "$client" | sha256sum --check --status',
-    'fi',
-    'node "$client" --project "$PWD" "${options[@]}" agent connect --server ' + quote(origin) + ' --owner ' + quote(owner),
+    'if [ -n "${CROSSFIRE_RUNTIME:-}" ]; then options+=("--runtime" "$CROSSFIRE_RUNTIME"); fi',
+    'command -v curl >/dev/null || { printf "%s\\n" "Install curl: https://curl.se/download.html" >&2; exit 1; }',
+    'temporary=$(mktemp -d "${TMPDIR:-/tmp}/crossfire-setup.XXXXXX")',
+    'trap \'rm -f -- "$temporary/crossfire-client.mjs"; rmdir -- "$temporary"\' EXIT',
+    'client="$temporary/crossfire-client.mjs"',
+    'curl --fail --silent --show-error --max-time 30 --max-filesize ' + client.bytes + ' --output "$client" ' + quote(origin + '/onboarding/' + release.release + '/crossfire-client.mjs'),
+    'node --input-type=module -e \'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; const bytes=readFileSync(process.argv[1]); if(bytes.length !== Number(process.argv[2]) || createHash("sha256").update(bytes).digest("hex") !== process.argv[3]) throw new Error("Crossfire download verification failed");\' "$client" ' + client.bytes + ' ' + quote(client.sha256),
+    'node "$client" --project "$PWD" ${options[@]+"${options[@]}"} agent connect --server ' + quote(origin) + ' --owner ' + quote(owner),
   ].join('\n');
 }

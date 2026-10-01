@@ -22,7 +22,10 @@ test("management core applies and verifies direct native authority", { timeout: 
   const fixture = await nativeApplication(scope), { services, admin } = fixture;
   const owner = await fixture.member('alice'), ownerId = owner.member.principal.matrixUserId;
   await scope.test("human invitation creates one native identity without storing a password", async () => {
-    assert.deepEqual(value(await acceptMemberInvitation(services, owner.invitation.invitationId, owner.input, randomUUID())), owner.accepted);
+    const resumed = value(await acceptMemberInvitation(services, owner.invitation.invitationId, owner.input, randomUUID(), 'RECOVERED_ELEMENT_DEVICE'));
+    assert.equal(resumed.memberId, owner.accepted.memberId);
+    assert.equal(resumed.account.userId, owner.accepted.account.userId);
+    assert.equal(value(await services.matrix.identify(resumed.account.accessToken)), ownerId);
     assert(!JSON.stringify(value(services.repositories.memberInvitation.find({ id: owner.invitation.invitationId }))).includes(owner.input.password));
     assert.deepEqual(value(await nativeOk({ base: fixture.native.base, token: owner.token }, "GET", API + "/joined_rooms")).joined_rooms, []);
   });

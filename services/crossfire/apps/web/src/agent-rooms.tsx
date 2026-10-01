@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AgentView, RoomView, RoomGrantView } from '@crossfire/contracts/schema/response';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
-import { Alert, Loaded, Page, Panel, Status, timestamp } from './ui.js';
+import { Alert, Loaded, Page, Panel, Pagination, PageItems, Status, timestamp } from './ui.js';
 
 const labels = { none: 'No access', read: 'Read only', reply: 'Read & reply', custom: 'Custom power level' } as const;
 function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; view?: RoomGrantView }) {
@@ -42,7 +42,7 @@ export function AgentRooms({ agent }: { agent: AgentView }) {
     <Loaded {...rooms} retry={rooms.refresh}>{found => <>
       <RoomAssignments agent={agent} rooms={found.data}/>
       {!found.data.length && <p>No matching rooms. Join or create a room in Element, then refresh.</p>}
-      <div className="pagination"><button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button><span>Page {page}</span><button disabled={page >= (found.meta.totalPages ?? 0)} onClick={() => setPage(page + 1)}>Next</button></div>
+      <Pagination meta={{ page, totalPages: found.meta.totalPages ?? 1, totalItems: found.meta.totalItems ?? 0 }} onPage={setPage}/>
     </>}</Loaded></Panel>;
 }
 function RoomAssignments({ agent, rooms }: { agent: AgentView; rooms: RoomView[] }) {
@@ -73,7 +73,7 @@ export function AgentRoomDetail({ id, room }: { id: string; room: string }) {
     <Loaded {...agent} retry={agent.refresh}>{identity => <Loaded {...resource} retry={resource.refresh}>{native => <Loaded {...grant} retry={grant.refresh}>{access => <>
       <Panel title={native.data.name}><p className="mono">{room}</p><p>{native.data.topic}</p><GrantEditor agent={identity.data} room={native.data} view={access.data}/><AppliedGrant view={access.data}/><p>Last applied: {timestamp(access.data.application?.lastSuccessAt ?? null)}</p></Panel>
       <Panel title="Agent invitations"><Delegation view={access.data} roomId={room}/></Panel>
-      <Panel title="Native Matrix permissions"><Authority room={native.data}/><div className="table-wrap"><table><thead><tr><th>Action</th><th>Required power</th></tr></thead><tbody>
-        {native.data.authority?.nativePermissions.map(permission => <tr key={permission.action}><td>{permission.action}</td><td>{permission.level}</td></tr>)}</tbody></table></div></Panel>
+      <Panel title="Native Matrix permissions"><Authority room={native.data}/><PageItems items={native.data.authority?.nativePermissions ?? []} parameter="permissionsPage">{permissions => <div className="table-wrap"><table><thead><tr><th>Action</th><th>Required power</th></tr></thead><tbody>
+        {permissions.map(permission => <tr key={permission.action}><td>{permission.action}</td><td>{permission.level}</td></tr>)}</tbody></table></div>}</PageItems></Panel>
     </>}</Loaded>}</Loaded>}</Loaded></Page>;
 }

@@ -44,6 +44,7 @@ for (const forced of [false, true]) test('stock Claude confirms native input and
   assert.equal(discovered.session, context.CLAUDE_CODE_SESSION_ID);
   const connection = await connectClaude(readJson<ClaudeContext>(descriptor), { journal: join(directory, 'receipt.json'), pollMs: 100, timeoutMs: 100 }, stop.signal);
   scope.after(() => connection.close());
+  assert.equal((await connection.inspect()).busy, true, 'Native busy inspection does not depend on interruption support');
   let delivered = false;
   const accepted = connection.deliver('Crossfire fixture input.\nSecond line.', 'fixture-input').then(() => { delivered = true; });
   await new Promise<void>(resolve => setTimeout(resolve, 250));

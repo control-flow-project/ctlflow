@@ -6,6 +6,7 @@ import { recordEvent } from '../audit/record-event.js';
 
 export function changeMember(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock'>,
   actor: Actor, memberId: string, input: { expectedRevision: number; status?: Principal['status']; displayName?: string; roleCode?: 'member' | 'administrator' }, requestId: string) {
+  if (input.displayName !== undefined && (!input.displayName || input.displayName.length > 100 || /[\u0000-\u001f\u007f]/u.test(input.displayName))) return failure('invalid', 'Member names must contain 1–100 characters without control characters');
   return services.unitOfWork.run(() => {
     const authority = authorize(services, actor, 'member.manage');
     if (!authority.ok) return authority;
