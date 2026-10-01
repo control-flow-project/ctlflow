@@ -3,6 +3,7 @@ import type { Services } from '../port/services.js';
 import type { EnrollmentRoster } from './input.js';
 import { authenticateController } from '../fleet/authority.js';
 import { validateRoster } from './input.js';
+import { enrollmentCapacity } from './capacity.js';
 
 export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; revision: number }[] };
 export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
@@ -59,11 +60,11 @@ export async function preflightEnrollment(services: Pick<Services, 'repositories
     }
   }
   if (collisions.length) return failure('name_collision', 'Name collision: ' + collisions.join(', '));
-  const policy = services.repositories.instancePolicy.find({ id: 'instance' });
-  const active = services.directory.activeAgentCount(), owned = services.directory.activeAgentCount(verified.value.ownerId);
-  const pending = services.collection.pendingIdentityCount(), ownedPending = services.collection.pendingIdentityCount(verified.value.ownerId);
-  if (!policy.ok) return policy; if (!active.ok) return active; if (!owned.ok) return owned; if (!pending.ok) return pending; if (!ownedPending.ok) return ownedPending;
+  const capacity = enrollmentCapacity(services, verified.value.ownerId);
+  if (!capacity.ok) return capacity;
   const additional = input.instances.length - verified.value.existing.length;
-  if (!policy.value || active.value + pending.value + additional > policy.value.maxAgents || owned.value + ownedPending.value + additional > policy.value.maxOwnerAgents) return failure('capacity', 'Agent capacity is insufficient; ask the administrator to adjust instance limits');
+  if (additional > capacity.value.remaining) return failure('capacity', 'Enrollment needs ' + additional + ' new agents; owner capacity is '
+    + capacity.value.ownerCount + '/' + capacity.value.ownerLimit + ' and instance capacity is '
+    + capacity.value.instanceCount + '/' + capacity.value.policy.maxAgents + '. Ask an administrator to adjust the applicable limits.');
   return success({ available: true, instances: input.instances.length });
 }

@@ -6,6 +6,7 @@ import { bindRoster } from '../fleet/bind-roster.js';
 import { verifyRoster } from './preflight.js';
 import { expireEnrollments } from './expire.js';
 import type { EnrollmentRequest, EnrollmentItem } from './types.js';
+import { enrollmentCapacity } from './capacity.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'unitOfWork' | 'identity' | 'clock'>;
 export type EnrollmentReceipt = { request: EnrollmentRequest; instances: EnrollmentItem[] };
@@ -40,21 +41,18 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       if (!principal.ok) return principal;
       if (!principal.value || principal.value.status !== 'active' || principal.value.revision !== item.revision) return failure('conflict', 'Existing agent authority changed');
     }
-    const policy = services.repositories.instancePolicy.find({ id: 'instance' });
-    if (!policy.ok) return policy;
-    if (!policy.value) return failure('unavailable', 'Instance is not initialized');
+    const capacity = enrollmentCapacity(services, owner.value.id);
+    if (!capacity.ok) return capacity;
+    const policy = capacity.value.policy;
     const pendingRequests = services.collection.pendingEnrollmentCount();
     if (!pendingRequests.ok) return pendingRequests;
-    if (pendingRequests.value >= policy.value.maxPending) return failure('limit', 'Pending enrollment capacity reached');
-    const active = services.directory.activeAgentCount(), owned = services.directory.activeAgentCount(owner.value.id);
-    const pending = services.collection.pendingIdentityCount(), ownedPending = services.collection.pendingIdentityCount(owner.value.id);
-    if (!active.ok) return active; if (!owned.ok) return owned; if (!pending.ok) return pending; if (!ownedPending.ok) return ownedPending;
-    let remaining = Math.min(policy.value.maxAgents - active.value - pending.value, policy.value.maxOwnerAgents - owned.value - ownedPending.value);
+    if (pendingRequests.value >= policy.maxPending) return failure('limit', 'Pending enrollment capacity reached');
+    let remaining = capacity.value.remaining;
     const now = services.clock.now();
     const request: EnrollmentRequest = { controllerName: input.controller?.name ?? null,
       controllerCredentialHash: input.controller ? services.identity.hash(controllerToken(services, input.enrollmentId, input.claimSecret)) : null, id: input.enrollmentId, ownerId: owner.value.id, fleetKey: input.fleetKey,
       verificationCode: services.identity.verificationCode(), claimHash: services.identity.hash(input.claimSecret), rosterDigest,
-      status: 'pending', revision: 0, createdAt: now, expiresAt: now + policy.value.enrollmentSeconds * 1000, decidedByMemberId: null, decidedAt: null };
+      status: 'pending', revision: 0, createdAt: now, expiresAt: now + policy.enrollmentSeconds * 1000, decidedByMemberId: null, decidedAt: null };
     const saved = services.repositories.enrollmentRequest.insert(request);
     if (!saved.ok) return saved;
     for (const [key, value] of Object.entries(input.controller?.metadata ?? {})) {

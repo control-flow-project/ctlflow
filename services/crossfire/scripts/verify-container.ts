@@ -194,12 +194,13 @@ try {
         assert.equal(await page.evaluate<string>('navigator.clipboard.readText()'), copied);
         await page.screenshot({ path: join(directory, 'connect-' + iteration + '.png'), fullPage: true });
         await page.goto(origin + '/manage/policy');
+        await expect(page.getByText('Members use the per-owner limit.', { exact: false })).toContainText('defaults to 100 agents');
         if (iteration === 0) {
-          await page.getByLabel('Agents per owner').fill('9');
+          await page.getByLabel('Agents per member owner').fill('9');
           await page.getByLabel('Additional agent instructions', { exact: true }).fill(additionalInstructions);
           await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save settings' }).click()]);
         }
-        await expect(page.getByLabel('Agents per owner')).toHaveValue('9');
+        await expect(page.getByLabel('Agents per member owner')).toHaveValue('9');
         await expect(page.getByLabel('Additional agent instructions', { exact: true })).toHaveValue(additionalInstructions);
         await page.screenshot({ path: join(directory, 'management-' + iteration + '.png') });
         assert.deepEqual(errors, []);

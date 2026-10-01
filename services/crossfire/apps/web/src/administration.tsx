@@ -43,7 +43,7 @@ export function Invitations() {
 function PolicyForm({ initial }: { initial: PolicyView }) {
   const viewer = useSession(), [value, setValue] = useState(initial), action = useAction();
   const fields: { key: keyof typeof POLICY_LIMITS; label: string }[] = [
-    { key: 'maxOwnerAgents', label: 'Agents per owner' }, { key: 'maxAgents', label: 'Agents across this instance' },
+    { key: 'maxOwnerAgents', label: 'Agents per member owner' }, { key: 'maxAgents', label: 'Agents across this instance' },
     { key: 'maxPending', label: 'Pending enrollment requests' }, { key: 'enrollmentSeconds', label: 'Enrollment lifetime (seconds)' },
     { key: 'reconcileSeconds', label: 'Permission reconciliation (seconds)' },
   ];
@@ -52,7 +52,7 @@ function PolicyForm({ initial }: { initial: PolicyView }) {
     <Panel title="Signup & invitations"><div className="bounded-form"><Field label="Who can sign up?">{id => <select id={id} value={value.signupMode} onChange={event => setValue({ ...value, signupMode: event.target.value === 'open' ? 'open' : 'invitation' })}><option value="invitation">Invitation links only</option><option value="open">Anyone · open Element signup</option></select>}</Field>
       <Field label="Who can invite members?">{id => <select id={id} value={value.invitationIssuers} onChange={event => setValue({ ...value, invitationIssuers: event.target.value === 'members' ? 'members' : 'administrators' })}><option value="administrators">Administrators only</option><option value="members">Administrators and members</option></select>}</Field>
       <p className="support">Invited people complete normal signup in Element. Members can invite members, never administrators. Signup policy is enforced by the server, not just this page.</p></div></Panel>
-    <Panel title="Instance limits"><div className="bounded-form">{fields.map(field => <label key={field.key}>{field.label}<input type="number" min={POLICY_LIMITS[field.key].min} max={POLICY_LIMITS[field.key].max} required disabled={action.pending} value={value[field.key]} onChange={event => setValue({ ...value, [field.key]: Number(event.target.value) })}/></label>)}</div></Panel>
+    <Panel title="Instance limits"><p className="support">Members use the per-owner limit. Administrators have no separate owner limit and use the instance capacity, which defaults to 100 agents. Active agents and pending identity reservations count toward capacity.</p><div className="bounded-form">{fields.map(field => <label key={field.key}>{field.label}<input type="number" min={POLICY_LIMITS[field.key].min} max={POLICY_LIMITS[field.key].max} required disabled={action.pending} value={value[field.key]} onChange={event => setValue({ ...value, [field.key]: Number(event.target.value) })}/></label>)}</div></Panel>
     <Panel title="Agent onboarding instructions"><div className="bounded-form"><p>Additional instance-wide guidance. Only system administrators can change it.</p>
       <Field label="Additional agent instructions">{id => <textarea id={id} rows={8} disabled={action.pending} value={value.agentInstructions} onChange={event => setValue({ ...value, agentInstructions: event.target.value })}/>}</Field>
       <p className="support">{instructionBytes} / {AGENT_INSTRUCTIONS_MAX_BYTES} UTF-8 bytes. Plain text only; no secrets. Included in the personalized agent setup guide.</p>
