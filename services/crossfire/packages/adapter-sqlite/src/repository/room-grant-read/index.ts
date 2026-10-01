@@ -10,6 +10,15 @@ import { mapAgentRoomPermission } from '../agent-room-permission/map.js';
 import { mapRoomGrantApplication } from '../room-grant-application/map.js';
 export function createRoomGrantReadRepository(database: Database.Database): RoomGrantReadRepository {
   return {
+    forAgents(agentIds) {
+      return stored(() => {
+        const grants = executeSelect(database, schema, (query, params) => query.from('agent_room_grant')
+          .where(row => params.agentIds.includes(row.agent_id)).orderBy(row => row.agent_id).thenBy(row => row.room_id), { agentIds }).map(mapAgentRoomGrant);
+        const applications = executeSelect(database, schema, (query, params) => query.from('room_grant_application')
+          .where(row => params.agentIds.includes(row.agent_id)).orderBy(row => row.agent_id).thenBy(row => row.room_id), { agentIds }).map(mapRoomGrantApplication);
+        return success({ grants, applications });
+      });
+    },
     page(agentId, input) {
       return stored(() => {
         const parameters = { agentId, offset: (input.page - 1) * input.pageSize, limit: input.pageSize, filterRooms: input.roomIds !== undefined, roomIds: input.roomIds ?? [] };

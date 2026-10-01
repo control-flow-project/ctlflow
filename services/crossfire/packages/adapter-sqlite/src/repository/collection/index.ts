@@ -48,6 +48,11 @@ export function createCollectionRepository(database: Database.Database): Collect
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('agent_wake_sender')
         .where(row => row.agent_id === params.agentId).orderBy(row => row.sender_principal_id), input).map(mapAgentWakeSender)));
     },
+    wakeSendersForAgents(agentIds) {
+      return stored(() => success(executeSelect(database, schema, (query, params) => query.from('agent_wake_sender')
+        .where(row => params.agentIds.includes(row.agent_id)).orderBy(row => row.agent_id).thenBy(row => row.sender_principal_id),
+        { agentIds }).map(mapAgentWakeSender)));
+    },
     listenerRuns(input) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('listener_run')
         .where(row => row.agent_id === params.agentId).orderBy(row => row.id), input).map(mapListenerRun)));

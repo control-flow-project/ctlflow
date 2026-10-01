@@ -14,7 +14,7 @@ for (const directory of ['apps', 'tests', 'scripts']) {
   const base = join(root, directory);
   if (!existsSync(base)) continue;
   for (const file of readdirSync(base, { recursive: true })) {
-    if (!file.endsWith('.ts') || file.endsWith('.d.ts') || file.startsWith('web/') || (file.startsWith('architecture-proof/') && file.endsWith('.test.ts')) || file === 'verify-architecture.ts') continue;
+    if (!file.endsWith('.ts') || file.endsWith('.d.ts') || (file.startsWith('architecture-proof/') && file.endsWith('.test.ts')) || file === 'verify-architecture.ts') continue;
     entries.push(join(base, file));
   }
 }

@@ -10,6 +10,7 @@ import { Alert, Empty, Field, Loaded, Page, Panel, Pagination, PageItems, Status
 import { OwnerFilter } from './agent-filters.js';
 import { filterQuery } from './form.js';
 import { FleetDelivery } from './fleet-control.js';
+import { FleetNavigation } from './fleet-navigation.js';
 
 export function Fleets() {
   const viewer = useSession(), resource = useResource(operations.fleets, {}, location.search, 5000);
@@ -56,6 +57,7 @@ function FleetSettings({ fleet }: { fleet: FleetView }) {
 export function FleetDetail({ id }: { id: string }) {
   const resource = useResource(operations.fleet, { fleetId: id }, '', 5000), agents = useResource(operations.fleetAgents, { fleetId: id }, pagingQuery(), 5000);
   return <Page title="Fleet details" description="Controller, agents and room access."><a className="back" href="/manage/fleets">← Fleets</a>
+    <FleetNavigation id={id}/>
     <Loaded {...resource} retry={resource.refresh}>{result => <><FleetDelivery fleet={result.data}/><FleetSettings fleet={result.data}/><Panel title="Agents"><Loaded {...agents} retry={agents.refresh}>{page => <>
       {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>
         <tr key={instance.instanceKey}><td><a href={'/manage/agents/' + instance.agent.agentId}>{instance.agent.displayName}</a></td><td>{instance.instanceKey}</td><td><Status value={instance.agent.activity.status}/></td><td><Status value={instance.agent.status}/></td></tr>)}</tbody></table></div>

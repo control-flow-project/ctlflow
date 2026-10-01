@@ -1,10 +1,13 @@
 import { operations } from '@crossfire/contracts/rest/operations';
+import { readFleetMap } from '@crossfire/domain/fleet/read-map';
+import { fleetMap } from '../representation/fleet-map.js';
 import { changeFleetDelivery, reportFleetConnection } from '@crossfire/domain/fleet/control';
 import { createFleetMessage, listFleetMessages, readFleetControl, acknowledgeFleetMessage } from '@crossfire/domain/fleet/message';
-import { bind, fleetActor, paged, reply } from '../bind.js';
+import { bind, actor, fleetActor, paged, reply } from '../bind.js';
 
 export function fleetRoutes() {
   return [
+    bind(operations.fleetMap, async (context, params) => reply(await readFleetMap(context.services, actor(context), params.fleetId), fleetMap)),
     bind(operations.changeFleetDelivery, (context, params, _query, input) => reply(changeFleetDelivery(context.services, fleetActor(context), params.fleetId, input, context.requestId))),
     bind(operations.reportFleetConnection, (context, params, _query, input) => reply(reportFleetConnection(context.services, fleetActor(context), params.fleetId, params.connectionId, input.stopped))),
     bind(operations.fleetControl, async (context, params, query) => {

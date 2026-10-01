@@ -13,6 +13,11 @@ import { createFleetControlConnection } from '@crossfire/adapter-crossfire/fleet
 import { API } from '@crossfire/contracts/matrix';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
 import { checkPaperLayout } from './support/browser-layout.js';
+import { mapFleet } from './support/map-fleet.js';
+import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
+import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
+import { reportListener } from '@crossfire/domain/listener/report';
+import { WAKE_POLICIES, WAKE_LABELS } from '@crossfire/contracts/wake';
 
 test('browser fleet review, room-plan confirmation, invitation delegation and selected wake identities share canonical APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
@@ -146,5 +151,91 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await checkPaperLayout(page);
   assert.equal(value(services.directory.agent(alpha.agentId))!.principal.status, 'active');
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: alpha.agentId, roomId }))!.accessMode, 'reply');
+  assert.deepEqual(errors, []);
+});
+
+test('browser fleet connection map uses management theme, full roster, adaptive geometry and durable accessible selection', { timeout: 120000 }, async scope => {
+  const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
+  const { fleet, instances } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
+  const other = await fixture.member('map-visitor');
+  const roomIds: string[] = [];
+  for (const name of ['Credit review', 'Covenant calculations', 'Downside risk', 'Document sources']) roomIds.push(value(await nativeOk(
+    { base: fixture.native.base, token: admin.token }, 'POST', API + '/createRoom', { name, preset: 'private_chat' })).room_id as string);
+  for (let index = 0; index < instances.length; index++) {
+    const id = instances[index]!.agentId!, principal = value(services.directory.agent(id))!.principal, mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
+    value(changeWakePolicy(services, admin.actor, id, { expectedRevision: principal.revision, mode, senderIds: mode === 'selected' ? [other.actor.principalId] : [] }, randomUUID()));
+    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { release: 'browser-map', messagesDelivered: 0, stopped: false }, 'browser-map'));
+    if (index >= 20) continue;
+    const record = value(services.directory.agent(id))!, modeIndex = index % 3;
+    value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId: roomIds[index % roomIds.length]!, expectedRevision: record.principal.revision,
+      expectedGeneration: null, accessMode: modeIndex === 0 ? 'read' : modeIndex === 1 ? 'reply' : 'custom', powerLevel: modeIndex === 2 ? 25 : null, muted: index % 5 === 0 }, randomUUID()));
+  }
+  await worker.drain();
+  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  scope.after(() => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1200 } });
+  await context.addCookies([{ name: 'crossfire', value: admin.secret, url: origin }]);
+  const page = await context.newPage(), errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const base = '/manage/fleets/' + fleet.id, route = base + '/map';
+  await page.goto(origin + base);
+  await page.getByRole('link', { name: 'Connection map', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Fleet map', exact: true })).toBeVisible();
+  await expect(page.locator('.map-node-agent')).toHaveCount(24);
+  await expect(page.locator('.map-node-room')).toHaveCount(4);
+  await expect(page.locator('.map-node-source')).toHaveCount(6);
+  await expect(page.locator('.map-edge')).toHaveCount(44);
+  await expect(page.locator('.map-toolbar')).toContainText('24 of 24 agents shown');
+  await checkPaperLayout(page);
+  assert.equal(await page.evaluate<string>("getComputedStyle(document.querySelector('.shell')).getPropertyValue('--accent').trim()"), '#2f5fe0');
+  const first = page.locator('[data-node="agent:' + instances[0]!.agentId + '"]');
+  await first.focus(); await first.press('ArrowRight');
+  assert.notEqual(await page.locator(':focus').getAttribute('data-node'), await first.getAttribute('data-node'));
+  await page.locator(':focus').press('Enter');
+  assert(new URL(page.url()).searchParams.get('node'));
+  await page.locator(':focus').press('Escape');
+  assert.equal(new URL(page.url()).searchParams.get('node'), null);
+  await first.click();
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  const details = page.getByRole('region', { name: 'Connection details', exact: true });
+  await expect(details.getByRole('link', { name: 'Agent details →', exact: true })).toHaveAttribute('href', '/manage/agents/' + instances[0]!.agentId);
+  await expect(details.getByRole('table', { name: 'Selected room connections' })).toContainText('Credit review');
+  await expect(details.getByRole('table', { name: 'Selected room connections' })).toContainText('Muted');
+  await expect(page.locator('.map-edge[data-highlighted=true]')).toHaveCount(2);
+  const savedUrl = page.url(); await page.reload(); await expect(first).toHaveAttribute('aria-pressed', 'true'); assert.equal(page.url(), savedUrl);
+  await page.getByRole('button', { name: 'Select source ' + WAKE_LABELS.everyone, exact: true }).click();
+  await expect(details.getByRole('table', { name: 'Wake-up identities' }).locator('tbody tr')).toHaveCount(20);
+  await details.getByRole('navigation', { name: 'Pagination', exact: true }).last().getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(details.getByRole('table', { name: 'Wake-up identities' }).locator('tbody tr')).toHaveCount(6);
+  await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+  await page.getByLabel('Search map').fill('map-worker-23'); await page.getByRole('button', { name: 'Apply search', exact: true }).click();
+  await expect(page.locator('.map-node-agent')).toHaveCount(1); await expect(page.locator('.map-node-room')).toHaveCount(0);
+  await expect(page.locator('.map-node-source small')).toHaveText('1 agent · 1 chosen');
+  await page.locator('.map-node-agent').click(); await expect(details.getByRole('heading', { name: 'No rooms', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reset filters', exact: true }).click(); await expect(page.locator('.map-node-agent')).toHaveCount(24);
+  await page.getByLabel('Listener status').selectOption('online'); await expect(page.locator('.map-node-agent')).toHaveCount(12);
+  await page.goBack(); await expect(page.locator('.map-node-agent')).toHaveCount(24);
+  await page.getByRole('button', { name: 'Refresh map', exact: true }).click(); await expect(page.locator('.map-node-agent')).toHaveCount(24);
+  const directory = mkdtempSync(join(process.cwd(), '.temp/fleet-map-browser-'));
+  for (const width of [1920, 1280, 390]) {
+    await page.setViewportSize({ width, height: 1100 }); await page.goto(origin + route);
+    await expect(page.locator('.map-node-agent')).toHaveCount(24); await expect(page.getByRole('alert')).toHaveCount(0); await checkPaperLayout(page);
+    const geometry = await page.locator('.map-node').evaluateAll(nodes => nodes.map(element => {
+      const rectangle = element.getBoundingClientRect(); return { left: rectangle.left, top: rectangle.top, right: rectangle.right, bottom: rectangle.bottom };
+    }));
+    for (let index = 0; index < geometry.length; index++) for (let otherIndex = index + 1; otherIndex < geometry.length; otherIndex++) {
+      const first = geometry[index]!, second = geometry[otherIndex]!;
+      assert(first.right <= second.left || second.right <= first.left || first.bottom <= second.top || second.bottom <= first.top, 'Map nodes do not overlap');
+    }
+    if (width === 390) {
+      await page.getByRole('button', { name: 'Select room Credit review', exact: true }).click();
+      await expect(details.getByRole('table', { name: 'Selected room connections' }).locator('tbody tr')).toHaveCount(5);
+    }
+    await page.screenshot({ path: join(directory, 'fleet-map-' + width + '.png'), fullPage: true });
+  }
+  const unauthorized = await browser.newContext(); scope.after(() => unauthorized.close());
+  await unauthorized.addCookies([{ name: 'crossfire', value: other.secret, url: origin }]);
+  const denied = await unauthorized.newPage(); await denied.goto(origin + route);
+  await expect(denied.getByRole('alert')).toBeVisible(); await expect(denied.locator('.map-node')).toHaveCount(0);
   assert.deepEqual(errors, []);
 });

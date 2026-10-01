@@ -1454,6 +1454,7 @@ ownership. The management website remains under `/manage`.
 | `POST /api/enrollments/{enrollmentId}/decision` | Owner approves/rejects; administrator may reject others' requests. |
 | `POST /api/enrollments/{enrollmentId}/exchange` | Private initiating claim obtains status/ready credentials. |
 | `GET /api/fleets`, `GET, PATCH, DELETE /api/fleets/{fleetId}`, `GET /api/fleets/{fleetId}/agents`, `PUT, DELETE /api/fleets/{fleetId}/agents/{agentId}` | Authorized durable fleet/instance views; not native process control. |
+| `GET /api/fleets/{fleetId}/map` | Human-authorized complete fleet topology: wake sources, agents, desired room access and last observed application. No controller access or mutation. |
 | `GET /api/agents`, `GET, PATCH /api/agents/{agentId}` | Scoped list/details and configuration/lifecycle changes. |
 | `GET, PUT /api/agents/{agentId}/wake-policy` | One complete mode/selected-sender configuration. |
 | `GET /api/agents/{agentId}/delivery-policy` | This authenticated agent's resolved native delivery policy. |
@@ -1509,6 +1510,26 @@ Paginated message history shows recipient outcomes without claiming model comple
 Each fleet's agents appear in a compact paginated table: linked agent name,
 instance key, listener status and account status. Agent details are reached through
 the name link; fleet rosters have no per-agent cards or duplicated detail controls.
+The fleet's separate `/manage/fleets/{fleetId}/map` view is a dense, flat connection
+graph: wake sources, packed agent nodes and shared room nodes. Its appearance uses
+only the shared management theme, independently of any deployed Element theme.
+The layout adapts to available content width, groups identical wake sources and
+orders connections deterministically. Selection and search are durable URL state.
+Keyboard/touch selection highlights connections and exposes agent/room detail
+links; a textual legend and explicit labels supplement colors and line styles.
+Agents without rooms remain visible. Desired access, muted delivery, pending or
+failed enforcement and last observed membership are distinct; neither a grant nor
+an online heartbeat proves a currently executing model turn. Allowed authors use
+the same active-principal wake resolver as listener delivery; inactive configured
+authors are not presented as eligible. Detail lists use shared pagination.
+The read-only projection uses batched normalized queries and one label resolution
+per distinct room, with at most four concurrent native reads. Unobservable room
+names are explicitly unavailable rather than invented. Authorization is checked
+before reads and again after asynchronous native labels. Snapshots are bounded to
+1,000 agents, 10,000 room relationships and 2,000 rooms/principals; an oversized
+snapshot fails explicitly, never returns a partial graph. The graph refreshes
+every 30 seconds and on request, with capture time and refresh errors visible.
+This view adds no domain tables, permission editor, telemetry or model calls.
 Selected-author responses retain display labels for all selected principals,
 independently of the current search/page. Empty optional UI filters are omitted
 from URLs; an empty identifier is not a separate API meaning.
