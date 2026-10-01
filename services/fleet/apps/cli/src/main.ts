@@ -7,7 +7,7 @@ import { realpathSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDaemonClient, operations } from '@fleet/daemon-client/client';
 import { openTunnel } from '@fleet/ssh-transport/tunnel';
-import { name as nameParser } from '@crossfire/contracts/schema/validation';
+import { name as nameParser, identifier } from '@crossfire/contracts/schema/validation';
 import type { Result } from '@crossfire/kernel/result';
 import { codexTerminal } from '@crossfire/adapter-codex/terminal';
 import { loadConnections, saveConnections } from './configuration.js';
@@ -21,16 +21,19 @@ fleet daemon status|stop --root DIRECTORY
 fleet remote add NAME --ssh USER@HOST --root DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] add DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] list|show|start|stop|remove [FLEET]
+fleet [--root DIRECTORY | --remote NAME] activate|deactivate FLEET
+fleet [--root DIRECTORY | --remote NAME] message FLEET --text TEXT [--message-id UUID]
 fleet agent list FLEET
 fleet agent add FLEET INSTANCE --definition DEFINITION
 fleet agent start|stop|remove|attach FLEET INSTANCE`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, remote: { type: 'string' },
-    name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, help: { type: 'boolean' } } });
+    name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, help: { type: 'boolean' } } });
   if (values.help || !positionals.length) { console.log(usage); return; }
   const allowed = new Set(['root', 'remote', ...(positionals[0] === 'remote' ? ['ssh'] : []),
     ...(positionals[0] === 'daemon' && positionals[1] === 'start' ? ['name'] : []),
-    ...(positionals[0] === 'agent' && positionals[1] === 'add' ? ['definition'] : [])]);
+    ...(positionals[0] === 'agent' && positionals[1] === 'add' ? ['definition'] : []),
+    ...(positionals[0] === 'message' ? ['text', 'message-id'] : [])]);
   for (const option of Object.keys(values)) if (!allowed.has(option)) throw new Error('Option is not valid for this command: --' + option);
   const connections = loadConnections();
   if (positionals[0] === 'remote') {
@@ -70,6 +73,15 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     if (!fleet) throw new Error('Fleet not found: ' + fleetKey);
     if (fleet.error) throw new Error(fleet.error);
     const params = { fleetId: fleet.fleetId };
+    if (!agentCommand && ['activate', 'deactivate'].includes(command ?? '') && positionals.length === 2) {
+      if (!fleet.connection.connected || fleet.connection.revision === null) throw new Error('Fleet controller is not connected to Crossfire');
+      output(value(await client.call(operations.changeFleetDelivery, params, { expectedRevision: fleet.connection.revision, enabled: command === 'activate' })).data); return;
+    }
+    if (!agentCommand && command === 'message' && positionals.length === 2 && values.text) {
+      const messageId = value(identifier(values['message-id'] ?? randomUUID()));
+      output({ messageId });
+      output(value(await client.call(operations.createFleetMessage, params, { messageId, body: values.text })).data); return;
+    }
     if (!agentCommand && command === 'show' && positionals.length === 2) { output(fleet); return; }
     if (agentCommand && command === 'list' && positionals.length === 3) { output(fleet.instances); return; }
     if (!agentCommand && command === 'remove' && positionals.length === 2) { output(value(await client.call(operations.removeFleet, params, { expectedRevision: fleet.revision })).data); return; }

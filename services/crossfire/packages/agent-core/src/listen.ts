@@ -21,6 +21,8 @@ import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
 import { deliveryEvents, resolveSenders } from './senders.js';
 import { testListener, type ListenerTest } from './diagnostic.js';
 import { releaseUpdates } from './updates.js';
+import { controlledPublisher, waitForActivation, type ListenerControl } from './listener-control.js';
+import type { ReadBatch } from './receive.js';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
   identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
@@ -44,6 +46,7 @@ export function deliveryBatches(events: readonly ReceivedEvent[], settings: Sett
 }
 
 export type ListenerOptions = {
+  control?: ListenerControl;
   storage: LocalState;
   transport: Transport;
   ready?: (test: () => Promise<ListenerTest>) => void;
@@ -66,7 +69,7 @@ export type ListenerOptions = {
 function retryable(error: unknown): boolean {
   if (error instanceof Error && 'status' in error && typeof error.status === 'number') return error.status === 429 || error.status >= 500;
   return error instanceof Error && 'code' in error
-    && ['native', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(String(error.code));
+    && ['native', 'unavailable', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(String(error.code));
 }
 
 export async function listen(options: ListenerOptions, stop: AbortSignal): Promise<void> {
@@ -92,6 +95,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     });
   } catch (error) { failed.abort(error); approval?.close(); throw error; }
   const updates = releaseUpdates(storage, options.cursorFile, options.release.release, options.settings.owner, destination.sessionId);
+  const controlled = options.control ? controlledPublisher(storage, options.cursorFile + '.controller-input', options.control, destination) : undefined;
   const signal = AbortSignal.any([stop, destination.signal, failed.signal]);
   const client = options.transport(signal, 45_000);
   const maximum = options.maximumBytes ?? DEFAULT_OUTPUT_BYTES;
@@ -113,6 +117,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const retiredRooms = new Set<string>();
   let sending: { cancel: AbortController; done: Promise<boolean> } | undefined;
   let activity: Awaited<ReturnType<typeof reportActivity>> | undefined;
+  let completed: { batch: ReadBatch; messageIds: string[]; membership: number } | undefined;
   let pendingMessages = 0;
   const changed = () => { revision++; wake?.(); };
   async function retry<Result>(operation: () => Promise<Result>, scope = signal): Promise<Result> {
@@ -127,11 +132,17 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   }
   async function work<Result>(operation: (client: Matrix, scope: AbortSignal) => Promise<Result>): Promise<Result> {
     const deadline = AbortSignal.timeout(options.reconcileMs);
-    const scope = AbortSignal.any([signal, deadline]);
-    const cancel = () => failed.abort(new Error('Listener acquisition exceeded its reconciliation deadline'));
+    const scope = AbortSignal.any([signal, deadline, ...(options.control ? [options.control.current().signal] : [])]);
+    const cancel = () => {
+      if (options.control) options.control.unavailable('Fleet listener acquisition exceeded its reconciliation deadline');
+      else failed.abort(new Error('Listener acquisition exceeded its reconciliation deadline'));
+    };
     deadline.addEventListener('abort', cancel, { once: true });
     try {
       return await operation(options.transport(scope, Math.min(45_000, options.reconcileMs)), scope);
+    } catch (error) {
+      if (options.control && retryable(error) && !signal.aborted) options.control.unavailable('Fleet listener coordination is unavailable');
+      throw error;
     } finally { deadline.removeEventListener('abort', cancel); }
   }
   async function wait(previous: number, milliseconds = options.reconcileMs, control = false): Promise<void> {
@@ -147,14 +158,16 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     signal.throwIfAborted();
   }
   async function send(operation: (scope: AbortSignal) => Promise<void>): Promise<boolean> {
+    if (options.control && !options.control.current().active) return false;
+    const generation = options.control?.current().signal;
     const cancel = new AbortController();
     const done = (async () => {
       try {
-        await operation(AbortSignal.any([cancel.signal, signal]));
+        await operation(AbortSignal.any([cancel.signal, signal, ...(options.control ? [options.control.current().signal] : [])]));
         return true;
       } catch (error) {
         signal.throwIfAborted();
-        if (cancel.signal.aborted) return false;
+        if (cancel.signal.aborted || generation?.aborted) return false;
         throw error;
       }
     })();
@@ -192,9 +205,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   }
   let acquisition: Promise<void> | undefined;
   const backstop = setInterval(changed, options.reconcileMs);
-  async function access(): Promise<boolean> {
-    const parsed = await options.coordination.delivery(options.id, signal);
-    if (!parsed.ok) throw new Error(parsed.error.message);
+  async function access(scope = signal): Promise<boolean> {
+    const parsed = await options.coordination.delivery(options.id, scope);
+    if (!parsed.ok) throw Object.assign(new Error(parsed.error.message), { code: parsed.error.code });
     const view = parsed.value;
     if (view.agentId !== options.id || view.matrixUserId !== options.account.user_id || view.ownerMatrixId !== options.settings.owner
       || view.status !== 'active' || view.ownerStatus !== 'active') throw new Error('Agent or owner access is no longer active');
@@ -212,8 +225,22 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     lastAccess = performance.now();
     return different;
   }
+  const unsubscribe = options.control?.subscribe(() => {
+    if (!options.control?.current().active) {
+      membershipRevision++;
+      void cancelDelivery().catch(error => failed.abort(error));
+    }
+    changed();
+  });
+  async function startActivity(): Promise<void> {
+    if (activity) return;
+    try { activity = await reportActivity(options.coordination, options.id, options.release, signal, release => { updates.available(release); changed(); }); }
+    catch (error) { if (options.control && retryable(error)) options.control.unavailable('Fleet listener heartbeat is unavailable'); throw error; }
+    activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
+    if (activity.signal.aborted) failed.abort(activity.signal.reason);
+  }
   try {
-    await work(() => access());
+    await access();
     await flushAcknowledgements(storage, client, options.cursorFile);
     for (const control of state.controls.filter(control => control.status === 'interrupting')) {
       if (control.turn) {
@@ -227,24 +254,25 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const selected = options.room ? selectRoom(options.room) : undefined;
     let joined = new Set(await joinedRooms(client));
     retainJoinedCursors(storage, options.cursorFile, joined);
-    activity = await reportActivity(options.coordination, options.id, options.release, signal, release => { updates.available(release); changed(); });
-    activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
-    if (activity.signal.aborted) failed.abort(activity.signal.reason);
+    if (!options.control || options.control.current().active) await startActivity();
     signal.throwIfAborted();
     options.ready?.(() => {
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
       return testListener({ coordination: options.coordination, runtime: destination, matrix: options.transport(deadline, 10000),
-        id: options.id, owner: options.settings.owner, matrixUserId: options.account.user_id, paused: state.paused, signal: deadline });
+        id: options.id, owner: options.settings.owner, matrixUserId: options.account.user_id, paused: state.paused || !!options.control && !options.control.current().active, signal: deadline });
     });
     acquisition = (async () => {
       for (;;) {
         signal.throwIfAborted();
+        if (options.control) await waitForActivation(options.control, signal);
+        const generation = options.control?.current().signal;
+        try {
         await work(async (client, scope) => {
         const synced = await retry(() => synchronize(client, since, Math.min(options.pollMs, Math.floor(options.reconcileMs / 2))), scope);
         controlling = true;
         const membership = new Set(await joinedRooms(client));
         const membershipChanged = membership.size !== joined.size || [...joined].some(room => !membership.has(room));
-        const accessChanged = membershipChanged || performance.now() - lastAccess >= options.reconcileMs ? await retry(() => access(), scope) : false;
+        const accessChanged = membershipChanged || performance.now() - lastAccess >= options.reconcileMs ? await retry(() => access(scope), scope) : false;
         const humans = (await retry(() => humanEvents(client, options.settings, synced, since, selected), scope))
           .filter(event => allowed.has(event.room_id));
         const reset = await retry(() => membershipResets(client, synced, options.account, since), scope);
@@ -306,11 +334,38 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         if (initial || waitingForControl || accessChanged || reset.size || humans.length
           || Object.values(synced.rooms?.join ?? {}).some(room => (room.timeline?.events.length ?? 0) > 0)) changed();
         });
+        } catch (error) {
+          controlling = false;
+          if (generation?.aborted && !signal.aborted) continue;
+          throw error;
+        }
       }
     })().catch(error => { failed.abort(error); changed(); });
     while (!signal.aborted) {
       const previous = revision;
-      if (!synchronized || state.paused) { await wait(previous); continue; }
+      const generation = options.control?.current().signal;
+      try {
+      if (options.control && !options.control.current().active) {
+        const reporter = activity; activity = undefined;
+        await reporter?.close();
+        await wait(previous); continue;
+      }
+      await startActivity();
+      if (!synchronized) { await wait(previous); continue; }
+      if (completed) {
+        const value = completed;
+        await work((client, scope) => retry(() => acknowledge(storage, client, options.cursorFile, { ...value.batch,
+          cursors: Object.fromEntries(Object.entries(value.batch.cursors).filter(([room]) => !retiredRooms.has(room))),
+          latest: Object.fromEntries(Object.entries(value.batch.latest).filter(([room]) => !retiredRooms.has(room))) }), scope));
+        destination.acknowledge(value.messageIds); completed = undefined;
+        if (value.membership !== membershipRevision) continue;
+        state.controls = state.controls.filter(control => !value.batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
+        saveControl(storage, controlFile, state);
+        if (!value.batch.more_rooms.length) { cycle = undefined; saveWake(storage, options.cursorFile); }
+        if (!value.batch.more_rooms.length) await wait(previous);
+        continue;
+      }
+      if (state.paused) { await wait(previous); continue; }
       if (controlling) { await wait(previous, options.reconcileMs, true); continue; }
       const urgent = urgentControl();
       if (urgent) {
@@ -327,6 +382,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         continue;
       }
       retiredRooms.clear();
+      if (controlled?.pending()) { await send(scope => controlled.publish(scope)); continue; }
       if (updates.pending()) { await send(scope => updates.publish(destination, scope)); continue; }
       if (cycle && (!allowed.has(cycle.room) || !joined.has(cycle.room) || !senders.has(cycle.sender))) {
         cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0;
@@ -362,21 +418,16 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       for (const event of batch.events) if (await accept(event)) events.push(event);
       const attempt = await deliver(events);
       if (!attempt.accepted && !await settle()) continue;
-      await work((client, scope) => retry(async () => {
-        await acknowledge(storage, client, options.cursorFile, { ...batch,
-          cursors: Object.fromEntries(Object.entries(batch.cursors).filter(([room]) => !retiredRooms.has(room))),
-          latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => !retiredRooms.has(room))) });
-      }, scope));
-      destination.acknowledge(attempt.messageIds);
-      if (membershipAtRead !== membershipRevision) continue;
-      state.controls = state.controls.filter(control => !batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
-      saveControl(storage, controlFile, state);
-      if (!batch.more_rooms.length) { cycle = undefined; saveWake(storage, options.cursorFile); }
-      if (!batch.more_rooms.length) await wait(previous);
+      completed = { batch, messageIds: attempt.messageIds, membership: membershipAtRead };
+      } catch (error) {
+        if (options.control && (generation?.aborted || !options.control.current().active) && !signal.aborted) continue;
+        throw error;
+      }
     }
     signal.throwIfAborted();
   } finally {
     clearInterval(backstop);
+    unsubscribe?.();
     failed.abort(new Error('Listener stopped'));
     approval?.close();
     wake?.();

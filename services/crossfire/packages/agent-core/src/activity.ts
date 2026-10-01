@@ -13,7 +13,7 @@ export async function reportActivity(client: Coordination, agent: string, instal
   async function report(stopped: boolean, initial = false): Promise<void> {
     const response = await client.report(agent, run, { release: installed.release, messagesDelivered: messages, stopped }, stopped ? undefined : signal);
     if (!response.ok) {
-      if (initial) throw new Error(response.error.message);
+      if (initial) throw Object.assign(new Error(response.error.message), { code: response.error.code });
       if (!stopped && ['invalid', 'unauthorized', 'forbidden', 'missing', 'conflict'].includes(response.error.code)) failed.abort(new Error(response.error.message));
       if (!signal.aborted && !unavailable) process.stderr.write('Crossfire heartbeat unavailable; management will show offline when it expires.\n');
       unavailable = true; return;

@@ -30,6 +30,9 @@ import { createAuditEventRepository } from './repository/audit-event/index.js';
 
 export function createRepositories(database: Database.Database): Repositories {
   return {
+    fleetConnection: createFleetConnectionRepository(database),
+    fleetMessage: createFleetMessageRepository(database),
+    fleetMessageDelivery: createFleetMessageDeliveryRepository(database),
     enrollmentControllerMetadata: createEnrollmentControllerMetadataRepository(database),
     fleetControllerMetadata: createFleetControllerMetadataRepository(database),
     fleetCredential: createFleetCredentialRepository(database),
@@ -59,3 +62,6 @@ export function createRepositories(database: Database.Database): Repositories {
     auditEvent: createAuditEventRepository(database),
   };
 }
+import { createFleetConnectionRepository } from './repository/fleet-connection/index.js';
+import { createFleetMessageRepository } from './repository/fleet-message/index.js';
+import { createFleetMessageDeliveryRepository } from './repository/fleet-message-delivery/index.js';

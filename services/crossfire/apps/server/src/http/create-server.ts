@@ -14,6 +14,8 @@ import { type Context, type Endpoint, type Reply } from './bind.js';
 import { readBody, send, cookie, setCookie } from './transport.js';
 import { sessionRoutes } from './routes/session.js';
 import { enrollmentRoutes } from './routes/enrollment.js';
+import { fleetRoutes } from './routes/fleet.js';
+import { createFleetChanges } from './fleet-changes.js';
 import { agentRoutes } from './routes/agent.js';
 import { roomRoutes } from './routes/room.js';
 import { memberRoutes } from './routes/member.js';
@@ -23,7 +25,8 @@ import { verifyInvitation } from '@crossfire/domain/member/registration';
 export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: ElementPresentation = {}) {
   const { services, config } = application;
   const register = registrationTransport(services);
-  const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...agentRoutes(), ...roomRoutes(), ...memberRoutes(),
+  const fleetChanges = createFleetChanges();
+  const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...roomRoutes(), ...memberRoutes(),
     ...instanceRoutes(config.instance, services.clock.now())];
   const limits = new Map<string, { count: number; expiresAt: number }>();
   function rate(request: IncomingMessage): boolean {
@@ -35,11 +38,11 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
     entry.count++; limits.set(key, entry);
     return entry.count <= HTTP_LIMITS.publicMutationsPerMinute;
   }
-  async function authenticate(request: IncomingMessage, endpoint: Endpoint, requestId: string): Promise<Result<Context>> {
+  async function authenticate(request: IncomingMessage, endpoint: Endpoint, requestId: string, signal: AbortSignal): Promise<Result<Context>> {
     const authorization = request.headers.authorization, credential = cookie(request);
     const mutation = request.method !== 'GET';
     if (authorization !== undefined && request.headers.cookie !== undefined) return failure('invalid', 'Do not mix cookie and bearer authentication');
-    const context: Context = { services, requestId, actor: null, session: null, credential, manifest: release.manifest };
+    const context: Context = { services, requestId, actor: null, session: null, credential, manifest: release.manifest, signal, fleetChanges };
     if (endpoint.auth === 'public') {
       if (authorization !== undefined) return failure('invalid', 'This operation does not accept bearer authentication');
       return success(context);
@@ -61,6 +64,8 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
   }
   return createServer({ requestTimeout: HTTP_LIMITS.requestMilliseconds, headersTimeout: 10_000 }, async (request, response) => {
     const requestId = services.identity.id();
+    const stop = new AbortController();
+    response.once('close', () => stop.abort(new Error('HTTP connection closed')));
     try {
       const url = new URL(request.url ?? '/', config.publicOrigin);
       if (url.origin !== config.publicOrigin || request.headers.host !== new URL(config.publicOrigin).host) { send(response, requestId, failure('forbidden', 'Invalid request host')); return; }
@@ -121,7 +126,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       }
       if (endpoint.path === '/api/sessions' && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin human login required')); return; }
       if (endpoint.path.endsWith('/claim') && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }
-      const authenticated = await authenticate(request, endpoint, requestId);
+      const authenticated = await authenticate(request, endpoint, requestId, stop.signal);
       if (!authenticated.ok) { send(response, requestId, authenticated); return; }
       const input = method === 'GET' ? success({}) : await readBody(request);
       if (!input.ok) { send(response, requestId, input); return; }
@@ -129,7 +134,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (result.ok && result.value.cookie !== undefined) setCookie(response, result.value.cookie, config.publicOrigin);
       if (result.ok && result.value.invitationCookie !== undefined) setInvitationCookie(response, result.value.invitationCookie, config.publicOrigin);
       send(response, requestId, result, endpoint.status);
-      if (result.ok && method !== 'GET') worker.wake();
+      if (result.ok && method !== 'GET') { worker.wake(); fleetChanges.notify(params.fleetId); }
     } catch {
       send(response, requestId, failure('unavailable', 'The operation could not be completed; request ID: ' + requestId));
     }

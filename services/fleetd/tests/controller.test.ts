@@ -12,6 +12,7 @@ import { createRegistry } from '@fleetd/storage/registry';
 import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
 import { fleetView, instanceView } from '@fleetd/contracts/api';
 import { success, failure, type Result } from '@crossfire/kernel/result';
+import { createListenerControl } from '@crossfire/agent-core/listener-control';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 function fixture(execution?: Partial<Execution>) {
@@ -23,9 +24,11 @@ function fixture(execution?: Partial<Execution>) {
   writeFileSync(join(fleet, 'runtime.toml'), 'fleet = "research"\n[coordination]\nadapter = "crossfire"\nserver = "http://127.0.0.1:8098"\nowner = "@owner:test"\n[[instances]]\nkey = "analyst"\nname = "analyst"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n', { mode: 0o600 });
   const closed: string[] = [], started: string[] = [];
   const registry = createRegistry(root), services = { registry, controller: { name: 'desktop' }, now: Date.now, id: randomUUID,
-    execution: { validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
+    execution: { connect: () => success(undefined), connection: () => ({ connected: true, deliveryEnabled: true, revision: 0, error: null }),
+      delivery: async () => failure('unavailable', 'Not connected'), message: async () => failure('unavailable', 'Not connected'), disconnect: async () => {}, close: async () => {},
+      validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
       start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success({ sessionId, signal: stop.signal,
-        attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } },
+        attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
         close: async () => { closed.push(instance.key); stop.abort(); } }); }, ...execution } satisfies Execution };
   const controller = value(createController(services)), record = value(controller.add(fleet));
   async function operation(action: 'start' | 'stop', instanceKey?: string) {
@@ -68,6 +71,29 @@ test('controller owns runtimes, rejects duplicates and operation reuse with diff
   assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
 });
 const fixtureController = fixture;
+
+test('delivery deactivation retains owned engines and unregister closes the control connection', async scope => {
+  const binding = createListenerControl(async () => {}); binding.update({ active: true, input: null });
+  let enabled = true, disconnected = false;
+  const fixture = fixtureController({ connection: () => ({ connected: true, deliveryEnabled: enabled, revision: 4, error: null }),
+    delivery: async (_configuration, input) => { enabled = input.enabled; binding.update({ active: enabled, input: null });
+      return success({ fleetId: randomUUID(), revision: input.expectedRevision + 1, deliveryEnabled: enabled, connection: { status: 'online', lastSeenAt: 1 } }); },
+    start: async () => { const stop = new AbortController(); return success({ sessionId: 'unchanged', signal: stop.signal,
+      control: binding.connection, attachment: { runtime: 'fixture', sessionId: 'unchanged', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } }); },
+    disconnect: async () => { disconnected = true; binding.close(); } });
+  scope.after(() => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start'));
+  const fleetId = fixture.record.fleetId;
+  assert.equal(value(fixture.controller.view(fleetId)).instances[0]!.listenerActive, true);
+  value(await fixture.controller.delivery(fleetId, { expectedRevision: 4, enabled: false }));
+  const paused = value(fixture.controller.view(fleetId));
+  assert.equal(paused.phase, 'running'); assert.equal(paused.instances[0]!.listenerActive, false); assert.equal(paused.instances[0]!.sessionId, 'unchanged');
+  value(await fixture.controller.delivery(fleetId, { expectedRevision: 5, enabled: true }));
+  assert.equal(value(fixture.controller.view(fleetId)).instances[0]!.listenerActive, true);
+  binding.close(); assert.equal(value(fixture.controller.view(fleetId)).instances[0]!.listenerActive, false);
+  await fixture.finish(await fixture.operation('stop'));
+  value(await fixture.controller.remove(fleetId, value(fixture.controller.view(fleetId)).revision)); assert(disconnected);
+});
 
 test('terminal pointers exist only for live instances and never leak into registry views', async scope => {
   const fixture = fixtureController(); scope.after(() => fixture.controller.close());

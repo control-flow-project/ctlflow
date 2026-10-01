@@ -96,7 +96,7 @@ test('bulk room review is complete, revision-bound and atomic', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const agents = [await fixture.agent(admin.actor, 'alpha'), await fixture.agent(admin.actor, 'beta')];
   const fleetId = randomUUID();
-  value(services.repositories.fleet.insert({ id: fleetId, label: 'Team', controllerName: 'desktop', revision: 0, updatedAt: fixture.now(), ownerId: admin.actor.principalId, fleetKey: 'team', createdAt: fixture.now() }));
+  value(services.repositories.fleet.insert({ id: fleetId, label: 'Team', controllerName: 'desktop', revision: 0, deliveryEnabled: true, updatedAt: fixture.now(), ownerId: admin.actor.principalId, fleetKey: 'team', createdAt: fixture.now() }));
   for (const [index, agent] of agents.entries()) value(services.repositories.fleetInstance.insert({ ownerId: admin.actor.principalId, fleetKey: 'team', instanceKey: 'worker-' + index, agentId: agent.id }));
   const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Team')).roomId;
   const plan = { fleetId, agents: agents.map((_agent, index) => ({ instanceKey: 'worker-' + index,

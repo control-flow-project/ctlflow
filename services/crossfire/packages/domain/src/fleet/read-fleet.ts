@@ -7,21 +7,26 @@ import { readActivity } from '../listener/activity.js';
 import { authorizeFleet, type FleetActor } from './authority.js';
 import { agentActions, type AgentDetails } from '../agent/read-agent.js';
 import type { PrincipalSummary } from '../port/discovery.js';
+import { connectionView } from './control.js';
+import type { FleetConnectionView } from './control-types.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'clock'>;
-export type FleetDetails = Fleet & { metadata: Record<string, string>; owner: PrincipalSummary };
+export type FleetDetails = Fleet & { metadata: Record<string, string>; owner: PrincipalSummary; connection: FleetConnectionView };
 export function listFleets(services: Dependencies, actor: Actor, input: PageRequest & { ownerId?: string; search?: string }): Result<Page<FleetDetails>> {
   const scope = ownerScope(services, actor, 'agent.read', input.ownerId);
   if (!scope.ok) return scope;
   const page = services.collection.fleets({ ...input, ...scope.value });
   if (!page.ok) return page;
   const metadata = services.collection.fleetMetadata(page.value.items.map(fleet => fleet.id)); if (!metadata.ok) return metadata;
+  const connections = services.repositories.fleetConnection.findMany(page.value.items.map(fleet => fleet.id)); if (!connections.ok) return connections;
+  const byConnection = new Map(connections.value.map(connection => [connection.fleetId, connection]));
   const owners = services.discovery.selected([...new Set(page.value.items.map(fleet => fleet.ownerId))]); if (!owners.ok) return owners;
   const byOwner = new Map(owners.value.map(owner => [owner.principalId, owner]));
   if (page.value.items.some(fleet => !byOwner.has(fleet.ownerId))) return failure('unavailable', 'Fleet owner record is missing');
   const entries = new Map<string, [string, string][]>();
   for (const entry of metadata.value) { const group = entries.get(entry.fleetId) ?? []; group.push([entry.key, entry.value]); entries.set(entry.fleetId, group); }
-  const items = page.value.items.map(fleet => ({ ...fleet, owner: byOwner.get(fleet.ownerId)!, metadata: Object.fromEntries(entries.get(fleet.id) ?? []) }));
+  const items = page.value.items.map(fleet => ({ ...fleet, owner: byOwner.get(fleet.ownerId)!, metadata: Object.fromEntries(entries.get(fleet.id) ?? []),
+    connection: connectionView(byConnection.get(fleet.id) ?? null, services.clock.now()) }));
   return success({ ...page.value, items });
 }
 export function readFleet(services: Dependencies, actor: FleetActor, fleetId: string): Result<FleetDetails> {
@@ -32,7 +37,8 @@ export function readFleet(services: Dependencies, actor: FleetActor, fleetId: st
   const metadata = services.collection.fleetMetadata([fleetId]); if (!metadata.ok) return metadata;
   const owners = services.discovery.selected([fleet.value.ownerId]); if (!owners.ok) return owners;
   const owner = owners.value[0]; if (!owner) return failure('unavailable', 'Fleet owner record is missing');
-  return success({ ...fleet.value, owner, metadata: Object.fromEntries(metadata.value.map(entry => [entry.key, entry.value])) });
+  const connection = services.repositories.fleetConnection.find(fleetId); if (!connection.ok) return connection;
+  return success({ ...fleet.value, owner, metadata: Object.fromEntries(metadata.value.map(entry => [entry.key, entry.value])), connection: connectionView(connection.value, services.clock.now()) });
 }
 export function listFleetAgents(services: Dependencies & Pick<Services, 'listenerRead' | 'clock'>, actor: FleetActor, fleetId: string, page: PageRequest): Result<Page<{ instanceKey: string; agent: AgentDetails }>> {
   const fleet = readFleet(services, actor, fleetId); if (!fleet.ok) return fleet;

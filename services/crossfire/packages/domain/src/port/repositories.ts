@@ -199,6 +199,9 @@ export type EnrollmentControllerMetadataRepository = {
 };
 
 export type Repositories = {
+  fleetConnection: FleetConnectionRepository;
+  fleetMessage: FleetMessageRepository;
+  fleetMessageDelivery: FleetMessageDeliveryRepository;
   enrollmentControllerMetadata: EnrollmentControllerMetadataRepository;
   fleetControllerMetadata: FleetControllerMetadataRepository;
   fleetCredential: FleetCredentialRepository;
@@ -227,3 +230,4 @@ export type Repositories = {
   instancePolicy: InstancePolicyRepository;
   auditEvent: AuditEventRepository;
 };
+import type { FleetConnectionRepository, FleetMessageRepository, FleetMessageDeliveryRepository } from '../fleet/control-types.js';

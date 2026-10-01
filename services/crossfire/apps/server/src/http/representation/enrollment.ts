@@ -12,7 +12,8 @@ export function enrollmentDetails(value: { request: EnrollmentRequest; instances
   return { enrollment: enrollment(value.request), instances: value.instances.map(enrollmentItem) };
 }
 export function fleet(value: FleetDetails) { return { fleetId: value.id, owner: value.owner, fleetKey: value.fleetKey,
-  label: value.label, controller: { name: value.controllerName, metadata: value.metadata }, revision: value.revision, createdAt: value.createdAt, updatedAt: value.updatedAt }; }
+  label: value.label, controller: { name: value.controllerName, metadata: value.metadata }, revision: value.revision, createdAt: value.createdAt, updatedAt: value.updatedAt,
+  delivery: { fleetId: value.id, revision: value.revision, deliveryEnabled: value.deliveryEnabled, connection: value.connection } }; }
 export function invitation(value: MemberInvitation) {
   return { invitationId: value.id, createdByMemberId: value.createdByMemberId, roleCode: value.roleCode, createdAt: value.createdAt,
     expiresAt: value.expiresAt, consumedByMemberId: value.consumedByMemberId, revokedAt: value.revokedAt };

@@ -33,6 +33,7 @@ export type AgentName = {
 
 export type Fleet = {
   id: string;
+  deliveryEnabled: boolean;
   label: string;
   controllerName: string;
   revision: number;

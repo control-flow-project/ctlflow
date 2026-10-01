@@ -37,6 +37,9 @@ native startup and listener heartbeats require no model turns.
 ```sh
 fleet list
 fleet show research
+fleet deactivate research
+fleet activate research
+fleet message research --text "Review the updated assignment"
 fleet agent list research
 fleet agent add research analyst-west --definition analyst
 fleet agent start research analyst-west
@@ -49,6 +52,20 @@ fleet remove research
 fleet daemon status
 fleet daemon stop
 ```
+
+`deactivate` pauses all fleet-bound listeners, leaving their controller, engines
+and native sessions running. `activate` resumes those same listeners and unread
+positions. Crossfire management exposes the same revision-checked control.
+Controller connection loss also pauses delivery; reconnecting restores current
+server intent. Direct listeners are independent of these fleet controls.
+
+`message` queues one explicit input per enrolled agent through the controller.
+It does not join rooms or change wake-up permissions. Unavailable instances are
+skipped, not started. The command prints its message ID before submission; use
+`--message-id UUID` with the identical text to retry an uncertain response.
+Management shows paginated delivered/pending/skipped/failed/expired outcomes.
+An accepted native receipt is not a completed model task. New messages require
+an enabled fleet and connected controller and expire after ten minutes.
 
 The selected local root is saved in the private CLI connection configuration.
 `--root DIRECTORY` selects another local controller. New agents require approval;
