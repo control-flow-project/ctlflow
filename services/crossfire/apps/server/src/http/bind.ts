@@ -5,9 +5,11 @@ import type { Page } from '@crossfire/domain/port/directory';
 import type { Actor, Services } from '@crossfire/domain/port/services';
 import type { Manifest } from '@crossfire/contracts/release';
 import type { MemberRecord } from '@crossfire/domain/port/directory';
+import type { createFleetChanges } from './fleet-changes.js';
 export type Metadata = { page: number; pageSize: number; totalItems: number; totalPages: number };
 export type Reply = { data: unknown; pagination?: Metadata; cookie?: string | null; invitationCookie?: string };
 export type Context = { services: Services; requestId: string; actor: Actor | null; manifest: Manifest;
+  signal: AbortSignal; fleetChanges: ReturnType<typeof createFleetChanges>;
   controller?: Extract<FleetActor, { kind: 'controller' }>;
   session: { member: MemberRecord; csrfSecret: string; permissions: string[] } | null; credential: string };
 export type Endpoint = {

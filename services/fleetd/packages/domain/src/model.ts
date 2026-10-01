@@ -1,3 +1,8 @@
+import type { ControllerState } from '@crossfire/agent-core/listener-control';
+export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled: boolean;
+  connection: { status: 'online' | 'offline'; lastSeenAt: number | null } };
+export type FleetMessageResult = { messageId: string; body: string; createdAt: number; expiresAt: number;
+  total: number; pending: number; delivered: number; failed: number; skipped: number; expired: number };
 export type Controller = { name: string; metadata?: Record<string, string> };
 export type Instance = { key: string; name: string; definition: string; workarea: string };
 export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string; approval_room?: string }; instances: Instance[] };
@@ -6,7 +11,8 @@ export type Configuration = { directory: string; roster: Roster; definitions: Re
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
 export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'stopping' | 'failed';
 export type InstanceState = { instance: Instance; phase: Phase; sessionId: string | null; error: string | null; startedAt: number | null };
-export type FleetState = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; controller: Controller; phase: Phase; instances: InstanceState[]; error: string | null };
+export type FleetState = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; controller: Controller; phase: Phase;
+  connection: ControllerState; instances: (InstanceState & { listenerActive: boolean })[]; error: string | null };
 export type Target = { kind: 'fleet' | 'agent' | 'daemon'; fleetId?: string; instanceKey?: string };
 export type OperationInput = { operationId: string; target: Target; action: 'start' | 'stop'; expectedRevision: number };
 export type Approval = { url: string; code: string };

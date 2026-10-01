@@ -4,10 +4,12 @@ import { operation } from '@crossfire/contracts/rest/operation';
 import { page, none } from '@crossfire/contracts/schema/query';
 import { instance } from './configuration.js';
 import { attachment } from './attachment.js';
+import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@crossfire/contracts/fleet-control';
 export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'stopping', 'failed');
-export const instanceView = check.object({ instance, phase, sessionId: check.nullable(check.text(200)), error: check.nullable(check.text(4096)), startedAt: check.nullable(check.integer()) });
+export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, sessionId: check.nullable(check.text(200)), error: check.nullable(check.text(4096)), startedAt: check.nullable(check.integer()) });
 export const fleetView = check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), directory: check.text(4096), revision: check.integer(), controller,
-  phase, instances: check.list(instanceView, 100), error: check.nullable(check.text(4096)) });
+  phase, instances: check.list(instanceView, 100), error: check.nullable(check.text(4096)),
+  connection: check.object({ connected: check.boolean, deliveryEnabled: check.boolean, revision: check.nullable(check.integer()), error: check.nullable(check.text(4096)) }) });
 export const target = check.object({ kind: check.choice('fleet', 'agent', 'daemon'), fleetId: check.optional(check.identifier), instanceKey: check.optional(check.name) });
 export const operationInput = check.object({ operationId: check.identifier, target, action: check.choice('start', 'stop'), expectedRevision: check.integer() });
 export const operationView = check.object({ ...{
@@ -29,6 +31,8 @@ export const operations = {
   fleet: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}', params, query: none, input: check.empty, output: fleetView, description: 'Fleet details' }),
   changeFleet: operation({ ...common, method: 'PATCH', path: '/api/fleets/{fleetId}', params, query: none, input: check.object({ expectedRevision: check.integer(), label: check.text(100) }), output: fleetView, description: 'Fleet label' }),
   removeFleet: operation({ ...common, method: 'DELETE', path: '/api/fleets/{fleetId}', params, query: none, input: check.object({ expectedRevision: check.integer() }), output: check.object({ accepted: check.boolean }), description: 'Unregister stopped fleet' }),
+  changeFleetDelivery: operation({ ...common, method: 'PUT', path: '/api/fleets/{fleetId}/delivery', params, query: none, input: deliveryChange, output: fleetControl, description: 'Change Crossfire delivery intent' }),
+  createFleetMessage: operation({ ...common, method: 'POST', path: '/api/fleets/{fleetId}/messages', params, query: none, input: messageCreation, output: fleetMessageSummary, status: 201, description: 'Message the enrolled roster through its controller' }),
   agents: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents', params, query: page, input: check.empty, output: check.list(instanceView, 100), collection: true, description: 'Fleet instances' }),
   addAgent: operation({ ...common, method: 'POST', path: '/api/fleets/{fleetId}/agents', params, query: none, input: check.object({ expectedRevision: check.integer(), instance }), output: fleetView, status: 201, description: 'Add defined instance' }),
   agent: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents/{instanceKey}', params: agentParams, query: none, input: check.empty, output: instanceView, description: 'Instance details' }),

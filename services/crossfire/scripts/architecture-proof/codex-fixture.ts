@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import type { TestContext } from "node:test";
@@ -22,8 +23,7 @@ export async function until(check: () => Promise<boolean> | boolean, description
 
 export async function codexFixture(context: TestContext, hooks: boolean) {
   const binary = process.env.CROSSFIRE_TEST_CODEX ?? "codex";
-  mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
-  const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-codex-"));
+  const directory = mkdtempSync(join(tmpdir(), "crossfire-codex-"));
   const home = join(directory, "codex-home");
   const workspace = join(directory, "workspace");
   mkdirSync(home, { mode: 0o700 });

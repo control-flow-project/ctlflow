@@ -138,6 +138,8 @@ The CLI supports:
 - fleet agent start KEY INSTANCE; fleet agent stop KEY INSTANCE
 - fleet agent remove KEY INSTANCE
 - fleet agent attach KEY INSTANCE
+- fleet activate KEY; fleet deactivate KEY
+- fleet message KEY --text TEXT [--message-id UUID]
 
 Local commands identify their controller root explicitly or through the selected
 CLI connection profile. Remote paths refer to the daemon's computer. SSH uses
@@ -195,6 +197,48 @@ permission and instruction configuration. An initial native history read persist
 an empty session without a dummy prompt, allowing zero-turn resumption.
 Normal stop closes the listener and owned Codex process. Descendant-process
 supervision and crash-proof tool cleanup are not product guarantees.
+
+### Fleet controller connection and delivery
+
+Every enrolled fleet has one authenticated live controller connection, maintained
+by bounded HTTPS long polls, even when its listeners are deactivated or its native
+instances are stopped. A fleet-scoped credential owns that connection; labels do
+not authenticate it. A second live controller for the same fleet is refused.
+Controller leases expire after 30 seconds. Each long poll lasts at most 10 seconds,
+with a 15-second request deadline. Detected failure immediately closes the local
+delivery gate; an undetected stalled connection is bounded by that deadline.
+Reconnection obtains a fresh connection generation and current server intent.
+
+Fleet-bound listeners retain a typed local control connection to their controller.
+They continue to use their normal Crossfire/Matrix adapters for coordination and
+room acquisition. They publish input only while the controller connection is live
+and the fleet's delivery intent is enabled. Connection loss, controller death or
+deactivation cancels queued publication without consuming unread positions.
+Already accepted turns are not rolled back. Directly attached listeners have no
+fleet control binding and are unaffected, even if their identity is a fleet member.
+
+Owners and administrators can deactivate/reactivate the fleet in management;
+the fleet CLI uses the same server intent through fleetd. Deactivation stops room
+acquisition, model publication and activity reporting, not the controller or owned
+native engines. Listener control connections and native sessions remain available.
+Reactivation resumes those same listeners, sessions and unread positions, not
+another enrollment or engine. Runtime/explicit per-listener termination remains
+distinct from reversible fleet deactivation.
+
+An explicit fleet message is delivered through the controller and the shared
+listener's serialized receipt path to the enrolled roster snapshot. This direct
+input does not require room membership or room wake eligibility and does not
+grant either. It carries verified human/controller provenance, never forged Matrix
+events or administrator instructions. Only the fleet's owner/administrator or its
+authenticated controller may submit it. An offline/deactivated fleet refuses new
+messages. Stopped/unavailable instances are reported as skipped, never launched.
+Messages have UUID idempotency keys, a 4096-character/16-KiB plain-text bound and
+a ten-minute delivery lifetime. Each fleet accepts at most 32 pending messages;
+history is SQL-paginated in pages of at most ten. Reusing an ID requires the same
+fleet, author and body. Per-recipient publication/acknowledgment is durable and idempotent;
+receipt uncertainty never becomes success or automatic resubmission under a new ID.
+Failed/expired/skipped recipients and receipt-confirmed delivery remain distinct.
+No model calls perform control, reconnection, fan-out, reporting or acknowledgment.
 
 Incoming Matrix events are filtered and batched by ordinary code before model
 delivery. The model chooses intentional replies/attachments through Crossfire's
@@ -377,6 +421,8 @@ not another operation implementation. Unknown fields/routes/methods fail.
 | GET /api/status | Controller descriptor and daemon health. |
 | GET, POST /api/fleets | Paginated registry or register a validated explicit fleet directory. |
 | GET, PATCH, DELETE /api/fleets/{fleetId} | Inspect, update allowed metadata/configuration or unregister. |
+| PUT /api/fleets/{fleetId}/delivery | Revision-checked activation/deactivation through Crossfire. |
+| POST /api/fleets/{fleetId}/messages | Submit an idempotent direct fleet message through Crossfire. |
 | GET, POST /api/fleets/{fleetId}/agents | List or add an instance using a validated existing definition. |
 | GET, PATCH, DELETE /api/fleets/{fleetId}/agents/{instanceKey} | Inspect/update/remove an instance. |
 | GET /api/fleets/{fleetId}/agents/{instanceKey}/attachment | Private current running-session pointer; no lifecycle mutation or model turn. |
@@ -405,8 +451,13 @@ Only owned process handles may be signalled; no process-name scanning/killing.
 | GET, PATCH, DELETE /api/fleets/{fleetId} | Read/update/delete grouping. Deletion never revokes agent accounts. |
 | GET /api/fleets/{fleetId}/agents | Paginated ordinary agent projections. |
 | PUT, DELETE /api/fleets/{fleetId}/agents/{agentId} | Authorized, revision-checked association/detachment. |
+| PUT /api/fleets/{fleetId}/delivery | Owner/admin/controller changes delivery intent with expectedRevision. |
+| PUT /api/fleets/{fleetId}/controller-connections/{connectionId} | Controller-only exclusive lease acquisition, renewal or closure. |
+| GET /api/fleets/{fleetId}/control | Controller-only bounded long poll of intent and pending direct messages. |
+| GET, POST /api/fleets/{fleetId}/messages | Scoped paginated history or idempotent message creation. |
+| PUT /api/fleets/{fleetId}/messages/{messageId}/deliveries/{agentId} | Controller-only exact recipient acknowledgment; no native launch. |
 
-Crossfire has no fleet execution/start/stop, SSH, host-control or runtime-options
+Crossfire has no native fleet execution/start/stop, SSH, host-control or runtime-options
 routes. Its fleet page shows members, named controller, approved identities,
 reporting listeners and ordinary room/wake controls. Humans see their fleets;
 administrators can inspect all. A controller credential is restricted to its
@@ -1072,7 +1123,7 @@ operator configuration, external credentials and other projects remain intact.
 
 ### Relational conventions
 
-All twenty-seven application tables have singular snake_case names. Tables are
+All application tables have singular snake_case names. Tables are
 STRICT and foreign keys remain enabled. Timestamps/durations use integer
 milliseconds; revisions/counters are checked nonnegative integers. Boolean
 data properties use checked integers, but delegated capabilities are permission
@@ -1144,7 +1195,10 @@ repository methods serve issuance and native account operations only.
 | `enrollment_request` | `id PK`, `owner_id FK member`, `fleet_key?`, `verification_code UQ`, `claim_hash`, `controller_name?`, `controller_credential_hash?`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. |
 | `enrollment_item` | `request_id FK enrollment_request`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. |
 | `agent_name` | `name PK`, `request_id?`, `instance_key?`, `agent_id? UQ/FK agent`; pending-item composite FK; `UQ(request_id, instance_key)`. |
-| `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `revision`, `created_at`, `updated_at`; `PK(owner_id, fleet_key)`. |
+| `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `delivery_enabled`, `revision`, `created_at`, `updated_at`; `PK(owner_id, fleet_key)`. |
+| `fleet_connection` | `fleet_id PK/FK fleet`, `connection_id UQ`, `credential_id FK fleet_credential`, `last_seen_at`, `expires_at`, `closed_at?`. One exclusive controller generation. |
+| `fleet_message` | `id PK`, `fleet_id FK fleet`, `author_principal_id? FK member`, `author_credential_id? FK fleet_credential`, `body`, `created_at`, `expires_at`; exactly one author; `(fleet_id, created_at, id)` index. |
+| `fleet_message_delivery` | `message_id FK fleet_message`, `agent_id FK agent`, `status`, `completed_at?`, `error_message?`; composite PK; status is pending/delivered/failed/skipped; `(status, message_id, agent_id)` index. |
 | `fleet_controller_metadata` | `fleet_id FK fleet(id)`, `key`, `value`; `PK(fleet_id, key)`. |
 | `fleet_credential` | `id PK`, `fleet_id FK fleet(id)`, `secret_hash`, `created_at`, `revoked_at?`. Fleet-scoped authority, not a human login. |
 | `enrollment_controller_metadata` | `enrollment_id FK enrollment_request`, `key`, `value`; `PK(enrollment_id, key)`. Exact approval snapshot. |
@@ -1265,7 +1319,9 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `enrollment_request` | `(owner_id, created_at, id)`, `(created_at, id)`, `(status, expires_at, id)` | Review lists and pending expiry/capacity. |
 | `enrollment_item` | `(agent_id, request_id, instance_key)` | Existing identity and provisioning references. |
 | `fleet` | `(created_at, fleet_key)` | Global fleet list. Owner lists use the composite primary-key prefix. |
-| `fleet_credential` | `(fleet_id, revoked_at)` | Fleet credential lifecycle. |
+| `fleet_credential` | `(fleet_id, revoked_at)`; UQ `(id, fleet_id)` | Fleet credential lifecycle and exact fleet-scoped connection/message authority. |
+| `fleet_message` | `(fleet_id, created_at DESC, id DESC)` | Stable fleet-scoped message history and bounded paging. |
+| `fleet_message_delivery` | `(status, message_id, agent_id)` | Pending message selection and capacity; message-prefix PK covers roster receipts. |
 | `agent_room_grant` | `(room_id, agent_id)`, `(authorizer_id, agent_id, room_id)`, `(added_by_id, agent_id, room_id)` | Room views, authority loss, provenance. |
 | `agent_room_permission` | `(permission_code, room_id, agent_id)`, `(granted_by_member_id, agent_id, room_id)` | Effective delegation and delegator lifecycle. |
 | `room_grant_application` | `(next_check_at, agent_id, room_id)` | Bounded grant application. |
@@ -1439,6 +1495,10 @@ not opaque IDs. Owners see their scope; administrators may filter all owners.
 Lists have useful status/search filters and pagination. Revoked entries are
 explicitly included by filter. Fleet controller labels are visible in fleet
 summaries and agent deployment context, without implying heartbeat freshness.
+Fleet views separately show observed controller connectivity and desired delivery
+state. Confirmed activation/deactivation and an explicit message composer use the
+same scoped REST contract as the CLI; neither starts nor stops native engines.
+Paginated message history shows recipient outcomes without claiming model completion.
 Each fleet's agents appear in a compact paginated table: linked agent name,
 instance key, listener status and account status. Agent details are reached through
 the name link; fleet rosters have no per-agent cards or duplicated detail controls.
@@ -1533,6 +1593,9 @@ Required banks:
   normal owned-engine shutdown, no production or paid-provider calls.
 - Daemon HTTP/Unix ownership, typed operation idempotency, local/SSH transport,
   CLI error/status contracts, disconnected CLI survival and explicit stop.
+- Exclusive controller leases, loss/deadline deactivation, retained listener/runtime
+  bindings, UI/CLI reactivation, queued-send cancellation, durable fleet-message
+  receipts/fan-out, authorization and unaffected direct listeners.
 - Native TUI pointers to the exact session locally and through SSH, no extra
   model call/receiver/engine, TUI exit leaves the fleet running, stopped-run
   refusal, shell quoting and exclusion of authentication tokens from output.

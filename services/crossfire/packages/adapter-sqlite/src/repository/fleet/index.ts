@@ -25,6 +25,7 @@ export function createFleetRepository(database: Database.Database): FleetReposit
       return stored(() => {
         executeInsert(database, schema, (query, params) => query.insertInto('fleet').values({
       id: params.id,
+      delivery_enabled: params.deliveryEnabled,
       label: params.label,
       controller_name: params.controllerName,
       revision: params.revision,
@@ -32,19 +33,20 @@ export function createFleetRepository(database: Database.Database): FleetReposit
       owner_id: params.ownerId,
       fleet_key: params.fleetKey,
       created_at: params.createdAt,
-        }), value);
+        }), { ...value, deliveryEnabled: value.deliveryEnabled ? 1 : 0 });
         return success(undefined);
       });
     },
     update(value) {
       return stored(() => {
         const changed = executeUpdate(database, schema, (query, params) => query.update('fleet').set({
+      delivery_enabled: params.deliveryEnabled,
       label: params.label,
       controller_name: params.controllerName,
       revision: params.revision,
       updated_at: params.updatedAt,
       created_at: params.createdAt,
-        }).where(row => row.owner_id === params.ownerId && row.fleet_key === params.fleetKey), value);
+        }).where(row => row.owner_id === params.ownerId && row.fleet_key === params.fleetKey), { ...value, deliveryEnabled: value.deliveryEnabled ? 1 : 0 });
         return changed === 1 ? success(undefined) : failure('missing', 'Fleet not found');
       });
     },

@@ -5,6 +5,7 @@ import * as res from '../schema/response.js';
 import * as query from '../schema/query.js';
 import * as plan from '../schema/plan.js';
 import { manifest } from '../release.js';
+import * as fleetControl from '../fleet-control.js';
 export const operations = {
   createSession: operation({ method: 'POST', path: '/api/sessions', auth: 'public',
     params: check.empty, query: query.none, input: req.session, output: res.session,
@@ -90,6 +91,24 @@ export const operations = {
   fleetAgents: operation({ method: 'GET', path: '/api/fleets/{fleetId}/agents', auth: 'fleet',
     params: check.object({ fleetId: check.identifier }), query: query.page, input: check.empty, output: check.list(res.fleetAgent, 100),
     status: 200, collection: true, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Fleet members' }),
+  changeFleetDelivery: operation({ method: 'PUT', path: '/api/fleets/{fleetId}/delivery', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier }), query: query.none, input: fleetControl.deliveryChange, output: fleetControl.fleetControl,
+    status: 200, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Activate or deactivate fleet listener delivery' }),
+  reportFleetConnection: operation({ method: 'PUT', path: '/api/fleets/{fleetId}/controller-connections/{connectionId}', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier, connectionId: check.identifier }), query: query.none, input: fleetControl.connectionReport, output: fleetControl.fleetControl,
+    status: 200, collection: false, permissions: [], description: 'Exclusive authenticated controller lease' }),
+  fleetControl: operation({ method: 'GET', path: '/api/fleets/{fleetId}/control', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier }), query: fleetControl.controlQuery, input: check.empty, output: fleetControl.fleetControlSnapshot,
+    status: 200, collection: false, permissions: [], description: 'Live controller delivery and message long poll' }),
+  fleetMessages: operation({ method: 'GET', path: '/api/fleets/{fleetId}/messages', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier }), query: fleetControl.messagePage, input: check.empty, output: check.list(fleetControl.fleetMessageSummary, 10),
+    status: 200, collection: true, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Paginated fleet message receipt history' }),
+  createFleetMessage: operation({ method: 'POST', path: '/api/fleets/{fleetId}/messages', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier }), query: query.none, input: fleetControl.messageCreation, output: fleetControl.fleetMessageSummary,
+    status: 201, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Explicit idempotent direct fleet input' }),
+  acknowledgeFleetMessage: operation({ method: 'PUT', path: '/api/fleets/{fleetId}/messages/{messageId}/deliveries/{agentId}', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier, messageId: check.identifier, agentId: check.identifier }), query: query.none, input: fleetControl.receiptReport, output: fleetControl.fleetMessageReceipt,
+    status: 200, collection: false, permissions: [], description: 'Controller reports an exact recipient receipt' }),
   bindFleetAgent: operation({ method: 'PUT', path: '/api/fleets/{fleetId}/agents/{agentId}', auth: 'fleet',
     params: check.object({ fleetId: check.identifier, agentId: check.identifier }), query: query.none, input: req.fleetBinding, output: res.acknowledged,
     status: 200, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Bind an owned agent' }),

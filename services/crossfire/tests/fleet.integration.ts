@@ -27,7 +27,7 @@ async function until(predicate: () => boolean): Promise<void> {
   const deadline = Date.now() + 30000;
   while (!predicate()) { assert(Date.now() < deadline, 'Native integration observation timed out'); await delay(30); }
 }
-type Fleet = { fleetId: string; phase: string; instances: { instance: { key: string }; phase: string; sessionId: string | null }[] };
+type Fleet = { fleetId: string; phase: string; connection: { connected: boolean; deliveryEnabled: boolean; revision: number | null }; instances: { instance: { key: string }; phase: string; sessionId: string | null; listenerActive: boolean }[] };
 type Binding = { fleetId: string; controllerCredential: string; identities: { instanceKey: string; agentId: string; account: { user_id: string; access_token: string } }[] };
 
 test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume without model housekeeping', { timeout: 180000 }, async scope => {
@@ -151,5 +151,57 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await delay(1400);
   assert.equal(providers[0]!.requests.length, delivered, 'Restart does not duplicate an acknowledged room input');
   assert.equal(value(services.directory.activeAgentCount()), 3, 'Restarts preserve the two fleet identities and the invited guest');
+  const sessions = (JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.map(instance => instance.sessionId);
+  async function ownerCall(path: string, body: unknown) {
+    const response = await fetch(origin + path, { method: 'PUT', headers: { Cookie: 'crossfire=' + admin.secret, Origin: origin,
+      'X-Crossfire-CSRF': admin.csrfSecret, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal(response.status, 200, await response.text());
+  }
+  const remoteFleet = () => value(services.repositories.fleet.findById(binding.fleetId))!;
+  await ownerCall('/api/fleets/' + binding.fleetId + '/delivery', { expectedRevision: remoteFleet().revision, enabled: false });
+  async function observe(predicate: (fleet: Fleet) => boolean) {
+    const deadline = Date.now() + 30000;
+    for (;;) {
+      const current = JSON.parse((await cli('show', 'research')).stdout) as Fleet;
+      if (predicate(current)) return current;
+      assert(Date.now() < deadline, JSON.stringify(current)); await delay(100);
+    }
+  }
+  const paused = await observe(current => current.instances.every(instance => !instance.listenerActive));
+  assert.equal(paused.phase, 'running'); assert.deepEqual(paused.instances.map(instance => instance.sessionId), sessions);
+  const beforePause = providers.map(provider => provider.requests.length);
+  value(await nativeOk(ownerNative, 'PUT', roomPath + '/send/m.room.message/while-disabled', { msgtype: 'm.text', body: 'Retained while fleet is deactivated' }));
+  await delay(1500); assert.deepEqual(providers.map(provider => provider.requests.length), beforePause);
+  await assert.rejects(cli('message', 'research', '--text', 'Refused while deactivated'), /Activate this fleet/);
+  await cli('activate', 'research');
+  await observe(current => current.instances.every(instance => instance.listenerActive));
+  await until(() => providers[0]!.requests.length === beforePause[0]! + 1);
+  assert(JSON.stringify(providers[0]!.requests.at(-1)).includes('Retained while fleet is deactivated'));
+  const messageId = randomUUID();
+  await cli('message', 'research', '--text', 'Explicit controller task to the whole fleet', '--message-id', messageId);
+  await until(() => providers[1]!.requests.length === 1);
+  await until(() => value(services.repositories.fleetMessageDelivery.forMessages([messageId])).every(delivery => delivery.status === 'delivered'));
+  assert(providers.every(provider => JSON.stringify(provider.requests.at(-1)).includes('Explicit controller task to the whole fleet')));
+  providers[1]!.finish();
+  const beforeRepeat = providers.map(provider => provider.requests.length);
+  await cli('message', 'research', '--text', 'Explicit controller task to the whole fleet', '--message-id', messageId);
+  await delay(1200); assert.deepEqual(providers.map(provider => provider.requests.length), beforeRepeat);
+  const address = fixture.router.address(); assert(address && typeof address !== 'string');
+  fixture.router.closeAllConnections(); await new Promise<void>(resolve => fixture.router.close(() => resolve()));
+  const disconnected = await observe(current => !current.connection.connected && current.instances.every(instance => !instance.listenerActive));
+  assert.equal(disconnected.phase, 'running'); assert.deepEqual(disconnected.instances.map(instance => instance.sessionId), sessions);
+  fixture.router.listen(address.port, '127.0.0.1'); await once(fixture.router, 'listening');
+  await observe(current => current.connection.connected && current.instances.every(instance => instance.listenerActive));
+  await delay(1200); assert.deepEqual(providers.map(provider => provider.requests.length), beforeRepeat, 'Control reconnection makes no model calls or duplicate deliveries');
+  await cli('deactivate', 'research'); await observe(current => current.instances.every(instance => !instance.listenerActive));
+  await cli('activate', 'research'); await observe(current => current.instances.every(instance => instance.listenerActive));
+  await cli('stop', 'research');
+  await observe(current => current.phase === 'stopped' && current.connection.connected);
+  const stoppedMessageId = randomUUID(), beforeStopped = providers.map(provider => provider.requests.length);
+  await cli('message', 'research', '--text', 'Stopped recipients are not automatically started', '--message-id', stoppedMessageId);
+  await until(() => value(services.repositories.fleetMessageDelivery.forMessages([stoppedMessageId])).every(delivery => delivery.status === 'skipped'));
+  assert.deepEqual(providers.map(provider => provider.requests.length), beforeStopped);
+  await cli('remove', 'research');
+  assert.notEqual(value(services.repositories.fleetConnection.find(binding.fleetId))!.closedAt, null, 'Unregistering a stopped fleet closes its controller connection');
   await cli('daemon', 'stop');
 });

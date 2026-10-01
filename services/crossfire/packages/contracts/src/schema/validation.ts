@@ -53,5 +53,8 @@ export const secret: Parser<string> = input => typeof input === 'string' && /^[A
 export const empty = object({});
 export const status = choice('active', 'suspended', 'revoked');
 export const wakeMode = choice('nobody', 'owner', 'owner-agents', 'humans', 'everyone', 'selected');
-export const multiline: Parser<string> = input => typeof input === 'string' && new TextEncoder().encode(input).length <= 8192 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(input)
-  ? success(input) : failure('invalid', 'Expected plain text up to 8192 UTF-8 bytes');
+export function plainText(maximumBytes: number): Parser<string> {
+  return input => typeof input === 'string' && new TextEncoder().encode(input).length <= maximumBytes && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(input)
+    ? success(input) : failure('invalid', 'Expected plain text up to ' + maximumBytes + ' UTF-8 bytes');
+}
+export const multiline = plainText(8192);

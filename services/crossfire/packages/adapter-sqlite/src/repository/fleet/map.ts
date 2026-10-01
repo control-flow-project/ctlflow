@@ -3,6 +3,7 @@ import type { Tables } from '../../schema/tables.js';
 export function mapFleet(row: Tables['fleet']): Fleet {
   return {
     id: row.id,
+    deliveryEnabled: row.delivery_enabled === 1,
     label: row.label,
     controllerName: row.controller_name,
     revision: row.revision,

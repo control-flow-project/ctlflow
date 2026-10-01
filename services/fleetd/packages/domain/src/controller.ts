@@ -17,8 +17,18 @@ export function createController(services: Services) {
   const active = new Map<string, { stop: AbortController; done: Promise<void> }>();
   const deployed = new Map<string, Configuration>(), mutations = new Map<string, Promise<void>>();
   const lifetime = new AbortController();
+  const connectionErrors = new Map<string, string>();
   let stopping = false;
   const startedAt = services.now();
+  function connect(configuration: Configuration): void {
+    const result = services.execution.connect(configuration, lifetime.signal);
+    if (!result.ok) connectionErrors.set(configuration.directory, result.error.message);
+    else connectionErrors.delete(configuration.directory);
+  }
+  for (const record of records) {
+    const configuration = services.registry.load(record.directory);
+    if (configuration.ok) connect(configuration.value);
+  }
   const key = (fleetId: string, instanceKey: string) => fleetId + ':' + instanceKey;
   function persist(next: Registration[]): Result<void> {
     const result = services.registry.saveRegistrations(next);
@@ -46,18 +56,20 @@ export function createController(services: Services) {
     const current = inspect(fleetId);
     if (!current.ok) return current;
     const { record, configuration } = current.value;
-    const instances = configuration.roster.instances.map(instance => states.get(key(fleetId, instance.key)) ?? { instance, phase: 'stopped' as const, sessionId: null, error: null, startedAt: null });
+    const instances = configuration.roster.instances.map(instance => ({ ...(states.get(key(fleetId, instance.key)) ?? { instance, phase: 'stopped' as const, sessionId: null, error: null, startedAt: null }),
+      listenerActive: running.get(key(fleetId, instance.key))?.control.current().active ?? false }));
     const phase = instances.find(instance => instance.phase === 'stopping')?.phase ?? instances.find(instance => instance.phase === 'awaiting-approval')?.phase
       ?? instances.find(instance => instance.phase === 'starting')?.phase ?? instances.find(instance => instance.phase === 'failed')?.phase
       ?? instances.find(instance => instance.phase === 'running')?.phase ?? 'stopped';
     return success({ fleetId, fleetKey: record.fleetKey, label: record.label, directory: record.directory, revision: record.revision,
-      controller: services.controller, instances, phase, error: null });
+      controller: services.controller, instances, phase, connection: services.execution.connection(configuration), error: connectionErrors.get(configuration.directory) ?? null });
   }
   function list(): Result<FleetState[]> {
     const values: FleetState[] = [];
     for (const record of records.toSorted((left, right) => left.fleetKey.localeCompare(right.fleetKey))) {
       const result = view(record.fleetId);
-      values.push(result.ok ? result.value : { ...record, controller: services.controller, phase: 'failed', error: result.error.message, instances: [] });
+      values.push(result.ok ? result.value : { ...record, controller: services.controller, phase: 'failed', error: result.error.message, instances: [],
+        connection: { connected: false, deliveryEnabled: false, revision: null, error: result.error.message } });
     }
     return success(values);
   }
@@ -80,6 +92,7 @@ export function createController(services: Services) {
     if (records.length >= 100) return failure('capacity', 'Controller supports at most 100 registered fleets');
     const record = { fleetId: services.id(), fleetKey: configuration.value.roster.fleet, label: configuration.value.roster.fleet, directory, revision: 0, digest: configuration.value.digest };
     const result = persist([...records, record]);
+    if (result.ok) connect(configuration.value);
     return result.ok ? view(record.fleetId) : result;
   }
   function mutable(fleetId: string, revision: number) {
@@ -97,9 +110,12 @@ export function createController(services: Services) {
     const changed = persist(records.map(record => record.fleetId === fleetId ? { ...record, label, revision: revision + 1 } : record));
     return changed.ok ? view(fleetId) : changed;
   }
-  function remove(fleetId: string, revision: number): Result<void> {
+  async function remove(fleetId: string, revision: number): Promise<Result<void>> {
     const current = mutable(fleetId, revision);
-    return current.ok ? persist(records.filter(record => record.fleetId !== fleetId)) : current;
+    if (!current.ok) return current;
+    const removed = persist(records.filter(record => record.fleetId !== fleetId));
+    if (removed.ok) { await services.execution.disconnect(current.value.configuration); connectionErrors.delete(current.value.configuration.directory); }
+    return removed;
   }
   async function editInstance(fleetId: string, revision: number, action: { kind: 'add'; instance: Instance } | { kind: 'remove'; instanceKey: string } | { kind: 'definition'; instanceKey: string; definition: string }): Promise<Result<FleetState>> {
     const current = mutable(fleetId, revision);
@@ -153,6 +169,8 @@ export function createController(services: Services) {
           for (const instance of selected) if (!running.has(key(fleetId, instance.key))) states.set(key(fleetId, instance.key), { ...states.get(key(fleetId, instance.key))!, phase: 'awaiting-approval' });
         });
         if (!prepared.ok) { operation.errors.push({ instanceKey: null, ...prepared.error }); return; }
+        connect(configuration);
+        if (connectionErrors.has(configuration.directory)) { operation.errors.push({ instanceKey: null, code: 'unavailable', message: connectionErrors.get(configuration.directory)! }); return; }
         operation.errors.push(...prepared.value.failed);
         operation.status = 'running'; operation.approval = null; saveOperation(operation);
         for (const instance of selected) {
@@ -241,8 +259,19 @@ export function createController(services: Services) {
     }
     for (const process of running.values()) await process.close();
     running.clear(); lifetime.abort(new Error('Controller stopped'));
+    await services.execution.close();
   }
   return success({ status: () => ({ controller: services.controller, startedAt, stopping }), list, view, attachment, add, rename, remove, editInstance, operate, close,
+    async delivery(fleetId: string, input: { expectedRevision: number; enabled: boolean }) {
+      const current = inspect(fleetId); if (!current.ok) return current;
+      if (stopping) return failure('unavailable', 'Controller is stopping');
+      return services.execution.delivery(current.value.configuration, input);
+    },
+    async message(fleetId: string, input: { messageId: string; body: string }) {
+      const current = inspect(fleetId); if (!current.ok) return current;
+      if (stopping) return failure('unavailable', 'Controller is stopping');
+      return services.execution.message(current.value.configuration, input);
+    },
     operation(id: string): Result<Operation> { const operation = operations.find(item => item.operationId === id); return operation ? success(structuredClone(operation)) : failure('missing', 'Operation not found'); } });
 }
 export type FleetController = Extract<ReturnType<typeof createController>, { ok: true }>['value'];

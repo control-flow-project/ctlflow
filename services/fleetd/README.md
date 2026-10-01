@@ -28,8 +28,13 @@ the controller root; invalid/symlinked/unowned private state is rejected.
 - Crossfire packages own enrollment, authorization, the shared listener and
   native Codex settings/protocol. No copied listener or native integration exists.
 
-The private API exposes `/api/status`, `/api/fleets`, nested fleet `/agents`, and
-`/api/operations`. Operations have UUID idempotency keys and expected revisions;
+The private API exposes `/api/status`, `/api/fleets`, nested fleet `/agents`,
+fleet `/delivery` and `/messages`, and `/api/operations`. Delivery intent is distinct from
+engine lifecycle: pausing listeners retains their native sessions and bindings.
+Every approved registered fleet keeps an authenticated bounded long-poll
+connection to Crossfire, even while stopped or deactivated. The adapter closes
+publication gates on connection loss and reconnects with a fresh lease generation.
+Operations have UUID idempotency keys and expected revisions;
 reusing a key with different input fails. Accepted operations are observed until
 completion, with per-instance outcomes. Closing a CLI does not cancel them.
 The private `/api/fleets/{fleetId}/agents/{instanceKey}/attachment` resource

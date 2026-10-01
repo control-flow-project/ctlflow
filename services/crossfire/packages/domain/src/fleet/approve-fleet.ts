@@ -8,7 +8,7 @@ export function approveFleet(services: Pick<Services, 'repositories' | 'collecti
   const previous = services.repositories.fleet.find({ ownerId: request.ownerId, fleetKey: request.fleetKey });
   if (!previous.ok) return previous;
   if (previous.value) return success(undefined);
-  const fleet = { id: services.identity.id(), ownerId: request.ownerId, fleetKey: request.fleetKey, label: request.fleetKey,
+  const fleet = { id: services.identity.id(), deliveryEnabled: true, ownerId: request.ownerId, fleetKey: request.fleetKey, label: request.fleetKey,
     controllerName: request.controllerName, revision: 0, createdAt: services.clock.now(), updatedAt: services.clock.now() };
   const saved = services.repositories.fleet.insert(fleet);
   if (!saved.ok) return saved;

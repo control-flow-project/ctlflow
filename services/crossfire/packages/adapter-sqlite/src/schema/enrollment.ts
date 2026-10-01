@@ -60,6 +60,7 @@ CREATE TABLE agent_name (
 
 CREATE TABLE fleet (
   id TEXT NOT NULL UNIQUE,
+  delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK(delivery_enabled IN (0,1)),
   label TEXT NOT NULL,
   controller_name TEXT NOT NULL,
   revision INTEGER NOT NULL CHECK(revision >= 0),

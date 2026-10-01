@@ -1,6 +1,9 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  fleet_connection: { fleet_id: string; connection_id: string; credential_id: string; last_seen_at: number; expires_at: number; closed_at: number | null };
+  fleet_message: { id: string; fleet_id: string; author_principal_id: string | null; author_credential_id: string | null; body: string; created_at: number; expires_at: number };
+  fleet_message_delivery: { message_id: string; agent_id: string; status: 'pending' | 'delivered' | 'failed' | 'skipped'; completed_at: number | null; error_message: string | null };
   enrollment_controller_metadata: {
     enrollment_id: string;
     key: string;
@@ -110,6 +113,7 @@ export type Tables = {
   };
   fleet: {
     id: string;
+    delivery_enabled: number;
     label: string;
     controller_name: string;
     revision: number;

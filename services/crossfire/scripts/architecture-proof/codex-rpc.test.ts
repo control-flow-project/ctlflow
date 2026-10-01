@@ -3,6 +3,7 @@ import { once } from "node:events";
 import { mkdtempSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import test from "node:test";
 import { WebSocketServer } from "ws";
 import { connectRpc } from "./codex-rpc.js";
@@ -15,7 +16,7 @@ test("proof observer closes on malformed or oversized protocol responses", { tim
   ];
   for (const input of cases) {
     await context.test(input.name, async child => {
-      const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-rpc-"));
+      const directory = mkdtempSync(join(tmpdir(), "crossfire-rpc-"));
       const path = join(directory, "rpc.sock");
       const server = createServer();
       const websocket = new WebSocketServer({ server });

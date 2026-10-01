@@ -9,16 +9,17 @@ import { useSession } from './session.js';
 import { Alert, Empty, Field, Loaded, Page, Panel, Pagination, PageItems, Status, timestamp, pagingQuery } from './ui.js';
 import { OwnerFilter } from './agent-filters.js';
 import { filterQuery } from './form.js';
+import { FleetDelivery } from './fleet-control.js';
 
 export function Fleets() {
-  const viewer = useSession(), resource = useResource(operations.fleets, {}, location.search);
+  const viewer = useSession(), resource = useResource(operations.fleets, {}, location.search, 5000);
   return <Page title="Fleets" description="Agent deployment groups and their last-reported controllers." action={<button onClick={resource.refresh}>Refresh</button>}>
     <form className="filter-bar" onSubmit={event => { event.preventDefault(); location.assign('/manage/fleets?' + filterQuery(event.currentTarget)); }}><label>Search fleets or controllers<input name="search" type="search" defaultValue={new URLSearchParams(location.search).get('search') ?? ''}/></label>
       {viewer.permissions.includes('agent.read.any') && <OwnerFilter/>}<div className="filter-actions"><button>Apply filters</button><a href="/manage/fleets">Reset</a></div></form>
     <Loaded {...resource} retry={resource.refresh}>{page => <>{page.data.length ? <div className="agent-grid">{page.data.map(fleet =>
-      <a key={fleet.fleetId} className="agent-card" href={'/manage/fleets/' + fleet.fleetId}><h2>{fleet.label}</h2><p>{fleet.fleetKey}</p><p className="owner">{fleet.owner.displayName} · {fleet.owner.matrixUserId}</p><dl><dt>Controller</dt><dd>{fleet.controller.name}</dd><dt>Last reported</dt><dd>{timestamp(fleet.updatedAt)}</dd></dl><footer>Agents &amp; room plan →</footer></a>)}</div>
+      <a key={fleet.fleetId} className="agent-card" href={'/manage/fleets/' + fleet.fleetId}><h2>{fleet.label}</h2><p>{fleet.fleetKey}</p><p className="owner">{fleet.owner.displayName} · {fleet.owner.matrixUserId}</p><dl><dt>Controller</dt><dd>{fleet.controller.name}</dd><dt>Connection</dt><dd><Status value={fleet.delivery.connection.status}/></dd><dt>Delivery</dt><dd>{fleet.delivery.deliveryEnabled ? 'Enabled' : 'Deactivated'}</dd></dl><footer>Agents &amp; room plan →</footer></a>)}</div>
       : <Empty title="No fleets">Register a fleet directory with your fleet controller, then start it to review its enrollment here.</Empty>}<Pagination meta={page.meta}/></>}</Loaded>
-    <div className="quiet-note"><strong>Fleet execution</strong><p>Start and stop fleets through the fleet CLI. This page manages their grouping and access, not remote processes.</p></div></Page>;
+    <div className="quiet-note"><strong>Fleet execution</strong><p>Start and stop engines through the fleet CLI. Management can deactivate their listeners or send a direct fleet message.</p></div></Page>;
 }
 function RoomPlan({ fleet }: { fleet: FleetView }) {
   const viewer = useSession(), action = useAction(), [source, setSource] = useState(''), [review, setReview] = useState<{ source: string; value: Parsed<typeof preview> }>();
@@ -50,12 +51,12 @@ function FleetSettings({ fleet }: { fleet: FleetView }) {
     <dt>Last reported</dt><dd>{timestamp(fleet.updatedAt)}</dd>{Object.entries(fleet.controller.metadata ?? {}).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{value}</dd></Fragment>)}</dl>
     <form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.changeFleet, { fleetId: fleet.fleetId }, { expectedRevision: fleet.revision, label, controller: fleet.controller }, viewer.csrfSecret)); }}>
       <label>Fleet label<input required maxLength={100} value={label} onChange={event => setLabel(event.target.value)}/></label><div className="actions"><button disabled={action.pending}>Save label</button>
-        <button type="button" className="danger" disabled={action.pending} onClick={() => { if (confirm('Remove this grouping and its controller access? Agent accounts, grants and native sessions are retained. Running processes are not stopped.')) void action.run(() => call(operations.removeFleet, { fleetId: fleet.fleetId }, { expectedRevision: fleet.revision }, viewer.csrfSecret), () => location.assign('/manage/fleets')); }}>Remove fleet grouping</button></div><Alert>{action.error}</Alert></form></Panel>;
+        <button type="button" className="danger" disabled={action.pending} onClick={() => { if (confirm('Remove this grouping and its controller access? Bound listeners deactivate. Agent accounts, grants and native sessions are retained.')) void action.run(() => call(operations.removeFleet, { fleetId: fleet.fleetId }, { expectedRevision: fleet.revision }, viewer.csrfSecret), () => location.assign('/manage/fleets')); }}>Remove fleet grouping</button></div><Alert>{action.error}</Alert></form></Panel>;
 }
 export function FleetDetail({ id }: { id: string }) {
-  const resource = useResource(operations.fleet, { fleetId: id }), agents = useResource(operations.fleetAgents, { fleetId: id }, pagingQuery(), 30000);
+  const resource = useResource(operations.fleet, { fleetId: id }, '', 5000), agents = useResource(operations.fleetAgents, { fleetId: id }, pagingQuery(), 5000);
   return <Page title="Fleet details" description="Controller, agents and room access."><a className="back" href="/manage/fleets">← Fleets</a>
-    <Loaded {...resource} retry={resource.refresh}>{result => <><FleetSettings fleet={result.data}/><Panel title="Agents"><Loaded {...agents} retry={agents.refresh}>{page => <>
+    <Loaded {...resource} retry={resource.refresh}>{result => <><FleetDelivery fleet={result.data}/><FleetSettings fleet={result.data}/><Panel title="Agents"><Loaded {...agents} retry={agents.refresh}>{page => <>
       {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>
         <tr key={instance.instanceKey}><td><a href={'/manage/agents/' + instance.agent.agentId}>{instance.agent.displayName}</a></td><td>{instance.instanceKey}</td><td><Status value={instance.agent.activity.status}/></td><td><Status value={instance.agent.status}/></td></tr>)}</tbody></table></div>
         : <Empty title="No agents">There are no agents on this page.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel><RoomPlan fleet={result.data}/></>}</Loaded></Page>;

@@ -9,6 +9,7 @@ import { privateDir, writeJson } from '@crossfire/adapter-filesystem/index';
 import { installSoftware } from '@crossfire/adapter-crossfire/software';
 import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { createClient } from '@crossfire/adapter-crossfire/client';
+import { createFleetControlConnection, type FleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
 import { operations } from '@crossfire/contracts/rest/operations';
 import { MAX_UPLOAD_BYTES } from '@crossfire/contracts/client';
 import { loadBinding, saveBinding, protectFleet } from '@fleetd/storage/binding';
@@ -16,7 +17,32 @@ import type { Execution } from '@fleetd/domain/port';
 import { prepareEnrollment } from './enrollment.js';
 
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
+  const connections = new Map<string, FleetControlConnection>();
+  function connect(configuration: Parameters<Execution['connect']>[0], signal: AbortSignal) {
+    try {
+      const binding = loadBinding(configuration); if (!binding.ok) return binding;
+      if (!binding.value.fleetId || !binding.value.controllerCredential) return success(undefined);
+      if (binding.value.server !== configuration.roster.coordination.server || binding.value.owner !== configuration.roster.coordination.owner
+        || binding.value.fleetKey !== configuration.roster.fleet) return failure('conflict', 'Fleet binding does not match its coordination configuration');
+      if (connections.has(configuration.directory)) return success(undefined);
+      connections.set(configuration.directory, createFleetControlConnection({ origin: binding.value.server, credential: binding.value.controllerCredential,
+        fleetId: binding.value.fleetId, owner: binding.value.owner, signal }));
+      return success(undefined);
+    } catch (error) { return failure('invalid', error instanceof Error ? error.message : 'Invalid fleet controller binding'); }
+  }
   return {
+    connect,
+    connection(configuration) { return connections.get(configuration.directory)?.status() ?? { connected: false, deliveryEnabled: false, revision: null, error: 'Fleet has no approved controller binding' }; },
+    async delivery(configuration, input) {
+      const connection = connections.get(configuration.directory);
+      return connection ? connection.delivery(input) : failure('conflict', 'Enroll this fleet before changing its delivery');
+    },
+    async message(configuration, input) {
+      const connection = connections.get(configuration.directory);
+      return connection ? connection.message(input) : failure('conflict', 'Enroll this fleet before sending messages');
+    },
+    async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear(); },
+    async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close(); },
     validate(configuration) {
       for (const definition of Object.values(configuration.definitions)) {
         const adapter = adapters[definition.runtime];
@@ -33,12 +59,15 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
     async start(configuration, instance, signal) {
       let release: (() => Promise<void>) | undefined, destination: OwnedRuntimeConnection | undefined;
       let done: Promise<void> | undefined;
+      let bindingControl: ReturnType<FleetControlConnection['listener']> | undefined;
       const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
       try {
         const loaded = loadBinding(configuration);
         if (!loaded.ok) return loaded;
         const binding = loaded.value, identity = binding.identities.find(item => item.instanceKey === instance.key);
         if (!identity) return failure('missing', 'Instance has no enrolled identity');
+        const connection = connections.get(configuration.directory);
+        if (!connection) return failure('conflict', 'Fleet controller connection is not initialized');
         const definition = configuration.definitions[instance.definition]!;
         const adapter = adapters[definition.runtime];
         if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
@@ -56,8 +85,10 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         const instructions = [definition.instructions, 'Crossfire identity: ' + instance.name + '. This instance is already enrolled and its listener is managed by the fleet controller. Do not reconnect, enroll or start another listener.',
           'Use node .crossfire/client.mjs --profile ' + instance.name + ' for intentional Matrix replies and attachments. Connection and telemetry require no model action.', readFileSync(software.skill.path, 'utf8')].join('\n\n');
         let ready!: () => void, rejectReady!: (error: unknown) => void;
+        bindingControl = connection.listener(identity.agentId);
         const readiness = new Promise<void>((resolve, reject) => { ready = resolve; rejectReady = reject; });
         done = listen({ settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
+          control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
           ...(configuration.roster.coordination.approval_room ? { approvalRoom: configuration.roster.coordination.approval_room } : {}), ready,
           runtime: async (runtimeStop, _poll, hooks) => {
@@ -70,9 +101,9 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         if (!destination) throw new Error('Runtime did not report its session');
         let closing: Promise<void> | undefined;
         const unlock = release;
-        const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; await destination?.close(); await unlock(); })();
-        return success({ sessionId: destination.sessionId, signal: stop.signal, attachment: destination.attachment, close });
-      } catch (error) { stop.abort(error); await done; await destination?.close(); await release?.(); return failure('native', error instanceof Error ? error.message : 'Instance startup failed'); }
+        const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; bindingControl?.close(); await destination?.close(); await unlock(); })();
+        return success({ sessionId: destination.sessionId, signal: stop.signal, attachment: destination.attachment, control: bindingControl.control, close });
+      } catch (error) { stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.(); return failure('native', error instanceof Error ? error.message : 'Instance startup failed'); }
     },
     async detach(configuration, instance) {
       try {
