@@ -6,6 +6,7 @@ import { recordEvent } from '../audit/record-event.js';
 import { bindRoster } from '../fleet/bind-roster.js';
 import { approveFleet } from '../fleet/approve-fleet.js';
 import { expireEnrollments } from './expire.js';
+import { enrollmentCapacity } from './capacity.js';
 
 export function decideEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'instance'>,
   actor: Actor, enrollmentId: string, input: { expectedRevision: number; decision: 'approve' | 'reject'; verificationCode: string }, requestId: string) {
@@ -28,11 +29,9 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
     if (!items.ok) return items;
     const now = services.clock.now();
     if (input.decision === 'approve') {
-      const policy = services.repositories.instancePolicy.find({ id: 'instance' });
-      const active = services.directory.activeAgentCount(), owned = services.directory.activeAgentCount(request.ownerId);
-      const pending = services.collection.pendingIdentityCount(), ownedPending = services.collection.pendingIdentityCount(request.ownerId);
-      if (!policy.ok) return policy; if (!active.ok) return active; if (!owned.ok) return owned; if (!pending.ok) return pending; if (!ownedPending.ok) return ownedPending;
-      if (!policy.value || active.value + pending.value > policy.value.maxAgents || owned.value + ownedPending.value > policy.value.maxOwnerAgents) return failure('limit', 'Agent capacity changed; adjust the instance limits');
+      const capacity = enrollmentCapacity(services, request.ownerId);
+      if (!capacity.ok) return capacity;
+      if (capacity.value.remaining < 0) return failure('limit', 'Agent capacity changed; adjust the instance limits');
       const fleet = approveFleet(services, request); if (!fleet.ok) return fleet;
       for (const item of items.value) {
         if (item.outcome === 'failed') continue;

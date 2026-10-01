@@ -704,8 +704,15 @@ outside the SQLite transaction and can be pending or fail per instance. Retry
 retains the same identity. The UI and controller expose that actual state.
 
 Capacity counts identities, including reserved pending identities, rather than
-counting a fleet as one account. The same owner/global policy applies to single
-and fleet enrollment and is checked transactionally at claim and approval.
+counting a fleet as one account. Members use the configured per-owner allowance,
+which defaults to ten agents. Administrators have no separate per-owner allowance
+and use the instance-wide capacity, which defaults to one hundred agents. The
+current normalized human role is resolved at preflight, claim and approval;
+controller labels, request fields and the approving actor cannot substitute for
+the intended owner's role. A role or policy change is rechecked at approval.
+The same capacity calculation serves single and fleet enrollment and is checked
+transactionally at claim and approval. Instance capacity remains authoritative
+for every role and includes the other owners' agents and pending reservations.
 Twenty-instance approval must work when configured capacity permits twenty;
 the controller never bypasses a configured limit or divides one approval into
 hidden batches.

@@ -387,13 +387,14 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await memberPage.screenshot({ path: join(directory, 'member-mobile.png'), fullPage: true });
   assert(await memberPage.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
   await page.goto(origin + '/manage/policy');
-  await page.getByLabel('Agents per owner').fill('8');
+  await page.getByLabel('Agents per member owner').fill('8');
+  await expect(page.getByText('Members use the per-owner limit.', { exact: false })).toContainText('defaults to 100 agents');
   const guidance = 'Keep replies concise.\nUse project tickets for "東京". <b>Plain text only.</b>';
   const instructionsField = page.getByLabel('Additional agent instructions', { exact: true });
   await expect(page.getByRole('button', { name: 'Reset to default', exact: true })).toBeDisabled();
   await instructionsField.fill(guidance);
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save settings' }).click()]);
-  await expect(page.getByLabel('Agents per owner')).toHaveValue('8');
+  await expect(page.getByLabel('Agents per member owner')).toHaveValue('8');
   await expect(instructionsField).toHaveValue(guidance);
   const customized = await checkEnrollmentInstructions(memberPage, origin, '@alice:architecture.localhost');
   assert(!customized.includes(guidance), 'The pasted banner stays one line');
@@ -403,7 +404,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await page.getByRole('button', { name: 'Reset to default', exact: true }).click();
   await expect(instructionsField).toHaveValue('');
   assert.equal(value(services.repositories.instancePolicy.find({ id: 'instance' }))!.agentInstructions, guidance, 'Reset is a draft until Save settings');
-  await expect(page.getByLabel('Agents per owner')).toHaveValue('8');
+  await expect(page.getByLabel('Agents per member owner')).toHaveValue('8');
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save settings' }).click()]);
   await expect(instructionsField).toHaveValue('');
   const reset = await checkEnrollmentInstructions(memberPage, origin, '@alice:architecture.localhost');

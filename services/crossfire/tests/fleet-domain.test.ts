@@ -10,13 +10,9 @@ import { authenticateController } from '@crossfire/domain/fleet/authority';
 import { changeFleet, bindFleetAgent, removeFleet } from '@crossfire/domain/fleet/change-fleet';
 import { listFleetAgents, listFleets, readFleet } from '@crossfire/domain/fleet/read-fleet';
 import { previewGrantPlan, applyGrantPlan } from '@crossfire/domain/room-access/grant-plan';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
 
 test('twenty-instance approval, scoped controller, and same-key fleets retain exact authority', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const current = value(services.repositories.instancePolicy.find({ id: 'instance' }))!;
-  const { id: _id, revision, ...settings } = current;
-  value(changeInstancePolicy(services, admin.actor, { ...settings, expectedRevision: revision, maxOwnerAgents: 100, maxAgents: 1000 }, randomUUID()));
   const other = await fixture.member('other');
   async function enroll(owner: typeof admin, count: number, prefix: string) {
     const request = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
