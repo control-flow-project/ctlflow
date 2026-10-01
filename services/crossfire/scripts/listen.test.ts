@@ -204,7 +204,7 @@ test('CLI validates listener-only controls before network use', async scope => {
   const native = await fakeCodex(scope);
   const fixture = await matrixFixture(scope, native.directory);
   const base = [CLIENT, '--project', fixture.workspace, '--profile', 'watson'];
-  for (const args of [['read', '--thread', THREAD], ['listen'], ['run'], ['attach'], ['listen', '--runtime', 'pi'],
+  for (const args of [['read', '--thread', THREAD], ['listen'], ['run'], ['attach'], ['listen', '--runtime', 'unsupported'],
     ['listen', '--runtime', 'codex', '--poll-ms', 'NaN'], ['listen', '--runtime', 'codex', '--poll-ms', '0'],
     ['listen', '--runtime', 'codex', '--poll-ms', '30001'], ['listen', '--runtime', 'codex', '--request-timeout-ms', 'Infinity'],
     ['read', '--debounce-ms', '10000'], ['listen', '--runtime', 'codex', '--thread', THREAD],
@@ -212,6 +212,15 @@ test('CLI validates listener-only controls before network use', async scope => {
     ...['', ' ', 'NaN', 'Infinity', '-1', '0.5', '60001'].map(value => ['listen', '--runtime', 'codex', '--debounce-ms=' + value])]) {
     await assert.rejects(execute(process.execPath, [...base, 'agent', ...args], { env: { ...fixture.env, RUNCODEX_CONNECTION_FILE: '', CODEX_THREAD_ID: '' } }), /Unsupported option|Unknown command|[Ss]upported|must be|Unknown option|Expected one namespace|native thread identity/);
   }
+});
+
+test('Pi listener refuses an absent native attachment before Matrix network use', async scope => {
+  const native = await fakeCodex(scope);
+  const fixture = await matrixFixture(scope, native.directory);
+  const args = [CLIENT, '--project', fixture.workspace, '--profile', 'watson', 'agent', 'listen', '--runtime', 'pi'];
+  await assert.rejects(execute(process.execPath, args, { env: { ...fixture.env, CROSSFIRE_PI_CONNECTION: '' } }), /Pi native connection is not ready/);
+  assert.equal(fixture.requests.length, 0);
+  assert.equal(existsSync(fixture.cursorFile), false);
 });
 
 test('foreground SIGINT and SIGHUP close only their attached connection and receiver', async context => {

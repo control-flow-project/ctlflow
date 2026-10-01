@@ -1,7 +1,7 @@
 import { fields, text } from "./validation.js";
 import { failure, success, type Result } from "@crossfire/kernel/result";
 
-export const ARTIFACTS = ["README.md", "SKILL.md", "crossfire-client.mjs", "matrix-spec-LICENSE.txt", "runcodex.sh"] as const;
+export const ARTIFACTS = ["README.md", "SKILL.md", "crossfire-client.mjs", "crossfire-pi.mjs", "matrix-spec-LICENSE.txt", "runcodex.sh"] as const;
 export type ArtifactName = typeof ARTIFACTS[number];
 export type Manifest = { release: string; version: string; artifacts: Record<ArtifactName, { bytes: number; sha256: string }> };
 export const MAX_ARTIFACT_BYTES = 8 * 1024 * 1024;

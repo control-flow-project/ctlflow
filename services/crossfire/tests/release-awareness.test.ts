@@ -4,12 +4,13 @@ import { readFileSync, writeFileSync, chmodSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import test from 'node:test';
-import { fakeCodex, matrixFixture, THREAD } from '../scripts/test-support/listener.js';
+import { fakeCodex, matrixFixture, THREAD, ROOM } from '../scripts/test-support/listener.js';
 import { builtRelease, installTestRelease } from '../scripts/test-support/release.js';
 import { updatedRelease } from './release-fixture.js';
 import { updateNotice } from '@crossfire/contracts/release';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { discoverCodex } from '@crossfire/adapter-codex/discovery';
+import { writeJson, readJson } from '@crossfire/adapter-filesystem/index';
 
 const execute = promisify(execFile);
 
@@ -19,6 +20,10 @@ test('one connect installs, starts, reuses, upgrades and disconnects the existin
   const client = installTestRelease(native.directory);
   const profile = join(fixture.workspace, '.crossfire/profiles/watson.json');
   const identity = readFileSync(profile);
+  const settings = join(fixture.workspace, '.crossfire/state/watson/settings.json');
+  writeJson(settings, { runtime: 'codex', approvalRoom: null });
+  const settingsBytes = readFileSync(settings);
+  writeJson(fixture.cursorFile, { [ROOM]: 'sync-0' });
   const args = [client, '--project', fixture.workspace, '--profile', 'watson'];
   const executeClient = (...command: string[]) => execute(process.execPath, [...args, ...command], { env: fixture.env, timeout: 30_000 });
   scope.after(async () => { await executeClient('agent', 'disconnect'); });
@@ -30,6 +35,8 @@ test('one connect installs, starts, reuses, upgrades and disconnects the existin
   const started = JSON.parse(first.stdout.slice(first.stdout.lastIndexOf('\n{\n') + 1)) as { status: string; listener: { ready: boolean } };
   assert.equal(started.status, 'listening');
   assert.equal(started.listener.ready, true);
+  assert.deepEqual(readFileSync(settings), settingsBytes, 'Approved profiles reuse the canonical runtime settings without adding connection authority');
+  assert.equal(readJson<Record<string, string>>(fixture.cursorFile)[ROOM], 'sync-0');
   assert(first.stdout.includes('software-ready'));
   assert(first.stdout.includes('skill'));
   const record = readFileSync(join(fixture.workspace, '.crossfire/state/watson/listener.json'));
@@ -54,6 +61,7 @@ test('one connect installs, starts, reuses, upgrades and disconnects the existin
   assert.notDeepEqual(readFileSync(join(fixture.workspace, '.crossfire/state/watson/listener.json')), record);
   assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, count + 1);
   assert.deepEqual(readFileSync(profile), identity);
+  assert.deepEqual(readFileSync(settings), settingsBytes);
   assert(!fixture.requests.some(request => request.path.endsWith('/exchange') || request.path === '/_coord/enrollments'));
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
   const status = await execute(process.execPath, [stable, '--project', fixture.workspace, 'agent', 'status'], { env: fixture.env });

@@ -23,11 +23,17 @@ for (const published of [true, false]) test('lost native response preserves publ
       throw new Error('Response disconnected after submission');
     } };
   const options = { receiptFile: join(workspace, 'receipt.json'), pollMs: 100, timeoutMs: 1000 };
-  await assert.rejects(codexDelivery(session, options).deliver(text, messageId), /Response disconnected/);
-  const restarted = codexDelivery(session, options);
+  const first = codexDelivery(session, options);
+  await assert.rejects(first.deliver(text, messageId), /Response disconnected/);
+  assert.throws(() => codexDelivery(session, options), /already owns/);
+  await first.close();
+  let restarted = codexDelivery(session, options);
+  scope.after(() => restarted.close());
   if (published) {
     await restarted.deliver(text, messageId);
-    await codexDelivery(session, options).deliver(text, messageId);
+    await restarted.close();
+    restarted = codexDelivery(session, options);
+    await restarted.deliver(text, messageId);
     await assert.rejects(restarted.deliver('Changed content', messageId), /different content/);
     restarted.acknowledge([messageId]);
   } else {

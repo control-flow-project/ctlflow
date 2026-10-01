@@ -120,7 +120,8 @@ test('nobody blocks urgent owner prompts without disabling owner stop or startin
   await until(() => !controls().paused);
   await delay(300);
   assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
-  assert.equal(matrix.waiting(), 1);
+  await until(() => matrix.waiting() === 1);
+  assert.equal(matrix.maximumWaiting(), 1, 'The full pause/resume flow has only one acquisition receiver');
 });
 
 test('selecting nobody during collection cancels an owner wake and preserves the unread trail', async context => {

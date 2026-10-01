@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import { privateDir } from './index.js';
 
-export async function acquireProcessLock(path: string, retries = 0): Promise<() => Promise<void>> {
+export function acquireFileLock(path: string): () => void {
   privateDir(dirname(path));
   const descriptor = openSync(path + '.lock', constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
   let database: DatabaseSync | undefined;
@@ -12,15 +12,22 @@ export async function acquireProcessLock(path: string, retries = 0): Promise<() 
     const info = fstatSync(descriptor);
     if (!info.isFile() || info.uid !== process.getuid!() || info.mode & 0o077) throw new Error('Lock must be a private owned regular file');
     database = new DatabaseSync(path + '.lock', { timeout: 0 });
-    for (let attempt = 0; ; attempt++) {
-      try { database.exec('BEGIN EXCLUSIVE'); break; }
-      catch (error) {
-        if (!error || typeof error !== 'object' || !('errcode' in error) || ![5, 6].includes(Number(error.errcode))) throw error;
-        if (attempt >= retries) throw Object.assign(new Error('Another process already owns this private state'), { code: 'ELOCKED' });
-        await delay(1000);
-      }
+    try { database.exec('BEGIN EXCLUSIVE'); }
+    catch (error) {
+      if (!error || typeof error !== 'object' || !('errcode' in error) || ![5, 6].includes(Number(error.errcode))) throw error;
+      throw Object.assign(new Error('Another process already owns this private state'), { code: 'ELOCKED' });
     }
     let released = false;
-    return async () => { if (!released) { released = true; database?.close(); closeSync(descriptor); } };
+    return () => { if (!released) { released = true; database?.close(); closeSync(descriptor); } };
   } catch (error) { database?.close(); closeSync(descriptor); throw error; }
+}
+
+export async function acquireProcessLock(path: string, retries = 0): Promise<() => Promise<void>> {
+  for (let attempt = 0; ; attempt++) {
+    try { const release = acquireFileLock(path); return async () => release(); }
+    catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ELOCKED') || attempt >= retries) throw error;
+      await delay(1000);
+    }
+  }
 }

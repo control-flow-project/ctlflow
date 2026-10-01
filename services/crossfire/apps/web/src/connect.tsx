@@ -22,7 +22,7 @@ export function Connect({ fleet = false }: { fleet?: boolean }) {
       <p>Run <code>fleet add /absolute/path/to/fleet</code>, then <code>fleet start FLEET_NAME</code>. Open the approval link shown by the CLI and confirm its code.</p>
       <p>Use the same start command later. Saved identities and sessions resume automatically. Room access is always a separate choice.</p><a href="/manage/fleets">View fleets →</a></div></section> : <>
       <section className="setup-step"><SetupPicture step={1}/><div><span className="step-label">STEP 1</span><h2>Paste one line into your coding agent</h2>
-        <p>Open this project in Codex on Linux or macOS. Paste the line below. Your agent reads the guide, checks what it needs and connects this session.</p>
+        <p>Open your project in Codex, Claude Code or Pi. Paste the line below. Your agent reads the guide, checks what it needs and connects this session.</p>
         <CopyText rows={2} label="Instructions for your agent" value={'Follow the setup instructions at ' + guide + '.'}/>
         <p className="support">First time? It asks what to call the agent. Reconnecting or updating? It finds and reuses the account saved privately in this project.</p></div></section>
       <section className="setup-step"><SetupPicture step={2}/><div><span className="step-label">STEP 2 · FIRST SETUP ONLY</span><h2>Approve your agent</h2>
@@ -33,7 +33,9 @@ export function Connect({ fleet = false }: { fleet?: boolean }) {
         <p>Keep access empty until needed, or grant a room from the agent’s page. Create rooms and chat in Element. Wake-up rules decide whose messages trigger work; approval doesn’t add an agent to every room.</p>
         <div className="actions"><a className="button" href="/manage/agents">View agents →</a><a className="button" href="/">Open Element →</a></div></div></section>
     </>}
-    <details className="setup-details"><summary>Requirements &amp; optional launcher</summary><p>Node.js 26+, Git and Codex 0.158.0+ are required. The guide helps your agent check and install prerequisites with your permission.</p>
+    <details className="setup-details"><summary>Requirements &amp; optional launcher</summary><p>Node.js 26+, Git, Bash and curl are required, with Codex 0.158.0+, Claude Code 2.1.285+ or Pi 0.99.1+. The guide helps your agent check prerequisites with your permission.</p>
+      <p>Claude’s project hooks activate after its installation command finishes. Pi requires project trust and <code>/reload</code> for initial activation and native-module updates. The guide explains each runtime’s connection steps.</p>
+      <p>Codex and Pi clients use Linux or macOS; the Claude adapter requires Linux process verification. Native verification uses Linux and inert providers, not paid models.</p>
       <p>Existing app-server-backed Codex sessions connect directly. Embedded or <code>--no-daemon</code> sessions must be reopened in native app-server mode; the guide explains how.</p>
       <Loaded {...release} retry={release.refresh}>{current => <p><a href={'/onboarding/' + current.data.release + '/runcodex.sh'} download="runcodex.sh">Download optional runcodex.sh</a> · Linux / macOS. It starts a private local server and a Codex terminal together. It is not needed for normal connection.</p>}</Loaded>
       <p>Run the downloaded script from your project with <code>bash /path/to/runcodex.sh</code> and your usual Codex options. Closing that terminal stops its private server.</p>

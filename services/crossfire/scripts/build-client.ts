@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -9,6 +9,8 @@ export async function buildClient(root: string, destination = join(root, 'dist/c
     bundle: true, platform: 'node', format: 'esm', target: 'node26',
     banner: { js: "import { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" },
   });
+  await build({ entryPoints: [join(root, 'apps/client/src/pi.ts')], outfile: join(dirname(destination), 'crossfire-pi.mjs'),
+    bundle: true, platform: 'node', format: 'esm', target: 'node26' });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

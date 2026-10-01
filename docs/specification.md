@@ -39,8 +39,11 @@ The root contains workspace/build coordination, repository instructions,
 documentation and shared verification tooling; it contains no application source
 or repository-wide package pool. Cross-project reuse is through declared package
 exports and dependencies. Applications never import another application's source.
-There is one listener and one native Codex integration, not per-product copies.
-Only concrete, supported capabilities have packages.
+There is one listener and one native integration per supported runtime, not per-product copies.
+Only concrete, supported capabilities have packages. Individual agent attachment
+supports Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+. Fleet execution supports
+Codex; Claude Code/Pi fleet execution is a separate capability, not implicit in
+their individual-agent adapters.
 
 - Crossfire owns identity, enrollment, human authorization, room access, native
   reconciliation, wake policies, listener activity, fleet grouping and React UI.
@@ -68,17 +71,28 @@ explicit .js relative imports, validated boundaries, and semantic splits near
 
 ### Individual agent connection
 
-The user opens an existing Codex session in a project on Linux or macOS and
+The user opens an existing Codex, Claude Code or Pi session in a project and
 pastes one sentence directing it to the personalized setup URL. That guide owns
 all setup instructions, the verified owner ID, prerequisite installers and any
 administrator-authored agent instructions. Owner details are always dynamic.
 
 The client checks prerequisites and verifies downloaded artifacts with Node's
-SHA-256 implementation. Missing Node.js 26+, Git, curl or Codex 0.158.0+ produces
+SHA-256 implementation. Missing Node.js 26+, Git, Bash, curl or the selected native
+runtime produces
 actionable official installation guidance; installation follows the human's
 normal permission policy. No global skills or system settings are changed.
+Individual runtime minimums are Codex 0.158.0, Claude Code 2.1.285 and Pi 0.99.1.
+Native Linux evidence does not certify macOS or paid-provider behavior.
+Codex and Pi client transports use Linux or macOS. Claude attachment requires
+Linux procfs process-birth verification and rejects unsupported platforms before
+native integration or enrollment.
 
-The approved account and listener settings are private project-local files.
+The approved account, listener settings and temporary setup choices are private
+project-local records with distinct ownership. Runtime settings contain only the
+selected adapter and approval room. The approved account owns its server and
+owner; pre-enrollment setup retains those choices only until pending enrollment
+durably owns them. Neither reconnect nor an upgrade changes the settings format
+or requires another identity. A failed native activation preserves setup choices.
 First setup asks for a name; reconnects and upgrades reuse the existing account.
 Several saved profiles require a human selection. The client owns approval
 waiting, verified installation and starting/reusing exactly one listener.
@@ -891,9 +905,117 @@ authority. A director-to-worker workflow needs an explicit compatible wake
 policy. Selected meaningful room-state notices use the same receiver and
 receipt path rather than a separate listener.
 
+### Individual runtime adapters
+
+Individual sessions use the shared receiver, activity reporter, wake controls,
+release installer and cursor owner. Harness-specific discovery, publication,
+history, lifecycle and native controls live in functional `adapter-codex`,
+`adapter-claude` and `adapter-pi` directories. Shared bounded publication journals
+and native-file validation live in `adapter-runtime`; the listener contains no
+runtime-name dispatch or native protocol decoding.
+An exclusive native SQLite transaction owns each session's publication journal for the
+attachment lifetime. Different profiles cannot concurrently mutate one native
+journal. Close or process death releases that ownership; uncertainty remains
+durable for the next attachment, not another input submission.
+Positive native busy/waiting state keeps pending input attached without a
+turn-duration deadline or an early receipt. An idle, unconfirmed publication
+retains its finite uncertainty deadline; native operation deadlines and attachment
+closure still stop failed connections. Only the exact native receipt advances
+Matrix read positions.
+Every runtime exposes native attachment inspection independently of optional
+turn interruption. The model-free listener test verifies live binding and busy
+state without claiming a runtime can cancel a turn it cannot control.
+
+The composition root selects an explicit `--runtime` or exact native tool context.
+Ambiguous contexts require an explicit runtime, not process scanning. One saved
+project profile keeps its identity across reconnects, runtime selection and
+upgrades. A native setup/activation state is reported separately from a ready
+listener; enrollment or saved credentials cannot masquerade as delivery.
+Before enrollment, private runtime settings retain the selected runtime and
+approval room, while private setup state retains the chosen server and owner.
+The profile's directory binds the chosen name. Native activation never makes
+the user repeat those choices:
+the same option-free connect command continues the selected setup. Multiple
+saved profiles require an explicit selection; no latest-profile guess is used.
+
+Claude Code supplies its session UUID, PID, authenticated peer Unix socket and
+child token to tools. The adapter verifies the native registry's exact session,
+workspace, process birth and peer protocol. A project-local native hook captures
+the exact transcript path; no encoded-path guessing or history-directory scan is
+used. First setup returns before waiting for its own hook. Native settings reload
+activates the project hooks; `PreToolUse`/`PostToolUse` on Bash and `SessionStart`
+capture the native context. A subsequent connect uses that context without
+restarting Claude Code or enabling channels. A setup-required result never claims
+the settings watcher or hook has already run.
+No global Claude settings, permission modes, MCP servers or organization controls
+are changed.
+
+Claude peer messaging is an explicit version-tested native dependency, protocol
+1 on stock 2.1.285. Inputs carry the native correlation UUID. Receipt confirmation
+matches exact session, publisher PID, content and native peer wrapper in the
+bounded transcript interval captured before publication. The native wrapper
+retains Claude's peer-permission warning. Native peer sockets are short-lived per
+publication, not listener-lifetime connections: the native idle-input deadline
+must not disconnect an otherwise idle listener. On Linux the exact native process
+birth is checked against procfs, including forced death that leaves stale native
+registry/socket paths. Native endpoint removal, registry removal,
+workspace/session switching or process-birth change stops the listener. A new
+native binding cannot silently retarget an old listener. This peer connection
+does not expose native turn interruption or permission brokering.
+
+Pi uses a verified project-local extension, loaded by the native extension
+lifecycle. First installation and native-module upgrades need `/reload` in an
+existing Pi session; project trust is required, not silently enabled. The native
+entry uses Pi's required default factory export; implementation modules use named
+functional exports. The small stable project entry resolves the current verified
+release on every native load and imports its immutable native module. It does not
+depend on a loader refreshing a symlinked module's cached code. The native module
+verifies the complete release before registering handlers. `session_start` creates an authenticated loopback connection
+and a private exact session/generation descriptor for subsequent tools. Exit,
+reload, session replacement and tree navigation close that connection. The
+descriptor includes the loaded native module's hash; a client never claims a new
+module is running merely because its files were downloaded.
+
+The Pi adapter serializes pending external publication at its native boundary.
+Busy input waits for native idle events without model polling. Only an exact
+native `custom_message` carrying the Crossfire ID and unchanged content on the
+captured branch confirms publication. A cancelled, not-yet-submitted publication
+can be retired by its exact identity; already submitted input is never retracted
+or marked absent by assumption. Captured native operation identities gate Pi
+interruption, so a stale control cannot cancel a newer operation.
+
+Runtime turn control is an explicit optional native capability. For an attachment
+without it, an owner `!!` control pauses listener delivery and, only with current
+unmuted send access, posts a deterministic notice directing the owner to stop the
+native turn in the coding session. Native send denial leaves the receiver paused
+and connected, with unread positions unchanged. Generated control, approval and blocked-wake
+notices share one explicit wire marker and are excluded from both wake selection
+and later model context; legitimate unmarked notices remain eligible. It does
+not claim cancellation or send the redirect into the model. A later owner message
+resumes normal wake-eligible delivery. Codex and Pi expose exact native turn
+control. Native permission handling remains in Claude Code/Pi; selecting a
+Crossfire approval room for those adapters is rejected explicitly.
+
+The complete immutable release includes `crossfire-pi.mjs` alongside the client,
+skill, README, Matrix license and optional Codex launcher. All artifacts are
+verified before activation.
+Project-only native integration files are separate from credentials and preserve
+unrelated project configuration. No new global installation, service, launcher,
+model-generated receipt or telemetry prompt is introduced.
+
+Acceptance includes real installed CLI/native-extension tests against inert local
+providers: attachment without model input, idle/busy publication, exact receipts,
+lost-response/reconnect safety, bounded native history, native interruption where
+available, shared Matrix batching, session replacement, release activation and
+owner disconnect. These tests do not certify paid-provider behavior or an
+untested operating system. Fleet orchestration is not extended by this work.
+Acceptance also covers canonical approved-profile reconnects, first-activation
+choice retention and retirement, read-only/native-denied notices preserving the
+paused receiver, and peer automatic notices causing no model call or lost context.
+
 ### Native tool approvals
 
-The runtime adapter decodes exact native permission requests. The Crossfire
+The Codex runtime adapter decodes exact native permission requests. The Crossfire
 permission path sends them to an explicitly authorized approval room and accepts
 only the verified owner's explicit matching native decision.
 

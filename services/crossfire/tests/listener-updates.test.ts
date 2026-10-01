@@ -52,7 +52,7 @@ test('uncertain or cancelled delivery is not recorded as notified and retries th
   let reject = true;
   const runtime: RuntimeConnection = { sessionId: THREAD, signal: new AbortController().signal,
     deliver: async (_text, id) => { recorded.push(id); if (reject) throw Error('Receipt unavailable'); },
-    acknowledge: ids => { acknowledged.push(...ids); }, activeTurn: async () => null, close: () => {}, settle: async () => false, interrupt: async () => {} };
+    acknowledge: ids => { acknowledged.push(...ids); }, inspect: async () => ({ busy: false }), close: () => {}, settle: async () => false };
   const installed = '0.1.0-aaaaaaaaaaaaaaaaaaaaaaaa', release = '0.1.0-bbbbbbbbbbbbbbbbbbbbbbbb';
   const publisher = () => releaseUpdates(storage, 'cursor', installed, '@human:test', THREAD);
   const failed = publisher(); failed.available(release);
@@ -74,8 +74,8 @@ test('update notices retain opaque runtime identities without using them as file
   const { storage, values } = storageFixture(), delivered: string[] = [];
   const session = 'runtime:/session/with:opaque-identity';
   const runtime: RuntimeConnection = { sessionId: session, signal: new AbortController().signal,
-    deliver: async (_text, id) => { delivered.push(id); }, acknowledge: () => {}, activeTurn: async () => null,
-    close: () => {}, settle: async () => false, interrupt: async () => {} };
+    deliver: async (_text, id) => { delivered.push(id); }, acknowledge: () => {}, inspect: async () => ({ busy: false }),
+    close: () => {}, settle: async () => false };
   const installed = '0.1.0-aaaaaaaaaaaaaaaaaaaaaaaa', release = '0.1.0-bbbbbbbbbbbbbbbbbbbbbbbb';
   const publisher = () => releaseUpdates(storage, 'cursor', installed, '@human:test', session);
   const first = publisher(); first.available(release); await first.publish(runtime, runtime.signal);

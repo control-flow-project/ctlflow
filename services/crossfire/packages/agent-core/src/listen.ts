@@ -10,7 +10,7 @@ import { synchronize, loadSyncCursor, checkpointSync, membershipResets, acknowle
 import { captureWake, collectBatch, pendingBatch, wakeEvent, loadWake, saveWake, retireSnapshot } from './delivery.js';
 import type { RuntimeAdapter } from './runtime.js';
 import { DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES } from '@crossfire/contracts/limits';
-import { loadControl, saveControl, humanEvents, humanText, isControl } from './control.js';
+import { loadControl, saveControl, humanEvents, humanText, isControl, publishControlNotice } from './control.js';
 import { permissions } from './permissions.js';
 import { reportActivity } from './activity.js';
 import { requireCurrentRelease } from './release.js';
@@ -24,7 +24,7 @@ import { releaseUpdates } from './updates.js';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
   identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
-  if (!Number.isSafeInteger(maximum) || maximum < 1024 || maximum > MAX_OUTPUT_BYTES) throw new Error('Invalid Codex input budget');
+  if (!Number.isSafeInteger(maximum) || maximum < 1024 || maximum > MAX_OUTPUT_BYTES) throw new Error('Invalid runtime input budget');
   const batches: { text: string; messageId: string; messages: number }[] = [];
   let current: ReceivedEvent[] = [];
   function flush(): void {
@@ -35,7 +35,7 @@ export function deliveryBatches(events: readonly ReceivedEvent[], settings: Sett
     current = [];
   }
   for (const event of deliveryEvents(events, self)) {
-    if (Buffer.byteLength(deliveryText([event], settings, identities)) > maximum) throw new Error(`A chat event exceeds the ${maximum}-byte Codex input limit; retrieve it explicitly`);
+    if (Buffer.byteLength(deliveryText([event], settings, identities)) > maximum) throw new Error(`A chat event exceeds the ${maximum}-byte runtime input limit; retrieve it explicitly`);
     if (Buffer.byteLength(deliveryText([...current, event], settings, identities)) > maximum) flush();
     current.push(event);
   }
@@ -216,7 +216,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     await work(() => access());
     await flushAcknowledgements(storage, client, options.cursorFile);
     for (const control of state.controls.filter(control => control.status === 'interrupting')) {
-      if (control.turn) await destination.interrupt(control.turn, true);
+      if (control.turn) {
+        if (!destination.turnControl) throw new Error('Native turn cancellation is unavailable for this attachment');
+        await destination.turnControl.interrupt(control.turn, true);
+      }
       control.status = control.stop ? 'delivered' : 'interrupted';
       state.paused = control.stop;
       saveControl(storage, controlFile, state);
@@ -265,13 +268,20 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           }
           {
             await cancelDelivery();
-            const turn = await destination.activeTurn();
+            if (!destination.turnControl) {
+              state.paused = true;
+              state.controls.push({ room: event.room_id, event: event.event_id, turn: null, stop: true, status: 'delivered' });
+              saveControl(storage, controlFile, state);
+              await publishControlNotice(client, options.coordination, options.id, options.settings, options.account, event, scope);
+              continue;
+            }
+            const turn = await destination.turnControl.activeTurn();
             for (const earlier of state.controls) if (earlier.status === 'interrupted') earlier.status = 'superseded';
             const control = { room: event.room_id, event: event.event_id, stop: String(event.content.body).trim() === '!!',
               turn, status: 'interrupting' as const };
             state.controls.push(control);
             saveControl(storage, controlFile, state);
-            if (turn) await destination.interrupt(turn);
+            if (turn) await destination.turnControl.interrupt(turn);
             const saved = state.controls.at(-1)!;
             saved.status = saved.stop ? 'delivered' : 'interrupted';
             state.paused = saved.stop;

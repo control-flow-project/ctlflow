@@ -1,46 +1,38 @@
-# Connect a coding agent
+# Connect a coding agent to this server
 
-Open **Connect an agent** in this server’s management UI. Copy its one-line
-personalized setup link into your coding session. The link owns all instructions
-and identifies the signed-in owner; it is not a password or permission grant.
-The agent checks prerequisites, asks for a name only on first setup, and connects.
-Administrator-configured instructions are included in the guide, not the banner.
+Crossfire delivers authorized Matrix messages into an existing Codex, Claude Code
+or Pi session through a private project-local listener. It never starts another
+individual engine or changes native model/permission settings. Open the
+management Connect an agent page and paste its one-line personalized setup link
+into the coding session. The guide supplies the verified server and owner,
+prerequisite installation links and inspected bootstrap command.
 
-## Requirements and connection
-
-Agents support Linux and macOS, Node.js 26+, Git, Bash, curl and stock Codex
-0.158.0+. The guide points to official installation instructions for missing
-tools. The agent can help install them within normal human approval boundaries;
-no automatic privileged installer or global skill is used.
-
-A native app-server-backed session exposes its private local Unix socket and
-tool-provided thread identity. The functional Codex adapter selects this exact
-loaded thread and validates its workspace. The optional downloadable
-`runcodex.sh` starts a private authenticated loopback WebSocket server and TUI
-together; its descriptor supplies the same native connection information.
-
-Embedded / `--no-daemon` execution exposes no external app-server connection.
-Reopen/resume the saved session in normal app-server-backed Codex. Native daemon
-startup is `codex app-server daemon start`. Crossfire never silently starts a
-second engine, guesses a session or edits global Codex configuration.
-
-The server publishes a content-addressed manifest for the client, skill,
-documentation, Matrix license and optional launcher. Size/SHA-256 verification
-covers all artifacts. Hashes from this server verify bytes, not an independent
-publisher identity. The launcher is a pinned distribution artifact from
-jeswin/scripts; assets/runcodex-source.json records its source and checksum.
+Codex and Pi clients use Linux or macOS, Node.js 26+, Git, Bash and curl.
+The Claude Code adapter requires Linux native process-birth verification.
+Supported native versions are Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+.
+Linux native proofs use isolated inert providers; they do not certify macOS or
+paid-provider behavior. Fleets currently use the Codex adapter on Linux.
 
 ## First setup, reconnect and test
 
-Approved accounts are saved privately in this project’s Git-ignored
-`.crossfire/profiles/`. The client discovers and reuses them automatically.
-For a new account, ask for a lowercase agent name (letters, digits, hyphens).
-If several accounts exist, ask which profile to connect.
+An approved Matrix account is saved privately in the project's Git-ignored
+`.crossfire/profiles/` directory. The client discovers and reuses it automatically.
+Ask for a lowercase name (letters, digits, hyphens) only when no profile exists.
+If several profiles exist, ask which one to connect. Runtime settings and
+pre-enrollment connection choices are private, separate records; activation never
+requires repeating a chosen name, server or owner.
 
-The connection command prints one approval URL and verification code, then waits
-in ordinary code. Show both to the human immediately. Approval continues
-connection automatically; no model polling or separate listener command.
-Approval grants no rooms. The owner chooses access when needed.
+A `runtime-setup-required` result is not a ready listener. Claude's installation
+command must finish before native settings reload activates project hooks.
+A subsequent Bash tool call captures the exact native context; run connect again
+without choosing a new identity. Pi requires project trust and `/reload` to
+activate its verified project extension. Never wait inside the first tool call
+for its own completion hook or repeatedly poll with the model.
+
+When native activation is ready, the command prints one approval URL and code,
+then waits in ordinary code. Show both to the human immediately. Approval resumes
+connection automatically; no separate listener command or model polling.
+Approval grants no rooms. The owner chooses limited access when needed.
 
 ```sh
 node .crossfire/client.mjs agent connect
@@ -49,52 +41,101 @@ node .crossfire/client.mjs agent status
 node .crossfire/client.mjs agent disconnect
 ```
 
-Use `--project /absolute/project` and `--profile NAME` if needed. Connect
-verifies identity, updates verified files, and starts or reuses exactly one
-listener. A suspended/revoked identity fails; it is never replaced automatically.
+Use `--project /absolute/project` and `--profile NAME` if needed.
+Native tool context selects the runtime; first Pi setup uses `--runtime pi`.
+Ambiguous native contexts require explicit selection. Connect verifies identity,
+installs the complete verified release, and starts or reuses exactly one listener.
+A suspended/revoked account fails; it is never replaced or re-enrolled automatically.
 
-`agent test` calls the live receiver, verifies the exact native session, Matrix
-authentication, active agent/owner and applied joined rooms. It makes no model
-call or test message. A disconnected receiver or failed runtime/authentication
-fails explicitly. Zero unmuted rooms is valid but cannot receive room tasks;
-paused delivery and a busy runtime are reported separately.
-`agent status` is a cheap local status read; server heartbeats establish the
-management online indicator. Credentials alone are neither.
+`agent test` checks the actual receiver, exact native session, authenticated
+server access, active owner/agent and applied joined rooms. It sends no model
+prompt or test message and advances no cursor. Zero rooms is valid but cannot
+receive room tasks; paused delivery and native busy state are reported explicitly.
+`agent status` reads local status. Heartbeats establish the management online
+indicator; credentials alone establish neither.
 
-## Updates and lifecycle
+## Native attachment and lifecycle
 
-Version checks and heartbeats are ordinary code. A new release produces one
-receipt-confirmed native maintenance notice per session/release; the agent asks
-the human for consent. No repeated heartbeat prompts or silent live replacement.
-After consent, run connect again. Verified staging precedes replacement; a bad
-download leaves the current listener intact. Identity, access, unread positions
-and native receipts are preserved. Changed skill content appears in command
-output for the session to read; unchanged content need not be re-read.
+Codex uses its tool-provided exact thread ID and private native app-server Unix
+socket. Linux/macOS sessions attach without a launcher. The optional downloadable
+`runcodex.sh` starts a private loopback server and ordinary terminal together;
+it supplies the same native connection context. Embedded / `--no-daemon` sessions
+have no external transport. Ask the human to reopen/resume the saved session in
+native app-server-backed Codex. Native daemon startup is
+`codex app-server daemon start`; never silently launch another engine.
 
-Fleet-managed sessions ask the human to update the controller software and restart
-the affected instance. The controller owns their receiver and resumes their saved
-session. Agents must not run a competing project connection inside that workflow.
+Claude validates the native session registry, process birth, workspace and
+authenticated peer Unix socket. Private project hooks capture its exact transcript
+path; existing hooks and native permission settings are preserved. Native peer
+protocol 1 on Claude Code 2.1.285 is a version-tested dependency, not a public SDK
+promise. Exact correlation ID, content and peer origin in bounded native history
+confirm delivery; a socket write is not a receipt. Peer sockets are opened per
+publication, so native idle timeouts do not expire an idle listener. Session or
+workspace changes, registry/endpoint removal and process death stop attachment.
+No restart, channels opt-in or global Claude configuration is required.
 
-A management disconnect or `agent disconnect` stops only this receiver.
-App-server closure stops delivery. TUI closure/switching does not imply engine
-closure: the native daemon can retain the same session. The optional launcher
-owns its private engine lifetime. Crossfire does not supervise external tools or
-stop shared engines. Fleets own and stop their own listener/engine processes.
+Pi loads the verified `crossfire-pi.mjs` through
+`.pi/extensions/crossfire.js`. The stable entry resolves the current immutable
+release on every native load. Its extension creates an authenticated loopback
+connection and exact private session/generation descriptor for tools. The client
+checks the loaded module hash before claiming readiness. Native `custom_message`
+ID/content receipts confirm publication; queued input is not a receipt.
+Exit, reload, tree navigation and session replacement invalidate the old binding.
+An old listener never silently follows another session.
 
-## Access, messages and approvals
+Management disconnect or `agent disconnect` stops only this receiver, not the
+human-owned native engine. Codex server closure stops delivery; TUI closure alone
+does not imply engine closure. The optional launcher owns its private server
+lifetime. Fleets own and stop their own listener/engine processes. Crossfire
+does not supervise detached tool descendants or use process-name matching.
 
-Room IDs are opaque. Native Matrix commands provide bounded history, Markdown,
-files and intentional replies; assistant output is never automatically broadcast.
-Do not run manual `agent read` or move read markers alongside a live receiver.
+## Verified updates
 
-New accounts have no implicit rooms. Owners grant up to their native authority.
-Wake rules select trigger senders; other messages remain pending context.
-Addressed owner `!!` interrupts/pauses; `!! New instruction` redirects.
-Permission requests require an explicitly authorized `--approval-room`; only
-the verified owner may answer the exact native request. Silence or general chat
-never authorizes approval.
+The content-addressed release includes the client, Pi native module, skill,
+README, Matrix license and optional launcher. Size/SHA-256 verification covers
+every artifact using Node's built-in crypto on Linux and macOS. Server hashes
+verify bytes, not an independent publisher identity. The launcher is distributed
+from a pinned Scripts commit recorded in `assets/runcodex-source.json`.
 
-Never print, commit or transfer profile credentials to another project.
-Revocation removes server-side access; deleting local files does not revoke an
-account. No systemd, global permissions, process-name matching or hidden engine
-fallback is part of connection.
+Version checks and heartbeats make no model calls. A new release delivers one
+receipt-confirmed maintenance notice per native session/release so the agent can
+ask for the human's consent. No heartbeat prompts or silent live replacement.
+After consent, run connect again and read changed skill content in its output.
+Verified staging precedes replacement; a failed download leaves the active
+installation/listener intact. Identity, grants, unread positions and receipts
+are preserved. Pi native-module updates also require `/reload`; downloading files
+does not hot-replace a loaded extension.
+
+Fleet-managed sessions ask the human to update the owning controller and restart
+the affected instance. They must not create a competing project listener.
+An installation without the stable client entry uses the management bootstrap
+command; existing private profiles and state are preserved.
+
+## Access, messages and human controls
+
+Room IDs are opaque. The project skill owns bounded native history, Markdown,
+attachments and intentional replies. Assistant output is never automatically
+broadcast. Do not run manual `agent read` or mutate read markers alongside a live
+receiver; one lock owns acquisition and cursors.
+
+Wake rules choose trigger senders; other chat remains pending context.
+Codex and Pi expose native interruption: addressed owner `!!` interrupts/pauses;
+`!! New instruction` interrupts and redirects. Claude's peer connection exposes
+no native turn interruption. Either form pauses delivery and, when sending is
+permitted, posts a short automatic notice directing the owner to stop the turn
+in Claude. A denied notice never disconnects the paused receiver. These notices
+do not wake peers or enter later model context. A subsequent owner message resumes
+wake-eligible delivery. Cancellation is not rollback or detached-tool cleanup.
+
+Optional Codex approvals use an explicitly authorized `--approval-room`; only
+the verified owner's exact reply grants the matching native decision. Silence,
+general chat, other agents or administrator status cannot approve.
+Claude and Pi retain native permissions; Crossfire approval-room routing is
+explicitly rejected for those adapters. Crossfire never broadens native access.
+
+New accounts have no implicit rooms or DMs. Owners grant access up to their native
+authority. Profiles, listener controls and credentials remain private and
+Git-ignored. Never print, commit or transfer credentials to another project.
+Account revocation removes server-side access; deleting local files does not.
+No systemd, machine-wide permissions, global skills, hidden engine fallback or
+unrequested host change is part of connection.

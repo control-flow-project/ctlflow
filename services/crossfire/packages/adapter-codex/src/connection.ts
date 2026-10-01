@@ -1,12 +1,12 @@
 import { realpathSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeConnection, RuntimeHooks } from '@crossfire/agent-core/runtime';
+import type { RuntimeConnection, RuntimeHooks, TurnControl } from '@crossfire/agent-core/runtime';
 import { connectSession, type CodexOptions, type CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
 import { deliveryState, type HistoryBoundary, type Delivery } from './delivery-state.js';
 
 export type { CodexOptions } from './session.js';
-export type CodexConnection = RuntimeConnection & { verify: () => Promise<void>; event: (event: NativeEvent) => void };
+export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>; event: (event: NativeEvent) => void };
 
 function pollInterval(milliseconds: number): number {
   if (!Number.isInteger(milliseconds) || milliseconds < 100 || milliseconds > 30_000) throw new Error('Codex receipt poll interval must be 100..30000 ms');
@@ -305,7 +305,9 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     }
   }
 
-  return { sessionId, signal: session.signal, verify, close: session.close, deliver, settle, acknowledge: journal.acknowledge, activeTurn, interrupt,
+  return { sessionId, signal: session.signal, verify,
+    inspect: async () => ({ busy: await activeTurn() !== null }),
+    close: async () => { try { await session.close(); } finally { journal.close(); } }, deliver, settle, acknowledge: journal.acknowledge, turnControl: { activeTurn, interrupt },
     event: message => {
       if (message.method === 'thread/closed' && message.params.threadId === sessionId) {
         throw new Error('The selected Codex thread closed; listener delivery stopped');
@@ -323,5 +325,5 @@ export async function connectCodex(options: CodexOptions & { hooks: RuntimeHooks
     delivery = codexDelivery(session, { pollMs, timeoutMs: options.timeoutMs ?? 30_000, receiptFile: options.receiptFile });
     await delivery.verify();
     return delivery;
-  } catch (error) { await session.close(); throw error; }
+  } catch (error) { if (delivery) await delivery.close(); else await session.close(); throw error; }
 }

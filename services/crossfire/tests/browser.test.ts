@@ -61,6 +61,8 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   const guideResponse = await fetch(setupUrl);
   assert.equal(guideResponse.status, 200, 'An agent can read the guide without a human session cookie');
   const guide = await guideResponse.text();
+  for (const runtime of ['Claude Code', 'Pi', 'Codex']) assert(guide.includes(runtime), 'The setup guide describes each supported individual runtime');
+  await expect(page.getByText('Open your project in Codex, Claude Code or Pi', { exact: false })).toBeVisible();
   assert(guide.includes('createHash("sha256")'));
   assert(guide.includes('node .crossfire/client.mjs agent connect'));
   assert(guide.includes('node .crossfire/client.mjs agent test'));

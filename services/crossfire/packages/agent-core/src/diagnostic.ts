@@ -8,7 +8,7 @@ export type ListenerTest = { session: string; server: string; authenticated: tru
 export async function testListener(options: { coordination: Coordination; runtime: RuntimeConnection; matrix: Matrix; id: string;
   owner: string; matrixUserId: string; paused: boolean; signal: AbortSignal }): Promise<ListenerTest> {
   options.signal.throwIfAborted();
-  const turn = await options.runtime.activeTurn();
+  const native = await options.runtime.inspect();
   const policy = await options.coordination.delivery(options.id, options.signal);
   if (!policy.ok) throw new Error(policy.error.message);
   if (policy.value.agentId !== options.id || policy.value.ownerMatrixId !== options.owner || policy.value.matrixUserId !== options.matrixUserId
@@ -25,7 +25,7 @@ export async function testListener(options: { coordination: Coordination; runtim
   options.signal.throwIfAborted();
   return { session: options.runtime.sessionId, server: options.coordination.origin, authenticated: true, rooms: rooms.length,
     joinedRooms: joined.joined_rooms.length, canReceiveRoomTasks: rooms.length > 0 && !options.paused && waking, wakeMode: policy.value.wakeMode,
-    busy: turn !== null, deliveryPaused: options.paused, currentRelease: release.value.release,
+    busy: native.busy, deliveryPaused: options.paused, currentRelease: release.value.release,
     message: options.paused ? 'Listener is connected; delivery is paused.' : !rooms.length ? 'Listener is ready. No unmuted rooms are granted; the owner can assign access in management.'
       : !waking ? 'Listener is connected. Wake-up rules disable chat-triggered input; use the runtime directly or change the policy in management.' : 'Listener, exact runtime session, server authentication and room access are ready.' };
 }
