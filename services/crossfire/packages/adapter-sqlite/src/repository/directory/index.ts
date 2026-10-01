@@ -1,4 +1,5 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
+import { agentDisplayName } from '@crossfire/domain/identity/display-name';
 import type Database from 'better-sqlite3';
 import { schema, type Tables } from '../../schema/tables.js';
 import type { DirectoryRepository, Page, PageRequest, MemberRecord, AgentRecord, DirectoryFilter } from '@crossfire/domain/port/directory';
@@ -415,7 +416,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       name: row.name.name })));
         return success([
           ...humans.map(memberRecord).map(row => ({ principal: row.principal, displayName: row.member.displayName, ownerId: row.principal.id })),
-          ...agents.map(agentRecord).map(row => ({ principal: row.principal, displayName: row.agent.displayNameOverride ?? row.name + ' (' + row.ownerMember.displayName + ')', ownerId: row.owner.id })),
+          ...agents.map(agentRecord).map(row => ({ principal: row.principal, displayName: agentDisplayName(row.name, row.ownerMember.displayName, row.agent.displayNameOverride), ownerId: row.owner.id })),
         ]);
       });
     },

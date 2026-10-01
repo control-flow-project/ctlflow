@@ -57,7 +57,7 @@ export const room = check.object({ roomId: check.roomId, name: check.text(255), 
   authority: check.nullable(roomAuthority) });
 export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, outcome: check.choice('claimed', 'existing', 'failed'),
   agentId: check.nullable(check.identifier), failureCode: check.nullable(check.text(100)) });
-export const enrollment = check.object({ controllerName: check.nullable(check.text(100)), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.nullable(check.name),
+export const enrollment = check.object({ owner: principal, controllerName: check.nullable(check.text(100)), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.nullable(check.name),
   verificationCode: check.text(12, 12), status: check.choice('pending', 'approved', 'rejected', 'expired'), revision: check.integer(),
   createdAt: check.integer(), expiresAt: check.integer(), decidedByMemberId: check.nullable(check.identifier), decidedAt: check.nullable(check.integer()) });
 export const enrollmentDetails = check.object({ enrollment, instances: check.list(enrollmentItem, 100) });
@@ -79,6 +79,7 @@ export const policy = check.object({ revision: check.integer(), maxOwnerAgents: 
   maxPending: check.integer(1, 1000), enrollmentSeconds: check.integer(60, 3600), reconcileSeconds: check.integer(30, 3600), agentInstructions: check.multiline,
   signupMode: check.choice('invitation', 'open'), invitationIssuers: check.choice('administrators', 'members') });
 export const audit = check.object({ auditId: check.identifier, requestId: check.identifier, actorCredentialId: check.nullable(check.identifier), actorKind: check.choice('human', 'agent', 'controller', 'system', 'anonymous'),
+  actor: check.nullable(principal), target: check.nullable(principal),
   actorPrincipalId: check.nullable(check.identifier), ownerId: check.nullable(check.identifier), targetKind: check.text(100), targetId: check.text(255),
   roomId: check.nullable(check.roomId), membershipGeneration: check.nullable(check.identifier), authorizerId: check.nullable(check.identifier),
   addedById: check.nullable(check.identifier), permissionCode: check.nullable(check.text(100)), action: check.text(100),

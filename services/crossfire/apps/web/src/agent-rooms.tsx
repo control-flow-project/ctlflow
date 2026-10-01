@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AgentView, RoomView, RoomGrantView } from '@crossfire/contracts/schema/response';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
-import { Alert, Loaded, Page, Panel, Pagination, PageItems, Status, timestamp } from './ui.js';
+import { Alert, Help, Loaded, Page, Panel, Pagination, PageItems, Status, SubjectHeading, timestamp } from './ui.js';
 
 const labels = { none: 'No access', read: 'Read only', reply: 'Read & reply', custom: 'Custom power level' } as const;
 function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; view?: RoomGrantView }) {
@@ -64,16 +64,17 @@ function Delegation({ view, roomId }: { view: RoomGrantView; roomId: string }) {
     { expectedRevision: view.revision, expectedGeneration: grant.generation, permissions: enabled ? ['room.agent.invite'] : [] }, viewer.csrfSecret)); }}>
     <fieldset disabled={!view.allowedActions.includes('permissions.set') || action.pending}><label className="check"><input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)}/>Allow this agent to invite other registered agents</label>
       <p className="support">May cross owners, within the inviter’s native Matrix authority. The agent may remove only additions it made. It cannot pass this permission onward.</p><button>Save invitation permission</button></fieldset><Alert>{action.error}</Alert>
-    <dl><dt>Added by principal</dt><dd className="mono">{grant.addedById}</dd><dt>Authorizing principal</dt><dd className="mono">{grant.authorizerId}</dd><dt>Membership generation</dt><dd className="mono">{grant.generation}</dd></dl></form>;
+    <Help title="Grant provenance"><dl><dt>Added by principal</dt><dd className="mono">{grant.addedById}</dd><dt>Authorizing principal</dt><dd className="mono">{grant.authorizerId}</dd><dt>Membership generation</dt><dd className="mono">{grant.generation}</dd></dl></Help></form>;
 }
 export function AgentRoomDetail({ id, room }: { id: string; room: string }) {
   const agent = useResource(operations.agent, { agentId: id }), resource = useResource(operations.room, { roomId: room }, new URLSearchParams({ agentId: id }).toString());
   const grant = useResource(operations.grant, { agentId: id, roomId: room }, '', 5000);
   return <Page title="Room access" description="Room access, Matrix permissions and agent invitations."><a className="back" href={'/manage/agents/' + id}>← Agent details</a>
     <Loaded {...agent} retry={agent.refresh}>{identity => <Loaded {...resource} retry={resource.refresh}>{native => <Loaded {...grant} retry={grant.refresh}>{access => <>
-      <Panel title={native.data.name}><p className="mono">{room}</p><p>{native.data.topic}</p><GrantEditor agent={identity.data} room={native.data} view={access.data}/><AppliedGrant view={access.data}/><p>Last applied: {timestamp(access.data.application?.lastSuccessAt ?? null)}</p></Panel>
+      <SubjectHeading name={native.data.name} description={<>Access for {identity.data.displayName}{native.data.alias && <span className="subline">{native.data.alias}</span>}</>}><AppliedGrant view={access.data}/></SubjectHeading>
+      <Panel title="Room access" description="Set the permissions this agent needs in this room."><div className="bounded-form"><GrantEditor agent={identity.data} room={native.data} view={access.data}/></div><p className="support">Last applied: {timestamp(access.data.application?.lastSuccessAt ?? null)}</p>{native.data.topic && <Help title="Room topic"><p>{native.data.topic}</p></Help>}<Help title="Immutable room ID"><code>{room}</code></Help></Panel>
       <Panel title="Agent invitations"><Delegation view={access.data} roomId={room}/></Panel>
-      <Panel title="Native Matrix permissions"><Authority room={native.data}/><PageItems items={native.data.authority?.nativePermissions ?? []} parameter="permissionsPage">{permissions => <div className="table-wrap"><table><thead><tr><th>Action</th><th>Required power</th></tr></thead><tbody>
-        {permissions.map(permission => <tr key={permission.action}><td>{permission.action}</td><td>{permission.level}</td></tr>)}</tbody></table></div>}</PageItems></Panel>
+      <Panel title="Native Matrix permissions"><Authority room={native.data}/><Help title="View native permission thresholds"><PageItems items={native.data.authority?.nativePermissions ?? []} parameter="permissionsPage">{permissions => <div className="table-wrap"><table aria-label="Native permission thresholds"><thead><tr><th>Action</th><th>Required power</th></tr></thead><tbody>
+        {permissions.map(permission => <tr key={permission.action}><td>{permission.action}</td><td>{permission.level}</td></tr>)}</tbody></table></div>}</PageItems></Help></Panel>
     </>}</Loaded>}</Loaded>}</Loaded></Page>;
 }

@@ -1,7 +1,7 @@
 import { onboardingUrl } from '@crossfire/contracts/onboarding';
 import { useSession } from './session.js';
 import { operations, useResource } from './api.js';
-import { CopyText, Loaded, Page } from './ui.js';
+import { CopyText, Loaded, Page, ViewNavigation } from './ui.js';
 function SetupPicture({ step }: { step: number }) {
   return <svg className={'setup-picture setup-picture-' + step} viewBox="0 0 160 100" aria-hidden="true"><path d="M16 18h112v62H16z" fill="currentColor"/><path d="M28 30h112v62H28z" fill="var(--surface)" stroke="var(--ink)" strokeWidth="2"/>
     {step === 1 ? <><path d="m44 48 10 8-10 8m22 0h34" fill="none" stroke="var(--ink)" strokeWidth="3"/><circle cx="126" cy="32" r="15" fill="currentColor"/><path d="m119 32 5 5 9-10" fill="none" stroke="var(--ink)" strokeWidth="2"/></>
@@ -10,7 +10,7 @@ function SetupPicture({ step }: { step: number }) {
   </svg>;
 }
 function SetupTabs({ fleet }: { fleet: boolean }) {
-  return <nav className="setup-tabs" aria-label="Connection type"><a href="/manage/connect" aria-current={!fleet ? 'page' : undefined}>One agent</a><a href="/manage/connect/fleet" aria-current={fleet ? 'page' : undefined}>Fleet · advanced</a></nav>;
+  return <ViewNavigation label="Connection type" items={[{ label: 'One agent', href: '/manage/connect', current: !fleet }, { label: 'Fleet · advanced', href: '/manage/connect/fleet', current: fleet }]}/>;
 }
 export function Connect({ fleet = false }: { fleet?: boolean }) {
   const { member } = useSession(), release = useResource(operations.release, {});

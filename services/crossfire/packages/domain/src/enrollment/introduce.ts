@@ -7,9 +7,14 @@ import { verifyRoster } from './preflight.js';
 import { expireEnrollments } from './expire.js';
 import type { EnrollmentRequest, EnrollmentItem } from './types.js';
 import { enrollmentCapacity } from './capacity.js';
+import { enrollmentOverviews, type EnrollmentOverview } from './overview.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'unitOfWork' | 'identity' | 'clock'>;
-export type EnrollmentReceipt = { request: EnrollmentRequest; instances: EnrollmentItem[] };
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'matrix' | 'unitOfWork' | 'identity' | 'clock'>;
+export type EnrollmentReceipt = EnrollmentOverview & { instances: EnrollmentItem[] };
+function receipt(services: Dependencies, request: EnrollmentRequest, instances: EnrollmentItem[]): Result<EnrollmentReceipt> {
+  const overview = enrollmentOverviews(services, [request]);
+  return overview.ok ? success({ ...overview.value[0]!, instances }) : overview;
+}
 export async function introduceEnrollment(services: Dependencies, input: EnrollmentIntroduction): Promise<Result<EnrollmentReceipt>> {
   if (!/^[a-f0-9-]{36}$/u.test(input.enrollmentId) || !/^[A-Za-z0-9_-]{43}$/u.test(input.claimSecret)) return failure('invalid', 'Persist a request UUID and private 32-byte claim before enrollment');
   const rosterDigest = services.identity.hash(JSON.stringify({ owner: input.ownerMatrixId, fleet: input.fleetKey,
@@ -19,7 +24,7 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
   if (prior.value) {
     if (prior.value.expiresAt <= services.clock.now() || prior.value.rosterDigest !== rosterDigest || !services.identity.matches(input.claimSecret, prior.value.claimHash)) return failure('conflict', 'Enrollment request belongs to different credentials or roster, or has expired');
     const items = services.collection.enrollmentItems({ requestId: input.enrollmentId });
-    return items.ok ? success({ request: prior.value, instances: items.value }) : items;
+    return items.ok ? receipt(services, prior.value, items.value) : items;
   }
   const verified = await verifyRoster(services, input);
   if (!verified.ok) return verified;
@@ -31,7 +36,7 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
     if (previous.value) {
       if (previous.value.rosterDigest !== rosterDigest || !services.identity.matches(input.claimSecret, previous.value.claimHash)) return failure('conflict', 'Enrollment request belongs to different credentials or roster');
       const items = services.collection.enrollmentItems({ requestId: input.enrollmentId });
-      return items.ok ? success({ request: previous.value, instances: items.value }) : items;
+      return items.ok ? receipt(services, previous.value, items.value) : items;
     }
     const owner = services.repositories.principal.find({ id: verified.value.ownerId });
     if (!owner.ok) return owner;
@@ -86,6 +91,6 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       if (!finished.ok) return finished;
       request.status = 'approved'; request.revision = 1;
     }
-    return success({ request, instances });
+    return receipt(services, request, instances);
   });
 }

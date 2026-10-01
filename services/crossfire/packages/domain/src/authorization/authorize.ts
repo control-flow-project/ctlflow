@@ -7,12 +7,14 @@ export function activeActor(services: Pick<Services, 'repositories' | 'clock'>, 
   const principal = services.repositories.principal.find({ id: actor.principalId });
   if (!principal.ok) return principal;
   if (!principal.value || principal.value.kind !== actor.kind || principal.value.status !== 'active') return failure('forbidden', 'An active registered identity is required');
-  if (actor.kind === 'human') {
-    if (!actor.sessionHash) return failure('unauthorized', 'A human management session is required');
-    const session = services.repositories.memberSession.find({ secretHash: actor.sessionHash });
+  if (actor.authentication?.kind === 'native' && actor.authentication.matrixUserId !== principal.value.matrixUserId) return failure('unauthorized', 'Native session identity changed');
+  if (actor.kind === 'human' && actor.authentication?.kind !== 'native') {
+    if (actor.authentication?.kind !== 'management') return failure('unauthorized', 'A verified human session is required');
+    const session = services.repositories.memberSession.find({ secretHash: actor.authentication.sessionHash });
     if (!session.ok) return session;
     if (!session.value || session.value.memberId !== actor.principalId || session.value.expiresAt <= services.clock.now()) return failure('unauthorized', 'Management session expired or ended');
-  } else {
+  }
+  if (actor.kind === 'agent') {
     const agent = services.repositories.agent.find({ principalId: actor.principalId });
     if (!agent.ok) return agent;
     if (!agent.value) return failure('forbidden', 'Agent identity is not registered');

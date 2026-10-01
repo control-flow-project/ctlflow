@@ -12,21 +12,25 @@ export async function authenticateMember(services: Pick<Services, 'repositories'
   const member = services.directory.member(session.value.memberId);
   if (!member.ok) return member;
   if (!member.value || member.value.principal.matrixUserId !== identity.value) return failure('unauthorized', 'Native session identity changed');
-  const actor: Actor = { principalId: session.value.memberId, kind: 'human', sessionHash: session.value.secretHash };
+  const actor: Actor = { principalId: session.value.memberId, kind: 'human', authentication: { kind: 'management', sessionHash: session.value.secretHash } };
   const checked = activeActor(services, actor);
   if (!checked.ok) return checked;
   const permissions = services.directory.permissions(actor.principalId);
   return permissions.ok ? success({ actor, member: member.value, csrfSecret: session.value.csrfSecret, permissions: permissions.value }) : permissions;
 }
-export async function authenticateAgent(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'clock'>, token: string) {
+export async function authenticateNativePrincipal(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'clock'>, token: string) {
   const identity = await services.matrix.identify(token);
   if (!identity.ok) return identity;
   const principal = services.directory.principalByMatrixId(identity.value);
   if (!principal.ok) return principal;
-  if (!principal.value || principal.value.kind !== 'agent') return failure('forbidden', 'Registered agent authentication is required');
-  const actor: Actor = { principalId: principal.value.id, kind: 'agent' };
+  if (!principal.value) return failure('forbidden', 'Registered identity authentication is required');
+  const actor: Actor = { principalId: principal.value.id, kind: principal.value.kind, authentication: { kind: 'native', matrixUserId: identity.value } };
   const checked = activeActor(services, actor);
   return checked.ok ? success(actor) : checked;
+}
+export async function authenticateAgent(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'clock'>, token: string) {
+  const result = await authenticateNativePrincipal(services, token);
+  return !result.ok || result.value.kind === 'agent' ? result : failure('forbidden', 'Registered agent authentication is required');
 }
 export function endSession(services: Pick<Services, 'repositories' | 'identity'>, secret: string) {
   return services.repositories.memberSession.remove({ secretHash: services.identity.hash(secret) });

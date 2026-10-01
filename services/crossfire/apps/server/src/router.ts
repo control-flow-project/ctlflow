@@ -35,7 +35,7 @@ export function publicRouter(routes: Routes) {
     const registration = /^\/_matrix\/client\/[^/]+\/register\/?$/u.test(path);
     const registrationAuthentication = /^\/_matrix\/client\/[^/]+\/auth\/org\.crossfire\.login\.registration\/fallback\/web\/?$/u.test(path);
     const elementConfiguration = path === '/config.json' || path === '/config.' + new URL(routes.publicOrigin).hostname + '.json';
-    const management = registration || registrationAuthentication || elementConfiguration || path.startsWith('/api/') || path.startsWith('/onboarding/');
+    const management = path === '/_matrix/client/v3/user_directory/search' || registration || registrationAuthentication || elementConfiguration || path.startsWith('/api/') || path.startsWith('/onboarding/');
     if (native || management) {
       const target = new URL(management ? routes.serviceOrigin : routes.matrixOrigin);
       const headers: IncomingHttpHeaders = { ...request.headers, host: new URL(routes.publicOrigin).host };

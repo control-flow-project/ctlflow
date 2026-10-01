@@ -194,6 +194,7 @@ try {
         assert.equal(await page.evaluate<string>('navigator.clipboard.readText()'), copied);
         await page.screenshot({ path: join(directory, 'connect-' + iteration + '.png'), fullPage: true });
         await page.goto(origin + '/manage/policy');
+        await page.getByText('How capacity is counted', { exact: true }).click();
         await expect(page.getByText('Members use the per-owner limit.', { exact: false })).toContainText('defaults to 100 agents');
         if (iteration === 0) {
           await page.getByLabel('Agents per member owner').fill('9');

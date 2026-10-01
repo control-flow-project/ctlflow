@@ -30,8 +30,8 @@ const administration = [
 function Route({ canInvite }: { canInvite: boolean }) {
   const viewer = useSession();
   if (path === '/manage' || path === '/manage/agents') return <Agents/>;
-  const agent = /^\/manage\/agents\/([a-f0-9-]{36})$/u.exec(path);
-  if (agent) return <AgentDetail id={agent[1]!}/>;
+  const agent = /^\/manage\/agents\/([a-f0-9-]{36})(?:\/(wake|activity|software|settings))?$/u.exec(path);
+  if (agent) { const section = agent[2]; if (section === undefined || section === 'wake' || section === 'activity' || section === 'software' || section === 'settings') return <AgentDetail id={agent[1]!} section={section ?? 'rooms'}/>; }
   const agentRoom = /^\/manage\/agents\/([a-f0-9-]{36})\/rooms\/([^/]+)$/u.exec(path);
   if (agentRoom) return <AgentRoomDetail id={agentRoom[1]!} room={decodeURIComponent(agentRoom[2]!)}/>;
   if (path === '/manage/enrollments') return <Enrollments/>;
@@ -44,8 +44,8 @@ function Route({ canInvite }: { canInvite: boolean }) {
   if (path === '/manage/fleets') return <Fleets/>;
   const fleetMap = /^\/manage\/fleets\/([a-f0-9-]{36})\/map$/u.exec(path);
   if (fleetMap) return <FleetMap id={fleetMap[1]!}/>;
-  const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})$/u.exec(path);
-  if (fleet) return <FleetDetail id={fleet[1]!}/>;
+  const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})(?:\/(delivery|messages|rooms|settings))?$/u.exec(path);
+  if (fleet) { const section = fleet[2]; if (section === undefined || section === 'delivery' || section === 'messages' || section === 'rooms' || section === 'settings') return <FleetDetail id={fleet[1]!} section={section ?? 'agents'}/>; }
   if (viewer.member.roleCode === 'administrator') {
     if (path === '/manage/members') return <Members/>;
     if (path === '/manage/policy') return <Settings/>;

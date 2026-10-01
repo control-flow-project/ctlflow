@@ -150,7 +150,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
   scope.after(() => browser.close());
   const errors: string[] = [];
+  const identityReads: string[] = [];
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  page.on('request', request => { if (new URL(request.url()).pathname === '/api/principals') identityReads.push(request.url()); });
   page.on('pageerror', error => errors.push(error.message));
   page.on('dialog', dialog => dialog.accept());
   await page.goto(origin + '/manage/');
@@ -209,9 +211,14 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const profile = readProfile(destination.profile);
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
   await page.getByRole('link', { name: 'Agent details →' }).click();
+  await expect(page.getByRole('region', { name: 'Rooms & access', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveCount(0);
+  await expect(page.getByLabel('Configured display name')).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Wake-up rules', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue('owner');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' }).locator('option')).toHaveCount(6);
+  await page.getByText('Context and blocked messages', { exact: true }).click();
   await expect(page.getByText('Nobody disables chat-triggered input', { exact: false })).toBeVisible();
   for (const policy of ['nobody', 'owner-agents', 'humans', 'everyone', 'owner']) {
     await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption(policy);
@@ -222,6 +229,8 @@ test('real browser member/admin flows and project listener span native Conduit, 
     assert.equal(value(services.directory.agent(profile.id))!.agent.wakeMode, policy);
     assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
   }
+  assert.deepEqual(identityReads, [], 'Identity selection is read only when the selected wake-up mode is open');
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Rooms', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Engineering', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('read');
   await submit(page, 'Save access');
@@ -229,18 +238,30 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await worker.drain();
   const agent = { base: origin, token: profile.account.access_token };
   assert(!(await nativeOk(agent, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/denied', { msgtype: 'm.text', body: 'Denied' })).ok);
-  await page.reload();
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Configured display name').fill('Holmes');
   await submit(page, 'Save name');
   await expect(page.getByRole('heading', { name: 'Holmes', exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Rooms', exact: true }).click();
   await page.getByRole('link', { name: 'Engineering', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Native Matrix permissions', exact: true })).toBeVisible();
+  const nativePermissions = page.getByRole('table', { name: 'Native permission thresholds', exact: true });
+  await expect(nativePermissions).toBeHidden();
+  await page.getByText('View native permission thresholds', { exact: true }).click();
+  await expect(nativePermissions).toBeVisible();
+  const roomResponse = await page.request.get(origin + '/api/rooms/' + encodeURIComponent(room) + '?agentId=' + profile.id);
+  assert.equal(roomResponse.status(), 200);
+  const thresholds = (await roomResponse.json() as { data: { authority: { nativePermissions: { action: string; level: number }[] } } }).data.authority.nativePermissions;
+  for (const permission of thresholds) {
+    const row = nativePermissions.getByRole('row').filter({ has: page.getByRole('cell', { name: permission.action, exact: true }) });
+    await expect(row.getByRole('cell').nth(1)).toHaveText(String(permission.level));
+  }
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Engineering', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('custom');
   await page.getByLabel('Power level', { exact: true }).fill('50');
   await submit(page, 'Save access');
-  await expect(page.getByText('Custom power level', { exact: true }).last()).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.subject-status .status')).toHaveText('Custom power level', { timeout: 15_000 });
   await worker.drain();
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: room }))!.powerLevel, 50);
   await page.getByRole('link', { name: '← Agent details' }).click();
@@ -248,13 +269,13 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await submit(page, 'Save access');
   await page.waitForLoadState('load'); await worker.drain();
   await page.goto(origin + '/manage/agents');
-  await expect(page.getByRole('heading', { name: 'Holmes', exact: true })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Agents', exact: true }).getByRole('link', { name: 'Holmes', exact: true })).toBeVisible();
   await page.screenshot({ path: join(directory, 'admin-agents.png'), fullPage: true });
   const home = join(directory, 'codex-home'); mkdirSync(home);
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, workspace);
   await materialize(engine, provider);
-  await page.goto(origin + '/manage/agents/' + profile.id);
+  await page.goto(origin + '/manage/agents/' + profile.id + '/wake');
   await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('nobody');
   await submit(page, 'Save wake-up policy');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
@@ -285,9 +306,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await until(() => provider.requests.some(value => JSON.stringify(value).includes('Crossfire integrated native delivery')) || listenerFailure !== undefined);
   assert.equal(listenerFailure, undefined, String(listenerFailure));
   provider.finish();
-  await page.goto(origin + '/manage/agents/' + profile.id);
+  await page.goto(origin + '/manage/agents/' + profile.id + '/activity');
   const activity = page.getByRole('region', { name: 'Listener activity' });
   await expect(activity.getByText('online', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Software', exact: true }).click();
   const software = page.getByRole('region', { name: 'Listener software', exact: true });
   await expect(software.getByText('Current', { exact: true })).toBeVisible();
   const installedRelease = release.manifest.release;
@@ -297,11 +319,13 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(software.getByText('Update available', { exact: true })).toBeVisible();
   await expect(software.locator('tbody').getByText(installedRelease, { exact: true })).toBeVisible();
   await expect(software.getByRole('link', { name: 'Update instructions for this server', exact: true })).toHaveAttribute('href', '/onboarding/' + release.manifest.release + '/README.md');
-  await expect(activity.getByText('online', { exact: true })).toBeVisible();
   assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Version discovery must not call the model');
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Configured display name').fill('Unsaved name');
   await page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
   await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Activity', exact: true }).click();
+  await expect(activity.getByText('online', { exact: true })).toBeVisible();
   const requestsBeforeDisconnect = provider.requests.length;
   page.removeAllListeners('dialog');
   page.once('dialog', dialog => dialog.dismiss());
@@ -388,6 +412,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert(await memberPage.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
   await page.goto(origin + '/manage/policy');
   await page.getByLabel('Agents per member owner').fill('8');
+  await page.getByText('How capacity is counted', { exact: true }).click();
   await expect(page.getByText('Members use the per-owner limit.', { exact: false })).toContainText('defaults to 100 agents');
   const guidance = 'Keep replies concise.\nUse project tickets for "東京". <b>Plain text only.</b>';
   const instructionsField = page.getByLabel('Additional agent instructions', { exact: true });
@@ -422,6 +447,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none'), []);
   await page.goto(origin + '/manage/audit');
   await expect(page.getByText('instance-policy.configure', { exact: true })).toHaveCount(2);
+  const audit = page.getByRole('table', { name: 'Management activity', exact: true });
+  await expect(audit.getByText('Change instance settings', { exact: true })).toHaveCount(2);
+  await expect(audit.getByText('admin', { exact: true }).first()).toBeVisible();
   const adminSession = value(await createSession(services, human.token)), adminActor = value(await authenticateMember(services, adminSession.secret)).actor;
   const aliceAccount = value(await nativeOk({ base: origin }, 'POST', API + '/login', { type: 'm.login.password', identifier: { type: 'm.id.user', user: '@alice:architecture.localhost' }, password: 'browser-fixture-only-password' }));
   const aliceSession = value(await createSession(services, String(aliceAccount.access_token))), aliceActor = value(await authenticateMember(services, aliceSession.secret)).actor;
@@ -437,10 +465,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(page.getByLabel('Show active', { exact: true })).toBeChecked();
   await expect(page.getByLabel('Show suspended', { exact: true })).toBeChecked();
   await expect(page.getByLabel('Show revoked', { exact: true })).not.toBeChecked();
-  await expect(page.locator('.agent-card')).toHaveCount(2);
+  await expect(page.getByRole('table', { name: 'Agents', exact: true }).locator('tbody tr')).toHaveCount(2);
   await page.getByLabel('Show revoked', { exact: true }).check();
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Apply filters', exact: true }).click()]);
-  await expect(page.locator('.agent-card')).toHaveCount(3);
+  await expect(page.getByRole('table', { name: 'Agents', exact: true }).locator('tbody tr')).toHaveCount(3);
   assert.equal(new URL(page.url()).searchParams.get('status'), 'active,suspended,revoked');
   await page.reload();
   await expect(page.getByLabel('Show revoked', { exact: true })).toBeChecked();
@@ -448,9 +476,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Apply filters', exact: true }).click()]);
   await expect(page.getByRole('heading', { name: 'No matching agents', exact: true })).toBeVisible();
   await memberPage.goto(origin + '/manage/agents?status=active,suspended,revoked');
-  await expect(memberPage.locator('.agent-card')).toHaveCount(1);
-  await expect(memberPage.locator('.agent-card')).toContainText('alice-agent');
+  await expect(memberPage.getByRole('table', { name: 'Agents', exact: true }).locator('tbody tr')).toHaveCount(1);
+  await expect(memberPage.getByRole('table', { name: 'Agents', exact: true })).toContainText('alice-agent');
   await reviewLayouts(page, origin, directory, 'administrator', ['/manage/agents', '/manage/agents/' + profile.id,
+    ...['wake', 'activity', 'software', 'settings'].map(section => '/manage/agents/' + profile.id + '/' + section),
     '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room), '/manage/connect', '/manage/enrollments',
     new URL(request.approvalUrl).pathname, '/manage/members', '/manage/invitations', '/manage/policy', '/manage/audit', '/manage/not-a-page']);
   await reviewLayouts(memberPage, origin, directory, 'member', ['/manage/agents', '/manage/fleets', '/manage/enrollments', '/manage/connect', '/manage/policy']);

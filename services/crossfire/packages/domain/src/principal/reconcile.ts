@@ -1,6 +1,7 @@
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import type { Principal } from '../identity/types.js';
+import { agentDisplayName } from '../identity/display-name.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'identity' | 'clock' | 'unitOfWork'>;
 export async function reconcilePrincipal(services: Dependencies, principalId: string): Promise<Result<void>> {
@@ -23,7 +24,7 @@ export async function reconcilePrincipal(services: Dependencies, principalId: st
     ownerRevision = agent.value.owner.revision; ownerId = agent.value.owner.id;
     if (agent.value.owner.status === 'revoked') status = 'revoked';
     else if (agent.value.owner.status !== 'active' && status === 'active') status = 'suspended';
-    displayName = agent.value.agent.displayNameOverride ?? agent.value.name + ' (' + agent.value.ownerMember.displayName + ')';
+    displayName = agentDisplayName(agent.value.name, agent.value.ownerMember.displayName, agent.value.agent.displayNameOverride);
     const credentials = services.repositories.agentCredential.find({ agentId: principal.id });
     if (!credentials.ok) return credentials;
     if (!credentials.value) return failure('missing', 'Agent credentials are missing');

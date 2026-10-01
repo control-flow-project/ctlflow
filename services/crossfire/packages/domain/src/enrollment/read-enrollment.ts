@@ -2,10 +2,15 @@ import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { PageRequest } from '../port/directory.js';
 import { ownerScope } from '../authorization/read-scope.js';
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'clock'>;
+import { enrollmentOverviews } from './overview.js';
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'clock'>;
 export function listEnrollments(services: Dependencies, actor: Actor, input: PageRequest & { ownerId?: string }) {
   const scope = ownerScope(services, actor, 'enrollment.read', input.ownerId);
-  return scope.ok ? services.collection.enrollments({ ...input, ...scope.value }) : scope;
+  if (!scope.ok) return scope;
+  const page = services.collection.enrollments({ ...input, ...scope.value });
+  if (!page.ok) return page;
+  const items = enrollmentOverviews(services, page.value.items);
+  return items.ok ? success({ ...page.value, items: items.value }) : items;
 }
 export function readEnrollment(services: Dependencies, actor: Actor, enrollmentId: string) {
   const request = services.repositories.enrollmentRequest.find({ id: enrollmentId });
@@ -13,6 +18,8 @@ export function readEnrollment(services: Dependencies, actor: Actor, enrollmentI
   if (!request.value) return failure('missing', 'Enrollment not found');
   const scope = ownerScope(services, actor, 'enrollment.read', request.value.ownerId);
   if (!scope.ok) return scope;
+  const overview = enrollmentOverviews(services, [request.value]);
+  if (!overview.ok) return overview;
   const instances = services.collection.enrollmentItems({ requestId: enrollmentId });
-  return instances.ok ? success({ request: request.value, instances: instances.value }) : instances;
+  return instances.ok ? success({ ...overview.value[0]!, instances: instances.value }) : instances;
 }

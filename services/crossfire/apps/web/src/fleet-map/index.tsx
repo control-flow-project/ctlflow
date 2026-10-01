@@ -54,5 +54,5 @@ function MapView({ map }: { map: FleetMapView }) {
 export function FleetMap({ id }: { id: string }) {
   const resource = useResource(operations.fleetMap, { fleetId: id }, '', 30000);
   return <Page title="Fleet map" description="Wake-up sources, agents and room access." action={<button onClick={resource.refresh}>Refresh map</button>}><a className="back" href="/manage/fleets">← Fleets</a>
-    <FleetNavigation id={id} map/><Loaded {...resource} retry={resource.refresh}>{result => <MapView map={result.data}/>}</Loaded></Page>;
+    <FleetNavigation id={id} section="map"/><Loaded {...resource} retry={resource.refresh}>{result => <MapView map={result.data}/>}</Loaded></Page>;
 }
