@@ -42,11 +42,12 @@ test('one connect installs, starts, reuses, upgrades and disconnects the existin
   assert(first.stdout.includes('skill'));
   const record = readFileSync(join(fixture.workspace, '.crossfire/state/watson/listener.json'));
   const count = native.requests().filter(request => request.method === 'thread/resume').length;
-  const tested = JSON.parse((await executeClient('agent', 'test')).stdout) as { status: string; listener: { test: { authenticated: boolean; canReceiveRoomTasks: boolean; session: string } } };
+  const tested = JSON.parse((await executeClient('agent', 'test')).stdout) as { status: string; listener: { test: { authenticated: boolean; canReceiveRoomTasks: boolean; session: string; approval: string } } };
   assert.equal(tested.status, 'passed');
   assert.equal(tested.listener.test.authenticated, true);
   assert.equal(tested.listener.test.canReceiveRoomTasks, true);
   assert.equal(tested.listener.test.session, THREAD);
+  assert.equal(tested.listener.test.approval, 'none');
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
   await Promise.all([executeClient('agent', 'connect'), executeClient('agent', 'connect')]);
   assert.deepEqual(readFileSync(join(fixture.workspace, '.crossfire/state/watson/listener.json')), record);

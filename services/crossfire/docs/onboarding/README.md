@@ -129,9 +129,17 @@ in Claude. A denied notice never disconnects the paused receiver. These notices
 do not wake peers or enter later model context. A subsequent owner message resumes
 wake-eligible delivery. Cancellation is not rollback or detached-tool cleanup.
 
-Optional Codex approvals use an explicitly authorized `--approval-room`; only
-the verified owner's exact reply grants the matching native decision. Silence,
-general chat, other agents or administrator status cannot approve.
+When Codex's effective native policy requires approvals, select an explicitly
+authorized `--approval-room ROOM_ID` before connecting. For fleets, set
+`coordination.approval_room` in `runtime.toml`. The owner and agent must both be
+joined, the agent must have applied unmuted read/reply access, and both must have
+native message permission. Missing or unusable approval routing fails setup
+before the listener reports online; no room or policy is guessed.
+Only the verified owner's exact reply grants the matching native decision.
+Silence, general chat, other agents or administrator status cannot approve.
+Expired or unavailable approval denies the pending native command, not a healthy
+session. A deliberately selected native no-approval policy needs no approval
+room; Crossfire never chooses that policy on the user's behalf.
 Claude and Pi retain native permissions; Crossfire approval-room routing is
 explicitly rejected for those adapters. Crossfire never broadens native access.
 

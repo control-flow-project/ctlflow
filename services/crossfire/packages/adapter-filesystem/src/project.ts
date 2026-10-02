@@ -5,6 +5,17 @@ import { profile, profileName } from "@crossfire/contracts/client";
 import { endpoint } from "@crossfire/contracts/origin";
 import { privateDir, readJson } from "./index.js";
 
+function gitExit(error: unknown, status: number): boolean {
+  return error instanceof Error && 'status' in error && error.status === status
+    && (!('code' in error) || error.code === undefined) && (!('signal' in error) || error.signal === null);
+}
+
+function gitFailure(message: string, error: unknown): Error {
+  const detail = error instanceof Error && 'code' in error && typeof error.code === 'string' ? error.code
+    : error instanceof Error && 'status' in error && Number.isInteger(error.status) ? 'exit ' + String(error.status) : 'subprocess failure';
+  return new Error(message + ' (' + detail + ')', { cause: error });
+}
+
 export function paths(project: string, name: string) {
   if (!profileName(name)) throw new Error("Profile names use 1..40 lowercase letters, digits and hyphens");
   const workspace = realpathSync(resolve(project));
@@ -26,16 +37,18 @@ export function ignoreProjectPaths(workspace: string, paths: readonly string[]):
   if (paths.some(path => !path || path.startsWith('/') || path.split('/').includes('..') || /[\r\n\u0000]/u.test(path))) throw new Error('Git exclusions must be project-relative paths');
   try { execFileSync('git', ['-C', workspace, 'rev-parse', '--is-inside-work-tree'], { stdio: 'pipe' }); }
   catch (error) {
-    if (error && typeof error === 'object' && 'status' in error && error.status === 128) return;
-    throw new Error('Git is required to protect project-local credentials');
+    if (gitExit(error, 128)) return;
+    throw gitFailure('Cannot run Git to protect project-local credentials', error);
   }
   const missing: string[] = [];
   for (const path of paths) {
-    const tracked = execFileSync('git', ['-C', workspace, 'ls-files', '--', path], { encoding: 'utf8' });
+    let tracked: string;
+    try { tracked = execFileSync('git', ['-C', workspace, 'ls-files', '--', path], { encoding: 'utf8' }); }
+    catch (error) { throw gitFailure('Cannot inspect tracked private project files', error); }
     if (tracked.trim()) throw new Error('Private project integration files are tracked by Git; remove them from tracking before connecting: ' + path);
     try { execFileSync('git', ['-C', workspace, 'check-ignore', '--quiet', '--', path.endsWith('/') ? path + 'check.json' : path], { stdio: 'pipe' }); }
     catch (error) {
-      if (!error || typeof error !== 'object' || !('status' in error) || error.status !== 1) throw new Error('Cannot verify Git exclusions for this project');
+      if (!gitExit(error, 1)) throw gitFailure('Cannot verify Git exclusions for this project', error);
       missing.push(path);
     }
   }
@@ -52,17 +65,18 @@ function assertIgnored(workspace: string, name: string): void {
   try {
     execFileSync("git", ["-C", workspace, "rev-parse", "--is-inside-work-tree"], { stdio: "pipe" });
   } catch (error) {
-    if (error && typeof error === "object" && "status" in error && error.status === 128) {
+    if (gitExit(error, 128)) {
       return;
     }
-    throw new Error("Cannot verify project privacy; Git must be available");
+    throw gitFailure('Cannot run Git to verify project privacy', error);
   }
   try {
     for (const path of [".crossfire/profiles/" + name + ".json", ".crossfire/profiles/" + name + ".pending.json", ".crossfire/state/" + name]) {
       execFileSync("git", ["-C", workspace, "check-ignore", "--quiet", "--", path], { stdio: "pipe" });
     }
-  } catch {
-    throw new Error("Ignore .crossfire/ in this project's Git rules before using private agent state");
+  } catch (error) {
+    if (gitExit(error, 1)) throw new Error("Ignore .crossfire/ in this project's Git rules before using private agent state");
+    throw gitFailure('Cannot verify private project Git exclusions', error);
   }
 }
 

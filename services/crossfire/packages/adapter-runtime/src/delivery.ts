@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
+import type { RuntimeApproval, RuntimeConnection } from '@crossfire/agent-core/runtime';
 import * as check from '@crossfire/contracts/schema/validation';
 import { deliveryJournal, deliveryText } from './journal.js';
 import { fields } from '@crossfire/contracts/validation';
@@ -9,6 +9,7 @@ export type NativeInput<Boundary> = { text: string; messageId: string; boundary:
 export type NativeReceipt = boolean | 'cancelled' | 'waiting';
 export type Publication<Boundary> = {
   sessionId: string;
+  approval: RuntimeApproval;
   signal: AbortSignal;
   verify: () => void | Promise<void>;
   inspect: () => Promise<{ busy: boolean }>;
@@ -50,7 +51,7 @@ export function nativeDelivery<Boundary>(native: Publication<Boundary>, parseBou
     }
   }
   return {
-    sessionId: native.sessionId, signal: native.signal,
+    sessionId: native.sessionId, approval: native.approval, signal: native.signal,
     inspect: async () => { native.signal.throwIfAborted(); return native.inspect(); },
     close: async () => { try { await native.close(); } finally { journal.close(); } }, acknowledge: journal.acknowledge,
     settle: () => settle(),

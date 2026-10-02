@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
+import { setTimeout as delay, setImmediate as yieldLoop } from 'node:timers/promises';
 import { createController } from '@fleetd/domain/controller';
 import type { Execution } from '@fleetd/domain/port';
 import type { Operation } from '@fleetd/domain/model';
@@ -158,4 +158,44 @@ test('per-instance failure retains successful peers; startup history survives co
   const reopened = value(createController(fixture.services)); cleanup(scope, () => reopened.close());
   assert.equal(value(reopened.operation(operation.operationId)).status, 'failed');
   assert(value(reopened.view(fixture.record.fleetId)).instances.every(instance => instance.phase === 'stopped'));
+});
+
+test('runtime failures retain their cause, become inactive immediately and cannot restart during cleanup', async scope => {
+  const stops = new Map<string, AbortController>(), closed: string[] = [];
+  let release!: () => void;
+  const cleaning = new Promise<void>(resolve => { release = resolve; });
+  const fixture = fixtureController({ start: async (_configuration, instance) => {
+    const stop = new AbortController(), control = createListenerControl(async () => {});
+    control.update({ active: true, input: null }); stops.set(instance.key, stop);
+    return success({ sessionId: 'native-' + instance.key, signal: stop.signal, control: control.connection,
+      attachment: { runtime: 'fixture', sessionId: 'native-' + instance.key, workspace: '/fixture', connection: {} },
+      close: async () => { if (instance.key === 'analyst') await cleaning; closed.push(instance.key); stop.abort(); } });
+  } });
+  cleanup(scope, async () => { release(); await fixture.controller.close(); });
+  value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
+  await fixture.finish(await fixture.operation('start'));
+  const fleetId = fixture.record.fleetId;
+  stops.get('analyst')!.abort(new Error('Native approval route lost access'));
+  const failed = value(fixture.controller.view(fleetId));
+  assert.equal(failed.instances[0]!.error, 'Native approval route lost access');
+  assert.equal(failed.instances[0]!.listenerActive, false);
+  assert.equal(failed.instances[1]!.listenerActive, true);
+  assert.equal(failed.instances[1]!.phase, 'running');
+  const raced = await fixture.controller.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'agent', fleetId, instanceKey: 'analyst' }, expectedRevision: failed.revision });
+  assert.equal(raced.ok, false);
+  release(); await cleaning; await yieldLoop(); assert(closed.includes('analyst'));
+  assert.equal(value(fixture.controller.view(fleetId)).instances[0]!.error, 'Native approval route lost access');
+  assert.equal((await fixture.finish(await fixture.operation('start', 'analyst'))).status, 'succeeded');
+});
+
+test('runtime cleanup failure is secondary to the original disconnect cause', async scope => {
+  const stop = new AbortController();
+  const fixture = fixtureController({ start: async () => success({ sessionId: 'native', signal: stop.signal,
+    attachment: { runtime: 'fixture', sessionId: 'native', workspace: '/fixture', connection: {} }, control: createListenerControl(async () => {}).connection,
+    close: async () => { throw new Error('Private engine close failed'); } }) });
+  cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start'));
+  stop.abort(new Error('Selected thread closed'));
+  await yieldLoop();
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).instances[0]!.error, 'Selected thread closed; cleanup: Private engine close failed');
 });

@@ -74,7 +74,7 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       if (mode === 'oversized') { socket.send('x'.repeat(8 * 1024 * 1024 + 1)); return; }
       send({ id: request.id, result: { userAgent: 'protocol fixture' } });
     } else if (['thread/start', 'thread/resume', 'thread/read'].includes(request.method)) {
-      send({ id: request.id, result: { thread: { id: configuration.thread, cwd: configuration.workspace,
+      send({ id: request.id, result: { approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
         status: { type: configuration.status ?? 'idle' },
         canAcceptDirectInput: 'directInput' in configuration ? configuration.directInput : true } } });
     } else if (request.method === 'thread/turns/list') {
@@ -153,9 +153,9 @@ export function message(id: string, sender = '@agent-holmes:test.localhost', bod
     content: { msgtype: 'm.text', body } };
 }
 
-export async function until(predicate: () => boolean, message = 'Condition did not become true', timeoutMs = 5000): Promise<void> {
+export async function until(predicate: () => boolean | Promise<boolean>, message = 'Condition did not become true', timeoutMs = 5000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
+  while (!await predicate()) {
     if (Date.now() >= deadline) assert.fail(message);
     await delay(10);
   }
@@ -262,6 +262,11 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     } else if (path.endsWith('/joined_members')) {
       const room = path.slice((API + '/rooms/').length, -'/joined_members'.length);
       send(response, { joined: { [SELF]: {}, ...Object.fromEntries([...extraMembers].map(member => [member, {}])), ...(!missingObserver.has(room) ? { [OBSERVER]: {} } : {}) } });
+    } else if (path.endsWith('/state')) {
+      send(response, [
+        { type: 'm.room.create', state_key: '', sender: OBSERVER, content: { room_version: '11' } },
+        { type: 'm.room.power_levels', state_key: '', sender: OBSERVER, content: { users: { [OBSERVER]: 100, [SELF]: 0 } } },
+      ]);
     } else if (path.endsWith('/messages')) {
       const room = path.slice((API + '/rooms/').length, -'/messages'.length);
       const events = rooms.get(room) ?? [];

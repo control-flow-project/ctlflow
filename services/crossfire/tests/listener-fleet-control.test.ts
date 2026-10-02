@@ -59,7 +59,7 @@ test('controller checkpoint retries only receipts after native acceptance and re
   let fail = true;
   const binding = createListenerControl(async () => { if (fail) throw Error('Lost receipt response'); binding.update({ active: true, input: null }); });
   binding.update({ active: true, input: { messageId: 'message', text: 'Fleet task', expiresAt: Date.now() + 10000 } });
-  const runtime: RuntimeConnection = { sessionId: 'same-session', signal: new AbortController().signal,
+  const runtime: RuntimeConnection = { sessionId: 'same-session', approval: 'none', signal: new AbortController().signal,
     deliver: async (_text, id) => { submitted.push(id); }, recover: async () => false, acknowledge: ids => { acked.push(...ids); }, inspect: async () => ({ busy: false }), settle: async () => false, close: () => {} };
   const publisher = () => controlledPublisher(storage, 'checkpoint', binding.connection, runtime);
   await assert.rejects(publisher().publish(runtime.signal), /Lost receipt/);

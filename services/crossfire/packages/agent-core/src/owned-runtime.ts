@@ -1,5 +1,5 @@
 import type { Result } from '@crossfire/kernel/result';
-import type { RuntimeConnection, RuntimeHooks, TurnControl } from './runtime.js';
+import type { RuntimeApproval, RuntimeConnection, RuntimeHooks, TurnControl } from './runtime.js';
 import type { RuntimeAttachment } from './terminal.js';
 export type OwnedRuntimeConnection = RuntimeConnection & { attachment: RuntimeAttachment; turnControl: TurnControl };
 export type OwnedRuntimeInput = {
@@ -7,6 +7,6 @@ export type OwnedRuntimeInput = {
   options: Record<string, unknown>; hooks: RuntimeHooks;
 };
 export type OwnedRuntimeAdapter = {
-  validate(options: unknown): Result<Record<string, unknown>>;
+  validate(options: unknown): Result<{ options: Record<string, unknown>; approval: RuntimeApproval }>;
   start(input: OwnedRuntimeInput, stop: AbortSignal): Promise<Result<OwnedRuntimeConnection>>;
 };

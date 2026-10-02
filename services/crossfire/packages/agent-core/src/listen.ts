@@ -23,6 +23,7 @@ import { releaseUpdates } from './updates.js';
 import { controlledPublisher, waitForActivation, type ListenerControl } from './listener-control.js';
 import type { ReadBatch } from './receive.js';
 import { scheduledPublisher } from './scheduled.js';
+import { failure } from '@crossfire/kernel/result';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
   identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
@@ -92,7 +93,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   try {
     destination = await options.runtime(lifetime, options.pollMs, {
       requestPermission: async (permission, cancelled) => {
-        if (!approval) throw new Error('Runtime approval requires an explicitly selected authorized --approval-room');
+        if (!approval) return failure('forbidden', 'Runtime approval requires an explicitly selected authorized --approval-room');
         return approval.request(permission, cancelled);
       },
     });
@@ -251,6 +252,13 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
   }
   try {
+    if (destination.approval === 'listener' && !approval) {
+      throw new Error('Native approval policy requires an explicit --approval-room. Grant that room read/reply access and join it as the owner before connecting.');
+    }
+    if (approval) {
+      const authorized = await approval.authorize();
+      if (!authorized.ok) throw new Error('Native approval setup is not ready: ' + authorized.error.message);
+    }
     await access();
     await flushAcknowledgements(storage, client, options.cursorFile);
     for (const control of state.controls.filter(control => control.status === 'interrupting')) {
@@ -270,6 +278,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     options.ready?.(() => {
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
       return testListener({ coordination: options.coordination, runtime: destination, matrix: options.transport(deadline, 10000),
+        ...(approval ? { authorizeApproval: approval.authorize } : {}),
         id: options.id, owner: options.settings.owner, matrixUserId: options.account.user_id, paused: state.paused || !!options.control && !options.control.current().active, signal: deadline });
     });
     acquisition = (async () => {
@@ -471,7 +480,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     approval?.close();
     wake?.();
     await acquisition;
-    await activity?.close();
-    await destination.close();
+    try { await activity?.close(); }
+    finally { await destination.close(); }
   }
 }

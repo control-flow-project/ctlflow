@@ -188,6 +188,8 @@ directory uses symlink aliases. Its default shell syntax supports Bash 3.2.
 
 `agent test` uses the private listener control to check actual runtime readiness,
 native authentication, active owner/agent access and applied/joined room grants.
+It also rechecks the explicitly selected approval route when the runtime's
+effective native policy requires listener-mediated decisions.
 It does not send a prompt or advance unread positions. Paused delivery and zero
 rooms are reported explicitly; saved credentials alone do not pass this test.
 
@@ -355,6 +357,12 @@ a descriptor persisted as restart authority.
 Only composition roots select concrete runtime adapters. Native terminal
 arguments, authentication and session selection live in
 `services/crossfire/packages/adapter-codex`, reused through declared exports.
+Each adapter declares approval ownership as `none`, `runtime` or `listener`.
+Owned-runtime configuration validation reports that capability before enrollment;
+live connections report the effective native policy after session selection.
+Fleet orchestration consumes this capability without interpreting provider keys.
+Listener-mediated approval requires an explicit coordination approval room;
+unknown native policy is a setup failure, never a no-approval default.
 For remote fleets, the SSH adapter wraps the same native command so it runs on
 the controller computer through the user's verified SSH connection. The engine
 remains loopback-only; no public port or additional forwarding server is needed.
@@ -1202,12 +1210,36 @@ permission path sends them to an explicitly authorized approval room and accepts
 only the verified owner's explicit matching native decision.
 
 The fleet coordination block supplies that room once. Each affected listener
-validates its actual applied access before advertising approval readiness.
+validates current applied, unmuted read/reply access, active owner and agent,
+native membership of both, and native message permissions of both before
+advertising readiness or creating an online reporting run. Native room versions
+with implicit creator authority use that authority. Pure Matrix state and power
+parsing has one contract owner shared by management and listener authorization.
 
 Approval responses are control input, not model input, and do not alter wake
 policy or resume paused delivery. Silence, unrelated messages and another human's
 reply do not approve. A policy needing approvals without a usable approval room
 has a visible setup error/state; it is not silently changed to no-approval mode.
+
+The permission hook returns `Result` for expected authorization, transport,
+expiry and cancellation failures. The Codex adapter denies only the pending
+command using an exact offered native denial or cancellation choice; it does
+not terminate a healthy session for those failures. Invalid scope, invalid
+decisions, duplicate requests, bounds violations and malformed native protocol
+remain failures. Successful decisions are exact native choices; no general
+chat, missing reply or error becomes approval.
+
+Fleet runtime failure immediately makes listener activity false, preserves the
+bounded actual abort cause and retains successful peers. An explicit restart
+cannot race pending failure cleanup. A cleanup error is secondary to the
+original cause, not a replacement diagnosis. No automatic restart is introduced.
+
+Project privacy preserves subprocess errors such as `EPERM`, `ENOENT` and
+`EACCES`, distinguishing them from genuine Git exit codes. Sandbox subprocess
+capabilities belong to the native runtime; changing a single utility to another
+spawn mechanism does not certify that general capability. Readiness without a
+model turn verifies connection and authorization, not paid-model work or every
+native tool execution path.
 
 A user-selected native no-approval policy is a deliberate configuration choice,
 not a launcher default or model-authorized elevation.
@@ -1842,6 +1874,10 @@ Required banks:
   revocation, selected/nobody wake rules and durable blocked-mention cooldown.
 - One receipt/cursor path, buffering/debounce/size limits, approvals and metadata
   reporting without model turns; no duplicated receivers after restart.
+- Effective approval-policy capabilities, missing/read-only/muted/unjoined or
+  unavailable approval route refusal before online reporting, native powers,
+  verified owner approval, expected native denial retaining the same session,
+  intentional verified-client Matrix replies, and original failure diagnostics.
 - Real stock Codex headless startup/options, private-home state, native
   input/receipt/output and same-session resumption, isolated inert provider,
   changed model/reasoning/full-access settings, actual native tool execution,

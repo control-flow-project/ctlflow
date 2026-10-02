@@ -14,7 +14,7 @@ function temporary() { mkdirSync('.temp', { recursive: true }); return mkdtempSy
 test('native publication is journaled before send and uncertain recovery never replays input', async scope => {
   const directory = temporary(), file = join(directory, 'journal.json');
   let published = 0, received = false;
-  const native = { sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 42,
+  const native = { sessionId: session, approval: 'none' as const, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 42,
     publish: () => { assert.equal(readJson<{ pending: { messageId: string } }>(file).pending.messageId, 'input'); published++; throw new Error('Lost native response'); },
     received: () => received, close: () => {} };
   const first = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100, timeoutMs: 100 });
@@ -39,7 +39,7 @@ test('cancellation can clear only a proved unpublished native input', async scop
   const directory = temporary(), file = join(directory, 'journal.json');
   const cancel = new AbortController();
   let cancelled = 0;
-  const connection = nativeDelivery({ sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+  const connection = nativeDelivery({ sessionId: session, approval: 'none', signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
     publish: () => { cancel.abort(new Error('Owner control')); }, received: () => false,
     cancel: () => { cancelled++; return true; }, close: () => {} }, check.integer(), { journal: file, pollMs: 100 });
   cleanup(scope, () => connection.close());
@@ -52,7 +52,7 @@ test('cancellation can clear only a proved unpublished native input', async scop
 test('positive native waiting preserves busy input without a turn-duration deadline or early receipt', async scope => {
   const file = join(temporary(), 'journal.json');
   let published = 0, polls = 0;
-  const connection = nativeDelivery({ sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+  const connection = nativeDelivery({ sessionId: session, approval: 'none', signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
     publish: () => { published++; }, received: () => {
       polls++;
       if (polls <= 3) {
@@ -72,7 +72,7 @@ test('positive native waiting preserves busy input without a turn-duration deadl
 test('native cancellation receipts never claim successful delivery on send or recovery', async scope => {
   const directory = temporary(), file = join(directory, 'journal.json');
   let published = 0, uncertain = true;
-  const native = { sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+  const native = { sessionId: session, approval: 'none' as const, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
     publish: () => { published++; if (uncertain) throw new Error('Lost response'); },
     received: () => 'cancelled' as const, close: () => {} };
   const connection = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100 });
@@ -108,7 +108,7 @@ test('native history verification excludes old inputs, partial records and repla
 
 test('invalid journal identity, text and limits are refused before publication', async scope => {
   const directory = temporary(); let published = 0;
-  const native = { sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+  const native = { sessionId: session, approval: 'none' as const, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
     publish: () => { published++; }, received: () => true, close: () => {} };
   assert.throws(() => nativeDelivery(native, check.integer(), { journal: join(directory, 'a'), pollMs: 1 }), /interval/);
   const connection = nativeDelivery(native, check.integer(), { journal: join(directory, 'a'), pollMs: 100 });
@@ -120,7 +120,7 @@ test('invalid journal identity, text and limits are refused before publication',
 
 test('receipt-only recovery confirms, cancels or refuses uncertainty without publishing new input', async scope => {
   const file = join(temporary(), 'journal.json'); let publications = 0, receipt: boolean | 'cancelled' = false;
-  const native = { sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+  const native = { sessionId: session, approval: 'none' as const, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
     publish: () => { publications++; throw new Error('Lost publication response'); }, received: () => receipt, close: () => {} };
   const connection = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100, timeoutMs: 100 });
   cleanup(scope, () => connection.close());
@@ -139,7 +139,7 @@ test('receipt-only recovery confirms, cancels or refuses uncertainty without pub
 
 test('native session identities are opaque, bounded and exactly bound to their journal', async scope => {
   const directory = temporary(), file = join(directory, 'journal.json'), opaque = 'native-session:not-a-crossfire-uuid';
-  const native = { sessionId: opaque, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+  const native = { sessionId: opaque, approval: 'none' as const, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
     publish: () => {}, received: () => true, close: () => {} };
   const connection = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100 });
   cleanup(scope, () => connection.close());

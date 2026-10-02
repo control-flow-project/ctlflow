@@ -305,7 +305,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     }
   }
 
-  return { sessionId, signal: session.signal, verify,
+  return { sessionId, approval: session.approval, signal: session.signal, verify,
     inspect: async () => ({ busy: await activeTurn() !== null }),
     close: async () => { try { await session.close(); } finally { journal.close(); } }, deliver, settle,
     recover: async (text, messageId) => {

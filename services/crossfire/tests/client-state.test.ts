@@ -3,7 +3,7 @@ import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { paths } from '@crossfire/adapter-filesystem/project';
+import { paths, prepareProject } from '@crossfire/adapter-filesystem/project';
 import { privateDir, readJson, writeJson } from "@crossfire/adapter-filesystem/index";
 import { MAX_JSON_BYTES } from "@crossfire/contracts/limits";
 import { account } from "@crossfire/contracts/client";
@@ -58,4 +58,29 @@ test("server and client account credentials share a strict bounded native contra
   assert.equal(account({ ...input, access_token: "x".repeat(8193) }).ok, false);
   assert.equal(account({ ...input, password: "not-a-client-field" }).ok, false);
   assert.equal(account({ ...input, user_id: "agent" }).ok, false);
+});
+
+test('project privacy preserves subprocess failures and never treats them as a Git exit or creates credential storage', () => {
+  const project = directory(), executableDirectory = directory();
+  const blocked = join(executableDirectory, 'git');
+  writeFileSync(blocked, '#!/bin/sh\nexit 0\n', { mode: 0o600 });
+  const adapter = import.meta.resolve('@crossfire/adapter-filesystem/project');
+  const script = `
+import { paths, prepareProject } from ${JSON.stringify(adapter)};
+const failures = [];
+for (const operation of [() => paths(process.argv[1], 'holmes'), () => prepareProject(process.argv[1])]) {
+  try { operation(); throw new Error('Privacy unexpectedly accepted a failed subprocess'); }
+  catch (error) { failures.push({ message: error.message, code: error.cause?.code }); }
+}
+process.stdout.write(JSON.stringify(failures));
+`;
+  for (const [path, code] of [['', 'ENOENT'], [executableDirectory, 'EACCES']]) {
+    const output = execFileSync(process.execPath, ['--input-type=module', '--eval', script, project], { env: { ...process.env, PATH: path }, encoding: 'utf8' });
+    const failures = JSON.parse(output) as { message: string; code: string }[];
+    assert.equal(failures.length, 2);
+    for (const failure of failures) { assert.equal(failure.code, code); assert(failure.message.includes(code!)); }
+    assert.equal(existsSync(join(project, '.crossfire')), false);
+    assert.equal(existsSync(join(project, '.gitignore')), false);
+  }
+  assert.equal(prepareProject(project), project, 'A real non-Git project does not require a fabricated repository');
 });

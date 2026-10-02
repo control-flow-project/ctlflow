@@ -44,11 +44,14 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
     async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear(); },
     async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close(); },
     validate(configuration) {
-      for (const definition of Object.values(configuration.definitions)) {
+      for (const [key, definition] of Object.entries(configuration.definitions)) {
         const adapter = adapters[definition.runtime];
         if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
         const options = adapter.validate(definition.options);
         if (!options.ok) return options;
+        if (options.value.approval === 'listener' && !configuration.roster.coordination.approval_room) {
+          return failure('invalid', 'Definition ' + key + ' requires an explicit coordination.approval_room for native permissions. Grant that room to each affected agent and join it as the owner.');
+        }
       }
       return success(undefined);
     },
