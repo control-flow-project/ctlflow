@@ -1672,8 +1672,12 @@ establish hierarchy. Sections, filters, tables, result lists, empty states and
 supporting notes have no enclosing decorative boxes. Borders remain on controls
 and meaningful alerts; focus, status and destructive-action cues stay explicit.
 Shared section headings use a muted flat tint and a narrow accent rule, with
-consistent spacing between tasks. Technical identifiers, provenance, connection
-metadata and longer explanations are inspectable disclosures, not the default
+consistent spacing between tasks.
+Table cells vertically center their complete content group, including status
+captions. Controls have no surrounding form margins; individual captioned lines
+are not independently centered within the row.
+Technical identifiers, provenance, connection metadata and longer explanations
+are inspectable disclosures, not the default
 information hierarchy. Permission ceilings, destructive effects, pending/failed
 enforcement and the consequences of replacing access remain immediately visible.
 Account, onboarding, directory, detail and administration screens follow the
