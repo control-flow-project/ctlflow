@@ -12,14 +12,16 @@ test('room discovery and canonical agent grants retain native authority without 
   const fixture = await nativeApplication(scope), { services, admin } = fixture;
   const owner = await fixture.member('alice');
   const inviter = await fixture.agent(admin.actor, 'inviter'), target = await fixture.agent(owner.actor, 'target');
+  const inviterRoom = value(services.repositories.ownerConversation.find({ agentId: inviter.id }))!.roomId;
+  const targetRoom = value(services.repositories.ownerConversation.find({ agentId: target.id }))!.roomId;
   const http = await httpFixture(scope, fixture.application);
   const adminHeaders = http.headers(admin), ownerHeaders = http.headers(owner);
   const inviterHeaders = { Authorization: 'Bearer ' + inviter.token }, targetHeaders = { Authorization: 'Bearer ' + target.token };
   const adminNative = { base: fixture.native.base, token: admin.token };
   const joined = async (token: string) => value(await nativeOk({ base: fixture.native.base, token }, 'GET', API + '/joined_rooms')).joined_rooms;
-  assert.deepEqual(await joined(admin.token), []);
-  assert.deepEqual(await joined(inviter.token), []);
-  assert.deepEqual(await joined(target.token), []);
+  assert.deepEqual(await joined(admin.token), [inviterRoom]);
+  assert.deepEqual(await joined(inviter.token), [inviterRoom]);
+  assert.deepEqual(await joined(target.token), [targetRoom]);
   const created = value(await nativeOk(adminNative, 'POST', API + '/createRoom', { name: 'Engineering', preset: 'private_chat' }));
   assert(typeof created.room_id === 'string');
   const roomId = created.room_id, roomPath = '/api/rooms/' + segment(roomId);
@@ -47,20 +49,20 @@ test('room discovery and canonical agent grants retain native authority without 
         }
       }
     }
-    assert.deepEqual(await joined(admin.token), [roomId]);
-    assert.deepEqual(await joined(owner.token), []);
-    assert.deepEqual(await joined(inviter.token), []);
-    assert.deepEqual(await joined(target.token), []);
-    assert.deepEqual(value(services.collection.roomGrants({ agentId: inviter.id })), []);
-    assert.deepEqual(value(services.collection.roomGrants({ agentId: target.id })), []);
+    assert.deepEqual((await joined(admin.token) as string[]).sort(), [inviterRoom, roomId].sort());
+    assert.deepEqual(await joined(owner.token), [targetRoom]);
+    assert.deepEqual(await joined(inviter.token), [inviterRoom]);
+    assert.deepEqual(await joined(target.token), [targetRoom]);
+    assert.deepEqual(value(services.collection.roomGrants({ agentId: inviter.id })).map(grant => grant.roomId), [inviterRoom]);
+    assert.deepEqual(value(services.collection.roomGrants({ agentId: target.id })).map(grant => grant.roomId), [targetRoom]);
   });
 
   await scope.test('existing-room discovery retains names, native authority and human membership scope', async () => {
     const rooms = await http.request('/api/rooms', 'GET', undefined, adminHeaders);
     assert.equal(rooms.status, 200);
     const directory = await rooms.json() as { data: unknown[]; meta: { totalItems: number } };
-    assert.equal(directory.meta.totalItems, 1);
-    assert.equal(value(roomView(directory.data[0])).roomId, roomId);
+    assert.equal(directory.meta.totalItems, 2);
+    assert(directory.data.some(room => value(roomView(room)).roomId === roomId));
     const response = await http.request(roomPath, 'GET', undefined, adminHeaders);
     assert.equal(response.status, 200);
     const details = value(roomView((await response.json() as { data: unknown }).data));
@@ -68,7 +70,7 @@ test('room discovery and canonical agent grants retain native authority without 
     assert.equal(details.authority?.creator, true);
     const otherRooms = await http.request('/api/rooms', 'GET', undefined, ownerHeaders);
     assert.equal(otherRooms.status, 200);
-    assert.deepEqual((await otherRooms.json() as { data: unknown[] }).data, []);
+    assert.deepEqual((await otherRooms.json() as { data: unknown[] }).data.map(room => value(roomView(room)).roomId), [targetRoom]);
     assert.equal((await http.request('/api/rooms')).status, 401);
     assert.equal((await http.request('/api/rooms', 'GET', undefined, inviterHeaders)).status, 401);
   });
@@ -76,8 +78,8 @@ test('room discovery and canonical agent grants retain native authority without 
   await scope.test('an owner assigns native access and explicitly delegates room-scoped invitations', async () => {
     assert.equal((await assign(inviter.id, adminHeaders)).status, 202);
     value(await reconcileRoomGrant(services, inviter.id, roomId));
-    assert.deepEqual(await joined(inviter.token), [roomId]);
-    assert.equal((await http.request(grantPath(target.id), 'PUT', { expectedRevision: 0, expectedGeneration: null,
+    assert.deepEqual((await joined(inviter.token) as string[]).sort(), [inviterRoom, roomId].sort());
+    assert.equal((await http.request(grantPath(target.id), 'PUT', { expectedRevision: 1, expectedGeneration: null,
       accessMode: 'reply', powerLevel: null, muted: false }, inviterHeaders)).status, 403);
     const current = await grant(inviter.id, adminHeaders);
     assert(current.grant);
@@ -91,7 +93,7 @@ test('room discovery and canonical agent grants retain native authority without 
   await scope.test('the sole grant resource supports cross-owner invitations and removal of the inviter’s own addition', async () => {
     assert.equal((await assign(target.id, inviterHeaders)).status, 202);
     value(await reconcileRoomGrant(services, target.id, roomId));
-    assert.deepEqual(await joined(target.token), [roomId]);
+    assert.deepEqual((await joined(target.token) as string[]).sort(), [targetRoom, roomId].sort());
     const current = await grant(target.id, inviterHeaders);
     assert(current.grant);
     assert.equal(current.grant.addedById, inviter.id);
@@ -101,8 +103,8 @@ test('room discovery and canonical agent grants retain native authority without 
     assert.equal((await http.request(grantPath(target.id), 'DELETE', { expectedRevision: current.revision,
       expectedGeneration: current.grant.generation }, inviterHeaders)).status, 202);
     value(await reconcileRoomGrant(services, target.id, roomId));
-    assert.deepEqual(await joined(target.token), []);
+    assert.deepEqual(await joined(target.token), [targetRoom]);
     assert.equal((await grant(target.id, ownerHeaders)).application?.membership, 'leave');
-    assert.deepEqual(await joined(admin.token), [roomId], 'Grant changes do not create rooms');
+    assert.deepEqual((await joined(admin.token) as string[]).sort(), [inviterRoom, roomId].sort(), 'Grant changes do not create rooms');
   });
 });

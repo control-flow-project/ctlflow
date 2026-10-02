@@ -35,6 +35,23 @@ export function roomCreators(events: readonly RoomStateEvent[]): Result<string[]
   return success([...new Set([creation.sender, ...additional as string[]])]);
 }
 
+export function ownerConversationState(events: readonly RoomStateEvent[], owner: string, agent: string): Result<void> {
+  const creation = events.find(event => event.type === 'm.room.create' && event.state_key === '');
+  const creators = roomCreators(events);
+  if (!creators.ok) return creators;
+  if (!userId(owner) || !userId(agent) || owner === agent || creation?.sender !== owner
+    || creators.value.some(identity => identity !== owner && identity !== agent)
+    || events.some(event => event.type === 'm.room.encryption')
+    || events.find(event => event.type === 'm.room.join_rules' && event.state_key === '')?.content.join_rule !== 'invite'
+    || events.find(event => event.type === 'm.room.history_visibility' && event.state_key === '')?.content.history_visibility === 'world_readable'
+    || events.some(event => event.type === 'm.room.member'
+      && (event.content.membership === 'join' || event.content.membership === 'invite')
+      && event.state_key !== owner && event.state_key !== agent)) {
+    return failure('forbidden', 'Owner messages require a private unencrypted conversation containing only the owner and this agent');
+  }
+  return success(undefined);
+}
+
 export function roomPowers(powers: JsonObject, owner: string): Result<RoomPowers> {
   const users = object(powers.users ?? {});
   const events = object(powers.events ?? {});

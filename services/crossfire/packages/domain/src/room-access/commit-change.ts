@@ -4,9 +4,12 @@ import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import { recordEvent } from '../audit/record-event.js';
 import type { GrantAuthorization } from './authorize-change.js';
 import type { AgentRoomGrant } from './types.js';
+import { protectOwnerConversation } from '../owner-conversation/protect.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock'>;
 export function recheckGrantAuthorization(services: Dependencies, actor: Actor, proof: GrantAuthorization): Result<void> {
+  const protectedAccess = protectOwnerConversation(services, proof.input);
+  if (!protectedAccess.ok) return protectedAccess;
   const acting = activeActor(services, actor);
   if (!acting.ok) return acting;
   if (acting.value.revision !== proof.actorRevision) return failure('conflict', 'Acting authority changed');

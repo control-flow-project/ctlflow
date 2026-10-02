@@ -12,6 +12,7 @@ function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; 
   const editable = agent.allowedActions.includes('room-grant.manage') && agent.status !== 'revoked';
   const canReply = room.authority && (room.authority.creator || room.authority.powerLevel !== null && room.authority.replyLevel <= room.authority.powerLevel);
   const nativeCreator = room.authority?.creatorIds.includes(agent.matrixUserId) ?? false;
+  if (view?.ownerConversation) return <div><Status value="Read & reply"/><span className="subline">Owner DM · always available</span><span className="support">Private messages and native approvals. Access cannot be disabled.</span></div>;
   return <form onSubmit={event => { event.preventDefault();
     if (mode === 'none' && view?.grant && !confirm('Remove this agent’s access to ' + room.name + '?')) return;
     const params = { agentId: agent.agentId, roomId: room.roomId }, base = { expectedRevision: revision, expectedGeneration: view?.grant?.generation ?? null };
@@ -60,6 +61,7 @@ function Delegation({ view, roomId }: { view: RoomGrantView; roomId: string }) {
   const viewer = useSession(), action = useAction();
   const [enabled, setEnabled] = useState(view.permissions.includes('room.agent.invite'));
   const grant = view.grant;
+  if (view.ownerConversation) return <p>Owner DMs stay private between this agent and its owner. Invitation delegation is not available.</p>;
   if (!grant || grant.accessMode === 'none') return <p>Grant room access before delegating invitations.</p>;
   return <form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.setGrantPermissions, { agentId: view.agentId, roomId },
     { expectedRevision: view.revision, expectedGeneration: grant.generation, permissions: enabled ? ['room.agent.invite'] : [] }, viewer.csrfSecret)); }}>

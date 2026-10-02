@@ -160,16 +160,16 @@ native integration or enrollment.
 
 The approved account, listener settings and temporary setup choices are private
 project-local records with distinct ownership. Runtime settings contain only the
-selected adapter and approval room. The approved account owns its server and
+selected adapter. Approval routing is the agent's verified private owner DM. The approved account owns its server and
 owner; pre-enrollment setup retains those choices only until pending enrollment
 durably owns them. Neither reconnect nor an upgrade changes the settings format
 or requires another identity. A failed native activation preserves setup choices.
 First setup asks for a name; reconnects and upgrades reuse the existing account.
 Several saved profiles require a human selection. The client owns approval
 waiting, verified installation and starting/reusing exactly one listener.
-Approval creates an account, not room access. Zero rooms is a valid ready listener.
-The owner can invite its agent into an existing room or open a direct message
-in Element. The listener accepts authorized native invitations automatically,
+Approval creates an account and its private owner DM with permanent read/reply
+access. No other room is joined automatically. The owner can invite its agent
+into an existing room in Element. The listener accepts authorized native invitations automatically,
 with a durable read-and-reply grant; no second management action is required.
 
 The Codex adapter uses the tool-provided exact native thread ID and private
@@ -188,10 +188,10 @@ directory uses symlink aliases. Its default shell syntax supports Bash 3.2.
 
 `agent test` uses the private listener control to check actual runtime readiness,
 native authentication, active owner/agent access and applied/joined room grants.
-It also rechecks the explicitly selected approval route when the runtime's
-effective native policy requires listener-mediated decisions.
-It does not send a prompt or advance unread positions. Paused delivery and zero
-rooms are reported explicitly; saved credentials alone do not pass this test.
+It also verifies the private owner DM and, when the native policy requires
+listener-mediated decisions, both participants' native message permissions.
+It does not send a prompt or advance unread positions. Paused delivery and
+absence of additional room grants are reported explicitly; saved credentials alone do not pass this test.
 
 ### Fleet lifecycle
 
@@ -328,7 +328,7 @@ Incoming Matrix events are filtered and batched by ordinary code before model
 delivery. The model chooses intentional replies/attachments through Crossfire's
 messaging capability; arbitrary model output is never automatically broadcast.
 Agent account, runtime state, reporting listener and applied room access remain
-distinct observations. A zero-room agent is not advertised as receiving room tasks.
+distinct observations. An agent with only its owner DM is not advertised as receiving shared-room tasks.
 
 `fleet agent attach` prints a ready-to-run terminal command containing the exact
 running-session endpoint, native session ID and workspace. It does not start an engine,
@@ -361,7 +361,7 @@ Each adapter declares approval ownership as `none`, `runtime` or `listener`.
 Owned-runtime configuration validation reports that capability before enrollment;
 live connections report the effective native policy after session selection.
 Fleet orchestration consumes this capability without interpreting provider keys.
-Listener-mediated approval requires an explicit coordination approval room;
+Listener-mediated approval uses the verified private owner DM automatically;
 unknown native policy is a setup failure, never a no-approval default.
 For remote fleets, the SSH adapter wraps the same native command so it runs on
 the controller computer through the user's verified SSH connection. The engine
@@ -572,7 +572,6 @@ fleet = "gaap-equities"
 adapter = "crossfire"
 server = "https://gaap.lol"
 owner = "@yourname:gaap.lol"
-approval_room = "!verified-approval-room-id:gaap.lol"
 
 [[instances]]
 key = "ocr-east"
@@ -593,10 +592,6 @@ workarea = "agents/document-converter/workarea/ocr-west"
 - `definition` resolves to `agents/<definition>/agent.toml`.
 - The coordination block is supplied once for the fleet. It has no password,
   access token, runtime endpoint or thread ID.
-- Optional `approval_room` selects the native room for owner permission requests
-  across the fleet. It is routing configuration, not a room grant; the room plan
-  must separately authorize the affected instances to use it. Management can
-  include the selected approval room in the copied fleet connection block.
 - Model, reasoning, sandbox and approval settings belong to the definition,
   not to instance overrides in the roster.
 
@@ -615,7 +610,7 @@ runtime = "codex"
 [runtime_options]
 model = "VERIFIED_MODEL_ID"
 model_reasoning_effort = "high"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
 ```
 
@@ -628,8 +623,14 @@ The runtime adapter owns the typed `runtime_options` schema and native settings
 translation. Model/reasoning settings reach the headless native session directly.
 The roster's work area supplies native cwd. Permission settings retain native
 semantics; unsupported settings fail rather than being ignored or elevated.
-For Codex, `sandbox_mode = "danger-full-access"` and `approval_policy = "never"`
-are explicit supported choices. On the next stopped-to-running transition, the
+Codex defaults to `sandbox_mode = "danger-full-access"` and
+`approval_policy = "on-request"` when omitted. Both remain configurable.
+`dangerously_bypass_approvals_and_sandbox = true` selects `danger-full-access`
+and `never`, equivalent to the native Codex
+`--dangerously-bypass-approvals-and-sandbox` flag. Conflicting explicit sandbox or
+approval settings fail. The adapter sends native thread settings, not a TUI-only
+app-server CLI flag. `false` leaves ordinary settings/defaults in effect. There is
+no `yolo` alias. Provider restrictions remain authoritative. On the next stopped-to-running transition, the
 definition's current model, reasoning and permissions apply to the same saved
 session. No TUI resume permission flags or new identity are required. Editing
 definition files does not silently reconfigure an already running engine.
@@ -667,7 +668,8 @@ room IDs; names and aliases are display labels.
 
 The file is a **full replacement for each listed agent**. Unlisted agents are
 untouched. For a listed agent, omitted grants are removals. An explicit
-`grants = []` removes all its grants. Unknown identities are errors, not
+`grants = []` removes its discretionary grants, preserving the permanent owner
+DM. The owner DM is not an editable room-plan grant. Unknown identities are errors, not
 enrollment requests.
 
 The selected fleet's immutable UUID plus `instance` resolve the immutable agent
@@ -791,7 +793,9 @@ roster lookup. Recovery must require the named owner's authenticated authority;
 it cannot use a Matrix password requested by an agent.
 
 Approval transactionally creates/reserves all reviewed successful new identities
-with zero grants and owner-only wake policy. Native account provisioning occurs
+with owner-only wake policy. Active provisioning establishes the mandatory
+private owner DM through the canonical room-grant/application path; no additional
+room grants are created. Native account provisioning occurs
 outside the SQLite transaction and can be pending or fail per instance. Retry
 retains the same identity. The UI and controller expose that actual state.
 
@@ -883,11 +887,21 @@ creates another generation; old delegation does not return. Denied invitations
 do not stop unrelated listener delivery and retries are bounded. Admission never
 changes wake policy, fleet delivery intent, identity or model permissions.
 
-Owner direct messages use Element's normal direct-room invitation and the same
-admission path. No agent enrollment, room creation by Crossfire, special DM grant
-table, private default room, second listener or manual grant step is introduced.
-Joined membership and read/reply permission are verified before delivery becomes
-eligible. An online but uninvited agent remains in zero rooms.
+Each active agent has one canonical private DM with its verified owner. Native
+Matrix integration reuses a verified owner-created private DM or creates one
+idempotently and updates both participants' `m.direct` account data. Only owner
+and agent may be joined/invited; encryption, public join rules and world-readable
+history are rejected. The normalized `agent_owner_conversation` relationship
+identifies that room; the ordinary owner-authorized room grant/application owns
+membership and read/reply access. No second receiver or permission owner exists.
+
+This grant cannot be muted, downgraded, removed or delegated through single,
+bulk or room-permission operations. It does not consume the discretionary room
+allowance. Native reconciliation repairs membership and reply permission while
+both accounts are active. Suspension/revocation still removes access. Controller
+and listener disconnection and chat wake policy remain independent: Nobody and
+selected-sender restrictions still apply to owner chat. Exact approval decisions
+are handled independently of paused chat and wake eligibility.
 
 Native creator authority is represented explicitly, never as a finite power level.
 Element's trusted direct chats can make an invited agent an additional creator
@@ -899,7 +913,8 @@ rule applies to every native creator, not just direct rooms.
 
 Matrix clients such as Element own room creation, room configuration and human
 membership management. Crossfire manages agents' participation in existing rooms;
-enrollment, fleet startup and room plans never create rooms. Agent bearer
+room plans never create rooms. Native integration creates only the mandatory
+private owner DM; other rooms must already exist. Agent bearer
 credentials cannot apply a human bulk room plan.
 
 Existing-room reads support the agent assignment editor and fleet plan review.
@@ -1121,8 +1136,8 @@ Ambiguous contexts require an explicit runtime, not process scanning. One saved
 project profile keeps its identity across reconnects, runtime selection and
 upgrades. A native setup/activation state is reported separately from a ready
 listener; enrollment or saved credentials cannot masquerade as delivery.
-Before enrollment, private runtime settings retain the selected runtime and
-approval room, while private setup state retains the chosen server and owner.
+Before enrollment, private runtime settings retain the selected runtime,
+while private setup state retains the chosen server and owner.
 The profile's directory binds the chosen name. Native activation never makes
 the user repeat those choices:
 the same option-free connect command continues the selected setup. Multiple
@@ -1183,8 +1198,8 @@ notices share one explicit wire marker and are excluded from both wake selection
 and later model context; legitimate unmarked notices remain eligible. It does
 not claim cancellation or send the redirect into the model. A later owner message
 resumes normal wake-eligible delivery. Codex and Pi expose exact native turn
-control. Native permission handling remains in Claude Code/Pi; selecting a
-Crossfire approval room for those adapters is rejected explicitly.
+control. Native permission handling remains in Claude Code/Pi. All adapters
+share the owner DM; only Codex uses listener-mediated native approvals.
 
 The complete immutable release includes `crossfire-pi.mjs` alongside the client,
 skill, README, Matrix license and optional Codex launcher. All artifacts are
@@ -1206,19 +1221,27 @@ paused receiver, and peer automatic notices causing no model call or lost contex
 ### Native tool approvals
 
 The Codex runtime adapter decodes exact native permission requests. The Crossfire
-permission path sends them to an explicitly authorized approval room and accepts
-only the verified owner's explicit matching native decision.
+permission path sends them only to the canonical private owner DM and accepts
+only the verified owner's explicit matching native decision. No approval-room
+selection exists in the CLI or fleet configuration.
 
-The fleet coordination block supplies that room once. Each affected listener
+The authenticated agent ensures its owner conversation before connecting. Each affected listener
 validates current applied, unmuted read/reply access, active owner and agent,
 native membership of both, and native message permissions of both before
 advertising readiness or creating an online reporting run. Native room versions
 with implicit creator authority use that authority. Pure Matrix state and power
 parsing has one contract owner shared by management and listener authorization.
 
+The owner DM contains only its owner and its bound agent. Crossfire rejects
+admission of every other agent, including another agent of the same owner, at
+authorization and transaction commit. Indexed storage constraints enforce the
+same exclusivity. An agent's room picker excludes other agents' owner DMs;
+direct requests cannot bypass that exclusion. No human or administrator can
+delegate invitations or configure third-party access to this protected channel.
+
 Approval responses are control input, not model input, and do not alter wake
 policy or resume paused delivery. Silence, unrelated messages and another human's
-reply do not approve. A policy needing approvals without a usable approval room
+reply do not approve. A policy needing approvals without a usable private owner DM
 has a visible setup error/state; it is not silently changed to no-approval mode.
 
 The permission hook returns `Result` for expected authorization, transport,
@@ -1241,8 +1264,10 @@ spawn mechanism does not certify that general capability. Readiness without a
 model turn verifies connection and authorization, not paid-model work or every
 native tool execution path.
 
-A user-selected native no-approval policy is a deliberate configuration choice,
-not a launcher default or model-authorized elevation.
+A user-selected native no-approval policy or explicit native bypass option is
+a deliberate choice, not the default or model-authorized elevation. Owned Codex
+defaults to full access with on-request approval. Attached sessions retain their
+human-owned native model, sandbox and approval policy.
 
 ### Releases and listener activity
 
@@ -1279,7 +1304,7 @@ to kill unrelated or externally owned runtimes.
 
 One canonical schema and permission catalog own current state. Fresh development
 stores initialize that schema directly. Deployed stores advance transactionally
-to schema version 5 after a verified backup; existing identities, native access,
+to schema version 7 after a verified backup; existing identities, native access,
 credentials, controller authority, policy and audit remain intact. Runtime code
 has no historical-schema reader, importer, compatibility handler or dual
 read/write path. Production resets and automatic reset-on-startup-error are
@@ -1394,6 +1419,7 @@ enrollment decision state.
 | Table | Complete logical columns and keys |
 | --- | --- |
 | `agent_room_grant` | `agent_id FK agent`, `room_id`, `generation`, `authorizer_id FK principal`, `added_by_id FK principal`, `invitation_event_id?`, `admission_kind` (`managed` or `invitation`), `access_mode`, `power_level?`, `muted`, `revision`, `access_revision`, `updated_at`; `PK(agent_id, room_id)`; `UQ(agent_id, room_id, generation)`. |
+| `agent_owner_conversation` | `agent_id PK`, `owner_id`, `room_id UQ`, `created_at`; composite FKs to `agent(principal_id, owner_id)` and `agent_room_grant(agent_id, room_id)`. Schema guards require permanent owner-authorized unmuted reply access and reject grant downgrade/deletion. |
 | `agent_room_permission` | `agent_id`, `room_id`, `generation`, `permission_code`, `grant_scope = agent_room`, `granted_by_member_id FK member`, `granted_at`; `PK(agent_id, room_id, permission_code)`; composite FKs to the exact room-grant generation and `permission(code, grant_scope)`. |
 | `room_grant_application` | `agent_id`, `room_id`, `observed_generation?`, `applied_revision?`, `applied_access_revision?`, `membership?`, `creator`, `power_level?`, `last_attempt_at?`, `last_success_at?`, `next_check_at`, `error_code?`, `error_message?`; composite PK/FK to `agent_room_grant(agent_id, room_id)`. Native creators have no finite power level. |
 | `agent_wake_sender` | `agent_id FK agent`, `sender_principal_id FK principal`; composite PK; self-selection rejected. |
@@ -1510,6 +1536,7 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `fleet_message` | `(fleet_id, created_at DESC, id DESC)` | Stable fleet-scoped message history and bounded paging. |
 | `fleet_message_delivery` | `(status, message_id, agent_id)` | Pending message selection and capacity; message-prefix PK covers roster receipts. |
 | `agent_room_grant` | `(room_id, agent_id)`, `(authorizer_id, agent_id, room_id)`, `(added_by_id, agent_id, room_id)` | Room views, authority loss, provenance. |
+| `agent_owner_conversation` | UQ `(room_id)`, `(owner_id, agent_id)` | Canonical private channel lookup and owner lifecycle. |
 | `agent_room_permission` | `(permission_code, room_id, agent_id)`, `(granted_by_member_id, agent_id, room_id)` | Effective delegation and delegator lifecycle. |
 | `room_grant_application` | `(next_check_at, agent_id, room_id)` | Bounded grant application. |
 | `agent_wake_sender` | `(sender_principal_id, agent_id)` | Sender lifecycle invalidation. |
@@ -1629,7 +1656,7 @@ ownership. The management website remains under `/manage`.
 | `POST /api/sessions` | Human login; establish private cookie and CSRF state. |
 | `GET, DELETE /api/sessions/current` | Read/end this human session. |
 | `GET /api/principals` | Authorized, bounded identity discovery for wake selection and invitation targets; minimal directory projection. |
-| `POST /_matrix/client/v3/user_directory/search` | Native Matrix bearer-authenticated projection of the same authorized active registered-principal directory, including zero-room agents. Standard `results`/`limited` response; no room admission or grant. |
+| `POST /_matrix/client/v3/user_directory/search` | Native Matrix bearer-authenticated projection of the same authorized active registered-principal directory, without shared-room membership. Standard `results`/`limited` response; no room admission or grant. |
 | `POST /api/principal-resolutions` | Authorized bulk resolution of exact Matrix sender IDs to registered kind and agent owner; unknown IDs are explicit. |
 | `GET /api/roles`, `GET /api/permissions` | Read the fixed catalog, filtered by appropriate human/agent applicability. |
 | `GET /api/members`, `GET, PATCH /api/members/{memberId}` | Authorized human directory/lifecycle management. |
@@ -1648,6 +1675,7 @@ ownership. The management website remains under `/manage`.
 | `GET /api/agents`, `GET, PATCH /api/agents/{agentId}` | Scoped list/details and configuration/lifecycle changes. |
 | `GET, PUT /api/agents/{agentId}/wake-policy` | One complete mode/selected-sender configuration. |
 | `GET /api/agents/{agentId}/delivery-policy` | This authenticated agent's resolved native delivery policy. |
+| `POST /api/agents/{agentId}/owner-conversation` | This authenticated agent ensures its canonical private owner DM; empty request, `{ roomId }` response. No caller-selected room or other-agent access. |
 | `GET, POST /api/wake-rules` | Human owner/admin paginated rule list or idempotent named schedule creation; creation is CSRF protected. |
 | `GET, PUT, DELETE /api/wake-rules/{ruleId}` | Scoped details, complete revision-checked configuration replacement or confirmed removal. |
 | `GET, POST /api/agents/{agentId}/wake-deliveries` | Self-only read-only next-deadline metadata or atomic due claim. Both require the exact run/session binding. |
@@ -1867,20 +1895,22 @@ Required banks:
 - Real-browser Wake-ups CRUD, weekday/cron editors, assignment selection,
   owner/admin visibility, pagination, confirmations and desktop/mobile geometry.
   Actual Codex, Claude Code and Pi publication through the shared listener with
-  inert providers, including no-room/Nobody delivery, native busy and owner pause.
+  inert providers, including owner-DM-only/Nobody delivery, native busy and owner pause.
 - Enrollment name races, exact one-roster approval, private credential recovery,
   scoped fleet credentials, membership changes/controller updates and no leaks.
 - Native Conduit grants/invitations/removal, cross-owner authority/provenance,
   revocation, selected/nobody wake rules and durable blocked-mention cooldown.
 - One receipt/cursor path, buffering/debounce/size limits, approvals and metadata
   reporting without model turns; no duplicated receivers after restart.
-- Effective approval-policy capabilities, missing/read-only/muted/unjoined or
-  unavailable approval route refusal before online reporting, native powers,
+- Effective approval-policy capabilities, private unencrypted owner-DM validation,
+  rejection of additional participants and forbidden native message powers,
   verified owner approval, expected native denial retaining the same session,
   intentional verified-client Matrix replies, and original failure diagnostics.
 - Real stock Codex headless startup/options, private-home state, native
   input/receipt/output and same-session resumption, isolated inert provider,
-  changed model/reasoning/full-access settings, actual native tool execution,
+  defaults, configurable model/reasoning/sandbox/approval and native bypass,
+  conflicting option refusal, effective saved-session settings, synchronous Node
+  subprocess I/O and native tool execution,
   normal owned-engine shutdown, no production or paid-provider calls.
 - Daemon HTTP/Unix ownership, typed operation idempotency, local/SSH transport,
   CLI error/status contracts, disconnected CLI survival and explicit stop.

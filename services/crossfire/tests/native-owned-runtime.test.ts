@@ -12,6 +12,46 @@ import { value } from './support/application.js';
 import { codexTerminal } from '@crossfire/adapter-codex/terminal';
 import { openTerminal } from '../scripts/test-support/terminal.js';
 
+test('stock Codex default and native bypass execute synchronous subprocess IPC and resume the same session', { timeout: 60000 }, async scope => {
+  const directory = mkdtempSync(join(process.cwd(), '.temp/owned-options-'));
+  const workspace = join(directory, 'workspace'), home = join(workspace, '.codex');
+  mkdirSync(workspace, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
+  writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
+  const provider = await nativeProvider(scope, home), adapter = codexRuntime(), stop = new AbortController();
+  trustWorkspace(home, workspace);
+  const input = { name: 'native-options', workspace, instructions: 'Inert native option proof.',
+    options: {} as Record<string, unknown>, hooks: { requestPermission: async () => { throw new Error('Unexpected fixture approval'); } } };
+  let runtime = value(await adapter.start(input, stop.signal));
+  cleanup(scope, () => runtime.close());
+  const sessionId = runtime.sessionId;
+  assert.equal(runtime.approval, 'listener');
+  assert.equal(provider.requests.length, 0);
+  for (const bypass of [false, true]) {
+    if (bypass) {
+      await runtime.close();
+      input.options = { dangerously_bypass_approvals_and_sandbox: true };
+      runtime = value(await adapter.start(input, stop.signal));
+      assert.equal(runtime.sessionId, sessionId);
+      assert.equal(runtime.approval, 'none');
+    }
+    const marker = join(directory, 'ipc-' + bypass + '.txt');
+    const source = 'const {spawnSync}=require("node:child_process");const {writeFileSync}=require("node:fs");'
+      + 'const child=spawnSync(process.execPath,["-e","process.stdin.pipe(process.stdout)"],{input:"captured-IPC",encoding:"utf8"});'
+      + 'if(child.error||child.status!==0||child.stdout!=="captured-IPC")throw child.error||new Error(JSON.stringify(child));'
+      + 'const git=spawnSync("git",["--version"],{encoding:"utf8"});if(git.error||git.status!==0)throw git.error||new Error("Git failed");'
+      + 'writeFileSync(' + JSON.stringify(marker) + ',child.stdout);';
+    provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 1000, max_output_tokens: 1024 });
+    await runtime.deliver('Run the inert synchronous IPC control', 'native-default-' + bypass, stop.signal);
+    await until(() => existsSync(marker));
+    assert.equal(readFileSync(marker, 'utf8'), 'captured-IPC');
+    const deadline = performance.now() + 5000;
+    while (await runtime.turnControl.activeTurn() !== null) {
+      assert(performance.now() < deadline, 'Native IPC control did not become idle'); await delay(25);
+    }
+  }
+  assert.equal(provider.requests.length, 4);
+});
+
 test('owned stock Codex has zero-model startup and resumes the same private native session', { timeout: 60000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/owned-codex-'));
   const workspace = join(directory, 'workspace'), home = join(workspace, '.codex');

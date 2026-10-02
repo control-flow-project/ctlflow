@@ -5,7 +5,7 @@ export type FleetMessageResult = { messageId: string; body: string; createdAt: n
   total: number; pending: number; delivered: number; failed: number; skipped: number; expired: number };
 export type Controller = { name: string; metadata?: Record<string, string> };
 export type Instance = { key: string; name: string; definition: string; workarea: string };
-export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string; approval_room?: string }; instances: Instance[] };
+export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string }; instances: Instance[] };
 export type Definition = { name: string; runtime: string; options: Record<string, unknown>; instructions: string };
 export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };

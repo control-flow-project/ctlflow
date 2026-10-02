@@ -10,16 +10,11 @@ const configuration: Configuration = { directory: '/fixture', digest: 'fixture',
   roster: { fleet: 'fixture', instances: [], coordination: { adapter: 'crossfire', server: 'https://example.test', owner: '@human:example.test' } },
   definitions: { analyst: { name: 'Analyst', runtime: 'codex', instructions: '', options: { sandbox_mode: 'workspace-write', approval_policy: 'on-request' } } } };
 
-test('native approval requirements are validated before enrollment or process startup', () => {
+test('native policies are validated without manual approval-room configuration', () => {
   const execution = createExecution({ codex: codexRuntime() });
-  const rejected = execution.validate(configuration);
-  assert.equal(rejected.ok, false);
-  if (!rejected.ok) assert.match(rejected.error.message, /analyst.*coordination.approval_room/);
+  assert.deepEqual(execution.validate(configuration), success(undefined));
   const selected = structuredClone(configuration);
-  selected.roster.coordination.approval_room = '!approvals:example.test';
-  assert.deepEqual(execution.validate(selected), success(undefined));
   selected.definitions.analyst!.options.approval_policy = 'never';
-  delete selected.roster.coordination.approval_room;
   assert.deepEqual(execution.validate(selected), success(undefined));
   selected.definitions.analyst!.options.sandbox_mode = 'invalid';
   assert.equal(execution.validate(selected).ok, false);
@@ -33,10 +28,7 @@ test('fleet execution consumes adapter capabilities without interpreting native 
   const input = structuredClone(configuration);
   input.definitions.analyst!.runtime = 'fixture';
   input.definitions.analyst!.options = { native_setting: 'fixture' };
-  assert.equal(createExecution({ fixture: adapter }).validate(input).ok, false);
-  input.roster.coordination.approval_room = '!approvals:example.test';
   assert.deepEqual(createExecution({ fixture: adapter }).validate(input), success(undefined));
   adapter.validate = options => success({ options: options as Record<string, unknown>, approval: 'runtime' });
-  delete input.roster.coordination.approval_room;
   assert.deepEqual(createExecution({ fixture: adapter }).validate(input), success(undefined));
 });

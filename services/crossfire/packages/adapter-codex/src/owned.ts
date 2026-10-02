@@ -8,19 +8,14 @@ import { openSession } from './session.js';
 import { codexDelivery, type CodexConnection } from './connection.js';
 import { startProcess } from './owned-process.js';
 import { prepareHome } from './home.js';
-import { approvalRouting } from './permission-policy.js';
+import { ownedOptions } from './owned-options.js';
 
-const options = check.object({ model: check.optional(check.text(200)), model_reasoning_effort: check.optional(check.choice('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultra')),
-  sandbox_mode: check.choice('read-only', 'workspace-write', 'danger-full-access'), approval_policy: check.choice('untrusted', 'on-failure', 'on-request', 'never') });
 const state = check.object({ sessionId: check.identifier });
 export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
   return { validate(input) {
-    const parsed = options(input);
-    if (!parsed.ok) return parsed;
-    const approval = approvalRouting(parsed.value.approval_policy);
-    return approval.ok ? success({ options: parsed.value, approval: approval.value }) : approval;
+    return ownedOptions(input);
   }, async start(input, stop) {
-    const parsed = options(input.options);
+    const parsed = ownedOptions(input.options);
     if (!parsed.ok) return parsed;
     let process: Awaited<ReturnType<typeof startProcess>> | undefined;
     try {
@@ -31,8 +26,8 @@ export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
       const owner = process;
       let connection: CodexConnection | undefined;
       const session = await openSession({ workspace: input.workspace, endpoint: owner.endpoint, token: owner.token },
-        saved.value ? { kind: 'resume', id: saved.value.sessionId, instructions: input.instructions, config: parsed.value }
-          : { kind: 'create', name: input.name, instructions: input.instructions, config: parsed.value },
+        saved.value ? { kind: 'resume', id: saved.value.sessionId, instructions: input.instructions, config: parsed.value.options }
+          : { kind: 'create', name: input.name, instructions: input.instructions, config: parsed.value.options },
         AbortSignal.any([stop, owner.signal]), input.hooks, event => connection?.event(event));
       writeJson(stateFile, { sessionId: session.sessionId });
       connection = codexDelivery({ ...session, close: async () => { await session.close(); await owner.close(); } },

@@ -39,16 +39,18 @@ export const grantApplication = check.refine(check.object({ observedGeneration: 
   errorCode: check.nullable(check.text(100)), errorMessage: check.nullable(check.text(4096)) }),
   application => !application.creator || application.powerLevel === null, 'Native creators have no finite power level');
 export const grantView = check.object({ agentId: check.identifier, revision: check.integer(), grant: check.nullable(grant),
+  ownerConversation: check.boolean,
   application: check.nullable(grantApplication), permissions: check.list(check.choice('room.agent.invite'), 1),
   allowedActions: check.list(check.choice('set', 'remove', 'permissions.set'), 3) });
 export const deliveryGrant = check.object({ roomId: check.roomId, accessMode: check.choice('read', 'reply', 'custom'),
   powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
 export const deliveryPolicy = check.refine(check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, ownerMatrixId: check.matrixUserId,
-  status: check.status, ownerStatus: check.status, roomGrants: check.list(deliveryGrant, 100), wakeMode: check.wakeMode,
+  status: check.status, ownerStatus: check.status, ownerConversation: check.nullable(check.roomId), roomGrants: check.list(deliveryGrant, 101), wakeMode: check.wakeMode,
   senderMatrixIds: check.list(check.matrixUserId, 2000) }), policy =>
   new Set(policy.senderMatrixIds).size === policy.senderMatrixIds.length && !policy.senderMatrixIds.includes(policy.matrixUserId)
   && new Set(policy.roomGrants.map(grant => grant.roomId)).size === policy.roomGrants.length
   && policy.roomGrants.every(grant => (grant.accessMode === 'custom') === (grant.powerLevel !== null))
+  && (policy.ownerConversation === null || policy.roomGrants.some(grant => grant.roomId === policy.ownerConversation && grant.accessMode === 'reply' && !grant.muted))
   && (policy.status !== 'active' || policy.ownerStatus !== 'active' || policy.wakeMode === 'nobody' ? policy.senderMatrixIds.length === 0
     : policy.wakeMode === 'selected' || policy.senderMatrixIds.includes(policy.ownerMatrixId)), 'Invalid resolved delivery authority');
 export const roomAuthority = check.refine(check.object({ matrixUserId: check.matrixUserId, powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), creator: check.boolean,

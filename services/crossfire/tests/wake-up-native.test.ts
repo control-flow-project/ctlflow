@@ -17,10 +17,10 @@ import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
 
-test('real Conduit and stock Codex deliver idle-only scheduled input with no rooms and Nobody chat authority', { timeout: 120000 }, async scope => {
+test('real Conduit and stock Codex deliver idle-only scheduled input with only the owner DM and Nobody chat authority', { timeout: 120000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
   const agent = await fixture.agent(admin.actor, 'scheduled'), ruleId = randomUUID();
-  value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: 0, mode: 'nobody', senderIds: [] }, randomUUID()));
+  value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: 1, mode: 'nobody', senderIds: [] }, randomUUID()));
   const directory = mkdtempSync(join(process.cwd(), '.temp/wake-native-')), home = join(directory, 'home'), workspace = join(directory, 'project');
   mkdirSync(home, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
   const provider = await nativeProvider(scope, home), engine = await nativeEngine(scope, home, workspace);
@@ -48,7 +48,9 @@ test('real Conduit and stock Codex deliver idle-only scheduled input with no roo
   assert.equal(ended, undefined); assert.equal(provider.requests.length, 1);
   assert(JSON.stringify(inputs()[0]).includes(configuration.message));
   assert(JSON.stringify(inputs()[0]).includes('scheduled-wake'));
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.id })), []);
+  const grants = value(services.collection.roomGrants({ agentId: agent.id }));
+  assert.equal(grants.length, 1);
+  assert.equal(grants[0]!.roomId, value(services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId);
   await clock.advance(2600); assert.equal(inputs().length, 1, 'Busy native work is not interrupted or queued once per missed interval');
   provider.finish(); provider.hold();
   await clock.until(() => inputs().length === 2 || ended !== undefined, 'Coalesced wake-up was not delivered after native idle', 10000);

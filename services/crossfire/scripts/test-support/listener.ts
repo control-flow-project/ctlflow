@@ -25,6 +25,7 @@ export const OBSERVER = '@human:test.localhost';
 export const AGENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeef';
 export const SELF = '@agent-' + AGENT_ID + ':test.localhost';
 export const ROOM = '!coordination:test.localhost';
+export const OWNER_DM = '!owner-dm:test.localhost';
 
 export function temporary(_context: TestContext): string {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
@@ -170,8 +171,8 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     [SELF, { matrixUserId: SELF, kind: 'agent', ownerMatrixId: OBSERVER }],
     ['@agent-holmes:test.localhost', { matrixUserId: '@agent-holmes:test.localhost', kind: 'agent', ownerMatrixId: OBSERVER }],
   ]);
-  const rooms = new Map<string, Event[]>([[ROOM, []]]);
-  const joined = new Set([ROOM]);
+  const rooms = new Map<string, Event[]>([[ROOM, []], [OWNER_DM, []]]);
+  const joined = new Set([ROOM, OWNER_DM]);
   const invites: Record<string, { invite_state: { events: Event[] } }> = {};
   const missingObserver = new Set<string>();
   const failures = new Map<string, number[]>();
@@ -219,8 +220,11 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       api(response, input.matrixUserIds.map(matrixUserId => identities.get(matrixUserId) ?? { matrixUserId, kind: 'unknown', ownerMatrixId: null }));
     } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
       api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, wakeMode: waking.policy,
+        ownerConversation: joined.has(OWNER_DM) ? OWNER_DM : null,
         senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
         roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', powerLevel: null, muted: muted.has(room) })) });
+    } else if (path === '/api/agents/' + AGENT_ID + '/owner-conversation' && request.method === 'POST') {
+      api(response, { roomId: OWNER_DM });
     } else if (path === '/api/agents/' + AGENT_ID) {
       api(response, { agentId: AGENT_ID, matrixUserId: SELF, name: 'watson', displayName: 'Watson (Human)',
         owner: { memberId: AGENT_ID, matrixUserId: OBSERVER, displayName: 'Human', status: access.ownerStatus },
@@ -261,11 +265,15 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       joined.add(room); delete invites[room]; send(response, { room_id: room });
     } else if (path.endsWith('/joined_members')) {
       const room = path.slice((API + '/rooms/').length, -'/joined_members'.length);
-      send(response, { joined: { [SELF]: {}, ...Object.fromEntries([...extraMembers].map(member => [member, {}])), ...(!missingObserver.has(room) ? { [OBSERVER]: {} } : {}) } });
+      send(response, { joined: { [SELF]: {}, ...Object.fromEntries([...(room === OWNER_DM ? [] : extraMembers)].map(member => [member, {}])), ...(!missingObserver.has(room) ? { [OBSERVER]: {} } : {}) } });
     } else if (path.endsWith('/state')) {
       send(response, [
         { type: 'm.room.create', state_key: '', sender: OBSERVER, content: { room_version: '11' } },
         { type: 'm.room.power_levels', state_key: '', sender: OBSERVER, content: { users: { [OBSERVER]: 100, [SELF]: 0 } } },
+        { type: 'm.room.join_rules', state_key: '', sender: OBSERVER, content: { join_rule: 'invite' } },
+        { type: 'm.room.history_visibility', state_key: '', sender: OBSERVER, content: { history_visibility: 'shared' } },
+        { type: 'm.room.member', state_key: OBSERVER, sender: OBSERVER, content: { membership: 'join' } },
+        { type: 'm.room.member', state_key: SELF, sender: SELF, content: { membership: 'join' } },
       ]);
     } else if (path.endsWith('/messages')) {
       const room = path.slice((API + '/rooms/').length, -'/messages'.length);

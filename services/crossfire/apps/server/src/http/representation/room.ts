@@ -10,8 +10,8 @@ export function application(value: RoomGrantApplication) {
     membership: value.membership, creator: value.creator, powerLevel: value.powerLevel, lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt,
     errorCode: value.errorCode, errorMessage: value.errorMessage };
 }
-export function grantView(value: { agentId: string; revision: number; grant: AgentRoomGrant | null; application: RoomGrantApplication | null; permissions: string[]; allowedActions: string[] }) {
-  return { agentId: value.agentId, revision: value.revision, grant: value.grant ? grant(value.grant) : null,
+export function grantView(value: { agentId: string; revision: number; ownerConversation: boolean; grant: AgentRoomGrant | null; application: RoomGrantApplication | null; permissions: string[]; allowedActions: string[] }) {
+  return { agentId: value.agentId, revision: value.revision, ownerConversation: value.ownerConversation, grant: value.grant ? grant(value.grant) : null,
     application: value.application ? application(value.application) : null, permissions: value.permissions, allowedActions: value.allowedActions };
 }
 export function room(value: RoomDetails) {

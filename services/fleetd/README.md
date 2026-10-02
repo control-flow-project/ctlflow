@@ -1,6 +1,11 @@
 # fleetd
 
 A named, user-scoped controller for explicitly registered fleet directories.
+The guides cover controller ownership and the shared runtime configuration:
+- [Controller documentation](docs/README.md)
+- [Lifecycle, private API and execution boundaries](docs/operations.md)
+- [Fleet runtime defaults and overrides](../fleet/docs/configuration.md)
+
 Run it through the fleet CLI or directly:
 
 ```sh

@@ -1,6 +1,7 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  agent_owner_conversation: { agent_id: string; owner_id: string; room_id: string; created_at: number };
   wake_rule: { id: string; owner_id: string; configured_by_id: string; name: string; message: string; schedule_kind: 'interval' | 'cron'; interval_seconds: number | null; cron_expression: string | null; time_zone: string | null; enabled: number; revision: number; created_at: number; updated_at: number };
   wake_rule_agent: { rule_id: string; agent_id: string; next_due_at: number; last_delivered_at: number | null };
   wake_delivery: { id: string; rule_id: string; agent_id: string; rule_revision: number; run_id: string; session_id: string; scheduled_at: number; created_at: number; status: 'pending' | 'delivered' | 'cancelled'; delivered_at: number | null };

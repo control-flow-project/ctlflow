@@ -16,15 +16,15 @@ import { discoverRuntime, runtimeName } from './adapters.js';
 import { recordClaudeHook } from '@crossfire/adapter-claude/hook';
 import { connectProject, selectProfile } from './connect.js';
 import { localListener, runListener } from './listener-process.js';
-import { listenerSettings, listenerBinding } from './settings.js';
+import { listenerSettings } from './settings.js';
 import type { Manifest } from '@crossfire/contracts/release';
 import { roomOptions, runRoomCommand } from './room-access.js';
 import { listenerOptions } from './listener-options.js';
 
 const globals = ["project", "profile", "max-output-bytes"];
 const localOptions: Record<string, readonly string[]> = {
-  connect: ['server', 'owner', 'runtime', 'approval-room'], disconnect: [], status: [], test: [], read: ["room", "limit"], directory: ['search', 'page', 'page-size'],
-  listen: ["room", "limit", "runtime", "approval-room", "poll-ms", "debounce-ms", "reconcile-ms"],
+  connect: ['server', 'owner', 'runtime'], disconnect: [], status: [], test: [], read: ["room", "limit"], directory: ['search', 'page', 'page-size'],
+  listen: ["room", "limit", "runtime", "poll-ms", "debounce-ms", "reconcile-ms"],
 };
 
 export async function main(arguments_: string[], installation: () => Manifest, file: string): Promise<void> {
@@ -54,7 +54,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
     else emit({ usage: "node .crossfire/client.mjs [--project DIRECTORY] [--profile NAME] agent connect|disconnect|status|test|read|directory", agent: Object.fromEntries(Object.entries(localOptions).filter(([name]) => name !== 'listen')), room: roomOptions,
       matrix: "Native Matrix operation IDs converted to kebab-case; use matrix COMMAND --help.",
       output: "64 KiB default; finite --max-output-bytes 1024..98304",
-      identity: "Project-local profiles; no implicit rooms. The runtime server remains user-owned." }, maximum);
+      identity: "Project-local profiles; private owner DM, explicit additional rooms. The runtime server remains user-owned." }, maximum);
     return;
   }
   if (group !== "agent" && group !== "matrix" && group !== 'room') throw new Error("Use agent, room or matrix");
@@ -67,7 +67,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   const listener = group === "agent" && command === "listen" ? listenerOptions(values) : undefined;
   if (command === "connect" && group === "agent") {
     const result = await connectProject({ project: option(values, 'project') ?? process.cwd(), profile: option(values, 'profile'),
-      server: option(values, 'server'), owner: option(values, 'owner'), runtime: option(values, 'runtime'), approvalRoom: option(values, 'approval-room'), file, maximum });
+      server: option(values, 'server'), owner: option(values, 'owner'), runtime: option(values, 'runtime'), file, maximum });
     if (result.handoff) await new Promise<void>((resolve, reject) => {
       const child = spawn(process.execPath, [result.handoff!, ...arguments_], { stdio: 'inherit' });
       child.once('error', reject);
@@ -78,7 +78,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   const project = realpathSync(option(values, 'project') ?? process.cwd());
   const destination = paths(project, selectProfile(project, option(values, 'profile')));
   const installed = installation();
-  const settings = listener ? listenerSettings(destination.state, runtimeName(option(values, 'runtime')), option(values, 'approval-room')) : undefined;
+  const settings = listener ? listenerSettings(destination.state, runtimeName(option(values, 'runtime'))) : undefined;
   const runtime = settings ? discoverRuntime(settings.runtime, project) : undefined;
   if (group === 'agent' && ['disconnect', 'status', 'test'].includes(command)) {
     const unlock = await acquireProcessLock(join(destination.state, 'connection'), 35);
@@ -111,13 +111,11 @@ export async function main(arguments_: string[], installation: () => Manifest, f
       emit(view === "inbox" ? inbox(result as Sync) : view === "messages" ? projectMessages(result) : result, maximum);
     } else if (command === "listen") {
         const room = option(values, 'room');
-        const approvalRoom = settings!.approvalRoom;
         await runListener(destination, { ...selected, coordination, release: installed, cursorFile: destination.cursors, maximumBytes: maximum,
           limit: integerOption(option(values, "limit"), DEFAULT_EVENTS, 1, MAX_EVENTS, "--limit"), ...(room ? { room } : {}),
           pollMs: listener!.pollMs, debounceMs: listener!.debounceMs, reconcileMs: listener!.reconcileMs,
-          ...(approvalRoom ? { approvalRoom } : {}),
           runtime: runtime!.runtime,
-        }, { ...runtime!, binding: listenerBinding(runtime!.binding, approvalRoom) });
+        }, runtime!);
     } else {
       const view = await coordination.delivery(selected.id);
       if (!view.ok) throw new Error(view.error.message);

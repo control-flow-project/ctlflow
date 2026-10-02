@@ -16,6 +16,7 @@ test('wake modes resolve active verified identities and never modify room author
   const alice = await fixture.member('alice'), bob = await fixture.member('bob');
   const agent = await fixture.agent(alice.actor, 'self'), peer = await fixture.agent(alice.actor, 'peer'), foreign = await fixture.agent(bob.actor, 'foreign');
   const current = () => value(services.directory.agent(agent.id))!;
+  const originalGrants = value(services.collection.roomGrants({ agentId: agent.id }));
   const senders = () => value(deliveryPolicy(services, agent.actor, agent.id)).wake.senders.toSorted();
   const change = (mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected', senderIds: string[] = []) =>
     value(changeWakePolicy(services, alice.actor, agent.id, { expectedRevision: current().principal.revision, mode, senderIds }, randomUUID()));
@@ -26,9 +27,9 @@ test('wake modes resolve active verified identities and never modify room author
   change('everyone'); assert(senders().includes(foreign.matrixUserId));
   change('selected', [bob.actor.principalId, peer.id]); assert.deepEqual(senders(), [bob.member.principal.matrixUserId, peer.matrixUserId].sort());
   value(changeMember(services, admin.actor, bob.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
-  value(changeAgent(services, alice.actor, peer.id, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
+  value(changeAgent(services, alice.actor, peer.id, { expectedRevision: 1, status: 'suspended' }, randomUUID()));
   assert.deepEqual(senders(), []); change('nobody'); assert.deepEqual(senders(), []);
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.id })), []);
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.id })), originalGrants);
 });
 
 test('administrator policy is revisioned, resettable and authority is checked after demotion and logout', async scope => {
@@ -51,13 +52,13 @@ test('grant mutations recheck current authority, logout, target lifecycle and ex
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const owner = await fixture.member('owner'), agent = await fixture.agent(owner.actor, 'races');
   const roomId = value(await native.createRoom(owner.member.principal.matrixUserId, 'Race')).roomId;
-  const input = { agentId: agent.id, roomId, expectedRevision: 0, expectedGeneration: null, accessMode: 'reply' as const, powerLevel: null, muted: false };
+  const input = { agentId: agent.id, roomId, expectedRevision: 1, expectedGeneration: null, accessMode: 'reply' as const, powerLevel: null, muted: false };
   const original = services.matrix.room; let calls = 0, release!: () => void, entered!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });
   services.matrix.room = async (...args) => { calls++; const result = await original(...args); entered(); await new Promise<void>(resolve => { release = resolve; }); return result; };
-  assert.equal((await changeRoomGrant(services, owner.actor, { ...input, expectedRevision: 1 }, randomUUID())).ok, false); assert.equal(calls, 0);
+  assert.equal((await changeRoomGrant(services, owner.actor, { ...input, expectedRevision: 2 }, randomUUID())).ok, false); assert.equal(calls, 0);
   const pending = changeRoomGrant(services, owner.actor, input, randomUUID()); await started;
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 0, status: 'revoked' }, randomUUID())); release();
+  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 1, status: 'revoked' }, randomUUID())); release();
   assert.equal((await pending).ok, false); assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId })), null);
   services.matrix.room = original;
   const second = await fixture.agent(owner.actor, 'logout-race');
@@ -70,9 +71,9 @@ test('grant mutations recheck current authority, logout, target lifecycle and ex
 test('name and mute edits retain the native grant revision and membership generation', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, agent = await fixture.agent(admin.actor, 'rename');
   const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Room')).roomId;
-  const granted = value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: 0, expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
-  value(changeAgent(services, admin.actor, agent.id, { expectedRevision: 1, displayName: 'Renamed' }, randomUUID()));
-  value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: 2, expectedGeneration: granted.generation, accessMode: 'reply', powerLevel: null, muted: true }, randomUUID()));
+  const granted = value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: 1, expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
+  value(changeAgent(services, admin.actor, agent.id, { expectedRevision: 2, displayName: 'Renamed' }, randomUUID()));
+  value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: 3, expectedGeneration: granted.generation, accessMode: 'reply', powerLevel: null, muted: true }, randomUUID()));
   const updated = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId }))!;
   assert.equal(updated.accessRevision, granted.accessRevision); assert.equal(updated.generation, granted.generation);
   const before = value(services.repositories.principal.find({ id: agent.id }));

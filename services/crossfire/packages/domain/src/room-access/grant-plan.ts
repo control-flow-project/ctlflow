@@ -31,10 +31,12 @@ export async function previewGrantPlan(services: Dependencies, actor: Actor, pla
     const target = authorizeAgent(services, actor, binding.value.agentId, 'room-grant.manage');
     if (!target.ok) return target;
     const current = services.collection.roomGrants({ agentId: binding.value.agentId });
-    if (!current.ok) return current;
+    const conversation = services.repositories.ownerConversation.find({ agentId: binding.value.agentId });
+    if (!current.ok) return current; if (!conversation.ok) return conversation;
+    if (proposed.grants.some(grant => grant.roomId === conversation.value?.roomId)) return failure('invalid', 'Owner DMs are built in and must not appear in a room plan');
     snapshots.push({ agentId: binding.value.agentId, revision: target.value.principal.revision,
       grants: current.value.map(grant => ({ roomId: grant.roomId, generation: grant.generation, revision: grant.revision })).sort((left, right) => left.roomId.localeCompare(right.roomId)) });
-    const rooms = [...new Set([...current.value.map(grant => grant.roomId), ...proposed.grants.map(grant => grant.roomId)])].sort();
+    const rooms = [...new Set([...current.value.filter(grant => grant.roomId !== conversation.value?.roomId).map(grant => grant.roomId), ...proposed.grants.map(grant => grant.roomId)])].sort();
     for (const roomId of rooms) {
       const previous = current.value.find(grant => grant.roomId === roomId);
       const next = proposed.grants.find(grant => grant.roomId === roomId) ?? { accessMode: 'none' as const, powerLevel: null, muted: false };

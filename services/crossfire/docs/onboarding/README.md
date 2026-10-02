@@ -32,8 +32,8 @@ for its own completion hook or repeatedly poll with the model.
 When native activation is ready, the command prints one approval URL and code,
 then waits in ordinary code. Show both to the human immediately. Approval resumes
 connection automatically; no separate listener command or model polling.
-Approval grants no rooms. Start a DM with your agent or invite it to an existing
-room in Element; an authorized invitation grants read-and-reply access. You can
+Approval provides a private read/write DM with your agent automatically. No
+additional room is joined. Invite the agent to an existing room in Element; an authorized invitation grants read-and-reply access. You can
 also assign limited access in management. Wake-up rules remain separate.
 
 ```sh
@@ -51,8 +51,8 @@ A suspended/revoked account fails; it is never replaced or re-enrolled automatic
 
 `agent test` checks the actual receiver, exact native session, authenticated
 server access, active owner/agent and applied joined rooms. It sends no model
-prompt or test message and advances no cursor. Zero rooms is valid but cannot
-receive room tasks; paused delivery and native busy state are reported explicitly.
+prompt or test message and advances no cursor. Having only the owner DM does not
+authorize shared-room tasks; paused delivery and native busy state are reported explicitly.
 `agent status` reads local status. Heartbeats establish the management online
 indicator; credentials alone establish neither.
 
@@ -129,21 +129,23 @@ in Claude. A denied notice never disconnects the paused receiver. These notices
 do not wake peers or enter later model context. A subsequent owner message resumes
 wake-eligible delivery. Cancellation is not rollback or detached-tool cleanup.
 
-When Codex's effective native policy requires approvals, select an explicitly
-authorized `--approval-room ROOM_ID` before connecting. For fleets, set
-`coordination.approval_room` in `runtime.toml`. The owner and agent must both be
-joined, the agent must have applied unmuted read/reply access, and both must have
-native message permission. Missing or unusable approval routing fails setup
-before the listener reports online; no room or policy is guessed.
+Codex native approval requests are sent automatically to the verified private
+owner DM. Both participants must be joined and able to send messages; the agent
+must have applied unmuted read/reply access. The room must contain only owner and
+agent, with private join/history settings and no encryption. Invalid routing fails
+setup before online reporting. No approval-room CLI flag or fleet setting exists.
 Only the verified owner's exact reply grants the matching native decision.
 Silence, general chat, other agents or administrator status cannot approve.
 Expired or unavailable approval denies the pending native command, not a healthy
 session. A deliberately selected native no-approval policy needs no approval
-room; Crossfire never chooses that policy on the user's behalf.
-Claude and Pi retain native permissions; Crossfire approval-room routing is
-explicitly rejected for those adapters. Crossfire never broadens native access.
+response. Attached sessions retain their native settings; fleet-owned settings
+and defaults are documented in the fleet configuration guide. Claude and Pi keep
+native permission handling. Crossfire never broadens an attached session's access.
 
-New accounts have no implicit rooms or DMs. Authorized Element invitations and
+Every active account has its private owner DM with permanent read and reply
+access. Management cannot mute, downgrade, remove or delegate that channel.
+It cannot admit another agent, even one belonging to the same owner.
+Account suspension/revocation and chat wake policy remain separate. Authorized Element invitations and
 managed grants admit agents up to the inviter's native authority. Profiles,
 listener controls and credentials remain private and
 Git-ignored. Never print, commit or transfer credentials to another project.

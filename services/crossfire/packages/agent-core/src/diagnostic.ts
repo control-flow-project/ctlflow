@@ -10,7 +10,7 @@ export type ListenerTest = { session: string; server: string; authenticated: tru
 export async function testListener(options: { coordination: Coordination; runtime: RuntimeConnection; matrix: Matrix; id: string;
   owner: string; matrixUserId: string; paused: boolean; signal: AbortSignal; authorizeApproval?: () => Promise<Result<void>> }): Promise<ListenerTest> {
   options.signal.throwIfAborted();
-  if (options.runtime.approval === 'listener' && !options.authorizeApproval) throw new Error('Native approval room is not configured');
+  if (options.runtime.approval === 'listener' && !options.authorizeApproval) throw new Error('The verified owner DM approval broker is not connected');
   if (options.authorizeApproval) {
     const authorized = await options.authorizeApproval();
     if (!authorized.ok) throw new Error('Native approval setup is not ready: ' + authorized.error.message);

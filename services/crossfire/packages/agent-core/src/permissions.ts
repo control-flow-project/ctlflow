@@ -10,7 +10,7 @@ import type { Permission } from './runtime.js';
 import type { Coordination } from './coordination.js';
 import { LISTENER_NOTICE } from '@crossfire/contracts/notices';
 import { failure, success, type Result } from '@crossfire/kernel/result';
-import { roomCreators, roomPowers, roomState } from '@crossfire/contracts/matrix-room';
+import { ownerConversationState, roomCreators, roomPowers, roomState } from '@crossfire/contracts/matrix-room';
 
 type Pending = {
   request: string; session: string; expires: number; choices: Permission['choices'];
@@ -36,7 +36,7 @@ function decisionBody(body: string): string {
 export function permissions(options: { clock: Clock; client: Matrix; coordination: Coordination; settings: Settings; account: Account; agent: string;
   room: string; expiresMs: number }, stop: AbortSignal) {
   if (!roomId(options.room) || !Number.isInteger(options.expiresMs) || options.expiresMs < 1000 || options.expiresMs > 300_000) {
-    throw new Error('An explicit approval room and a 1000..300000 ms expiry are required');
+    throw new Error('A verified owner DM and a 1000..300000 ms expiry are required');
   }
   stop.throwIfAborted();
   const run = randomUUID();
@@ -65,6 +65,7 @@ export function permissions(options: { clock: Clock; client: Matrix; coordinatio
     if (!parsed.ok) return parsed;
     const agent = parsed.value;
     if (agent.agentId !== options.agent || agent.ownerMatrixId !== options.settings.owner || agent.matrixUserId !== options.account.user_id
+      || agent.ownerConversation !== options.room
       || agent.status !== 'active' || agent.ownerStatus !== 'active'
       || !agent.roomGrants.some(grant => grant.roomId === options.room && grant.accessMode !== 'read' && !grant.muted)) {
       return failure('forbidden', 'Approval conversation is not currently authorized');
@@ -72,11 +73,13 @@ export function permissions(options: { clock: Clock; client: Matrix; coordinatio
     const members = await boundary(() => options.client.get<{ joined: Record<string, unknown> }>(base + '/joined_members'));
     if (!members.ok) return members;
     if (!members.value.joined || !Object.hasOwn(members.value.joined, options.settings.owner)
-      || !Object.hasOwn(members.value.joined, options.account.user_id)) return failure('forbidden', 'Approval owner and agent must both be joined');
+      || !Object.hasOwn(members.value.joined, options.account.user_id) || Object.keys(members.value.joined).length !== 2) return failure('forbidden', 'Approval DMs must contain only the owner and this agent');
     const native = await boundary(() => options.client.get<unknown>(base + '/state'));
     if (!native.ok) return native;
     const state = roomState(native.value);
     if (!state.ok) return state;
+    const privacy = ownerConversationState(state.value, options.settings.owner, options.account.user_id);
+    if (!privacy.ok) return privacy;
     const creators = roomCreators(state.value);
     if (!creators.ok) return creators;
     const powers = state.value.find(event => event.type === 'm.room.power_levels' && event.state_key === '')?.content;

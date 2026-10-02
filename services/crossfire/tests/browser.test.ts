@@ -133,7 +133,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await expect(page.getByRole('link', { name: 'Fleet · advanced', exact: true })).toHaveAttribute('href', '/manage/connect/fleet');
   await expect(page.getByRole('link', { name: 'Rooms', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Manage rooms →', exact: true })).toHaveCount(0);
-  await expect(page.getByText('Approval creates its account, not room access.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Approval creates its account and a private read/write DM with you.', { exact: false })).toBeVisible();
   assert(!instructions.includes('--session'));
   assert(!instructions.includes('--token-file'));
   await page.reload();
@@ -256,7 +256,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await worker.drain();
   assert((await connect(destination, release.manifest)).ok);
   const profile = readProfile(destination.profile);
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+  const ownerDirect = value(services.repositories.ownerConversation.find({ agentId: profile.id }))!;
+  const mandatoryGrant = value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: ownerDirect.roomId }))!;
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);
   await page.getByRole('link', { name: 'Agent details →' }).click();
   await expect(page.getByRole('region', { name: 'Rooms & access', exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveCount(0);
@@ -274,7 +276,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
     await page.reload();
     await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue(policy);
     assert.equal(value(services.directory.agent(profile.id))!.agent.wakeMode, policy);
-    assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+    assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);
   }
   assert.deepEqual(identityReads, [], 'Identity selection is read only when the selected wake-up mode is open');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Rooms', exact: true }).click();
@@ -494,7 +496,8 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await page.reload();
   await expect(page.locator('.status').filter({ hasText: /^No access$/u })).toBeVisible();
   assert.equal(value(await services.matrix.membership(config.administrator, profile.account.user_id, room)).membership, 'leave');
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none'), []);
+  const ownerConversation = value(services.repositories.ownerConversation.find({ agentId: profile.id }))!;
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none').map(grant => grant.roomId), [ownerConversation.roomId]);
   await page.goto(origin + '/manage/audit');
   await expect(page.getByText('instance-policy.configure', { exact: true })).toHaveCount(2);
   const audit = page.getByRole('table', { name: 'Management activity', exact: true });

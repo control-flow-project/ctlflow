@@ -37,7 +37,7 @@ test('fleet gate pauses one receiver, cancels pending publication and retains un
 
 test('controller messages bypass room wake filtering without consuming room cursors', async scope => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
-  matrix.joined.clear(); matrix.waking.policy = 'nobody'; matrix.waking.senders = [];
+  matrix.joined.delete(ROOM); matrix.waking.policy = 'nobody'; matrix.waking.senders = [];
   const receipts: string[] = [];
   let ended: unknown;
   const binding = createListenerControl(async id => { receipts.push(id); binding.update({ active: true, input: null }); });
@@ -49,7 +49,7 @@ test('controller messages bypass room wake filtering without consuming room curs
   await until(() => receipts.length === 1);
   assert.deepEqual(receipts, ['direct-task']);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
-  assert.equal(existsSync(matrix.cursorFile), false);
+  assert.equal(Object.hasOwn(existsSync(matrix.cursorFile) ? JSON.parse(readFileSync(matrix.cursorFile, 'utf8')) : {}, ROOM), false);
 });
 
 test('controller checkpoint retries only receipts after native acceptance and rejects session retargeting', async () => {

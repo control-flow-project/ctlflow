@@ -12,7 +12,7 @@ import { enroll, connect } from './enrollment.js';
 import { installSoftware } from '@crossfire/adapter-crossfire/software';
 import { discoverRuntime, prepareRuntime, runtimeName } from './adapters.js';
 import { localListener, startListener } from './listener-process.js';
-import { listenerSettings, listenerBinding } from './settings.js';
+import { listenerSettings } from './settings.js';
 import { connectionSetup } from './setup.js';
 
 export function selectProfile(workspace: string, requested?: string): string {
@@ -26,13 +26,13 @@ export function selectProfile(workspace: string, requested?: string): string {
   throw new Error(names.length ? 'Choose --profile from the existing project identities: ' + names.join(', ') : 'What should this agent be called? Supply that name once with --profile NAME.');
 }
 
-export async function connectProject(input: { project: string; profile: string | undefined; server: string | undefined; owner: string | undefined; runtime: string | undefined; approvalRoom: string | undefined; file: string; maximum: number }) {
+export async function connectProject(input: { project: string; profile: string | undefined; server: string | undefined; owner: string | undefined; runtime: string | undefined; file: string; maximum: number }) {
   const workspace = prepareProject(input.project);
   const name = selectProfile(workspace, input.profile);
   const destination = paths(workspace, name);
   const unlock = await acquireProcessLock(join(destination.state, 'connection'), 35);
   try {
-    const settings = listenerSettings(destination.state, runtimeName(input.runtime), input.approvalRoom);
+    const settings = listenerSettings(destination.state, runtimeName(input.runtime));
     const profile = existsSync(destination.profile) ? readProfile(destination.profile) : undefined;
     const pending = !profile && existsSync(destination.pending) ? readJson<PendingEnrollment>(destination.pending) : undefined;
     const setup = connectionSetup(destination.state);
@@ -51,7 +51,7 @@ export async function connectProject(input: { project: string; profile: string |
     const activation = prepareRuntime(settings.runtime, workspace);
     if (activation) { emit({ status: 'runtime-setup-required', runtime: settings.runtime, instructions: activation }, input.maximum); return {}; }
     const runtime = discoverRuntime(settings.runtime, workspace);
-    const binding = listenerBinding(runtime.binding, settings.approvalRoom);
+    const binding = runtime.binding;
     const running = await localListener(destination, 'status');
     if (running && (running.release !== software.manifest.release || running.binding !== binding || !running.ready)) await localListener(destination, 'stop');
     if (!profile && !pending) {

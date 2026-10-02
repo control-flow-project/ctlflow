@@ -45,7 +45,7 @@ test('member labels retain every accepted signup username across requests and ow
 
 test('listener policy is explicit and rejects missing authority, self triggers and competing fields', () => {
   const policy = { agentId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', ownerMatrixId: '@owner:test.localhost', matrixUserId: '@agent:test.localhost',
-    status: 'active', ownerStatus: 'active', roomGrants: [], wakeMode: 'owner', senderMatrixIds: ['@owner:test.localhost'] };
+    status: 'active', ownerStatus: 'active', ownerConversation: null, roomGrants: [], wakeMode: 'owner', senderMatrixIds: ['@owner:test.localhost'] };
   assert(deliveryPolicy(policy).ok);
   assert(deliveryPolicy({ ...policy, wakeMode: 'nobody', senderMatrixIds: [] }).ok);
   assert.equal(deliveryPolicy({ ...policy, wakeMode: 'nobody' }).ok, false);

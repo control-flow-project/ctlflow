@@ -4,11 +4,13 @@ import { readRoomGrant, listRoomGrants } from '@crossfire/domain/room-access/rea
 import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
 import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
 import { acceptRoomInvitation } from '@crossfire/domain/room-access/accept-invitation';
+import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
 import { previewGrantPlan, applyGrantPlan } from '@crossfire/domain/room-access/grant-plan';
 import { bind, reply, paged, actor } from '../bind.js';
 import * as view from '../representation/room.js';
 export function roomRoutes() {
   return [
+    bind(operations.ownerConversation, async (context, params) => reply(await connectOwnerConversation(context.services, actor(context), params.agentId))),
     bind(operations.acceptRoomInvitation, async (context, params, _query, input) => reply(await acceptRoomInvitation(
       context.services, actor(context), params.agentId, input.roomId, context.requestId))),
     bind(operations.rooms, async (context, _params, query) => paged(await listRooms(context.services, actor(context), query), view.room)),

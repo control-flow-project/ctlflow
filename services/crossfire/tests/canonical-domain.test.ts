@@ -102,12 +102,12 @@ test('bulk room review is complete, revision-bound and atomic', async scope => {
   const plan = { fleetId, agents: agents.map((_agent, index) => ({ instanceKey: 'worker-' + index,
     grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
-  value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: 0, displayName: 'Beta' }, randomUUID()));
+  value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: 1, displayName: 'Beta' }, randomUUID()));
   assert.equal((await applyGrantPlan(services, admin.actor, { plan, digest: preview.digest, snapshots: preview.snapshots }, randomUUID())).ok, false);
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agents[0]!.id, roomId })), null);
   const revised = value(await previewGrantPlan(services, admin.actor, plan));
   value(await applyGrantPlan(services, admin.actor, { plan, digest: revised.digest, snapshots: revised.snapshots }, randomUUID()));
-  for (const agent of agents) assert.equal(value(services.collection.roomGrants({ agentId: agent.id })).length, 1);
+  for (const agent of agents) assert.equal(value(services.collection.roomGrants({ agentId: agent.id })).length, 2);
 });
 
 test('selected wake and explicit blocked mentions use durable sender cooldown without model involvement', async scope => {
@@ -155,7 +155,7 @@ test('listener activity is monotonic, targeted disconnection and owner visibilit
   assert.equal(value(services.repositories.listenerRun.find({ id: runId }))?.messagesDelivered, 3);
   assert.equal(value(services.repositories.listenerRun.find({ id: runId }))?.activeMs, 30_000);
   assert.equal(reportListener(services, foreign.actor, owned.id, runId, { release, messagesDelivered: 4, controllerBound: false, stopped: false }, release).ok, false);
-  value(disconnectListeners(services, admin.actor, owned.id, { expectedRevision: 0, runIds: [runId] }, randomUUID()));
+  value(disconnectListeners(services, admin.actor, owned.id, { expectedRevision: 1, runIds: [runId] }, randomUUID()));
   const newRun = randomUUID();
   value(reportListener(services, owned.actor, owned.id, newRun, { release, messagesDelivered: 0, controllerBound: false, stopped: false }, release));
   assert.equal(value(reportListener(services, owned.actor, owned.id, runId, { release, messagesDelivered: 3, controllerBound: false, stopped: false }, release)).disconnect, true);

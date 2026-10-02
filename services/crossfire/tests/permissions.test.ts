@@ -23,7 +23,8 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
   const stop = new AbortController();
   const announcements: { event: string; content: Record<string, unknown> }[] = [];
   const events = new Map<string, ReceivedEvent>();
-  const access = { status: 'active', ownerStatus: 'active', grant: true, ownerJoined: true, ownerLevel: 100, agentLevel: 0, messageLevel: 0, roomVersion: '11' };
+  const access = { status: 'active', ownerStatus: 'active', grant: true, ownerJoined: true, ownerLevel: 100, agentLevel: 0, messageLevel: 0, roomVersion: '11',
+    encrypted: false, public: false, outsider: false };
   let release!: () => void;
   const publication = new Promise<void>(resolve => { release = resolve; });
   if (!holdPublication) release();
@@ -32,6 +33,7 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
     let body: unknown;
     if (path.startsWith('/api/agents/')) body = { data: { agentId: '11111111-1111-4111-8111-111111111111', ownerMatrixId: owner, matrixUserId: self,
       status: access.status, ownerStatus: access.ownerStatus, wakeMode: 'owner', senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? [owner] : [],
+      ownerConversation: access.grant ? room : null,
       roomGrants: access.grant ? [{ roomId: room, accessMode: 'reply', powerLevel: null, muted: false }] : [] },
       meta: { requestId: '11111111-1111-4111-8111-111111111111' } };
     else if (path.endsWith('/joined_members')) body = { joined: { [self]: {}, ...(access.ownerJoined ? { [owner]: {} } : {}) } };
@@ -39,6 +41,11 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
       { type: 'm.room.create', state_key: '', sender: owner, content: { room_version: access.roomVersion } },
       { type: 'm.room.power_levels', state_key: '', sender: owner, content: {
         users: { [self]: access.agentLevel, [owner]: access.ownerLevel }, events: { 'm.room.message': access.messageLevel } } },
+      { type: 'm.room.join_rules', state_key: '', sender: owner, content: { join_rule: access.public ? 'public' : 'invite' } },
+      { type: 'm.room.member', state_key: owner, sender: owner, content: { membership: 'join' } },
+      { type: 'm.room.member', state_key: self, sender: self, content: { membership: 'join' } },
+      ...(access.encrypted ? [{ type: 'm.room.encryption', state_key: '', sender: owner, content: { algorithm: 'm.megolm.v1.aes-sha2' } }] : []),
+      ...(access.outsider ? [{ type: 'm.room.member', state_key: '@third:tests.localhost', sender: owner, content: { membership: 'invite' } }] : []),
     ];
     else if (path.includes('/send/')) {
       const chunks: Buffer[] = [];
@@ -99,7 +106,7 @@ test('only the verified owner replies once to the exact run-bound request', asyn
 });
 
 test('revocation, absent owner, expiry and disconnect never approve a pending request', async scope => {
-  for (const condition of ['grant', 'ownerJoined', 'ownerStatus', 'agentPower', 'ownerPower', 'expiry', 'disconnect'] as const) {
+  for (const condition of ['grant', 'ownerJoined', 'ownerStatus', 'agentPower', 'ownerPower', 'encrypted', 'public', 'outsider', 'expiry', 'disconnect'] as const) {
     await scope.test(condition, async control => {
       const clock = testClock(control);
       const fixture_ = await fixture(control, condition === 'expiry' ? 1000 : 300_000, false, clock);
@@ -109,6 +116,7 @@ test('revocation, absent owner, expiry and disconnect never approve a pending re
       if (condition === 'ownerStatus') fixture_.access.ownerStatus = 'suspended';
       if (condition === 'agentPower') fixture_.access.agentLevel = -1;
       if (condition === 'ownerPower') fixture_.access.ownerLevel = -1;
+      if (condition === 'encrypted' || condition === 'public' || condition === 'outsider') fixture_.access[condition] = true;
       if (condition === 'expiry') await clock.advance(1000);
       else if (condition === 'disconnect') fixture_.stop.abort();
       else {

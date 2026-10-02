@@ -9,13 +9,14 @@ import { testOptions, runtimeTestEnabled } from './test-options.mjs';
 const browserFiles = new Set(['browser.test.js', 'fleet-browser.test.js', 'wake-up-browser.test.js']);
 
 export async function runTests(selected, selection, options = { allRuntimes: false }) {
-  if (!['all', 'browser', 'integration'].includes(selection)) throw new Error('Select an existing test suite');
+  if (!['all', 'non-browser', 'browser', 'integration'].includes(selection)) throw new Error('Select an existing test suite');
   const discovered = selected.flatMap(service => {
     const root = join(repository, 'services', service), output = join(root, 'dist');
     return ['tests', ...(service === 'crossfire' ? ['scripts'] : [])].flatMap(directory =>
       readdirSync(join(output, directory), { recursive: true }).filter(file => {
         const browser = directory === 'tests' && browserFiles.has(file), integration = file.endsWith('.integration.js');
-        return selection === 'browser' ? browser : selection === 'integration' ? integration : file.endsWith('.test.js') || integration;
+        return selection === 'browser' ? browser : selection === 'integration' ? integration
+          : (selection !== 'non-browser' || !browser) && (file.endsWith('.test.js') || integration);
       }).map(file => ({ service, root, file: join(output, directory, file), label: service + '/' + directory + '/' + file })));
   });
   const jobs = discovered.filter(job => runtimeTestEnabled(job.file, options));

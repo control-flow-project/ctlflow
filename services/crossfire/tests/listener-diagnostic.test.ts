@@ -43,7 +43,7 @@ test('diagnostics verify native approval readiness without executing a model tur
   const options = { coordination: fixture.coordination, runtime,
     matrix: matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token, signal: stop.signal, timeoutMs: 1000 }),
     id: fixture.id, owner: fixture.settings.owner, matrixUserId: fixture.account.user_id, paused: false, signal: stop.signal };
-  await assert.rejects(testListener(options), /approval room is not configured/);
+  await assert.rejects(testListener(options), /owner DM approval broker is not connected/);
   const ready = await testListener({ ...options, authorizeApproval: async () => success(undefined) });
   assert.equal(ready.approval, 'listener');
   await assert.rejects(testListener({ ...options, authorizeApproval: async () => failure('forbidden', 'Room access was removed') }), /Room access was removed/);

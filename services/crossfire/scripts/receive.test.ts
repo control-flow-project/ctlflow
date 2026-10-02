@@ -150,7 +150,7 @@ test('leaving persists through discovery and sync; rejoining establishes a fresh
   assert(!fixture.joined.has(ROOM));
   const left = await readUnread(storage, client, fixture.settings, fixture.cursorFile);
   await acknowledge(storage, client, fixture.cursorFile, left);
-  assert.deepEqual(left.cursors, {});
+  assert.equal(Object.hasOwn(left.cursors, ROOM), false);
   fixture.add(ROOM, message('$away-one'), message('$away-two'));
   await client.post('/_matrix/client/v3/join/' + encodeURIComponent(ROOM), {});
   const rejoined = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 1);

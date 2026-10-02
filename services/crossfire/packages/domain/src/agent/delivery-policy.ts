@@ -8,6 +8,11 @@ export function deliveryPolicy(services: Pick<Services, 'repositories' | 'direct
   const grants = services.collection.roomGrants({ agentId }), applied = services.collection.agentRoomApplications({ agentId }), wake = resolveWakePolicy(services, target.value);
   if (!grants.ok) return grants; if (!applied.ok) return applied; if (!wake.ok) return wake;
   const joined = new Map(applied.value.filter(record => record.membership === 'join' && record.errorCode === null).map(record => [record.roomId, record]));
-  return success({ record: target.value, grants: grants.value.filter(grant => grant.accessMode !== 'none'
-    && joined.get(grant.roomId)?.observedGeneration === grant.generation), wake: wake.value });
+  const conversation = services.repositories.ownerConversation.find({ agentId });
+  if (!conversation.ok) return conversation;
+  const eligible = grants.value.filter(grant => grant.accessMode !== 'none'
+    && joined.get(grant.roomId)?.observedGeneration === grant.generation);
+  return success({ record: target.value, grants: eligible, wake: wake.value,
+    ownerConversation: conversation.value && eligible.some(grant => grant.roomId === conversation.value?.roomId)
+      ? conversation.value.roomId : null });
 }

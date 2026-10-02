@@ -22,8 +22,9 @@ subprocess capabilities.
 - Runtime adapters declare whether approval belongs to the runtime, listener or
   is disabled by an explicit native policy. Live Codex policy comes from the
   actual selected native thread, not a Crossfire default.
-- Fleet validation rejects missing listener-mediated approval routing before
-  enrollment. Shared listener readiness checks current applied grants, unmuted
+- Every active agent has a protected private read/write owner DM. Codex approvals
+  use it automatically; no global approval-room configuration exists.
+  Shared listener readiness checks current applied grants, unmuted
   delivery, active identities, both joined members and native message powers.
 - Readiness and `agent test` do not prompt a model. A configured but unauthorized
   approval conversation never reports ready or online.
@@ -91,6 +92,9 @@ Restoring the stock shutdown rule fails the captured subprocess control with
 to install a custom Codex binary. Crossfire includes no runtime patcher, alternate
 Git spawn path, sandbox relaxation, system service or restart workaround.
 
-The production fleet needs an explicitly selected authorized approval conversation
-and an approved way to obtain the native sandbox fix. Passing inert-provider
-tests does not certify paid-model work or restore a production deployment.
+Fleet-owned Codex defaults to `danger-full-access` with `on-request` approvals.
+All runtime settings remain configurable. Explicit
+`dangerously_bypass_approvals_and_sandbox = true` selects full access and `never`;
+conflicting settings fail. This approved policy avoids restricted-sandbox IPC
+without a custom runtime. The failure evidence remains applicable to restricted
+policies. Inert-provider tests do not certify paid-model work.

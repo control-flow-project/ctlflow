@@ -11,7 +11,7 @@ import { nativeOk } from '@crossfire/adapter-matrix/http';
 import { releaseFixture } from "./release-fixture.js";
 
 
-test("public documentation and local pairing enroll exactly one zero-room native identity", { timeout: 120_000 }, async scope => {
+test("public documentation and local pairing enroll exactly one native identity with its owner DM", { timeout: 120_000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release);
   const { services, origin, native, worker, admin } = fixture;
   const human = { id: admin.member.principal.matrixUserId, token: admin.token };
@@ -48,9 +48,10 @@ test("public documentation and local pairing enroll exactly one zero-room native
   assert.equal(profile.settings.owner, human.id);
   assert.equal(statSync(destination.profile).mode & 0o777, 0o600);
   assert.equal(statSync(destination.pending).mode & 0o777, 0o600);
-  assert.deepEqual(value(await nativeOk({ base: native.base, token: profile.account.access_token }, "GET", API + "/joined_rooms")).joined_rooms, []);
+  const ownerRoom = value(services.repositories.ownerConversation.find({ agentId: profile.id }))!.roomId;
+  assert.deepEqual(value(await nativeOk({ base: native.base, token: profile.account.access_token }, "GET", API + "/joined_rooms")).joined_rooms, [ownerRoom]);
   assert.equal((await enroll(destination, origin, human.id, "holmes", release.manifest)).ok, false);
   assert.equal((await connect(destination, release.manifest)).ok, true);
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1);
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).map(grant => grant.roomId), [ownerRoom]);
 });

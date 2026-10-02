@@ -16,6 +16,9 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
   if (!target.ok) return target; if (!stored.ok) return stored; if (!application.ok) return application; if (!policy.ok) return policy;
   if (!target.value || !stored.value || !application.value || !policy.value) return failure('missing', 'Room grant reconciliation state is missing');
   const agent = target.value, grant = stored.value, previous = application.value;
+  const conversation = services.repositories.ownerConversation.find({ agentId });
+  if (!conversation.ok) return conversation;
+  const ownerDirect = conversation.value?.roomId === roomId;
   const authorizer = services.repositories.principal.find({ id: grant.authorizerId });
   if (!authorizer.ok) return authorizer;
   let observed: RoomMembership | null = null;
@@ -48,6 +51,11 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
   }
   async function apply(): Promise<Result<void>> {
     if (grant.accessMode === 'none' || agent.principal.status !== 'active' || agent.owner.status !== 'active') return remove();
+    if (ownerDirect) {
+      const verified = await services.matrix.ownerConversation(agent.owner.matrixUserId, agent.principal.matrixUserId, roomId);
+      if (!verified.ok) return verified;
+      if (verified.value !== roomId) return failure('conflict', 'The owner DM changed during reconciliation');
+    }
     if (!authorizer.ok || !authorizer.value || authorizer.value.status !== 'active') {
       const left = await remove();
       return left.ok ? failure('forbidden', 'The grant authorizer is no longer active') : left;
@@ -71,7 +79,7 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
     const native = await services.matrix.membership(authorizer.value.matrixUserId, agent.principal.matrixUserId, roomId);
     if (!native.ok) return native;
     observed = native.value;
-    const command = previous.observedGeneration !== grant.generation || previous.appliedAccessRevision !== grant.accessRevision;
+    const command = ownerDirect || previous.observedGeneration !== grant.generation || previous.appliedAccessRevision !== grant.accessRevision;
     if (!command && native.value.membership !== 'join') { observed = native.value; return success(undefined); }
     const requested = requestedPower(facts.value, grant.accessMode === 'custom' && !facts.value.creator
       ? { ...grant, powerLevel: Math.min(grant.powerLevel!, facts.value.powerLevel) }

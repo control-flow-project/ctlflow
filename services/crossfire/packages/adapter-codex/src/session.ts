@@ -82,6 +82,16 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
       const routing = selected.ok ? approvalRouting(selected.value.approvalPolicy) : selected;
       if (!routing.ok) throw new Error(routing.error.message);
       approval = routing.value;
+      if (selected.ok) {
+        const sandbox = object(selected.value.sandbox);
+        const sandboxTypes: Record<string, string> = { 'danger-full-access': 'dangerFullAccess', 'workspace-write': 'workspaceWrite', 'read-only': 'readOnly' };
+        if (selection.config.sandbox_mode !== undefined && (!sandbox.ok || sandbox.value.type !== sandboxTypes[String(selection.config.sandbox_mode)])
+          || selection.config.approval_policy !== undefined && selected.value.approvalPolicy !== selection.config.approval_policy
+          || selection.config.model !== undefined && selected.value.model !== selection.config.model
+          || selection.config.model_reasoning_effort !== undefined && selected.value.reasoningEffort !== selection.config.model_reasoning_effort) {
+          throw new Error('Codex did not apply the selected model, reasoning, sandbox and approval settings');
+        }
+      }
       if (selection.kind === 'create') await engine.request('thread/name/set', { threadId: sessionId, name: selection.name });
     }
     const read = object(await engine.request('thread/read', { threadId: sessionId, includeTurns: selection.kind === 'create' }));
