@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import type { TestContext } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync } from 'node:fs';
@@ -29,7 +30,7 @@ export async function nativeCodex(context: TestContext) {
   const session = await connectSession({ ...fixture, timeoutMs: 10_000 }, stop.signal, {
     requestPermission: async () => { throw new Error('Unexpected permission in inert native delivery fixture'); },
   }, notice => { notifications.push(notice); adapter?.event(notice); });
-  context.after(async () => {
+  cleanup(context, async () => {
     stop.abort(); if (adapter) await adapter.close(); else await session.close();
   });
   adapter = codexDelivery({ ...session, request: async (method, params) => {
@@ -48,7 +49,7 @@ export async function nativeCodex(context: TestContext) {
     runtime: async (signal: AbortSignal) => {
       const close = () => { void session.close(); };
       signal.addEventListener('abort', close, { once: true });
-      context.after(() => signal.removeEventListener('abort', close));
+      cleanup(context, () => signal.removeEventListener('abort', close));
       signal.throwIfAborted();
       return connection;
     },

@@ -1,3 +1,5 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
+import { trustWorkspace } from '@crossfire/test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn, execFile } from 'node:child_process';
@@ -29,7 +31,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   const stop = new AbortController();
   let tunnel: Awaited<ReturnType<typeof openTunnel>> | undefined, sshd: ReturnType<typeof spawn> | undefined, ended: Promise<unknown> | undefined;
   let nativeRuntime: OwnedRuntimeConnection | undefined, terminal: ReturnType<typeof spawn> | undefined, terminalEnded: Promise<unknown> | undefined;
-  scope.after(async () => { terminal?.kill('SIGTERM'); await terminalEnded; await nativeRuntime?.close(); stop.abort(); await tunnel?.close(); sshd?.kill('SIGTERM'); await ended; await command('daemon', 'stop').catch(() => {}); rmSync(directory, { recursive: true, force: true }); });
+  cleanup(scope, async () => { terminal?.kill('SIGTERM'); await terminalEnded; await nativeRuntime?.close(); stop.abort(); await tunnel?.close(); sshd?.kill('SIGTERM'); await ended; await command('daemon', 'stop').catch(() => {}); rmSync(directory, { recursive: true, force: true }); });
   await command('daemon', 'start', '--root', root, '--name', 'ssh-proof');
   for (const key of ['host', 'client', 'wrong-host']) await execute('/usr/bin/ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', join(directory, key)]);
   const listener = createServer(); listener.listen(0, '127.0.0.1'); await once(listener, 'listening');
@@ -51,7 +53,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   for (let attempt = 0; !log.includes('Server listening') && attempt < 100; attempt++) { assert.equal(sshd.exitCode, null, log); await delay(30); }
   assert(log.includes('Server listening'), log);
   const previousPath = process.env.PATH; process.env.PATH = bin + ':' + previousPath;
-  scope.after(() => { if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath; });
+  cleanup(scope, () => { if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath; });
   tunnel = await openTunnel('fixture', root, AbortSignal.any([stop.signal, scope.signal])).catch(error => { throw new Error(String(error) + '\n' + log); });
   const status = await createDaemonClient(tunnel.socketPath, AbortSignal.timeout(5000)).call(operations.status, {}, {});
   assert(status.ok, JSON.stringify(status) + '\n' + log); assert.equal(status.value.data.controller.name, 'ssh-proof');
@@ -78,9 +80,10 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
     response.writeHead(404); response.end('{}');
   });
   provider.listen(0, '127.0.0.1'); await once(provider, 'listening');
-  scope.after(() => new Promise<void>(resolve => { provider.closeAllConnections(); provider.close(() => resolve()); }));
+  cleanup(scope, () => new Promise<void>(resolve => { provider.closeAllConnections(); provider.close(() => resolve()); }));
   const providerAddress = provider.address(); assert(providerAddress && typeof providerAddress !== 'string');
   writeFileSync(join(nativeHome, 'config.toml'), 'model_provider = "fixture"\n[model_providers.fixture]\nname = "Inert SSH fixture"\nbase_url = "http://127.0.0.1:' + providerAddress.port + '/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n', { mode: 0o600 });
+  trustWorkspace(nativeHome, workspace);
   const runtime = await codexRuntime().start({ name: 'ssh-native', workspace, instructions: 'Inert verification. No work is requested.',
     options: { model: 'gpt-5.1', model_reasoning_effort: 'medium', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestPermission: async () => { throw new Error('No tool approval is expected'); } } }, scope.signal);
@@ -90,9 +93,9 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   terminal = spawn('/usr/bin/script', ['--quiet', '--return', '--flush', '--command', 'stty cols 110 rows 35; ' + realRemote, '/dev/null'],
     { env: { ...process.env, TERM: 'xterm-256color' }, stdio: ['pipe', 'pipe', 'pipe'] });
   terminalEnded = once(terminal, 'close');
-  let terminalOutput = '', updatedAt = Date.now();
+  let terminalOutput = '';
   terminal.stdout!.on('data', (chunk: Buffer) => {
-    terminalOutput = (terminalOutput + chunk.toString()).slice(-1024 * 1024); updatedAt = Date.now();
+    terminalOutput = (terminalOutput + chunk.toString()).slice(-1024 * 1024);
     if (chunk.includes('\x1b[6n')) terminal!.stdin!.write('\x1b[1;1R');
   });
   terminal.stderr!.on('data', (chunk: Buffer) => { terminalOutput = (terminalOutput + chunk.toString()).slice(-1024 * 1024); });
@@ -100,10 +103,8 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
     const deadline = Date.now() + 25000;
     while (!predicate()) { assert.equal(terminal!.exitCode, null, terminalOutput); assert(Date.now() < deadline, terminalOutput); await delay(30); }
   }
-  await observe(() => terminalOutput.includes('Trust and continue') && Date.now() - updatedAt > 100);
-  terminal.stdin!.write('\r');
-  await observe(() => terminalOutput.includes('gpt-5.1') && Date.now() - updatedAt > 100);
-  terminal.stdin!.write('/quit'); await delay(150); terminal.stdin!.write('\r');
+  await observe(() => terminalOutput.includes('gpt-5.1'));
+  terminal.stdin!.write('/quit'); await observe(() => terminalOutput.includes('/quit')); terminal.stdin!.write('\r');
   await observe(() => terminal!.exitCode !== null || terminal!.signalCode !== null);
   assert.deepEqual(await terminalEnded, [0, null], terminalOutput);
   assert.equal(nativeRuntime.signal.aborted, false);

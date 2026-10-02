@@ -2,6 +2,7 @@ import type { ListenerRun } from '@crossfire/domain/activity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapListenerRun(row: Tables['listener_run']): ListenerRun {
   return {
+    controllerBound: row.controller_bound === 1,
     id: row.id,
     agentId: row.agent_id,
     release: row.release,

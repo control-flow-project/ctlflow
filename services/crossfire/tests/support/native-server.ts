@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { join } from 'node:path';
@@ -20,7 +21,7 @@ export async function nativeServer(scope: TestContext, release: Release, present
   const publicAddress = router.address(); assert(publicAddress && typeof publicAddress !== 'string');
   const origin = 'http://127.0.0.1:' + publicAddress.port;
   routes.publicOrigin = origin; fixture.application.config.publicOrigin = origin; fixture.services.instance.publicOrigin = origin;
-  scope.after(async () => { await worker.stop(); router.closeAllConnections(); server.closeAllConnections();
+  cleanup(scope, async () => { await worker.stop(); router.closeAllConnections(); server.closeAllConnections();
     await new Promise<void>(resolve => router.close(() => resolve())); await new Promise<void>(resolve => server.close(() => resolve())); });
   return { ...fixture, origin, worker, router, server };
 }

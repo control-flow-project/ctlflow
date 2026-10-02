@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
@@ -20,7 +21,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   const database = new Database(':memory:', { verbose(statement) {
     if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
   } });
-  scope.after(() => database.close());
+  cleanup(scope, () => database.close());
   database.pragma('foreign_keys = ON');
   createSchema(database);
   const repositories = createRepositories(database);
@@ -45,7 +46,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
         value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
         application(agentId);
         for (let runIndex = 0; runIndex < 3; runIndex++) value(repositories.listenerRun.insert({
-          id: agentId + '-run-' + runIndex, agentId, release: 'proof', startedAt: 1,
+          id: agentId + '-run-' + runIndex, agentId, release: 'proof', controllerBound: false, startedAt: 1,
           lastSeenAt: 100 + runIndex, activeMs: 100, messagesDelivered: 2,
           stoppedAt: runIndex === 2 ? null : 101, disconnectRequestedAt: null,
         }));
@@ -116,7 +117,7 @@ test('sender identity batches seek exact Matrix indexes across large human and a
   const database = new Database(':memory:', { verbose(statement) {
     if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
   } });
-  scope.after(() => database.close());
+  cleanup(scope, () => database.close());
   database.pragma('foreign_keys = ON');
   createSchema(database);
   const repositories = createRepositories(database), discovery = createDiscoveryRepository(database);

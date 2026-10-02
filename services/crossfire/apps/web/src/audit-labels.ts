@@ -20,5 +20,8 @@ const actionLabels: Readonly<Record<string, string>> = {
   'room-grant.remove': 'Remove room access',
   'room-grant.set': 'Set room access',
   'room-permission.set': 'Change invitation permission',
+  'wake-rule.create': 'Create Wake-up',
+  'wake-rule.update': 'Update Wake-up',
+  'wake-rule.delete': 'Delete Wake-up',
 };
 export function auditActionLabel(action: string): string { return Object.hasOwn(actionLabels, action) ? actionLabels[action]! : action; }

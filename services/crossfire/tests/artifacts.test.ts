@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -22,7 +23,7 @@ test("published project-local release is immutable, bounded, standalone and publ
     if (!serveArtifact(release, request.method ?? "", request.url ?? "", response)) { response.writeHead(404); response.end(); }
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
-  context.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
+  cleanup(context, () => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
   const address = server.address();
   assert(address && typeof address === "object");
   const base = `http://127.0.0.1:${address.port}/onboarding/${metadata.release}/`;

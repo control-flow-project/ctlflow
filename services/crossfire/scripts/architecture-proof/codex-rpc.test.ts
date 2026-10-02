@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { mkdtempSync } from "node:fs";
@@ -20,7 +21,7 @@ test("proof observer closes on malformed or oversized protocol responses", { tim
       const path = join(directory, "rpc.sock");
       const server = createServer();
       const websocket = new WebSocketServer({ server });
-      child.after(async () => {
+      cleanup(child, async () => {
         for (const client of websocket.clients) client.terminate();
         await new Promise<void>(resolve => websocket.close(() => resolve()));
         await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

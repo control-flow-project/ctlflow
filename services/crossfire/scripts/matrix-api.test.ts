@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -121,7 +122,7 @@ test('CLI exposes the native manifest and rejects every superseded top-level com
 test('large JSON transport fails independently of the smaller context budget', async context => {
   const server = createServer((_request, response) => response.end(JSON.stringify({ value: 'x'.repeat(1024 * 1024) })));
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
-  context.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  cleanup(context, () => new Promise<void>(resolve => server.close(() => resolve())));
   const address = server.address(); assert(address && typeof address === 'object');
   await assert.rejects(matrix({base: 'http://127.0.0.1:' + address.port}).get('/probe'), /size bound/);
 });

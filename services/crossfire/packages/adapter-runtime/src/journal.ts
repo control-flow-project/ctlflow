@@ -13,7 +13,7 @@ export function deliveryJournal<Pending extends { text: string; messageId: strin
   const release = acquireFileLock(file);
   try {
     const parsed = fields(existsSync(file) ? readJson<unknown>(file) : { sessionId, pending: null, confirmed: [] }, ['sessionId', 'pending', 'confirmed']);
-    if (!parsed.ok || !check.identifier(parsed.value.sessionId).ok || parsed.value.sessionId !== sessionId) throw new Error('Invalid native delivery journal or session binding');
+    if (!parsed.ok || !check.text(200)(parsed.value.sessionId).ok || parsed.value.sessionId !== sessionId) throw new Error('Invalid native delivery journal or session binding');
     const delivery = check.nullable(pending)(parsed.value.pending);
     const confirmed = check.list(check.object({ messageId: check.text(200),
       digest: check.refine(check.text(64), value => /^[a-f0-9]{64}$/u.test(value), 'Invalid native receipt digest') }), 128)(parsed.value.confirmed);

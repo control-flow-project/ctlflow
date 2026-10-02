@@ -10,7 +10,7 @@ import { LISTENER_NOTICE, isListenerNotice } from '@crossfire/contracts/notices'
 
 export function createMatrixAuthority(config: Config): MatrixAuthority {
   const accounts = authority(config);
-  const invitationSender = createInvitationReader();
+  const invitationState = createInvitationReader();
   async function room(matrixUserId: string, roomId: string): Promise<Result<RoomFacts>> {
     const client = await accounts.asUser(matrixUserId);
     if (!client.ok) return client;
@@ -85,11 +85,13 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
     async invitation(matrixUserId, roomId) {
       const target = await accounts.asUser(matrixUserId);
       if (!target.ok) return target;
-      const sender = await invitationSender(target.value, matrixUserId, roomId);
-      if (!sender.ok || sender.value === null) return sender.ok ? success(null) : sender;
-      if (!sender.value.endsWith(':' + config.serverName)) return failure('forbidden', 'The native inviter must be a local Crossfire identity');
-      const authorizer = await accounts.asUser(sender.value);
-      return authorizer.ok ? invitationEvent(authorizer.value, matrixUserId, roomId, sender.value) : authorizer;
+      const invitations = await invitationState(target.value, matrixUserId);
+      if (!invitations.ok) return invitations;
+      const sender = invitations.value.get(roomId);
+      if (!sender) return success(null);
+      if (!sender.endsWith(':' + config.serverName)) return failure('forbidden', 'The native inviter must be a local Crossfire identity');
+      const authorizer = await accounts.asUser(sender);
+      return authorizer.ok ? invitationEvent(authorizer.value, matrixUserId, roomId, sender) : authorizer;
     },
     async setRoomAccess(authorizerMatrixId, targetMatrixId, roomId, access, admission) {
       const { powerLevel } = access;

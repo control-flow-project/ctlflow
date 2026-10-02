@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync } from 'node:fs';
@@ -15,7 +16,7 @@ test('Pi native host enforces credentials, exact generation, bounded input and p
   const api: PiApi = { on: () => {}, sendMessage: input => { if (append) branch.push({ id: 'receipt', type: 'custom_message', ...input }); } };
   const context: PiContext = { cwd: directory, signal: undefined, isIdle: () => idle, isProjectTrusted: () => true, abort: () => { idle = true; },
     sessionManager: { getSessionId: () => session, getSessionFile: () => undefined, getLeafId: () => 'initial', getBranch: () => branch } };
-  const host = await piHost(api, context, 'a'.repeat(64)); scope.after(() => host.close());
+  const host = await piHost(api, context, 'a'.repeat(64)); cleanup(scope, () => host.close());
   const signal = new AbortController().signal;
   assert.equal(await piCall(host.descriptor, { method: 'verify' }, signal), true);
   await assert.rejects(piCall({ ...host.descriptor, token: 'b'.repeat(43) }, { method: 'verify' }, signal), /403/);

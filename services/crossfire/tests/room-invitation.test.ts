@@ -140,7 +140,7 @@ test('native room and direct-message invitations use the canonical grant authori
     const roomId = await create(owner.token);
     await invite(owner.token, roomId);
     const reader = createInvitationReader();
-    assert.equal(value(await reader({ base: fixture.native.base, token: target.token }, target.matrixUserId, roomId)), ownerId);
+    assert.equal(value(await reader({ base: fixture.native.base, token: target.token }, target.matrixUserId)).get(roomId), ownerId);
     assert.equal((await accept(roomId)).status, 200);
     assert.equal(grant(roomId)?.accessMode, 'reply');
   });

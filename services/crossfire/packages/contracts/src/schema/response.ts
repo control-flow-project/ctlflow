@@ -19,6 +19,7 @@ export const member = check.object({ memberId: check.identifier, matrixUserId: c
   roleCode: check.choice('member', 'administrator'), status: check.status, revision: check.integer(), createdAt: check.integer(), application });
 export const session = check.object({ member, csrfSecret: check.secret, permissions: check.list(check.text(100), 100) });
 export const listenerRun = check.object({ runId: check.identifier, agentId: check.identifier, release: check.nullable(check.text(200)),
+  controllerBound: check.boolean,
   startedAt: check.integer(), lastSeenAt: check.integer(), activeMs: check.integer(), messagesDelivered: check.integer(),
   stoppedAt: check.nullable(check.integer()), disconnectRequestedAt: check.nullable(check.integer()) });
 export const activity = check.object({ status: check.choice('online', 'offline', 'disconnecting'), activeMs: check.integer(),

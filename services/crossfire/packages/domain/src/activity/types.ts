@@ -23,6 +23,7 @@ export type MemberSession = {
 };
 
 export type ListenerRun = {
+  controllerBound: boolean;
   id: string;
   agentId: string;
   release: string | null;

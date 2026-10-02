@@ -69,6 +69,77 @@ explicit .js relative imports, validated boundaries, and semantic splits near
 
 ## 2. User experience and lifecycle
 
+### Wake-ups
+
+The management sidebar contains **Wake-ups** at `/manage/wake-ups`. Its searchable,
+paginated table lists named rules, schedules, enabled state, assigned-agent count,
+next due time and last receipt-confirmed delivery. `/manage/wake-ups/new` creates
+a rule; `/manage/wake-ups/{ruleId}` edits its name, plain-text message, schedule,
+enabled state and searchable/paginated agent assignments. Deletion requires human
+confirmation. An agent can belong to several rules and a rule can target many
+agents. Human owners see/manage their rules and may configure owned targets;
+administrators see/manage every rule and may configure every target.
+
+Schedules have one canonical tagged shape: `{kind: "interval", seconds}` or
+`{kind: "cron", expression, timeZone}`. Intervals range from one second to
+365 days and retain their cadence from the last save, even when a claim is late.
+Calendar schedules use five fields (minute, hour, day of month, month, day of
+week), explicit IANA time zones, lists, ranges and steps. Randomized fields,
+seconds fields, implicit server time zones and impossible schedules are refused.
+The UI offers weekdays/time controls and an advanced cron editor; both produce
+the same calendar representation. `0 22 * * 3` with `Asia/Kolkata` means Wednesday
+at 22:00 there; `0 1 * * 0,3,4` means Sunday, Wednesday and Thursday at 01:00.
+The server's functional calendar adapter owns parsing and next-occurrence
+calculation using pinned `cron-parser` 5.10.1. Neither the domain nor a runtime
+implements another parser. Daylight-saving gaps advance to the valid shifted
+hour (02:30 becomes 03:30 in a one-hour gap); repeated local times run once,
+at their first occurrence. No OS cron job is installed.
+
+The normalized `wake_rule`, `wake_rule_agent` and `wake_delivery` relations own
+configuration, assignments/deadlines and session-bound publication receipts.
+Revision checks prevent lost edits. Current configuring-human authority, rule
+owner access, target/owner access, listener generation and any fleet delivery
+gate are checked at admission. A rule grants no Matrix membership or tool
+permission. Explicit schedules are independent of chat wake authority, including
+Nobody. Scheduling and reporting use ordinary code, never model polling.
+
+The shared listener observes server-clock deadlines and publishes the configured
+message as clearly identified scheduled input through the ordinary runtime
+adapter. Busy targets wait without interrupting or delaying other targets.
+Missed occurrences coalesce to one due delivery per rule/agent, not a backlog;
+the next deadline lies after the current server time. At most one claimed input
+per agent is pending, serializing several rules without coupling different agents.
+Native publication is sequential and receipt-backed; exact session identity is
+retained during retries. Receipt-only recovery never submits a new input.
+Uncertain input is never silently retargeted to another native session.
+Disabled, edited or deleted rules stop subsequent publication admission; already
+accepted native input is not rolled back. Suspension, listener disconnection,
+owner pause and inactive fleet/controller delivery gates remain authoritative.
+No external scheduler, global service or additional daemon is installed.
+
+Rules use human-authenticated REST CRUD at `/api/wake-rules` and
+`/api/wake-rules/{ruleId}`. Agent-authenticated metadata, claim, validation and
+receipt operations live under `/api/agents/{agentId}/wake-deliveries`; one
+agent cannot acquire or acknowledge another agent's scheduled input. GET is
+read-only. Production upgrades use the forward schema migration and a verified
+backup, never a data reset.
+
+Creation includes a caller UUID `ruleId`, `name`, `message`, `schedule`, `enabled`
+and distinct `agentIds` (at most 1000). An identical creation retry is idempotent.
+Updates replace the same complete configuration with `expectedRevision`;
+deletion requires that revision as well. Names are bounded to 100 characters,
+messages to 16 KiB. Each rule records its owner and current configuring human;
+loss of that human's target configuration authority prevents future admission.
+Listener claims bind a stable `deliveryId` to a reporting `runId` and opaque
+native `sessionId`. An expired/stopped run's claim can transfer only to the same
+session; a live competing run and a different session are refused. A local
+queued/publishing/delivered checkpoint and the native receipt journal recover
+uncertainty without submitting another input. Recovery precedes any new urgent,
+fleet, release or chat input. Receipt acknowledgment occurs after native
+publication, not after model work completes. Accepted work is never rolled back.
+Client metadata checks are bounded to 30-second refreshes, server-clock due
+deadlines and a one-second busy recheck; they cause no model turn.
+
 ### Individual agent connection
 
 The user opens an existing Codex, Claude Code or Pi session in a project and
@@ -211,6 +282,14 @@ Controller leases expire after 30 seconds. Each long poll lasts at most 10 secon
 with a 15-second request deadline. Detected failure immediately closes the local
 delivery gate; an undetected stalled connection is bounded by that deadline.
 Reconnection obtains a fresh connection generation and current server intent.
+The adapter retains its acquired or potentially acquired lease identity across
+request failure, including a lost acquisition response. It releases that exact
+generation when transport returns before acquiring a fresh generation; failed
+cleanup cannot discard ownership or silently extend the
+outage until lease expiry. Another controller's live generation remains protected.
+Local shutdown always closes its delivery gate and listeners. Native lease release
+is attempted independently; an unreachable server is not required for local exit
+and an unconfirmed remote release remains bounded by the server's lease expiry.
 
 Fleet-bound listeners retain a typed local control connection to their controller.
 They continue to use their normal Crossfire/Matrix adapters for coordination and
@@ -325,6 +404,7 @@ Domain-owned repository and external-service ports
               |
               +--> SQLite adapter --> Tinqer --> SQLite
               +--> Matrix adapter --> native homeserver
+              +--> Schedule port --> calendar adapter
 
 Fleet core --> runtime port -------> Codex adapter
            --> coordination port --> Crossfire adapter --> Crossfire API / Matrix
@@ -375,12 +455,13 @@ no placeholder alternative backend.
 
 | Component | Sole responsibility |
 | --- | --- |
-| Domain | Identity, role/permission evaluation, enrollment, name allocation, desired room access, invitation provenance, wake policy, listener activity, notices, policy and audit intent. |
+| Domain | Identity, role/permission evaluation, enrollment, name allocation, desired room access, invitation provenance, chat wake policy, scheduled Wake-up rules/claims, listener activity, notices, policy and audit intent. |
 | SQLite adapter | One schema, integrity constraints, Tinqer repositories, row mapping, indexed queries, transactions and page-wide projections. |
 | Matrix adapter | Native account, room, power, membership, media and event operations; map native facts/failures into domain ports. |
+| Calendar adapter | Validate interval/calendar schedules and calculate the next occurrence through the domain's schedule port, with one pinned parser and explicit time-zone semantics. |
 | Server | Configuration, composition, authentication boundary, routing and worker scheduling. |
 | Fleet core | Roster validation, local work/state ownership, coordinated instance lifecycle and per-instance outcomes. |
-| Runtime adapter | Validate native options, create/resume the exact session, expose its delivery/approval binding, stop its owned connection/process. |
+| Runtime adapter | Validate native options, create/resume the exact session, expose its delivery/approval binding and receipt-only recovery, stop its owned connection/process. |
 | Coordination adapter | Preflight, enrollment, approval waiting, credential exchange, coordination attachment, release/activity/disconnect communication. |
 | Shared listener core | One bounded acquisition/wake/batch/cursor/receipt/control path per instance; no native transport or model-driven housekeeping. |
 | Filesystem adapter | Private project-local state, atomic files, owned local locks and validated paths. |
@@ -770,8 +851,14 @@ uses the configured interval, default 300 seconds, with pending/failed restricti
 visible. If native reply authority is lost, read-and-reply participation is removed
 and reported failed, not silently applied as read-only access.
 
-Native invitations are discovered in the shared listener's existing Matrix sync,
-not a second receiver or model prompt. The agent submits only the immutable room
+The shared listener acquires current native invitation metadata at activation and
+at its reconciliation interval, with incremental membership changes prompting a
+refresh. The Matrix adapter owns one bounded invitation-state reader: initial
+metadata-only sync plus incremental catch-up, independently of the saved timeline
+cursor. Reconnects, restarts and upgrades therefore recover existing pending
+invitations without erasing or replaying timeline delivery positions. This runs
+inside the existing controller-gated acquisition cycle, not a second receiver or
+model prompt. The agent submits only the immutable room
 ID to `POST /api/agents/{agentId}/room-invitation-acceptances`. Only that invited
 agent can call the resource. The domain obtains the current native membership
 event and its actual sender; supplied sender identities are not accepted.
@@ -1158,12 +1245,14 @@ to kill unrelated or externally owned runtimes.
 
 ## 11. Normalized persistence and authorization
 
-This schema and its permission model are authorized for implementation. Crossfire has no
-production users/data. Its selected development state can be recreated from one
-canonical schema; implementation does not need a historical-schema reader,
-importer, compatibility handler, migration chain or dual read/write path.
-Reset is explicit, never an automatic reaction to a startup error. Source work,
-operator configuration, external credentials and other projects remain intact.
+One canonical schema and permission catalog own current state. Fresh development
+stores initialize that schema directly. Deployed stores advance transactionally
+to schema version 5 after a verified backup; existing identities, native access,
+credentials, controller authority, policy and audit remain intact. Runtime code
+has no historical-schema reader, importer, compatibility handler or dual
+read/write path. Production resets and automatic reset-on-startup-error are
+prohibited. Source work, operator configuration, external credentials and other
+projects remain intact.
 
 ### Relational conventions
 
@@ -1224,6 +1313,10 @@ Representative role permission codes distinguish the actual authority:
 `listener.report.self`, `enrollment.approve.owned`,
 `enrollment.reject.owned`, `enrollment.reject.any`,
 `member.manage`, `policy.manage` and `audit.read.any`.
+Scheduled input adds `wake-rule.read.owned`, `wake-rule.manage.owned`,
+`wake-rule.read.any`, `wake-rule.manage.any` and `wake-delivery.receive.self`.
+Owners have the owned rule permissions; administrators also have the any rule
+permissions. Only the agent baseline role has self-delivery authority.
 The implemented operation catalog and permission catalog must cover each other
 in an architecture test. A role permission does not erase ownership checks or
 pretend an administrator approved enrollment as another owner.
@@ -1272,6 +1365,9 @@ enrollment decision state.
 | `agent_room_permission` | `agent_id`, `room_id`, `generation`, `permission_code`, `grant_scope = agent_room`, `granted_by_member_id FK member`, `granted_at`; `PK(agent_id, room_id, permission_code)`; composite FKs to the exact room-grant generation and `permission(code, grant_scope)`. |
 | `room_grant_application` | `agent_id`, `room_id`, `observed_generation?`, `applied_revision?`, `applied_access_revision?`, `membership?`, `creator`, `power_level?`, `last_attempt_at?`, `last_success_at?`, `next_check_at`, `error_code?`, `error_message?`; composite PK/FK to `agent_room_grant(agent_id, room_id)`. Native creators have no finite power level. |
 | `agent_wake_sender` | `agent_id FK agent`, `sender_principal_id FK principal`; composite PK; self-selection rejected. |
+| `wake_rule` | `id PK`, `owner_id FK member`, `configured_by_id FK member`, `name`, `message`, `schedule_kind`, `interval_seconds?`, `cron_expression?`, `time_zone?`, `enabled`, `revision`, `created_at`, `updated_at`. A check requires exactly the interval or cron columns, never both. |
+| `wake_rule_agent` | `rule_id FK wake_rule ON DELETE CASCADE`, `agent_id FK agent`, `next_due_at`, `last_delivered_at?`; `PK(rule_id, agent_id)`. One independent deadline/last receipt per target. |
+| `wake_delivery` | `id PK`, `rule_id`, `agent_id`, `rule_revision`, `run_id FK listener_run`, `session_id`, `scheduled_at`, `created_at`, `status`, `delivered_at?`; composite FK to `wake_rule_agent ON DELETE CASCADE`. Status is pending/delivered/cancelled; only delivered has a receipt time. |
 
 `agent_room_grant` is desired room access and addition provenance.
 Its nullable native invitation event ID records the last admitted native invite,
@@ -1309,13 +1405,21 @@ Selected wake senders are a separate relationship from permission grants.
 Invitation capability, room access or a role does not automatically grant wake
 authority. Every policy uses the same wake resolver and buffered-context path.
 
+Scheduled rules are explicit human-configured messages, not another chat sender
+policy. Claims and deadline advances commit atomically; failed Results roll back
+both. Editing a rule cancels pending claims and replaces assignments/deadlines
+without fabricating a receipt. Removing an assignment/deleting a rule cascades
+its delivery rows. A late exact native receipt can record work accepted before
+cancellation; a removed delivery returns `recorded: false`. Rule summaries use
+batched current assignments and their last recorded delivery, not model completion.
+
 ### Session, activity, policy and audit tables
 
 | Table | Complete logical columns and keys |
 | --- | --- |
 | `member_invitation` | `id PK`, `created_by_member_id FK member`, `claim_hash`, `role_code`, `principal_kind = human`, `created_at`, `expires_at`, `consumed_by_member_id? FK member`, `revoked_at?`, `claim_matrix_user_id? UQ`, `claim_display_name?`, `claim_fingerprint?`; composite role-kind FK requires a human role. |
 | `member_session` | `secret_hash PK`, `member_id FK member`, `csrf_secret`, `native_access_token`, `created_at`, `expires_at`. |
-| `listener_run` | `id PK`, `agent_id FK agent`, `release?`, `started_at`, `last_seen_at`, `active_ms`, `messages_delivered`, `stopped_at?`, `disconnect_requested_at?`. |
+| `listener_run` | `id PK`, `agent_id FK agent`, `release?`, `controller_bound`, `started_at`, `last_seen_at`, `active_ms`, `messages_delivered`, `stopped_at?`, `disconnect_requested_at?`. Controller binding is immutable per run and does not follow fleet membership alone. |
 | `wake_notice` | `receiver_agent_id FK agent`, `event_id`, `sender_matrix_id`, `room_id`, `reserved_at`, `message_body`, `status`, `sent_at?`, `native_event_id?`, `next_attempt_at?`, `last_error?`; `PK(receiver_agent_id, event_id)`. |
 | `instance_policy` | `id PK = instance`, `revision`, `max_owner_agents`, `max_agents`, `max_pending`, `enrollment_seconds`, `reconcile_seconds`, `agent_instructions`, `signup_mode` (`invitation` or `open`), `invitation_issuers` (`administrators` or `members`). |
 | `audit_event` | `id PK`, `request_id`, `actor_kind`, `actor_principal_id? FK principal`, `actor_credential_id?`, `owner_id? FK member`, `target_kind`, `target_id`, `room_id?`, `membership_generation?`, `authorizer_id? FK principal`, `added_by_id? FK principal`, `permission_code? FK permission`, `action`, `outcome`, `message`, `created_at`. |
@@ -1377,6 +1481,9 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `agent_room_permission` | `(permission_code, room_id, agent_id)`, `(granted_by_member_id, agent_id, room_id)` | Effective delegation and delegator lifecycle. |
 | `room_grant_application` | `(next_check_at, agent_id, room_id)` | Bounded grant application. |
 | `agent_wake_sender` | `(sender_principal_id, agent_id)` | Sender lifecycle invalidation. |
+| `wake_rule` | `(owner_id, created_at DESC, id, name)`, `(created_at DESC, id, name)` | Scoped/global sorted pages and name-filter counts without loading message bodies. |
+| `wake_rule_agent` | `(agent_id, next_due_at, rule_id)` | Indexed next deadline and due selection; rule-prefix PK covers batched assignment hydration. |
+| `wake_delivery` | partial UQ `(agent_id)` for pending status; `(rule_id, created_at DESC, id)`, `(agent_id, created_at DESC, id)` | One pending claim per receiver and indexed receipt history. |
 | `member_invitation` | `(created_at, id)`, `(expires_at, id)`, `(created_by_member_id, created_at DESC, id)` | Instance-wide administrator and scoped issuer listings/expiry. |
 | `member_session` | `(member_id, expires_at)`, `(expires_at)` | Session limits/revocation/expiry. |
 | `listener_run` | `(agent_id, last_seen_at DESC, id)`; partial `(last_seen_at, agent_id, id)` for unstopped runs | History, totals and online selection. |
@@ -1509,6 +1616,11 @@ ownership. The management website remains under `/manage`.
 | `GET /api/agents`, `GET, PATCH /api/agents/{agentId}` | Scoped list/details and configuration/lifecycle changes. |
 | `GET, PUT /api/agents/{agentId}/wake-policy` | One complete mode/selected-sender configuration. |
 | `GET /api/agents/{agentId}/delivery-policy` | This authenticated agent's resolved native delivery policy. |
+| `GET, POST /api/wake-rules` | Human owner/admin paginated rule list or idempotent named schedule creation; creation is CSRF protected. |
+| `GET, PUT, DELETE /api/wake-rules/{ruleId}` | Scoped details, complete revision-checked configuration replacement or confirmed removal. |
+| `GET, POST /api/agents/{agentId}/wake-deliveries` | Self-only read-only next-deadline metadata or atomic due claim. Both require the exact run/session binding. |
+| `GET /api/agents/{agentId}/wake-deliveries/{deliveryId}` | Self-only current publication eligibility for an exact claimed run/session; no mutation. |
+| `PUT /api/agents/{agentId}/wake-deliveries/{deliveryId}/receipt` | Self-only idempotent native publication receipt for that exact claim. No new input or fabricated model completion. |
 | `GET /api/rooms`, `GET /api/rooms/{roomId}` | Authorized native room directory/details; optional agent context for the assignment editor. |
 | `GET /api/agents/{agentId}/room-grants` | Desired grants with their observed application and allowed actions. |
 | `GET, PUT, DELETE /api/agents/{agentId}/room-grants/{roomId}` | One shared owner/admin/delegated-agent access resource; removal rechecks addition provenance and generation. |
@@ -1712,6 +1824,14 @@ is normative; execution notes never substitute for implementation verification.
 Required banks:
 - Schema integrity, typed repositories, foreign keys, indexes/query plans,
   pagination/query counts, transaction rollback, no serialized domain state.
+- Interval cadence, weekly/advanced cron schedules, IANA time zones, DST gaps and
+  repeats, invalid/impossible schedule rejection, multi-agent independence,
+  missed-occurrence coalescing, exact session-bound claims/receipt-only recovery,
+  disabled/edited/deleted rules and current configuring-human authority.
+- Real-browser Wake-ups CRUD, weekday/cron editors, assignment selection,
+  owner/admin visibility, pagination, confirmations and desktop/mobile geometry.
+  Actual Codex, Claude Code and Pi publication through the shared listener with
+  inert providers, including no-room/Nobody delivery, native busy and owner pause.
 - Enrollment name races, exact one-roster approval, private credential recovery,
   scoped fleet credentials, membership changes/controller updates and no leaks.
 - Native Conduit grants/invitations/removal, cross-owner authority/provenance,
@@ -1741,6 +1861,33 @@ Required banks:
   No gate is weakened or skipped to call the product complete.
 
 All authorized independently achievable work is completed before handoff.
+The complete test command typechecks and builds each selected workspace once,
+then executes independent test files in separate processes with a worker for
+every available CPU core. Browser and native fleet integration belong to that
+same run; architecture verification includes installation checks. Focused suite
+commands select subsets rather than adding duplicate certification runs.
+Runtime testing defaults to Codex. Claude Code, Pi and multi-adapter setup tests
+run only when the caller explicitly supplies `--all-runtimes`; their tests and
+product support remain intact. Test evidence identifies the selected runtimes.
+Per-file output, durations and a machine-readable summary identify slow tails.
+Test fixtures own distinct directories, databases, runtime homes, ports and
+containers. Tests never mutate production or another fixture's state.
+The service-owned test-support export provides one reverse-acquisition cleanup
+stack for all three products; failures are reported after every owned disposer
+has run. Listeners/clients stop before workers and their native backends.
+Immutable client/web releases are built once and loaded by verification fixtures,
+not rebuilt per test. Explicit changed-source build tests retain private inputs.
+The selected browser suite extracts the pinned stock Element assets once before
+parallel execution. Fixtures read those immutable assets while retaining separate
+configuration, identities, databases and browser contexts.
+Unconditional elapsed-time sleeps and browser timeout waits are forbidden by a
+source gate. Listener cadence, collection windows, heartbeat and permission
+expiry use the agent-core clock port; its native adapter owns real production
+timers. Controlled test clocks never replace global Date, timers or I/O clocks.
+Native protocol, process, browser and transport tests await bounded observable
+completion; real transport deadlines remain actual I/O verification. Assertions,
+supported runtimes and quality gates are retained when execution is optimized.
+
 The feature branch contains one coherent implementation and explicit checkpoint
 commits. Never push main or force-push. The user creates PRs manually from
 /pull/new/<branch>. Production deployment is a separate action and production

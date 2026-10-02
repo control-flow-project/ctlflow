@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,7 +25,7 @@ test('exact authenticated WS attachment leaves the external engine and sessions 
     hooks: { requestPermission: async () => { throw new Error('Unexpected permission in inert attachment proof'); } } };
   await assert.rejects(connectCodex({ ...options, token: 'incorrect-token' }, stop.signal), /connection failed/);
   const attached = await connectCodex(options, stop.signal);
-  scope.after(attached.close);
+  cleanup(scope, attached.close);
   await attached.deliver('Exact existing-session input', 'native-attachment-receipt');
   await until(() => provider.held() !== undefined);
   provider.finish();
@@ -39,7 +40,7 @@ test('exact authenticated WS attachment leaves the external engine and sessions 
   const history = await engine.call('thread/timeline/list', { threadId: engine.session, limit: 10 });
   assert(JSON.stringify(history).includes('native-attachment-receipt'));
   const reattached = await connectCodex(options, new AbortController().signal);
-  scope.after(reattached.close);
+  cleanup(scope, reattached.close);
   engine.child.kill('SIGTERM');
   await engine.ended;
   await until(() => reattached.signal.aborted);

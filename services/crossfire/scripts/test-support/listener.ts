@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { createServer, type ServerResponse } from 'node:http';
@@ -16,6 +17,8 @@ import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { serveArtifact } from '../../apps/server/src/artifacts.js';
 import type { WakePolicy } from '@crossfire/contracts/wake';
 import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
+import { nativeClock } from '@crossfire/adapter-runtime/clock';
+import type { Clock } from '@crossfire/agent-core/port';
 
 export const THREAD = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 export const OBSERVER = '@human:test.localhost';
@@ -33,7 +36,7 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   const directory = temporary(t);
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0, verifyClient: (info: { req: import('node:http').IncomingMessage }) => info.req.headers.authorization === 'Bearer fixture-only' });
   await once(server, 'listening');
-  t.after(() => new Promise<void>(resolve => {
+  cleanup(t, () => new Promise<void>(resolve => {
     for (const client of server.clients) client.terminate();
     server.close(() => resolve());
   }));
@@ -158,7 +161,7 @@ export async function until(predicate: () => boolean, message = 'Condition did n
   }
 }
 
-export async function matrixFixture(t: TestContext, workspace: string) {
+export async function matrixFixture(t: TestContext, workspace: string, clock: Clock = nativeClock) {
   const settings: Settings = { instance: 'test', server_name: 'test.localhost',
     homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };
   const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture' };
@@ -225,6 +228,8 @@ export async function matrixFixture(t: TestContext, workspace: string) {
         application: { appliedRevision: 0, appliedStatus: 'active', nativeDisplayName: 'Watson (Human)',
           lastAttemptAt: 1, lastSuccessAt: 1, errorCode: null, errorMessage: null },
         activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, deployment: null, allowedActions: [] });
+    } else if (path === '/api/agents/' + AGENT_ID + '/wake-deliveries' && request.method === 'GET') {
+      api(response, { now: Date.now(), nextDueAt: null });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && request.method === 'PUT') {
       api(response, { disconnect: reporting.disconnect, currentRelease: reporting.current.release });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
@@ -235,9 +240,9 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       send(response, { joined_rooms: [...joined] });
     } else if (path === API + '/sync') {
       if (syncUpdates.hung) return;
-      let timer: NodeJS.Timeout | undefined;
+      let cancelTimer: (() => void) | undefined;
       const complete = () => {
-        clearTimeout(timer); waiters.delete(complete);
+        cancelTimer?.(); waiters.delete(complete);
         const since = Number(url.searchParams.get('since')?.replace('sync-', '') ?? -1);
         const entries = [...joined].map(room => {
           const events = syncUpdates.enabled ? (rooms.get(room) ?? []).filter(event => (eventPositions.get(event.event_id) ?? 0) > since) : [];
@@ -248,8 +253,8 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       if (url.searchParams.get('since') === 'sync-' + revision && Number(url.searchParams.get('timeout')) > 0) {
         waiters.add(complete);
         maximumWaiters = Math.max(maximumWaiters, waiters.size);
-        timer = setTimeout(complete, Number(url.searchParams.get('timeout')));
-        response.on('close', () => { clearTimeout(timer); waiters.delete(complete); });
+        cancelTimer = clock.schedule(complete, Number(url.searchParams.get('timeout')));
+        response.on('close', () => { cancelTimer?.(); waiters.delete(complete); });
       } else complete();
     } else if (path.startsWith(API + '/join/')) {
       const room = path.slice((API + '/join/').length);
@@ -292,12 +297,12 @@ export async function matrixFixture(t: TestContext, workspace: string) {
     } else send(response, { error: 'Unexpected fixture request' }, 404);
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
+  cleanup(t, () => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
   const address = server.address(); assert(address && typeof address === 'object');
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities,
+  return { clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities,
     env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
     wake, waiting: () => waiters.size, maximumWaiting: () => maximumWaiters,
     hold: (path: string) => {
@@ -305,7 +310,7 @@ export async function matrixFixture(t: TestContext, workspace: string) {
       let release!: () => void;
       const wait = new Promise<void>(resolve => { release = resolve; });
       gates.set(path, { wait, entered: () => { entered = true; } });
-      t.after(release);
+      cleanup(t, release);
       return { entered: () => entered, release };
     },
     overridePage: (page: unknown) => { pageOverride = page; },

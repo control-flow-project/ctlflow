@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { collect } from '@crossfire/adapter-matrix/http';
@@ -27,6 +28,6 @@ export async function claudeProvider(scope: TestContext, command?: string, holdR
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Invalid provider fixture address');
-  scope.after(async () => { release?.(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  cleanup(scope, async () => { release?.(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
   return { base: 'http://127.0.0.1:' + address.port, requests, release: () => release?.(), tool: (command: string) => { nextCommand = command; } };
 }

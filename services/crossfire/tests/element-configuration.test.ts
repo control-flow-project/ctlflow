@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,7 +13,7 @@ import { createMemberInvitation } from '@crossfire/domain/member/invitation';
 
 test('Element presentation owns branding, not instance origin or access policy', scope => {
   const directory = mkdtempSync(join(tmpdir(), 'element-presentation-'));
-  scope.after(() => rmSync(directory, { recursive: true }));
+  cleanup(scope, () => rmSync(directory, { recursive: true }));
   assert.deepEqual(readElementPresentation(directory, 'https://example.test'), {});
   const path = join(directory, 'config.example.test.json');
   const presentation = { brand: 'GAAP', default_theme: 'custom-Paper', branding: { auth_header_logo_url: '/gaap/logo.svg' },

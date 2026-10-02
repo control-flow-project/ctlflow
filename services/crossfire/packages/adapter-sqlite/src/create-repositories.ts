@@ -27,9 +27,15 @@ import { createListenerRunRepository } from './repository/listener-run/index.js'
 import { createWakeNoticeRepository } from './repository/wake-notice/index.js';
 import { createInstancePolicyRepository } from './repository/instance-policy/index.js';
 import { createAuditEventRepository } from './repository/audit-event/index.js';
+import { createWakeRuleRepository } from './repository/wake-rule/index.js';
+import { createWakeRuleAgentRepository } from './repository/wake-rule-agent/index.js';
+import { createWakeDeliveryRepository } from './repository/wake-delivery/index.js';
 
 export function createRepositories(database: Database.Database): Repositories {
   return {
+    wakeRule: createWakeRuleRepository(database),
+    wakeRuleAgent: createWakeRuleAgentRepository(database),
+    wakeDelivery: createWakeDeliveryRepository(database),
     fleetConnection: createFleetConnectionRepository(database),
     fleetMessage: createFleetMessageRepository(database),
     fleetMessageDelivery: createFleetMessageDeliveryRepository(database),

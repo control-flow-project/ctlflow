@@ -1,4 +1,10 @@
 import type { JsonObject } from '@crossfire/contracts/json';
+export type Clock = {
+  now(): number;
+  delay(milliseconds: number, signal: AbortSignal): Promise<void>;
+  deadline(milliseconds: number): AbortSignal;
+  schedule(callback: () => void, milliseconds: number, recurring?: boolean): () => void;
+};
 export type LocalState = {
   exists(path: string): boolean;
   read<Value>(path: string): Value;

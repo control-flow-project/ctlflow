@@ -1,10 +1,10 @@
-import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { buildProducts, products, typecheckProducts } from './build.mjs';
+import { runTests } from './test.mjs';
+import { testOptions } from './test-options.mjs';
 const action = process.argv[2];
 if (!['typecheck', 'build', 'test'].includes(action)) throw new Error('Expected typecheck, build or test');
-const root = fileURLToPath(new URL('../', import.meta.url));
-if (action === 'test') execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit' });
-for (const workspace of ['@crossfire/service', '@fleetd/service', '@fleet/service']) {
-  execFileSync('npm', ['run', action, '--workspace=' + workspace], { cwd: root, stdio: 'inherit' });
-}
-if (action === 'test') execFileSync('npm', ['run', 'test:integration', '--workspace=@crossfire/service'], { cwd: root, stdio: 'inherit' });
+const options = action === 'test' ? testOptions(process.argv.slice(3)) : undefined;
+if (action !== 'test' && process.argv.length > 3) throw new Error('Build and typecheck take no flags');
+if (action === 'typecheck') await typecheckProducts(products);
+else if (action === 'build') await buildProducts(products);
+else { await buildProducts(products); await runTests(products, 'all', options); }

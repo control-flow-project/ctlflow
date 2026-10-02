@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync, chmodSync, realpathSync } from 'node:fs';
@@ -26,7 +27,7 @@ test('one connect installs, starts, reuses, upgrades and disconnects the existin
   writeJson(fixture.cursorFile, { [ROOM]: 'sync-0' });
   const args = [client, '--project', fixture.workspace, '--profile', 'watson'];
   const executeClient = (...command: string[]) => execute(process.execPath, [...args, ...command], { env: fixture.env, timeout: 30_000 });
-  scope.after(async () => { await executeClient('agent', 'disconnect'); });
+  cleanup(scope, async () => { await executeClient('agent', 'disconnect'); });
   for (const option of ['--session', '--endpoint', '--token-file', '--token-env']) {
     await assert.rejects(executeClient('agent', 'connect', option, 'not-a-connection'), /Unknown option|Unsupported option/);
   }

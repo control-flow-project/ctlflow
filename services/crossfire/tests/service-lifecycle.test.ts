@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { mkdirSync, mkdtempSync } from "node:fs";
@@ -18,7 +19,7 @@ test("native authority shutdown aborts reads and serialized provisioning without
   const server = createServer(request => { paths.push(request.url ?? ""); });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  scope.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
+  cleanup(scope, () => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
   const address = server.address();
   assert(address && typeof address === "object");
   const native = authority({ serverName: "tests.localhost",
@@ -61,7 +62,7 @@ test("private service starts with real native bootstrap and shuts down idempoten
   const output = join(directory, "release");
   const release = await buildRelease(process.cwd(), output);
   const service = await serve(directory, join(output, "onboarding", release.release), port);
-  scope.after(service.close);
+  cleanup(scope, service.close);
   const health = await fetch(config.publicOrigin + "/api/health", { signal: AbortSignal.timeout(5000) });
   assert.equal(health.status, 200);
   const identity = (await health.json() as { data: { startedAt: number } }).data;

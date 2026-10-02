@@ -11,7 +11,7 @@ const filter = { room: { timeline: { limit: 0 }, state: { types: ['m.room.member
 
 function invitationUpdates(input: unknown, matrixUserId: string): Result<Map<string, string>> {
   const invites = object(input ?? {});
-  if (!invites.ok) return failure('native', 'Invalid native invitations');
+  if (!invites.ok || Object.keys(invites.value).length > 1000) return failure('native', 'Invalid native invitations');
   const senders = new Map<string, string>();
   for (const [roomId, raw] of Object.entries(invites.value)) {
     if (!validRoomId(roomId)) return failure('native', 'Invalid native invitation room identity');
@@ -45,13 +45,14 @@ async function synchronizeInvitations(client: Native, matrixUserId: string, stat
   const senders = new Map(state?.senders);
   for (const [id, sender] of invited.value) senders.set(id, sender);
   for (const id of [...Object.keys(joined.value), ...Object.keys(left.value)]) senders.delete(id);
+  if (senders.size > 1000) return failure('native', 'Native pending invitations exceed the room limit');
   return success({ since: response.value.next_batch, senders });
 }
 
 export function createInvitationReader() {
   const states = new Map<string, InvitationState>();
   const operations = new Map<string, Promise<void>>();
-  return async (client: Native, matrixUserId: string, roomId: string): Promise<Result<string | null>> => {
+  return async (client: Native, matrixUserId: string): Promise<Result<ReadonlyMap<string, string>>> => {
     const previous = operations.get(matrixUserId) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>(resolve => { release = resolve; });
@@ -68,7 +69,7 @@ export function createInvitationReader() {
       const incremental = await synchronizeInvitations(client, matrixUserId, state);
       if (!incremental.ok) return incremental;
       states.set(matrixUserId, incremental.value);
-      return success(incremental.value.senders.get(roomId) ?? null);
+      return success(new Map(incremental.value.senders));
     } finally {
       release();
       if (operations.get(matrixUserId) === current) operations.delete(matrixUserId);

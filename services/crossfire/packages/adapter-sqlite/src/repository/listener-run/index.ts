@@ -18,6 +18,7 @@ export function createListenerRunRepository(database: Database.Database): Listen
     insert(value) {
       return stored(() => {
         executeInsert(database, schema, (query, params) => query.insertInto('listener_run').values({
+      controller_bound: params.controllerBound,
       id: params.id,
       agent_id: params.agentId,
       release: params.release,
@@ -27,13 +28,14 @@ export function createListenerRunRepository(database: Database.Database): Listen
       messages_delivered: params.messagesDelivered,
       stopped_at: params.stoppedAt,
       disconnect_requested_at: params.disconnectRequestedAt,
-        }), value);
+        }), { ...value, controllerBound: value.controllerBound ? 1 : 0 });
         return success(undefined);
       });
     },
     update(value) {
       return stored(() => {
         const changed = executeUpdate(database, schema, (query, params) => query.update('listener_run').set({
+      controller_bound: params.controllerBound,
       agent_id: params.agentId,
       release: params.release,
       started_at: params.startedAt,
@@ -42,7 +44,7 @@ export function createListenerRunRepository(database: Database.Database): Listen
       messages_delivered: params.messagesDelivered,
       stopped_at: params.stoppedAt,
       disconnect_requested_at: params.disconnectRequestedAt,
-        }).where(row => row.id === params.id), value);
+        }).where(row => row.id === params.id), { ...value, controllerBound: value.controllerBound ? 1 : 0 });
         return changed === 1 ? success(undefined) : failure('missing', 'ListenerRun not found');
       });
     },

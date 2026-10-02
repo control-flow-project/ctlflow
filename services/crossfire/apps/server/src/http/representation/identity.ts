@@ -13,7 +13,7 @@ export function member(value: MemberRecord) {
     application: application(value.application) };
 }
 export function listenerRun(value: ListenerRun) {
-  return { runId: value.id, agentId: value.agentId, release: value.release, startedAt: value.startedAt, lastSeenAt: value.lastSeenAt,
+  return { runId: value.id, agentId: value.agentId, release: value.release, controllerBound: value.controllerBound, startedAt: value.startedAt, lastSeenAt: value.lastSeenAt,
     activeMs: value.activeMs, messagesDelivered: value.messagesDelivered, stoppedAt: value.stoppedAt, disconnectRequestedAt: value.disconnectRequestedAt };
 }
 export function agent(value: AgentDetails) {

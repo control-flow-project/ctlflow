@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile, spawn } from 'node:child_process';
@@ -24,7 +25,7 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [installed, ...args], { env, timeout: 15000 });
   const client = createDaemonClient(join(root, 'fleetd.sock'));
-  scope.after(async () => {
+  cleanup(scope, async () => {
     await client.call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 });
   });
   const start = JSON.parse((await cli('daemon', 'start', '--root', root, '--name', 'native-test')).stdout) as { controller: { name: string } };
@@ -36,7 +37,7 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   let preflight = false;
   const waiting = createServer(incoming => { if (incoming.url === '/api/enrollments/preflight') preflight = true; });
   waiting.listen(0, '127.0.0.1'); await once(waiting, 'listening');
-  scope.after(async () => { waiting.closeAllConnections(); await new Promise<void>(resolve => waiting.close(() => resolve())); });
+  cleanup(scope, async () => { waiting.closeAllConnections(); await new Promise<void>(resolve => waiting.close(() => resolve())); });
   const address = waiting.address(); assert(address && typeof address !== 'string');
   writeFileSync(join(fleet, 'runtime.toml'), 'fleet = "research"\ninstances = []\n[coordination]\nadapter = "crossfire"\nserver = "http://127.0.0.1:' + address.port + '"\nowner = "@human:test"\n', { mode: 0o600 });
   writeFileSync(join(fleet, 'agents/analyst/agent.toml'), 'name = "Analyst"\nruntime = "codex"\n[runtime_options]\nsandbox_mode = "read-only"\napproval_policy = "never"\n', { mode: 0o600 });
@@ -52,7 +53,7 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   const starter = spawn(process.execPath, [entry, 'start', 'research'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const ended = once(starter, 'close'); let output = '';
   starter.stdout.on('data', chunk => { output += String(chunk); }); starter.stderr.resume();
-  scope.after(async () => { starter.kill('SIGKILL'); await ended; });
+  cleanup(scope, async () => { starter.kill('SIGKILL'); await ended; });
   for (let attempt = 0; !preflight && attempt < 100; attempt++) await delay(30);
   assert(preflight); assert(output.includes('operationId'));
   const operationId = (JSON.parse(output) as { operationId: string }).operationId;

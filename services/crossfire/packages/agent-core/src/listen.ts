@@ -1,6 +1,5 @@
-import type { LocalState, Transport } from './port.js';
+import type { Clock, LocalState, Transport } from './port.js';
 import { createHash } from 'node:crypto';
-import { setTimeout as delay } from 'node:timers/promises';
 import { API, segment } from '@crossfire/contracts/matrix';
 import type { Matrix } from './port.js';
 import { selectRoom } from '@crossfire/contracts/validation';
@@ -23,6 +22,7 @@ import { testListener, type ListenerTest } from './diagnostic.js';
 import { releaseUpdates } from './updates.js';
 import { controlledPublisher, waitForActivation, type ListenerControl } from './listener-control.js';
 import type { ReadBatch } from './receive.js';
+import { scheduledPublisher } from './scheduled.js';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
   identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
@@ -46,9 +46,11 @@ export function deliveryBatches(events: readonly ReceivedEvent[], settings: Sett
 }
 
 export type ListenerOptions = {
+  clock: Clock;
   control?: ListenerControl;
   storage: LocalState;
   transport: Transport;
+  invitationRooms: (signal: AbortSignal) => Promise<readonly string[]>;
   ready?: (test: () => Promise<ListenerTest>) => void;
   release: Manifest;
   coordination: Coordination;
@@ -83,6 +85,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const lifetime = AbortSignal.any([stop, failed.signal]);
   const approval = options.approvalRoom ? permissions({
     client: options.transport(lifetime, 45_000),
+    clock: options.clock,
     coordination: options.coordination, settings: options.settings, account: options.account, agent: options.id, room: options.approvalRoom, expiresMs: 300_000,
   }, lifetime) : undefined;
   let destination: Awaited<ReturnType<RuntimeAdapter>>;
@@ -117,9 +120,15 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const retiredRooms = new Set<string>();
   let sending: { cancel: AbortController; done: Promise<boolean> } | undefined;
   let activity: Awaited<ReturnType<typeof reportActivity>> | undefined;
+  const scheduled = scheduledPublisher({ storage, clock: options.clock, file: options.cursorFile + '.wake-input', coordination: options.coordination,
+    agentId: options.id, runtime: destination, attachment: () => {
+      if (!activity) throw new Error('Scheduled delivery requires a reporting listener');
+      return { runId: activity.runId, sessionId: destination.sessionId };
+    } });
   let completed: { batch: ReadBatch; messageIds: string[]; membership: number } | undefined;
   let pendingMessages = 0;
   const invitations = new Map<string, number>();
+  let lastInvitationCheck = -Infinity;
   const changed = () => { revision++; wake?.(); };
   async function retry<Result>(operation: () => Promise<Result>, scope = signal): Promise<Result> {
     for (let failures = 0; ; failures++) {
@@ -127,7 +136,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       catch (error) {
         scope.throwIfAborted();
         if (!retryable(error) || failures >= 3) throw error;
-        await delay(Math.min(options.pollMs, 1000 * 2 ** failures), undefined, { signal: scope });
+        await options.clock.delay(Math.min(options.pollMs, 1000 * 2 ** failures), scope);
       }
     }
   }
@@ -150,8 +159,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     signal.throwIfAborted();
     if (previous !== revision) return;
     await new Promise<void>(resolve => {
-      const finish = () => { clearTimeout(timer); signal.removeEventListener('abort', finish); wake = undefined; waitingForControl = false; resolve(); };
-      const timer = setTimeout(finish, milliseconds);
+      const finish = () => { cancelTimer(); signal.removeEventListener('abort', finish); wake = undefined; waitingForControl = false; resolve(); };
+      const cancelTimer = options.clock.schedule(finish, !control && activity && synchronized && !state.paused
+        && (!options.control || options.control.current().active) ? Math.min(milliseconds, scheduled.waitMs()) : milliseconds);
       wake = finish;
       waitingForControl = control;
       signal.addEventListener('abort', finish, { once: true });
@@ -205,7 +215,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     return confirmed;
   }
   let acquisition: Promise<void> | undefined;
-  const backstop = setInterval(changed, options.reconcileMs);
+  const cancelBackstop = options.clock.schedule(changed, options.reconcileMs, true);
   async function access(scope = signal): Promise<boolean> {
     const parsed = await options.coordination.delivery(options.id, scope);
     if (!parsed.ok) throw Object.assign(new Error(parsed.error.message), { code: parsed.error.code });
@@ -223,7 +233,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       senders = nextSenders;
       membershipRevision++;
     }
-    lastAccess = performance.now();
+    lastAccess = options.clock.now();
     return different;
   }
   const unsubscribe = options.control?.subscribe(() => {
@@ -235,7 +245,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   });
   async function startActivity(): Promise<void> {
     if (activity) return;
-    try { activity = await reportActivity(options.coordination, options.id, options.release, signal, release => { updates.available(release); changed(); }); }
+    try { activity = await reportActivity(options.coordination, options.id, options.release, signal, !!options.control, options.clock, release => { updates.available(release); changed(); }); }
     catch (error) { if (options.control && retryable(error)) options.control.unavailable('Fleet listener heartbeat is unavailable'); throw error; }
     activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
@@ -271,15 +281,20 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         await work(async (client, scope) => {
         const synced = await retry(() => synchronize(client, since, Math.min(options.pollMs, Math.floor(options.reconcileMs / 2))), scope);
         controlling = true;
-        for (const room of Object.keys(synced.rooms?.invite ?? {})) if (!invitations.has(room)) invitations.set(room, -Infinity);
-        for (const room of [...Object.keys(synced.rooms?.join ?? {}), ...Object.keys(synced.rooms?.leave ?? {})]) invitations.delete(room);
+        if (options.clock.now() - lastInvitationCheck >= options.reconcileMs
+          || Object.keys(synced.rooms?.invite ?? {}).length > 0 || Object.keys(synced.rooms?.leave ?? {}).length > 0) {
+          const pending = new Set(await retry(() => options.invitationRooms(scope), scope));
+          for (const room of invitations.keys()) if (!pending.has(room)) invitations.delete(room);
+          for (const room of pending) if (!invitations.has(room)) invitations.set(room, -Infinity);
+          lastInvitationCheck = options.clock.now();
+        }
         let invitationAccepted = false;
         if (invitations.size) {
           let attempted = 0;
           for (const [room, previousAttempt] of invitations) {
-            if (performance.now() - previousAttempt < options.reconcileMs) continue;
+            if (options.clock.now() - previousAttempt < options.reconcileMs) continue;
             if (attempted++ >= 10) break;
-            invitations.set(room, performance.now());
+            invitations.set(room, options.clock.now());
             const accepted = await options.coordination.acceptInvitation(options.id, room, scope);
             if (!accepted.ok) {
               if (['forbidden', 'missing', 'conflict', 'limit'].includes(accepted.error.code)) continue;
@@ -290,7 +305,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         }
         const membership = new Set(await joinedRooms(client));
         const membershipChanged = membership.size !== joined.size || [...joined].some(room => !membership.has(room));
-        const accessChanged = invitationAccepted || membershipChanged || performance.now() - lastAccess >= options.reconcileMs ? await retry(() => access(scope), scope) : false;
+        const accessChanged = invitationAccepted || membershipChanged || options.clock.now() - lastAccess >= options.reconcileMs ? await retry(() => access(scope), scope) : false;
         const humans = (await retry(() => humanEvents(client, options.settings, synced, since, selected), scope))
           .filter(event => allowed.has(event.room_id));
         const reset = await retry(() => membershipResets(client, synced, options.account, since), scope);
@@ -383,6 +398,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         if (!value.batch.more_rooms.length) await wait(previous);
         continue;
       }
+      let recoveredWake = false;
+      await send(async scope => { recoveredWake = await scheduled.recover(scope); });
+      if (recoveredWake) continue;
       if (state.paused) { await wait(previous); continue; }
       if (controlling) { await wait(previous, options.reconcileMs, true); continue; }
       const urgent = urgentControl();
@@ -402,6 +420,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       retiredRooms.clear();
       if (controlled?.pending()) { await send(scope => controlled.publish(scope)); continue; }
       if (updates.pending()) { await send(scope => updates.publish(destination, scope)); continue; }
+      let scheduledHandled = false;
+      await send(async scope => { scheduledHandled = await scheduled.publish(scope); });
+      if (scheduledHandled) continue;
       if (cycle && (!allowed.has(cycle.room) || !joined.has(cycle.room) || !senders.has(cycle.sender))) {
         cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0;
       }
@@ -421,7 +442,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (!cycle) {
         const trigger = await work(client => wakeEvent(client, batch, senders, allowed, selected, accept));
         if (trigger) {
-          const now = performance.now();
+          const now = options.clock.now();
           if (!windowEnd) windowEnd = now + options.debounceMs;
           if (now < windowEnd) { await wait(previous, Math.ceil(windowEnd - now)); continue; }
           cycle = await work(client => captureWake(client, trigger,
@@ -444,7 +465,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     }
     signal.throwIfAborted();
   } finally {
-    clearInterval(backstop);
+    cancelBackstop();
     unsubscribe?.();
     failed.abort(new Error('Listener stopped'));
     approval?.close();

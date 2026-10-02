@@ -19,6 +19,7 @@ import { localListener, runListener } from './listener-process.js';
 import { listenerSettings, listenerBinding } from './settings.js';
 import type { Manifest } from '@crossfire/contracts/release';
 import { roomOptions, runRoomCommand } from './room-access.js';
+import { listenerOptions } from './listener-options.js';
 
 const globals = ["project", "profile", "max-output-bytes"];
 const localOptions: Record<string, readonly string[]> = {
@@ -63,11 +64,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   if (!operation && !Object.hasOwn(commands, command)) throw new Error("Unknown command; use --help");
   const allowed = new Set([...globals, ...(operation ? operationOptions(operation) : commands[command]!)]);
   for (const name of Object.keys(values)) if (!allowed.has(name)) throw new Error("Unsupported option --" + name);
-  const listener = group === "agent" && command === "listen" ? {
-    pollMs: integerOption(option(values, "poll-ms"), 10_000, 100, 30_000, "--poll-ms"),
-    debounceMs: integerOption(option(values, "debounce-ms"), 10_000, 0, 60_000, "--debounce-ms"),
-    reconcileMs: integerOption(option(values, "reconcile-ms"), 120_000, 1000, 600_000, "--reconcile-ms"),
-  } : undefined;
+  const listener = group === "agent" && command === "listen" ? listenerOptions(values) : undefined;
   if (command === "connect" && group === "agent") {
     const result = await connectProject({ project: option(values, 'project') ?? process.cwd(), profile: option(values, 'profile'),
       server: option(values, 'server'), owner: option(values, 'owner'), runtime: option(values, 'runtime'), approvalRoom: option(values, 'approval-room'), file, maximum });

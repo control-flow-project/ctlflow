@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { once } from "node:events";
@@ -137,7 +138,7 @@ test("native age policy admits aged third parties and only the named owned exemp
   });
   registry.listen(0, "127.0.0.1");
   await once(registry, "listening");
-  context.after(() => { registry.closeAllConnections(); registry.close(); });
+  cleanup(context, () => { registry.closeAllConnections(); registry.close(); });
   const address = registry.address();
   assert(address && typeof address !== "string");
   origin = "http://127.0.0.1:" + address.port;

@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { createServer, type RequestListener } from "node:http";
 import { once } from "node:events";
@@ -13,7 +14,7 @@ async function fixture(scope: TestContext, listener: RequestListener): Promise<s
   await once(server, "listening");
   const address = server.address();
   assert(address && typeof address !== "string");
-  scope.after(async () => {
+  cleanup(scope, async () => {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
   });
@@ -71,8 +72,6 @@ test("native response limits cover streaming bytes and slow bodies", async scope
     if (request.url === "/large") response.end('"' + "x".repeat(MAX_JSON_BYTES) + '"');
     else {
       response.write("{");
-      const timer = setTimeout(() => response.end('"ok":true}'), 1000);
-      response.on("close", () => clearTimeout(timer));
     }
   });
   const client = { base: origin, timeoutMs: 100 };

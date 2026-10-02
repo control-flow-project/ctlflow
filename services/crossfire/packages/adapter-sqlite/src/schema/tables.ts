@@ -1,6 +1,9 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  wake_rule: { id: string; owner_id: string; configured_by_id: string; name: string; message: string; schedule_kind: 'interval' | 'cron'; interval_seconds: number | null; cron_expression: string | null; time_zone: string | null; enabled: number; revision: number; created_at: number; updated_at: number };
+  wake_rule_agent: { rule_id: string; agent_id: string; next_due_at: number; last_delivered_at: number | null };
+  wake_delivery: { id: string; rule_id: string; agent_id: string; rule_revision: number; run_id: string; session_id: string; scheduled_at: number; created_at: number; status: 'pending' | 'delivered' | 'cancelled'; delivered_at: number | null };
   fleet_connection: { fleet_id: string; connection_id: string; credential_id: string; last_seen_at: number; expires_at: number; closed_at: number | null };
   fleet_message: { id: string; fleet_id: string; author_principal_id: string | null; author_credential_id: string | null; body: string; created_at: number; expires_at: number };
   fleet_message_delivery: { message_id: string; agent_id: string; status: 'pending' | 'delivered' | 'failed' | 'skipped'; completed_at: number | null; error_message: string | null };
@@ -194,6 +197,7 @@ export type Tables = {
     expires_at: number;
   };
   listener_run: {
+    controller_bound: number;
     id: string;
     agent_id: string;
     release: string | null;

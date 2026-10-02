@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { codexFixture, until } from "./codex-fixture.js";
 import { object } from "./native-http.js";
@@ -13,7 +12,6 @@ test("actual Codex TUI switch and abrupt closure leave the native thread input-c
   const pane = await fixture.tmux(["display-message", "-p", "-t", "fixture", "#{pane_pid}"]);
   const tuiPid = Number(pane.stdout.trim());
   assert(Number.isSafeInteger(tuiPid) && tuiPid > 0);
-  await delay(1000);
   await fixture.type("/new");
   await until(() => observer.notifications.filter(value => value.method === "thread/started").length >= 2,
     "Real TUI did not switch to a new native thread");
@@ -37,21 +35,19 @@ test("actual Codex TUI switch and abrupt closure leave the native thread input-c
 test("normal TUI quit has no immediate SessionEnd while explicit native archive does", { timeout: 90_000 }, async context => {
   const fixture = await codexFixture(context, true);
   const { observer, threadId, server } = fixture;
-  await delay(1000);
   await fixture.type("Materialize fixture session; provider is deliberately unavailable.");
   await until(() => fixture.recorded().some(event => event.hook_event_name === "SessionStart" && event.session_id === threadId),
     "SessionStart positive control did not run");
   await fixture.type("/quit");
   await until(async () => !(await fixture.active()), "Fixture TUI did not quit normally");
   assert.equal(server.exitCode, null, "Native server must survive normal TUI quit");
-  await delay(2000);
   const after = object((await observer.call("thread/read", { threadId, includeTurns: false })).thread);
   assert.equal(after.id, threadId);
   assert.equal(after.canAcceptDirectInput, true);
   assert.equal(fixture.recorded().some(event => event.hook_event_name === "SessionEnd" && event.session_id === threadId), false);
   assert.equal(observer.notifications.some(event => event.method === "thread/closed" && event.params.threadId === threadId), false);
   console.log("GAP normal quit:", JSON.stringify({ threadId, canAcceptDirectInput: after.canAcceptDirectInput,
-    observedMilliseconds: 2000, hooks: fixture.recorded(), nativeServerSurvived: server.exitCode === null }));
+    observedAfterNativeRead: true, hooks: fixture.recorded(), nativeServerSurvived: server.exitCode === null }));
   await observer.call("thread/archive", { threadId });
   await until(() => fixture.recorded().some(event => event.hook_event_name === "SessionEnd" && event.session_id === threadId),
     "SessionEnd positive control did not run on explicit native archive");

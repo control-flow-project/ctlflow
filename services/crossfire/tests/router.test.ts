@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -27,7 +28,7 @@ async function fixture(scope: TestContext) {
   const address = server.address();
   assert(address && typeof address === 'object');
   routes.publicOrigin += ':' + address.port;
-  scope.after(async () => {
+  cleanup(scope, async () => {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
   });
@@ -72,7 +73,7 @@ test('browser admits the native opaque media sandbox but rejects cross-origin an
   const origin = await fixture(scope);
   const outside = await fixture(scope);
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
-  scope.after(() => browser.close());
+  cleanup(scope, () => browser.close());
   const page = await browser.newPage();
   await page.goto(origin);
   await page.setContent('<iframe sandbox="allow-scripts allow-downloads" src="/usercontent/"></iframe>');

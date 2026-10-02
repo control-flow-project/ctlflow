@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn, execFile, execFileSync } from 'node:child_process';
@@ -17,6 +18,9 @@ import { until } from '../scripts/test-support/listener.js';
 import { nativeServer } from './support/native-server.js';
 import { value } from './support/application.js';
 import { claudeProvider } from './support/claude-provider.js';
+import { createWakeRule, changeWakeRule } from '@crossfire/domain/wake-up/manage';
+import { readWakeRule } from '@crossfire/domain/wake-up/read';
+import { randomUUID } from 'node:crypto';
 
 const execute = promisify(execFile);
 
@@ -46,9 +50,9 @@ test('published bootstrap, native Claude activation, approval, Matrix delivery a
     ANTHROPIC_API_KEY: 'fixture-not-a-real-key', ANTHROPIC_BASE_URL: provider.base, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' };
   const child = spawn('claude', ['--print', '--verbose', '--debug', 'hooks', '--debug-file', join(directory, 'native.log'), '--input-format', 'stream-json', '--output-format', 'stream-json', '--model', 'claude-sonnet-4-6',
     '--permission-mode', 'default', '--allowedTools', 'Bash', '--mcp-config', '{"mcpServers":{}}', '--strict-mcp-config'], { cwd: project, env: environment, stdio: ['pipe', 'pipe', 'pipe'] });
-  scope.after(() => child.kill('SIGTERM'));
+  cleanup(scope, () => child.kill('SIGTERM'));
   let output = '', errors = '';
-  scope.after(() => writeFileSync(join(directory, 'evidence.json'), JSON.stringify({ output, errors, requests: provider.requests, httpRequests }, null, 2)));
+  cleanup(scope, () => writeFileSync(join(directory, 'evidence.json'), JSON.stringify({ output, errors, requests: provider.requests, httpRequests }, null, 2)));
   child.stdout.on('data', data => { output += String(data); }); child.stderr.on('data', data => { errors += String(data); });
   child.stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: 'Install the fixture project client.' } }) + '\n');
   const contextFile = join(project, 'native-context.json');
@@ -77,7 +81,7 @@ test('published bootstrap, native Claude activation, approval, Matrix delivery a
   assert.equal(approval.status, 202); await worker.drain();
   await until(() => output.includes(JSON.stringify('"status": "listening"').slice(1, -1)) && provider.requests.length === 4, 'The native tool must finish approval and listener startup', 30000);
   assert(!output.includes(nativeEnvironment.CLAUDE_CODE_MESSAGING_TOKEN!));
-  scope.after(async () => { await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: nativeEnvironment }); });
+  cleanup(scope, async () => { await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: nativeEnvironment }); });
   const profilePath = join(project, '.crossfire/profiles/charlie.json'), profileBytes = readFileSync(profilePath);
   const profile = readJson<{ id: string }>(profilePath);
   const lease = readFileSync(join(project, '.crossfire/state/charlie/listener.json'));
@@ -143,11 +147,26 @@ test('published bootstrap, native Claude activation, approval, Matrix delivery a
   assert.equal(readJson<Record<string, string>>(cursor)[room.room_id], priorCursor);
   assert.equal(provider.requests.length, beforePause, 'Native pause and inspection make no model request');
   assert(!readFileSync(transcript, 'utf8').includes(paused.event_id));
+  const ruleId = randomUUID(), schedule = { name: 'Claude fixture schedule', message: 'Scheduled Claude fixture input.',
+    schedule: { kind: 'interval' as const, seconds: 1 }, enabled: true, agentIds: [profile.id] };
+  let scheduleNow = services.clock.now();
+  scope.mock.method(services.clock, 'now', () => scheduleNow);
+  value(createWakeRule(services, admin.actor, ruleId, schedule, randomUUID()));
+  scheduleNow += 1200;
+  assert(value(services.repositories.wakeRuleAgent.find(ruleId, profile.id))!.nextDueAt <= scheduleNow);
+  const pausedTest = await execute(process.execPath, [client, 'agent', 'test'], { cwd: project, env: nativeEnvironment, timeout: 30000 });
+  assert.equal((JSON.parse(pausedTest.stdout) as { listener: { test: { deliveryPaused: boolean } } }).listener.test.deliveryPaused, true);
+  assert.equal(provider.requests.length, beforePause, 'Scheduled input must respect the shared owner pause without model involvement');
+  assert.equal(value(readWakeRule(services, admin.actor, ruleId)).lastDeliveredAt, null);
   const resumed = value(await nativeOk(ownerNative, 'PUT', API + '/rooms/' + segment(room.room_id) + '/send/m.room.message/claude-resume', {
     msgtype: 'm.text', body: 'Resume authorized room delivery.' }));
   assert(typeof resumed.event_id === 'string');
   await until(() => readFileSync(transcript, 'utf8').includes(resumed.event_id as string), 'Read-only native Claude resumes through the same receiver', 30000);
   assert.equal(readJson<{ paused: boolean }>(cursor + '.control').paused, false);
+  await until(() => value(readWakeRule(services, admin.actor, ruleId)).lastDeliveredAt !== null,
+    'Scheduled input must reach the real existing Claude session after owner resume', 45000);
+  assert(readFileSync(transcript, 'utf8').includes(schedule.message));
+  value(changeWakeRule(services, admin.actor, ruleId, { ...schedule, expectedRevision: 0, enabled: false }, randomUUID()));
   child.stdin.end(); await once(child, 'exit');
   await until(() => !existsSync(join(project, '.crossfire/state/charlie/listener.json')));
   writeFileSync(join(directory, 'evidence.json'), JSON.stringify({ output, errors, requests: provider.requests }, null, 2));

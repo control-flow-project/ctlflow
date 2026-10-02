@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import { randomUUID } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import { conduitFixture } from '../../scripts/architecture-proof/conduit-fixture.js';
@@ -13,17 +14,19 @@ import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
 import type { Actor } from '@crossfire/domain/port/services';
 import { value, secret } from './application.js';
 export async function nativeApplication(scope: TestContext) {
+  const started = performance.now();
   const jwtSecret = secret(), native = await conduitFixture(scope, { jwtSecret });
   const service = await native.register('crossfire-tests'), administrator = await native.register('admin');
   const config = { instance: 'tests', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1', matrixOrigin: native.base,
     administrator: administrator.id, registrationSecret: native.registrationToken, jwtSecret };
   const application = createApplication(':memory:', config), { services } = application;
-  scope.after(() => application.close());
+  cleanup(scope, () => application.close());
   async function login(token: string) {
     const session = value(await createSession(services, token)), authenticated = value(await authenticateMember(services, session.secret));
     return { ...session, actor: authenticated.actor, token };
   }
   const admin = await login(administrator.token);
+  scope.diagnostic('Native application bootstrap: ' + Math.round(performance.now() - started) + 'ms');
   async function member(name: string) {
     const invitation = value(createMemberInvitation(services, admin.actor, { roleCode: 'member', expiresSeconds: 600 }, randomUUID()));
     const input = { claimSecret: invitation.claimSecret, username: name, password: secret(), displayName: name };

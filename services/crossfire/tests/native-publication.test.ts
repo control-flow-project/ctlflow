@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, renameSync, symlinkSync } from 'node:fs';
@@ -21,7 +22,7 @@ test('native publication is journaled before send and uncertain recovery never r
   assert.throws(() => nativeDelivery(native, check.integer(), { journal: file, pollMs: 100 }), /already owns/);
   await first.close();
   const restored = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100, timeoutMs: 100 });
-  scope.after(() => restored.close());
+  cleanup(scope, () => restored.close());
   await assert.rejects(restored.deliver('Exact text.', 'input'), /uncertain/);
   assert.equal(published, 1);
   received = true;
@@ -41,7 +42,7 @@ test('cancellation can clear only a proved unpublished native input', async scop
   const connection = nativeDelivery({ sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
     publish: () => { cancel.abort(new Error('Owner control')); }, received: () => false,
     cancel: () => { cancelled++; return true; }, close: () => {} }, check.integer(), { journal: file, pollMs: 100 });
-  scope.after(() => connection.close());
+  cleanup(scope, () => connection.close());
   await assert.rejects(connection.deliver('Queued input.', 'cancelled', cancel.signal), /Owner control/);
   assert.equal(cancelled, 1);
   assert.equal(readJson<{ pending: unknown }>(file).pending, null);
@@ -60,7 +61,7 @@ test('positive native waiting preserves busy input without a turn-duration deadl
       }
       return true;
     }, close: () => {} }, check.integer(), { journal: file, pollMs: 100, timeoutMs: 100 });
-  scope.after(() => connection.close());
+  cleanup(scope, () => connection.close());
   const started = performance.now();
   await connection.deliver('Queued behind native work.', 'busy');
   assert(performance.now() - started >= 250);
@@ -75,7 +76,7 @@ test('native cancellation receipts never claim successful delivery on send or re
     publish: () => { published++; if (uncertain) throw new Error('Lost response'); },
     received: () => 'cancelled' as const, close: () => {} };
   const connection = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100 });
-  scope.after(() => connection.close());
+  cleanup(scope, () => connection.close());
   await assert.rejects(connection.deliver('Exact input.', 'first'), /Lost response/);
   await assert.rejects(connection.deliver('Exact input.', 'first'), /cancelled before publication/);
   assert.equal(published, 1);
@@ -111,8 +112,42 @@ test('invalid journal identity, text and limits are refused before publication',
     publish: () => { published++; }, received: () => true, close: () => {} };
   assert.throws(() => nativeDelivery(native, check.integer(), { journal: join(directory, 'a'), pollMs: 1 }), /interval/);
   const connection = nativeDelivery(native, check.integer(), { journal: join(directory, 'a'), pollMs: 100 });
-  scope.after(() => connection.close());
+  cleanup(scope, () => connection.close());
   await assert.rejects(connection.deliver('x'.repeat(98305), 'oversized'), /byte bound/);
   await assert.rejects(connection.deliver('text', ''), /text/);
   assert.equal(published, 0);
+});
+
+test('receipt-only recovery confirms, cancels or refuses uncertainty without publishing new input', async scope => {
+  const file = join(temporary(), 'journal.json'); let publications = 0, receipt: boolean | 'cancelled' = false;
+  const native = { sessionId: session, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+    publish: () => { publications++; throw new Error('Lost publication response'); }, received: () => receipt, close: () => {} };
+  const connection = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100, timeoutMs: 100 });
+  cleanup(scope, () => connection.close());
+  assert.equal(await connection.recover('Never submitted.', 'absent'), false);
+  await assert.rejects(connection.deliver('Exact input.', 'pending'), /Lost publication response/);
+  await assert.rejects(connection.recover('Different input.', 'pending'), /does not match/);
+  await assert.rejects(connection.recover('Exact input.', 'pending'), /uncertain/);
+  assert.equal(publications, 1);
+  receipt = true; assert.equal(await connection.recover('Exact input.', 'pending'), true);
+  assert.equal(await connection.recover('Exact input.', 'pending'), true);
+  connection.acknowledge(['pending']); assert.equal(await connection.recover('Exact input.', 'pending'), false);
+  await assert.rejects(connection.deliver('Cancelled input.', 'cancelled'), /Lost publication response/);
+  receipt = 'cancelled'; assert.equal(await connection.recover('Cancelled input.', 'cancelled'), false);
+  assert.equal(publications, 2);
+});
+
+test('native session identities are opaque, bounded and exactly bound to their journal', async scope => {
+  const directory = temporary(), file = join(directory, 'journal.json'), opaque = 'native-session:not-a-crossfire-uuid';
+  const native = { sessionId: opaque, signal: new AbortController().signal, verify: () => {}, inspect: async () => ({ busy: false }), boundary: () => 0,
+    publish: () => {}, received: () => true, close: () => {} };
+  const connection = nativeDelivery(native, check.integer(), { journal: file, pollMs: 100 });
+  cleanup(scope, () => connection.close());
+  await connection.deliver('Native identity belongs to the adapter.', 'input');
+  assert.equal(readJson<{ sessionId: string }>(file).sessionId, opaque);
+  await connection.close();
+  assert.throws(() => nativeDelivery({ ...native, sessionId: 'another-native-session' }, check.integer(), { journal: file, pollMs: 100 }), /session binding/);
+  for (const [index, sessionId] of ['', 'x'.repeat(201), 'native\ncontrol'].entries()) {
+    assert.throws(() => nativeDelivery({ ...native, sessionId }, check.integer(), { journal: join(directory, 'invalid-' + index), pollMs: 100 }), /session binding/);
+  }
 });

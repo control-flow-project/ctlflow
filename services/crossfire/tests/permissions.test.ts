@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
@@ -8,13 +9,16 @@ import type { Permission } from '@crossfire/agent-core/runtime';
 import { matrix } from '@crossfire/adapter-matrix/http';
 import type { ReceivedEvent } from '@crossfire/agent-core/receive';
 import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
+import { nativeClock } from '@crossfire/adapter-runtime/clock';
+import type { Clock } from '@crossfire/agent-core/port';
+import { testClock } from '../scripts/test-support/clock.js';
 
 const owner = '@alice:tests.localhost', self = '@agent-holmes:tests.localhost', room = '!native';
 const permission: Permission = { runtime: 'codex', session: 'session', request: 'native-request', action: 'command',
   scope: { command: 'npm install', cwd: '/work/project' },
   choices: [{ label: 'approve once', value: { decision: 'accept' } }, { label: 'deny', value: { decision: 'decline' } }] };
 
-async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication = false) {
+async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication = false, clock: Clock = nativeClock) {
   const stop = new AbortController();
   const announcements: { event: string; content: Record<string, unknown> }[] = [];
   const events = new Map<string, ReceivedEvent>();
@@ -42,12 +46,12 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
     response.end(JSON.stringify(body ?? { errcode: 'M_NOT_FOUND' }));
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
-  scope.after(async () => {
+  cleanup(scope, async () => {
     release(); stop.abort(); server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
   });
   const address = server.address(); assert(address && typeof address === 'object');
-  const broker = permissions({ coordination: createCoordination({ origin: 'http://127.0.0.1:' + address.port, token: 'fixture-only' }), client: matrix({ base: 'http://127.0.0.1:' + address.port, token: 'fixture-only', signal: stop.signal }),
+  const broker = permissions({ clock, coordination: createCoordination({ origin: 'http://127.0.0.1:' + address.port, token: 'fixture-only' }), client: matrix({ base: 'http://127.0.0.1:' + address.port, token: 'fixture-only', signal: stop.signal }),
     settings: { instance: 'tests', homeserver: 'http://127.0.0.1:' + address.port, server_name: 'tests.localhost', owner, max_upload_bytes: 1024 },
     account: { user_id: self, access_token: 'fixture-only', device_id: 'fixture' }, agent: '11111111-1111-4111-8111-111111111111', room, expiresMs }, stop.signal);
   async function announced() {
@@ -77,7 +81,7 @@ test('only the verified owner replies once to the exact run-bound request', asyn
   const edited = fixture_.reply(announced.event);
   edited.content['m.new_content'] = { body: 'approve once' };
   assert.equal(await fixture_.broker.consume(edited), false);
-  await delay(20); assert.equal(decisions, 0);
+  assert.equal(decisions, 0, 'Every unauthorized or unrelated consumption has completed without choosing a decision');
   const accepted = fixture_.reply(announced.event, '> <' + self + '> Permission needed\n> details\n\napprove once');
   assert.equal(await fixture_.broker.consume(accepted), true);
   assert.deepEqual(await pending, { decision: 'accept' });
@@ -89,12 +93,13 @@ test('only the verified owner replies once to the exact run-bound request', asyn
 test('revocation, absent owner, expiry and disconnect never approve a pending request', async scope => {
   for (const condition of ['grant', 'ownerJoined', 'ownerStatus', 'expiry', 'disconnect'] as const) {
     await scope.test(condition, async control => {
-      const fixture_ = await fixture(control, condition === 'expiry' ? 1000 : 300_000);
+      const clock = testClock(control);
+      const fixture_ = await fixture(control, condition === 'expiry' ? 1000 : 300_000, false, clock);
       const pending = fixture_.broker.request(permission, fixture_.stop.signal).catch(error => error);
       const announced = await fixture_.announced();
       if (condition === 'grant' || condition === 'ownerJoined') fixture_.access[condition] = false;
       if (condition === 'ownerStatus') fixture_.access.ownerStatus = 'suspended';
-      if (condition === 'expiry') assert(await pending instanceof Error);
+      if (condition === 'expiry') { await clock.advance(1000); assert(await pending instanceof Error); }
       else if (condition === 'disconnect') { fixture_.stop.abort(); assert(await pending instanceof Error); }
       else {
         await assert.rejects(fixture_.broker.consume(fixture_.reply(announced.event)), /authorized|joined/);
@@ -122,7 +127,7 @@ test('a reply observed before the announcement HTTP response waits for its exact
   const announced = await fixture_.announced();
   let consumed = false;
   const consuming = fixture_.broker.consume(fixture_.reply(announced.event)).then(result => { consumed = true; return result; });
-  await delay(20); assert.equal(consumed, false);
+  assert.equal(consumed, false, 'The announcement transport barrier still owns publication');
   fixture_.release();
   assert.equal(await consuming, true);
   assert.deepEqual(await pending, { decision: 'accept' });

@@ -38,6 +38,15 @@ Do not stop at intermediate milestones when completion is authorized. Never
 weaken tests/gates or claim fixture-only evidence as real-provider certification.
 Root commands coordinate typecheck, build, tests and architecture verification.
 
+## Test execution
+Default runtime verification is Codex only. Claude and Pi test suites require the
+explicit --all-runtimes flag; keep their tests and product adapters intact.
+Run isolated test files on every available CPU core. Build shared artifacts and
+pinned browser assets once per run. Unconditional sleeps are forbidden: use
+controlled clocks for timing logic and bounded observations for native I/O.
+Fixtures dispose owned resources in reverse acquisition order. Record selected
+runtimes, per-file timings and any failures without weakening assertions.
+
 ## Git
 Never commit/push main, force-push, reset/clean/stash shared work or create PRs.
 Authorized checkpoints go to the feature branch and are not release claims.

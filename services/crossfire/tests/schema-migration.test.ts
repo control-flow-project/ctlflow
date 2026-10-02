@@ -7,7 +7,7 @@ import { openStore } from '@crossfire/adapter-sqlite/open-store';
 import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
 
-function previousDatabase(version: 1 | 2 | 3 = 1) {
+function previousDatabase(version: 1 | 2 | 3 | 4 = 1) {
   mkdirSync('.temp', { recursive: true });
   const file = join(mkdtempSync(join(process.cwd(), '.temp/policy-migration-')), 'management.sqlite');
   const database = openStore(file), repositories = createRepositories(database);
@@ -19,8 +19,9 @@ function previousDatabase(version: 1 | 2 | 3 = 1) {
   database.exec("INSERT INTO member_invitation(id, created_by_member_id, claim_hash, role_code, principal_kind, created_at, expires_at) VALUES('invitation', 'owner', 'private-hash', 'member', 'human', 12, 600);");
   database.exec("INSERT INTO audit_event(id, request_id, actor_kind, actor_principal_id, owner_id, target_kind, target_id, action, outcome, message, created_at) VALUES('audit', 'request', 'human', 'owner', 'owner', 'member', 'owner', 'member.change', 'accepted', '', 12);");
   const before = { principal: database.prepare('SELECT * FROM principal').all(), invitation: database.prepare('SELECT * FROM member_invitation').all(), audit: database.prepare('SELECT * FROM audit_event').all() };
+  database.exec("DROP TABLE wake_delivery; DROP TABLE wake_rule_agent; DROP TABLE wake_rule; ALTER TABLE listener_run DROP COLUMN controller_bound; DELETE FROM role_permission WHERE permission_code LIKE 'wake-rule.%' OR permission_code = 'wake-delivery.receive.self'; DELETE FROM permission WHERE code LIKE 'wake-rule.%' OR code = 'wake-delivery.receive.self';");
   if (version < 3) database.exec('DROP TABLE fleet_message_delivery; DROP TABLE fleet_message; DROP TABLE fleet_connection; DROP INDEX uq_fleet_credential_id_fleet; ALTER TABLE fleet DROP COLUMN delivery_enabled;');
-  database.exec("ALTER TABLE agent_room_grant DROP COLUMN admission_kind; ALTER TABLE agent_room_grant DROP COLUMN invitation_event_id; ALTER TABLE room_grant_application DROP COLUMN creator; DELETE FROM role_permission WHERE permission_code = 'room-invitation.accept.self'; DELETE FROM permission WHERE code = 'room-invitation.accept.self';");
+  if (version < 4) database.exec("ALTER TABLE agent_room_grant DROP COLUMN admission_kind; ALTER TABLE agent_room_grant DROP COLUMN invitation_event_id; ALTER TABLE room_grant_application DROP COLUMN creator; DELETE FROM role_permission WHERE permission_code = 'room-invitation.accept.self'; DELETE FROM permission WHERE code = 'room-invitation.accept.self';");
   if (version === 1) database.exec("DROP INDEX ix_member_invitation_creator_created; ALTER TABLE instance_policy DROP COLUMN signup_mode; ALTER TABLE instance_policy DROP COLUMN invitation_issuers; DELETE FROM role_permission WHERE permission_code = 'member.invite'; DELETE FROM permission WHERE code = 'member.invite';");
   database.pragma('user_version = ' + version);
   database.close();
@@ -30,7 +31,7 @@ test('policy forward migration preserves identities, invitation claims, audit an
   const { file, before } = previousDatabase();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 4);
+    assert.equal(database.pragma('user_version', { simple: true }), 5);
     assert.deepEqual(database.prepare('SELECT * FROM principal').all(), before.principal);
     assert.deepEqual(database.prepare('SELECT * FROM member_invitation').all(), before.invitation);
     assert.deepEqual(database.prepare('SELECT * FROM audit_event').all(), before.audit);
@@ -54,7 +55,7 @@ test('fleet control forward migration preserves prior fleets and private control
   const credentials = old.prepare('SELECT * FROM fleet_credential').all(); old.close();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 4);
+    assert.equal(database.pragma('user_version', { simple: true }), 5);
     assert.deepEqual(database.prepare('SELECT * FROM fleet_credential').all(), credentials);
     const fleet = value(createRepositories(database).fleet.findById('fleet'))!;
     assert.equal(fleet.revision, 5); assert.equal(fleet.deliveryEnabled, true);
@@ -84,7 +85,7 @@ test('native invitation migration preserves managed grants, delegation, credenti
   old.close();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 4);
+    assert.equal(database.pragma('user_version', { simple: true }), 5);
     for (const table of tables) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), before.get(table));
     assert.deepEqual(database.prepare('SELECT * FROM agent_room_grant').all(), grants);
     assert.deepEqual(database.prepare("SELECT role_code FROM role_permission WHERE permission_code='room-invitation.accept.self'").all(), [{ role_code: 'agent' }]);
@@ -113,4 +114,48 @@ test('failed migration rolls back columns and version without mutating existing 
     assert.deepEqual(inspected.prepare('SELECT * FROM principal').all(), before.principal);
     assert.deepEqual(inspected.prepare('SELECT * FROM audit_event').all(), before.audit);
   } finally { inspected.close(); }
+});
+
+test('Wake-up schema migration preserves existing native access, controller authority and listener history', () => {
+  const { file } = previousDatabase(4), old = new Database(file);
+  old.exec(`
+    INSERT INTO principal(id,matrix_user_id,kind,status,revision,created_at) VALUES('agent','@agent:test','agent','active',23,12);
+    INSERT INTO agent(principal_id,principal_kind,owner_id,wake_mode) VALUES('agent','agent','owner','owner');
+    INSERT INTO agent_credential(agent_id,provisioning_password,access_token,updated_at) VALUES('agent','private-password','private-token',12);
+    INSERT INTO agent_room_grant(agent_id,room_id,generation,authorizer_id,added_by_id,access_mode,muted,revision,access_revision,updated_at,admission_kind,invitation_event_id)
+      VALUES('agent','!private:test','generation','owner','owner','reply',0,9,7,12,'invitation','$invite');
+    INSERT INTO fleet(id,label,controller_name,revision,updated_at,owner_id,fleet_key,created_at,delivery_enabled) VALUES('fleet','Private team','laptop',5,12,'owner','team',12,0);
+    INSERT INTO fleet_credential(id,fleet_id,secret_hash,created_at) VALUES('credential','fleet','private-secret-hash',12);
+    INSERT INTO listener_run(id,agent_id,release,started_at,last_seen_at,active_ms,messages_delivered,stopped_at)
+      VALUES('run','agent','old-release',12,100,88,17,100);
+  `);
+  const tables = ['principal', 'agent', 'agent_credential', 'agent_room_grant', 'fleet', 'fleet_credential'];
+  const before = new Map(tables.map(table => [table, old.prepare('SELECT * FROM ' + table).all()]));
+  const runs = old.prepare('SELECT *, 0 AS controller_bound FROM listener_run').all(); old.close();
+  const database = openStore(file);
+  try {
+    assert.equal(database.pragma('user_version', { simple: true }), 5);
+    for (const table of tables) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), before.get(table));
+    assert.deepEqual(database.prepare('SELECT * FROM listener_run').all(), runs);
+    for (const table of ['wake_rule', 'wake_rule_agent', 'wake_delivery']) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), []);
+    assert.deepEqual(database.prepare("SELECT role_code FROM role_permission WHERE permission_code='wake-rule.manage.any'").all(), [{ role_code: 'administrator' }]);
+    assert.deepEqual(database.prepare("SELECT role_code FROM role_permission WHERE permission_code='wake-delivery.receive.self'").all(), [{ role_code: 'agent' }]);
+    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
+  } finally { database.close(); }
+  const reopened = openStore(file); reopened.close();
+});
+
+test('failed Wake-up migration rolls back its tables, listener column and version', () => {
+  const { file, before } = previousDatabase(4), old = new Database(file);
+  old.exec('CREATE INDEX ix_wake_rule_owner_created ON member_invitation(created_at)'); old.close();
+  assert.throws(() => openStore(file), /already exists/);
+  const database = new Database(file);
+  try {
+    assert.equal(database.pragma('user_version', { simple: true }), 4);
+    assert.deepEqual(database.prepare('SELECT * FROM principal').all(), before.principal);
+    assert.equal((database.pragma('table_info(listener_run)') as { name: string }[]).some(column => column.name === 'controller_bound'), false);
+    const tables = database.prepare("SELECT count(*) AS count FROM sqlite_master WHERE type='table' AND name LIKE 'wake_%' AND name != 'wake_notice'").get() as { count: number };
+    assert.equal(tables.count, 0);
+  } finally { database.close(); }
 });

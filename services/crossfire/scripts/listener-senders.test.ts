@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, existsSync } from 'node:fs';
@@ -63,7 +64,7 @@ test('sender resolution retains its exact request while the independent receiver
   const pending = fixture.hold('/api/principal-resolutions');
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: native.runtime }, stop.signal).catch(error => error);
-  scope.after(async () => { stop.abort(); pending.release(); await receiving; });
+  cleanup(scope, async () => { stop.abort(); pending.release(); await receiving; });
   await until(pending.entered);
   await until(() => fixture.requests.filter(request => request.path.endsWith('/sync')).length >= 3);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
@@ -78,7 +79,7 @@ test('idle and blocked traffic perform no sender lookups; authorized delivery in
   const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory), stop = new AbortController();
   fixture.waking.policy = 'owner'; fixture.waking.senders = [OBSERVER];
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
-  scope.after(async () => { stop.abort(); await receiving; });
+  cleanup(scope, async () => { stop.abort(); await receiving; });
   await until(() => fixture.waiting() === 1);
   fixture.add(ROOM, message('$peer', '@agent-holmes:test.localhost', 'Buffered peer context'));
   await until(() => fixture.requests.filter(request => request.path.endsWith('/sync')).length >= 3);

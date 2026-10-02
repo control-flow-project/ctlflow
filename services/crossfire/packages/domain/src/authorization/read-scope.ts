@@ -2,7 +2,7 @@ import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { activeActor } from './authorize.js';
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'clock'>;
-export function ownerScope(services: Dependencies, actor: Actor, permission: 'agent.read' | 'enrollment.read' | 'audit.read', requestedOwnerId?: string) {
+export function ownerScope(services: Dependencies, actor: Actor, permission: 'agent.read' | 'enrollment.read' | 'audit.read' | 'wake-rule.read', requestedOwnerId?: string) {
   const current = activeActor(services, actor);
   if (!current.ok) return current;
   const permissions = services.directory.permissions(actor.principalId);

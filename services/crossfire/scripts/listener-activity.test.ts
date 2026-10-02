@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -24,7 +25,7 @@ test('listener counts confirmed chat inputs, not state notices, and stops report
   const matrix = await matrixFixture(scope, runtime.directory);
   const stop = new AbortController();
   const running = listen({ ...matrix, runtime: runtime.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, stop.signal).catch(error => error);
-  scope.after(async () => { stop.abort(); await running; });
+  cleanup(scope, async () => { stop.abort(); await running; });
   await until(() => matrix.waiting() === 1);
   matrix.add(ROOM, message('$chat'), { ...message('$renamed'), type: 'm.room.name', state_key: '', content: { name: 'A room' } });
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '2');
