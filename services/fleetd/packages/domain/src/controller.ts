@@ -56,8 +56,11 @@ export function createController(services: Services) {
     const current = inspect(fleetId);
     if (!current.ok) return current;
     const { record, configuration } = current.value;
-    const instances = configuration.roster.instances.map(instance => ({ ...(states.get(key(fleetId, instance.key)) ?? { instance, phase: 'stopped' as const, sessionId: null, error: null, startedAt: null }),
-      listenerActive: running.get(key(fleetId, instance.key))?.control.current().active ?? false }));
+    const instances = configuration.roster.instances.map(instance => {
+      const state = states.get(key(fleetId, instance.key)) ?? { instance, phase: 'stopped' as const, sessionId: null, error: null, startedAt: null };
+      const runtime = running.get(key(fleetId, instance.key));
+      return { ...state, listenerActive: state.phase === 'running' && !!runtime && !runtime.signal.aborted && runtime.control.current().active };
+    });
     const phase = instances.find(instance => instance.phase === 'stopping')?.phase ?? instances.find(instance => instance.phase === 'awaiting-approval')?.phase
       ?? instances.find(instance => instance.phase === 'starting')?.phase ?? instances.find(instance => instance.phase === 'failed')?.phase
       ?? instances.find(instance => instance.phase === 'running')?.phase ?? 'stopped';
@@ -186,9 +189,14 @@ export function createController(services: Services) {
           const failed = () => {
             const current = states.get(identity);
             if (current?.phase !== 'running') return;
-            states.set(identity, { ...current, phase: 'failed', error: 'Listener or runtime disconnected; inspect and explicitly restart' });
+            const reason: unknown = result.value.signal.reason;
+            const detail = reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : '';
+            const message = detail ? detail.replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 4096) : 'Listener or runtime disconnected; inspect and explicitly restart';
+            states.set(identity, { ...current, phase: 'failed', error: message });
             void result.value.close().then(() => running.delete(identity), error => {
-              states.set(identity, { ...current, phase: 'failed', error: error instanceof Error ? error.message : 'Runtime cleanup failed' });
+              running.delete(identity);
+              const cleanup = error instanceof Error ? error.message.replace(/[\u0000-\u001f\u007f]/gu, ' ') : 'Runtime cleanup failed';
+              states.set(identity, { ...current, phase: 'failed', error: (message + '; cleanup: ' + cleanup).slice(0, 4096) });
             });
           };
           result.value.signal.addEventListener('abort', failed, { once: true });
@@ -230,6 +238,10 @@ export function createController(services: Services) {
     if (current.value.record.revision !== input.expectedRevision) return failure('stale_revision', 'Refresh the fleet before starting this operation');
     if (target.kind === 'agent' && !current.value.configuration.roster.instances.some(instance => instance.key === target.instanceKey)) return failure('missing', 'Instance not found');
     if (input.action === 'start' && current.value.configuration.roster.instances.length === 0) return failure('invalid', 'Add an instance before starting this fleet');
+    if (input.action === 'start' && current.value.configuration.roster.instances.some(instance =>
+      (target.kind === 'fleet' || instance.key === target.instanceKey) && running.get(key(target.fleetId!, instance.key))?.signal.aborted)) {
+      return failure('conflict', 'Runtime failure cleanup is still in progress; retry after it finishes');
+    }
     const predecessor = active.get(target.fleetId);
     if (predecessor && input.action !== 'stop') return failure('conflict', 'Another operation is active for this fleet');
     const operation: Operation = { ...input, status: 'accepted', createdAt: services.now(), completedAt: null, approval: null, errors: [] };

@@ -51,7 +51,7 @@ test('one receipt-confirmed notice per native session and release survives resta
 test('uncertain or cancelled delivery is not recorded as notified and retries the exact native receipt identity', async () => {
   const { storage, values } = storageFixture(), recorded: string[] = [], acknowledged: string[] = [];
   let reject = true;
-  const runtime: RuntimeConnection = { sessionId: THREAD, signal: new AbortController().signal,
+  const runtime: RuntimeConnection = { sessionId: THREAD, approval: 'none', signal: new AbortController().signal,
     deliver: async (_text, id) => { recorded.push(id); if (reject) throw Error('Receipt unavailable'); },
     acknowledge: ids => { acknowledged.push(...ids); }, recover: async () => false, inspect: async () => ({ busy: false }), close: () => {}, settle: async () => false };
   const installed = '0.1.0-aaaaaaaaaaaaaaaaaaaaaaaa', release = '0.1.0-bbbbbbbbbbbbbbbbbbbbbbbb';
@@ -74,7 +74,7 @@ test('uncertain or cancelled delivery is not recorded as notified and retries th
 test('update notices retain opaque runtime identities without using them as filesystem paths', async () => {
   const { storage, values } = storageFixture(), delivered: string[] = [];
   const session = 'runtime:/session/with:opaque-identity';
-  const runtime: RuntimeConnection = { sessionId: session, signal: new AbortController().signal,
+  const runtime: RuntimeConnection = { sessionId: session, approval: 'none', signal: new AbortController().signal,
     deliver: async (_text, id) => { delivered.push(id); }, acknowledge: () => {}, inspect: async () => ({ busy: false }),
     close: () => {}, settle: async () => false, recover: async () => false };
   const installed = '0.1.0-aaaaaaaaaaaaaaaaaaaaaaaa', release = '0.1.0-bbbbbbbbbbbbbbbbbbbbbbbb';

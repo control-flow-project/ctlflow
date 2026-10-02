@@ -9,6 +9,7 @@ export type NativeResponse = { status: number; body: JsonObject };
 import { API, segment, json } from '@crossfire/contracts/matrix';
 import { endpoint } from '@crossfire/contracts/origin';
 import { markdownMessage } from './message.js';
+import { roomState, type RoomStateEvent } from '@crossfire/contracts/matrix-room';
 
 export async function nativeOpen(client: Native, method: string, path: string, body?: Buffer | Readable,
   contentType = "application/json"): Promise<Result<Response>> {
@@ -104,22 +105,10 @@ export async function nativeRequest(client: Native, method: string, path: string
     : failure("native", "Expected a native JSON object");
 }
 
-export async function nativeState(client: Native, room: string): Promise<Result<{ sender: string; type: string; state_key: string; content: JsonObject }[]>> {
+export async function nativeState(client: Native, room: string): Promise<Result<RoomStateEvent[]>> {
   const result = await nativeJson(client, "GET", API + "/rooms/" + segment(room) + "/state");
   if (!result.ok) return result;
-  if (result.value.status !== 200 || !Array.isArray(result.value.body)) return failure("native", "Native room state could not be read");
-  const events: { sender: string; type: string; state_key: string; content: JsonObject }[] = [];
-  for (const value of result.value.body) {
-    const parsed = object(value);
-    if (!parsed.ok) return failure("native", "Invalid native state event");
-    const event = parsed.value;
-    const content = object(event.content);
-    if (typeof event.sender !== "string" || typeof event.type !== "string" || typeof event.state_key !== "string" || !content.ok) {
-      return failure("native", "Invalid native state identity");
-    }
-    events.push({ sender: event.sender, type: event.type, state_key: event.state_key, content: event.content as JsonObject });
-  }
-  return success(events);
+  return result.value.status === 200 ? roomState(result.value.body) : failure('native', 'Native room state could not be read');
 }
 
 export async function nativeOk(client: Native, method: string, path: string, body?: unknown): Promise<Result<JsonObject>> {

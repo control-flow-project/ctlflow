@@ -1,5 +1,6 @@
 import { authority, type Config } from './account/authority.js';
-import { joined, roomFacts, roomCreators, roomPowers } from './room/facts.js';
+import { joined, roomFacts } from './room/facts.js';
+import { roomCreators, roomPowers } from '@crossfire/contracts/matrix-room';
 import { createInvitationReader, invitationEvent } from './room/invitation.js';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { MatrixAuthority, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';

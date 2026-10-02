@@ -14,7 +14,7 @@ for (const published of [true, false]) test('lost native response preserves publ
   const sessionId = randomUUID(), messageId = randomUUID(), turnId = randomUUID(), text = 'Exact input';
   const entries: unknown[] = [];
   let submissions = 0;
-  const session: CodexSession = { sessionId, workspace, signal: scope.signal, close: async () => {},
+  const session: CodexSession = { sessionId, workspace, approval: 'none', signal: scope.signal, close: async () => {},
     request: async method => {
       if (method === 'thread/read') return { thread: { id: sessionId, cwd: workspace, canAcceptDirectInput: true, status: { type: 'idle' } } };
       if (method === 'thread/timeline/list') return { data: entries, nextCursor: null };

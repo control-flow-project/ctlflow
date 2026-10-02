@@ -12,6 +12,7 @@ import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { nativeClock } from '@crossfire/adapter-runtime/clock';
 import type { Clock } from '@crossfire/agent-core/port';
 import { testClock } from '../scripts/test-support/clock.js';
+import { success } from '@crossfire/kernel/result';
 
 const owner = '@alice:tests.localhost', self = '@agent-holmes:tests.localhost', room = '!native';
 const permission: Permission = { runtime: 'codex', session: 'session', request: 'native-request', action: 'command',
@@ -22,7 +23,7 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
   const stop = new AbortController();
   const announcements: { event: string; content: Record<string, unknown> }[] = [];
   const events = new Map<string, ReceivedEvent>();
-  const access = { status: 'active', ownerStatus: 'active', grant: true, ownerJoined: true };
+  const access = { status: 'active', ownerStatus: 'active', grant: true, ownerJoined: true, ownerLevel: 100, agentLevel: 0, messageLevel: 0, roomVersion: '11' };
   let release!: () => void;
   const publication = new Promise<void>(resolve => { release = resolve; });
   if (!holdPublication) release();
@@ -34,6 +35,11 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
       roomGrants: access.grant ? [{ roomId: room, accessMode: 'reply', powerLevel: null, muted: false }] : [] },
       meta: { requestId: '11111111-1111-4111-8111-111111111111' } };
     else if (path.endsWith('/joined_members')) body = { joined: { [self]: {}, ...(access.ownerJoined ? { [owner]: {} } : {}) } };
+    else if (path.endsWith('/state')) body = [
+      { type: 'm.room.create', state_key: '', sender: owner, content: { room_version: access.roomVersion } },
+      { type: 'm.room.power_levels', state_key: '', sender: owner, content: {
+        users: { [self]: access.agentLevel, [owner]: access.ownerLevel }, events: { 'm.room.message': access.messageLevel } } },
+    ];
     else if (path.includes('/send/')) {
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
@@ -84,29 +90,52 @@ test('only the verified owner replies once to the exact run-bound request', asyn
   assert.equal(decisions, 0, 'Every unauthorized or unrelated consumption has completed without choosing a decision');
   const accepted = fixture_.reply(announced.event, '> <' + self + '> Permission needed\n> details\n\napprove once');
   assert.equal(await fixture_.broker.consume(accepted), true);
-  assert.deepEqual(await pending, { decision: 'accept' });
+  assert.deepEqual(await pending, success({ decision: 'accept' }));
   assert.equal(await fixture_.broker.consume(accepted), true);
   assert.equal(decisions, 1);
-  await assert.rejects(fixture_.broker.request(permission, fixture_.stop.signal), /Duplicate/);
+  const duplicate = await fixture_.broker.request(permission, fixture_.stop.signal);
+  assert.equal(duplicate.ok, false);
+  if (!duplicate.ok) assert.match(duplicate.error.message, /Duplicate/);
 });
 
 test('revocation, absent owner, expiry and disconnect never approve a pending request', async scope => {
-  for (const condition of ['grant', 'ownerJoined', 'ownerStatus', 'expiry', 'disconnect'] as const) {
+  for (const condition of ['grant', 'ownerJoined', 'ownerStatus', 'agentPower', 'ownerPower', 'expiry', 'disconnect'] as const) {
     await scope.test(condition, async control => {
       const clock = testClock(control);
       const fixture_ = await fixture(control, condition === 'expiry' ? 1000 : 300_000, false, clock);
-      const pending = fixture_.broker.request(permission, fixture_.stop.signal).catch(error => error);
+      const pending = fixture_.broker.request(permission, fixture_.stop.signal);
       const announced = await fixture_.announced();
       if (condition === 'grant' || condition === 'ownerJoined') fixture_.access[condition] = false;
       if (condition === 'ownerStatus') fixture_.access.ownerStatus = 'suspended';
-      if (condition === 'expiry') { await clock.advance(1000); assert(await pending instanceof Error); }
-      else if (condition === 'disconnect') { fixture_.stop.abort(); assert(await pending instanceof Error); }
+      if (condition === 'agentPower') fixture_.access.agentLevel = -1;
+      if (condition === 'ownerPower') fixture_.access.ownerLevel = -1;
+      if (condition === 'expiry') await clock.advance(1000);
+      else if (condition === 'disconnect') fixture_.stop.abort();
       else {
-        await assert.rejects(fixture_.broker.consume(fixture_.reply(announced.event)), /authorized|joined/);
-        fixture_.stop.abort(); assert(await pending instanceof Error);
+        assert.equal(await fixture_.broker.consume(fixture_.reply(announced.event)), true);
       }
+      const result = await pending;
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.error.code, condition === 'expiry' || condition === 'disconnect' ? 'unavailable' : 'forbidden');
+      if (condition !== 'disconnect') assert.equal(fixture_.stop.signal.aborted, false);
     });
   }
+});
+
+test('approval readiness uses current native powers and recognizes v12 creator authority', async scope => {
+  const fixture_ = await fixture(scope);
+  assert.deepEqual(await fixture_.broker.authorize(), success(undefined));
+  fixture_.access.messageLevel = 50;
+  const denied = await fixture_.broker.authorize();
+  assert.equal(denied.ok, false);
+  fixture_.access.agentLevel = 50;
+  fixture_.access.ownerLevel = -1;
+  assert.equal((await fixture_.broker.authorize()).ok, false);
+  fixture_.access.roomVersion = '12';
+  assert.deepEqual(await fixture_.broker.authorize(), success(undefined));
+  fixture_.access.grant = false;
+  assert.equal((await fixture_.broker.authorize()).ok, false);
+  assert.deepEqual(fixture_.announcements, []);
 });
 
 test('forged native event snapshots and concurrent replies cannot change the chosen decision', async scope => {
@@ -118,7 +147,7 @@ test('forged native event snapshots and concurrent replies cannot change the cho
   await fixture_.broker.consume(forged);
   const denied = fixture_.reply(announced.event, 'deny');
   await Promise.all([fixture_.broker.consume(denied), fixture_.broker.consume(denied)]);
-  assert.deepEqual(await pending, { decision: 'decline' });
+  assert.deepEqual(await pending, success({ decision: 'decline' }));
 });
 
 test('a reply observed before the announcement HTTP response waits for its exact publication', async scope => {
@@ -130,5 +159,5 @@ test('a reply observed before the announcement HTTP response waits for its exact
   assert.equal(consumed, false, 'The announcement transport barrier still owns publication');
   fixture_.release();
   assert.equal(await consuming, true);
-  assert.deepEqual(await pending, { decision: 'accept' });
+  assert.deepEqual(await pending, success({ decision: 'accept' }));
 });

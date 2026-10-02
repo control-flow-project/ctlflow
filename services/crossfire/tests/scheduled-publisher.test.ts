@@ -24,7 +24,7 @@ test('scheduled checkpoints recover only receipts before other input and retain 
   value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID())); fixture.advance(60000);
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/scheduled-'));
   let publications = 0, receipt = false;
-  const runtime = nativeDelivery({ sessionId: 'same-native-session', signal: new AbortController().signal, verify: () => {},
+  const runtime = nativeDelivery({ sessionId: 'same-native-session', approval: 'none', signal: new AbortController().signal, verify: () => {},
     inspect: async () => ({ busy: false }), boundary: () => 0, received: () => receipt,
     publish: () => { publications++; if (!receipt) throw new Error('Lost native publication response'); }, close: () => {} }, check.integer(),
   { journal: join(directory, 'native.json'), pollMs: 100, timeoutMs: 100 });
@@ -59,7 +59,7 @@ test('busy schedules make no claims or model submissions and a disabled queued i
   value(reportListener(services, agent.actor, agent.id, runId, { release: 'test', stopped: false, messagesDelivered: 0, controllerBound: false }, 'test'));
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/scheduled-busy-'));
   let busy = true, published = 0;
-  const cancel = new AbortController(), runtime = nativeDelivery({ sessionId: 'native-session', signal: new AbortController().signal, verify: () => {},
+  const cancel = new AbortController(), runtime = nativeDelivery({ sessionId: 'native-session', approval: 'none', signal: new AbortController().signal, verify: () => {},
     inspect: async () => ({ busy }), boundary: () => 0, received: () => false, publish: () => { published++; cancel.abort(new Error('Owner pause')); },
     cancel: () => true, close: () => {} }, check.integer(), { journal: join(directory, 'native.json'), pollMs: 100 });
   cleanup(scope, () => runtime.close());

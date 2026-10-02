@@ -48,10 +48,11 @@ export async function localListener(destination: Destination, action: 'status' |
   const status = fields(JSON.parse(body) as unknown, ['release', 'binding', 'session', 'ready'], ['test']);
   if (!status.ok || !releaseName(status.value.release) || typeof status.value.binding !== 'string' || typeof status.value.session !== 'string' || typeof status.value.ready !== 'boolean') throw new Error('Invalid project listener status');
   if (action === 'test') {
-    const result = fields(status.value.test, ['session', 'server', 'authenticated', 'rooms', 'joinedRooms', 'canReceiveRoomTasks', 'wakeMode', 'busy', 'deliveryPaused', 'currentRelease', 'message']);
+    const result = fields(status.value.test, ['session', 'server', 'authenticated', 'rooms', 'joinedRooms', 'canReceiveRoomTasks', 'wakeMode', 'busy', 'deliveryPaused', 'approval', 'currentRelease', 'message']);
     if (!result.ok || result.value.session !== status.value.session || result.value.authenticated !== true || !Number.isSafeInteger(result.value.rooms)
       || Number(result.value.rooms) < 0 || !Number.isSafeInteger(result.value.joinedRooms) || Number(result.value.joinedRooms) < 0
       || typeof result.value.canReceiveRoomTasks !== 'boolean' || !wakePolicy(result.value.wakeMode) || typeof result.value.busy !== 'boolean' || typeof result.value.deliveryPaused !== 'boolean'
+      || !['none', 'runtime', 'listener'].includes(String(result.value.approval))
       || typeof result.value.server !== 'string' || !releaseName(result.value.currentRelease) || typeof result.value.message !== 'string') throw new Error('Invalid live listener test result');
   }
   return status.value as LocalListener;

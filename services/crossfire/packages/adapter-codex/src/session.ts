@@ -1,9 +1,10 @@
 import { realpathSync } from 'node:fs';
 import type { Json } from '@crossfire/contracts/json';
-import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
+import type { RuntimeApproval, RuntimeHooks } from '@crossfire/agent-core/runtime';
 import { codexPermission } from './approval.js';
 import { object } from '@crossfire/contracts/validation';
 import { codexProtocol, type NativeEvent } from './protocol.js';
+import { approvalRouting } from './permission-policy.js';
 
 export type CodexOptions = {
   workspace: string; session: string; endpoint: string; token: string; receiptFile: string;
@@ -11,6 +12,7 @@ export type CodexOptions = {
 };
 export type CodexSession = {
   sessionId: string; workspace: string; signal: AbortSignal;
+  approval: RuntimeApproval;
   request: (method: string, params: unknown) => Promise<unknown>;
   close: () => Promise<void>;
 };
@@ -46,7 +48,21 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
     approval: async (request, signal) => {
       const decoded = codexPermission(request, sessionId, changes.get(String(request.params.itemId)));
       if (!decoded.ok) throw new Error(decoded.error.message);
-      return hooks.requestPermission(decoded.value, signal);
+      const response = await hooks.requestPermission(decoded.value, signal);
+      if (response.ok) {
+        if (!decoded.value.choices.some(choice => JSON.stringify(choice.value) === JSON.stringify(response.value))) throw new Error('Permission response is not a native available decision');
+        return response.value;
+      }
+      if (response.error.code === 'invalid' || response.error.code === 'limit') throw new Error(response.error.message);
+      const denied = decoded.value.choices.find(choice => {
+        const value = object(choice.value);
+        return value.ok && value.value.decision === 'decline';
+      }) ?? decoded.value.choices.find(choice => {
+        const value = object(choice.value);
+        return value.ok && value.value.decision === 'cancel';
+      });
+      if (!denied) throw new Error('Native permission request offers no denial or cancellation decision');
+      return denied.value;
     },
   }, stop);
   async function close(): Promise<void> { engine.close(); await engine.closed; }
@@ -54,6 +70,7 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
     await engine.request('initialize', { clientInfo: { name: 'crossfire', title: 'Crossfire listener', version: '0.1.0' },
       capabilities: { experimentalApi: true } });
     engine.notify('initialized');
+    let approval: RuntimeApproval | undefined;
     if (selection.kind !== 'attach') {
       const selected = object(await engine.request(selection.kind === 'create' ? 'thread/start' : 'thread/resume', {
         cwd: workspace, developerInstructions: selection.instructions, config: selection.config,
@@ -62,6 +79,9 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
       const thread = selected.ok ? object(selected.value.thread) : selected;
       if (!thread.ok || typeof thread.value.id !== 'string' || selection.kind === 'resume' && thread.value.id !== selection.id) throw new Error('Codex did not select the requested session');
       sessionId = thread.value.id;
+      const routing = selected.ok ? approvalRouting(selected.value.approvalPolicy) : selected;
+      if (!routing.ok) throw new Error(routing.error.message);
+      approval = routing.value;
       if (selection.kind === 'create') await engine.request('thread/name/set', { threadId: sessionId, name: selection.name });
     }
     const read = object(await engine.request('thread/read', { threadId: sessionId, includeTurns: selection.kind === 'create' }));
@@ -70,7 +90,13 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
     if (!thread.ok || !state.ok || thread.value.id !== sessionId || thread.value.canAcceptDirectInput !== true
       || !['idle', 'active'].includes(String(state.value.type)) || typeof thread.value.cwd !== 'string'
       || realpathSync(thread.value.cwd) !== workspace) throw new Error('The selected Codex session must be loaded in this exact workspace');
-    if (selection.kind === 'attach') await engine.request('thread/resume', { threadId: sessionId, excludeTurns: true });
-    return { sessionId, workspace, signal: engine.signal, request: engine.request, close };
+    if (selection.kind === 'attach') {
+      const resumed = object(await engine.request('thread/resume', { threadId: sessionId, excludeTurns: true }));
+      const routing = resumed.ok ? approvalRouting(resumed.value.approvalPolicy) : resumed;
+      if (!routing.ok) throw new Error(routing.error.message);
+      approval = routing.value;
+    }
+    if (!approval) throw new Error('Native approval policy was not selected');
+    return { sessionId, workspace, approval, signal: engine.signal, request: engine.request, close };
   } catch (error) { await close(); throw error; }
 }

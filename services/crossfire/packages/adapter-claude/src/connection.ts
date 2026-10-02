@@ -43,7 +43,7 @@ export async function connectClaude(context: ClaudeContext, options: { journal: 
   }
   try {
     return nativeDelivery({
-      sessionId: context.session, signal, verify, boundary: () => ({ history: captureHistory(context.transcript), publisher: process.pid }),
+      sessionId: context.session, approval: 'runtime', signal, verify, boundary: () => ({ history: captureHistory(context.transcript), publisher: process.pid }),
       inspect: async () => { verify(); return { busy }; },
       publish: input => publish(input.text, input.messageId),
       received: input => historySince(context.transcript, input.boundary.history).some(record => {

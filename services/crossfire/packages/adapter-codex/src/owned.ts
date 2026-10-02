@@ -8,12 +8,18 @@ import { openSession } from './session.js';
 import { codexDelivery, type CodexConnection } from './connection.js';
 import { startProcess } from './owned-process.js';
 import { prepareHome } from './home.js';
+import { approvalRouting } from './permission-policy.js';
 
 const options = check.object({ model: check.optional(check.text(200)), model_reasoning_effort: check.optional(check.choice('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultra')),
   sandbox_mode: check.choice('read-only', 'workspace-write', 'danger-full-access'), approval_policy: check.choice('untrusted', 'on-failure', 'on-request', 'never') });
 const state = check.object({ sessionId: check.identifier });
 export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
-  return { validate: options, async start(input, stop) {
+  return { validate(input) {
+    const parsed = options(input);
+    if (!parsed.ok) return parsed;
+    const approval = approvalRouting(parsed.value.approval_policy);
+    return approval.ok ? success({ options: parsed.value, approval: approval.value }) : approval;
+  }, async start(input, stop) {
     const parsed = options(input.options);
     if (!parsed.ok) return parsed;
     let process: Awaited<ReturnType<typeof startProcess>> | undefined;

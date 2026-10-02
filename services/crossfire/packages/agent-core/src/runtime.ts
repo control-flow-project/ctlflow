@@ -1,3 +1,8 @@
+import type { Json } from '@crossfire/contracts/json';
+import type { Result } from '@crossfire/kernel/result';
+
+export type RuntimeApproval = 'none' | 'runtime' | 'listener';
+
 export type TurnControl = {
   activeTurn: () => Promise<string | null>;
   interrupt: (turnId: string, recovery?: boolean) => Promise<void>;
@@ -5,6 +10,7 @@ export type TurnControl = {
 
 export type RuntimeConnection = {
   sessionId: string;
+  approval: RuntimeApproval;
   signal: AbortSignal;
   inspect: () => Promise<{ busy: boolean }>;
   deliver: (text: string, messageId: string, cancelled?: AbortSignal) => Promise<void>;
@@ -16,8 +22,6 @@ export type RuntimeConnection = {
 };
 
 export type RuntimeAdapter = (stop: AbortSignal, pollMs: number, hooks: RuntimeHooks) => Promise<RuntimeConnection>;
-import type { Json } from '@crossfire/contracts/json';
-
 export type Permission = {
   runtime: string;
   session: string;
@@ -28,5 +32,5 @@ export type Permission = {
 };
 
 export type RuntimeHooks = {
-  requestPermission: (permission: Permission, signal: AbortSignal) => Promise<Json>;
+  requestPermission: (permission: Permission, signal: AbortSignal) => Promise<Result<Json>>;
 };

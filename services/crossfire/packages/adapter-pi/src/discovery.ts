@@ -59,7 +59,7 @@ export async function connectPi(descriptor: PiDescriptor, journal: string, pollM
   const clear = () => { clearInterval(timer); signal.removeEventListener('abort', clear); };
   signal.addEventListener('abort', clear, { once: true });
   try {
-    const connection = nativeDelivery({ sessionId: descriptor.session, signal, verify,
+    const connection = nativeDelivery({ sessionId: descriptor.session, approval: 'runtime', signal, verify,
       inspect: async () => {
         await verify();
         const active = await piCall(descriptor, { method: 'active' }, signal);
