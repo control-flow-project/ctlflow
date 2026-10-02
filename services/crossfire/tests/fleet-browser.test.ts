@@ -264,12 +264,20 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 0);
   await page.screenshot({ path: join(directory, 'element-owner-room-admitted.png'), fullPage: true });
 
+  const directFacts = value(await services.matrix.room(owner.accepted.account.userId, conversation.roomId));
+  assert(directFacts.alias);
+  const createdDirectRooms: string[] = [];
+  page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/createRoom')) createdDirectRooms.push(request.url()); });
   await page.goto(origin + '/#/user/' + agent.matrixUserId);
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   const composer = page.getByRole('region', { name: 'Message composer', exact: true }).getByRole('textbox');
   await composer.fill('Ada, this is your owner’s direct message.');
+  const published = page.waitForResponse(response => response.request().method() === 'PUT'
+    && decodeURIComponent(new URL(response.url()).pathname).includes('/rooms/' + conversation.roomId + '/send/m.room.message/'));
   await composer.press('Enter');
-  await expect(page).toHaveURL(origin + '/#/room/' + conversation.roomId);
+  assert.equal((await published).status(), 200);
+  await expect(page).toHaveURL(origin + '/#/room/' + directFacts.alias);
+  assert.deepEqual(createdDirectRooms, [], 'Element reuses the exact existing owner DM without creating another');
   await page.screenshot({ path: join(directory, 'element-owner-dm-created.png'), fullPage: true });
   await until(() => joined(conversation.roomId) || ended !== undefined, 'Element DM did not admit the owned agent', 30000);
   await until(() => JSON.stringify(runtime.requests()).includes('Ada, this is your owner’s direct message.') || ended !== undefined, 'Element DM task was not delivered', 30000);

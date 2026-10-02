@@ -256,7 +256,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await worker.drain();
   assert((await connect(destination, release.manifest)).ok);
   const profile = readProfile(destination.profile);
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+  const ownerDirect = value(services.repositories.ownerConversation.find({ agentId: profile.id }))!;
+  const mandatoryGrant = value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: ownerDirect.roomId }))!;
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);
   await page.getByRole('link', { name: 'Agent details →' }).click();
   await expect(page.getByRole('region', { name: 'Rooms & access', exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveCount(0);
@@ -274,7 +276,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
     await page.reload();
     await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue(policy);
     assert.equal(value(services.directory.agent(profile.id))!.agent.wakeMode, policy);
-    assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+    assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);
   }
   assert.deepEqual(identityReads, [], 'Identity selection is read only when the selected wake-up mode is open');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Rooms', exact: true }).click();
