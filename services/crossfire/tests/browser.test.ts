@@ -1,7 +1,7 @@
 import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { chromium, expect, type Page } from '@playwright/test';
@@ -37,6 +37,51 @@ import { onboardingUrl } from '@crossfire/contracts/onboarding';
 import { checkPaperLayout } from './support/browser-layout.js';
 import { elementAssets } from './support/element.js';
 import { checkOnboardingPolicy } from './support/onboarding-browser.js';
+
+test('paper table checks center complete content groups and reject displaced controls', async scope => {
+  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
+  cleanup(scope, () => browser.close());
+  const page = await browser.newPage();
+  const style = readFileSync(new URL('../../apps/web/src/style.css', import.meta.url), 'utf8');
+  await page.setContent(`<main class="content"><div class="page-frame">
+    <header class="page-heading"><h1>Room access</h1></header><div class="page-body">
+    <div class="table-wrap"><table><tbody><tr>
+      <td><strong>Owner’s direct message</strong><span class="subline">Room identity</span></td>
+      <td><select aria-label="Access"><option>Read &amp; reply</option></select></td>
+      <td class="captioned-status"><span class="status">Read &amp; reply</span><span class="subline">Native room creator</span></td>
+      <td class="standalone-status"><span class="status">Applied</span></td>
+      <td><div class="actions"><button>Save access</button></div></td>
+      <td><span class="status">Applied</span><details><summary>Provenance</summary><p>Collapsed content does not contribute visible geometry.</p></details></td><td></td>
+    </tr></tbody></table></div></div></div></main>`);
+  await page.addStyleTag({ content: style });
+  for (const width of [1920, 390]) {
+    await page.setViewportSize({ width, height: 1100 });
+    await scope.test('centered status caption, closed disclosure and empty cell at ' + width, async () => {
+      await checkPaperLayout(page);
+      const offset = await page.locator('.captioned-status').evaluate(cell => {
+        const outer = cell.getBoundingClientRect(), badge = cell.querySelector('.status')!.getBoundingClientRect();
+        return Math.abs((badge.top + badge.bottom - outer.top - outer.bottom) / 2);
+      });
+      assert(offset > 1, 'A caption places its badge above the centered content group');
+    });
+    await scope.test('top-aligned cell is rejected at ' + width, async () => {
+      await page.locator('td').first().evaluate(cell => { cell.style.verticalAlign = 'top'; });
+      await assert.rejects(checkPaperLayout(page), /Every table cell uses one vertical alignment/u);
+      await page.locator('td').first().evaluate(cell => { cell.style.verticalAlign = ''; });
+    });
+    await scope.test('form margin is rejected at ' + width, async () => {
+      await page.locator('select').evaluate(control => { control.style.marginTop = '12px'; });
+      await assert.rejects(checkPaperLayout(page), /Table controls do not carry surrounding form margins/u);
+      await page.locator('select').evaluate(control => { control.style.marginTop = ''; });
+    });
+    await scope.test('displaced standalone status is rejected at ' + width, async () => {
+      await page.locator('.standalone-status .status').evaluate(control => { control.style.transform = 'translateY(12px)'; });
+      await assert.rejects(checkPaperLayout(page), /Table content shares the row’s vertical center/u);
+      await page.locator('.standalone-status .status').evaluate(control => { control.style.transform = ''; });
+      await checkPaperLayout(page);
+    });
+  }
+});
 
 async function submit(page: Page, name: string): Promise<void> {
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name, exact: true }).click()]);

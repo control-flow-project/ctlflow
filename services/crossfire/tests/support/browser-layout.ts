@@ -31,19 +31,32 @@ export async function checkPaperLayout(page: Page): Promise<void> {
     '.page-frame input:not([type=checkbox]), .page-frame select, .page-frame textarea, .page-frame .alert'
   )).filter(element => element.getBoundingClientRect().width > 0).map(element => getComputedStyle(element).borderLeftWidth)`);
   for (const border of controls) assert.equal(border, '1px', 'Input and alert boundaries remain visible');
-  const rows = await page.evaluate<{ alignment: string; controls: { margin: string; offset: number }[] }[]>(`Array.from(document.querySelectorAll('table td')).map(cell => ({
-    alignment: getComputedStyle(cell).verticalAlign,
-    controls: Array.from(cell.querySelectorAll(':scope > select, :scope > .actions, :scope > .status')).filter(control => control.getBoundingClientRect().height > 0).map(control => {
-      const outer = cell.getBoundingClientRect(), inner = control.getBoundingClientRect();
-      return { margin: getComputedStyle(control).marginTop, offset: Math.abs((inner.top + inner.bottom - outer.top - outer.bottom) / 2) };
-    })
-  }))`);
+  const rows = await page.evaluate<{ alignment: string; offset: number | null; margins: string[] }[]>(`Array.from(document.querySelectorAll('table td'))
+    .filter(cell => cell.getBoundingClientRect().height > 0).map(cell => {
+      const outer = cell.getBoundingClientRect();
+      const controls = Array.from(cell.querySelectorAll(':scope > select, :scope > .actions, :scope > .status'))
+        .filter(control => control.getBoundingClientRect().height > 0);
+      const content = Array.from(cell.childNodes).flatMap(node => {
+        if (node instanceof Element) {
+          const bounds = node.getBoundingClientRect();
+          return bounds.height > 0 ? [bounds] : [];
+        }
+        if (node.nodeType !== Node.TEXT_NODE || !node.textContent.trim()) return [];
+        const range = document.createRange();
+        range.selectNode(node);
+        const bounds = range.getBoundingClientRect();
+        return bounds.height > 0 ? [bounds] : [];
+      });
+      return { alignment: getComputedStyle(cell).verticalAlign,
+        offset: controls.length > 0 && content.length > 0 ? Math.abs((Math.min(...content.map(bounds => bounds.top))
+          + Math.max(...content.map(bounds => bounds.bottom)) - outer.top - outer.bottom) / 2) : null,
+        margins: controls.map(control => getComputedStyle(control).marginTop)
+      };
+    })`);
   for (const row of rows) {
     assert.equal(row.alignment, 'middle', 'Every table cell uses one vertical alignment');
-    for (const control of row.controls) {
-      assert.equal(control.margin, '0px', 'Table controls do not carry surrounding form margins');
-      assert(control.offset <= 1, 'Table controls share the row’s vertical center: ' + control.offset);
-    }
+    for (const margin of row.margins) assert.equal(margin, '0px', 'Table controls do not carry surrounding form margins');
+    if (row.offset !== null) assert(row.offset <= 1, 'Table content shares the row’s vertical center: ' + row.offset);
   }
   const paginationLabels = await page.evaluate<string[]>(`Array.from(document.querySelectorAll('.pagination label'))
     .filter(label => label.getBoundingClientRect().width > 0).map(label => getComputedStyle(label).flexDirection)`);
