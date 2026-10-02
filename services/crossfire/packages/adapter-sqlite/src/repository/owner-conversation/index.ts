@@ -14,6 +14,13 @@ export function createOwnerConversationRepository(database: Database.Database): 
         return success(row ? { agentId: row.agent_id, ownerId: row.owner_id, roomId: row.room_id, createdAt: row.created_at } : null);
       });
     },
+    findByRoom(key) {
+      return stored(() => {
+        const row = executeSelect(database, schema, (query, params) => query.from('agent_owner_conversation')
+          .where(row => row.room_id === params.roomId).firstOrDefault(), key);
+        return success(row ? { agentId: row.agent_id, ownerId: row.owner_id, roomId: row.room_id, createdAt: row.created_at } : null);
+      });
+    },
     insert(value) {
       return stored(() => {
         executeInsert(database, schema, (query, params) => query.insertInto('agent_owner_conversation')

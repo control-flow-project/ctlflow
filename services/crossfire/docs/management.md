@@ -25,7 +25,9 @@ also preserve it. Native membership and reply permission are repaired while the
 accounts remain active.
 
 Only owner and agent may participate in this canonical room. It must remain
-unencrypted and private. Invalid membership/privacy prevents listener readiness
+unencrypted and private. Other agents' owner DMs are absent from its room picker;
+owners and administrators cannot assign another agent to this protected channel.
+Invalid membership/privacy prevents listener readiness
 or permission publication. Suspension/revocation still disables account access.
 
 Chat wake eligibility and listener delivery intent remain independent. Nobody

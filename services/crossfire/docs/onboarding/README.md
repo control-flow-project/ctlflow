@@ -144,6 +144,7 @@ native permission handling. Crossfire never broadens an attached session's acces
 
 Every active account has its private owner DM with permanent read and reply
 access. Management cannot mute, downgrade, remove or delegate that channel.
+It cannot admit another agent, even one belonging to the same owner.
 Account suspension/revocation and chat wake policy remain separate. Authorized Element invitations and
 managed grants admit agents up to the inviter's native authority. Profiles,
 listener controls and credentials remain private and

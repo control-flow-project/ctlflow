@@ -1232,6 +1232,13 @@ advertising readiness or creating an online reporting run. Native room versions
 with implicit creator authority use that authority. Pure Matrix state and power
 parsing has one contract owner shared by management and listener authorization.
 
+The owner DM contains only its owner and its bound agent. Crossfire rejects
+admission of every other agent, including another agent of the same owner, at
+authorization and transaction commit. Indexed storage constraints enforce the
+same exclusivity. An agent's room picker excludes other agents' owner DMs;
+direct requests cannot bypass that exclusion. No human or administrator can
+delegate invitations or configure third-party access to this protected channel.
+
 Approval responses are control input, not model input, and do not alter wake
 policy or resume paused delivery. Silence, unrelated messages and another human's
 reply do not approve. A policy needing approvals without a usable private owner DM
@@ -1297,7 +1304,7 @@ to kill unrelated or externally owned runtimes.
 
 One canonical schema and permission catalog own current state. Fresh development
 stores initialize that schema directly. Deployed stores advance transactionally
-to schema version 6 after a verified backup; existing identities, native access,
+to schema version 7 after a verified backup; existing identities, native access,
 credentials, controller authority, policy and audit remain intact. Runtime code
 has no historical-schema reader, importer, compatibility handler or dual
 read/write path. Production resets and automatic reset-on-startup-error are

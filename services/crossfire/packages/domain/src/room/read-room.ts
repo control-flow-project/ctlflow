@@ -10,9 +10,10 @@ export async function readRoom(services: Dependencies, actor: Actor, roomId: str
   if (!current.ok) return current;
   let ownerDirect = false;
   if (agentId) {
-    const permitted = authorizeAgent(services, actor, agentId, 'read'), conversation = services.repositories.ownerConversation.find({ agentId });
+    const permitted = authorizeAgent(services, actor, agentId, 'read'), conversation = services.repositories.ownerConversation.findByRoom({ roomId });
     if (!permitted.ok) return permitted; if (!conversation.ok) return conversation;
-    ownerDirect = conversation.value?.roomId === roomId;
+    if (conversation.value && conversation.value.agentId !== agentId) return failure('forbidden', 'This private owner DM belongs to another agent');
+    ownerDirect = conversation.value !== null;
   }
   const native = await services.matrix.room(current.value.matrixUserId, roomId);
   if (native.ok) return success({ roomId, name: ownerDirect ? 'Owner DM' : native.value.name, topic: native.value.topic, alias: native.value.alias, authority: native.value });
@@ -41,6 +42,11 @@ export async function listRooms(services: Dependencies, actor: Actor, input: Pag
   }
   const rooms: RoomDetails[] = [];
   for (const roomId of [...identifiers].sort()) {
+    if (input.agentId !== undefined) {
+      const conversation = services.repositories.ownerConversation.findByRoom({ roomId });
+      if (!conversation.ok) return conversation;
+      if (conversation.value && conversation.value.agentId !== input.agentId) continue;
+    }
     const found = await readRoom(services, actor, roomId, input.agentId);
     if (!found.ok) return found;
     if ([found.value.name, found.value.alias ?? '', roomId].some(value => value.toLowerCase().includes(input.search.toLowerCase()))) rooms.push(found.value);

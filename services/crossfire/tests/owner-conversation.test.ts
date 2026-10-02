@@ -16,6 +16,9 @@ import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
 import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
 import { changeAgent } from '@crossfire/domain/agent/change-agent';
 import { listRoomGrants } from '@crossfire/domain/room-access/read-grants';
+import { listRooms, readRoom } from '@crossfire/domain/room/read-room';
+import { authorizeGrantChange } from '@crossfire/domain/room-access/authorize-change';
+import { recheckGrantAuthorization } from '@crossfire/domain/room-access/commit-change';
 
 test('enrollment creates one permanent owner DM and reconnect preserves its identity and generation', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
@@ -88,6 +91,37 @@ test('binding an existing private owner DM retires its discretionary invitation 
   assert.deepEqual(value(services.collection.roomPermissions({ agentId: agent.id, roomId: previous.roomId })), []);
 });
 
+test('owner DMs exclude other agents at authorization, storage and room-discovery boundaries', async scope => {
+  const fixture = await applicationFixture(scope), { services, admin } = fixture;
+  const alice = await fixture.member('alice'), bob = await fixture.member('bob');
+  const ada = await fixture.agent(alice.actor, 'ada'), jo = await fixture.agent(alice.actor, 'jo'), remy = await fixture.agent(bob.actor, 'remy');
+  const conversation = value(services.repositories.ownerConversation.find({ agentId: ada.id }))!;
+  const original = value(services.repositories.agentRoomGrant.find({ agentId: ada.id, roomId: conversation.roomId }))!;
+  assert.deepEqual(value(services.repositories.ownerConversation.findByRoom({ roomId: conversation.roomId })), conversation);
+  for (const agent of [jo, remy]) {
+    const revision = value(services.directory.agent(agent.id))!.principal.revision;
+    for (const actor of [alice.actor, bob.actor, admin.actor, ada.actor]) {
+      const changed = await changeRoomGrant(services, actor, { agentId: agent.id, roomId: conversation.roomId,
+        expectedRevision: revision, expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID());
+      assert(!changed.ok); assert.equal(changed.error.code, 'forbidden');
+    }
+    const grant = { ...original, agentId: agent.id, generation: randomUUID() };
+    assert.equal(services.repositories.agentRoomGrant.insert(grant).ok, false);
+    value(services.repositories.agentRoomGrant.insert({ ...grant, accessMode: 'none' }));
+    assert.equal(services.repositories.agentRoomGrant.update(grant).ok, false);
+    assert.equal(services.repositories.agentRoomPermission.insert({ agentId: agent.id, roomId: conversation.roomId,
+      generation: grant.generation, permissionCode: 'room.agent.invite', grantScope: 'agent_room',
+      grantedByMemberId: alice.actor.principalId, grantedAt: services.clock.now() }).ok, false);
+    const observed = await readRoom(services, admin.actor, conversation.roomId, agent.id);
+    assert(!observed.ok); assert.equal(observed.error.code, 'forbidden');
+    const rooms = value(await listRooms(services, admin.actor, { agentId: agent.id, search: '', page: 1, pageSize: 100 }));
+    assert.equal(rooms.items.some(room => room.roomId === conversation.roomId), false);
+  }
+  const rooms = value(await listRooms(services, alice.actor, { agentId: jo.id, search: '', page: 1, pageSize: 100 }));
+  assert.deepEqual(rooms.items.map(room => room.roomId), [value(services.repositories.ownerConversation.find({ agentId: jo.id }))!.roomId]);
+  assert.deepEqual(value(services.repositories.agentRoomGrant.find({ agentId: ada.id, roomId: conversation.roomId })), original);
+});
+
 test('active owner DM membership and reply permissions are repaired; suspension still wins', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const agent = await fixture.agent(admin.actor, 'ada');
@@ -107,4 +141,23 @@ test('active owner DM membership and reply permissions are repaired; suspension 
   value(await reconcilePrincipal(services, agent.id));
   assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.matrixUserId)!.membership, 'join');
   assert.deepEqual(value(services.repositories.ownerConversation.find({ agentId: agent.id })), conversation);
+});
+
+test('binding an owner DM invalidates pending third-party grant authorization at commit', async scope => {
+  const directory = mkdtempSync(join(tmpdir(), 'crossfire-owner-binding-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  const databasePath = join(directory, 'management.sqlite');
+  const fixture = await applicationFixture(scope, databasePath), { services, admin } = fixture;
+  const database = new Database(databasePath);
+  cleanup(scope, () => database.close());
+  const ada = await fixture.agent(admin.actor, 'ada'), jo = await fixture.agent(admin.actor, 'jo');
+  const conversation = value(services.repositories.ownerConversation.find({ agentId: ada.id }))!;
+  database.prepare('DELETE FROM agent_owner_conversation WHERE agent_id = ?').run(ada.id);
+  const input = { agentId: jo.id, roomId: conversation.roomId, expectedRevision: value(services.directory.agent(jo.id))!.principal.revision,
+    expectedGeneration: null, accessMode: 'reply' as const, powerLevel: null, muted: false };
+  const proof = value(await authorizeGrantChange(services, admin.actor, input));
+  value(services.repositories.ownerConversation.insert(conversation));
+  const rechecked = services.unitOfWork.run(() => recheckGrantAuthorization(services, admin.actor, proof));
+  assert(!rechecked.ok); assert.equal(rechecked.error.code, 'forbidden');
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: jo.id, roomId: conversation.roomId })), null);
 });

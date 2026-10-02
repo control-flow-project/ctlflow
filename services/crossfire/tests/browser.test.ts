@@ -133,7 +133,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await expect(page.getByRole('link', { name: 'Fleet · advanced', exact: true })).toHaveAttribute('href', '/manage/connect/fleet');
   await expect(page.getByRole('link', { name: 'Rooms', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Manage rooms →', exact: true })).toHaveCount(0);
-  await expect(page.getByText('Approval creates its account, not room access.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Approval creates its account and a private read/write DM with you.', { exact: false })).toBeVisible();
   assert(!instructions.includes('--session'));
   assert(!instructions.includes('--token-file'));
   await page.reload();
@@ -494,7 +494,8 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await page.reload();
   await expect(page.locator('.status').filter({ hasText: /^No access$/u })).toBeVisible();
   assert.equal(value(await services.matrix.membership(config.administrator, profile.account.user_id, room)).membership, 'leave');
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none'), []);
+  const ownerConversation = value(services.repositories.ownerConversation.find({ agentId: profile.id }))!;
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none').map(grant => grant.roomId), [ownerConversation.roomId]);
   await page.goto(origin + '/manage/audit');
   await expect(page.getByText('instance-policy.configure', { exact: true })).toHaveCount(2);
   const audit = page.getByRole('table', { name: 'Management activity', exact: true });

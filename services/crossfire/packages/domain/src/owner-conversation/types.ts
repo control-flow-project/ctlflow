@@ -9,5 +9,6 @@ export type OwnerConversation = {
 
 export type OwnerConversationRepository = {
   find(key: { agentId: string }): Result<OwnerConversation | null>;
+  findByRoom(key: { roomId: string }): Result<OwnerConversation | null>;
   insert(value: OwnerConversation): Result<void>;
 };

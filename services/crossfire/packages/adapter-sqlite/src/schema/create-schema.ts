@@ -9,11 +9,12 @@ import { seedReferenceData } from './reference-data.js';
 import { fleetControlSchema } from './fleet-control.js';
 import { wakeUpSchema } from './wake-up.js';
 import { ownerConversationSchema } from './owner-conversation.js';
+import { ownerConversationGuards, ownerConversationExclusivityCheck } from './owner-conversation-guards.js';
 export function createSchema(database: Database.Database): void {
   const application = database.pragma('application_id', { simple: true });
   const version = database.pragma('user_version', { simple: true });
-  if (application === 1129465426 && version === 6) return;
-  if (application === 1129465426 && (version === 1 || version === 2 || version === 3 || version === 4 || version === 5)) {
+  if (application === 1129465426 && version === 7) return;
+  if (application === 1129465426 && (version === 1 || version === 2 || version === 3 || version === 4 || version === 5 || version === 6)) {
     database.transaction(() => {
       if (version === 1) database.exec("ALTER TABLE instance_policy ADD COLUMN signup_mode TEXT NOT NULL DEFAULT 'invitation' CHECK(signup_mode IN ('invitation','open')); ALTER TABLE instance_policy ADD COLUMN invitation_issuers TEXT NOT NULL DEFAULT 'administrators' CHECK(invitation_issuers IN ('administrators','members')); CREATE INDEX ix_member_invitation_creator_created ON member_invitation(created_by_member_id, created_at DESC, id);");
       if (version < 3) database.exec('ALTER TABLE fleet ADD COLUMN delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK(delivery_enabled IN (0,1));' + fleetControlSchema);
@@ -26,9 +27,14 @@ export function createSchema(database: Database.Database): void {
         database.exec(wakeUpSchema);
         database.exec('ALTER TABLE listener_run ADD COLUMN controller_bound INTEGER NOT NULL DEFAULT 0 CHECK(controller_bound IN (0,1));');
       }
-      database.exec(ownerConversationSchema);
+      if (version < 6) database.exec(ownerConversationSchema);
+      else {
+        if (database.prepare(ownerConversationExclusivityCheck).get()) throw new Error('Owner conversation exclusivity is violated; no data was changed');
+        database.exec('DROP TRIGGER validate_owner_conversation; DROP TRIGGER protect_owner_conversation_permission_insert; DROP TRIGGER protect_owner_conversation_permission_update;');
+        database.exec(ownerConversationGuards);
+      }
       seedReferenceData(database);
-      database.pragma('user_version = 6');
+      database.pragma('user_version = 7');
     }).immediate();
     return;
   }
@@ -39,6 +45,6 @@ export function createSchema(database: Database.Database): void {
     seedReferenceData(database);
     database.exec('CREATE INDEX ix_member_invitation_creator_created ON member_invitation(created_by_member_id, created_at DESC, id)');
     database.pragma('application_id = 1129465426');
-    database.pragma('user_version = 6');
+    database.pragma('user_version = 7');
   }).immediate();
 }

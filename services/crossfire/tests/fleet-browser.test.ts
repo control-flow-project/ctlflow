@@ -181,7 +181,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   assert.deepEqual(errors, []);
 });
 
-test('stock Element room invite search finds a registered zero-room agent without admitting it', { timeout: 120000 }, async scope => {
+test('stock Element room invite search finds an agent with no shared rooms without admitting it', { timeout: 120000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/element-directory-'));
   const fixture = await nativeServer(scope, await releaseFixture(), {}, elementAssets());
   const owner = await fixture.member('alice'), other = await fixture.member('bob'), agent = await fixture.agent(other.actor, 'bea');
@@ -211,8 +211,9 @@ test('stock Element room invite search finds a registered zero-room agent withou
   await expect(dialog.getByText('bea (bob)', { exact: true })).toBeVisible();
   await expect(dialog.getByText(agent.matrixUserId, { exact: true })).toBeVisible();
   await page.screenshot({ path: join(directory, 'native-invite-zero-room.png'), fullPage: true });
-  assert.deepEqual(value(await fixture.services.matrix.joined(agent.matrixUserId)), []);
-  assert.deepEqual(value(fixture.services.collection.roomGrants({ agentId: agent.id })), []);
+  const conversation = value(fixture.services.repositories.ownerConversation.find({ agentId: agent.id }))!;
+  assert.deepEqual(value(await fixture.services.matrix.joined(agent.matrixUserId)), [conversation.roomId]);
+  assert.deepEqual(value(fixture.services.collection.roomGrants({ agentId: agent.id })).map(grant => grant.roomId), [conversation.roomId]);
   assert.equal(value(await fixture.services.matrix.membership(owner.accepted.account.userId, agent.matrixUserId, String(room.room_id))).membership, 'leave');
 });
 
@@ -220,6 +221,7 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   const directory = mkdtempSync(join(process.cwd(), '.temp/element-invitations-')), release = await releaseFixture();
   const fixture = await nativeServer(scope, release, {}, elementAssets()), { services, origin } = fixture;
   const owner = await fixture.member('alice'), agent = await fixture.agent(owner.actor, 'ada');
+  const conversation = value(services.repositories.ownerConversation.find({ agentId: agent.id }))!;
   const created = value(await nativeOk({ base: origin, token: owner.token }, 'POST', API + '/createRoom', { name: 'Samosas', preset: 'private_chat' }));
   assert(typeof created.room_id === 'string');
   const roomId = created.room_id, runtime = await fakeCodex(scope), stop = new AbortController();
@@ -266,26 +268,27 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   const composer = page.getByRole('region', { name: 'Message composer', exact: true }).getByRole('textbox');
   await composer.fill('Ada, this is your owner’s direct message.');
-  const creation = page.waitForResponse(response => response.url().endsWith('/_matrix/client/v3/createRoom') && response.request().method() === 'POST');
   await composer.press('Enter');
-  const response = await creation;
-  assert.equal(response.status(), 200);
-  const dm = await response.json() as { room_id: string };
+  await expect(page).toHaveURL(origin + '/#/room/' + conversation.roomId);
   await page.screenshot({ path: join(directory, 'element-owner-dm-created.png'), fullPage: true });
-  await until(() => joined(dm.room_id) || ended !== undefined, 'Element DM did not admit the owned agent', 30000);
+  await until(() => joined(conversation.roomId) || ended !== undefined, 'Element DM did not admit the owned agent', 30000);
   await until(() => JSON.stringify(runtime.requests()).includes('Ada, this is your owner’s direct message.') || ended !== undefined, 'Element DM task was not delivered', 30000);
   assert.equal(ended, undefined);
-  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: dm.room_id }))?.accessMode, 'reply');
-  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId: dm.room_id }))?.creator, true);
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: conversation.roomId }))?.accessMode, 'reply');
+  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId: conversation.roomId }))?.creator, false);
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId, conversation.roomId);
   assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 1);
   await page.screenshot({ path: join(directory, 'element-owner-dm-admitted.png'), fullPage: true });
   await context.addCookies([{ name: 'crossfire', value: owner.secret, url: origin }]);
   await page.goto(origin + '/manage/agents/' + agent.id);
   await expect(page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Samosas', exact: true }) }).getByRole('cell').nth(2)).toHaveText('Read & reply');
-  const directRow = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Unnamed room', exact: true }) });
-  await expect(directRow.getByText('Native room creator', { exact: true })).toBeVisible();
-  await expect(directRow.getByRole('combobox').locator('option[value="read"]')).toBeDisabled();
-  await expect(directRow.getByRole('combobox').locator('option[value="custom"]')).toBeDisabled();
+  const directRow = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Owner DM', exact: true }) });
+  await expect(directRow.getByText('Owner DM · always available', { exact: true })).toBeVisible();
+  await expect(directRow.getByRole('combobox')).toHaveCount(0);
+  await expect(directRow.getByRole('button', { name: 'Save access' })).toHaveCount(0);
+  await expect(directRow.getByRole('checkbox')).toHaveCount(0);
+  await directRow.getByRole('link', { name: 'Owner DM', exact: true }).click();
+  await expect(page.getByText('Owner DMs stay private between this agent and its owner. Invitation delegation is not available.', { exact: true })).toBeVisible();
   await page.screenshot({ path: join(directory, 'management-invited-access.png'), fullPage: true });
   assert.deepEqual(errors, []);
 });
@@ -318,9 +321,9 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   await page.getByRole('link', { name: 'Connection map', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Fleet map', exact: true })).toBeVisible();
   await expect(page.locator('.map-node-agent')).toHaveCount(24);
-  await expect(page.locator('.map-node-room')).toHaveCount(4);
+  await expect(page.locator('.map-node-room')).toHaveCount(28);
   await expect(page.locator('.map-node-source')).toHaveCount(6);
-  await expect(page.locator('.map-edge')).toHaveCount(44);
+  await expect(page.locator('.map-edge')).toHaveCount(68);
   await expect(page.locator('.map-toolbar')).toContainText('24 of 24 agents shown');
   await checkPaperLayout(page);
   assert.equal(await page.evaluate<string>("getComputedStyle(document.querySelector('.shell')).getPropertyValue('--accent').trim()"), '#2f5fe0');
@@ -337,7 +340,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   await expect(details.getByRole('link', { name: 'Agent details →', exact: true })).toHaveAttribute('href', '/manage/agents/' + instances[0]!.agentId);
   await expect(details.getByRole('table', { name: 'Selected room connections' })).toContainText('Credit review');
   await expect(details.getByRole('table', { name: 'Selected room connections' })).toContainText('Muted');
-  await expect(page.locator('.map-edge[data-highlighted=true]')).toHaveCount(2);
+  await expect(page.locator('.map-edge[data-highlighted=true]')).toHaveCount(3);
   const savedUrl = page.url(); await page.reload(); await expect(first).toHaveAttribute('aria-pressed', 'true'); assert.equal(page.url(), savedUrl);
   await page.getByRole('button', { name: 'Select source ' + WAKE_LABELS.everyone, exact: true }).click();
   await expect(details.getByRole('table', { name: 'Wake-up identities' }).locator('tbody tr')).toHaveCount(20);
@@ -345,9 +348,9 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   await expect(details.getByRole('table', { name: 'Wake-up identities' }).locator('tbody tr')).toHaveCount(6);
   await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
   await page.getByLabel('Search map').fill('map-worker-23'); await page.getByRole('button', { name: 'Apply search', exact: true }).click();
-  await expect(page.locator('.map-node-agent')).toHaveCount(1); await expect(page.locator('.map-node-room')).toHaveCount(0);
+  await expect(page.locator('.map-node-agent')).toHaveCount(1); await expect(page.locator('.map-node-room')).toHaveCount(1);
   await expect(page.locator('.map-node-source small')).toHaveText('1 agent · 1 chosen');
-  await page.locator('.map-node-agent').click(); await expect(details.getByRole('heading', { name: 'No rooms', exact: true })).toBeVisible();
+  await page.locator('.map-node-agent').click(); await expect(details.getByRole('table', { name: 'Selected room connections' }).locator('tbody tr')).toHaveCount(1);
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click(); await expect(page.locator('.map-node-agent')).toHaveCount(24);
   await page.getByLabel('Listener status').selectOption('online'); await expect(page.locator('.map-node-agent')).toHaveCount(12);
   await page.goBack(); await expect(page.locator('.map-node-agent')).toHaveCount(24);
