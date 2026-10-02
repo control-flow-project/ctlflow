@@ -7,13 +7,16 @@ COPY .npmrc package.json package-lock.json tsconfig.base.json ./
 COPY scripts ./scripts
 COPY services ./services
 RUN npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source
-RUN npm run build --workspace=@crossfire/service && npm prune --omit=dev --ignore-scripts
+RUN npm run build --workspace=@crossfire/service
+
+FROM build AS production-dependencies
+RUN npm ci --omit=dev --ignore-scripts && npm rebuild better-sqlite3 --build-from-source
 
 FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
 COPY --from=conduit /nix/store /nix/store
 RUN set -eu; for binary in /nix/store/*/bin/conduit; do cp "$binary" /usr/local/bin/conduit; done; test -x /usr/local/bin/conduit; rm -rf /nix/store
 WORKDIR /app
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/services/crossfire ./services/crossfire
 COPY --from=build /app/package.json /app/.npmrc ./
 COPY --from=element /app ./element
