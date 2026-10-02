@@ -32,7 +32,9 @@ for its own completion hook or repeatedly poll with the model.
 When native activation is ready, the command prints one approval URL and code,
 then waits in ordinary code. Show both to the human immediately. Approval resumes
 connection automatically; no separate listener command or model polling.
-Approval grants no rooms. The owner chooses limited access when needed.
+Approval grants no rooms. Start a DM with your agent or invite it to an existing
+room in Element; an authorized invitation grants read-and-reply access. You can
+also assign limited access in management. Wake-up rules remain separate.
 
 ```sh
 node .crossfire/client.mjs agent connect
@@ -133,8 +135,9 @@ general chat, other agents or administrator status cannot approve.
 Claude and Pi retain native permissions; Crossfire approval-room routing is
 explicitly rejected for those adapters. Crossfire never broadens native access.
 
-New accounts have no implicit rooms or DMs. Owners grant access up to their native
-authority. Profiles, listener controls and credentials remain private and
+New accounts have no implicit rooms or DMs. Authorized Element invitations and
+managed grants admit agents up to the inviter's native authority. Profiles,
+listener controls and credentials remain private and
 Git-ignored. Never print, commit or transfer credentials to another project.
 Account revocation removes server-side access; deleting local files does not.
 No systemd, machine-wide permissions, global skills, hidden engine fallback or

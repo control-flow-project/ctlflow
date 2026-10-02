@@ -9,6 +9,7 @@ import { createRoomGrantReadRepository } from '@crossfire/adapter-sqlite/reposit
 import { createUnitOfWork } from '@crossfire/adapter-sqlite/unit-of-work';
 import { createMatrixAuthority } from '@crossfire/adapter-matrix/create-authority';
 import { initializeInstance } from '@crossfire/domain/principal/register';
+import { createRoomOperations } from '@crossfire/domain/room-access/create-operations';
 import type { Services } from '@crossfire/domain/port/services';
 import type { MatrixAuthority } from '@crossfire/domain/port/matrix-authority';
 import { serviceUser, type Config } from './config.js';
@@ -20,7 +21,7 @@ export function createApplication(path: string, config: Config, options: { now?:
   const services: Services = {
     repositories: createRepositories(database), directory: createDirectoryRepository(database), collection: createCollectionRepository(database),
     listenerRead: createListenerReadRepository(database), discovery: createDiscoveryRepository(database), roomGrantRead: createRoomGrantReadRepository(database),
-    unitOfWork: createUnitOfWork(database), matrix, clock: { now: options.now ?? Date.now },
+    unitOfWork: createUnitOfWork(database), roomOperations: createRoomOperations(), matrix, clock: { now: options.now ?? Date.now },
     instance: { serverName: config.serverName, publicOrigin: config.publicOrigin, serviceMatrixId: serviceUser(config) },
     identity: { id: randomUUID, secret: () => randomBytes(32).toString('base64url'), verificationCode: () => randomBytes(6).toString('hex').toUpperCase(), hash,
       matches(value, digest) { const actual = Buffer.from(hash(value), 'hex'), expected = Buffer.from(digest, 'hex');

@@ -7,7 +7,7 @@ export function grant(value: AgentRoomGrant) {
 }
 export function application(value: RoomGrantApplication) {
   return { observedGeneration: value.observedGeneration, appliedRevision: value.appliedRevision, appliedAccessRevision: value.appliedAccessRevision,
-    membership: value.membership, powerLevel: value.powerLevel, lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt,
+    membership: value.membership, creator: value.creator, powerLevel: value.powerLevel, lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt,
     errorCode: value.errorCode, errorMessage: value.errorMessage };
 }
 export function grantView(value: { agentId: string; revision: number; grant: AgentRoomGrant | null; application: RoomGrantApplication | null; permissions: string[]; allowedActions: string[] }) {

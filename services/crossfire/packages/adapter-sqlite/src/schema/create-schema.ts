@@ -10,13 +10,16 @@ import { fleetControlSchema } from './fleet-control.js';
 export function createSchema(database: Database.Database): void {
   const application = database.pragma('application_id', { simple: true });
   const version = database.pragma('user_version', { simple: true });
-  if (application === 1129465426 && version === 3) return;
-  if (application === 1129465426 && (version === 1 || version === 2)) {
+  if (application === 1129465426 && version === 4) return;
+  if (application === 1129465426 && (version === 1 || version === 2 || version === 3)) {
     database.transaction(() => {
       if (version === 1) database.exec("ALTER TABLE instance_policy ADD COLUMN signup_mode TEXT NOT NULL DEFAULT 'invitation' CHECK(signup_mode IN ('invitation','open')); ALTER TABLE instance_policy ADD COLUMN invitation_issuers TEXT NOT NULL DEFAULT 'administrators' CHECK(invitation_issuers IN ('administrators','members')); CREATE INDEX ix_member_invitation_creator_created ON member_invitation(created_by_member_id, created_at DESC, id);");
-      database.exec('ALTER TABLE fleet ADD COLUMN delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK(delivery_enabled IN (0,1));' + fleetControlSchema);
+      if (version < 3) database.exec('ALTER TABLE fleet ADD COLUMN delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK(delivery_enabled IN (0,1));' + fleetControlSchema);
+      database.exec("ALTER TABLE agent_room_grant ADD COLUMN invitation_event_id TEXT CHECK(invitation_event_id IS NULL OR (substr(invitation_event_id, 1, 1) = '$' AND length(invitation_event_id) BETWEEN 2 AND 255));");
+      database.exec("ALTER TABLE agent_room_grant ADD COLUMN admission_kind TEXT NOT NULL DEFAULT 'managed' CHECK(admission_kind IN ('managed','invitation') AND (admission_kind != 'invitation' OR invitation_event_id IS NOT NULL));");
+      database.exec('ALTER TABLE room_grant_application ADD COLUMN creator INTEGER NOT NULL DEFAULT 0 CHECK(creator IN (0,1) AND (creator = 0 OR power_level IS NULL));');
       seedReferenceData(database);
-      database.pragma('user_version = 3');
+      database.pragma('user_version = 4');
     }).immediate();
     return;
   }
@@ -27,6 +30,6 @@ export function createSchema(database: Database.Database): void {
     seedReferenceData(database);
     database.exec('CREATE INDEX ix_member_invitation_creator_created ON member_invitation(created_by_member_id, created_at DESC, id)');
     database.pragma('application_id = 1129465426');
-    database.pragma('user_version = 3');
+    database.pragma('user_version = 4');
   }).immediate();
 }

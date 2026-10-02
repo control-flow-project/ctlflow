@@ -10,6 +10,7 @@ export const permissionCatalog = [
   { code: 'agent.listener.disconnect.owned', grantScope: 'role', description: 'Disconnect owned listeners', roles: ['member', 'administrator'] },
   { code: 'agent.listener.disconnect.any', grantScope: 'role', description: 'Disconnect every listener', roles: ['administrator'] },
   { code: 'listener.report.self', grantScope: 'role', description: 'Report own listener activity', roles: ['agent'] },
+  { code: 'room-invitation.accept.self', grantScope: 'role', description: 'Accept native invitations within the inviter’s room authority', roles: ['agent'] },
   { code: 'wake-notice.publish.self', grantScope: 'role', description: 'Request verified blocked-mention notices', roles: ['agent'] },
   { code: 'enrollment.approve.owned', grantScope: 'role', description: 'Approve enrollment for oneself', roles: ['member', 'administrator'] },
   { code: 'enrollment.reject.owned', grantScope: 'role', description: 'Reject enrollment for oneself', roles: ['member', 'administrator'] },

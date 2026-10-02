@@ -134,6 +134,8 @@ export type Tables = {
     generation: string;
     authorizer_id: string;
     added_by_id: string;
+    invitation_event_id: string | null;
+    admission_kind: 'managed' | 'invitation';
     access_mode: 'none' | 'read' | 'reply' | 'custom';
     power_level: number | null;
     muted: number;
@@ -157,6 +159,7 @@ export type Tables = {
     applied_revision: number | null;
     applied_access_revision: number | null;
     membership: 'join' | 'leave' | 'invite' | 'ban' | null;
+    creator: number;
     power_level: number | null;
     last_attempt_at: number | null;
     last_success_at: number | null;

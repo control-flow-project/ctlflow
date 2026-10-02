@@ -1,22 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { MatrixAuthority, MatrixEvent, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';
+import type { MatrixAuthority, MatrixEvent, RoomFacts, RoomMembership, RoomInvitation } from '@crossfire/domain/port/matrix-authority';
 export function matrixAuthorityFixture() {
   const accounts = new Map<string, { token: string; displayName: string; active: boolean; password: string }>();
   const rooms = new Map<string, { name: string; creator: string; members: Map<string, RoomMembership> }>();
   const events = new Map<string, MatrixEvent>();
   const notices = new Map<string, { body: string; senderMatrixId: string; eventId: string }>();
+  const invitations = new Map<string, RoomInvitation>();
   let noticeFailure: Result<string> | null = null;
   function facts(matrixUserId: string, roomId: string): Result<RoomFacts> {
     const room = rooms.get(roomId), member = room?.members.get(matrixUserId);
     if (!room || !member || member.membership !== 'join') return failure('forbidden', 'Not a native room member');
-    return success({ roomId, name: room.name, topic: '', alias: null, matrixUserId, powerLevel: member.powerLevel, creator: room.creator === matrixUserId,
+    return success({ roomId, name: room.name, topic: '', alias: null, matrixUserId,
+      ...(room.creator === matrixUserId ? { creator: true as const, powerLevel: null } : { creator: false as const, powerLevel: member.powerLevel ?? 0 }),
       creatorIds: [room.creator], readLevel: -1, replyLevel: 0, inviteLevel: 0, kickLevel: 50, changePowerLevel: 50,
       nativePermissions: [{ action: 'm.room.message', level: 0 }, { action: 'invite', level: 0 }] });
   }
   async function createRoom(id: string, name: string) {
     const roomId = '!' + randomUUID() + ':test.localhost';
-    rooms.set(roomId, { name, creator: id, members: new Map([[id, { matrixUserId: id, displayName: id, membership: 'join', powerLevel: 100 }]]) });
+    rooms.set(roomId, { name, creator: id, members: new Map([[id, { matrixUserId: id, displayName: id, membership: 'join', creator: true, powerLevel: null }]]) });
     return success({ roomId, name });
   }
   const matrix: MatrixAuthority = {
@@ -41,15 +43,19 @@ export function matrixAuthorityFixture() {
     async membership(id, targetId, roomId) {
       const authority = facts(id, roomId);
       if (!authority.ok) return authority;
-      return success(rooms.get(roomId)!.members.get(targetId) ?? { matrixUserId: targetId, displayName: targetId, membership: 'leave', powerLevel: 0 });
+      return success(rooms.get(roomId)!.members.get(targetId) ?? { matrixUserId: targetId, displayName: targetId, membership: 'leave', creator: false, powerLevel: 0 });
     },
-    async setRoomAccess(id, targetId, roomId, powerLevel, admit) {
+    async invitation(id, roomId) { return success(rooms.get(roomId)?.members.get(id)?.membership === 'invite' ? invitations.get(roomId + ':' + id) ?? null : null); },
+    async setRoomAccess(id, targetId, roomId, access, admission) {
+      const { powerLevel } = access;
       const authority = facts(id, roomId);
       if (!authority.ok) return authority;
       if (!authority.value.creator && powerLevel > authority.value.powerLevel) return failure('forbidden', 'Native ceiling exceeded');
       const members = rooms.get(roomId)!.members, previous = members.get(targetId);
+      if (admission?.kind === 'invitation' && previous?.membership !== 'join'
+        && invitations.get(roomId + ':' + targetId)?.eventId !== admission.eventId) return failure('conflict', 'Native invitation was withdrawn or replaced');
       const member: RoomMembership = { matrixUserId: targetId, displayName: accounts.get(targetId)?.displayName ?? targetId,
-        membership: admit ? 'join' : previous?.membership ?? 'leave', powerLevel };
+        membership: admission ? 'join' : previous?.membership ?? 'leave', creator: false, powerLevel };
       members.set(targetId, member); return success(member);
     },
     async leave(id, roomId) {
@@ -69,5 +75,5 @@ export function matrixAuthorityFixture() {
     },
     close() {},
   };
-  return { matrix, accounts, rooms, events, notices, createRoom, setNoticeFailure(value: Result<string> | null) { noticeFailure = value; } };
+  return { matrix, accounts, rooms, events, notices, invitations, createRoom, setNoticeFailure(value: Result<string> | null) { noticeFailure = value; } };
 }

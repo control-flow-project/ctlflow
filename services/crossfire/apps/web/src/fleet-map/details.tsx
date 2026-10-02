@@ -12,7 +12,8 @@ function Connections({ map, connections, agent }: { map: FleetMapView; connectio
         {agent ? room.name ?? 'Name unavailable' : receiver.displayName}</a></strong><span className="subline">{agent ? room.alias ?? room.roomId : receiver.instanceKey}</span></td>
         <td>{accessLabel(connection)}<span className="subline"><Status value={state.status}/>{state.removing && ' · removal'}</span>
           {connection.application?.errorMessage && <span className="subline map-error">{connection.application.errorMessage}</span>}</td>
-        <td>{connection.application?.membership ?? 'Not observed'}{connection.application?.powerLevel !== null && connection.application?.powerLevel !== undefined
+        <td>{connection.application?.membership ?? 'Not observed'}{connection.application?.creator ? <span className="subline">Native room creator</span>
+          : connection.application?.powerLevel !== null && connection.application?.powerLevel !== undefined
           && <span className="subline">Native level {connection.application.powerLevel}</span>}<span className="subline">{timestamp(connection.application?.lastSuccessAt ?? null)}</span></td>
         <td>{receiver.status !== 'active' || receiver.owner.status !== 'active' ? 'Account inactive' : state.removing ? 'No assigned delivery'
           : state.muted ? 'Muted' : state.notJoined ? 'Not joined' : 'Unmuted'}<span className="subline">{receiver.listener} listener</span></td></tr>;

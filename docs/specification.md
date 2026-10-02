@@ -97,6 +97,9 @@ First setup asks for a name; reconnects and upgrades reuse the existing account.
 Several saved profiles require a human selection. The client owns approval
 waiting, verified installation and starting/reusing exactly one listener.
 Approval creates an account, not room access. Zero rooms is a valid ready listener.
+The owner can invite its agent into an existing room or open a direct message
+in Element. The listener accepts authorized native invitations automatically,
+with a durable read-and-reply grant; no second management action is required.
 
 The Codex adapter uses the tool-provided exact native thread ID and private
 native app-server Unix socket, or an explicit authenticated loopback WebSocket
@@ -764,7 +767,40 @@ to change atomically across the homeserver because a database transaction passed
 Grant revisions change for access changes; name/mute/metadata edits do not cause
 unrelated membership rejoin or power elevation. Owner-ceiling reconciliation
 uses the configured interval, default 300 seconds, with pending/failed restrictions
-visible.
+visible. If native reply authority is lost, read-and-reply participation is removed
+and reported failed, not silently applied as read-only access.
+
+Native invitations are discovered in the shared listener's existing Matrix sync,
+not a second receiver or model prompt. The agent submits only the immutable room
+ID to `POST /api/agents/{agentId}/room-invitation-acceptances`. Only that invited
+agent can call the resource. The domain obtains the current native membership
+event and its actual sender; supplied sender identities are not accepted.
+Owners may invite their own agents, administrators any agent, and agents only
+within their explicit room-scoped delegation and native invitation authority.
+The same checks, ceilings, transaction and audit owner apply as for managed grants.
+
+An authorized invitation creates a read-and-reply grant and its exact native
+invitation event binds a fresh admission generation. The Matrix adapter accepts
+that invitation without issuing a replacement invitation. Withdrawn/replaced
+events cannot authorize admission. Removal retains the event receipt so observing
+the same pending invite cannot undo removal. A genuinely new authorized invite
+creates another generation; old delegation does not return. Denied invitations
+do not stop unrelated listener delivery and retries are bounded. Admission never
+changes wake policy, fleet delivery intent, identity or model permissions.
+
+Owner direct messages use Element's normal direct-room invitation and the same
+admission path. No agent enrollment, room creation by Crossfire, special DM grant
+table, private default room, second listener or manual grant step is introduced.
+Joined membership and read/reply permission are verified before delivery becomes
+eligible. An online but uninvited agent remains in zero rooms.
+
+Native creator authority is represented explicitly, never as a finite power level.
+Element's trusted direct chats can make an invited agent an additional creator
+in Matrix room version 12. Read-and-reply participation preserves that immutable
+native authority without writing a creator into `m.room.power_levels`. Read-only
+and custom-power restrictions are rejected before changing the grant; the UI
+explains the native authority and offers mute or membership removal. The same
+rule applies to every native creator, not just direct rooms.
 
 Matrix clients such as Element own room creation, room configuration and human
 membership management. Crossfire manages agents' participation in existing rooms;
@@ -802,8 +838,9 @@ membership remain distinguishable statuses.
 The project client exposes `agent directory`, `room agent-access`,
 `room invite-agent` and `room remove-agent`. The coordination adapter reads the
 current grant and submits its exact revision/generation through the same REST
-resource used by management. Native Matrix invites alone do not replace that
-durable permission operation.
+resource used by management. Native Matrix invitations are verified by the
+receiving listener's coordination adapter and admitted through that same durable
+permission operation.
 
 ### Authority invariants
 
@@ -824,9 +861,9 @@ durable permission operation.
   access. The result stays within all applicable owner/native ceilings.
 - Inviting an agent does not automatically delegate onward invitation powers
   or change its wake policy.
-- Direct native invitations do not establish Crossfire grant approval or bypass
-  target authorization. Management does not claim a UI flag independently
-  changes homeserver enforcement.
+- Native invitations must pass canonical target authorization before the
+  receiving listener commits a grant and accepts them. Management does not claim
+  a UI flag independently changes homeserver enforcement.
 - Retry is idempotent; revocation or lost authority is rechecked at the owning
   operation. Audit records identify actor, target, room, membership generation,
   addition provenance and authorization.
@@ -1231,12 +1268,19 @@ enrollment decision state.
 
 | Table | Complete logical columns and keys |
 | --- | --- |
-| `agent_room_grant` | `agent_id FK agent`, `room_id`, `generation`, `authorizer_id FK principal`, `added_by_id FK principal`, `access_mode`, `power_level?`, `muted`, `revision`, `access_revision`, `updated_at`; `PK(agent_id, room_id)`; `UQ(agent_id, room_id, generation)`. |
+| `agent_room_grant` | `agent_id FK agent`, `room_id`, `generation`, `authorizer_id FK principal`, `added_by_id FK principal`, `invitation_event_id?`, `admission_kind` (`managed` or `invitation`), `access_mode`, `power_level?`, `muted`, `revision`, `access_revision`, `updated_at`; `PK(agent_id, room_id)`; `UQ(agent_id, room_id, generation)`. |
 | `agent_room_permission` | `agent_id`, `room_id`, `generation`, `permission_code`, `grant_scope = agent_room`, `granted_by_member_id FK member`, `granted_at`; `PK(agent_id, room_id, permission_code)`; composite FKs to the exact room-grant generation and `permission(code, grant_scope)`. |
-| `room_grant_application` | `agent_id`, `room_id`, `observed_generation?`, `applied_revision?`, `applied_access_revision?`, `membership?`, `power_level?`, `last_attempt_at?`, `last_success_at?`, `next_check_at`, `error_code?`, `error_message?`; composite PK/FK to `agent_room_grant(agent_id, room_id)`. |
+| `room_grant_application` | `agent_id`, `room_id`, `observed_generation?`, `applied_revision?`, `applied_access_revision?`, `membership?`, `creator`, `power_level?`, `last_attempt_at?`, `last_success_at?`, `next_check_at`, `error_code?`, `error_message?`; composite PK/FK to `agent_room_grant(agent_id, room_id)`. Native creators have no finite power level. |
 | `agent_wake_sender` | `agent_id FK agent`, `sender_principal_id FK principal`; composite PK; self-selection rejected. |
 
 `agent_room_grant` is desired room access and addition provenance.
+Its nullable native invitation event ID records the last admitted native invite,
+not another permission source. It survives managed access edits and removal so an
+old invitation cannot undo those decisions. The admission kind determines whether
+the current intent requires that exact invitation or an explicit managed invite;
+invitation admission requires a receipt. Existing managed grants have no receipt.
+Stored grants and credentials are preserved by the transactional forward schema
+migration; no runtime maintains another representation or resets production data.
 `agent_room_permission` is explicit scoped authority to act in that room.
 `room_grant_application` is observed native state. These are different facts,
 not overlapping permission systems.
@@ -1374,7 +1418,13 @@ expected revisions; a preview is not an authorization token.
 
 Native provisioning and network calls occur outside SQLite transactions.
 Reconciliation applies one desired-state model with finite concurrency, timeouts
-and truthful pending/failure reporting. No model call performs permission,
+and truthful pending/failure reporting. Each room has one serialized native
+application owner within the Crossfire instance. Invitation acceptance and the
+background worker use that same owner and read the latest grant after acquiring
+it. Different rooms remain independent; power-map writes and membership cleanup
+cannot race another application for the same room. Native calls remain outside
+database transactions and revision checks still guard application commits.
+No model call performs permission,
 version, heartbeat, notice, filtering or lifecycle housekeeping.
 
 The CLI uses ordinary user privileges and touches only selected project/fleet
@@ -1462,6 +1512,7 @@ ownership. The management website remains under `/manage`.
 | `GET /api/rooms`, `GET /api/rooms/{roomId}` | Authorized native room directory/details; optional agent context for the assignment editor. |
 | `GET /api/agents/{agentId}/room-grants` | Desired grants with their observed application and allowed actions. |
 | `GET, PUT, DELETE /api/agents/{agentId}/room-grants/{roomId}` | One shared owner/admin/delegated-agent access resource; removal rechecks addition provenance and generation. |
+| `POST /api/agents/{agentId}/room-invitation-acceptances` | Receiving agent submits a room ID. Verify the current native invitation and actual inviter; apply the same canonical read-and-reply grant and confirm native admission. No self-assigned inviter or power level. |
 | `GET, PUT /api/agents/{agentId}/room-grants/{roomId}/permissions` | Owner/admin reads/replaces this generation's complete scoped permission set. |
 | `POST /api/room-grant-previews` | Validate/normalize a bulk plan and expose changes/digest/revisions; no mutation. |
 | `POST /api/room-grant-changes` | Apply the exact confirmed plan atomically to desired state through the same grant domain. |

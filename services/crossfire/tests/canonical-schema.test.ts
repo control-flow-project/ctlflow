@@ -62,7 +62,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.deepEqual(value(activity.reportingAgentIds(5, false)), ['agent']);
     assert.equal(value(activity.activeCount('agent', 5)), 1);
     assert.equal(value(activity.totals(['agent']))[0]?.messagesDelivered, 2);
-    value(repositories.agentRoomGrant.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', authorizerId: 'human', addedById: 'human', accessMode: 'reply', powerLevel: null, muted: false, revision: 0, accessRevision: 0, updatedAt: 1 }));
+    value(repositories.agentRoomGrant.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', authorizerId: 'human', addedById: 'human', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', powerLevel: null, muted: false, revision: 0, accessRevision: 0, updatedAt: 1 }));
     assert.equal(value(repositories.agentRoomGrant.find({ agentId: 'agent', roomId: '!room:test' }))?.muted, false);
     assert.equal(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'policy.manage', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }).ok, false);
     value(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }));

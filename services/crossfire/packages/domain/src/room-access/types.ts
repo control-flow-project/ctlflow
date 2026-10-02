@@ -4,6 +4,8 @@ export type AgentRoomGrant = {
   generation: string;
   authorizerId: string;
   addedById: string;
+  invitationEventId: string | null;
+  admissionKind: 'managed' | 'invitation';
   accessMode: 'none' | 'read' | 'reply' | 'custom';
   powerLevel: number | null;
   muted: boolean;
@@ -29,6 +31,7 @@ export type RoomGrantApplication = {
   appliedRevision: number | null;
   appliedAccessRevision: number | null;
   membership: 'join' | 'leave' | 'invite' | 'ban' | null;
+  creator: boolean;
   powerLevel: number | null;
   lastAttemptAt: number | null;
   lastSuccessAt: number | null;

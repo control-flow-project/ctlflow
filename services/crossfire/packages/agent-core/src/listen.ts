@@ -119,6 +119,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let activity: Awaited<ReturnType<typeof reportActivity>> | undefined;
   let completed: { batch: ReadBatch; messageIds: string[]; membership: number } | undefined;
   let pendingMessages = 0;
+  const invitations = new Map<string, number>();
   const changed = () => { revision++; wake?.(); };
   async function retry<Result>(operation: () => Promise<Result>, scope = signal): Promise<Result> {
     for (let failures = 0; ; failures++) {
@@ -270,9 +271,26 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         await work(async (client, scope) => {
         const synced = await retry(() => synchronize(client, since, Math.min(options.pollMs, Math.floor(options.reconcileMs / 2))), scope);
         controlling = true;
+        for (const room of Object.keys(synced.rooms?.invite ?? {})) if (!invitations.has(room)) invitations.set(room, -Infinity);
+        for (const room of [...Object.keys(synced.rooms?.join ?? {}), ...Object.keys(synced.rooms?.leave ?? {})]) invitations.delete(room);
+        let invitationAccepted = false;
+        if (invitations.size) {
+          let attempted = 0;
+          for (const [room, previousAttempt] of invitations) {
+            if (performance.now() - previousAttempt < options.reconcileMs) continue;
+            if (attempted++ >= 10) break;
+            invitations.set(room, performance.now());
+            const accepted = await options.coordination.acceptInvitation(options.id, room, scope);
+            if (!accepted.ok) {
+              if (['forbidden', 'missing', 'conflict', 'limit'].includes(accepted.error.code)) continue;
+              throw Object.assign(new Error(accepted.error.message), { code: accepted.error.code });
+            }
+            if (accepted.value.accepted) { invitations.delete(room); invitationAccepted = true; }
+          }
+        }
         const membership = new Set(await joinedRooms(client));
         const membershipChanged = membership.size !== joined.size || [...joined].some(room => !membership.has(room));
-        const accessChanged = membershipChanged || performance.now() - lastAccess >= options.reconcileMs ? await retry(() => access(scope), scope) : false;
+        const accessChanged = invitationAccepted || membershipChanged || performance.now() - lastAccess >= options.reconcileMs ? await retry(() => access(scope), scope) : false;
         const humans = (await retry(() => humanEvents(client, options.settings, synced, since, selected), scope))
           .filter(event => allowed.has(event.room_id));
         const reset = await retry(() => membershipResets(client, synced, options.account, since), scope);

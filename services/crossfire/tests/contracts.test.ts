@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AGENT_INSTRUCTIONS_MAX_BYTES, DEFAULT_AGENT_INSTRUCTIONS } from "@crossfire/contracts/policy";
 import { roomId } from "@crossfire/contracts/validation";
-import { deliveryGrant, policy, deliveryPolicy } from "@crossfire/contracts/schema/response";
+import { deliveryGrant, policy, deliveryPolicy, roomAuthority, grantApplication } from "@crossfire/contracts/schema/response";
 import { agents as agentFilters } from "@crossfire/contracts/schema/query";
 import { page } from "@crossfire/contracts/schema/query";
 import { memberChange } from '@crossfire/contracts/schema/request';
@@ -15,6 +15,21 @@ test("native room identities remain opaque, including version 12 IDs", () => {
   assert.equal(roomId("!native:example.org"), true);
   for (const invalid of ["", "!", "room", "!room id", "!room\n"]) assert.equal(roomId(invalid), false);
   assert.equal(deliveryGrant({ roomId: room, accessMode: "read", powerLevel: null, muted: false }).ok, true);
+});
+
+test('room authority and observations distinguish immutable creators from finite power levels', () => {
+  const authority = { matrixUserId: '@alice:test.localhost', powerLevel: null, creator: true, creatorIds: ['@alice:test.localhost'],
+    readLevel: -1, replyLevel: 0, inviteLevel: 0, kickLevel: 50, changePowerLevel: 50, nativePermissions: [] };
+  assert(roomAuthority(authority).ok);
+  assert(roomAuthority({ ...authority, creator: false, powerLevel: 0 }).ok);
+  assert.equal(roomAuthority({ ...authority, powerLevel: 100 }).ok, false);
+  assert.equal(roomAuthority({ ...authority, creator: false }).ok, false);
+  const observation = { observedGeneration: null, appliedRevision: null, appliedAccessRevision: null, membership: 'join',
+    creator: true, powerLevel: null, lastAttemptAt: null, lastSuccessAt: null, errorCode: null, errorMessage: null };
+  assert(grantApplication(observation).ok);
+  assert(grantApplication({ ...observation, creator: false, membership: null }).ok);
+  assert(grantApplication({ ...observation, creator: false, powerLevel: 0 }).ok);
+  assert.equal(grantApplication({ ...observation, powerLevel: 100 }).ok, false);
 });
 
 test('member labels retain every accepted signup username across requests and owner views', () => {

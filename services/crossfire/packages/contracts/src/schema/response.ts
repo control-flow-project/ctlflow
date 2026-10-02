@@ -32,10 +32,11 @@ export const wakePolicy = check.object({ agentId: check.identifier, revision: ch
 export const grant = check.object({ agentId: check.identifier, roomId: check.roomId, generation: check.identifier, authorizerId: check.identifier,
   addedById: check.identifier, accessMode: check.choice('none', 'read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)),
   muted: check.boolean, revision: check.integer(), accessRevision: check.integer(), updatedAt: check.integer() });
-export const grantApplication = check.object({ observedGeneration: check.nullable(check.identifier), appliedRevision: check.nullable(check.integer()),
-  appliedAccessRevision: check.nullable(check.integer()), membership: check.nullable(check.choice('join', 'invite', 'leave', 'ban')),
+export const grantApplication = check.refine(check.object({ observedGeneration: check.nullable(check.identifier), appliedRevision: check.nullable(check.integer()),
+  appliedAccessRevision: check.nullable(check.integer()), membership: check.nullable(check.choice('join', 'invite', 'leave', 'ban')), creator: check.boolean,
   powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), lastAttemptAt: check.nullable(check.integer()), lastSuccessAt: check.nullable(check.integer()),
-  errorCode: check.nullable(check.text(100)), errorMessage: check.nullable(check.text(4096)) });
+  errorCode: check.nullable(check.text(100)), errorMessage: check.nullable(check.text(4096)) }),
+  application => !application.creator || application.powerLevel === null, 'Native creators have no finite power level');
 export const grantView = check.object({ agentId: check.identifier, revision: check.integer(), grant: check.nullable(grant),
   application: check.nullable(grantApplication), permissions: check.list(check.choice('room.agent.invite'), 1),
   allowedActions: check.list(check.choice('set', 'remove', 'permissions.set'), 3) });
@@ -49,10 +50,11 @@ export const deliveryPolicy = check.refine(check.object({ agentId: check.identif
   && policy.roomGrants.every(grant => (grant.accessMode === 'custom') === (grant.powerLevel !== null))
   && (policy.status !== 'active' || policy.ownerStatus !== 'active' || policy.wakeMode === 'nobody' ? policy.senderMatrixIds.length === 0
     : policy.wakeMode === 'selected' || policy.senderMatrixIds.includes(policy.ownerMatrixId)), 'Invalid resolved delivery authority');
-export const roomAuthority = check.object({ matrixUserId: check.matrixUserId, powerLevel: check.integer(Number.MIN_SAFE_INTEGER), creator: check.boolean,
+export const roomAuthority = check.refine(check.object({ matrixUserId: check.matrixUserId, powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), creator: check.boolean,
   creatorIds: check.list(check.matrixUserId, 100), readLevel: check.integer(Number.MIN_SAFE_INTEGER), replyLevel: check.integer(Number.MIN_SAFE_INTEGER),
   inviteLevel: check.integer(Number.MIN_SAFE_INTEGER), kickLevel: check.integer(Number.MIN_SAFE_INTEGER), changePowerLevel: check.integer(Number.MIN_SAFE_INTEGER),
-  nativePermissions: check.list(check.object({ action: check.text(255), level: check.integer(Number.MIN_SAFE_INTEGER) }), 1000) });
+  nativePermissions: check.list(check.object({ action: check.text(255), level: check.integer(Number.MIN_SAFE_INTEGER) }), 1000) }),
+  authority => authority.creator === (authority.powerLevel === null), 'Native creator authority has no finite power level');
 export const room = check.object({ roomId: check.roomId, name: check.text(255), topic: check.text(4096, 0), alias: check.nullable(check.text(255)),
   authority: check.nullable(roomAuthority) });
 export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, outcome: check.choice('claimed', 'existing', 'failed'),

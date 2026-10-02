@@ -24,13 +24,14 @@ export function createRoomGrantApplicationRepository(database: Database.Database
       applied_revision: params.appliedRevision,
       applied_access_revision: params.appliedAccessRevision,
       membership: params.membership,
+      creator: params.creator,
       power_level: params.powerLevel,
       last_attempt_at: params.lastAttemptAt,
       last_success_at: params.lastSuccessAt,
       next_check_at: params.nextCheckAt,
       error_code: params.errorCode,
       error_message: params.errorMessage,
-        }), value);
+        }), { ...value, creator: value.creator ? 1 : 0 });
         return success(undefined);
       });
     },
@@ -41,13 +42,14 @@ export function createRoomGrantApplicationRepository(database: Database.Database
       applied_revision: params.appliedRevision,
       applied_access_revision: params.appliedAccessRevision,
       membership: params.membership,
+      creator: params.creator,
       power_level: params.powerLevel,
       last_attempt_at: params.lastAttemptAt,
       last_success_at: params.lastSuccessAt,
       next_check_at: params.nextCheckAt,
       error_code: params.errorCode,
       error_message: params.errorMessage,
-        }).where(row => row.agent_id === params.agentId && row.room_id === params.roomId), value);
+        }).where(row => row.agent_id === params.agentId && row.room_id === params.roomId), { ...value, creator: value.creator ? 1 : 0 });
         return changed === 1 ? success(undefined) : failure('missing', 'RoomGrantApplication not found');
       });
     },

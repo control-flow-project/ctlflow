@@ -91,7 +91,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   database.transaction(() => {
     for (let roomIndex = 0; roomIndex < 200; roomIndex++) value(repositories.agentRoomGrant.insert({
       agentId, roomId: '!room-' + String(roomIndex).padStart(3, '0') + ':test', generation: 'generation-' + roomIndex,
-      authorizerId: 'owner-2', addedById: 'owner-2', accessMode: 'reply', powerLevel: null,
+      authorizerId: 'owner-2', addedById: 'owner-2', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', powerLevel: null,
       muted: false, revision: 0, accessRevision: 0, updatedAt: 1,
     }));
   })();

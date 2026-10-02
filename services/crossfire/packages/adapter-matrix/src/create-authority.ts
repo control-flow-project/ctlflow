@@ -1,14 +1,16 @@
 import { authority, type Config } from './account/authority.js';
-import { joined, roomFacts } from './room/facts.js';
+import { joined, roomFacts, roomCreators, roomPowers } from './room/facts.js';
+import { createInvitationReader, invitationEvent } from './room/invitation.js';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { MatrixAuthority, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';
 import { API, segment } from '@crossfire/contracts/matrix';
-import { nativeOk, nativeRequest } from './http.js';
+import { nativeOk, nativeRequest, nativeState } from './http.js';
 import { object, text, userId } from '@crossfire/contracts/validation';
 import { LISTENER_NOTICE, isListenerNotice } from '@crossfire/contracts/notices';
 
 export function createMatrixAuthority(config: Config): MatrixAuthority {
   const accounts = authority(config);
+  const invitationSender = createInvitationReader();
   async function room(matrixUserId: string, roomId: string): Promise<Result<RoomFacts>> {
     const client = await accounts.asUser(matrixUserId);
     if (!client.ok) return client;
@@ -25,27 +27,34 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
       ...Object.entries(events.value).filter(([action]) => !['m.room.message', 'm.reaction'].includes(action)).map(([action, value]) => ({ action, level: Number(value) }))];
     if (!Number.isSafeInteger(readLevel) || nativePermissions.some(permission => !Number.isSafeInteger(permission.level))) return failure('native', 'Invalid native permission levels');
     return success({ roomId, name: facts.value.name, topic: facts.value.topic, alias: facts.value.alias, matrixUserId,
-      powerLevel: facts.value.ownerLevel, creator: facts.value.ownerCreator, creatorIds: facts.value.creators,
+      ...(facts.value.ownerCreator ? { powerLevel: null, creator: true as const } : { powerLevel: facts.value.ownerLevel, creator: false as const }), creatorIds: facts.value.creators,
       readLevel, replyLevel: Math.max(facts.value.message, facts.value.reaction), inviteLevel: Number(powers.invite ?? 0),
       kickLevel: Number(powers.kick ?? 50), changePowerLevel: Number(events.value['m.room.power_levels'] ?? powers.state_default ?? 50), nativePermissions });
   }
-  async function membership(matrixUserId: string, targetMatrixId: string, roomId: string): Promise<Result<RoomMembership>> {
+  async function membershipState(matrixUserId: string, targetMatrixId: string, roomId: string): Promise<Result<{ member: RoomMembership; readLevel: number; replyLevel: number }>> {
     const client = await accounts.asUser(matrixUserId);
     if (!client.ok) return client;
-    const base = API + '/rooms/' + segment(roomId) + '/state/';
-    const membership = await nativeRequest(client.value, 'GET', base + 'm.room.member/' + segment(targetMatrixId));
-    if (!membership.ok) return membership;
-    if (membership.value.status !== 200 && membership.value.status !== 404) return failure('native', 'Native membership could not be read');
-    const content = membership.value.body;
-    const current = membership.value.status === 404 ? 'leave' : content.membership;
+    const state = await nativeState(client.value, roomId);
+    if (!state.ok) return state;
+    const content = state.value.find(event => event.type === 'm.room.member' && event.state_key === targetMatrixId)?.content;
+    const current = content?.membership ?? 'leave';
     if (current !== 'join' && current !== 'invite' && current !== 'leave' && current !== 'ban') return failure('native', 'Unsupported native membership');
-    const powers = await nativeOk(client.value, 'GET', base + 'm.room.power_levels');
-    if (!powers.ok) return powers;
-    const users = object(powers.value.users ?? {});
-    if (!users.ok) return failure('native', 'Invalid native user power levels');
-    const level = users.value[targetMatrixId] ?? powers.value.users_default ?? 0;
-    if (typeof level !== 'number' || !Number.isSafeInteger(level)) return failure('native', 'Invalid native power level');
-    return success({ matrixUserId: targetMatrixId, displayName: text(content.displayname, 255) ? content.displayname : targetMatrixId, membership: current, powerLevel: level });
+    const powers = state.value.find(event => event.type === 'm.room.power_levels' && event.state_key === '')?.content;
+    if (!powers) return failure('native', 'Native room power levels are missing');
+    const levels = roomPowers(powers, targetMatrixId);
+    if (!levels.ok) return levels;
+    const creators = roomCreators(state.value);
+    if (!creators.ok) return creators;
+    const identity: Pick<RoomMembership, 'matrixUserId' | 'displayName' | 'membership'> = {
+      matrixUserId: targetMatrixId, displayName: text(content?.displayname, 255) ? content.displayname : targetMatrixId, membership: current };
+    const member: RoomMembership = creators.value.includes(targetMatrixId) ? { ...identity, creator: true, powerLevel: null }
+      : { ...identity, creator: false, powerLevel: levels.value.ownerLevel };
+    return success({ member, readLevel: Math.min(levels.value.ceiling, levels.value.ordinary - 1, levels.value.message - 1, levels.value.reaction - 1),
+      replyLevel: Math.max(levels.value.message, levels.value.reaction) });
+  }
+  async function membership(matrixUserId: string, targetMatrixId: string, roomId: string): Promise<Result<RoomMembership>> {
+    const result = await membershipState(matrixUserId, targetMatrixId, roomId);
+    return result.ok ? success(result.value.member) : result;
   }
   async function leave(matrixUserId: string, roomId: string): Promise<Result<void>> {
     const client = await accounts.asUser(matrixUserId);
@@ -73,18 +82,39 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
     },
     async joined(matrixUserId) { const client = await accounts.asUser(matrixUserId); return client.ok ? joined(client.value) : client; },
     room, membership, leave,
-    async setRoomAccess(authorizerMatrixId, targetMatrixId, roomId, powerLevel, admit) {
+    async invitation(matrixUserId, roomId) {
+      const target = await accounts.asUser(matrixUserId);
+      if (!target.ok) return target;
+      const sender = await invitationSender(target.value, matrixUserId, roomId);
+      if (!sender.ok || sender.value === null) return sender.ok ? success(null) : sender;
+      if (!sender.value.endsWith(':' + config.serverName)) return failure('forbidden', 'The native inviter must be a local Crossfire identity');
+      const authorizer = await accounts.asUser(sender.value);
+      return authorizer.ok ? invitationEvent(authorizer.value, matrixUserId, roomId, sender.value) : authorizer;
+    },
+    async setRoomAccess(authorizerMatrixId, targetMatrixId, roomId, access, admission) {
+      const { powerLevel } = access;
       const facts = await room(authorizerMatrixId, roomId);
       if (!facts.ok) return facts;
       if (!Number.isSafeInteger(powerLevel) || !facts.value.creator && powerLevel > facts.value.powerLevel) return failure('forbidden', 'Requested power exceeds native authority');
-      if (facts.value.creatorIds.includes(targetMatrixId)) return failure('forbidden', 'Native creator authority cannot be restricted by an agent grant');
+      if (facts.value.creatorIds.includes(targetMatrixId) && access.mode !== 'reply') return failure('forbidden', 'Native creator authority cannot be restricted by an agent grant');
+      if (!facts.value.creatorIds.includes(targetMatrixId) && access.mode === 'reply' && powerLevel < facts.value.replyLevel) return failure('forbidden', 'Read-and-reply access requires native reply authority');
       const current = await membership(authorizerMatrixId, targetMatrixId, roomId);
       if (!current.ok) return current;
-      if (!admit && current.value.membership !== 'join') return current;
+      if (admission === null && current.value.membership !== 'join') return current;
       const client = await accounts.asUser(authorizerMatrixId);
       if (!client.ok) return client;
+      const authorizedClient = client.value;
       const path = API + '/rooms/' + segment(roomId);
-      if (current.value.powerLevel !== powerLevel) {
+      async function verifyInvitation(): Promise<Result<void>> {
+        if (admission?.kind !== 'invitation' || current.ok && current.value.membership === 'join') return success(undefined);
+        if (admission.senderMatrixId !== authorizerMatrixId) return failure('forbidden', 'Native invitation authority does not match');
+        const invitation = await invitationEvent(authorizedClient, targetMatrixId, roomId, authorizerMatrixId);
+        return !invitation.ok ? invitation : invitation.value?.eventId === admission.eventId ? success(undefined)
+          : failure('conflict', 'Native invitation was withdrawn or replaced');
+      }
+      const verified = await verifyInvitation();
+      if (!verified.ok) return verified;
+      if (!current.value.creator && current.value.powerLevel !== powerLevel) {
         const powers = await nativeOk(client.value, 'GET', path + '/state/m.room.power_levels');
         if (!powers.ok) return powers;
         const users = object(powers.value.users ?? {});
@@ -93,16 +123,26 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
         if (!result.ok) return result;
       }
       if (current.value.membership !== 'join') {
-        const invited = await inviteToRoom(authorizerMatrixId, roomId, targetMatrixId);
-        if (!invited.ok) return invited;
+        if (admission?.kind === 'managed') {
+          const invited = await inviteToRoom(authorizerMatrixId, roomId, targetMatrixId);
+          if (!invited.ok) return invited;
+        } else {
+          const currentInvitation = await verifyInvitation();
+          if (!currentInvitation.ok) return currentInvitation;
+        }
         const target = await accounts.asUser(targetMatrixId);
         if (!target.ok) return target;
         const accepted = await nativeOk(target.value, 'POST', path + '/join', {});
         if (!accepted.ok) return accepted;
       }
-      const checked = await membership(authorizerMatrixId, targetMatrixId, roomId);
-      return checked.ok && (checked.value.membership !== 'join' || checked.value.powerLevel !== powerLevel)
-        ? failure('native', 'Native room application was not confirmed') : checked;
+      const checked = await membershipState(authorizerMatrixId, targetMatrixId, roomId);
+      if (!checked.ok) return checked;
+      const member = checked.value.member;
+      if (member.membership !== 'join' || (member.creator ? access.mode !== 'reply' : member.powerLevel !== powerLevel
+        || access.mode === 'reply' && member.powerLevel < checked.value.replyLevel || access.mode === 'read' && member.powerLevel > checked.value.readLevel)) {
+        return failure('native', 'Native room membership and requested permissions were not confirmed');
+      }
+      return success(member);
     },
     async event(matrixUserId, roomId, eventId) {
       const client = await accounts.asUser(matrixUserId);
