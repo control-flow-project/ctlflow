@@ -15,7 +15,7 @@ async function invitedFixture(scope: TestContext) {
   const fixture = await applicationFixture(scope), owner = await fixture.member('alice');
   const target = await fixture.agent(owner.actor, 'ada'), roomId = value(await fixture.native.createRoom(owner.member.principal.matrixUserId, 'Matter')).roomId;
   fixture.native.rooms.get(roomId)!.members.set(target.matrixUserId, { matrixUserId: target.matrixUserId, displayName: 'Ada', membership: 'invite', creator: false, powerLevel: 0 });
-  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$original-invite', senderMatrixId: owner.member.principal.matrixUserId });
+  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$original-invite', senderMatrixId: owner.member.principal.matrixUserId, direct: false });
   return { ...fixture, owner, target, roomId };
 }
 
@@ -53,7 +53,7 @@ test('native invitation admission rechecks owner and target authority after nati
     services.matrix.room = async (...input) => {
       const facts = await original(...input);
       if (changed === 'owner') value(changeMember(services, admin.actor, owner.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
-      else value(changeAgent(services, owner.actor, target.id, { expectedRevision: 1, status: 'revoked' }, randomUUID()));
+      else value(changeAgent(services, owner.actor, target.id, { expectedRevision: 0, status: 'revoked' }, randomUUID()));
       return facts;
     };
     const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
@@ -98,16 +98,16 @@ test('withdrawing delegation during a native invitation check prevents a cross-o
   const other = await fixture.member('bob'), inviter = await fixture.agent(other.actor, 'jo');
   fixture.native.rooms.get(roomId)!.members.set(admin.member.principal.matrixUserId, {
     matrixUserId: admin.member.principal.matrixUserId, displayName: 'Admin', membership: 'join', creator: false, powerLevel: 100 });
-  const assigned = value(await changeRoomGrant(services, admin.actor, { agentId: inviter.id, roomId, expectedRevision: 1,
+  const assigned = value(await changeRoomGrant(services, admin.actor, { agentId: inviter.id, roomId, expectedRevision: 0,
     expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
   value(await reconcileRoomGrant(services, inviter.id, roomId));
-  value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: 2,
+  value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: 1,
     expectedGeneration: assigned.generation, permissions: ['room.agent.invite'] }, randomUUID()));
-  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$delegated-invite', senderMatrixId: inviter.matrixUserId });
+  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$delegated-invite', senderMatrixId: inviter.matrixUserId, direct: false });
   const original = services.matrix.room;
   services.matrix.room = async (...input) => {
     const facts = await original(...input);
-    value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: 3,
+    value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: 2,
       expectedGeneration: assigned.generation, permissions: [] }, randomUUID()));
     return facts;
   };
@@ -159,17 +159,17 @@ test('a delegated agent cannot take over another principal’s durable addition 
   const previous = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }))!;
   const other = await fixture.member('bob'), inviter = await fixture.agent(other.actor, 'jo');
   const assigned = value(await changeRoomGrant(services, owner.actor, { agentId: target.id, roomId,
-    expectedRevision: 2, expectedGeneration: previous.generation, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
+    expectedRevision: 1, expectedGeneration: previous.generation, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
   assert.equal(assigned.grant?.addedById, owner.actor.principalId);
   const adminId = fixture.admin.member.principal.matrixUserId;
   fixture.native.rooms.get(roomId)!.members.set(adminId, { matrixUserId: adminId, displayName: 'Admin', membership: 'join', creator: false, powerLevel: 100 });
-  const delegated = value(await changeRoomGrant(services, fixture.admin.actor, { agentId: inviter.id, roomId, expectedRevision: 1,
+  const delegated = value(await changeRoomGrant(services, fixture.admin.actor, { agentId: inviter.id, roomId, expectedRevision: 0,
     expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
   value(await reconcileRoomGrant(services, inviter.id, roomId));
-  value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: 2,
+  value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: 1,
     expectedGeneration: delegated.generation, permissions: ['room.agent.invite'] }, randomUUID()));
   fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)!.membership = 'invite';
-  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$replacement-from-jo', senderMatrixId: inviter.matrixUserId });
+  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$replacement-from-jo', senderMatrixId: inviter.matrixUserId, direct: false });
   const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
   assert(!accepted.ok);
   assert.equal(accepted.error.code, 'forbidden');

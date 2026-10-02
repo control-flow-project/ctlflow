@@ -22,8 +22,9 @@ fleet start research
 ```
 
 First enrollment uses one human-approved roster. Later starts reuse identities,
-native sessions and unread positions automatically. Every active agent gets a
-private owner DM; additional rooms are explicit.
+native sessions and unread positions automatically. Startup creates no chats.
+Private owner DMs open on first contact or native permission request;
+additional rooms are explicit.
 
 Codex defaults to `danger-full-access` and `on-request`. Sandbox, approval
 policy, model and reasoning remain configurable in the definition's

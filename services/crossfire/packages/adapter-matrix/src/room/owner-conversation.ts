@@ -27,6 +27,20 @@ async function privateConversation(client: Native, owner: string, agent: string,
   return ownerConversationState(state.value, owner, agent);
 }
 
+export async function verifyOwnerConversation(accounts: Authority, owner: string, agent: string, room: string): Promise<Result<void>> {
+  if (!userId(owner) || !userId(agent) || !roomId(room) || owner === agent) return failure('invalid', 'Invalid owner conversation identities');
+  const client = await accounts.asUser(owner);
+  return client.ok ? privateConversation(client.value, owner, agent, room) : client;
+}
+
+async function conversationName(client: Native, agent: string): Promise<Result<string>> {
+  const profile = await nativeOk(client, 'GET', API + '/profile/' + segment(agent) + '/displayname');
+  if (!profile.ok) return profile;
+  const name = profile.value.displayname;
+  return typeof name === 'string' && name.trim().length > 0 && name.length <= 255 ? success(name)
+    : failure('native', 'Invalid native agent display name');
+}
+
 async function markDirect(client: Native, identity: string, counterpart: string, room: string): Promise<Result<void>> {
   const current = await directRooms(client, identity);
   if (!current.ok) return current;
@@ -59,8 +73,10 @@ export function createOwnerConversations(accounts: Authority, serverName: string
       let existing = await nativeRequest(ownerClient.value, 'GET', aliasPath);
       if (!existing.ok) return existing;
       if (existing.value.status === 404) {
+        const name = await conversationName(ownerClient.value, agent);
+        if (!name.ok) return name;
         const created = await nativeRequest(ownerClient.value, 'POST', API + '/createRoom', {
-          preset: 'private_chat', visibility: 'private', is_direct: true, room_alias_name: localAlias, invite: [agent],
+          preset: 'private_chat', visibility: 'private', is_direct: true, name: name.value, room_alias_name: localAlias, invite: [agent],
           power_level_content_override: { invite: 100 },
         });
         if (!created.ok) return created;
@@ -79,6 +95,14 @@ export function createOwnerConversations(accounts: Authority, serverName: string
     if (!verified.ok) return verified;
     const members = await nativeState(ownerClient.value, room);
     if (!members.ok) return members;
+    const title = members.value.find(event => event.type === 'm.room.name' && event.state_key === '')?.content.name;
+    if (title !== undefined && typeof title !== 'string') return failure('native', 'Invalid native conversation name');
+    if (title === undefined || typeof title === 'string' && !title.trim()) {
+      const name = await conversationName(ownerClient.value, agent);
+      if (!name.ok) return name;
+      const named = await nativeOk(ownerClient.value, 'PUT', API + '/rooms/' + segment(room) + '/state/m.room.name', { name: name.value });
+      if (!named.ok) return named;
+    }
     for (const [identity, client] of [[owner, ownerClient.value], [agent, agentClient.value]] as const) {
       const membership = members.value.find(event => event.type === 'm.room.member' && event.state_key === identity)?.content.membership;
       if (membership === 'ban') {

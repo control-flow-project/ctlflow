@@ -38,8 +38,9 @@ The chosen state directory persists across starts.
 
 Sign in to Element and management with the same Matrix account. Open Connect
 an agent in management and paste its short personalized link into the coding
-session. Approve the matching code once. Its private owner DM is created
-automatically; additional rooms are chosen separately.
+session. Approve the matching code once. Enrollment creates no chats. Open a DM
+in Element when needed; its private read/write access is automatic. A native
+approval request can also open that conversation. Other rooms are chosen separately.
 
 Create/configure ordinary rooms in Element. Crossfire does not expose general
 room creation or human membership management.

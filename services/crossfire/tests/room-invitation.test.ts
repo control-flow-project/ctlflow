@@ -37,10 +37,10 @@ test('native room and direct-message invitations use the canonical grant authori
   await scope.test('an owner invite is pending until acceptance, then grants actual reading and replies', async () => {
     const roomId = await create(owner.token);
     await invite(owner.token, roomId);
-    const ownerRoom = value(services.repositories.ownerConversation.find({ agentId: target.id }))!.roomId;
-    assert.deepEqual(value(await services.matrix.joined(target.matrixUserId)), [ownerRoom]);
+    assert.equal(value(services.repositories.ownerConversation.find({ agentId: target.id })), null);
+    assert.deepEqual(value(await services.matrix.joined(target.matrixUserId)), []);
     assert.equal(grant(roomId), null);
-    assert.deepEqual(value(deliveryPolicy(services, target.actor, target.id)).grants.map(grant => grant.roomId), [ownerRoom]);
+    assert.deepEqual(value(deliveryPolicy(services, target.actor, target.id)).grants, []);
     const proof = value(await services.matrix.invitation(target.matrixUserId, roomId));
     assert(proof);
     assert(proof.eventId.startsWith('$'));
@@ -80,6 +80,7 @@ test('native room and direct-message invitations use the canonical grant authori
     assert.equal(response.status, 200, await response.clone().text());
     assert.equal(grant(roomId)?.accessMode, 'reply');
     assert.equal(grant(roomId)?.muted, false);
+    assert.equal(value(services.repositories.ownerConversation.find({ agentId: target.id }))!.roomId, roomId);
     value(await native(target.token, 'PUT', '/rooms/' + segment(roomId) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body: 'Direct reply' }));
     assert.equal(value(services.repositories.agent.find({ principalId: target.id }))?.wakeMode, 'owner');
     assert.deepEqual(value(deliveryPolicy(services, target.actor, target.id)).wake.senders, [ownerId]);

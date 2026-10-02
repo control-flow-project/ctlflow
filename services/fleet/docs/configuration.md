@@ -49,7 +49,8 @@ be distinct. Work areas are non-overlapping relative children of
 `agents/<definition>/workarea/`; symlinked or unsafe private paths fail.
 
 The coordination block supplies server/owner once. It contains no approval room,
-runtime transport, session UUID or secret. The private owner DM is automatic.
+runtime transport, session UUID or secret. The private owner DM opens automatically
+on first owner contact or native permission request, not at fleet startup.
 
 ## agent.toml
 

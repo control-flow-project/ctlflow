@@ -20,18 +20,18 @@ export function Connect({ fleet = false }: { fleet?: boolean }) {
     {fleet ? <section className="setup-step"><div><h2>Configure the controller</h2><p>Fleets run on Linux. The controller connects every agent without model calls; one approval covers the roster.</p>
       <CopyText label="Coordination settings for runtime.toml" value={'[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(location.origin) + '\nowner = ' + JSON.stringify(member.matrixUserId)} buttonLabel="Copy fleet configuration" copiedMessage="Copied. Add to the fleet’s runtime.toml."/>
       <p>Run <code>fleet add /absolute/path/to/fleet</code>, then <code>fleet start FLEET_NAME</code>. Open the approval link shown by the CLI and confirm its code.</p>
-      <p>Use the same start command later. Saved identities and sessions resume automatically. Each agent gets a private owner DM; additional room access is a separate choice.</p><a href="/manage/fleets">View fleets →</a></div></section> : <>
+      <p>Use the same start command later. Saved identities and sessions resume automatically. Starting a fleet creates no chats. Open a DM or invite an agent when you need it.</p><a href="/manage/fleets">View fleets →</a></div></section> : <>
       <section className="setup-step"><SetupPicture step={1}/><div><span className="step-label">STEP 1</span><h2>Paste one line into your coding agent</h2>
         <p>Open your project in Codex, Claude Code or Pi. Paste the line below. Your agent reads the guide, checks what it needs and connects this session.</p>
         <CopyText rows={2} label="Instructions for your agent" value={'Follow the setup instructions at ' + guide + '.'}/>
         <p className="support">First time? It asks what to call the agent. Reconnecting or updating? It finds and reuses the account saved privately in this project.</p></div></section>
       <section className="setup-step"><SetupPicture step={2}/><div><span className="step-label">STEP 2 · FIRST SETUP ONLY</span><h2>Approve your agent</h2>
         <p>Your agent gives you a private approval link and a verification code. Open the link, check the name and enter that code. Connection continues automatically.</p>
-        <p>Approval creates its account and a private read/write DM with you. Reconnecting an approved agent doesn’t require another approval.</p><a href="/manage/enrollments">Review enrollment requests →</a></div></section>
+        <p>Approval creates its account, not a chat. Reconnecting an approved agent doesn’t require another approval.</p><a href="/manage/enrollments">Review enrollment requests →</a></div></section>
       <section className="setup-step"><SetupPicture step={3}/><div><span className="step-label">STEP 3 · YOUR CHOICE</span><h2>Choose where it can listen</h2>
         <p>See the reporting listener on your agent’s page. Your agent also runs a connection test without prompting the model.</p>
-        <p>Your private owner DM is ready automatically. Invite your agent to other rooms in Element for read-and-reply access, or assign access from its agent page.</p>
-        <p>Wake-up rules decide whose messages trigger work. No shared rooms are joined automatically. Codex tool approval requests go only to your private DM.</p>
+        <p>Open a DM with your agent in Element when you want to talk. That private conversation gets permanent read/write access automatically. Invite it to other rooms or assign access from its agent page.</p>
+        <p>Wake-up rules decide whose messages trigger work. No chats are created at startup. A Codex approval request opens your private DM only when needed.</p>
         <div className="actions"><a className="button" href="/manage/agents">View agents →</a><a className="button" href="/">Open Element →</a></div></div></section>
     </>}
     <details className="setup-details"><summary>Requirements &amp; optional launcher</summary><p>Node.js 26+, Git, Bash and curl are required, with Codex 0.158.0+, Claude Code 2.1.285+ or Pi 0.99.1+. The guide helps your agent check prerequisites with your permission.</p>

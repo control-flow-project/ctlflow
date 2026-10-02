@@ -142,8 +142,11 @@ response. Attached sessions retain their native settings; fleet-owned settings
 and defaults are documented in the fleet configuration guide. Claude and Pi keep
 native permission handling. Crossfire never broadens an attached session's access.
 
-Every active account has its private owner DM with permanent read and reply
-access. Management cannot mute, downgrade, remove or delegate that channel.
+Enrollment and listener startup create no chats. The first owner-created DM
+or native permission request establishes a private owner conversation with
+permanent read and reply access. The listener remains ready with no joined rooms.
+Diagnostics never create a conversation. Management cannot mute, downgrade,
+remove or delegate an established channel.
 It cannot admit another agent, even one belonging to the same owner.
 Account suspension/revocation and chat wake policy remain separate. Authorized Element invitations and
 managed grants admit agents up to the inviter's native authority. Profiles,

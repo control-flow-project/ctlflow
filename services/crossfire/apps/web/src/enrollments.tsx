@@ -15,7 +15,7 @@ function Approval({ item }: { item: EnrollmentView }) {
       <tr key={instance.instanceKey}><td>{instance.instanceKey}</td><td>{instance.requestedName}</td><td><Status value={instance.outcome}/></td><td>{instance.failureCode ?? ''}
         {instance.agentId && <a href={'/manage/agents/' + instance.agentId}>Agent details →</a>}</td></tr>)}</tbody></table></div>}</PageItems>
     {pending && <form onSubmit={event => { event.preventDefault(); void action.run(() => decide('approve')); }}>
-      <p>Verify the exact roster and code printed by your project or fleet controller. New agents get a <strong>private owner DM</strong>, with no additional rooms. Fleet approval authorizes its controller to manage this grouping, not shared-room access.</p>
+      <p>Verify the exact roster and code printed by your project or fleet controller. New agents join no rooms. Your private DM opens on first use and keeps read/write access. Fleet approval authorizes its controller to manage this grouping, not shared-room access.</p>
       <label className="bounded-form">Verification code<input value={code} onChange={event => setCode(event.target.value.toUpperCase())} required minLength={12} maxLength={12} autoComplete="off" className="mono"/></label>
       <Alert>{action.error}</Alert><div className="actions"><button disabled={action.pending || request.ownerId !== viewer.member.memberId}>Approve roster</button>
         <button type="button" disabled={action.pending || code.length !== 12} onClick={() => { if (confirm('Reject this exact request?')) void action.run(() => decide('reject')); }}>Reject</button></div>

@@ -8,6 +8,7 @@ import { resolveWakePolicy } from '@crossfire/domain/wake/resolve-policy';
 import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
 import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
 import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
+import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
 import { reportListener } from '@crossfire/domain/listener/report';
 import { WAKE_POLICIES } from '@crossfire/contracts/wake';
 import { fleetMap as mapSchema, type FleetMapView } from '@crossfire/contracts/schema/fleet-map';
@@ -21,6 +22,8 @@ import { httpFixture } from './support/http.js';
 async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const { fleet, instances, ready } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
+  const contacted = instances.at(-1)!.agentId!;
+  value(await connectOwnerConversation(services, { kind: 'agent', principalId: contacted }, contacted));
   const other = await fixture.member('alice'), specialist = await fixture.agent(other.actor, 'specialist');
   const rooms = [];
   for (const name of ['Credit review', 'Covenant review', 'Risk review', 'Source documents', 'Unavailable name']) rooms.push(value(await fixture.native.createRoom(admin.member.principal.matrixUserId, name)));
@@ -60,7 +63,7 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
     } } };
   const snapshot = value(await readFleetMap(dependencies, admin.actor, fleet.id));
   const map = value(mapSchema(mapRepresentation(snapshot)));
-  assert.equal(map.agents.length, 24); assert.equal(map.connections.length, 47); assert.equal(map.rooms.length, 29); assert.equal(map.sources.length, 6);
+  assert.equal(map.agents.length, 24); assert.equal(map.connections.length, 24); assert.equal(map.rooms.length, 6); assert.equal(map.sources.length, 6);
   assert.equal(batchGrants, 1); assert.equal(batchWake, 1); assert.equal(activeReads, 1); assert(maximumNative <= 4); assert(maximumNative > 1);
   assert.equal(map.rooms.find(room => room.name === null)?.alias, null);
   assert.equal(map.connections.filter(connection => connection.agentId === instances[23]!.agentId).length, 1);

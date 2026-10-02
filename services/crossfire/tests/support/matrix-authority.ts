@@ -53,6 +53,11 @@ export function matrixAuthorityFixture() {
       ownerRooms.set(agent, roomId);
       return success(roomId);
     },
+    async verifyOwnerConversation(owner, agent, roomId) {
+      const room = rooms.get(roomId);
+      return room && room.creator === owner && ![...room.members].some(([id, member]) => id !== owner && id !== agent && ['join', 'invite'].includes(member.membership))
+        ? success(undefined) : failure('forbidden', 'Invalid private owner DM');
+    },
     async room(id, roomId) { return facts(id, roomId); },
     async membership(id, targetId, roomId) {
       const authority = facts(id, roomId);

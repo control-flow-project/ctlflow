@@ -10,7 +10,7 @@ export type RoomFacts = {
 export type RoomMembership = { matrixUserId: string; displayName: string; membership: 'join' | 'invite' | 'leave' | 'ban' }
   & RoomPower;
 export type RoomAccess = { mode: 'read' | 'reply' | 'custom'; powerLevel: number };
-export type RoomInvitation = { roomId: string; eventId: string; senderMatrixId: string };
+export type RoomInvitation = { roomId: string; eventId: string; senderMatrixId: string; direct: boolean };
 export type RoomAdmission = { kind: 'managed' } | { kind: 'invitation'; eventId: string; senderMatrixId: string };
 export type MatrixEvent = { eventId: string; roomId: string; senderMatrixId: string; type: string; messageType: string | null; body: string | null; mentions: string[]; edited: boolean; control: boolean };
 export type MatrixAuthority = {
@@ -23,6 +23,7 @@ export type MatrixAuthority = {
   setDisplayName(matrixUserId: string, displayName: string): Promise<Result<void>>;
   joined(matrixUserId: string): Promise<Result<string[]>>;
   ownerConversation(ownerMatrixId: string, agentMatrixId: string, roomId: string | null): Promise<Result<string>>;
+  verifyOwnerConversation(ownerMatrixId: string, agentMatrixId: string, roomId: string): Promise<Result<void>>;
   room(matrixUserId: string, roomId: string): Promise<Result<RoomFacts>>;
   membership(matrixUserId: string, targetMatrixId: string, roomId: string): Promise<Result<RoomMembership>>;
   invitation(matrixUserId: string, roomId: string): Promise<Result<RoomInvitation | null>>;

@@ -13,7 +13,7 @@ import { failure, success, type Result } from '@crossfire/kernel/result';
 import { ownerConversationState, roomCreators, roomPowers, roomState } from '@crossfire/contracts/matrix-room';
 
 type Pending = {
-  request: string; session: string; expires: number; choices: Permission['choices'];
+  room: string; request: string; session: string; expires: number; choices: Permission['choices'];
   complete: (decision: Result<Json>) => void;
 };
 
@@ -34,9 +34,9 @@ function decisionBody(body: string): string {
 }
 
 export function permissions(options: { clock: Clock; client: Matrix; coordination: Coordination; settings: Settings; account: Account; agent: string;
-  room: string; expiresMs: number }, stop: AbortSignal) {
-  if (!roomId(options.room) || !Number.isInteger(options.expiresMs) || options.expiresMs < 1000 || options.expiresMs > 300_000) {
-    throw new Error('A verified owner DM and a 1000..300000 ms expiry are required');
+  expiresMs: number }, stop: AbortSignal) {
+  if (!Number.isInteger(options.expiresMs) || options.expiresMs < 1000 || options.expiresMs > 300_000) {
+    throw new Error('A 1000..300000 ms permission expiry is required');
   }
   stop.throwIfAborted();
   const run = randomUUID();
@@ -45,7 +45,7 @@ export function permissions(options: { clock: Clock; client: Matrix; coordinatio
   const consumed = new Set<string>();
   const publications = new Set<Promise<void>>();
   let preparing = 0;
-  const base = API + '/rooms/' + segment(options.room);
+  let conversation: string | null = null;
   async function boundary<Value>(operation: () => Promise<Value>): Promise<Result<Value>> {
     try { return success(await operation()); }
     catch (error) {
@@ -59,17 +59,23 @@ export function permissions(options: { clock: Clock; client: Matrix; coordinatio
       throw error;
     }
   }
-  async function authorize(): Promise<Result<void>> {
+  async function authorize(expectedRoom?: string, signal = stop): Promise<Result<void>> {
     if (stop.aborted) return failure('unavailable', 'Foreground permission run stopped');
-    const parsed = await options.coordination.delivery(options.agent, stop);
+    const parsed = await options.coordination.delivery(options.agent, signal);
     if (!parsed.ok) return parsed;
     const agent = parsed.value;
     if (agent.agentId !== options.agent || agent.ownerMatrixId !== options.settings.owner || agent.matrixUserId !== options.account.user_id
-      || agent.ownerConversation !== options.room
       || agent.status !== 'active' || agent.ownerStatus !== 'active'
-      || !agent.roomGrants.some(grant => grant.roomId === options.room && grant.accessMode !== 'read' && !grant.muted)) {
+      || expectedRoom !== undefined && agent.ownerConversation !== expectedRoom
+      || conversation !== null && agent.ownerConversation !== conversation) {
       return failure('forbidden', 'Approval conversation is not currently authorized');
     }
+    if (agent.ownerConversation === null) return success(undefined);
+    conversation = agent.ownerConversation;
+    if (!agent.roomGrants.some(grant => grant.roomId === conversation && grant.accessMode === 'reply' && !grant.muted)) {
+      return failure('forbidden', 'Approval conversation read and reply is not currently authorized');
+    }
+    const base = API + '/rooms/' + segment(conversation);
     const members = await boundary(() => options.client.get<{ joined: Record<string, unknown> }>(base + '/joined_members'));
     if (!members.ok) return members;
     if (!members.value.joined || !Object.hasOwn(members.value.joined, options.settings.owner)
@@ -117,14 +123,19 @@ export function permissions(options: { clock: Clock; client: Matrix; coordinatio
     publications.add(publication);
     preparing++;
     let eventId: string;
+    let room: string;
     try {
-      const authorized = await authorize();
+      const selected = await options.coordination.ownerConversation(options.agent, signal);
+      if (!selected.ok) return selected;
+      if (!roomId(selected.value.roomId)) return failure('invalid', 'Invalid private owner conversation identity');
+      room = selected.value.roomId;
+      const authorized = await authorize(room, signal);
       if (!authorized.ok) return authorized;
       if (signal.aborted) return cancelledResult();
       const description = JSON.stringify({ run, runtime: permission.runtime, session: permission.session,
         request: permission.request, action: permission.action, scope: permission.scope,
         choices: permission.choices }, null, 2).split('\n').map(line => '    ' + line).join('\n');
-      const sent = await boundary(() => options.client.put<{ event_id: string }>(base + '/send/m.room.message/' + randomUUID(),
+      const sent = await boundary(() => options.client.put<{ event_id: string }>(API + '/rooms/' + segment(room) + '/send/m.room.message/' + randomUUID(),
         { ...options.client.message('**Permission needed.** Reply to this exact message with one choice. Silence is not approval.\n\n'
           + description + '\n\nChoices: ' + permission.choices.map(choice => '`' + choice.label + '`').join(', ')),
           msgtype: 'm.notice', [LISTENER_NOTICE]: true }));
@@ -142,7 +153,7 @@ export function permissions(options: { clock: Clock; client: Matrix; coordinatio
         resolve(decision);
       };
       const cancel = () => finish(cancelledResult());
-      pending.set(eventId, { request: permission.request, session: permission.session, expires,
+      pending.set(eventId, { room, request: permission.request, session: permission.session, expires,
         choices: structuredClone(permission.choices), complete: finish });
       signal.addEventListener('abort', cancel, { once: true });
       if (signal.aborted) cancel();
@@ -150,18 +161,21 @@ export function permissions(options: { clock: Clock; client: Matrix; coordinatio
   }
   async function consume(event: ReceivedEvent): Promise<boolean> {
     const target = reply(event);
-    if (event.room_id !== options.room || !target) return false;
+    if (!target) return false;
     await Promise.all(publications);
+    if (event.room_id !== conversation) return false;
     if (!pending.has(target) && !consumed.has(target)) return false;
     if (event.sender !== options.settings.owner || consumed.has(target)) return true;
     const current = pending.get(target)!;
+    if (event.room_id !== current.room) return false;
+    const base = API + '/rooms/' + segment(current.room);
     const original = await boundary(() => options.client.get<Event>(base + '/event/' + segment(event.event_id)));
     if (!original.ok) { current.complete(original); return true; }
     if (original.value.event_id !== event.event_id || original.value.sender !== options.settings.owner || reply(original.value) !== target
       || typeof original.value.content.body !== 'string') return true;
     const choice = current.choices.find(choice => choice.label === decisionBody(original.value.content.body as string));
     if (!choice) return true;
-    const authorized = await authorize();
+    const authorized = await authorize(current.room);
     if (!authorized.ok) { current.complete(authorized); return true; }
     if (pending.get(target) !== current || options.clock.now() >= current.expires) return true;
     current.complete(success(structuredClone(choice.value)));

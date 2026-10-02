@@ -14,6 +14,9 @@ export async function reconcilePrincipal(services: Dependencies, principalId: st
   const target = services.directory.agent(principalId);
   if (!target.ok) return target;
   if (target.value?.owner.status !== 'active') return applied;
+  const bound = services.repositories.ownerConversation.find({ agentId: principalId });
+  if (!bound.ok) return bound;
+  if (!bound.value) return applied;
   const conversation = await ensureOwnerConversation(services, principalId);
   return conversation.ok ? success(undefined) : conversation;
 }

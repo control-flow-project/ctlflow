@@ -224,6 +224,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
         senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
         roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', powerLevel: null, muted: muted.has(room) })) });
     } else if (path === '/api/agents/' + AGENT_ID + '/owner-conversation' && request.method === 'POST') {
+      joined.add(OWNER_DM); wake();
       api(response, { roomId: OWNER_DM });
     } else if (path === '/api/agents/' + AGENT_ID) {
       api(response, { agentId: AGENT_ID, matrixUserId: SELF, name: 'watson', displayName: 'Watson (Human)',

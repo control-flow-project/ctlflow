@@ -1,4 +1,5 @@
 import { cleanup } from '@crossfire/test-support/cleanup';
+import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -133,7 +134,7 @@ async function checkEnrollmentInstructions(page: Page, origin: string, owner: st
   await expect(page.getByRole('link', { name: 'Fleet · advanced', exact: true })).toHaveAttribute('href', '/manage/connect/fleet');
   await expect(page.getByRole('link', { name: 'Rooms', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Manage rooms →', exact: true })).toHaveCount(0);
-  await expect(page.getByText('Approval creates its account and a private read/write DM with you.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Approval creates its account, not a chat.', { exact: false })).toBeVisible();
   assert(!instructions.includes('--session'));
   assert(!instructions.includes('--token-file'));
   await page.reload();
@@ -256,6 +257,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await worker.drain();
   assert((await connect(destination, release.manifest)).ok);
   const profile = readProfile(destination.profile);
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: profile.id })), null);
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+  value(await connectOwnerConversation(services, { principalId: profile.id, kind: 'agent' }, profile.id));
   const ownerDirect = value(services.repositories.ownerConversation.find({ agentId: profile.id }))!;
   const mandatoryGrant = value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: ownerDirect.roomId }))!;
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);

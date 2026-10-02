@@ -22,10 +22,12 @@ subprocess capabilities.
 - Runtime adapters declare whether approval belongs to the runtime, listener or
   is disabled by an explicit native policy. Live Codex policy comes from the
   actual selected native thread, not a Crossfire default.
-- Every active agent has a protected private read/write owner DM. Codex approvals
-  use it automatically; no global approval-room configuration exists.
-  Shared listener readiness checks current applied grants, unmuted
-  delivery, active identities, both joined members and native message powers.
+- The first owner contact or real native approval request establishes the
+  protected private read/write owner DM. Starting, reconnecting and testing
+  creates no chats; a roomless authenticated listener is ready. No global
+  approval-room configuration exists. Established channels are checked for
+  current applied grants, unmuted delivery, active identities, both joined
+  members and native message powers.
 - Readiness and `agent test` do not prompt a model. A configured but unauthorized
   approval conversation never reports ready or online.
 - The permission broker returns expected failures through `Result`. The Codex
@@ -55,8 +57,10 @@ The focused cases live in:
 
 - `services/crossfire/tests/permissions.test.ts`: native powers, exact owner,
   revoked authority, expiry, concurrent decisions and publication races.
-- `services/crossfire/scripts/listener-permissions.test.ts`: missing or unusable
-  routes cannot reach online readiness; owner decisions work while paused.
+- `services/crossfire/scripts/listener-permissions.test.ts`: roomless listeners
+  report readiness without creating chats; failed first-use routing denies only
+  the pending request; unauthorized established routes do not report ready;
+  owner decisions work while paused.
 - `services/crossfire/scripts/native-tests/permissions.test.ts`: stock Codex with
   an inert local provider, actual native approval, forbidden/unavailable denial,
   following input in the same session, and an intentional Matrix reply through
