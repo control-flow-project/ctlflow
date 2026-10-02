@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -58,7 +59,7 @@ test('rosters are strict, disjoint and bounded; empty stopped fleets and persist
 });
 
 test('controller owns runtimes, rejects duplicates and operation reuse with different input', async scope => {
-  const fixture = fixtureController(); scope.after(() => fixture.controller.close());
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
   assert.equal(fixture.controller.add(fixture.fleet).ok, false);
   const start = await fixture.operation('start'); assert.equal((await fixture.finish(start)).status, 'succeeded');
   assert.equal(value(fixture.controller.view(fixture.record.fleetId)).phase, 'running');
@@ -81,7 +82,7 @@ test('delivery deactivation retains owned engines and unregister closes the cont
     start: async () => { const stop = new AbortController(); return success({ sessionId: 'unchanged', signal: stop.signal,
       control: binding.connection, attachment: { runtime: 'fixture', sessionId: 'unchanged', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } }); },
     disconnect: async () => { disconnected = true; binding.close(); } });
-  scope.after(() => fixture.controller.close());
+  cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start'));
   const fleetId = fixture.record.fleetId;
   assert.equal(value(fixture.controller.view(fleetId)).instances[0]!.listenerActive, true);
@@ -96,7 +97,7 @@ test('delivery deactivation retains owned engines and unregister closes the cont
 });
 
 test('terminal pointers exist only for live instances and never leak into registry views', async scope => {
-  const fixture = fixtureController(); scope.after(() => fixture.controller.close());
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
   const fleetId = fixture.record.fleetId;
   assert.equal(fixture.controller.attachment(fleetId, 'analyst').ok, false);
   assert.equal(fixture.controller.attachment(fleetId, 'missing').ok, false);
@@ -124,9 +125,12 @@ test('approval waiting is model-free and stop cancels a pending start', async sc
     approval({ url: 'http://127.0.0.1/manage/enrollments/test', code: 'ABCDEF123456' });
     await new Promise<void>(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true }); });
     return failure('unavailable', 'Cancelled');
-  } }); scope.after(() => fixture.controller.close());
+  } }); cleanup(scope, () => fixture.controller.close());
   const start = await fixture.operation('start');
-  await delay(10); assert.equal(value(fixture.controller.operation(start.operationId)).status, 'awaiting-approval');
+  const approvalDeadline = Date.now() + 5000;
+  while (value(fixture.controller.operation(start.operationId)).status !== 'awaiting-approval') {
+    assert(Date.now() < approvalDeadline); await delay(10);
+  }
   const stop = await fixture.operation('stop'); assert.equal((await fixture.finish(stop)).status, 'succeeded');
   assert.equal((await fixture.finish(start)).status, 'failed'); assert.deepEqual(fixture.started, []);
 });
@@ -134,24 +138,24 @@ test('approval waiting is model-free and stop cancels a pending start', async sc
 test('roster edits serialize native detachment and retain files when removing the last instance', async scope => {
   let release!: () => void;
   const fixture = fixtureController({ detach: async () => { await new Promise<void>(resolve => { release = resolve; }); return success(undefined); } });
-  scope.after(() => fixture.controller.close());
+  cleanup(scope, () => fixture.controller.close());
   const pending = fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'remove', instanceKey: 'analyst' });
   assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 })).ok, false);
   assert.equal(fixture.controller.rename(fixture.record.fleetId, 0, 'Raced').ok, false);
   release(); assert.deepEqual(value(await pending).instances, []);
   assert.equal(value(fixture.registry.load(fixture.fleet)).roster.instances.length, 0);
-  const rebooted = value(createController(fixture.services)); scope.after(() => rebooted.close());
+  const rebooted = value(createController(fixture.services)); cleanup(scope, () => rebooted.close());
   assert.equal(value(rebooted.list()).length, 1); assert.deepEqual(value(rebooted.view(fixture.record.fleetId)).instances, []);
 });
 
 test('per-instance failure retains successful peers; startup history survives controller restart', async scope => {
   const fixture = fixtureController({ prepare: async () => success({ failed: [{ instanceKey: 'analyst', code: 'name_collision', message: 'Name is taken' }] }) });
-  scope.after(() => fixture.controller.close());
+  cleanup(scope, () => fixture.controller.close());
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
   const operation = await fixture.operation('start'); const result = await fixture.finish(operation);
   assert.equal(result.status, 'failed'); assert.equal(result.errors[0]?.code, 'name_collision'); assert.deepEqual(fixture.started, ['peer']);
   await fixture.controller.close(); assert.deepEqual(fixture.closed, ['peer']);
-  const reopened = value(createController(fixture.services)); scope.after(() => reopened.close());
+  const reopened = value(createController(fixture.services)); cleanup(scope, () => reopened.close());
   assert.equal(value(reopened.operation(operation.operationId)).status, 'failed');
   assert(value(reopened.view(fixture.record.fleetId)).instances.every(instance => instance.phase === 'stopped'));
 });

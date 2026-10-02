@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -31,7 +32,7 @@ export async function nativeEngine(scope: TestContext, home: string, workspace: 
   });
   const ended = once(child, 'close');
   const terminate = (signal: NodeJS.Signals) => { try { process.kill(-child.pid!, signal); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; } };
-  scope.after(async () => { terminate('SIGTERM'); const timer = setTimeout(() => terminate('SIGKILL'), 3000); try { await ended; } finally { clearTimeout(timer); terminate('SIGKILL'); } });
+  cleanup(scope, async () => { terminate('SIGTERM'); const timer = setTimeout(() => terminate('SIGKILL'), 3000); try { await ended; } finally { clearTimeout(timer); terminate('SIGKILL'); } });
   const endpoint = await new Promise<string>((resolve, reject) => {
     let output = '';
     const timer = setTimeout(() => reject(new Error('Native WS readiness timed out: ' + output)), 15_000);
@@ -50,7 +51,7 @@ export async function nativeEngine(scope: TestContext, home: string, workspace: 
   const protocol = codexProtocol({ endpoint, token, timeoutMs: 10_000, event: notice => notifications.push(notice),
     approval: async () => { throw new Error('Unexpected approval on fixture owner connection'); },
   }, controller.signal);
-  scope.after(async () => { controller.abort(); await protocol.closed; });
+  cleanup(scope, async () => { controller.abort(); await protocol.closed; });
   const call = async (method: string, params: unknown) => await protocol.request(method, params) as Record<string, unknown>;
   await call('initialize', { clientInfo: { name: 'crossfire-native-fixture', version: '0.1.0' }, capabilities: { experimentalApi: true } });
   protocol.notify('initialized');

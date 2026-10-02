@@ -1,4 +1,9 @@
 export const permissionCatalog = [
+  { code: 'wake-rule.read.owned', grantScope: 'role', description: 'Read owned scheduled wake-up rules', roles: ['member', 'administrator'] },
+  { code: 'wake-rule.read.any', grantScope: 'role', description: 'Read every scheduled wake-up rule', roles: ['administrator'] },
+  { code: 'wake-rule.manage.owned', grantScope: 'role', description: 'Manage owned scheduled wake-up rules', roles: ['member', 'administrator'] },
+  { code: 'wake-rule.manage.any', grantScope: 'role', description: 'Manage every scheduled wake-up rule', roles: ['administrator'] },
+  { code: 'wake-delivery.receive.self', grantScope: 'role', description: 'Receive own scheduled input and report native receipts', roles: ['agent'] },
   { code: 'principal.read', grantScope: 'role', description: 'Search active identities and resolve sender ownership', roles: ['member', 'administrator', 'agent'] },
   { code: 'agent.read.self', grantScope: 'role', description: 'Read own agent identity', roles: ['agent'] },
   { code: 'agent.read.owned', grantScope: 'role', description: 'Read owned agents', roles: ['member', 'administrator'] },
@@ -10,6 +15,7 @@ export const permissionCatalog = [
   { code: 'agent.listener.disconnect.owned', grantScope: 'role', description: 'Disconnect owned listeners', roles: ['member', 'administrator'] },
   { code: 'agent.listener.disconnect.any', grantScope: 'role', description: 'Disconnect every listener', roles: ['administrator'] },
   { code: 'listener.report.self', grantScope: 'role', description: 'Report own listener activity', roles: ['agent'] },
+  { code: 'room-invitation.accept.self', grantScope: 'role', description: 'Accept native invitations within the inviter’s room authority', roles: ['agent'] },
   { code: 'wake-notice.publish.self', grantScope: 'role', description: 'Request verified blocked-mention notices', roles: ['agent'] },
   { code: 'enrollment.approve.owned', grantScope: 'role', description: 'Approve enrollment for oneself', roles: ['member', 'administrator'] },
   { code: 'enrollment.reject.owned', grantScope: 'role', description: 'Reject enrollment for oneself', roles: ['member', 'administrator'] },

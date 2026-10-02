@@ -199,6 +199,9 @@ export type EnrollmentControllerMetadataRepository = {
 };
 
 export type Repositories = {
+  wakeRule: WakeRuleRepository;
+  wakeRuleAgent: WakeRuleAgentRepository;
+  wakeDelivery: WakeDeliveryRepository;
   fleetConnection: FleetConnectionRepository;
   fleetMessage: FleetMessageRepository;
   fleetMessageDelivery: FleetMessageDeliveryRepository;
@@ -231,3 +234,4 @@ export type Repositories = {
   auditEvent: AuditEventRepository;
 };
 import type { FleetConnectionRepository, FleetMessageRepository, FleetMessageDeliveryRepository } from '../fleet/control-types.js';
+import type { WakeRuleRepository, WakeRuleAgentRepository, WakeDeliveryRepository } from '../wake-up/types.js';

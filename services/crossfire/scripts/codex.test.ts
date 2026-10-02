@@ -1,13 +1,13 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setTimeout as delay } from 'node:timers/promises';
 import { connectCodex } from '@crossfire/adapter-codex/connection';
 import { fakeCodex, inputReceipt, THREAD, until } from './test-support/listener.js';
 
 test('native delivery verifies the selected workspace and uses only start-or-steer without policy overrides', async t => {
   const fixture = await fakeCodex(t);
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  t.after(connection.close);
+  cleanup(t, connection.close);
   await connection.deliver('idle input', 'first');
   fixture.update({ status: 'active' });
   await connection.deliver('active input', 'second');
@@ -35,7 +35,7 @@ test('explicit attachment rejects foreign or unavailable native sessions before 
 test('the thread is checked again before each input', async t => {
   const fixture = await fakeCodex(t);
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  t.after(connection.close);
+  cleanup(t, connection.close);
   fixture.update({ directInput: false });
   await assert.rejects(connection.deliver('blocked', 'blocked'), /not loaded for direct input/);
   assert(!fixture.requests().some(request => request.method === 'turn/start'));
@@ -44,7 +44,7 @@ test('the thread is checked again before each input', async t => {
 test('invalid native permission requests fail closed rather than being answered or delegated to the model', async t => {
   const fixture = await fakeCodex(t, { mode: 'server-requests' });
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  t.after(connection.close);
+  cleanup(t, connection.close);
   await assert.rejects(connection.deliver('input', 'input'), /invalid native session/);
   assert(!fixture.requests().some(request => request.id === 'approval' || !request.method));
 });
@@ -83,7 +83,7 @@ test('selected native thread closure cancels hung requests and receipt waits wit
   for (const mode of ['timeout', 'accepted']) {
     const fixture = await fakeCodex(context, { mode });
     const connection = await connectCodex({ ...fixture.options, timeoutMs: 30_000 }, new AbortController().signal);
-    context.after(connection.close);
+    cleanup(context, connection.close);
     const rejected = assert.rejects(connection.deliver('input', 'closed-input'), /selected Codex thread closed/);
     await until(() => fixture.requests().some(request => request.method === 'turn/start'));
     fixture.notify('thread/closed', { threadId: THREAD });
@@ -98,7 +98,7 @@ test('selected native thread closure cancels hung requests and receipt waits wit
 test('another native thread closing does not stop the selected connection', async context => {
   const fixture = await fakeCodex(context);
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   fixture.notify('thread/closed', { threadId: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee' });
   await connection.verify();
   assert.equal(connection.signal.aborted, false);
@@ -121,7 +121,7 @@ test('invalid destinations and credentials fail before native requests', async t
 test('acceptance is not receipt: only the exact completed native user item acknowledges input', async context => {
   const fixture = await fakeCodex(context, { mode: 'accepted' });
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   let delivered = false;
   const delivery = connection.deliver('input', 'exact').then(() => { delivered = true; });
   await until(() => fixture.requests().some(request => request.method === 'turn/start'));
@@ -140,21 +140,22 @@ test('acceptance is not receipt: only the exact completed native user item ackno
 test('history receipts acknowledge input without detailed event subscriptions', async context => {
   const fixture = await fakeCodex(context, { receiptFirst: true });
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   await connection.deliver('input', 'early');
   assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
   assert(fixture.requests().some(request => request.method === 'thread/timeline/list'));
 });
 
 test('busy receipt checks are bounded polls, not additional model turns or turn-duration timeouts', async context => {
+
   const fixture = await fakeCodex(context, { mode: 'accepted' });
   const connection = await connectCodex({ ...fixture.options, timeoutMs: 100 }, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'waiting');
   await until(() => fixture.requests().some(request => request.method === 'turn/start'));
   await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
   const count = fixture.requests().length;
-  await delay(150);
+  await until(() => fixture.requests().length > count);
   assert(fixture.requests().length > count && fixture.requests().length <= count + 2);
   assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
   assert.equal(connection.signal.aborted, false);
@@ -165,7 +166,7 @@ test('busy receipt checks are bounded polls, not additional model turns or turn-
 test('interrupted input is retried only after complete bounded history proves it absent', async context => {
   const fixture = await fakeCodex(context, { mode: 'accepted' });
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'interrupted');
   await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
   fixture.update({ mode: 'normal', turnId: 'replacement-turn', historyPages: [
@@ -194,7 +195,7 @@ test('history receipts prevent retries even when interruption precedes the start
       { type: 'item', turnId: 'existing-turn', position: 2, item: inputReceipt('persisted') }], nextCursor: null },
   ] });
   const connection = await connectCodex(fixture.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   await connection.deliver('input', 'persisted');
   assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
 });
@@ -263,7 +264,7 @@ test('missing or malformed turn history never proves interruption or permits rep
     [{ type: 'unknown', turnId: 'existing-turn', position: 1 }]]) {
     const fixture = await fakeCodex(context, { mode: 'accepted', historyPages: Array.from({ length: 3 }, () => ({ data, nextCursor: null })) });
     const connection = await connectCodex(fixture.options, new AbortController().signal);
-    context.after(connection.close);
+    cleanup(context, connection.close);
     await assert.rejects(connection.deliver('input', 'input'), /turn/);
     assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
   }
@@ -273,7 +274,7 @@ test('an unsupported native history contract fails without another input or comp
   for (const count of [2, 3]) {
     const fixture = await fakeCodex(context, { historyUnavailable: Array.from({ length: count }, () => -32601) });
     const connection = await connectCodex(fixture.options, new AbortController().signal);
-    context.after(connection.close);
+    cleanup(context, connection.close);
     await assert.rejects(connection.deliver('input', 'input'), /not supported yet/);
     assert.equal(fixture.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length, 1);
     assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);

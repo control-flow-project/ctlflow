@@ -38,6 +38,7 @@ CREATE INDEX ix_member_session_member ON member_session(member_id, expires_at);
 CREATE INDEX ix_member_session_expiry ON member_session(expires_at);
 
 CREATE TABLE listener_run (
+  controller_bound INTEGER NOT NULL CHECK(controller_bound IN (0,1)),
   id TEXT NOT NULL,
   agent_id TEXT NOT NULL,
   release TEXT,

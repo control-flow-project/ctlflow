@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createServer } from 'node:http';
@@ -21,7 +22,7 @@ test('fleet terminal pointers dispatch only through the runtime adapter and the 
     response.end(JSON.stringify({ data: descriptor, meta: { requestId: randomUUID() } }));
   });
   server.listen(socket); await once(server, 'listening');
-  scope.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  cleanup(scope, () => new Promise<void>(resolve => server.close(() => resolve())));
   const client = createDaemonClient(socket), received: unknown[] = [];
   const adapters = { fixture: { command: (attachment: typeof descriptor) => { received.push(attachment); return success('native-fixture --existing-session'); } } };
   const local = await terminalPointer(client, fleetId, 'analyst', adapters);

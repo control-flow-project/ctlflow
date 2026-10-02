@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
@@ -19,7 +20,7 @@ function validateName(value: unknown): Result<{ name: string }> {
 
 test("functional HTTP/client/Tinqer round-trip uses one strict boundary contract", async context => {
   const database = openDatabase();
-  context.after(() => database.close());
+  cleanup(context, () => database.close());
   const server = createServer(async (incoming, outgoing) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -46,7 +47,7 @@ test("functional HTTP/client/Tinqer round-trip uses one strict boundary contract
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  context.after(async () => {
+  cleanup(context, async () => {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   });

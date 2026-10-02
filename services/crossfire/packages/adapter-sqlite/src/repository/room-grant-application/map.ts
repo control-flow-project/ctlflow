@@ -8,6 +8,7 @@ export function mapRoomGrantApplication(row: Tables['room_grant_application']): 
     appliedRevision: row.applied_revision,
     appliedAccessRevision: row.applied_access_revision,
     membership: row.membership,
+    creator: row.creator === 1,
     powerLevel: row.power_level,
     lastAttemptAt: row.last_attempt_at,
     lastSuccessAt: row.last_success_at,

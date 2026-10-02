@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
@@ -23,7 +24,7 @@ test("private service bootstrap survives a human password change without resetti
   const credentials = { servicePassword: secret(), administratorPassword: secret() };
   value(await bootstrap(config, credentials));
   const native = authority({ ...config, serviceMatrixId: serviceUser(config) });
-  scope.after(() => native.close());
+  cleanup(scope, () => native.close());
   const human = value(await native.provision(config.administrator, credentials.administratorPassword, "CROSSFIRE_HUMAN"));
   const client = { base: fixture.base, token: human.access_token };
   assert.deepEqual(value(await nativeOk(client, "GET", API + "/joined_rooms")).joined_rooms, []);

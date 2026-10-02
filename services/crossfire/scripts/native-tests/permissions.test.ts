@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,7 +30,7 @@ test('a real native permission is answered only by the verified Matrix owner thr
       } },
     }, signal),
   }, stop.signal).catch(error => { failure = error; return error; });
-  scope.after(async () => {
+  cleanup(scope, async () => {
     stop.abort(); await receiving;
   });
   await until(() => fixture.waiting() > 0);

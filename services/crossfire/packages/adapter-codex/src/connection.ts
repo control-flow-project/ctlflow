@@ -307,7 +307,16 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
 
   return { sessionId, signal: session.signal, verify,
     inspect: async () => ({ busy: await activeTurn() !== null }),
-    close: async () => { try { await session.close(); } finally { journal.close(); } }, deliver, settle, acknowledge: journal.acknowledge, turnControl: { activeTurn, interrupt },
+    close: async () => { try { await session.close(); } finally { journal.close(); } }, deliver, settle,
+    recover: async (text, messageId) => {
+      if (receiveDelivery) throw new Error('Codex receipt recovery must be sequential');
+      if (pendingDelivery) {
+        if (pendingDelivery.messageId !== messageId || pendingDelivery.text !== text) throw new Error('Receipt recovery does not match the pending native input');
+        return settle();
+      }
+      return journal.confirmed(text, messageId);
+    },
+    acknowledge: journal.acknowledge, turnControl: { activeTurn, interrupt },
     event: message => {
       if (message.method === 'thread/closed' && message.params.threadId === sessionId) {
         throw new Error('The selected Codex thread closed; listener delivery stopped');

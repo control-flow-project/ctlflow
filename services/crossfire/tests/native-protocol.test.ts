@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import test, { type TestContext } from 'node:test';
@@ -10,7 +11,7 @@ async function fixture(scope: TestContext, mode: string, approval = async (_requ
 }) {
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0, verifyClient: (info: { req: import('node:http').IncomingMessage }) => info.req.headers.authorization === 'Bearer fixture' });
   await once(server, 'listening');
-  scope.after(() => new Promise<void>(resolve => { for (const client of server.clients) client.terminate(); server.close(() => resolve()); }));
+  cleanup(scope, () => new Promise<void>(resolve => { for (const client of server.clients) client.terminate(); server.close(() => resolve()); }));
   const address = server.address(); assert(address && typeof address === 'object');
   server.on('connection', socket => {
     let pending: unknown;
@@ -31,7 +32,7 @@ async function fixture(scope: TestContext, mode: string, approval = async (_requ
   });
   const stop = new AbortController();
   const engine = codexProtocol({ endpoint: 'ws://127.0.0.1:' + address.port, token: 'fixture', timeoutMs: 1000, event: () => {}, approval }, stop.signal);
-  scope.after(async () => { stop.abort(); await engine.closed; });
+  cleanup(scope, async () => { stop.abort(); await engine.closed; });
   return engine;
 }
 
@@ -67,8 +68,9 @@ test('native approval responses wait for the explicit bound human decision', asy
   });
   let resolved = false;
   const request = engine.request('test', {}).then(value => { resolved = true; return value; });
-  while (!received) await delay(5);
-  await delay(20); assert.equal(resolved, false);
+  const deadline = performance.now() + 5000;
+  while (!received) { assert(performance.now() < deadline, 'Native approval did not arrive'); await delay(5); }
+  assert.equal(resolved, false, 'The observed native approval remains held by the explicit decision promise');
   assert.deepEqual(received, { id: 'approval', method: 'item/commandExecution/requestApproval', params: { threadId: 'fixture' } });
   decide({ decision: 'decline' });
   assert.deepEqual(await request, { decision: 'decline' });

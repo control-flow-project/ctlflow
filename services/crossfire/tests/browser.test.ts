@@ -1,6 +1,7 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { chromium, expect, type Page } from '@playwright/test';
@@ -23,6 +24,7 @@ import { publicRouter } from '../apps/server/src/router.js';
 import { releaseFixture, updatedRelease } from './release-fixture.js';
 import { enroll, connect } from '../apps/client/src/enrollment.js';
 import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
+import { readJson } from '@crossfire/adapter-filesystem/index';
 import { API, segment } from '@crossfire/contracts/matrix';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
 import { nativeProvider } from '../scripts/test-support/native-provider.js';
@@ -138,17 +140,17 @@ test('real browser member/admin flows and project listener span native Conduit, 
   service.listen(0, '127.0.0.1'); await once(service, 'listening');
   const address = service.address(); assert(address && typeof address === 'object');
   const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
-    web: join(process.cwd(), 'dist/web'), element: elementAssets(directory) };
+    web: join(process.cwd(), 'dist/web'), element: elementAssets() };
   const router = publicRouter(routes);
   router.listen(0, '127.0.0.1'); await once(router, 'listening');
   const publicAddress = router.address(); assert(publicAddress && typeof publicAddress === 'object');
   const origin = 'http://127.0.0.1:' + publicAddress.port;
   routes.publicOrigin = origin; config.publicOrigin = origin; services.instance.publicOrigin = origin;
-  scope.after(async () => { services.matrix.close(); router.closeAllConnections(); service.closeAllConnections();
+  cleanup(scope, async () => { services.matrix.close(); router.closeAllConnections(); service.closeAllConnections();
     await new Promise<void>(resolve => router.close(() => resolve())); await new Promise<void>(resolve => service.close(() => resolve()));
     await worker.stop(); application.close(); });
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
-  scope.after(() => browser.close());
+  cleanup(scope, () => browser.close());
   const errors: string[] = [];
   const identityReads: string[] = [];
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -286,11 +288,14 @@ test('real browser member/admin flows and project listener span native Conduit, 
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
     runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, hooks }, signal),
   }, stop.signal).catch(error => { listenerFailure = error; });
-  scope.after(async () => { stop.abort(); await receiving; });
+  cleanup(scope, async () => { stop.abort(); await receiving; });
   await until(() => listenerReady || listenerFailure !== undefined);
   assert.equal(listenerFailure, undefined, String(listenerFailure));
+  await until(() => existsSync(join(destination.state, 'cursors.json.sync')));
+  const previousSync = readJson<string>(join(destination.state, 'cursors.json.sync'));
   assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/e2e', { msgtype: 'm.text', body: 'Crossfire integrated native delivery' })).ok);
-  await page.waitForTimeout(1200);
+  await until(() => existsSync(join(destination.state, 'cursors.json.sync'))
+    && readJson<string>(join(destination.state, 'cursors.json.sync')) !== previousSync, 'The native receiver must consume the room notification before testing Nobody');
   assert.equal(provider.requests.length, 0, 'Nobody must prevent real Matrix chat from reaching the native model transport');
   assert.equal(listenerFailure, undefined, String(listenerFailure));
   await engine.call('turn/start', { threadId: engine.session, input: [{ type: 'text', text: 'Direct native user input with Nobody selected.', text_elements: [] }] });

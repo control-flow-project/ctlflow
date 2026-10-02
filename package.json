@@ -16,7 +16,7 @@
     "typecheck": "node scripts/workspaces.mjs typecheck",
     "build": "node scripts/workspaces.mjs build",
     "test": "node scripts/workspaces.mjs test",
-    "test:browser": "npm run test:browser --workspace=@crossfire/service",
+    "test:browser": "node scripts/test.mjs crossfire browser",
     "verify:structure": "node scripts/verify-structure.mjs",
     "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@crossfire/service",
     "verify:installation": "npm run verify:installation --workspace=@crossfire/service",

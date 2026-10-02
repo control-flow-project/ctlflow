@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testListener } from '@crossfire/agent-core/diagnostic';
@@ -6,7 +7,7 @@ import { fakeCodex, matrixFixture, THREAD } from '../scripts/test-support/listen
 test('listener diagnostics distinguish live readiness, no rooms, nobody policy, pause and inactive authority without prompts or read markers', async scope => {
   const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory), stop = new AbortController();
   const runtime = await native.runtime(stop.signal, 100);
-  scope.after(() => runtime.close());
+  cleanup(scope, () => runtime.close());
   const transport = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token, signal: stop.signal, timeoutMs: 1000 });
   const options = { coordination: fixture.coordination, runtime, matrix: transport, id: fixture.id, owner: fixture.settings.owner,
     matrixUserId: fixture.account.user_id, paused: false, signal: stop.signal };

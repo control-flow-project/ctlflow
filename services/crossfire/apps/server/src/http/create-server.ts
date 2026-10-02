@@ -17,6 +17,7 @@ import { enrollmentRoutes } from './routes/enrollment.js';
 import { fleetRoutes } from './routes/fleet.js';
 import { createFleetChanges } from './fleet-changes.js';
 import { agentRoutes } from './routes/agent.js';
+import { wakeUpRoutes } from './routes/wake-up.js';
 import { roomRoutes } from './routes/room.js';
 import { memberRoutes } from './routes/member.js';
 import { instanceRoutes } from './routes/instance.js';
@@ -27,7 +28,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
   const { services, config } = application;
   const register = registrationTransport(services);
   const fleetChanges = createFleetChanges();
-  const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...roomRoutes(), ...memberRoutes(),
+  const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...wakeUpRoutes(), ...roomRoutes(), ...memberRoutes(),
     ...instanceRoutes(config.instance, services.clock.now())];
   const limits = new Map<string, { count: number; expiresAt: number }>();
   function rate(request: IncomingMessage): boolean {

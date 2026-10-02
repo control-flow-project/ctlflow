@@ -78,7 +78,10 @@ test('fleet messages are durable, roster-snapshotted, bounded, idempotent and re
   const detached = value(readFleetControl(...params, connectionId));
   assert.deepEqual(detached.agentIds, [agentId]); assert.deepEqual(detached.messages[0]!.agentIds, [otherId], 'Recipient snapshot survives detachment');
   value(acknowledgeFleetMessage(...params, input.messageId, otherId, { status: 'skipped', errorMessage: 'No bound listener' }));
-  for (let index = 0; index < 32; index++) value(createFleetMessage(...params, { messageId: randomUUID(), body: 'Queued ' + index }, randomUUID()));
+  for (let index = 0; index < 32; index++) {
+    fixture.advance(1);
+    value(createFleetMessage(...params, { messageId: randomUUID(), body: 'Queued ' + index }, randomUUID()));
+  }
   assert.equal(createFleetMessage(...params, { messageId: randomUUID(), body: 'Queue overflow' }, randomUUID()).ok, false);
   const page = value(listFleetMessages(services, admin.actor, fleet.fleetId, { page: 2, pageSize: 10 }));
   assert.equal(page.totalItems, 33); assert.equal(page.items.length, 10);

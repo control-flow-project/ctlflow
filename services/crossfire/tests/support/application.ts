@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { TestContext } from 'node:test';
@@ -21,7 +22,7 @@ export async function applicationFixture(scope: TestContext) {
     administrator: '@admin:test.localhost', jwtSecret: secret(), registrationSecret: secret() };
   const adminNative = value(await native.matrix.provision(config.administrator, secret(), 'test'));
   const application = createApplication(':memory:', config, { now: () => now, matrix: native.matrix });
-  scope.after(() => application.close());
+  cleanup(scope, () => application.close());
   const { services } = application;
   async function login(token: string) {
     const session = value(await createSession(services, token)), authenticated = value(await authenticateMember(services, session.secret));

@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { releaseUpdates } from '@crossfire/agent-core/updates';
@@ -17,7 +18,7 @@ test('one receipt-confirmed notice per native session and release survives resta
   const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory), stop = new AbortController();
   const { storage } = storageFixture();
   const runtime = await native.runtime(stop.signal, 100);
-  scope.after(() => runtime.close());
+  cleanup(scope, () => runtime.close());
   const installed = builtRelease().release.manifest.release;
   const first = updatedRelease(builtRelease().release, 'SKILL.md', 'First update').manifest.release;
   const next = updatedRelease(builtRelease().release, 'SKILL.md', 'Next update').manifest.release;
@@ -52,7 +53,7 @@ test('uncertain or cancelled delivery is not recorded as notified and retries th
   let reject = true;
   const runtime: RuntimeConnection = { sessionId: THREAD, signal: new AbortController().signal,
     deliver: async (_text, id) => { recorded.push(id); if (reject) throw Error('Receipt unavailable'); },
-    acknowledge: ids => { acknowledged.push(...ids); }, inspect: async () => ({ busy: false }), close: () => {}, settle: async () => false };
+    acknowledge: ids => { acknowledged.push(...ids); }, recover: async () => false, inspect: async () => ({ busy: false }), close: () => {}, settle: async () => false };
   const installed = '0.1.0-aaaaaaaaaaaaaaaaaaaaaaaa', release = '0.1.0-bbbbbbbbbbbbbbbbbbbbbbbb';
   const publisher = () => releaseUpdates(storage, 'cursor', installed, '@human:test', THREAD);
   const failed = publisher(); failed.available(release);
@@ -75,7 +76,7 @@ test('update notices retain opaque runtime identities without using them as file
   const session = 'runtime:/session/with:opaque-identity';
   const runtime: RuntimeConnection = { sessionId: session, signal: new AbortController().signal,
     deliver: async (_text, id) => { delivered.push(id); }, acknowledge: () => {}, inspect: async () => ({ busy: false }),
-    close: () => {}, settle: async () => false };
+    close: () => {}, settle: async () => false, recover: async () => false };
   const installed = '0.1.0-aaaaaaaaaaaaaaaaaaaaaaaa', release = '0.1.0-bbbbbbbbbbbbbbbbbbbbbbbb';
   const publisher = () => releaseUpdates(storage, 'cursor', installed, '@human:test', session);
   const first = publisher(); first.available(release); await first.publish(runtime, runtime.signal);

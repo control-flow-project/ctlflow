@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -69,7 +70,7 @@ trust_level = "trusted"
     try { process.kill(-server.pid, signal); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error; }
   };
-  context.after(async () => {
+  cleanup(context, async () => {
     terminate("SIGTERM");
     const timer = setTimeout(() => terminate("SIGKILL"), 5000);
     try { await stopped; } finally { clearTimeout(timer); }
@@ -77,13 +78,13 @@ trust_level = "trusted"
   await until(() => existsSync(socket) || server.exitCode !== null, "Native server socket not available");
   assert.equal(server.exitCode, null, errors);
   const observer = await connectRpc(socket);
-  context.after(observer.close);
+  cleanup(context, observer.close);
   const tmux = (args: string[]) => execute("tmux", ["-L", mux, "-f", "/dev/null", ...args], {
     env: environment, timeout: 10_000, maxBuffer: 128 * 1024,
   });
   await tmux(["new-session", "-d", "-s", "fixture", "-x", "120", "-y", "40", "--",
     binary, "--remote", "unix://" + socket, "--cd", workspace, "--no-alt-screen"]);
-  context.after(async () => {
+  cleanup(context, async () => {
     if (await tmux(["list-sessions"]).catch(() => undefined)) await tmux(["kill-server"]);
   });
   if (hooks) {
@@ -102,7 +103,7 @@ trust_level = "trusted"
   const threadId = string(object(started.params.thread).id);
   async function type(text: string): Promise<void> {
     await tmux(["send-keys", "-t", "fixture", "-l", text]);
-    await delay(250);
+    await until(async () => (await tmux(["capture-pane", "-p", "-t", "fixture"])).stdout.includes(text), "Native TUI did not render the typed input");
     await tmux(["send-keys", "-t", "fixture", "Enter"]);
   }
   const active = () => tmux(["has-session", "-t", "fixture"]).then(() => true, () => false);

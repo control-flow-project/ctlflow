@@ -10,7 +10,8 @@ function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; 
   const [mode, setMode] = useState<keyof typeof labels>(view?.grant?.accessMode ?? 'none'), [muted, setMuted] = useState(view?.grant?.muted ?? false);
   const [level, setLevel] = useState(view?.grant?.powerLevel ?? 0), [revision] = useState(view?.revision ?? agent.revision);
   const editable = agent.allowedActions.includes('room-grant.manage') && agent.status !== 'revoked';
-  const canReply = room.authority && (room.authority.creator || room.authority.replyLevel <= room.authority.powerLevel);
+  const canReply = room.authority && (room.authority.creator || room.authority.powerLevel !== null && room.authority.replyLevel <= room.authority.powerLevel);
+  const nativeCreator = room.authority?.creatorIds.includes(agent.matrixUserId) ?? false;
   return <form onSubmit={event => { event.preventDefault();
     if (mode === 'none' && view?.grant && !confirm('Remove this agent’s access to ' + room.name + '?')) return;
     const params = { agentId: agent.agentId, roomId: room.roomId }, base = { expectedRevision: revision, expectedGeneration: view?.grant?.generation ?? null };
@@ -18,17 +19,17 @@ function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; 
       : call(operations.setGrant, params, { ...base, accessMode: mode, powerLevel: mode === 'custom' ? level : null, muted }, viewer.csrfSecret));
   }}><fieldset disabled={!editable || action.pending}><label className="sr-only" htmlFor={'access-' + room.roomId}>Access for {room.name}</label>
     <select id={'access-' + room.roomId} value={mode} onChange={event => { const value = event.target.value; if (value === 'none' || value === 'read' || value === 'reply' || value === 'custom') setMode(value); }}>
-      <option value="none">No access</option><option value="read" disabled={!room.authority}>Read only</option>
-      <option value="reply" disabled={!canReply}>Read &amp; reply</option><option value="custom" disabled={!room.authority}>Custom power level</option></select>
-    {mode === 'custom' && <label>Power level<input type="number" required value={level} max={room.authority?.creator ? undefined : room.authority?.powerLevel} onChange={event => setLevel(Number(event.target.value))}/></label>}
+      <option value="none">No access</option><option value="read" disabled={!room.authority || nativeCreator}>Read only</option>
+      <option value="reply" disabled={!canReply}>Read &amp; reply</option><option value="custom" disabled={!room.authority || nativeCreator}>Custom power level</option></select>
+    {mode === 'custom' && <label>Power level<input type="number" required value={level} max={room.authority?.creator ? undefined : room.authority?.powerLevel ?? undefined} onChange={event => setLevel(Number(event.target.value))}/></label>}
     <div className="room-actions"><label className="check"><input type="checkbox" disabled={mode === 'none'} checked={muted} onChange={event => setMuted(event.target.checked)}/>Mute delivery</label><button className="room-save">Save access</button></div>
-  </fieldset><Alert>{action.error}</Alert></form>;
+  </fieldset>{nativeCreator && <p className="support">Matrix made this agent a room creator. Its native authority cannot be reduced; you can mute delivery or remove its membership.</p>}<Alert>{action.error}</Alert></form>;
 }
 function AppliedGrant({ view }: { view?: RoomGrantView }) {
   const grant = view?.grant, application = view?.application;
   const status = application?.errorMessage ? 'Failed' : !grant ? 'No access'
     : application?.observedGeneration === grant.generation && application.appliedRevision === grant.revision ? labels[grant.accessMode] : 'Pending';
-  return <><Status value={status}/>{application?.errorMessage && <span className="subline">{application.errorMessage}</span>}</>;
+  return <><Status value={status}/>{application?.creator && application.membership === 'join' && <span className="subline">Native room creator</span>}{application?.errorMessage && <span className="subline">{application.errorMessage}</span>}</>;
 }
 function Authority({ room }: { room: RoomView }) {
   return room.authority ? <><span>{room.authority.creator ? 'Room creator' : 'Your power level ' + room.authority.powerLevel}</span>

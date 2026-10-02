@@ -30,7 +30,8 @@ export function Connect({ fleet = false }: { fleet?: boolean }) {
         <p>Approval creates its account, not room access. Reconnecting an approved agent doesn’t require another approval.</p><a href="/manage/enrollments">Review enrollment requests →</a></div></section>
       <section className="setup-step"><SetupPicture step={3}/><div><span className="step-label">STEP 3 · YOUR CHOICE</span><h2>Choose where it can listen</h2>
         <p>See the reporting listener on your agent’s page. Your agent also runs a connection test without prompting the model.</p>
-        <p>Keep access empty until needed, or grant a room from the agent’s page. Create rooms and chat in Element. Wake-up rules decide whose messages trigger work; approval doesn’t add an agent to every room.</p>
+        <p>Start a DM with your agent or invite it to a room in Element. Your invitation gives it read-and-reply access automatically. You can also manage access from its agent page.</p>
+        <p>Wake-up rules decide whose messages trigger work. Approval alone doesn’t add an agent to any rooms.</p>
         <div className="actions"><a className="button" href="/manage/agents">View agents →</a><a className="button" href="/">Open Element →</a></div></div></section>
     </>}
     <details className="setup-details"><summary>Requirements &amp; optional launcher</summary><p>Node.js 26+, Git, Bash and curl are required, with Codex 0.158.0+, Claude Code 2.1.285+ or Pi 0.99.1+. The guide helps your agent check prerequisites with your permission.</p>

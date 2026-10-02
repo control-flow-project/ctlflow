@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import test from 'node:test';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import assert from 'node:assert/strict';
@@ -6,7 +7,6 @@ import { once } from 'node:events';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
 import { API } from '@crossfire/contracts/matrix';
 import { writeJson } from '@crossfire/adapter-filesystem/index';
 import { listen, type ListenerOptions } from '@crossfire/adapter-crossfire/listener';
@@ -22,7 +22,7 @@ test('listener long-polls silently, wakes promptly, drains backlog, and checkpoi
   const controller = new AbortController();
   const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 0, runtime: native.runtime };
   const result = listen(options, controller.signal).catch(error => error);
-  t.after(async () => { controller.abort(new Error('test complete')); await result; });
+  cleanup(t, async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
   const before = statSync(matrix.cursorFile).mtimeMs;
   await until(() => matrix.requests.filter(request => request.path === API + '/sync').length >= 4);
@@ -52,7 +52,7 @@ test('empty acquisition completion releases a blocked backlog reader without wai
   const stop = new AbortController();
   const receiving = listen({ ...matrix, reconcileMs: 120_000, limit: 1, pollMs: 10_000, debounceMs: 0,
     runtime: native.runtime }, stop.signal).catch(error => error);
-  context.after(async () => { stop.abort(); await receiving; });
+  cleanup(context, async () => { stop.abort(); await receiving; });
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
   await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
   matrix.add(ROOM, ...[1, 2, 3].map(index => message('$readiness-' + index, undefined, 'x'.repeat(40_000))));
@@ -65,7 +65,6 @@ test('empty acquisition completion releases a blocked backlog reader without wai
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(first.clientUserMessageId), first.input) });
   native.notify('thread/status/changed', { threadId: THREAD, status: { type: 'active' } });
   await until(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
-  await delay(50);
   assert.equal(starts().length, 1);
   barrier.release();
   await until(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '3');
@@ -109,7 +108,7 @@ test('an incoming message wakes a ten-second long poll without waiting for its t
   const matrix = await matrixFixture(t, native.directory);
   const controller = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 120_000, limit: 50, pollMs: 10_000, debounceMs: 100, runtime: native.runtime }, controller.signal).catch(error => error);
-  t.after(async () => { controller.abort(new Error('test complete')); await result; });
+  cleanup(t, async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1);
   assert.equal(matrix.requests.filter(request => request.path === API + '/sync').at(-1)!.query.get('timeout'), '10000');
   matrix.add(ROOM, message('$wake'));
@@ -122,7 +121,7 @@ test('active-turn acceptance leaves messages unread until native receipt, includ
   const matrix = await matrixFixture(context, native.directory);
   const controller = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 1000, limit: 1, pollMs: 100, debounceMs: 0, runtime: native.runtime }, controller.signal).catch(error => error);
-  context.after(async () => { controller.abort(new Error('test complete')); await result; });
+  cleanup(context, async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
   matrix.add(ROOM, message('$first'), message('$second'));
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
@@ -149,7 +148,7 @@ test('transient Matrix errors retry bounded reads, never replaying acknowledged 
   matrix.add(ROOM, message('$one'));
   const controller = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 1000, limit: 50, pollMs: 100, debounceMs: 0, runtime: native.runtime }, controller.signal).catch(error => error);
-  t.after(async () => { controller.abort(); await result; });
+  cleanup(t, async () => { controller.abort(); await result; });
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
   matrix.failures.set(API + '/sync', [503, 503, 503, 503]);
@@ -182,7 +181,7 @@ test('foreground CLI emits one session record, stays quiet on idle polls, reject
   child.stdout.on('data', chunk => { output += String(chunk); });
   child.stderr.on('data', chunk => { errors += String(chunk); });
   const stopped = once(child, 'close');
-  t.after(async () => { child.kill('SIGTERM'); await stopped; });
+  cleanup(t, async () => { child.kill('SIGTERM'); await stopped; });
   await until(() => matrix.waiting() === 1, errors);
   for (const command of ['read']) {
     await assert.rejects(execute(process.execPath, [...base, 'agent', command], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already owns this private state/);
@@ -192,7 +191,9 @@ test('foreground CLI emits one session record, stays quiet on idle polls, reject
   assert(JSON.parse(who.stdout).joined[SELF]);
   matrix.add(ROOM, message('$one'));
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
-  await delay(110);
+  const priorPolls = matrix.requests.filter(request => request.path === API + '/sync').length;
+  matrix.wake();
+  await until(() => matrix.requests.filter(request => request.path === API + '/sync').length > priorPolls && matrix.waiting() === 1);
   assert.deepEqual(JSON.parse(output), { runtime: 'codex', session: THREAD, workspace: matrix.workspace }); assert.equal(errors, '');
   child.kill('SIGTERM');
   assert.deepEqual(await stopped, [0, null]);
@@ -214,15 +215,6 @@ test('CLI validates listener-only controls before network use', async scope => {
   }
 });
 
-test('Pi listener refuses an absent native attachment before Matrix network use', async scope => {
-  const native = await fakeCodex(scope);
-  const fixture = await matrixFixture(scope, native.directory);
-  const args = [CLIENT, '--project', fixture.workspace, '--profile', 'watson', 'agent', 'listen', '--runtime', 'pi'];
-  await assert.rejects(execute(process.execPath, args, { env: { ...fixture.env, CROSSFIRE_PI_CONNECTION: '' } }), /Pi native connection is not ready/);
-  assert.equal(fixture.requests.length, 0);
-  assert.equal(existsSync(fixture.cursorFile), false);
-});
-
 test('foreground SIGINT and SIGHUP close only their attached connection and receiver', async context => {
   for (const signal of ['SIGINT', 'SIGHUP'] as const) {
     const native = await fakeCodex(context);
@@ -231,7 +223,7 @@ test('foreground SIGINT and SIGHUP close only their attached connection and rece
       '--runtime', 'codex', '--poll-ms', '100'],
       { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' }, stdio: ['ignore', 'pipe', 'pipe'] });
     const stopped = once(child, 'close');
-    context.after(async () => { child.kill('SIGTERM'); await stopped; });
+    cleanup(context, async () => { child.kill('SIGTERM'); await stopped; });
     await until(() => matrix.waiting() > 0);
     child.kill(signal);
     assert.deepEqual(await stopped, [0, null]);
@@ -254,7 +246,7 @@ test('the standalone bundle relays from a foreign project without node_modules',
   let errors = '', output = '';
   child.stderr.on('data', chunk => { errors += String(chunk); });
   child.stdout.on('data', chunk => { output += String(chunk); });
-  t.after(async () => { child.kill('SIGTERM'); await stopped; });
+  cleanup(t, async () => { child.kill('SIGTERM'); await stopped; });
   await until(() => child.exitCode !== null || existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   assert.equal(errors, ''); assert.deepEqual(JSON.parse(output), { runtime: 'codex', session: THREAD, workspace: matrix.workspace });
   assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], '1');

@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync } from "node:fs";
+import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
 import { join } from "node:path";
-import { buildRelease } from "../scripts/build-release.js";
 import { artifactHash, releaseHash, loadRelease, type Release } from "@crossfire/adapter-filesystem/release";
 import { ARTIFACTS, type ArtifactName, type Manifest } from '@crossfire/contracts/release';
 
@@ -13,8 +13,7 @@ export function updatedRelease(release: Release, name: ArtifactName, content: st
 }
 
 export async function releaseFixture() {
-  mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
-  const output = mkdtempSync(join(process.cwd(), ".temp/release-fixture-"));
-  const manifest = await buildRelease(process.cwd(), output);
-  return loadRelease(join(output, "onboarding", manifest.release));
+  const directory = join(process.cwd(), 'dist/onboarding'), releases = readdirSync(directory);
+  assert.equal(releases.length, 1, 'Build one immutable current release before running tests');
+  return loadRelease(join(directory, releases[0]!));
 }

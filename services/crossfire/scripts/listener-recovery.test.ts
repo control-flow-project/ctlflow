@@ -1,30 +1,32 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
+import { withClock } from './test-support/clock.js';
 import { localState as storage } from '@crossfire/adapter-filesystem/state';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync } from "node:fs";
-import { setTimeout as delay } from "node:timers/promises";
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { readJson } from "@crossfire/adapter-filesystem/index";
 import { loadControl } from "@crossfire/agent-core/control";
-import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD, until } from "./test-support/listener.js";
+import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD } from "./test-support/listener.js";
 
-test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", async scope => {
+test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", withClock(async (scope, clock) => {
+
   const native = await fakeCodex(scope);
-  const matrix = await matrixFixture(scope, native.directory);
+  const matrix = await matrixFixture(scope, native.directory, clock);
   const stop = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
-  scope.after(async () => { stop.abort(); await result; });
-  await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
+  cleanup(scope, async () => { stop.abort(); await clock.complete(result); });
+  await clock.until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   const before = readJson(matrix.cursorFile);
   matrix.syncUpdates.enabled = false;
   matrix.add(ROOM, message("$missed"), { ...message("$rename", OBSERVER), type: "m.room.name", state_key: "", content: { name: "Coffee Day" } },
     { ...message("$avatar", OBSERVER), type: "m.room.avatar", state_key: "", content: { url: "mxc://test/avatar" } },
     { ...message("$topic", OBSERVER), type: "m.room.topic", state_key: "", content: { topic: "Coordination" } });
-  await delay(200);
+  await clock.advance(200);
   assert.deepEqual(readJson(matrix.cursorFile), before);
   const starts = () => native.requests().filter(request => request.method === "turn/start");
   assert.equal(starts().length, 0);
-  await until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === "4");
+  await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === "4");
   const ids = starts().flatMap(request => {
     const input = request.params!.input as { text: string }[];
     const batch = JSON.parse(input[0]!.text.slice(input[0]!.text.indexOf("\n") + 1)) as { events: { event_id: string; state_key?: string }[] };
@@ -35,29 +37,30 @@ test("one bounded reconciliation receiver recovers missed notifications and impo
   assert.deepEqual(ids, ["$missed", "$rename", "$topic"]);
   assert.equal(starts().length, 1);
   const count = starts().length;
-  await delay(1100);
+  await clock.advance(1100);
   assert.equal(starts().length, count);
-});
+}));
 
-test("reconciliation respects human pause, mute and suspension without empty model turns", async scope => {
+test("reconciliation respects human pause, mute and suspension without empty model turns", withClock(async (scope, clock) => {
+
   const native = await fakeCodex(scope);
-  const matrix = await matrixFixture(scope, native.directory);
+  const matrix = await matrixFixture(scope, native.directory, clock);
   const stop = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
-  scope.after(async () => { stop.abort(); await result; });
-  await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
+  cleanup(scope, async () => { stop.abort(); await clock.complete(result); });
+  await clock.until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   matrix.add(ROOM, message("$pause", OBSERVER, "!!"));
-  await until(() => loadControl(storage, matrix.cursorFile + ".control", THREAD).paused);
+  await clock.until(() => loadControl(storage, matrix.cursorFile + ".control", THREAD).paused);
   matrix.syncUpdates.enabled = false;
   matrix.add(ROOM, message("$paused-backlog"));
-  await delay(1100);
+  await clock.advance(1100);
   assert.equal(native.requests().filter(request => request.method === "turn/start").length, 0);
   assert(loadControl(storage, matrix.cursorFile + ".control", THREAD).paused);
   matrix.muted.add(ROOM);
   matrix.access.status = "suspended";
-  assert.match(String(await result), /no longer active/);
+  assert.match(String(await clock.complete(result)), /no longer active/);
   assert.equal(native.requests().filter(request => request.method === "turn/start").length, 0);
-});
+}));
 
 test("a hung acquisition is cancelled within the finite reconciliation budget without advancing unread cursors", async scope => {
   const native = await fakeCodex(scope);

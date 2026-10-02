@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "devDependencies": { "@crossfire/test-support": "0.1.0" },
   "bin": { "fleetd": "./dist/apps/daemon/src/main.js" },
   "exports": { "./executable": "./dist/apps/daemon/src/main.js" },
   "engines": {
@@ -12,6 +13,6 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "node ../../scripts/build-service.mjs fleetd",
-    "test": "node ../../scripts/test-service.mjs fleetd"
+    "test": "node ../../scripts/test.mjs fleetd all"
   }
 }

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { API, segment } from '@crossfire/contracts/matrix';
-import type { Matrix } from './port.js';
+import type { Clock, Matrix } from './port.js';
 import type { Json } from '@crossfire/contracts/json';
 import { roomId, text } from '@crossfire/contracts/validation';
 import type { Account, Event, Settings } from '@crossfire/contracts/client';
@@ -31,7 +31,7 @@ function decisionBody(body: string): string {
     ? body.slice(boundary + 2).trim().toLowerCase() : body.trim().toLowerCase();
 }
 
-export function permissions(options: { client: Matrix; coordination: Coordination; settings: Settings; account: Account; agent: string;
+export function permissions(options: { clock: Clock; client: Matrix; coordination: Coordination; settings: Settings; account: Account; agent: string;
   room: string; expiresMs: number }, stop: AbortSignal) {
   if (!roomId(options.room) || !Number.isInteger(options.expiresMs) || options.expiresMs < 1000 || options.expiresMs > 300_000) {
     throw new Error('An explicit approval room and a 1000..300000 ms expiry are required');
@@ -74,8 +74,8 @@ export function permissions(options: { client: Matrix; coordination: Coordinatio
     const identity = JSON.stringify([permission.runtime, permission.session, permission.request]);
     if (identities.has(identity) || identities.size >= 1000 || pending.size + preparing >= 16) throw new Error('Duplicate or excessive run permissions');
     identities.add(identity);
-    const expires = performance.now() + options.expiresMs;
-    const signal = AbortSignal.any([stop, cancelled, AbortSignal.timeout(options.expiresMs)]);
+    const expires = options.clock.now() + options.expiresMs;
+    const signal = AbortSignal.any([stop, cancelled, options.clock.deadline(options.expiresMs)]);
     signal.throwIfAborted();
     let published!: () => void;
     const publication = new Promise<void>(resolve => { published = resolve; });
@@ -123,7 +123,7 @@ export function permissions(options: { client: Matrix; coordination: Coordinatio
     const choice = current.choices.find(choice => choice.label === decisionBody(original.content.body as string));
     if (!choice) return true;
     await authorize();
-    if (pending.get(target) !== current || performance.now() >= current.expires) return true;
+    if (pending.get(target) !== current || options.clock.now() >= current.expires) return true;
     current.complete(structuredClone(choice.value));
     return true;
   }

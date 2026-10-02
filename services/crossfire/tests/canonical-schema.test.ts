@@ -17,7 +17,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     const directory = createDirectoryRepository(database);
     const unit = createUnitOfWork(database);
     const tables = database.prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string; sql: string }[];
-    assert.equal(tables.length, 30);
+    assert.equal(tables.length, 33);
     assert(tables.every(table => !/json_valid/iu.test(table.sql)));
     assert.deepEqual(database.pragma('foreign_key_check'), []);
     assert.deepEqual(database.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
@@ -57,12 +57,12 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.equal(identities.items.length, 1);
     assert.equal(value(discovery.principals({ page: 1, pageSize: 20, kind: 'agent', search: 'ALPHA' })).items[0]?.principalId, 'agent');
     assert.equal(value(directory.agents({ page: 1, pageSize: 20, statuses: ['active'], search: '', activity: { mode: 'include', agentIds: [] } })).totalItems, 0);
-    value(repositories.listenerRun.insert({ id: 'run', agentId: 'agent', release: 'test', startedAt: 1, lastSeenAt: 10, activeMs: 9, messagesDelivered: 2, stoppedAt: null, disconnectRequestedAt: null }));
+    value(repositories.listenerRun.insert({ id: 'run', agentId: 'agent', release: 'test', startedAt: 1, lastSeenAt: 10, activeMs: 9, messagesDelivered: 2, controllerBound: false, stoppedAt: null, disconnectRequestedAt: null }));
     const activity = createListenerReadRepository(database);
     assert.deepEqual(value(activity.reportingAgentIds(5, false)), ['agent']);
     assert.equal(value(activity.activeCount('agent', 5)), 1);
     assert.equal(value(activity.totals(['agent']))[0]?.messagesDelivered, 2);
-    value(repositories.agentRoomGrant.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', authorizerId: 'human', addedById: 'human', accessMode: 'reply', powerLevel: null, muted: false, revision: 0, accessRevision: 0, updatedAt: 1 }));
+    value(repositories.agentRoomGrant.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', authorizerId: 'human', addedById: 'human', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', powerLevel: null, muted: false, revision: 0, accessRevision: 0, updatedAt: 1 }));
     assert.equal(value(repositories.agentRoomGrant.find({ agentId: 'agent', roomId: '!room:test' }))?.muted, false);
     assert.equal(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'policy.manage', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }).ok, false);
     value(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }));

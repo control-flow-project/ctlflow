@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -9,7 +10,7 @@ import type { CodexSession } from '@crossfire/adapter-codex/session';
 
 for (const published of [true, false]) test('lost native response preserves publication evidence across restart: ' + published, async scope => {
   const workspace = mkdtempSync(join(tmpdir(), 'receipt-proof-'));
-  scope.after(() => rmSync(workspace, { recursive: true, force: true }));
+  cleanup(scope, () => rmSync(workspace, { recursive: true, force: true }));
   const sessionId = randomUUID(), messageId = randomUUID(), turnId = randomUUID(), text = 'Exact input';
   const entries: unknown[] = [];
   let submissions = 0;
@@ -28,7 +29,7 @@ for (const published of [true, false]) test('lost native response preserves publ
   assert.throws(() => codexDelivery(session, options), /already owns/);
   await first.close();
   let restarted = codexDelivery(session, options);
-  scope.after(() => restarted.close());
+  cleanup(scope, () => restarted.close());
   if (published) {
     await restarted.deliver(text, messageId);
     await restarted.close();

@@ -1,3 +1,5 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
+import { trustWorkspace } from '@crossfire/test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
@@ -16,11 +18,12 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   mkdirSync(workspace, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
   const provider = await nativeProvider(scope, home), adapter = codexRuntime(), stop = new AbortController();
+  trustWorkspace(home, workspace);
   const input = { name: 'native-proof', workspace, instructions: 'Inert native verification. Never contact external services.',
     options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestPermission: async () => { throw new Error('No approvals are expected'); } } };
   let runtime = value(await adapter.start(input, stop.signal));
-  scope.after(() => runtime.close());
+  cleanup(scope, () => runtime.close());
   assert.equal(provider.requests.length, 0);
   const sessionId = runtime.sessionId;
   const firstPointer = runtime.attachment;
@@ -34,7 +37,8 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   const request = provider.requests[0] as { model: string; reasoning: { effort: string } };
   assert.equal(request.model, 'gpt-5.2'); assert.equal(request.reasoning.effort, 'high', JSON.stringify(request.reasoning));
   provider.finish();
-  while (await runtime.turnControl.activeTurn() !== null) await delay(50);
+  let deadline = performance.now() + 5000;
+  while (await runtime.turnControl.activeTurn() !== null) { assert(performance.now() < deadline, 'Native work did not become idle'); await delay(50); }
   await runtime.close();
   runtime = value(await adapter.start(input, stop.signal));
   assert.equal(runtime.sessionId, sessionId);
@@ -48,8 +52,6 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   const command = value(codexTerminal().command(runtime.attachment));
   assert(!command.includes(readFileSync(runtime.attachment.connection.tokenFile!, 'utf8')));
   const terminal = openTerminal(scope, command, { ...process.env, CODEX_HOME: home });
-  await terminal.until(output => output.includes('Folder access'));
-  terminal.write('\r');
   await terminal.until(output => output.includes('gpt-5.1'));
   assert.equal(provider.requests.length, 1, 'Opening the native TUI does not call the model');
   await terminal.quit();
@@ -59,7 +61,8 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   await runtime.deliver('Inert full-access native tool control', 'owned-native-proof-2', stop.signal);
   await until(() => existsSync(outside));
   assert.equal(readFileSync(outside, 'utf8'), 'full-access-confirmed');
-  while (await runtime.turnControl.activeTurn() !== null) await delay(50);
+  deadline = performance.now() + 5000;
+  while (await runtime.turnControl.activeTurn() !== null) { assert(performance.now() < deadline, 'Native tool work did not become idle'); await delay(50); }
   const changed = provider.requests[1] as { model: string; reasoning: { effort: string } };
   assert.equal(changed.model, 'gpt-5.1'); assert.equal(changed.reasoning.effort, 'medium');
 });

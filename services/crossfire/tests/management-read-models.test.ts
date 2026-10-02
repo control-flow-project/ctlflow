@@ -85,6 +85,9 @@ test('activity action labels are readable while unknown recorded actions retain 
   assert.equal(auditActionLabel('instance-policy.configure'), 'Change instance settings');
   assert.equal(auditActionLabel('room-permission.set'), 'Change invitation permission');
   assert.equal(auditActionLabel('fleet.delivery.deactivate'), 'Deactivate fleet delivery');
+  assert.equal(auditActionLabel('wake-rule.create'), 'Create Wake-up');
+  assert.equal(auditActionLabel('wake-rule.update'), 'Update Wake-up');
+  assert.equal(auditActionLabel('wake-rule.delete'), 'Delete Wake-up');
   assert.equal(auditActionLabel('recorded.native.action'), 'recorded.native.action');
   for (const action of ['constructor', 'toString', '__proto__']) assert.equal(auditActionLabel(action), action);
 });

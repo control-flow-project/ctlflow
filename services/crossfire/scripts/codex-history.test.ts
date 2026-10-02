@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,7 +18,7 @@ function oldHistory(count: number, completed = true) {
 test('acknowledgement before publication never scans unrelated large history or submits twice', async context => {
   const native = await fakeCodex(context, { initialHistory: oldHistory(10_100), deferHistory: true });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   let delivered = false;
   const delivery = connection.deliver('input', 'delayed').then(() => { delivered = true; });
   const reads = () => native.requests().filter(request => request.method === 'thread/timeline/list');
@@ -34,7 +35,7 @@ test('acknowledgement before publication never scans unrelated large history or 
 test('a long active turn needs only its post-submission interval to prove interruption', async context => {
   const native = await fakeCodex(context, { initialHistory: oldHistory(10_100, false), mode: 'accepted', turnId: 'old-turn' });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'interrupted-long');
   await until(() => native.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
   native.update({ mode: 'normal', turnId: 'new-turn' });
@@ -49,7 +50,7 @@ test('a long active turn needs only its post-submission interval to prove interr
 test('completed intervals advance a bounded in-memory boundary instead of rescanning the active turn', async context => {
   const native = await fakeCodex(context, { initialHistory: oldHistory(10_100, false), mode: 'accepted', turnId: 'old-turn' });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'incremental');
   const reads = () => native.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100);
   await until(() => reads().length >= 1);
@@ -75,7 +76,7 @@ test('an exact receipt published after a page snapshot is found on the next poll
     { data: history.slice(-100), nextCursor: 'older-snapshot' },
   ] });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   await connection.deliver('input', 'snapshot');
   const reads = native.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100);
   assert.equal(reads.length, 2);
@@ -86,7 +87,7 @@ test('an exact receipt published after a page snapshot is found on the next poll
 test('unsupported history without native unmaterialized proof fails before input', async context => {
   const native = await fakeCodex(context, { boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601] });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   await assert.rejects(connection.deliver('input', 'fresh'), /not supported yet/);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
   assert.equal(native.requests().filter(request => request.method === 'thread/timeline/list').length, 1);
@@ -95,7 +96,7 @@ test('unsupported history without native unmaterialized proof fails before input
 test('native unmaterialized history permits one first input but never fabricates its receipt', async context => {
   const native = await fakeCodex(context, { unmaterialized: true, boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601], deferHistory: true });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   let delivered = false;
   const delivery = connection.deliver('input', 'fresh').then(() => { delivered = true; });
   await until(() => native.requests().filter(request => request.method === 'thread/timeline/list').length === 3);
@@ -109,7 +110,7 @@ test('native unmaterialized history permits one first input but never fabricates
 test('unmaterialized initialization is bounded and unsupported receipts never replay', async context => {
   const native = await fakeCodex(context, { unmaterialized: true, boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601, -32601] });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   await assert.rejects(connection.deliver('input', 'fresh'), /not supported yet/);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
   assert.equal(native.requests().filter(request => request.method === 'thread/timeline/list').length, 4);
@@ -187,7 +188,7 @@ test('realtime entries and coincident positions retain exact boundary identity',
     { type: 'turnStarted', turnId: 'current', position: 1 },
   ], nextCursor: null }] });
   const connection = await connectCodex(native.options, new AbortController().signal);
-  context.after(connection.close);
+  cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'realtime');
   await until(() => native.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt('realtime') });
@@ -204,7 +205,7 @@ test('Matrix cursors remain unread during native publication lag and later drain
   matrix.add(other, message('$second'));
   const stop = new AbortController();
   const receiving = listen({ ...matrix, reconcileMs: 1000, limit: 50, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
-  context.after(async () => { stop.abort(new Error('test complete')); await receiving; });
+  cleanup(context, async () => { stop.abort(new Error('test complete')); await receiving; });
   await until(() => native.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length >= 2);
   assert.throws(() => readFileSync(matrix.cursorFile));
   native.publish();

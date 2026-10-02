@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import { nativeServer } from './support/native-server.js';
 import { value } from './support/application.js';
 import assert from 'node:assert/strict';
@@ -54,7 +55,7 @@ test('published bootstrap connects a real Codex session after native human appro
   assert(result.stdout.includes('"status": "online"'));
   assert(!result.stdout.includes(engine.token));
   const client = join(project, '.crossfire/client.mjs');
-  scope.after(async () => { await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: environment }); });
+  cleanup(scope, async () => { await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: environment }); });
   const profile = readFileSync(join(project, '.crossfire/profiles/holmes.json'));
   const lease = readFileSync(join(project, '.crossfire/state/holmes/listener.json'));
   const repeated = await execute('bash', ['-c', command], { cwd: project, env: { ...environment, CROSSFIRE_AGENT_NAME: '' }, timeout: 30_000 });

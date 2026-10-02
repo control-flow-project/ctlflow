@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -30,7 +31,7 @@ test('canonical HTTP has scoped REST resources, strict envelopes, CSRF and no cr
   const origin = 'http://127.0.0.1:' + address.port;
   fixture.application.config.publicOrigin = origin;
   fixture.services.instance.publicOrigin = origin;
-  scope.after(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  cleanup(scope, async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
   async function request(path: string, method = 'GET', input?: unknown, headers: Record<string, string> = {}) {
     return fetch(origin + path, { method, headers: { 'Content-Type': 'application/json', ...headers },
       ...(input === undefined ? {} : { body: JSON.stringify(input) }), signal: AbortSignal.timeout(10_000) });

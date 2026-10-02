@@ -54,6 +54,15 @@ export function nativeDelivery<Boundary>(native: Publication<Boundary>, parseBou
     inspect: async () => { native.signal.throwIfAborted(); return native.inspect(); },
     close: async () => { try { await native.close(); } finally { journal.close(); } }, acknowledge: journal.acknowledge,
     settle: () => settle(),
+    async recover(text, messageId) {
+      if (delivering) throw new Error('Native receipt recovery must be sequential');
+      const pending = journal.pending();
+      if (pending) {
+        if (pending.messageId !== messageId || pending.text !== text) throw new Error('Receipt recovery does not match the pending native input');
+        return settle();
+      }
+      return journal.confirmed(text, messageId);
+    },
     async deliver(text, messageId, cancelled) {
       if (delivering) throw new Error('Native delivery must be sequential');
       delivering = true;

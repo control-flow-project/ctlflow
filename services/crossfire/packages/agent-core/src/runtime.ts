@@ -9,6 +9,7 @@ export type RuntimeConnection = {
   inspect: () => Promise<{ busy: boolean }>;
   deliver: (text: string, messageId: string, cancelled?: AbortSignal) => Promise<void>;
   settle: () => Promise<boolean>;
+  recover: (text: string, messageId: string) => Promise<boolean>;
   acknowledge: (messageIds: readonly string[]) => void;
   turnControl?: TurnControl;
   close: () => void | Promise<void>;

@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -10,7 +11,7 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
   assert(Array.isArray((await native.call('thread/timeline/list', { threadId: native.thread.id, limit: 1 })).data));
   assert.equal(native.requests.length, 0, 'Attaching must not submit model input');
   const adapter = native.adapter;
-  context.after(adapter.close);
+  cleanup(context, adapter.close);
   await adapter.deliver('idle fixture input', 'fixture-idle');
   await until(() => native.held() !== undefined);
   assert.equal(((await native.call('thread/read', { threadId: native.thread.id, includeTurns: false })).thread as { status: { type: string } }).status.type, 'active');
@@ -69,7 +70,7 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
   const stop = new AbortController();
   const receiving = listen({ ...matrix, reconcileMs: 120_000, limit: 2, pollMs: 100, debounceMs: 100, runtime: native.runtime }, stop.signal)
     .catch(error => error);
-  context.after(async () => { stop.abort(new Error('verification complete')); await receiving; });
+  cleanup(context, async () => { stop.abort(new Error('verification complete')); await receiving; });
   await until(() => matrix.waiting() === 1);
   native.hold();
   await native.call('turn/start', { threadId: native.thread.id, input: [{ type: 'text', text: 'hold during Matrix burst', text_elements: [] }] });
@@ -107,7 +108,7 @@ test('installed Codex verifies new input independently of previous turn history'
   assert.equal((old.data as unknown[]).length, 100);
   assert.equal(typeof old.nextCursor, 'string');
   const connection = native.adapter;
-  context.after(connection.close);
+  cleanup(context, connection.close);
   for (let index = 0; index < 60; index++) {
     const before = native.historyQueries.length;
     await connection.deliver('new input ' + index, 'native-history-' + index);
@@ -128,7 +129,7 @@ test('a human Matrix control cancels the owned native Codex run during receipt w
   const matrix = await matrixFixture(context, native.workspace);
   const stop = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 120_000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
-  context.after(async () => { stop.abort(new Error('verification complete')); await result; });
+  cleanup(context, async () => { stop.abort(new Error('verification complete')); await result; });
   await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   await native.call('turn/start', { threadId: native.thread.id, input: [{ type: 'text', text: 'human-owned work', text_elements: [] }] });
   await until(() => native.held() !== undefined);

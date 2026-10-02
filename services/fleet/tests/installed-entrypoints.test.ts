@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -17,7 +18,7 @@ test('installed fleetd symlink starts the exact private daemon and stops normall
   const ended = once(child, 'close'); let output = '', errors = '';
   child.stdout.on('data', chunk => { output += String(chunk); });
   child.stderr.on('data', chunk => { errors += String(chunk); });
-  scope.after(async () => { if (child.exitCode === null) child.kill('SIGTERM'); await ended; });
+  cleanup(scope, async () => { if (child.exitCode === null) child.kill('SIGTERM'); await ended; });
   const client = createDaemonClient(join(root, 'fleetd.sock'));
   const deadline = Date.now() + 10000;
   for (;;) {

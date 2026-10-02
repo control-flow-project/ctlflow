@@ -1,17 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { setTimeout as delay } from 'node:timers/promises';
+import type { Clock } from './port.js';
 import { HEARTBEAT_MS } from '@crossfire/contracts/activity';
 import type { Manifest } from '@crossfire/contracts/release';
 import type { Coordination } from './coordination.js';
 
-export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, onUpdate?: (release: string) => void) {
+export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controllerBound: boolean, clock: Clock, onUpdate?: (release: string) => void) {
   const run = randomUUID();
   const failed = new AbortController(), lifetime = new AbortController();
   const signal = AbortSignal.any([stop, failed.signal, lifetime.signal]);
   let messages = 0, unavailable = false;
   let warnedRelease: string | undefined;
   async function report(stopped: boolean, initial = false): Promise<void> {
-    const response = await client.report(agent, run, { release: installed.release, messagesDelivered: messages, stopped }, stopped ? undefined : signal);
+    const response = await client.report(agent, run, { release: installed.release, messagesDelivered: messages, stopped, controllerBound }, stopped ? undefined : signal);
     if (!response.ok) {
       if (initial) throw Object.assign(new Error(response.error.message), { code: response.error.code });
       if (!stopped && ['invalid', 'unauthorized', 'forbidden', 'missing', 'conflict'].includes(response.error.code)) failed.abort(new Error(response.error.message));
@@ -30,12 +30,13 @@ export async function reportActivity(client: Coordination, agent: string, instal
   await report(false, true);
   const running = (async () => {
     while (!signal.aborted) {
-      await delay(HEARTBEAT_MS, undefined, { signal });
+      await clock.delay(HEARTBEAT_MS, signal);
       if (!signal.aborted) await report(false);
     }
   })().catch(error => { if (!signal.aborted) failed.abort(error); });
   let closing: Promise<void> | undefined;
   return {
+    runId: run,
     signal: failed.signal,
     delivered(count: number): void {
       if (!Number.isSafeInteger(count) || count < 0 || !Number.isSafeInteger(messages + count)) throw new Error('Invalid delivered message count');

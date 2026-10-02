@@ -7,6 +7,8 @@ export function mapAgentRoomGrant(row: Tables['agent_room_grant']): AgentRoomGra
     generation: row.generation,
     authorizerId: row.authorizer_id,
     addedById: row.added_by_id,
+    invitationEventId: row.invitation_event_id,
+    admissionKind: row.admission_kind,
     accessMode: row.access_mode,
     powerLevel: row.power_level,
     muted: row.muted === 1,

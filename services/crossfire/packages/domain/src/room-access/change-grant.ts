@@ -2,9 +2,10 @@ import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { authorizeGrantChange, type GrantChange } from './authorize-change.js';
 import { commitGrantChange, recheckGrantAuthorization } from './commit-change.js';
+import type { RoomInvitation } from '../port/matrix-authority.js';
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork'>;
-export async function changeRoomGrant(services: Dependencies, actor: Actor, input: GrantChange, requestId: string) {
-  const authorized = await authorizeGrantChange(services, actor, input);
+export async function changeRoomGrant(services: Dependencies, actor: Actor, input: GrantChange, requestId: string, invitation: RoomInvitation | null = null) {
+  const authorized = await authorizeGrantChange(services, actor, input, invitation);
   if (!authorized.ok) return authorized;
   return services.unitOfWork.run(() => {
     const rechecked = recheckGrantAuthorization(services, actor, authorized.value);

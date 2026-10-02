@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -17,6 +18,7 @@ async function docker(args: string[]): Promise<string> {
 }
 
 export async function conduitFixture(context: TestContext, options: { jwtSecret?: string } = {}) {
+  const started = performance.now();
   const name = "crossfire-architecture-" + randomUUID();
   const registrationToken = randomUUID();
   const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-conduit-"));
@@ -39,14 +41,27 @@ allow_check_for_updates = false
 trusted_servers = []
 log = "warn"
 `, { mode: 0o600 });
-  await docker([
-    "run", "--detach", "--rm", "--pull=never", "--name", name, "--label", "crossfire.fixture=architecture",
-    "--publish", "127.0.0.1::6167",
-    "--mount", "type=bind,src=" + config + ",dst=/etc/conduit.toml,readonly",
-    "--mount", "type=bind,src=" + database + ",dst=/var/lib/matrix-conduit",
-    "--env", "CONDUIT_CONFIG=/etc/conduit.toml", conduitImage,
-  ]);
-  context.after(async () => { await docker(["stop", "--timeout", "5", name]); });
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await docker([
+        "run", "--detach", "--rm", "--pull=never", "--name", name, "--label", "crossfire.fixture=architecture",
+        "--publish", "127.0.0.1::6167",
+        "--mount", "type=bind,src=" + config + ",dst=/etc/conduit.toml,readonly",
+        "--mount", "type=bind,src=" + database + ",dst=/var/lib/matrix-conduit",
+        "--env", "CONDUIT_CONFIG=/etc/conduit.toml", conduitImage,
+      ]);
+      break;
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('bind: address already in use')) throw error;
+      await docker(['rm', '--force', name]);
+      if (attempt >= 2) throw error;
+      context.diagnostic('Docker port acquisition collided with a live host socket; acquiring a fresh native binding');
+    }
+  }
+  cleanup(context, async () => {
+    const before = performance.now(); await docker(["stop", "--timeout", "5", name]);
+    context.diagnostic('Conduit teardown: ' + Math.round(performance.now() - before) + 'ms');
+  });
   const binding = await docker(["port", name, "6167/tcp"]);
   assert.match(binding, /^127\.0\.0\.1:\d+$/);
   const base = "http://" + binding;
@@ -56,6 +71,7 @@ log = "warn"
       const response = await request(base, "GET", "/_matrix/client/versions");
       assert.equal(response.status, 200);
       console.log("Isolated Conduit native transport ready.");
+      context.diagnostic('Conduit startup: ' + Math.round(performance.now() - started) + 'ms');
       break;
     } catch (error) {
       if (Date.now() >= deadline) {

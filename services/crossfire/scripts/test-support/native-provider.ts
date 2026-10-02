@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
 import { createServer, type ServerResponse } from "node:http";
@@ -35,7 +36,7 @@ export async function nativeProvider(context: TestContext, home: string) {
     } catch (error) { response.destroy(error instanceof Error ? error : new Error(String(error))); }
   });
   await new Promise<void>(resolve => model.listen(0, "127.0.0.1", resolve));
-  context.after(() => new Promise<void>(resolve => { model.closeAllConnections(); model.close(() => resolve()); }));
+  cleanup(context, () => new Promise<void>(resolve => { model.closeAllConnections(); model.close(() => resolve()); }));
   const address = model.address(); assert(address && typeof address === "object");
   writeFileSync(join(home, "config.toml"), `model = "fixture-model"
 model_provider = "fixture"

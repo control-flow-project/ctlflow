@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -12,7 +13,7 @@ test('native process locks survive suspension, release on owner death, and retai
   const path = join(mkdtempSync(join(tmpdir(), 'crossfire-lock-')), 'receiver');
   const child = spawn(process.execPath, [fileURLToPath(new URL('./support/lock-owner.js', import.meta.url)), path], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   const ended = once(child, 'close');
-  scope.after(async () => { child.kill('SIGKILL'); await ended; });
+  cleanup(scope, async () => { child.kill('SIGKILL'); await ended; });
   await once(child, 'message');
   const inode = statSync(path + '.lock').ino;
   await assert.rejects(acquireProcessLock(path), { code: 'ELOCKED' });

@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -19,6 +20,9 @@ import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
 import { reportListener } from '@crossfire/domain/listener/report';
 import { WAKE_POLICIES, WAKE_LABELS } from '@crossfire/contracts/wake';
 import { elementAssets } from './support/element.js';
+import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
+import { listen } from '@crossfire/adapter-crossfire/listener';
+import { fakeCodex, until } from '../scripts/test-support/listener.js';
 
 test('browser fleet review, room-plan confirmation, invitation delegation and selected wake identities share canonical APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
@@ -28,7 +32,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
     controller: { name: 'Research workstation', metadata: { site: 'local' } }, instances: [{ instanceKey: 'alpha', name: 'alpha' }, { instanceKey: 'beta', name: 'beta' }] };
   const introduced = value(await introduceEnrollment(services, input));
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
-  scope.after(() => browser.close());
+  cleanup(scope, () => browser.close());
   const context = await browser.newContext(); await context.addCookies([{ name: 'crossfire', value: admin.secret, url: origin }]);
   const page = await context.newPage(), errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin + '/manage/enrollments/' + input.enrollmentId);
@@ -41,7 +45,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   const ready = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
   const control = createFleetControlConnection({ origin, credential: ready.fleet!.controllerCredential!, fleetId: fleet.id,
     owner: admin.member.principal.matrixUserId, signal: new AbortController().signal });
-  scope.after(() => control.close());
+  cleanup(scope, () => control.close());
   const instances = value(services.collection.fleetInstances({ ownerId: admin.actor.principalId, fleetKey: 'research' }));
   const alpha = instances.find(instance => instance.instanceKey === 'alpha')!;
   const roomId = value(await nativeOk({ base: fixture.native.base, token: admin.token }, 'POST', API + '/createRoom', { name: 'Research', preset: 'private_chat' })).room_id as string;
@@ -179,11 +183,11 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
 
 test('stock Element room invite search finds a registered zero-room agent without admitting it', { timeout: 120000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/element-directory-'));
-  const fixture = await nativeServer(scope, await releaseFixture(), {}, elementAssets(directory));
+  const fixture = await nativeServer(scope, await releaseFixture(), {}, elementAssets());
   const owner = await fixture.member('alice'), other = await fixture.member('bob'), agent = await fixture.agent(other.actor, 'bea');
   const room = value(await nativeOk({ base: fixture.origin, token: owner.token }, 'POST', API + '/createRoom', { name: 'Matter review', preset: 'private_chat' }));
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
-  scope.after(() => browser.close());
+  cleanup(scope, () => browser.close());
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on('dialog', dialog => dialog.dismiss());
   await page.goto(fixture.origin + '/#/login');
@@ -212,6 +216,80 @@ test('stock Element room invite search finds a registered zero-room agent withou
   assert.equal(value(await fixture.services.matrix.membership(owner.accepted.account.userId, agent.matrixUserId, String(room.room_id))).membership, 'leave');
 });
 
+test('stock Element owner invitations and DMs enable read-and-reply access without management steps', { timeout: 120000 }, async scope => {
+  const directory = mkdtempSync(join(process.cwd(), '.temp/element-invitations-')), release = await releaseFixture();
+  const fixture = await nativeServer(scope, release, {}, elementAssets()), { services, origin } = fixture;
+  const owner = await fixture.member('alice'), agent = await fixture.agent(owner.actor, 'ada');
+  const created = value(await nativeOk({ base: origin, token: owner.token }, 'POST', API + '/createRoom', { name: 'Samosas', preset: 'private_chat' }));
+  assert(typeof created.room_id === 'string');
+  const roomId = created.room_id, runtime = await fakeCodex(scope), stop = new AbortController();
+  let ended: unknown;
+  const receiver = listen({ coordination: createCoordination({ origin, token: agent.token }), settings: {
+    instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
+    account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
+    id: agent.id, release: release.manifest, cursorFile: join(runtime.directory, 'cursor.json'),
+    limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000, runtime: runtime.runtime,
+  }, stop.signal).catch(error => { ended = error; });
+  cleanup(scope, async () => { stop.abort(); await receiver; });
+  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  cleanup(scope, () => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } }), page = await context.newPage();
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  page.on('dialog', dialog => dialog.dismiss());
+  await page.goto(origin + '/#/login');
+  await page.getByRole('textbox', { name: 'Username', exact: true }).fill(owner.accepted.account.userId);
+  await page.getByLabel('Password', { exact: true }).fill(owner.input.password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const keys = page.getByRole('dialog', { name: 'Setting up keys', exact: true }).filter({ has: page.getByRole('textbox', { name: 'Password', exact: true }) });
+  await keys.getByRole('textbox', { name: 'Password', exact: true }).fill(owner.input.password);
+  await keys.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(page.locator('.mx_LeftPanel')).toBeVisible({ timeout: 30000 });
+  await page.goto(origin + '/#/room/' + roomId);
+  await expect(page.locator('.mx_RoomHeader')).toBeVisible({ timeout: 30000 });
+  await page.getByRole('button', { name: /Invite.*room/u }).click();
+  const invitation = page.getByRole('dialog', { name: 'Invite to Samosas', exact: true });
+  await invitation.getByRole('textbox').fill('ada');
+  await invitation.getByText('ada (alice)', { exact: true }).click();
+  await invitation.getByRole('button', { name: 'Invite', exact: true }).click();
+  await expect(invitation).toBeHidden();
+  const confirmation = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Invite new contacts to this room?', exact: true }) });
+  await confirmation.getByRole('button', { name: 'Invite', exact: true }).click();
+  await expect(confirmation).toBeHidden();
+  const joined = (room: string) => value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId: room }))?.membership === 'join';
+  await until(() => joined(roomId) || ended !== undefined, 'Element invitation did not admit the owned agent', 30000);
+  assert.equal(ended, undefined);
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId }))?.accessMode, 'reply');
+  assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 0);
+  await page.screenshot({ path: join(directory, 'element-owner-room-admitted.png'), fullPage: true });
+
+  await page.goto(origin + '/#/user/' + agent.matrixUserId);
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  const composer = page.getByRole('region', { name: 'Message composer', exact: true }).getByRole('textbox');
+  await composer.fill('Ada, this is your owner’s direct message.');
+  const creation = page.waitForResponse(response => response.url().endsWith('/_matrix/client/v3/createRoom') && response.request().method() === 'POST');
+  await composer.press('Enter');
+  const response = await creation;
+  assert.equal(response.status(), 200);
+  const dm = await response.json() as { room_id: string };
+  await page.screenshot({ path: join(directory, 'element-owner-dm-created.png'), fullPage: true });
+  await until(() => joined(dm.room_id) || ended !== undefined, 'Element DM did not admit the owned agent', 30000);
+  await until(() => JSON.stringify(runtime.requests()).includes('Ada, this is your owner’s direct message.') || ended !== undefined, 'Element DM task was not delivered', 30000);
+  assert.equal(ended, undefined);
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: dm.room_id }))?.accessMode, 'reply');
+  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId: dm.room_id }))?.creator, true);
+  assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 1);
+  await page.screenshot({ path: join(directory, 'element-owner-dm-admitted.png'), fullPage: true });
+  await context.addCookies([{ name: 'crossfire', value: owner.secret, url: origin }]);
+  await page.goto(origin + '/manage/agents/' + agent.id);
+  await expect(page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Samosas', exact: true }) }).getByRole('cell').nth(2)).toHaveText('Read & reply');
+  const directRow = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Unnamed room', exact: true }) });
+  await expect(directRow.getByText('Native room creator', { exact: true })).toBeVisible();
+  await expect(directRow.getByRole('combobox').locator('option[value="read"]')).toBeDisabled();
+  await expect(directRow.getByRole('combobox').locator('option[value="custom"]')).toBeDisabled();
+  await page.screenshot({ path: join(directory, 'management-invited-access.png'), fullPage: true });
+  assert.deepEqual(errors, []);
+});
+
 test('browser fleet connection map uses management theme, full roster, adaptive geometry and durable accessible selection', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
   const { fleet, instances } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
@@ -222,7 +300,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   for (let index = 0; index < instances.length; index++) {
     const id = instances[index]!.agentId!, principal = value(services.directory.agent(id))!.principal, mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: principal.revision, mode, senderIds: mode === 'selected' ? [other.actor.principalId] : [] }, randomUUID()));
-    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { release: 'browser-map', messagesDelivered: 0, stopped: false }, 'browser-map'));
+    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { release: 'browser-map', messagesDelivered: 0, controllerBound: false, stopped: false }, 'browser-map'));
     if (index >= 20) continue;
     const record = value(services.directory.agent(id))!, modeIndex = index % 3;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId: roomIds[index % roomIds.length]!, expectedRevision: record.principal.revision,
@@ -230,7 +308,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   }
   await worker.drain();
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
-  scope.after(() => browser.close());
+  cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1920, height: 1200 } });
   await context.addCookies([{ name: 'crossfire', value: admin.secret, url: origin }]);
   const page = await context.newPage(), errors: string[] = [];
@@ -291,7 +369,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
     }
     await page.screenshot({ path: join(directory, 'fleet-map-' + width + '.png'), fullPage: true });
   }
-  const unauthorized = await browser.newContext(); scope.after(() => unauthorized.close());
+  const unauthorized = await browser.newContext(); cleanup(scope, () => unauthorized.close());
   await unauthorized.addCookies([{ name: 'crossfire', value: other.secret, url: origin }]);
   const denied = await unauthorized.newPage(); await denied.goto(origin + route);
   await expect(denied.getByRole('alert')).toBeVisible(); await expect(denied.locator('.map-node')).toHaveCount(0);

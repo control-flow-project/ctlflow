@@ -6,6 +6,8 @@ import type { MatrixAuthority } from './matrix-authority.js';
 import type { ListenerReadRepository } from './listener-read.js';
 import type { DiscoveryRepository } from './discovery.js';
 import type { RoomGrantReadRepository } from './room-grant-read.js';
+import type { RoomOperations } from './room-operations.js';
+import type { ScheduleCalculator } from './schedule.js';
 export type Services = {
   repositories: Repositories;
   directory: DirectoryRepository;
@@ -13,6 +15,8 @@ export type Services = {
   listenerRead: ListenerReadRepository;
   discovery: DiscoveryRepository;
   roomGrantRead: RoomGrantReadRepository;
+  roomOperations: RoomOperations;
+  schedule: ScheduleCalculator;
   unitOfWork: UnitOfWork;
   matrix: MatrixAuthority;
   clock: { now(): number };

@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { once } from 'node:events';
@@ -53,7 +54,7 @@ test('authenticated HTTP resolves sender metadata through the coordination adapt
   const address = server.address(); assert(address && typeof address !== 'string');
   const origin = 'http://127.0.0.1:' + address.port;
   fixture.application.config.publicOrigin = origin; fixture.services.instance.publicOrigin = origin;
-  scope.after(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  cleanup(scope, async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
   const coordination = createCoordination({ origin, token: self.token });
   const ids = [fixture.admin.member.principal.matrixUserId, self.matrixUserId, '@unknown:remote.test'];
   const result = value(await coordination.identities(ids));

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { setTimeout } from 'node:timers/promises';
+import { setImmediate as yieldLoop } from 'node:timers/promises';
 import { FLEET_MAP_LIMITS } from '@crossfire/kernel/fleet-map';
 import { readFleetMap } from '@crossfire/domain/fleet/read-map';
 import { resolveWakePolicy } from '@crossfire/domain/wake/resolve-policy';
@@ -29,7 +29,7 @@ async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
     const mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: agent.principal.revision, mode,
       senderIds: mode === 'selected' ? [specialist.id, other.actor.principalId] : [] }, randomUUID()));
-    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { release: 'test', messagesDelivered: 0, stopped: false }, 'test'));
+    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { release: 'test', messagesDelivered: 0, controllerBound: false, stopped: false }, 'test'));
     if (index === instances.length - 1) continue;
     const roomId = rooms[index % rooms.length]!.roomId, current = value(services.directory.agent(id))!;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId, expectedRevision: current.principal.revision,
@@ -56,7 +56,7 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
     directory: { ...services.directory, activePrincipals() { activeReads++; return services.directory.activePrincipals(); } },
     matrix: { ...services.matrix, async room(matrixId: string, roomId: string) {
       nativeActive++; maximumNative = Math.max(maximumNative, nativeActive);
-      try { await setTimeout(2); return await services.matrix.room(matrixId, roomId); } finally { nativeActive--; }
+      try { await yieldLoop(); return await services.matrix.room(matrixId, roomId); } finally { nativeActive--; }
     } } };
   const snapshot = value(await readFleetMap(dependencies, admin.actor, fleet.id));
   const map = value(mapSchema(mapRepresentation(snapshot)));

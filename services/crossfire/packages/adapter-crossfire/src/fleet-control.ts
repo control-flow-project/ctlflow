@@ -11,6 +11,7 @@ export function createFleetControlConnection(options: { origin: string; credenti
   const client = createClient({ origin: options.origin, token: options.credential, signal: lifetime, timeoutMs: 15000 });
   let state: ControllerState = { connected: false, deliveryEnabled: false, revision: null, error: 'Connecting to Crossfire' };
   let snapshot: FleetControlSnapshot | undefined, connectionId = randomUUID(), requests = new AbortController();
+  let releaseRequired = false;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
   const listeners = new Map<string, ReturnType<typeof createListenerControl>>(), completed = new Set<string>();
   function refresh(): void {
@@ -44,15 +45,25 @@ export function createFleetControlConnection(options: { origin: string; credenti
     if (!result.ok) { disconnect(result.error.message); throw Object.assign(new Error(result.error.message), { code: result.error.code }); }
     completed.add(messageId + ':' + agentId); refresh();
   }
-  async function closeLease(id: string): Promise<void> {
-    await createClient({ origin: options.origin, token: options.credential, timeoutMs: 2000 }).call(operations.reportFleetConnection,
+  async function closeLease(id: string) {
+    const result = await createClient({ origin: options.origin, token: options.credential, timeoutMs: 2000 }).call(operations.reportFleetConnection,
       { fleetId: options.fleetId, connectionId: id }, { stopped: true });
+    if (!result.ok && result.error.code !== 'conflict') return result;
+    if (connectionId === id) releaseRequired = false;
+    return success(undefined);
   }
   const running = (async () => {
     while (!lifetime.aborted) {
       try {
-        if (requests.signal.aborted) { connectionId = randomUUID(); requests = new AbortController(); }
+        if (requests.signal.aborted) {
+          if (releaseRequired) {
+            const released = await closeLease(connectionId);
+            if (!released.ok) throw new Error(released.error.message);
+          }
+          connectionId = randomUUID(); requests = new AbortController();
+        }
         const scope = AbortSignal.any([lifetime, requests.signal]);
+        releaseRequired = true;
         const lease = await client.call(operations.reportFleetConnection, { fleetId: options.fleetId, connectionId }, { stopped: false }, undefined, scope);
         if (!lease.ok) throw new Error(lease.error.message);
         const response = await client.call(operations.fleetControl, { fleetId: options.fleetId }, {}, new URLSearchParams({
@@ -64,9 +75,7 @@ export function createFleetControlConnection(options: { origin: string; credenti
         }
         if (response.value.data.messages.length) await delay(1000, undefined, { signal: scope });
       } catch (error) {
-        const old = connectionId;
         disconnect(error instanceof Error ? error.message : 'Controller connection unavailable');
-        await closeLease(old);
         if (!lifetime.aborted) await delay(1000, undefined, { signal: lifetime });
       }
     }
@@ -97,7 +106,10 @@ export function createFleetControlConnection(options: { origin: string; credenti
       const result = await client.call(operations.createFleetMessage, { fleetId: options.fleetId }, input);
       return result.ok ? success(result.value.data) : result;
     },
-    close(): Promise<void> { return closing ??= (async () => { stop.abort(); await running; await closeLease(connectionId); lifetime.removeEventListener('abort', onClose); listeners.clear(); })(); },
+    close(): Promise<void> { return closing ??= (async () => { stop.abort(); await running;
+      try { if (releaseRequired) await closeLease(connectionId); }
+      finally { lifetime.removeEventListener('abort', onClose); listeners.clear(); }
+    })(); },
   };
 }
 export type FleetControlConnection = ReturnType<typeof createFleetControlConnection>;

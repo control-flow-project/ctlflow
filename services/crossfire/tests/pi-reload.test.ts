@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile, execFileSync } from 'node:child_process';
@@ -36,7 +37,7 @@ test('native Pi reload activates installation and software upgrades without repl
   const errors: unknown[] = [];
   const { session: native } = await sdk.createAgentSession({ cwd: project, agentDir: agent, settingsManager: settings, tools: [], thinkingLevel: 'off' });
   await native.bindExtensions({ mode: 'rpc', onError: error => errors.push(error) });
-  scope.after(async () => { settings.setProjectTrusted(false); await native.reload(); native.dispose(); });
+  cleanup(scope, async () => { settings.setProjectTrusted(false); await native.reload(); native.dispose(); });
   const release = { ...builtRelease().release };
   const fixture = await nativeServer(scope, release), { origin, services, admin } = fixture;
   const owner = admin.member.principal.matrixUserId;
@@ -65,7 +66,7 @@ test('native Pi reload activates installation and software upgrades without repl
   await fixture.worker.drain();
   const connected = await enrollment;
   assert(connected.stdout.includes('"status": "listening"'), connected.stdout);
-  scope.after(async () => { await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: environment }); });
+  cleanup(scope, async () => { await execute(process.execPath, [client, 'agent', 'disconnect'], { cwd: project, env: environment }); });
   const identity = readFileSync(approvedProfile), old = piDescriptor(readJson<unknown>(descriptor));
   assert(old.ok);
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1);

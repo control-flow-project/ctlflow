@@ -8,6 +8,7 @@ import { Connect } from './connect.js';
 import { Members, Invitations, Settings, Audit } from './administration.js';
 import { Fleets, FleetDetail } from './fleets.js';
 import { FleetMap } from './fleet-map/index.js';
+import { WakeUps, WakeUpDetail } from './wake-ups/index.js';
 import { Join } from './join.js';
 import { Alert, Page } from './ui.js';
 import { call, operations, useAction, useResource } from './api.js';
@@ -18,6 +19,7 @@ const path = location.pathname.replace(/\/$/u, '');
 const sections = [
   { path: '/manage/agents', label: 'Agents', icon: '◉' },
   { path: '/manage/fleets', label: 'Fleets', icon: '▦' },
+  { path: '/manage/wake-ups', label: 'Wake-ups', icon: '◷' },
   { path: '/manage/enrollments', label: 'Enrollments', icon: '↗' },
   { path: '/manage/connect', label: 'Connect an agent', icon: '+' },
   { path: '/manage/audit', label: 'Activity', icon: '≡' },
@@ -30,6 +32,10 @@ const administration = [
 function Route({ canInvite }: { canInvite: boolean }) {
   const viewer = useSession();
   if (path === '/manage' || path === '/manage/agents') return <Agents/>;
+  if (path === '/manage/wake-ups') return <WakeUps/>;
+  if (path === '/manage/wake-ups/new') return <WakeUpDetail/>;
+  const wakeUp = /^\/manage\/wake-ups\/([a-f0-9-]{36})$/u.exec(path);
+  if (wakeUp) return <WakeUpDetail id={wakeUp[1]!}/>;
   const agent = /^\/manage\/agents\/([a-f0-9-]{36})(?:\/(wake|activity|software|settings))?$/u.exec(path);
   if (agent) { const section = agent[2]; if (section === undefined || section === 'wake' || section === 'activity' || section === 'software' || section === 'settings') return <AgentDetail id={agent[1]!} section={section ?? 'rooms'}/>; }
   const agentRoom = /^\/manage\/agents\/([a-f0-9-]{36})\/rooms\/([^/]+)$/u.exec(path);

@@ -1,3 +1,4 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -12,9 +13,17 @@ import { readJson } from '@crossfire/adapter-filesystem/index';
 import { piDescriptor } from '@crossfire/adapter-pi/protocol';
 import { connectPi } from '@crossfire/adapter-pi/discovery';
 import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
-import { builtClient } from '../scripts/test-support/release.js';
+import { builtClient, builtRelease } from '../scripts/test-support/release.js';
+import { nativeServer } from './support/native-server.js';
+import { value } from './support/application.js';
+import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
+import { createWakeRule, changeWakeRule } from '@crossfire/domain/wake-up/manage';
+import { readWakeRule } from '@crossfire/domain/wake-up/read';
+import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
 
-test('installed Pi native extension confirms idle/busy inputs, exact interruption, Matrix batching and replacement', { timeout: 60000 }, async scope => {
+test('installed Pi native extension confirms idle/busy inputs, exact interruption, Matrix batching and replacement', { timeout: 180000 }, async scope => {
+  const release = builtRelease().release, fixture = await nativeServer(scope, release);
+  await scope.test('native Pi publication, schedules and replacement complete within the protocol deadline', { timeout: 60000 }, async scope => {
   mkdirSync('.temp', { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), '.temp/pi-native-'));
   const home = join(directory, 'home'), agent = join(home, '.pi/agent');
@@ -25,7 +34,7 @@ test('installed Pi native extension confirms idle/busy inputs, exact interruptio
   const child = spawn('pi', ['--mode', 'rpc', '--provider', 'anthropic', '--model', 'claude-sonnet-4-6', '--thinking', 'off', '--no-tools', '--offline', '--approve', '--no-extensions', '--extension', join(dirname(builtClient()), 'crossfire-pi.mjs'), '--session-dir', join(directory, 'sessions')], {
     cwd: directory, env: { ...process.env, HOME: home, PI_CODING_AGENT_DIR: agent, PI_OFFLINE: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
   });
-  scope.after(() => child.kill('SIGTERM'));
+  cleanup(scope, () => child.kill('SIGTERM'));
   let buffer = '', errors = '';
   const records: Record<string, unknown>[] = [];
   child.stderr.on('data', bytes => { errors += String(bytes); });
@@ -48,12 +57,13 @@ test('installed Pi native extension confirms idle/busy inputs, exact interruptio
   const stop = new AbortController();
   const journal = join(directory, '.crossfire/runtime/pi', String(state.sessionId) + '.receipt');
   const adapter = await connectPi(parsed.value, journal, 100, stop.signal);
-  scope.after(() => adapter.close());
+  cleanup(scope, () => adapter.close());
   await adapter.deliver('Idle Pi input.', 'pi-idle');
   await until(() => provider.requests.length === 2);
   let received = false;
   const pending = adapter.deliver('Busy Pi input.\nRetain Unicode \u2028 safely.', 'pi-busy').then(() => { received = true; });
-  await new Promise<void>(resolve => setTimeout(resolve, 200)); assert.equal(received, false);
+  await until(() => readJson<{ pending: { messageId: string } | null }>(journal).pending?.messageId === 'pi-busy');
+  assert.equal(received, false);
   const captured = await adapter.turnControl.activeTurn(); assert(captured);
   await adapter.turnControl.interrupt(captured);
   provider.release();
@@ -65,6 +75,26 @@ test('installed Pi native extension confirms idle/busy inputs, exact interruptio
   assert.equal(history.split('\n').filter(line => line.includes('"messageId":"pi-idle"')).length, 1);
   adapter.acknowledge(['pi-idle', 'pi-busy']);
   await adapter.close();
+  const scheduledAgent = await fixture.agent(fixture.admin.actor, 'scheduled-pi');
+  value(changeWakePolicy(fixture.services, fixture.admin.actor, scheduledAgent.id, { expectedRevision: 0, mode: 'nobody', senderIds: [] }, randomUUID()));
+  const ruleId = randomUUID(), configuration = { name: 'Pi schedule', message: 'Scheduled native Pi fixture input.',
+    schedule: { kind: 'interval' as const, seconds: 1 }, enabled: true, agentIds: [scheduledAgent.id] };
+  value(createWakeRule(fixture.services, fixture.admin.actor, ruleId, configuration, randomUUID()));
+  const scheduledStop = new AbortController(); let scheduleError: unknown;
+  const scheduled = listen({ coordination: createCoordination({ origin: fixture.origin, token: scheduledAgent.token }), settings: {
+    instance: 'tests', homeserver: fixture.origin, server_name: 'architecture.localhost', owner: fixture.admin.member.principal.matrixUserId, max_upload_bytes: 1024 },
+    account: { user_id: scheduledAgent.matrixUserId, access_token: scheduledAgent.token, device_id: 'CROSSFIRE_AGENT' }, id: scheduledAgent.id,
+    release: release.manifest, cursorFile: join(directory, 'scheduled-cursor.json'), reconcileMs: 10000, pollMs: 100, debounceMs: 0, limit: 20,
+    runtime: (signal, pollMs) => connectPi(parsed.value, journal, pollMs, signal),
+  }, scheduledStop.signal).catch(error => { scheduleError = error; });
+  cleanup(scope, async () => { scheduledStop.abort(); await scheduled; });
+  await until(() => value(readWakeRule(fixture.services, fixture.admin.actor, ruleId)).lastDeliveredAt !== null || scheduleError !== undefined,
+    'Real Pi schedule did not produce a native receipt', 15000);
+  assert.equal(scheduleError, undefined); assert(readFileSync(String(state.sessionFile), 'utf8').includes(configuration.message));
+  value(changeWakeRule(fixture.services, fixture.admin.actor, ruleId, { ...configuration, expectedRevision: 0, enabled: false }, randomUUID()));
+  await until(() => readJson<{ pending: unknown; confirmed: unknown[] }>(journal).pending === null
+    && readJson<{ confirmed: unknown[] }>(journal).confirmed.length === 0, 'Scheduled receipt acknowledgment must retire the native Pi journal');
+  scheduledStop.abort(); await scheduled;
   const matrix = await matrixFixture(scope, directory);
   matrix.subscribe(ROOM);
   const receiverStop = new AbortController();
@@ -72,7 +102,7 @@ test('installed Pi native extension confirms idle/busy inputs, exact interruptio
   let ended = false;
   const receiver = listen({ ...matrix, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 2, runtime }, receiverStop.signal)
     .catch(error => error).finally(() => { ended = true; });
-  scope.after(async () => { receiverStop.abort(); await receiver; });
+  cleanup(scope, async () => { receiverStop.abort(); await receiver; });
   await until(() => matrix.waiting() > 0 && existsSync(matrix.cursorFile)
     && readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '0');
   matrix.add(ROOM, ...Array.from({ length: 5 }, (_, index) => message('$pi-matrix-' + index, undefined, 'Matrix burst ' + index)));
@@ -86,4 +116,5 @@ test('installed Pi native extension confirms idle/busy inputs, exact interruptio
   await assert.rejects(connectPi(parsed.value, journal, 100, stop.signal), /unavailable|rejected|closed/iu);
   child.stdin.end(); child.kill('SIGTERM'); await once(child, 'exit');
   writeFileSync(join(directory, 'evidence.json'), JSON.stringify({ errors, records, requests: provider.requests }, null, 2));
+  });
 });
