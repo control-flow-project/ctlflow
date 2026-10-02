@@ -8,6 +8,9 @@ export function setRoomPermission(services: Pick<Services, 'repositories' | 'dir
     if (actor.kind !== 'human') return failure('forbidden', 'Agents cannot delegate invitation permission onward');
     const target = authorizeAgent(services, actor, input.agentId, 'room-grant.manage');
     if (!target.ok) return target;
+    const conversation = services.repositories.ownerConversation.find({ agentId: input.agentId });
+    if (!conversation.ok) return conversation;
+    if (conversation.value?.roomId === input.roomId) return failure('forbidden', 'Owner DMs are private channels and cannot delegate invitations');
     if (target.value.principal.revision !== input.expectedRevision) return failure('conflict', 'Agent revision changed');
     if (target.value.principal.status !== 'active' || target.value.owner.status !== 'active') return failure('forbidden', 'Agent and owner must be active');
     if (input.permissions.length > 1 || input.permissions.some(code => code !== 'room.agent.invite')) return failure('invalid', 'Unsupported room-scoped permission');

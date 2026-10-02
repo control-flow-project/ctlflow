@@ -25,7 +25,7 @@ export function agentRoutes() {
     }),
     bind(operations.deliveryPolicy, (context, params) => reply(deliveryPolicy(context.services, actor(context), params.agentId), value => ({
       agentId: value.record.principal.id, matrixUserId: value.record.principal.matrixUserId, ownerMatrixId: value.record.owner.matrixUserId,
-      status: value.record.principal.status, ownerStatus: value.record.owner.status,
+      status: value.record.principal.status, ownerStatus: value.record.owner.status, ownerConversation: value.ownerConversation,
       roomGrants: value.grants.map(grant => ({ roomId: grant.roomId, accessMode: grant.accessMode, powerLevel: grant.powerLevel, muted: grant.muted })),
       wakeMode: value.wake.mode, senderMatrixIds: value.wake.senders,
     }))),

@@ -7,6 +7,7 @@ export function matrixAuthorityFixture() {
   const events = new Map<string, MatrixEvent>();
   const notices = new Map<string, { body: string; senderMatrixId: string; eventId: string }>();
   const invitations = new Map<string, RoomInvitation>();
+  const ownerRooms = new Map<string, string>();
   let noticeFailure: Result<string> | null = null;
   function facts(matrixUserId: string, roomId: string): Result<RoomFacts> {
     const room = rooms.get(roomId), member = room?.members.get(matrixUserId);
@@ -39,6 +40,19 @@ export function matrixAuthorityFixture() {
     async profileName(id) { return success(accounts.get(id)?.displayName ?? null); },
     async setDisplayName(id, name) { const account = accounts.get(id); if (!account) return failure('missing', 'Native account missing'); account.displayName = name; return success(undefined); },
     async joined(id) { return success([...rooms].filter(([, room]) => room.members.get(id)?.membership === 'join').map(([id]) => id)); },
+    async ownerConversation(owner, agent, selected) {
+      const existing = selected ?? ownerRooms.get(agent);
+      const created = existing ? success({ roomId: existing }) : await createRoom(owner, 'Owner DM');
+      if (!created.ok) return created;
+      const roomId = created.value.roomId;
+      const room = rooms.get(roomId);
+      if (!room || room.creator !== owner || [...room.members].some(([id, member]) => id !== owner && id !== agent && ['join', 'invite'].includes(member.membership))) return failure('forbidden', 'Invalid private owner DM');
+      room.members.set(owner, { matrixUserId: owner, displayName: owner, membership: 'join', creator: true, powerLevel: null });
+      const previous = room.members.get(agent);
+      room.members.set(agent, { matrixUserId: agent, displayName: agent, membership: 'join', creator: false, powerLevel: previous?.powerLevel ?? 0 });
+      ownerRooms.set(agent, roomId);
+      return success(roomId);
+    },
     async room(id, roomId) { return facts(id, roomId); },
     async membership(id, targetId, roomId) {
       const authority = facts(id, roomId);

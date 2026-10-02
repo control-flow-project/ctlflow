@@ -37,7 +37,7 @@ async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
       powerLevel: index % 3 === 2 ? 25 : null, muted: index % 4 === 0 }, randomUUID()));
     if (index % 3 !== 0) value(await reconcileRoomGrant(services, id, roomId));
   }
-  const failed = value(services.collection.agentRoomApplications({ agentId: instances[1]!.agentId! }))[0]!;
+  const failed = value(services.repositories.roomGrantApplication.find({ agentId: instances[1]!.agentId!, roomId: rooms[1]!.roomId }))!;
   value(services.repositories.roomGrantApplication.update({ ...failed, errorCode: 'native', errorMessage: 'Observed native failure' }));
   const removed = value(services.repositories.agentRoomGrant.find({ agentId: instances[2]!.agentId!, roomId: rooms[2]!.roomId }))!;
   value(services.repositories.agentRoomGrant.update({ ...removed, accessMode: 'none', powerLevel: null, revision: removed.revision + 1, accessRevision: removed.accessRevision + 1 }));
@@ -60,10 +60,10 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
     } } };
   const snapshot = value(await readFleetMap(dependencies, admin.actor, fleet.id));
   const map = value(mapSchema(mapRepresentation(snapshot)));
-  assert.equal(map.agents.length, 24); assert.equal(map.connections.length, 23); assert.equal(map.rooms.length, 5); assert.equal(map.sources.length, 6);
+  assert.equal(map.agents.length, 24); assert.equal(map.connections.length, 47); assert.equal(map.rooms.length, 29); assert.equal(map.sources.length, 6);
   assert.equal(batchGrants, 1); assert.equal(batchWake, 1); assert.equal(activeReads, 1); assert(maximumNative <= 4); assert(maximumNative > 1);
   assert.equal(map.rooms.find(room => room.name === null)?.alias, null);
-  assert.equal(map.connections.filter(connection => connection.agentId === instances[23]!.agentId).length, 0);
+  assert.equal(map.connections.filter(connection => connection.agentId === instances[23]!.agentId).length, 1);
   for (const agent of snapshot.agents) {
     const source = snapshot.sources.find(entry => entry.sourceId === agent.sourceId)!;
     const matrixIds = snapshot.principals.filter(principal => source.eligiblePrincipalIds.includes(principal.principalId) && principal.principalId !== agent.record.principal.id)
@@ -145,11 +145,15 @@ function assertGeometry(map: FleetMapView, width: number) {
   return layout;
 }
 
-test('functional fleet layout is deterministic, dense, node-safe and adapts to content width; filters and selection preserve isolated agents', async scope => {
-  const { fixture, fleet } = await preparedMap(scope);
+test('functional fleet layout is deterministic, dense and node-safe; filters retain owner-DM-only agents', async scope => {
+  const { fixture, fleet, rooms } = await preparedMap(scope);
   const map = value(mapSchema(mapRepresentation(value(await readFleetMap(fixture.services, fixture.admin.actor, fleet.id)))));
   const narrow = assertGeometry(map, 320), wide = assertGeometry(map, 1600);
-  assert(wide.columns > narrow.columns); assert(wide.height < narrow.height);
+  assert(wide.columns > narrow.columns); assert(wide.height <= narrow.height);
+  const sharedRooms = new Set(rooms.map(room => room.roomId));
+  const sharedMap = { ...map, rooms: map.rooms.filter(room => sharedRooms.has(room.roomId)),
+    connections: map.connections.filter(connection => sharedRooms.has(connection.roomId)) };
+  assert(assertGeometry(sharedMap, 1600).height < assertGeometry(sharedMap, 320).height);
   assertGeometry(map, 700); assertGeometry(map, 1100); assertGeometry({ ...map, agents: [], rooms: [], connections: [], sources: [] }, 1600);
   const expanded = Array.from({ length: 100 }, (_, index) => ({ ...map.agents[index % map.agents.length]!, agentId: randomUUID(), instanceKey: 'dense-' + index }));
   const dense: FleetMapView = { ...map, agents: expanded, connections: expanded.map((agent, index) => {
@@ -159,7 +163,7 @@ test('functional fleet layout is deterministic, dense, node-safe and adapts to c
   value(mapSchema(dense));
   assertGeometry(dense, 700); assertGeometry(dense, 1600);
   const filtered = filterMap(map, { search: 'worker-23', listener: 'all' });
-  assert.equal(filtered.agents.length, 1); assert.equal(filtered.connections.length, 0); assert.equal(filtered.rooms.length, 0); assert.equal(filtered.sources.length, 1);
+  assert.equal(filtered.agents.length, 1); assert.equal(filtered.connections.length, 1); assert.equal(filtered.rooms.length, 1); assert.equal(filtered.sources.length, 1);
   assert.equal(filterMap(map, { search: 'no-match', listener: 'all' }).agents.length, 0);
   assert.equal(filterMap(map, { search: '', listener: 'online' }).agents.length, 12);
   assert(filterMap(map, { search: 'Credit review', listener: 'all' }).agents.length > 0);

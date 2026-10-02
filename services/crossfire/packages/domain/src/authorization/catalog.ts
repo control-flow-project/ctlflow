@@ -6,6 +6,7 @@ export const permissionCatalog = [
   { code: 'wake-delivery.receive.self', grantScope: 'role', description: 'Receive own scheduled input and report native receipts', roles: ['agent'] },
   { code: 'principal.read', grantScope: 'role', description: 'Search active identities and resolve sender ownership', roles: ['member', 'administrator', 'agent'] },
   { code: 'agent.read.self', grantScope: 'role', description: 'Read own agent identity', roles: ['agent'] },
+  { code: 'owner-conversation.ensure.self', grantScope: 'role', description: 'Ensure the permanent private owner conversation', roles: ['agent'] },
   { code: 'agent.read.owned', grantScope: 'role', description: 'Read owned agents', roles: ['member', 'administrator'] },
   { code: 'agent.read.any', grantScope: 'role', description: 'Read every agent', roles: ['administrator'] },
   { code: 'agent.configure.owned', grantScope: 'role', description: 'Configure owned agents', roles: ['member', 'administrator'] },

@@ -47,9 +47,8 @@ test('native runtime selection and permissions fail explicitly without guessing 
   assert.equal(runtimeName(undefined, { CROSSFIRE_PI_CONNECTION: 'native' }), 'pi');
   assert.throws(() => runtimeName(undefined, { CLAUDE_CODE_SESSION_ID: 'native', CODEX_THREAD_ID: 'native' }), /Multiple runtime contexts/);
   assert.throws(() => discoverRuntime('opencode', directory), /Supported runtime adapters/);
-  assert.throws(() => listenerSettings(state, 'pi', '!approval:example'), /native permission handling/);
-  listenerSettings(state, 'codex', '!approval:example').save();
-  assert.equal(listenerSettings(state, 'claude').approvalRoom, null);
+  listenerSettings(state, 'codex').save();
+  assert.equal(listenerSettings(state, 'claude').runtime, 'claude');
   writeJson(join(state, 'settings.json'), { runtime: 'pi', approvalRoom: null, server: 'https://crossfire.example', owner: '@owner:example' });
   assert.throws(() => listenerSettings(state), /Invalid listener settings/);
   writeJson(join(state, 'setup.json'), { server: 'not-an-origin', owner: '@owner:example' });
@@ -58,20 +57,18 @@ test('native runtime selection and permissions fail explicitly without guessing 
   assert.throws(() => connectionSetup(state), /Invalid project connection setup/);
 });
 
-test('approved project settings preserve their canonical shape across reconnect and adapter selection', () => {
+test('private listener settings migrate once to runtime-only and preserve reconnect and adapter selection', () => {
   const directory = project(), state = join(directory, '.crossfire/state/charlie');
   const original = { runtime: 'codex', approvalRoom: '!approval:example' };
   writeJson(join(state, 'settings.json'), original);
   const codex = listenerSettings(state);
   assert.equal(codex.runtime, 'codex');
-  assert.equal(codex.approvalRoom, original.approvalRoom);
   codex.save();
-  assert.deepEqual(readJson(join(state, 'settings.json')), original);
+  assert.deepEqual(readJson(join(state, 'settings.json')), { runtime: 'codex' });
   assert.equal(connectionSetup(state).value, undefined);
   const claude = listenerSettings(state, 'claude');
-  assert.equal(claude.approvalRoom, null);
   claude.save();
-  assert.deepEqual(readJson(join(state, 'settings.json')), { runtime: 'claude', approvalRoom: null });
+  assert.deepEqual(readJson(join(state, 'settings.json')), { runtime: 'claude' });
 });
 
 test('Claude project hooks are private, idempotent and preserve unrelated native configuration', () => {

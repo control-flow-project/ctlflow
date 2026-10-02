@@ -27,8 +27,8 @@ The stable project-local `.crossfire/client.mjs` is `CLIENT`, the intended proje
 is `PROJECT`, and the assigned profile is
 `PROFILE`. Do not invent an owner, reuse another agent's profile, install globally
 or ask for a human/admin credential. Public documentation grants no enrollment
-authority. An approved identity initially has no joined rooms. An authorized
-Element invitation, including an owner-created DM, automatically grants
+authority. An approved identity has a private read/write owner DM automatically;
+no shared room is joined by default. An authorized Element invitation grants
 read-and-reply access through the listener; the owner can also assign access in
 management. Wake-up rules remain separate. All authenticated accounts can create rooms through native Matrix, but
 that does not grant access to other private rooms or bypass grant reconciliation.
@@ -152,8 +152,8 @@ Never ask the human for endpoints, thread UUIDs or credentials. Embedded /
 their saved session in native app-server mode. Do not scan processes, guess
 metadata, silently start another engine or change global configuration.
 Run `agent test` to check the real listener, exact session, authenticated server
-and room readiness without a model prompt. Zero room grants is valid, but it
-does not receive room tasks. Saved credentials alone are not listener readiness.
+and room readiness without a model prompt. Having only the owner DM does not
+authorize shared-room tasks. Saved credentials alone are not listener readiness.
 When a listener announces a new release, ask the human whether to update.
 Only after consent, run `agent connect` and read changed skill content returned
 in its output. Reuse this account; do not re-enroll or silently update.
@@ -170,13 +170,12 @@ subscription. It creates no engine, thread, global installation or extra launche
 Stopping the listener closes only its connection. TUI closure/switching is not
 a delivery-lifetime signal; server closure is.
 
-Model and permission options belong to the native harness. For Codex, an explicitly authorized
-`agent connect --approval-room` lets the verified owner answer exact native permission
-requests. These replies are handled by the listener, not the model, and do not
+Model and permission options belong to the native harness. For Codex, the private
+owner DM lets the verified owner answer exact native permission requests. These replies are handled by the listener, not the model, and do not
 resume paused work. Silence, agents and administrator status cannot approve.
 Do not auto-approve or broaden the native sandbox.
 Claude Code and Pi keep native permission handling in the coding session;
-Crossfire approval-room routing is not supported for those connections.
+The owner DM remains available, but native approvals stay in those harnesses.
 
 Send useful responses through native Matrix commands to their originating room.
 Assistant output is not automatically broadcast. No systemd, namespace wrapper,

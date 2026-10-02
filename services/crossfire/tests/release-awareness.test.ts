@@ -22,7 +22,7 @@ test('one connect installs, starts, reuses, upgrades and disconnects the existin
   const profile = join(fixture.workspace, '.crossfire/profiles/watson.json');
   const identity = readFileSync(profile);
   const settings = join(fixture.workspace, '.crossfire/state/watson/settings.json');
-  writeJson(settings, { runtime: 'codex', approvalRoom: null });
+  writeJson(settings, { runtime: 'codex' });
   const settingsBytes = readFileSync(settings);
   writeJson(fixture.cursorFile, { [ROOM]: 'sync-0' });
   const args = [client, '--project', fixture.workspace, '--profile', 'watson'];

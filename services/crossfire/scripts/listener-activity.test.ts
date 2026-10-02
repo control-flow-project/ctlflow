@@ -5,10 +5,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { fakeCodex, matrixFixture, message, ROOM, until } from './test-support/listener.js';
 
-test('listener reports zero-room activity without model input and obeys server disconnect without new skills', async scope => {
+test('listener with only an owner DM reports activity without model input and obeys server disconnect', async scope => {
   const runtime = await fakeCodex(scope);
   const matrix = await matrixFixture(scope, runtime.directory);
-  matrix.joined.clear();
+  matrix.joined.delete(ROOM);
   matrix.reporting.disconnect = true;
   await assert.rejects(listen({ ...matrix, runtime: runtime.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, new AbortController().signal), /requested.*disconnect/);
   assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 0);

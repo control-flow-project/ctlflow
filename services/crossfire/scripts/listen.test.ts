@@ -126,11 +126,11 @@ test('active-turn acceptance leaves messages unread until native receipt, includ
   matrix.add(ROOM, message('$first'), message('$second'));
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
   await until(() => starts().length === 1);
-  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: 'sync-0' });
+  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
   native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
   await until(() => starts().length === 2);
   assert.deepEqual(starts()[0]!.params, starts()[1]!.params);
-  assert.deepEqual(JSON.parse(readFileSync(matrix.cursorFile, 'utf8')), { [ROOM]: 'sync-0' });
+  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
   const accepted = starts()[1]!.params!;
   native.update({ mode: 'normal' });
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(accepted.clientUserMessageId), accepted.input) });
@@ -165,7 +165,7 @@ test('permanent Matrix errors, suspended ownership, and oversized messages stop 
     if (kind === 'ownership') matrix.access.ownerStatus = 'suspended';
     matrix.add(ROOM, message('$one', undefined, kind === 'oversized' ? 'x'.repeat(128 * 1024) : 'normal'));
     await assert.rejects(listen({ ...matrix, reconcileMs: 1000, limit: 50, pollMs: 100, debounceMs: 0, runtime: native.runtime }, new AbortController().signal),
-      kind === 'authentication' ? /HTTP 401/ : kind === 'ownership' ? /no longer active/ : /65536-byte/);
+      kind === 'authentication' ? /HTTP 401/ : kind === 'ownership' ? /not currently authorized/ : /65536-byte/);
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
     assert.equal(existsSync(matrix.cursorFile), false);
   }

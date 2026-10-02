@@ -107,10 +107,11 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const other = await fixture.member('other'), guest = await fixture.agent(other.actor, 'guest');
   const invitations = roomAccess({ origin, token: north.account.access_token });
   value(await invitations.change(guest.id, roomId, { accessMode: 'reply', powerLevel: null })); await worker.drain();
-  assert.deepEqual(value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'GET', API + '/joined_rooms')).joined_rooms, [roomId]);
+  const guestRoom = value(services.repositories.ownerConversation.find({ agentId: guest.id }))!.roomId;
+  assert.deepEqual((value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'GET', API + '/joined_rooms')).joined_rooms as string[]).sort(), [guestRoom, roomId].sort());
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: guest.id, roomId }))!.addedById, north.agentId);
   value(await invitations.change(guest.id, roomId, null)); await worker.drain();
-  assert.deepEqual(value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'GET', API + '/joined_rooms')).joined_rooms, []);
+  assert.deepEqual(value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'GET', API + '/joined_rooms')).joined_rooms, [guestRoom]);
   await cli('stop', 'research');
   writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.1"\nmodel_reasoning_effort = "medium"\nsandbox_mode = "danger-full-access"\napproval_policy = "never"\n', { mode: 0o600 });
   await cli('start', 'research');

@@ -8,8 +8,14 @@ type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' |
 export async function readRoom(services: Dependencies, actor: Actor, roomId: string, agentId?: string): Promise<Result<RoomDetails>> {
   const current = activeActor(services, actor);
   if (!current.ok) return current;
+  let ownerDirect = false;
+  if (agentId) {
+    const permitted = authorizeAgent(services, actor, agentId, 'read'), conversation = services.repositories.ownerConversation.find({ agentId });
+    if (!permitted.ok) return permitted; if (!conversation.ok) return conversation;
+    ownerDirect = conversation.value?.roomId === roomId;
+  }
   const native = await services.matrix.room(current.value.matrixUserId, roomId);
-  if (native.ok) return success({ roomId, name: native.value.name, topic: native.value.topic, alias: native.value.alias, authority: native.value });
+  if (native.ok) return success({ roomId, name: ownerDirect ? 'Owner DM' : native.value.name, topic: native.value.topic, alias: native.value.alias, authority: native.value });
   if (!agentId) return native;
   const agent = authorizeAgent(services, actor, agentId, 'read');
   if (!agent.ok) return agent;
@@ -18,7 +24,7 @@ export async function readRoom(services: Dependencies, actor: Actor, roomId: str
   if (!grant.value) return failure('missing', 'Assigned room not found');
   const observed = await services.matrix.room(agent.value.principal.matrixUserId, roomId);
   if (!observed.ok) return success({ roomId, name: roomId, topic: '', alias: null, authority: null });
-  return success({ roomId, name: observed.value.name, topic: observed.value.topic, alias: observed.value.alias, authority: null });
+  return success({ roomId, name: ownerDirect ? 'Owner DM' : observed.value.name, topic: observed.value.topic, alias: observed.value.alias, authority: null });
 }
 export async function listRooms(services: Dependencies, actor: Actor, input: PageRequest & { agentId?: string; search: string }): Promise<Result<Page<RoomDetails>>> {
   const current = activeActor(services, actor);

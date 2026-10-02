@@ -3,7 +3,7 @@ import * as check from '@crossfire/contracts/schema/validation';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 
 export const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024) });
-export const coordination = check.object({ adapter: check.choice('crossfire'), server: check.text(2048), owner: check.matrixUserId, approval_room: check.optional(check.roomId) });
+export const coordination = check.object({ adapter: check.choice('crossfire'), server: check.text(2048), owner: check.matrixUserId });
 export const roster = check.object({ fleet: check.name, coordination, instances: check.list(instance, 100) });
 export const definition = check.object({ name: check.text(100), runtime: check.name, runtime_options: (input: unknown): Result<Record<string, unknown>> =>
   input && typeof input === 'object' && !Array.isArray(input) ? success(input as Record<string, unknown>) : failure('invalid', 'Expected runtime options') });

@@ -12,11 +12,13 @@ export function listRoomGrants(services: Dependencies, actor: Actor, agentId: st
   const applications = services.roomGrantRead.applications(agentId, roomIds), permissions = services.roomGrantRead.permissions(agentId, roomIds);
   if (!applications.ok) return applications; if (!permissions.ok) return permissions;
   const canManage = authorizeAgent(services, actor, agentId, 'room-grant.manage').ok;
+  const conversation = services.repositories.ownerConversation.find({ agentId });
+  if (!conversation.ok) return conversation;
   return success({ ...grants.value, items: grants.value.items.map(grant => ({
-    agentId, revision: target.value.principal.revision,
+    agentId, revision: target.value.principal.revision, ownerConversation: conversation.value?.roomId === grant.roomId,
     grant, application: applications.value.find(application => application.roomId === grant.roomId) ?? null,
     permissions: permissions.value.filter(permission => permission.roomId === grant.roomId).map(permission => permission.permissionCode),
-    allowedActions: canManage ? ['set', 'remove', 'permissions.set'] : [],
+    allowedActions: canManage && conversation.value?.roomId !== grant.roomId ? ['set', 'remove', 'permissions.set'] : [],
   })) });
 }
 export async function readRoomGrant(services: Dependencies, actor: Actor, agentId: string, roomId: string) {
@@ -41,11 +43,12 @@ export async function readRoomGrant(services: Dependencies, actor: Actor, agentI
   if (!canRead) return failure('missing', 'Room grant not found');
   const grant = services.repositories.agentRoomGrant.find({ agentId, roomId }), application = services.repositories.roomGrantApplication.find({ agentId, roomId });
   const permissions = services.collection.roomPermissions({ agentId, roomId });
-  if (!grant.ok) return grant; if (!application.ok) return application; if (!permissions.ok) return permissions;
+  const conversation = services.repositories.ownerConversation.find({ agentId });
+  if (!grant.ok) return grant; if (!application.ok) return application; if (!permissions.ok) return permissions; if (!conversation.ok) return conversation;
   const canManage = authorizeAgent(services, actor, agentId, 'room-grant.manage').ok;
   const ownAddition = grant.value?.addedById === actor.principalId;
-  const allowedActions = canManage ? ['set', 'remove', 'permissions.set']
+  const allowedActions = conversation.value?.roomId === roomId ? [] : canManage ? ['set', 'remove', 'permissions.set']
     : delegated ? !grant.value || grant.value.accessMode === 'none' ? ['set'] : ownAddition ? ['set', 'remove'] : [] : [];
-  return success({ agentId, revision: target.value.principal.revision, grant: grant.value, application: application.value,
+  return success({ agentId, revision: target.value.principal.revision, ownerConversation: conversation.value?.roomId === roomId, grant: grant.value, application: application.value,
     permissions: permissions.value.map(permission => permission.permissionCode), allowedActions });
 }

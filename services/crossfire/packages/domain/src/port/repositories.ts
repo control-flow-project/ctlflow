@@ -5,6 +5,7 @@ import type { FleetControllerMetadata, EnrollmentControllerMetadata, FleetCreden
 import type { AgentRoomGrant, AgentRoomPermission, RoomGrantApplication, AgentWakeSender } from '../room-access/types.js';
 import type { MemberInvitation, MemberSession, ListenerRun, WakeNotice } from '../activity/types.js';
 import type { InstancePolicy, AuditEvent } from '../audit/types.js';
+import type { OwnerConversationRepository } from '../owner-conversation/types.js';
 
 export type PrincipalKey = { id: string };
 export type PrincipalRepository = {
@@ -199,6 +200,7 @@ export type EnrollmentControllerMetadataRepository = {
 };
 
 export type Repositories = {
+  ownerConversation: OwnerConversationRepository;
   wakeRule: WakeRuleRepository;
   wakeRuleAgent: WakeRuleAgentRepository;
   wakeDelivery: WakeDeliveryRepository;

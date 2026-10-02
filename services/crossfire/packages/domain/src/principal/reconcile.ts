@@ -2,9 +2,23 @@ import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import type { Principal } from '../identity/types.js';
 import { agentDisplayName } from '../identity/display-name.js';
+import { ensureOwnerConversation } from '../owner-conversation/ensure.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'identity' | 'clock' | 'unitOfWork'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'identity' | 'clock' | 'unitOfWork' | 'roomOperations'>;
 export async function reconcilePrincipal(services: Dependencies, principalId: string): Promise<Result<void>> {
+  const applied = await services.roomOperations.run('agent:' + principalId, () => applyPrincipal(services, principalId));
+  if (!applied.ok) return applied;
+  const principal = services.repositories.principal.find({ id: principalId });
+  if (!principal.ok) return principal;
+  if (principal.value?.kind !== 'agent' || principal.value.status !== 'active') return applied;
+  const target = services.directory.agent(principalId);
+  if (!target.ok) return target;
+  if (target.value?.owner.status !== 'active') return applied;
+  const conversation = await ensureOwnerConversation(services, principalId);
+  return conversation.ok ? success(undefined) : conversation;
+}
+
+async function applyPrincipal(services: Dependencies, principalId: string): Promise<Result<void>> {
   const found = services.repositories.principal.find({ id: principalId });
   const application = services.repositories.principalApplication.find({ principalId });
   const policy = services.repositories.instancePolicy.find({ id: 'instance' });

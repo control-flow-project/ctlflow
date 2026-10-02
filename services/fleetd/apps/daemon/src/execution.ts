@@ -44,14 +44,11 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
     async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear(); },
     async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close(); },
     validate(configuration) {
-      for (const [key, definition] of Object.entries(configuration.definitions)) {
+      for (const definition of Object.values(configuration.definitions)) {
         const adapter = adapters[definition.runtime];
         if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
         const options = adapter.validate(definition.options);
         if (!options.ok) return options;
-        if (options.value.approval === 'listener' && !configuration.roster.coordination.approval_room) {
-          return failure('invalid', 'Definition ' + key + ' requires an explicit coordination.approval_room for native permissions. Grant that room to each affected agent and join it as the owner.');
-        }
       }
       return success(undefined);
     },
@@ -93,7 +90,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         done = listen({ settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
-          ...(configuration.roster.coordination.approval_room ? { approvalRoom: configuration.roster.coordination.approval_room } : {}), ready,
+          ready,
           runtime: async (runtimeStop, _poll, hooks) => {
             const started = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks }, runtimeStop);
             if (!started.ok) throw new Error(started.error.message);

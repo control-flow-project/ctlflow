@@ -23,7 +23,6 @@ import { releaseUpdates } from './updates.js';
 import { controlledPublisher, waitForActivation, type ListenerControl } from './listener-control.js';
 import type { ReadBatch } from './receive.js';
 import { scheduledPublisher } from './scheduled.js';
-import { failure } from '@crossfire/kernel/result';
 
 export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
   identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
@@ -64,7 +63,6 @@ export type ListenerOptions = {
   pollMs: number;
   debounceMs: number;
   runtime: RuntimeAdapter;
-  approvalRoom?: string;
   id: string;
   reconcileMs: number;
 };
@@ -84,16 +82,17 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   if (!current.ok) throw new Error(current.error.message);
   const failed = new AbortController();
   const lifetime = AbortSignal.any([stop, failed.signal]);
-  const approval = options.approvalRoom ? permissions({
+  const ownerConversation = await options.coordination.ownerConversation(options.id, AbortSignal.any([lifetime, AbortSignal.timeout(45_000)]));
+  if (!ownerConversation.ok) throw new Error('Owner DM is not ready: ' + ownerConversation.error.message);
+  const approval = permissions({
     client: options.transport(lifetime, 45_000),
     clock: options.clock,
-    coordination: options.coordination, settings: options.settings, account: options.account, agent: options.id, room: options.approvalRoom, expiresMs: 300_000,
-  }, lifetime) : undefined;
+    coordination: options.coordination, settings: options.settings, account: options.account, agent: options.id, room: ownerConversation.value.roomId, expiresMs: 300_000,
+  }, lifetime);
   let destination: Awaited<ReturnType<RuntimeAdapter>>;
   try {
     destination = await options.runtime(lifetime, options.pollMs, {
       requestPermission: async (permission, cancelled) => {
-        if (!approval) return failure('forbidden', 'Runtime approval requires an explicitly selected authorized --approval-room');
         return approval.request(permission, cancelled);
       },
     });
@@ -252,9 +251,6 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
   }
   try {
-    if (destination.approval === 'listener' && !approval) {
-      throw new Error('Native approval policy requires an explicit --approval-room. Grant that room read/reply access and join it as the owner before connecting.');
-    }
     if (approval) {
       const authorized = await approval.authorize();
       if (!authorized.ok) throw new Error('Native approval setup is not ready: ' + authorized.error.message);

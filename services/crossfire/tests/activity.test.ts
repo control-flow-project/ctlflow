@@ -21,12 +21,12 @@ test('listener activity counts cumulative receipts once and excludes offline gap
   fixture.advance(90_001); assert.equal(activity().status, 'offline');
   value(beat(run, 4)); assert.equal(activity().activeMs, 30_000);
   value(beat(another, 3)); assert.equal(activity().activeRuns.length, 2);
-  value(disconnectListeners(services, admin.actor, agent.id, { expectedRevision: 0, runIds: [run, another] }, randomUUID()));
+  value(disconnectListeners(services, admin.actor, agent.id, { expectedRevision: 1, runIds: [run, another] }, randomUUID()));
   assert.equal(activity().status, 'disconnecting'); assert.equal(value(beat(run, 4)).disconnect, true);
   value(beat(run, 4, true)); value(beat(another, 3, true));
   assert.equal(activity().status, 'offline'); value(beat(run, 999)); assert.equal(activity().messagesDelivered, 7);
   const fresh = randomUUID(); value(beat(fresh, 0)); assert.equal(activity().status, 'online');
-  value(changeAgent(services, admin.actor, agent.id, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
+  value(changeAgent(services, admin.actor, agent.id, { expectedRevision: 1, status: 'suspended' }, randomUUID()));
   assert.equal(beat(fresh, 0).ok, false);
   for (const input of [{}, { release, messagesDelivered: 0, stopped: false }, { release, messagesDelivered: -1, controllerBound: false, stopped: false }, { release, messagesDelivered: 1.5, controllerBound: false, stopped: false }, { release, messagesDelivered: 0, controllerBound: false, stopped: false, extra: true }]) assert.equal(heartbeat(input).ok, false);
 });
@@ -52,7 +52,7 @@ test('HTTP heartbeat binds native identity; disconnect requires owner/admin, rev
   assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, { ...auth, Cookie: 'crossfire=' + owner.secret })).status, 400);
   assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, { ...auth, Origin: 'https://wrong.invalid' })).status, 403);
   assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, auth)).status, 200);
-  const stop = { expectedRevision: 0, runIds: [run] };
+  const stop = { expectedRevision: 1, runIds: [run] };
   assert.equal((await request(path + '/listener-disconnections', 'POST', stop, auth)).status, 401);
   assert.equal((await request(path + '/listener-disconnections', 'POST', stop, { Cookie: 'crossfire=' + owner.secret, Origin: origin })).status, 403);
   assert.equal((await request(path + '/listener-disconnections', 'POST', stop, headers(other))).status, 404);

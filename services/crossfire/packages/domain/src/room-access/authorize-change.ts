@@ -3,6 +3,7 @@ import type { Services, Actor } from '../port/services.js';
 import type { AgentRoomGrant } from './types.js';
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import type { RoomFacts, RoomInvitation } from '../port/matrix-authority.js';
+import { protectOwnerConversation } from '../owner-conversation/protect.js';
 
 export type GrantIntent = { accessMode: AgentRoomGrant['accessMode']; powerLevel: number | null; muted: boolean };
 export type GrantChange = GrantIntent & { agentId: string; roomId: string; expectedRevision: number; expectedGeneration: string | null };
@@ -27,6 +28,8 @@ export function requestedPower(facts: RoomFacts, intent: GrantIntent): Result<nu
 export async function authorizeGrantChange(services: Dependencies, actor: Actor, input: GrantChange, invitation: RoomInvitation | null = null): Promise<Result<GrantAuthorization>> {
   const acting = activeActor(services, actor);
   if (!acting.ok) return acting;
+  const protectedAccess = protectOwnerConversation(services, input);
+  if (!protectedAccess.ok) return protectedAccess;
   const target = services.directory.agent(input.agentId);
   if (!target.ok) return target;
   if (!target.value) return failure('missing', 'Target agent not found');

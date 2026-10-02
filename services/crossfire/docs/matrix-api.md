@@ -80,8 +80,9 @@ Use smaller pages, projections, filters or explicit file output instead.
 
 Fresh identities get a recent snapshot bounded across rooms, followed by native
 forward continuation. Existing acknowledged cursors remain intact. Membership
-is authoritative: catalog reads do not join; enrollment grants no rooms; an
-explicit approved room grant establishes native membership. All authenticated
+is authoritative: catalog reads do not join; active enrollment establishes only
+the private owner DM; explicit additional room grants establish shared-room
+membership. All authenticated
 accounts can also create rooms; native public-room admission still applies.
 Agent memberships outside explicit grants are removed by reconciliation.
 Native read markers and

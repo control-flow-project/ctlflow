@@ -41,12 +41,12 @@ test('Matrix directory authenticates native principals, bounds searches and reta
   assert.equal((await search(unregistered.accessToken)).status, 403);
   assert.equal((await request('/api/members', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
   assert.equal((await request('/api/agents', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 0, displayName: 'Research Bea' }, randomUUID()));
+  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 1, displayName: 'Research Bea' }, randomUUID()));
   assert.equal((await (await search(owner.token, { search_term: 'research' })).json() as MatrixDirectoryResult).results[0]?.display_name, 'Research Bea');
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 1, status: 'suspended' }, randomUUID()));
+  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 2, status: 'suspended' }, randomUUID()));
   assert.equal((await search(agent.token)).status, 403);
   assert.deepEqual((await (await search(other.token)).json() as MatrixDirectoryResult).results, []);
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 2, status: 'active' }, randomUUID()));
+  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 3, status: 'active' }, randomUUID()));
   value(changeMember(services, admin.actor, owner.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
   assert.equal((await search(owner.token)).status, 403); assert.equal((await search(agent.token)).status, 403);
   assert.deepEqual((await (await search(other.token)).json() as MatrixDirectoryResult).results, []);
@@ -55,11 +55,11 @@ test('Matrix directory authenticates native principals, bounds searches and reta
   fixture.advance(session.expiresAt - fixture.now() + 1);
   assert.equal((await authenticateMember(services, owner.secret)).ok, false);
   assert.equal((await authenticateNativePrincipal(services, owner.token)).ok, true, 'Native auth does not revive an expired management session');
-  value(changeAgent(services, value(await authenticateNativePrincipal(services, owner.token)), agent.id, { expectedRevision: 3, status: 'revoked' }, randomUUID()));
+  value(changeAgent(services, value(await authenticateNativePrincipal(services, owner.token)), agent.id, { expectedRevision: 4, status: 'revoked' }, randomUUID()));
   assert.deepEqual((await (await search(other.token)).json() as MatrixDirectoryResult).results, []);
 });
 
-test('public Matrix directory routes zero-room identities through Crossfire without granting native membership', { timeout: 120000 }, async scope => {
+test('public Matrix directory routes identities through Crossfire without granting shared room membership', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture());
   const owner = await fixture.member('alice'), searcher = await fixture.member('bob'), agent = await fixture.agent(owner.actor, 'bea');
   const native = await fetch(fixture.native.base + path, { method: 'POST', headers: { Authorization: 'Bearer ' + searcher.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ search_term: 'bea' }) });
@@ -68,6 +68,7 @@ test('public Matrix directory routes zero-room identities through Crossfire with
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { results: [{ user_id: agent.matrixUserId, display_name: 'bea (alice)' }], limited: false });
   const joined = await fetch(fixture.origin + API + '/joined_rooms', { headers: { Authorization: 'Bearer ' + agent.token } });
-  assert.equal(joined.status, 200); assert.deepEqual(await joined.json(), { joined_rooms: [] });
-  assert.deepEqual(value(fixture.services.collection.roomGrants({ agentId: agent.id })), []);
+  const ownerRoom = value(fixture.services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId;
+  assert.equal(joined.status, 200); assert.deepEqual(await joined.json(), { joined_rooms: [ownerRoom] });
+  assert.deepEqual(value(fixture.services.collection.roomGrants({ agentId: agent.id })).map(grant => grant.roomId), [ownerRoom]);
 });

@@ -11,9 +11,10 @@ export async function changeRoomGrant(services: Dependencies, actor: Actor, inpu
     const rechecked = recheckGrantAuthorization(services, actor, authorized.value);
     if (!rechecked.ok) return rechecked;
     const grants = services.collection.roomGrants({ agentId: input.agentId });
-    if (!grants.ok) return grants;
+    const conversation = services.repositories.ownerConversation.find({ agentId: input.agentId });
+    if (!grants.ok) return grants; if (!conversation.ok) return conversation;
     if (input.accessMode !== 'none' && (!authorized.value.previous || authorized.value.previous.accessMode === 'none')
-      && grants.value.filter(grant => grant.accessMode !== 'none').length >= 100) return failure('limit', 'An agent can have at most 100 room grants');
+      && grants.value.filter(grant => grant.accessMode !== 'none' && grant.roomId !== conversation.value?.roomId).length >= 100) return failure('limit', 'An agent can have at most 100 room grants in addition to its owner DM');
     const saved = commitGrantChange(services, actor, authorized.value, requestId);
     if (!saved.ok) return saved;
     if (!authorized.value.changed) return success({ grant: saved.value, revision: input.expectedRevision });

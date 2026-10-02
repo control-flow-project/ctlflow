@@ -8,7 +8,7 @@ import type { RuntimeHooks, Permission } from '@crossfire/agent-core/runtime';
 import { isListenerNotice } from '@crossfire/contracts/notices';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import { success } from '@crossfire/kernel/result';
-import { fakeCodex, matrixFixture, temporary, message, ROOM, OBSERVER, SELF, THREAD } from './test-support/listener.js';
+import { fakeCodex, matrixFixture, temporary, message, ROOM, OWNER_DM, AGENT_ID, OBSERVER, SELF, THREAD } from './test-support/listener.js';
 
 const permission: Permission = { runtime: 'codex', session: THREAD, request: 'fixture-request', action: 'command',
   scope: { command: 'npm install', cwd: '/work/project' },
@@ -22,7 +22,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   let hooks: RuntimeHooks | undefined;
   const delivered: string[] = [];
   let closed = false;
-  const receiving = listen({ ...fixture, approvalRoom: ROOM, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
+  const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
       return { sessionId: THREAD, approval: 'listener', signal, inspect: async () => ({ busy: false }), deliver: async text => { delivered.push(text); }, settle: async () => false, recover: async () => false, acknowledge: () => {},
@@ -37,13 +37,13 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   }
   assert(hooks);
   const pending = hooks.requestPermission(permission, stop.signal);
-  await clock.until(() => fixture.rooms.get(ROOM)!.some(event => event.sender === SELF && String(event.content.body).includes('Permission needed')));
-  const request = fixture.rooms.get(ROOM)!.find(event => event.sender === SELF && String(event.content.body).includes('Permission needed'))!;
+  await clock.until(() => fixture.rooms.get(OWNER_DM)!.some(event => event.sender === SELF && String(event.content.body).includes('Permission needed')));
+  const request = fixture.rooms.get(OWNER_DM)!.find(event => event.sender === SELF && String(event.content.body).includes('Permission needed'))!;
   assert(isListenerNotice(request), 'Automatic native approvals cannot wake peer models');
   const reply = { ...message('$approval', OBSERVER, 'approve once'), content: { msgtype: 'm.text', body: 'approve once',
     'm.relates_to': { 'm.in_reply_to': { event_id: request.event_id } } } };
-  fixture.add(ROOM, { ...reply, event_id: '$outsider', sender: '@administrator:elsewhere' });
-  fixture.add(ROOM, reply);
+  fixture.add(OWNER_DM, { ...reply, event_id: '$outsider', sender: '@administrator:elsewhere' });
+  fixture.add(OWNER_DM, reply);
   assert.deepEqual(await clock.complete(pending), success({ decision: 'accept' }));
   assert.equal(readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused, mode === 'paused');
   assert.equal(delivered.length, 0);
@@ -59,9 +59,10 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   assert.equal(closed, true);
 }));
 
-test('an approval-capable runtime without a route cannot become ready or report online', withClock(async (scope, clock) => {
+test('an unavailable owner DM prevents runtime attachment and online reporting', withClock(async (scope, clock) => {
 
   const fixture = await matrixFixture(scope, temporary(scope), clock);
+  fixture.failures.set('/api/agents/' + AGENT_ID + '/owner-conversation', [503]);
   const stop = new AbortController();
   let ready = false, closed = false;
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
@@ -72,9 +73,9 @@ test('an approval-capable runtime without a route cannot become ready or report 
     },
   }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(receiving); });
-  assert.match(String(await clock.complete(receiving)), /requires an explicit --approval-room/);
+  assert.match(String(await clock.complete(receiving)), /Fixture failure|request|owner DM/i);
   assert.equal(ready, false);
-  assert.equal(closed, true);
+  assert.equal(closed, false);
   assert.equal(fixture.requests.some(request => request.path.includes('/listener-runs')), false);
   assert.equal(fixture.requests.some(request => request.path.includes('/send/')), false);
 }));
@@ -83,12 +84,12 @@ for (const condition of ['read-only', 'muted', 'owner-absent', 'native-unavailab
   test('native approval readiness rejects ' + condition + ' before reporting online', withClock(async (scope, clock) => {
     const native = await fakeCodex(scope, { approvalPolicy: 'on-request' });
     const fixture = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
-    if (condition === 'read-only') fixture.accessModes.set(ROOM, 'read');
-    if (condition === 'muted') fixture.muted.add(ROOM);
-    if (condition === 'owner-absent') fixture.missingObserver.add(ROOM);
-    if (condition === 'native-unavailable') fixture.failures.set('/_matrix/client/v3/rooms/' + ROOM + '/state', [503]);
+    if (condition === 'read-only') fixture.accessModes.set(OWNER_DM, 'read');
+    if (condition === 'muted') fixture.muted.add(OWNER_DM);
+    if (condition === 'owner-absent') fixture.missingObserver.add(OWNER_DM);
+    if (condition === 'native-unavailable') fixture.failures.set('/_matrix/client/v3/rooms/' + OWNER_DM + '/state', [503]);
     let ready = false;
-    const receiving = listen({ ...fixture, approvalRoom: ROOM, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
+    const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
       ready: () => { ready = true; }, runtime: native.runtime }, stop.signal).catch(error => error);
     cleanup(scope, async () => { stop.abort(); await clock.complete(receiving); });
     assert.match(String(await clock.complete(receiving)), /Native approval setup is not ready/);

@@ -41,6 +41,7 @@ test("management core applies and verifies direct native authority", { timeout: 
   value(await nativeOk(serviceClient, "POST", path + "/invite", { user_id: ownerId }));
   value(await nativeOk({ base: fixture.native.base, token: owner.token }, "POST", path + "/join", {}));
   const agent = await fixture.agent(owner.actor, 'holmes'), agentId = agent.id;
+  const ownerRoom = value(services.repositories.ownerConversation.find({ agentId }))!.roomId;
   const current = () => value(services.directory.agent(agentId))!;
   async function grant(accessMode: 'read' | 'reply' | 'custom' | 'none', powerLevel: number | null = null, muted = false) {
     return changeRoomGrant(services, owner.actor, { agentId, roomId: room, expectedRevision: current().principal.revision,
@@ -49,9 +50,9 @@ test("management core applies and verifies direct native authority", { timeout: 
   async function reconcile() { value(await reconcilePrincipal(services, agentId)); return reconcileRoomGrant(services, agentId, room); }
   const joined = async (client: Native) => { const response = await nativeOk(client, "GET", API + "/joined_rooms"); return response.ok ? success(response.value.joined_rooms) : response; };
   const client: Native = { base: fixture.native.base, token: agent.token };
-  await scope.test("agent approval provisions a zero-room identity and only its initiating secret exchanges it", async () => {
+  await scope.test("agent approval provisions only its owner DM and only its initiating secret exchanges it", async () => {
     assert.equal(exchangeEnrollment(services, agent.input.enrollmentId, "bad").ok, false);
-    assert.deepEqual(value(await joined(client)), []);
+    assert.deepEqual(value(await joined(client)), [ownerRoom]);
     assert.equal((await createSession(services, agent.token)).ok, false);
     assert.equal(value(await nativeRequest(client, "POST", path + "/join", {})).status, 403);
   });
@@ -90,7 +91,7 @@ test("management core applies and verifies direct native authority", { timeout: 
       assert.equal(rules.join_rule, "public");
       value(await nativeOk(creator, "POST", createdPath + "/leave", {}));
     }
-    assert.deepEqual(value(await joined(client!)), []);
+    assert.deepEqual(value(await joined(client!)), [ownerRoom]);
     assert.equal(value(await nativeRequest(client!, "POST", path + "/join", {})).status, 403);
   });
   await scope.test("fresh read-only grant denies default arbitrary events below higher explicit message thresholds", async () => {
@@ -100,7 +101,7 @@ test("management core applies and verifies direct native authority", { timeout: 
     }));
     value(await grant('read', null, false));
     value(await reconcile());
-    assert.deepEqual(value(await joined(client!)), [room]);
+    assert.deepEqual((value(await joined(client!)) as string[]).sort(), [ownerRoom, room].sort());
     assert.equal(value(await nativeRequest(client!, "PUT", path + "/send/m.room.message/denied", { msgtype: "m.text", body: "no" })).status, 403);
     assert.equal(value(await nativeRequest(client!, "PUT", path + "/send/m.reaction/denied", { "m.relates_to": { rel_type: "m.annotation", event_id: "$unknown", key: "x" } })).status, 403);
     assert.equal(value(await nativeRequest(client!, "POST", path + "/invite", { user_id: admin.member.principal.matrixUserId })).status, 403);
@@ -121,20 +122,20 @@ test("management core applies and verifies direct native authority", { timeout: 
     value(changeAgent(services, admin.actor, agentId, { expectedRevision: current().principal.revision, displayName: "Detective" }, randomUUID()));
     value(await grant('reply', null, true));
     value(await reconcile());
-    assert.deepEqual(value(await joined(client!)), []);
-    assert.deepEqual(value(deliveryPolicy(services, agent.actor, agentId)).grants, []);
+    assert.deepEqual(value(await joined(client!)), [ownerRoom]);
+    assert.deepEqual(value(deliveryPolicy(services, agent.actor, agentId)).grants.map(grant => grant.roomId), [ownerRoom]);
   });
   await scope.test("owner removal narrows the durable grant and never restores it automatically", async () => {
     value(await grant('reply', null, false));
     value(await reconcile());
     value(await nativeOk(serviceClient, "POST", path + "/kick", { user_id: ownerId }));
     value(await reconcile());
-    assert.deepEqual(value(await joined(client!)), []);
-    assert.deepEqual(value(deliveryPolicy(services, agent.actor, agentId)).grants, []);
+    assert.deepEqual(value(await joined(client!)), [ownerRoom]);
+    assert.deepEqual(value(deliveryPolicy(services, agent.actor, agentId)).grants.map(grant => grant.roomId), [ownerRoom]);
     value(await nativeOk(serviceClient, "POST", path + "/invite", { user_id: ownerId }));
     value(await nativeOk({ base: fixture.native.base, token: owner.token }, "POST", path + "/join", {}));
     value(await reconcile());
-    assert.deepEqual(value(await joined(client!)), []);
+    assert.deepEqual(value(await joined(client!)), [ownerRoom]);
   });
   await scope.test("trusted native administrative revocation disables the real old client token", async () => {
     const formerToken = client!.token!;

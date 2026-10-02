@@ -17,7 +17,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     const directory = createDirectoryRepository(database);
     const unit = createUnitOfWork(database);
     const tables = database.prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string; sql: string }[];
-    assert.equal(tables.length, 33);
+    assert.equal(tables.length, 34);
     assert(tables.every(table => !/json_valid/iu.test(table.sql)));
     assert.deepEqual(database.pragma('foreign_key_check'), []);
     assert.deepEqual(database.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
