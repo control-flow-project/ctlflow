@@ -3,6 +3,7 @@ import type { Services, Actor } from '../port/services.js';
 import { authorize } from '../authorization/authorize.js';
 import { changeRoomGrant } from './change-grant.js';
 import { reconcileRoomGrant } from './reconcile-grant.js';
+import { ensureOwnerConversation } from '../owner-conversation/ensure.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'roomOperations'>;
 
@@ -16,6 +17,13 @@ export async function acceptRoomInvitation(services: Dependencies, receiver: Act
   const invitation = await services.matrix.invitation(target.value.principal.matrixUserId, roomId);
   if (!invitation.ok) return invitation;
   if (!invitation.value) return success({ accepted: false });
+  const bound = services.repositories.ownerConversation.find({ agentId });
+  if (!bound.ok) return bound;
+  if (invitation.value.direct && invitation.value.senderMatrixId === target.value.owner.matrixUserId
+    && (!bound.value || bound.value.roomId === roomId)) {
+    const conversation = await ensureOwnerConversation(services, agentId, invitation.value);
+    return conversation.ok ? success({ accepted: true }) : conversation;
+  }
   const sender = services.directory.principalByMatrixId(invitation.value.senderMatrixId);
   if (!sender.ok) return sender;
   if (!sender.value) return failure('forbidden', 'The inviter is not a registered Crossfire identity');

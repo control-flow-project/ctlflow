@@ -19,10 +19,18 @@ import { listRoomGrants } from '@crossfire/domain/room-access/read-grants';
 import { listRooms, readRoom } from '@crossfire/domain/room/read-room';
 import { authorizeGrantChange } from '@crossfire/domain/room-access/authorize-change';
 import { recheckGrantAuthorization } from '@crossfire/domain/room-access/commit-change';
+import { acceptRoomInvitation } from '@crossfire/domain/room-access/accept-invitation';
 
-test('enrollment creates one permanent owner DM and reconnect preserves its identity and generation', async scope => {
+test('enrollment and reconciliation create no chats; first use and reconnect retain one protected owner DM', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const agent = await fixture.agent(admin.actor, 'ada');
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id })), null);
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.id })), []);
+  assert.deepEqual(value(await services.matrix.joined(agent.matrixUserId)), []);
+  value(await reconcilePrincipal(services, agent.id));
+  assert.equal(fixture.native.rooms.size, 0);
+  const created = await Promise.all([connectOwnerConversation(services, agent.actor, agent.id), connectOwnerConversation(services, agent.actor, agent.id)]);
+  assert(created.every(result => result.ok));
   const original = value(services.repositories.ownerConversation.find({ agentId: agent.id }))!;
   assert.equal(original.ownerId, admin.actor.principalId);
   const before = value(services.directory.agent(agent.id))!;
@@ -47,6 +55,7 @@ test('owners, administrators and agents cannot downgrade, mute, remove or delega
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const owner = await fixture.member('alice'), agent = await fixture.agent(owner.actor, 'ada');
   const other = await fixture.agent(admin.actor, 'jo');
+  value(await connectOwnerConversation(services, agent.actor, agent.id));
   const conversation = value(services.repositories.ownerConversation.find({ agentId: agent.id }))!;
   const original = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: conversation.roomId }))!;
   const revision = value(services.directory.agent(agent.id))!.principal.revision;
@@ -72,6 +81,29 @@ test('owners, administrators and agents cannot downgrade, mute, remove or delega
   assert.equal((await connectOwnerConversation(services, admin.actor, agent.id)).ok, false);
 });
 
+test('withdrawal during first owner DM verification never binds or re-invites the conversation', async scope => {
+  const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
+  const agent = await fixture.agent(admin.actor, 'ada');
+  const owner = admin.member.principal.matrixUserId;
+  const roomId = value(await native.createRoom(owner, 'Private matter')).roomId;
+  const membership = { matrixUserId: agent.matrixUserId, displayName: 'Ada', membership: 'invite' as const, creator: false as const, powerLevel: 0 };
+  native.rooms.get(roomId)!.members.set(agent.matrixUserId, membership);
+  native.invitations.set(roomId + ':' + agent.matrixUserId, { roomId, senderMatrixId: owner, eventId: '$owner-dm', direct: true });
+  const verify = services.matrix.verifyOwnerConversation;
+  services.matrix.verifyOwnerConversation = async (...input) => {
+    const result = await verify(...input);
+    native.invitations.delete(roomId + ':' + agent.matrixUserId);
+    native.rooms.get(roomId)!.members.set(agent.matrixUserId, { ...membership, membership: 'leave' });
+    return result;
+  };
+  assert.equal((await acceptRoomInvitation(services, agent.actor, agent.id, roomId, randomUUID())).ok, false);
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id })), null);
+  assert.equal(native.rooms.size, 1, 'No alternate approval conversation is created');
+  assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+  value(await reconcileRoomGrant(services, agent.id, roomId));
+  assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+});
+
 test('binding an existing private owner DM retires its discretionary invitation delegation atomically', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-owner-conversation-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
@@ -80,6 +112,7 @@ test('binding an existing private owner DM retires its discretionary invitation 
   const database = new Database(databasePath);
   cleanup(scope, () => database.close());
   const agent = await fixture.agent(admin.actor, 'ada');
+  value(await connectOwnerConversation(services, agent.actor, agent.id));
   const previous = value(services.repositories.ownerConversation.find({ agentId: agent.id }))!;
   const grant = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: previous.roomId }))!;
   database.prepare('DELETE FROM agent_owner_conversation WHERE agent_id = ?').run(agent.id);
@@ -95,6 +128,8 @@ test('owner DMs exclude other agents at authorization, storage and room-discover
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const alice = await fixture.member('alice'), bob = await fixture.member('bob');
   const ada = await fixture.agent(alice.actor, 'ada'), jo = await fixture.agent(alice.actor, 'jo'), remy = await fixture.agent(bob.actor, 'remy');
+  value(await connectOwnerConversation(services, ada.actor, ada.id));
+  value(await connectOwnerConversation(services, jo.actor, jo.id));
   const conversation = value(services.repositories.ownerConversation.find({ agentId: ada.id }))!;
   const original = value(services.repositories.agentRoomGrant.find({ agentId: ada.id, roomId: conversation.roomId }))!;
   assert.deepEqual(value(services.repositories.ownerConversation.findByRoom({ roomId: conversation.roomId })), conversation);
@@ -125,6 +160,7 @@ test('owner DMs exclude other agents at authorization, storage and room-discover
 test('active owner DM membership and reply permissions are repaired; suspension still wins', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const agent = await fixture.agent(admin.actor, 'ada');
+  value(await connectOwnerConversation(services, agent.actor, agent.id));
   const conversation = value(services.repositories.ownerConversation.find({ agentId: agent.id }))!;
   const member = native.rooms.get(conversation.roomId)!.members.get(agent.matrixUserId)!;
   member.membership = 'leave'; member.powerLevel = -1;
@@ -151,6 +187,7 @@ test('binding an owner DM invalidates pending third-party grant authorization at
   const database = new Database(databasePath);
   cleanup(scope, () => database.close());
   const ada = await fixture.agent(admin.actor, 'ada'), jo = await fixture.agent(admin.actor, 'jo');
+  value(await connectOwnerConversation(services, ada.actor, ada.id));
   const conversation = value(services.repositories.ownerConversation.find({ agentId: ada.id }))!;
   database.prepare('DELETE FROM agent_owner_conversation WHERE agent_id = ?').run(ada.id);
   const input = { agentId: jo.id, roomId: conversation.roomId, expectedRevision: value(services.directory.agent(jo.id))!.principal.revision,

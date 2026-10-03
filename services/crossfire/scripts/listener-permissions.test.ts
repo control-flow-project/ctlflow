@@ -17,6 +17,7 @@ const permission: Permission = { runtime: 'codex', session: THREAD, request: 'fi
 for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' receiver handles owner approval without model input', withClock(async (scope, clock) => {
 
   const fixture = await matrixFixture(scope, temporary(scope), clock);
+  if (mode === 'nobody') fixture.joined.delete(OWNER_DM);
   if (mode === 'nobody') { fixture.waking.policy = 'nobody'; fixture.waking.senders = []; }
   const stop = new AbortController();
   let hooks: RuntimeHooks | undefined;
@@ -31,6 +32,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(receiving); });
   await clock.until(() => fixture.waiting() > 0);
+  assert.equal(fixture.requests.some(request => request.path.endsWith('/owner-conversation')), false, 'Listener startup never creates a conversation');
   if (mode === 'paused') {
     fixture.add(ROOM, message('$pause', OBSERVER, '!!'));
     await clock.until(() => existsSync(fixture.cursorFile + '.control') && readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused);
@@ -59,25 +61,34 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   assert.equal(closed, true);
 }));
 
-test('an unavailable owner DM prevents runtime attachment and online reporting', withClock(async (scope, clock) => {
+test('an unavailable first-use owner DM denies only that permission request, not a roomless listener', withClock(async (scope, clock) => {
 
   const fixture = await matrixFixture(scope, temporary(scope), clock);
+  fixture.joined.clear();
   fixture.failures.set('/api/agents/' + AGENT_ID + '/owner-conversation', [503]);
   const stop = new AbortController();
   let ready = false, closed = false;
+  let hooks: RuntimeHooks | undefined;
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0,
     ready: () => { ready = true; },
-    runtime: async signal => {
+    runtime: async (signal, _pollMs, callbacks) => {
+      hooks = callbacks;
       return { sessionId: THREAD, approval: 'listener', signal, inspect: async () => ({ busy: false }), deliver: async () => {}, settle: async () => false, recover: async () => false, acknowledge: () => {},
         turnControl: { activeTurn: async () => null, interrupt: async () => {} }, close: () => { closed = true; } };
     },
   }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(receiving); });
-  assert.match(String(await clock.complete(receiving)), /Fixture failure|request|owner DM/i);
-  assert.equal(ready, false);
+  await clock.until(() => ready && fixture.waiting() > 0);
+  assert(hooks);
+  assert.equal(fixture.requests.some(request => request.path.endsWith('/owner-conversation')), false);
+  const result = await clock.complete(hooks.requestPermission(permission, stop.signal));
+  assert.equal(result.ok, false);
+  assert.equal(ready, true);
   assert.equal(closed, false);
-  assert.equal(fixture.requests.some(request => request.path.includes('/listener-runs')), false);
+  assert.equal(fixture.requests.some(request => request.path.includes('/listener-runs')), true);
   assert.equal(fixture.requests.some(request => request.path.includes('/send/')), false);
+  stop.abort(); await clock.complete(receiving);
+  assert.equal(closed, true);
 }));
 
 for (const condition of ['read-only', 'muted', 'owner-absent', 'native-unavailable'] as const) {

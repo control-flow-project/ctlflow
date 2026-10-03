@@ -33,6 +33,6 @@ export async function testListener(options: { coordination: Coordination; runtim
   return { session: options.runtime.sessionId, server: options.coordination.origin, authenticated: true, rooms: rooms.length,
     joinedRooms: joined.joined_rooms.length, canReceiveRoomTasks: rooms.length > 0 && !options.paused && waking, wakeMode: policy.value.wakeMode,
     busy: native.busy, deliveryPaused: options.paused, approval: options.runtime.approval, currentRelease: release.value.release,
-    message: options.paused ? 'Listener is connected; delivery is paused.' : !rooms.length ? 'Listener is ready. No unmuted rooms are granted; the owner can assign access in management.'
+    message: options.paused ? 'Listener is connected; delivery is paused.' : !rooms.length ? 'Listener is ready. No unmuted rooms are granted. The owner can open a DM or invite this agent in Element; native approvals open the private DM only when needed.'
       : !waking ? 'Listener is connected. Wake-up rules disable chat-triggered input; use the runtime directly or change the policy in management.' : 'Listener, exact runtime session, server authentication and room access are ready.' };
 }

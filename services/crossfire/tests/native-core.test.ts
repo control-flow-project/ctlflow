@@ -11,6 +11,7 @@ import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
 import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
 import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
 import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
+import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
 import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
 import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
 import { readRoom } from '@crossfire/domain/room/read-room';
@@ -41,6 +42,9 @@ test("management core applies and verifies direct native authority", { timeout: 
   value(await nativeOk(serviceClient, "POST", path + "/invite", { user_id: ownerId }));
   value(await nativeOk({ base: fixture.native.base, token: owner.token }, "POST", path + "/join", {}));
   const agent = await fixture.agent(owner.actor, 'holmes'), agentId = agent.id;
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId })), null);
+  assert.deepEqual(value(await services.matrix.joined(agent.matrixUserId)), []);
+  value(await connectOwnerConversation(services, agent.actor, agentId));
   const ownerRoom = value(services.repositories.ownerConversation.find({ agentId }))!.roomId;
   const current = () => value(services.directory.agent(agentId))!;
   async function grant(accessMode: 'read' | 'reply' | 'custom' | 'none', powerLevel: number | null = null, muted = false) {
@@ -50,7 +54,7 @@ test("management core applies and verifies direct native authority", { timeout: 
   async function reconcile() { value(await reconcilePrincipal(services, agentId)); return reconcileRoomGrant(services, agentId, room); }
   const joined = async (client: Native) => { const response = await nativeOk(client, "GET", API + "/joined_rooms"); return response.ok ? success(response.value.joined_rooms) : response; };
   const client: Native = { base: fixture.native.base, token: agent.token };
-  await scope.test("agent approval provisions only its owner DM and only its initiating secret exchanges it", async () => {
+  await scope.test("first private owner contact establishes only its owner DM and only its initiating secret exchanges identity", async () => {
     assert.equal(exchangeEnrollment(services, agent.input.enrollmentId, "bad").ok, false);
     assert.deepEqual(value(await joined(client)), [ownerRoom]);
     assert.equal((await createSession(services, agent.token)).ok, false);

@@ -90,7 +90,8 @@ export async function invitationEvent(client: Native, matrixUserId: string, room
     if (content.value.membership !== 'invite' || event.value.sender !== senderMatrixId) return success(null);
     const identifier = eventId(event.value.event_id);
     if (!identifier.ok) return failure('native', 'Invalid native invitation identity');
-    return success({ roomId, eventId: identifier.value, senderMatrixId });
+    if (content.value.is_direct !== undefined && typeof content.value.is_direct !== 'boolean') return failure('native', 'Invalid native direct invitation');
+    return success({ roomId, eventId: identifier.value, senderMatrixId, direct: content.value.is_direct === true });
   }
   return success(null);
 }

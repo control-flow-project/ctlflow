@@ -23,6 +23,8 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
   const stop = new AbortController();
   const announcements: { event: string; content: Record<string, unknown> }[] = [];
   const events = new Map<string, ReceivedEvent>();
+  const conversations: string[] = [];
+  let conversation: string | null = room;
   const access = { status: 'active', ownerStatus: 'active', grant: true, ownerJoined: true, ownerLevel: 100, agentLevel: 0, messageLevel: 0, roomVersion: '11',
     encrypted: false, public: false, outsider: false };
   let release!: () => void;
@@ -31,9 +33,12 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
   const server = createServer(async (request, response) => {
     const path = decodeURIComponent(new URL(request.url!, 'http://localhost').pathname);
     let body: unknown;
-    if (path.startsWith('/api/agents/')) body = { data: { agentId: '11111111-1111-4111-8111-111111111111', ownerMatrixId: owner, matrixUserId: self,
+    if (path.endsWith('/owner-conversation')) {
+      conversations.push(path); conversation = room;
+      body = { data: { roomId: room }, meta: { requestId: '11111111-1111-4111-8111-111111111111' } };
+    } else if (path.startsWith('/api/agents/')) body = { data: { agentId: '11111111-1111-4111-8111-111111111111', ownerMatrixId: owner, matrixUserId: self,
       status: access.status, ownerStatus: access.ownerStatus, wakeMode: 'owner', senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? [owner] : [],
-      ownerConversation: access.grant ? room : null,
+      ownerConversation: access.grant ? conversation : null,
       roomGrants: access.grant ? [{ roomId: room, accessMode: 'reply', powerLevel: null, muted: false }] : [] },
       meta: { requestId: '11111111-1111-4111-8111-111111111111' } };
     else if (path.endsWith('/joined_members')) body = { joined: { [self]: {}, ...(access.ownerJoined ? { [owner]: {} } : {}) } };
@@ -66,7 +71,7 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
   const address = server.address(); assert(address && typeof address === 'object');
   const broker = permissions({ clock, coordination: createCoordination({ origin: 'http://127.0.0.1:' + address.port, token: 'fixture-only' }), client: matrix({ base: 'http://127.0.0.1:' + address.port, token: 'fixture-only', signal: stop.signal }),
     settings: { instance: 'tests', homeserver: 'http://127.0.0.1:' + address.port, server_name: 'tests.localhost', owner, max_upload_bytes: 1024 },
-    account: { user_id: self, access_token: 'fixture-only', device_id: 'fixture' }, agent: '11111111-1111-4111-8111-111111111111', room, expiresMs }, stop.signal);
+    account: { user_id: self, access_token: 'fixture-only', device_id: 'fixture' }, agent: '11111111-1111-4111-8111-111111111111', expiresMs }, stop.signal);
   async function announced() {
     const deadline = Date.now() + 2000;
     while (!announcements.length) { assert(Date.now() < deadline); await delay(5); }
@@ -77,7 +82,8 @@ async function fixture(scope: TestContext, expiresMs = 300_000, holdPublication 
       content: { msgtype: 'm.text', body, 'm.relates_to': { 'm.in_reply_to': { event_id: target } } } };
     events.set(event.event_id, event); return event;
   }
-  return { broker, stop, access, announcements, events, reply, announced, release };
+  return { broker, stop, access, announcements, conversations, events, reply, announced, release,
+    noConversation() { conversation = null; } };
 }
 
 test('only the verified owner replies once to the exact run-bound request', async scope => {
@@ -105,6 +111,22 @@ test('only the verified owner replies once to the exact run-bound request', asyn
   if (!duplicate.ok) assert.match(duplicate.error.message, /Duplicate/);
 });
 
+test('permission readiness creates no chat; the first validated request obtains its private owner DM', async scope => {
+  const fixture_ = await fixture(scope);
+  fixture_.noConversation();
+  assert.deepEqual(await fixture_.broker.authorize(), success(undefined));
+  assert.deepEqual(fixture_.conversations, []);
+  const invalid = await fixture_.broker.request({ ...permission, choices: [] }, fixture_.stop.signal);
+  assert.equal(invalid.ok, false);
+  assert.deepEqual(fixture_.conversations, []);
+  const pending = fixture_.broker.request(permission, fixture_.stop.signal);
+  const announcement = await fixture_.announced();
+  assert.equal(fixture_.conversations.length, 1);
+  assert.equal(await fixture_.broker.consume(fixture_.reply(announcement.event, 'deny')), true);
+  assert.deepEqual(await pending, success({ decision: 'decline' }));
+  assert.equal(fixture_.stop.signal.aborted, false);
+});
+
 test('revocation, absent owner, expiry and disconnect never approve a pending request', async scope => {
   for (const condition of ['grant', 'ownerJoined', 'ownerStatus', 'agentPower', 'ownerPower', 'encrypted', 'public', 'outsider', 'expiry', 'disconnect'] as const) {
     await scope.test(condition, async control => {
@@ -128,6 +150,18 @@ test('revocation, absent owner, expiry and disconnect never approve a pending re
       if (condition !== 'disconnect') assert.equal(fixture_.stop.signal.aborted, false);
     });
   }
+});
+
+test('a cancelled native request never creates or publishes an owner conversation', async scope => {
+  const fixture_ = await fixture(scope);
+  fixture_.noConversation();
+  const cancelled = new AbortController();
+  cancelled.abort(new Error('Native request was cancelled'));
+  const result = await fixture_.broker.request(permission, cancelled.signal);
+  assert.equal(result.ok, false);
+  assert.deepEqual(fixture_.conversations, []);
+  assert.deepEqual(fixture_.announcements, []);
+  assert.deepEqual(await fixture_.broker.authorize(), success(undefined));
 });
 
 test('approval readiness uses current native powers and recognizes v12 creator authority', async scope => {

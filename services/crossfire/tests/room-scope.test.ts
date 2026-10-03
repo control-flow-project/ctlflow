@@ -4,6 +4,7 @@ import { API, segment } from '@crossfire/contracts/matrix';
 import { grantView, room as roomView } from '@crossfire/contracts/schema/response';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
 import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
+import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
 import { nativeApplication } from './support/native-application.js';
 import { httpFixture } from './support/http.js';
 import { value } from './support/application.js';
@@ -12,6 +13,10 @@ test('room discovery and canonical agent grants retain native authority without 
   const fixture = await nativeApplication(scope), { services, admin } = fixture;
   const owner = await fixture.member('alice');
   const inviter = await fixture.agent(admin.actor, 'inviter'), target = await fixture.agent(owner.actor, 'target');
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: inviter.id })), null);
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: target.id })), null);
+  value(await connectOwnerConversation(services, inviter.actor, inviter.id));
+  value(await connectOwnerConversation(services, target.actor, target.id));
   const inviterRoom = value(services.repositories.ownerConversation.find({ agentId: inviter.id }))!.roomId;
   const targetRoom = value(services.repositories.ownerConversation.find({ agentId: target.id }))!.roomId;
   const http = await httpFixture(scope, fixture.application);

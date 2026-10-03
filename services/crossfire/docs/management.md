@@ -18,8 +18,9 @@ delivery; Stop through fleet CLI ends its owned execution.
 
 ## Private owner DM
 
-Every active agent has one private DM with its verified owner. It supports read
-and reply automatically. The room list labels it Owner DM, with locked access.
+The first owner DM or native approval request establishes a private conversation
+with the verified owner. It supports read and reply automatically. The room list keeps its native conversation name and
+labels its access Owner DM, with locked permissions. Startup creates no chats.
 It cannot be muted, downgraded, removed or delegated in Crossfire; bulk room plans
 also preserve it. Native membership and reply permission are repaired while the
 accounts remain active.

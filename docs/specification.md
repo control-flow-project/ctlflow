@@ -167,8 +167,11 @@ or requires another identity. A failed native activation preserves setup choices
 First setup asks for a name; reconnects and upgrades reuse the existing account.
 Several saved profiles require a human selection. The client owns approval
 waiting, verified installation and starting/reusing exactly one listener.
-Approval creates an account and its private owner DM with permanent read/reply
-access. No other room is joined automatically. The owner can invite its agent
+Approval creates an account without creating or joining any room. The owner's
+first private direct invitation or a native tool approval establishes the
+canonical owner DM with permanent read/reply access. Enrollment, listener
+startup, reconnection, diagnostics and heartbeats do not create conversations.
+The owner can invite its agent
 into an existing room in Element. The listener accepts authorized native invitations automatically,
 with a durable read-and-reply grant; no second management action is required.
 
@@ -188,8 +191,10 @@ directory uses symlink aliases. Its default shell syntax supports Bash 3.2.
 
 `agent test` uses the private listener control to check actual runtime readiness,
 native authentication, active owner/agent access and applied/joined room grants.
-It also verifies the private owner DM and, when the native policy requires
-listener-mediated decisions, both participants' native message permissions.
+It verifies an established private owner DM and both participants' native
+message permissions without creating a missing conversation. An authenticated
+listener without rooms is ready for the owner's first invitation or an
+on-demand native approval; saved credentials alone do not establish readiness.
 It does not send a prompt or advance unread positions. Paused delivery and
 absence of additional room grants are reported explicitly; saved credentials alone do not pass this test.
 
@@ -669,7 +674,7 @@ room IDs; names and aliases are display labels.
 The file is a **full replacement for each listed agent**. Unlisted agents are
 untouched. For a listed agent, omitted grants are removals. An explicit
 `grants = []` removes its discretionary grants, preserving the permanent owner
-DM. The owner DM is not an editable room-plan grant. Unknown identities are errors, not
+DM if one exists. A room plan never creates an owner DM. The owner DM is not an editable room-plan grant. Unknown identities are errors, not
 enrollment requests.
 
 The selected fleet's immutable UUID plus `instance` resolve the immutable agent
@@ -793,9 +798,10 @@ roster lookup. Recovery must require the named owner's authenticated authority;
 it cannot use a Matrix password requested by an agent.
 
 Approval transactionally creates/reserves all reviewed successful new identities
-with owner-only wake policy. Active provisioning establishes the mandatory
-private owner DM through the canonical room-grant/application path; no additional
-room grants are created. Native account provisioning occurs
+with owner-only wake policy. Active provisioning creates no conversations or
+room grants. First private owner contact or a native permission request establishes
+the protected owner DM through the canonical room-grant/application path.
+Native account provisioning occurs
 outside the SQLite transaction and can be pending or fail per instance. Retry
 retains the same identity. The UI and controller expose that actual state.
 
@@ -887,9 +893,16 @@ creates another generation; old delegation does not return. Denied invitations
 do not stop unrelated listener delivery and retries are bounded. Admission never
 changes wake policy, fleet delivery intent, identity or model permissions.
 
-Each active agent has one canonical private DM with its verified owner. Native
-Matrix integration reuses a verified owner-created private DM or creates one
-idempotently and updates both participants' `m.direct` account data. Only owner
+Each agent can establish one canonical private DM with its verified owner on
+first use. Native Matrix integration adopts the exact verified owner-created
+direct invitation, or reuses/creates a DM idempotently for an actual native
+permission request, and updates both participants' `m.direct` account data.
+No private conversation is required to enroll, start, reconnect, test or report
+a listener. Existing conversation bindings are repaired, not replaced.
+Generated conversations have a readable native name from the agent's verified
+native profile; unnamed existing conversations receive that name without
+overwriting human-supplied titles. Internal recovery aliases are not display
+names. Only owner
 and agent may be joined/invited; encryption, public join rules and world-readable
 history are rejected. The normalized `agent_owner_conversation` relationship
 identifies that room; the ordinary owner-authorized room grant/application owns
@@ -913,8 +926,8 @@ rule applies to every native creator, not just direct rooms.
 
 Matrix clients such as Element own room creation, room configuration and human
 membership management. Crossfire manages agents' participation in existing rooms;
-room plans never create rooms. Native integration creates only the mandatory
-private owner DM; other rooms must already exist. Agent bearer
+room plans never create rooms. Native integration creates only an on-demand
+private owner DM for native permission routing; other rooms must already exist. Agent bearer
 credentials cannot apply a human bulk room plan.
 
 Existing-room reads support the agent assignment editor and fleet plan review.
@@ -1225,10 +1238,14 @@ permission path sends them only to the canonical private owner DM and accepts
 only the verified owner's explicit matching native decision. No approval-room
 selection exists in the CLI or fleet configuration.
 
-The authenticated agent ensures its owner conversation before connecting. Each affected listener
-validates current applied, unmuted read/reply access, active owner and agent,
-native membership of both, and native message permissions of both before
-advertising readiness or creating an online reporting run. Native room versions
+Each affected listener validates active owner and agent access before advertising
+readiness or creating an online reporting run. A missing conversation is a
+normal on-demand state, not a setup error. For an established conversation it
+also validates current applied, unmuted read/reply access, native membership of
+both, and native message permissions of both. A validated native permission
+request ensures the private channel under that request's deadline/cancellation,
+then performs the same current-identity, privacy and power checks before posting.
+Native room versions
 with implicit creator authority use that authority. Pure Matrix state and power
 parsing has one contract owner shared by management and listener authorization.
 
@@ -1241,8 +1258,9 @@ delegate invitations or configure third-party access to this protected channel.
 
 Approval responses are control input, not model input, and do not alter wake
 policy or resume paused delivery. Silence, unrelated messages and another human's
-reply do not approve. A policy needing approvals without a usable private owner DM
-has a visible setup error/state; it is not silently changed to no-approval mode.
+reply do not approve. Failure to establish or authorize the private channel for
+an actual request denies that request explicitly without terminating an otherwise
+healthy listener or silently changing its native permission policy.
 
 The permission hook returns `Result` for expected authorization, transport,
 expiry and cancellation failures. The Codex adapter denies only the pending

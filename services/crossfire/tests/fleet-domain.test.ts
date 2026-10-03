@@ -53,8 +53,8 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
   assert.equal(preview.snapshots.length, 20); assert.equal(preview.changes.length, 20);
   value(await applyGrantPlan(services, admin.actor, { plan, digest: preview.digest, snapshots: preview.snapshots }, randomUUID()));
-  for (const instance of first.instances) assert.equal(value(services.collection.roomGrants({ agentId: instance.agentId! })).length, 2);
-  assert.equal(value(services.collection.roomGrants({ agentId: second.instances[0]!.agentId! })).length, 1);
+  for (const instance of first.instances) assert.equal(value(services.collection.roomGrants({ agentId: instance.agentId! })).length, 1);
+  assert.equal(value(services.collection.roomGrants({ agentId: second.instances[0]!.agentId! })).length, 0);
   const credential = value(services.repositories.fleetCredential.find({ id: controller.credentialId }))!;
   value(services.repositories.fleetCredential.update({ ...credential, revokedAt: fixture.now() }));
   assert.equal(authenticateController(services, first.fleet!.controllerCredential!).ok, false);

@@ -82,12 +82,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   if (!current.ok) throw new Error(current.error.message);
   const failed = new AbortController();
   const lifetime = AbortSignal.any([stop, failed.signal]);
-  const ownerConversation = await options.coordination.ownerConversation(options.id, AbortSignal.any([lifetime, AbortSignal.timeout(45_000)]));
-  if (!ownerConversation.ok) throw new Error('Owner DM is not ready: ' + ownerConversation.error.message);
   const approval = permissions({
     client: options.transport(lifetime, 45_000),
     clock: options.clock,
-    coordination: options.coordination, settings: options.settings, account: options.account, agent: options.id, room: ownerConversation.value.roomId, expiresMs: 300_000,
+    coordination: options.coordination, settings: options.settings, account: options.account, agent: options.id, expiresMs: 300_000,
   }, lifetime);
   let destination: Awaited<ReturnType<RuntimeAdapter>>;
   try {
