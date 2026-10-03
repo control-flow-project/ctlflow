@@ -39,7 +39,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
       if (signedIn.status() !== 200 || !native || typeof native !== 'object' || !('access_token' in native) || typeof native.access_token !== 'string'
         || !('user_id' in native) || native.user_id !== account.matrixUserId) return failure('unauthorized', 'Browser native login failed');
       token = native.access_token;
-      await expect(page.locator('.page-heading h1')).toBeVisible();
+      await expect(page.locator('.shell .page-heading h1')).toBeVisible();
       const current = await context.request.get(origin + '/api/sessions/current');
       const viewer = decodeResponse(await current.json(), operations.currentSession.output, false);
       if (current.status() !== 200 || !viewer.ok) return failure('native', 'Browser Crossfire session is invalid');

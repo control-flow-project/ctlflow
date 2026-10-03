@@ -113,6 +113,11 @@ not preservation assertions. Each protected relation is bounded to 100,000 rows;
 exceeding that bound fails explicitly. Hashes are used internally for comparison;
 reports contain counts, not private row data or credential hashes.
 
+This comparison is strict: configuration writes between snapshots, including a
+revision-only controller update or a fleet pause/resume, cause a conflict. Review
+intentional changes against their audit records separately; do not modify a
+snapshot or suppress fields to make preservation pass.
+
 ## Files, archives, source and host
 
 A file plan:

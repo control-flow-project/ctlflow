@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { buildProducts, repository, products, command } from './build.mjs';
 import { testOptions, runtimeTestEnabled } from './test-options.mjs';
 
-const browserFiles = new Set(['browser.test.js', 'fleet-browser.test.js', 'wake-up-browser.test.js']);
+const browserFiles = new Set(['browser.test.js', 'fleet-browser.test.js', 'wake-up-browser.test.js', 'operator-browser.test.js']);
 
 export async function runTests(selected, selection, options = { allRuntimes: false }) {
   if (!['all', 'non-browser', 'browser', 'integration'].includes(selection)) throw new Error('Select an existing test suite');
