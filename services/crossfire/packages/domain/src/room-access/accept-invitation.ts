@@ -5,7 +5,7 @@ import { changeRoomGrant } from './change-grant.js';
 import { reconcileRoomGrant } from './reconcile-grant.js';
 import { ensureOwnerConversation } from '../owner-conversation/ensure.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'roomOperations'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
 
 export async function acceptRoomInvitation(services: Dependencies, receiver: Actor, agentId: string, roomId: string, requestId: string) {
   const permitted = authorize(services, receiver, 'room-invitation.accept.self');
@@ -44,5 +44,10 @@ export async function acceptRoomInvitation(services: Dependencies, receiver: Act
   if (!observation.ok) return observation;
   if (observation.value?.errorCode) return failure(observation.value.errorCode === 'conflict' ? 'conflict'
     : observation.value.errorCode === 'forbidden' ? 'forbidden' : 'native', observation.value.errorMessage ?? 'Native invitation remains pending');
-  return success({ accepted: observation.value?.membership === 'join' });
+  const accepted = observation.value?.membership === 'join';
+  if (accepted && invitation.value.direct) {
+    const marked = await services.matrix.markDirect(target.value.principal.matrixUserId, invitation.value.senderMatrixId, roomId);
+    if (!marked.ok) return marked;
+  }
+  return success({ accepted });
 }

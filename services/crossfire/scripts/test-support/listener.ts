@@ -65,6 +65,7 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   server.on('connection', socket => socket.on('message', data => {
     const request = JSON.parse(data.toString());
     requests.push(request);
+    if (!request.method) return;
     const mode = configuration.mode;
     const send = (value: unknown) => socket.send(JSON.stringify(value));
     if (request.method === 'initialized') return;
@@ -138,9 +139,9 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
     directory, update, notify, publish: () => { for (const publish of publications.splice(0)) publish(); },
     disconnect: () => { for (const client of server.clients) client.terminate(); },
     options: { session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs: 2000, pollMs: 100,
-      hooks: { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } },
+      hooks: { requestDecision: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } },
     runtime: (signal: AbortSignal, pollMs: number, hooks?: RuntimeHooks, timeoutMs = 2000) => connectCodex({ session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs, pollMs,
-      hooks: hooks ?? { requestPermission: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } }, signal),
+      hooks: hooks ?? { requestDecision: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } }, signal),
     requests: () => requests,
   };
 }
@@ -167,9 +168,9 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };
   const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture' };
   const identities = new Map<string, PrincipalIdentity>([
-    [OBSERVER, { matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null }],
-    [SELF, { matrixUserId: SELF, kind: 'agent', ownerMatrixId: OBSERVER }],
-    ['@agent-holmes:test.localhost', { matrixUserId: '@agent-holmes:test.localhost', kind: 'agent', ownerMatrixId: OBSERVER }],
+    [OBSERVER, { matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }],
+    [SELF, { matrixUserId: SELF, kind: 'agent', ownerMatrixId: OBSERVER, displayName: null, ownerDisplayName: null }],
+    ['@agent-holmes:test.localhost', { matrixUserId: '@agent-holmes:test.localhost', kind: 'agent', ownerMatrixId: OBSERVER, displayName: null, ownerDisplayName: null }],
   ]);
   const rooms = new Map<string, Event[]>([[ROOM, []], [OWNER_DM, []]]);
   const joined = new Set([ROOM, OWNER_DM]);
@@ -183,6 +184,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   const muted = new Set<string>();
   const accessModes = new Map<string, 'read' | 'reply' | 'custom'>();
   const access = { ownerStatus: 'active', status: 'active' };
+  const decisions = new Map<string, { id: string; questions: { id: string }[]; status: string; answers: { questionId: string; optionId: string | null; text: string | null }[] }>();
   const waking: { policy: WakePolicy; senders: string[] } = { policy: 'owner-agents', senders: [OBSERVER, '@agent-holmes:test.localhost'] };
   const release = builtRelease().release.manifest;
   const publication = { release: builtRelease().release };
@@ -217,7 +219,20 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       api(response, reporting.current);
     } else if (path === '/api/principal-resolutions' && request.method === 'POST') {
       const input = body as { matrixUserIds: string[] };
-      api(response, input.matrixUserIds.map(matrixUserId => identities.get(matrixUserId) ?? { matrixUserId, kind: 'unknown', ownerMatrixId: null }));
+      api(response, input.matrixUserIds.map(matrixUserId => identities.get(matrixUserId) ?? { matrixUserId, kind: 'unknown', ownerMatrixId: null, displayName: null, ownerDisplayName: null }));
+    } else if (path === '/api/agents/' + AGENT_ID + '/runtime-decisions' && request.method === 'POST') {
+      const decision = body as { id: string; questions: { id: string }[] };
+      const stored = { ...decision, agentId: AGENT_ID, createdAt: Date.now(), status: 'pending', answers: [] };
+      decisions.set(decision.id, stored);
+      const { answers: _answers, ...view } = stored;
+      send(response, { data: view, meta: { requestId: AGENT_ID } }, 201);
+    } else if (path.startsWith('/api/agents/' + AGENT_ID + '/runtime-decisions/') && path.endsWith('/answer')) {
+      const id = path.split('/').at(-2)!; const decision = decisions.get(id)!;
+      api(response, { status: decision.status, answers: decision.answers });
+    } else if (path.startsWith('/api/agents/' + AGENT_ID + '/runtime-decisions/') && path.endsWith('/receipt')) {
+      const decision = decisions.get(path.split('/').at(-2)!)!;
+      if (!decision) { send(response, { error: { code: 'missing', message: 'Decision not found' }, meta: { requestId: AGENT_ID } }, 404); return; }
+      decision.status = (body as { status: string }).status; decision.answers = []; api(response, { accepted: true });
     } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
       api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, wakeMode: waking.policy,
         ownerConversation: joined.has(OWNER_DM) ? OWNER_DM : null,
@@ -235,12 +250,16 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
         activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, deployment: null, allowedActions: [] });
     } else if (path === '/api/agents/' + AGENT_ID + '/wake-deliveries' && request.method === 'GET') {
       api(response, { now: Date.now(), nextDueAt: null });
+    } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && path.endsWith('/runtime') && request.method === 'PUT') {
+      api(response, { accepted: true });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && request.method === 'PUT') {
       api(response, { disconnect: reporting.disconnect, currentRelease: reporting.current.release });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
       send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
     } else if (path === API + '/account/whoami') {
       send(response, { user_id: SELF });
+    } else if (path === API + '/user/' + SELF + '/account_data/m.direct') {
+      send(response, { [OBSERVER]: [OWNER_DM] });
     } else if (path === API + '/joined_rooms') {
       send(response, { joined_rooms: [...joined] });
     } else if (path === API + '/sync') {
@@ -268,12 +287,13 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       const room = path.slice((API + '/rooms/').length, -'/joined_members'.length);
       send(response, { joined: { [SELF]: {}, ...Object.fromEntries([...(room === OWNER_DM ? [] : extraMembers)].map(member => [member, {}])), ...(!missingObserver.has(room) ? { [OBSERVER]: {} } : {}) } });
     } else if (path.endsWith('/state')) {
+      const room = path.slice((API + '/rooms/').length, -'/state'.length);
       send(response, [
         { type: 'm.room.create', state_key: '', sender: OBSERVER, content: { room_version: '11' } },
         { type: 'm.room.power_levels', state_key: '', sender: OBSERVER, content: { users: { [OBSERVER]: 100, [SELF]: 0 } } },
         { type: 'm.room.join_rules', state_key: '', sender: OBSERVER, content: { join_rule: 'invite' } },
         { type: 'm.room.history_visibility', state_key: '', sender: OBSERVER, content: { history_visibility: 'shared' } },
-        { type: 'm.room.member', state_key: OBSERVER, sender: OBSERVER, content: { membership: 'join' } },
+        { type: 'm.room.member', state_key: OBSERVER, sender: OBSERVER, content: { membership: missingObserver.has(room) ? 'leave' : 'join' } },
         { type: 'm.room.member', state_key: SELF, sender: SELF, content: { membership: 'join' } },
       ]);
     } else if (path.endsWith('/messages')) {
@@ -294,6 +314,8 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       const next = page.length ? events.indexOf(page.at(-1)!) + 1 : start;
       send(response, pageOverride ?? { chunk: page, ...(page.length ? { end: String(next) } : {}) });
     } else if (path.endsWith('/read_markers')) {
+      send(response, {});
+    } else if (path.includes('/typing/')) {
       send(response, {});
     } else if (path.includes('/send/m.room.message/')) {
       const room = path.slice((API + '/rooms/').length, path.indexOf('/send/'));
@@ -316,7 +338,11 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities,
+  return { clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
+    answerDecision(id: string, optionId = '0', text: string | null = null) {
+      const decision = decisions.get(id)!; decision.status = 'answered';
+      decision.answers = decision.questions.map(question => ({ questionId: question.id, optionId: text === null ? optionId : null, text }));
+    },
     env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
     wake, waiting: () => waiters.size, maximumWaiting: () => maximumWaiters,
     hold: (path: string) => {

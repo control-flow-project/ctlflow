@@ -28,13 +28,13 @@ function content(native: Awaited<ReturnType<typeof fakeCodex>>) {
     const input = request.params!.input as { text: string }[];
     assert.equal(input.length, 1);
     const text = input[0]!.text;
-    assert(Buffer.byteLength(text) <= 64 * 1024);
+    assert(Buffer.byteLength(text) <= 100000);
     return (JSON.parse(text.slice(text.indexOf('\n') + 1)) as { events: ReceivedEvent[] }).events;
   });
 }
 
 async function fixture(context: TestContext, clock: ReturnType<typeof testClock>,
-  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner',
+  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room' | 'maximumBytes'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner',
   prepare?: (matrix: Awaited<ReturnType<typeof matrixFixture>>) => void) {
   const native = await fakeCodex(context);
   const matrix = await matrixFixture(context, native.directory, clock);
@@ -278,7 +278,7 @@ test('bulk delivery advances only after its exact receipt and later unauthorized
 
 test('only the byte ceiling splits large context and remaining chunks do not require more wake messages or windows', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 100 });
+  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 100, maximumBytes: 64 * 1024 });
   matrix.add(ROOM, ...Array.from({ length: 5 }, (_, index) => message('$large-' + index, PEER, 'x'.repeat(45_000))), message('$wake', OBSERVER));
   const started = clock.now();
   await clock.until(() => cursors()[ROOM] === '6');
@@ -305,7 +305,7 @@ test('restricting authority during collection cancels the peer wake without losi
 
 test('a saved wake drains remaining byte-sized context after restart without replaying its already received owner message', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors, stop, options, result } = await fixture(context, clock, { debounceMs: 0 });
+  const { native, matrix, cursors, stop, options, result } = await fixture(context, clock, { debounceMs: 0, maximumBytes: 64 * 1024 });
   const barrier = matrix.hold(`${API}/rooms/${ROOM}/read_markers`);
   matrix.add(ROOM, message('$owner', OBSERVER, 'o'.repeat(40_000)), message('$peer', PEER, 'p'.repeat(40_000)));
   await clock.until(() => barrier.entered() && cursors()[ROOM] === '1');

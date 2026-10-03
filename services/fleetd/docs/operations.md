@@ -19,7 +19,7 @@ process-name scan decides native ownership.
 ## Private API
 
 Resources include `/api/status`, `/api/fleets`, nested fleet `/agents`,
-`/delivery`, `/messages`, `/api/operations` and agent `/attachment`.
+`/delivery`, `/messages`, `/api/operations` and agent `/attachment`/`/contexts`.
 Local and SSH CLI commands use the same typed requests. UUID operation keys and
 expected revisions reject conflicting reuse. Accepted operations continue after
 CLI disconnect and have per-instance outcomes.
@@ -27,6 +27,16 @@ CLI disconnect and have per-instance outcomes.
 Attachment returns a current running-session pointer to the shared terminal
 adapter. It carries a private token-file path, never the token. Connection data
 does not belong in public fleet views or durable registry restart authority.
+
+Contexts lists only existing native histories. Attachment can select one exact
+listed context; neither endpoint creates a room/history or starts another
+engine. Room and private-control histories remain runtime-adapter owned.
+
+Unexpected startup/listener/native failures are recorded in each fleet's private
+`.fleet/failures.json` before reporting through its scoped controller credential.
+Delivery retries independently of listener activation; reporting errors remain
+visible. Crossfire owns normalized episodes and management-DM notifications.
+Deliberate stop/deactivation is not a failure; no silent respawn is attempted.
 
 ## Crossfire connection
 

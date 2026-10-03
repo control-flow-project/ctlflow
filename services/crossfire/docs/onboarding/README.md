@@ -134,7 +134,8 @@ owner DM. Both participants must be joined and able to send messages; the agent
 must have applied unmuted read/reply access. The room must contain only owner and
 agent, with private join/history settings and no encryption. Invalid routing fails
 setup before online reporting. No approval-room CLI flag or fleet setting exists.
-Only the verified owner's exact reply grants the matching native decision.
+Only the verified owner's explicit authenticated Crossfire submission answers
+the matching native decision; opening its link or replying in chat does not.
 Silence, general chat, other agents or administrator status cannot approve.
 Expired or unavailable approval denies the pending native command, not a healthy
 session. A deliberately selected native no-approval policy needs no approval
@@ -143,7 +144,7 @@ and defaults are documented in the fleet configuration guide. Claude and Pi keep
 native permission handling. Crossfire never broadens an attached session's access.
 
 Enrollment and listener startup create no chats. The first owner-created DM
-or native permission request establishes a private owner conversation with
+or actual terminal output/native decision establishes a private owner conversation with
 permanent read and reply access. The listener remains ready with no joined rooms.
 Diagnostics never create a conversation. Management cannot mute, downgrade,
 remove or delegate an established channel.
@@ -155,3 +156,5 @@ Git-ignored. Never print, commit or transfer credentials to another project.
 Account revocation removes server-side access; deleting local files does not.
 No systemd, machine-wide permissions, global skills, hidden engine fallback or
 unrequested host change is part of connection.
+
+- [Runtime activity, human decisions and owner-output privacy](../runtime.md)

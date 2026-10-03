@@ -3,15 +3,16 @@ import type { Services, Actor } from '../port/services.js';
 import type { Page, PageRequest } from '../port/directory.js';
 import type { RoomFacts } from '../port/matrix-authority.js';
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
+import { privateConversation } from '../owner-conversation/protect.js';
 export type RoomDetails = { roomId: string; name: string; topic: string; alias: string | null; authority: RoomFacts | null };
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'clock'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'clock' | 'runtime'>;
 export async function readRoom(services: Dependencies, actor: Actor, roomId: string, agentId?: string): Promise<Result<RoomDetails>> {
   const current = activeActor(services, actor);
   if (!current.ok) return current;
   if (agentId) {
-    const permitted = authorizeAgent(services, actor, agentId, 'read'), conversation = services.repositories.ownerConversation.findByRoom({ roomId });
+    const permitted = authorizeAgent(services, actor, agentId, 'read'), conversation = privateConversation(services, roomId);
     if (!permitted.ok) return permitted; if (!conversation.ok) return conversation;
-    if (conversation.value && conversation.value.agentId !== agentId) return failure('forbidden', 'This private owner DM belongs to another agent');
+    if (conversation.value && (conversation.value.kind === 'management' || conversation.value.agentId !== agentId)) return failure('forbidden', 'This private owner DM is not an agent assignment');
   }
   const native = await services.matrix.room(current.value.matrixUserId, roomId);
   if (native.ok) return success({ roomId, name: native.value.name, topic: native.value.topic, alias: native.value.alias, authority: native.value });
@@ -41,9 +42,9 @@ export async function listRooms(services: Dependencies, actor: Actor, input: Pag
   const rooms: RoomDetails[] = [];
   for (const roomId of [...identifiers].sort()) {
     if (input.agentId !== undefined) {
-      const conversation = services.repositories.ownerConversation.findByRoom({ roomId });
+      const conversation = privateConversation(services, roomId);
       if (!conversation.ok) return conversation;
-      if (conversation.value && conversation.value.agentId !== input.agentId) continue;
+      if (conversation.value && (conversation.value.kind === 'management' || conversation.value.agentId !== input.agentId)) continue;
     }
     const found = await readRoom(services, actor, roomId, input.agentId);
     if (!found.ok) return found;

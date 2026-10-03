@@ -11,6 +11,10 @@ async function data<Value>(response: Promise<Result<Response<Value>>>): Promise<
 export function createCoordination(options: ClientOptions): Coordination {
   const client = createClient(options);
   return { origin: options.origin,
+    createDecision: (agentId, input, signal) => data(client.call(operations.createRuntimeDecision, { agentId }, input, undefined, signal)),
+    pollDecision: (agentId, decisionId, signal) => data(client.call(operations.pollRuntimeDecision, { agentId, decisionId }, {}, undefined, signal)),
+    receiptDecision: (agentId, decisionId, status, signal) => data(client.call(operations.receiptRuntimeDecision, { agentId, decisionId }, { status }, undefined, signal)),
+    runtime: (agentId, runId, input, signal) => data(client.call(operations.reportRuntime, { agentId, runId }, input, undefined, signal)),
     release: signal => data(client.call(operations.release, {}, {}, undefined, signal)),
     delivery: (agentId, signal) => data(client.call(operations.deliveryPolicy, { agentId }, {}, undefined, signal)),
     ownerConversation: (agentId, signal) => data(client.call(operations.ownerConversation, { agentId }, {}, undefined, signal)),

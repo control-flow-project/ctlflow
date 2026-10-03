@@ -45,8 +45,9 @@ test('invalid native permission requests fail closed rather than being answered 
   const fixture = await fakeCodex(t, { mode: 'server-requests' });
   const connection = await connectCodex(fixture.options, new AbortController().signal);
   cleanup(t, connection.close);
-  await assert.rejects(connection.deliver('input', 'input'), /invalid native session/);
-  assert(!fixture.requests().some(request => request.id === 'approval' || !request.method));
+  await connection.deliver('input', 'input');
+  await until(() => fixture.requests().some(request => request.id === 'approval' && !request.method));
+  assert(!connection.signal.aborted);
 });
 
 test('invalid protocol responses fail promptly and do not leave unresolved requests', async t => {

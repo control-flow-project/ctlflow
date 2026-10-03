@@ -1,0 +1,16 @@
+export const INPUT_BYTES = 100000;
+export const MAX_INPUT_BYTES = 4 * 1024 * 1024;
+export const MAX_REVIEW_BYTES = 8 * 1024 * 1024;
+export type DecisionOption = { id: string; label: string; description: string };
+export type DecisionQuestion = { id: string; title: string; prompt: string; secret: boolean; allowText: boolean; options: DecisionOption[] };
+export type DecisionCreation = { id: string; runId: string; runtime: string; sessionId: string; requestId: string; turnId: string; itemId: string;
+  kind: 'permission' | 'question'; action: string; review: string; blocking: boolean; expiresAt: number | null; questions: DecisionQuestion[] };
+export type DecisionStatus = 'pending' | 'answered' | 'responded' | 'cancelled' | 'expired';
+export type DecisionView = DecisionCreation & { agentId: string; status: DecisionStatus; createdAt: number };
+export type DecisionSummary = Omit<DecisionView, 'review' | 'questions'>;
+export type DecisionAnswer = { questionId: string; optionId: string | null; text: string | null };
+export type RuntimeState = 'idle' | 'working' | 'waiting-approval' | 'waiting-answer' | 'failed' | 'unavailable';
+export type RuntimeSetting = { name: string; configured: string | null; effective: string | null };
+export type RuntimeObservation = { sessionId: string; roomId: string | null; runtime: string; state: RuntimeState; observedAt: number;
+  historyMode: 'shared' | 'per-room'; maxInputBytes: number; settings: RuntimeSetting[]; errorMessage: string | null };
+export type RuntimeObservationView = RuntimeObservation & { runId: string };

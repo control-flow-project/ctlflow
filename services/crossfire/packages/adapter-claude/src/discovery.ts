@@ -18,6 +18,6 @@ export function discoverClaude(workspace: string, environment: NodeJS.ProcessEnv
   }
   const context: ClaudeContext = { ...native, transcript: parsed.value.transcript };
   const binding = createHash('sha256').update(JSON.stringify(context)).digest('hex');
-  const runtime: RuntimeAdapter = (stop, pollMs) => connectClaude(context, { journal: join(workspace, '.crossfire/runtime/claude', native.session + '.receipt'), pollMs }, stop);
+  const runtime: RuntimeAdapter = (stop, pollMs, hooks) => connectClaude(context, { journal: join(workspace, '.crossfire/runtime/claude', native.session + '.receipt'), pollMs, hooks }, stop);
   return { name: 'claude', session: native.session, binding, runtime };
 }

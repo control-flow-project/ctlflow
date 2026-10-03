@@ -41,7 +41,8 @@ export function matrixAuthorityFixture() {
     async setDisplayName(id, name) { const account = accounts.get(id); if (!account) return failure('missing', 'Native account missing'); account.displayName = name; return success(undefined); },
     async joined(id) { return success([...rooms].filter(([, room]) => room.members.get(id)?.membership === 'join').map(([id]) => id)); },
     async ownerConversation(owner, agent, selected) {
-      const existing = selected ?? ownerRooms.get(agent);
+      const key = JSON.stringify([owner, agent]);
+      const existing = selected ?? ownerRooms.get(key);
       const created = existing ? success({ roomId: existing }) : await createRoom(owner, 'Owner DM');
       if (!created.ok) return created;
       const roomId = created.value.roomId;
@@ -50,7 +51,7 @@ export function matrixAuthorityFixture() {
       room.members.set(owner, { matrixUserId: owner, displayName: owner, membership: 'join', creator: true, powerLevel: null });
       const previous = room.members.get(agent);
       room.members.set(agent, { matrixUserId: agent, displayName: agent, membership: 'join', creator: false, powerLevel: previous?.powerLevel ?? 0 });
-      ownerRooms.set(agent, roomId);
+      ownerRooms.set(key, roomId);
       return success(roomId);
     },
     async verifyOwnerConversation(owner, agent, roomId) {
@@ -58,6 +59,7 @@ export function matrixAuthorityFixture() {
       return room && room.creator === owner && ![...room.members].some(([id, member]) => id !== owner && id !== agent && ['join', 'invite'].includes(member.membership))
         ? success(undefined) : failure('forbidden', 'Invalid private owner DM');
     },
+    async markDirect() { return success(undefined); },
     async room(id, roomId) { return facts(id, roomId); },
     async membership(id, targetId, roomId) {
       const authority = facts(id, roomId);

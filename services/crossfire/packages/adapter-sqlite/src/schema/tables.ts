@@ -1,6 +1,15 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  runtime_decision: { id: string; agent_id: string; run_id: string; runtime: string; session_id: string; request_id: string; turn_id: string; item_id: string; kind: 'permission' | 'question'; action: string; review_text: string; blocking: number; expires_at: number | null; created_at: number; status: 'pending' | 'answered' | 'responded' | 'cancelled' | 'expired' };
+  runtime_decision_question: { decision_id: string; question_id: string; position: number; title: string; prompt: string; secret: number; allow_text: number };
+  runtime_decision_option: { decision_id: string; question_id: string; option_id: string; position: number; label: string; description: string };
+  runtime_decision_answer: { decision_id: string; question_id: string; option_id: string | null; answer_text: string | null };
+  runtime_observation: { run_id: string; agent_id: string; session_id: string; room_id: string | null; runtime: string; state: 'idle' | 'working' | 'waiting-approval' | 'waiting-answer' | 'failed' | 'unavailable'; observed_at: number; history_mode: 'shared' | 'per-room'; max_input_bytes: number; error_message: string | null };
+  runtime_setting: { run_id: string; session_id: string; name: string; configured_value: string | null; effective_value: string | null };
+  runtime_incident: { id: string; owner_id: string; agent_id: string | null; fleet_id: string | null; run_id: string | null; session_id: string | null; kind: 'failure' | 'contact'; message: string; created_at: number; recovered_at: number | null };
+  incident_notification: { incident_id: string; phase: 'initial' | 'recovery'; body: string; next_attempt_at: number; event_id: string | null };
+  management_conversation: { owner_id: string; room_id: string; created_at: number };
   agent_owner_conversation: { agent_id: string; owner_id: string; room_id: string; created_at: number };
   wake_rule: { id: string; owner_id: string; configured_by_id: string; name: string; message: string; schedule_kind: 'interval' | 'cron'; interval_seconds: number | null; cron_expression: string | null; time_zone: string | null; enabled: number; revision: number; created_at: number; updated_at: number };
   wake_rule_agent: { rule_id: string; agent_id: string; next_due_at: number; last_delivered_at: number | null };

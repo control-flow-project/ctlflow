@@ -41,7 +41,7 @@ async function conversationName(client: Native, agent: string): Promise<Result<s
     : failure('native', 'Invalid native agent display name');
 }
 
-async function markDirect(client: Native, identity: string, counterpart: string, room: string): Promise<Result<void>> {
+export async function markDirect(client: Native, identity: string, counterpart: string, room: string): Promise<Result<void>> {
   const current = await directRooms(client, identity);
   if (!current.ok) return current;
   if (current.value[counterpart]?.includes(room)) return success(undefined);

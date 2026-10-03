@@ -11,7 +11,7 @@ export type GrantPlan = { fleetId: string; agents: { instanceKey: string; grants
 export type GrantPlanSnapshot = { agentId: string; revision: number; grants: { roomId: string; generation: string; revision: number }[] };
 export type GrantPlanChange = GrantAuthorization & { agentName: string; instanceKey: string; roomName: string; roomAlias: string | null };
 export type GrantPlanPreview = { digest: string; fleetId: string; fleetRevision: number; snapshots: GrantPlanSnapshot[]; changes: GrantPlanChange[] };
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'runtime'>;
 
 export async function previewGrantPlan(services: Dependencies, actor: Actor, plan: GrantPlan): Promise<Result<GrantPlanPreview>> {
   if (actor.kind !== 'human') return failure('forbidden', 'Only a human can review a fleet room plan');

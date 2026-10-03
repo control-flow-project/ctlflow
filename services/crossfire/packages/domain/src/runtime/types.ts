@@ -1,0 +1,31 @@
+import type { DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservationView } from './values.js';
+import type { Result } from '@crossfire/kernel/result';
+
+export type Incident = { id: string; ownerId: string; agentId: string | null; fleetId: string | null; runId: string | null; sessionId: string | null;
+  kind: 'failure' | 'contact'; message: string; createdAt: number; recoveredAt: number | null };
+export type IncidentNotification = { incidentId: string; phase: 'initial' | 'recovery'; body: string; nextAttemptAt: number; eventId: string | null };
+export type ManagementConversation = { ownerId: string; roomId: string; createdAt: number };
+export type RuntimeRepository = {
+  decision(id: string): Result<DecisionView | null>;
+  decisions(agentId: string, page: number, pageSize: number): Result<{ items: DecisionSummary[]; totalItems: number }>;
+  pendingDecisions(): Result<DecisionSummary[]>;
+  insertDecision(value: DecisionView): Result<void>;
+  decisionStatus(id: string, status: DecisionView['status']): Result<void>;
+  answers(id: string): Result<DecisionAnswer[]>;
+  answer(id: string, values: DecisionAnswer[]): Result<void>;
+  observation(agentId: string): Result<RuntimeObservationView[]>;
+  saveObservation(agentId: string, value: RuntimeObservationView): Result<void>;
+  incident(id: string): Result<Incident | null>;
+  activeIncidents(): Result<Incident[]>;
+  insertIncident(value: Incident): Result<void>;
+  recoverIncident(id: string, now: number): Result<void>;
+  notifications(now: number): Result<IncidentNotification[]>;
+  notification(incidentId: string, phase: IncidentNotification['phase']): Result<IncidentNotification | null>;
+  insertNotification(value: IncidentNotification): Result<void>;
+  saveNotification(value: IncidentNotification): Result<void>;
+  conversation(ownerId: string): Result<ManagementConversation | null>;
+  conversationByRoom(roomId: string): Result<ManagementConversation | null>;
+  insertConversation(value: ManagementConversation): Result<void>;
+  watchedRuns(): Result<{ id: string; agentId: string; startedAt: number; lastSeenAt: number; stoppedAt: number | null; disconnectRequestedAt: number | null }[]>;
+  watchedFleets(): Result<{ id: string; ownerId: string; label: string; connectionId: string; expiresAt: number; closedAt: number | null }[]>;
+};

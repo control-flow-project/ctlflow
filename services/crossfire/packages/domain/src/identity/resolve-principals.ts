@@ -14,5 +14,5 @@ export function resolvePrincipals(services: Pick<Services, 'repositories' | 'dir
   if (!resolved.ok) return resolved;
   const identities = new Map(resolved.value.map(identity => [identity.matrixUserId, identity]));
   return success(matrixUserIds.map((matrixUserId): PrincipalIdentity => identities.get(matrixUserId)
-    ?? { matrixUserId, kind: 'unknown', ownerMatrixId: null }));
+    ?? { matrixUserId, kind: 'unknown', ownerMatrixId: null, displayName: null, ownerDisplayName: null }));
 }

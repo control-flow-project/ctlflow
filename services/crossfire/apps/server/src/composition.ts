@@ -14,12 +14,14 @@ import { createRoomOperations } from '@crossfire/domain/room-access/create-opera
 import type { Services } from '@crossfire/domain/port/services';
 import type { MatrixAuthority } from '@crossfire/domain/port/matrix-authority';
 import { serviceUser, type Config } from './config.js';
+import { createRuntimeRepository } from '@crossfire/adapter-sqlite/repository/runtime/index';
 export type Application = { services: Services; config: Config; close(): void };
 export function createApplication(path: string, config: Config, options: { now?: () => number; matrix?: MatrixAuthority } = {}): Application {
   const database = openStore(path);
   const matrix = options.matrix ?? createMatrixAuthority({ ...config, serviceMatrixId: serviceUser(config) });
   function hash(value: string) { return createHash('sha256').update(value).digest('hex'); }
   const services: Services = {
+    runtime: createRuntimeRepository(database),
     repositories: createRepositories(database), directory: createDirectoryRepository(database), collection: createCollectionRepository(database),
     listenerRead: createListenerReadRepository(database), discovery: createDiscoveryRepository(database), roomGrantRead: createRoomGrantReadRepository(database),
     unitOfWork: createUnitOfWork(database), roomOperations: createRoomOperations(), schedule: createScheduleCalculator(), matrix, clock: { now: options.now ?? Date.now },

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { codexPermission } from '@crossfire/adapter-codex/approval';
+import { codexPermission, permissionDenial } from '@crossfire/adapter-codex/approval';
 import type { NativeRequest } from '@crossfire/adapter-codex/protocol';
 import { approvalRouting } from '@crossfire/adapter-codex/permission-policy';
 import { success } from '@crossfire/kernel/result';
@@ -41,7 +41,20 @@ test('wrong session, unavailable scope and unclassified choices cannot solicit a
   assert(decoded.ok);
   assert.deepEqual(decoded.value.scope, { request: file.params, changes });
   assert.equal(codexPermission({ ...request, method: 'item/tool/call' }, 'session').ok, false);
-  assert.equal(codexPermission({ ...request, params: { ...request.params, command: 'x'.repeat(12_000) } }, 'session').ok, false);
+  assert.equal(codexPermission({ ...request, params: { ...request.params, command: 'x'.repeat(26_036) } }, 'session').ok, true);
+});
+
+test('unavailable human review uses only an exact offered native denial, never an approving or policy-changing choice', () => {
+  for (const [availableDecisions, expected] of [
+    [['accept', 'decline', 'cancel'], { decision: 'decline' }],
+    [['accept', 'cancel'], { decision: 'cancel' }],
+    [['accept'], undefined],
+    [[{ applyNetworkPolicyAmendment: { network_policy_amendment: { host: 'example.org', action: 'deny' } } }], undefined],
+  ] as const) {
+    const parsed = codexPermission({ ...request, params: { ...request.params, availableDecisions } }, 'session');
+    assert(parsed.ok);
+    assert.deepEqual(permissionDenial(parsed.value), expected);
+  }
 });
 
 test('native effective approval policy determines readiness without a no-approval default', () => {

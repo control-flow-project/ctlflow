@@ -18,12 +18,12 @@ test('sender resolution distinguishes owners, their agents, other owners and unr
   const ids = [owner, peer.matrixUserId, otherOwner, foreign.matrixUserId, lookalike.member.principal.matrixUserId, '@agent-unregistered:test.localhost'];
   const resolved = value(resolvePrincipals(services, self.actor, ids));
   assert.deepEqual(resolved, [
-    { matrixUserId: owner, kind: 'human', ownerMatrixId: null },
-    { matrixUserId: peer.matrixUserId, kind: 'agent', ownerMatrixId: owner },
-    { matrixUserId: otherOwner, kind: 'human', ownerMatrixId: null },
-    { matrixUserId: foreign.matrixUserId, kind: 'agent', ownerMatrixId: otherOwner },
-    { matrixUserId: lookalike.member.principal.matrixUserId, kind: 'human', ownerMatrixId: null },
-    { matrixUserId: ids[5], kind: 'unknown', ownerMatrixId: null },
+    { matrixUserId: owner, kind: 'human', ownerMatrixId: null, displayName: 'admin', ownerDisplayName: null },
+    { matrixUserId: peer.matrixUserId, kind: 'agent', ownerMatrixId: owner, displayName: 'peer (admin)', ownerDisplayName: 'admin' },
+    { matrixUserId: otherOwner, kind: 'human', ownerMatrixId: null, displayName: 'other', ownerDisplayName: null },
+    { matrixUserId: foreign.matrixUserId, kind: 'agent', ownerMatrixId: otherOwner, displayName: 'foreign (other)', ownerDisplayName: 'other' },
+    { matrixUserId: lookalike.member.principal.matrixUserId, kind: 'human', ownerMatrixId: null, displayName: 'agent-lookalike', ownerDisplayName: null },
+    { matrixUserId: ids[5], kind: 'unknown', ownerMatrixId: null, displayName: null, ownerDisplayName: null },
   ]);
   const stored = value(services.repositories.principal.find({ id: peer.id }))!;
   value(services.repositories.principal.update({ ...stored, status: 'revoked' }));
@@ -60,7 +60,8 @@ test('authenticated HTTP resolves sender metadata through the coordination adapt
   const result = value(await coordination.identities(ids));
   assert.deepEqual(result, value(resolvePrincipals(fixture.services, self.actor, ids)));
   const body = JSON.stringify(result);
-  assert(!body.includes(self.token) && !body.includes('principalId') && !body.includes('displayName'));
+  assert(!body.includes(self.token) && !body.includes('principalId'));
+  assert(result.every(identity => 'displayName' in identity && 'ownerDisplayName' in identity));
   const unauthenticated = await fetch(origin + '/api/principal-resolutions', { method: 'POST',
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matrixUserIds: ids }) });
   assert.equal(unauthenticated.status, 403);

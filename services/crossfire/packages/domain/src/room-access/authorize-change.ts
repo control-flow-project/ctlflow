@@ -15,7 +15,7 @@ export type GrantAuthorization = {
   invitationEventId: string | null;
   admissionKind: AgentRoomGrant['admissionKind'];
 };
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'clock' | 'matrix'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'clock' | 'matrix' | 'runtime'>;
 
 export function sameGrant(left: GrantIntent, right: GrantIntent): boolean {
   return left.accessMode === right.accessMode && left.powerLevel === right.powerLevel && left.muted === right.muted;

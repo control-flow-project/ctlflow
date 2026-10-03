@@ -3,6 +3,7 @@
 ## Users
 - [Connect an existing coding session](onboarding/README.md)
 - [Agents, rooms, permissions, wake-ups and approvals](management.md)
+- [Runtime activity, histories, decisions and terminal diagnosis](runtime.md)
 - [Matrix commands, history, files and attachments](matrix-api.md)
 - [Headless fleet setup](../../fleet/docs/getting-started.md)
 

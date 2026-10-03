@@ -5,7 +5,7 @@
 Agents lists identities in a table. Search, account/listener filters and owner
 filters narrow it. Owners manage their own agents; administrators can inspect
 global authorized collections. Details are organized into Rooms, Wake-up rules,
-Activity, Software and Settings.
+Runtime, Decisions, Activity, Software and Settings.
 
 Online means a listener is reporting, not that the model finished a task.
 Listeners ping every 30 seconds; after 90 seconds without a ping they show
@@ -18,7 +18,7 @@ delivery; Stop through fleet CLI ends its owned execution.
 
 ## Private owner DM
 
-The first owner DM or native approval request establishes a private conversation
+The first owner DM, terminal output or native decision establishes a private conversation
 with the verified owner. It supports read and reply automatically. The room list keeps its native conversation name and
 labels its access Owner DM, with locked permissions. Startup creates no chats.
 It cannot be muted, downgraded, removed or delegated in Crossfire; bulk room plans
@@ -32,7 +32,7 @@ Invalid membership/privacy prevents listener readiness
 or permission publication. Suspension/revocation still disables account access.
 
 Chat wake eligibility and listener delivery intent remain independent. Nobody
-does not wake even for owner chat. Native approval decisions are control input
+does not wake even for owner chat. Native human decisions are control input
 and can still be answered while chat is paused or its wake policy is Nobody.
 
 ## Other rooms and invitations
@@ -75,13 +75,21 @@ offers intervals and selected weekdays/time; advanced mode accepts cron with a
 time zone. Busy work is not interrupted; missed occurrences coalesce.
 Chat wake policy does not grant authority to edit schedules.
 
-## Native tool approvals
+## Native human decisions
 
-For Codex, the listener posts the exact request and offered native choices only
-to the owner DM. Reply to that specific request with an explicit offered decision.
-Only the verified owner can approve. General chat, another human/agent, silence
-or administrator status is not approval. Expiry or authorization loss denies
-only the pending command using an exact native denial/cancellation.
+For Codex, the listener posts review links and native choices to the owner DM.
+The owner explicitly submits an authenticated, CSRF-protected decision on
+Crossfire. Opening a link only reads. Structured questions can contain several
+required answers or secret inputs. General chat, another human/agent, silence or
+administrator status is not consent. Expiry or authorization loss cannot answer
+a replacement session or turn.
+
+Runtime separates connection from native work and shows configured/effective
+public settings. Decisions lists pending and historical requests. Non-thinking
+terminal output goes privately to the owner, including room-derived content
+when the owner is not a room member. This is intentional disclosure, not room
+confidentiality protection.
+- [Native support, privacy and diagnosis](runtime.md)
 
 Claude and Pi keep their native permissions in their coding sessions. Attached
 Codex retains its existing policy. Fleet policy is configurable:

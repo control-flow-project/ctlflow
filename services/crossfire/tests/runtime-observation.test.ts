@@ -1,0 +1,94 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { cleanup } from '@crossfire/test-support/cleanup';
+import { nativeObservation } from '@crossfire/adapter-codex/observation';
+import { ownerObservation } from '@crossfire/agent-core/owner-observation';
+import type { RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
+import { fakeCodex, matrixFixture, OWNER_DM, ROOM, SELF, until } from '../scripts/test-support/listener.js';
+import { testClock } from '../scripts/test-support/clock.js';
+import { localState } from '@crossfire/adapter-filesystem/state';
+import { matrix as matrixClient } from '@crossfire/adapter-matrix/http';
+import type { Transport } from '@crossfire/agent-core/port';
+
+test('native terminal observation excludes reasoning and forwards complete streamed and large file output', () => {
+  const events: RuntimeObservationEvent[] = [];
+  const observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => events.push(event) }, () => 'original');
+  const send = (method: string, params: Record<string, unknown>) => observer.event({ method, params: { threadId: 'original', ...params } });
+  send('item/reasoning/textDelta', { itemId: 'thinking', delta: 'private reasoning' });
+  send('item/agentMessage/delta', { itemId: 'reply', delta: 'visible ' });
+  send('item/completed', { item: { id: 'reply', type: 'agentMessage', text: 'visible complete' } });
+  send('item/commandExecution/outputDelta', { itemId: 'command', delta: 'first\n' });
+  send('item/completed', { item: { id: 'command', type: 'commandExecution', aggregatedOutput: 'first\nlast\n' } });
+  const patch = 'x'.repeat(26036);
+  send('item/completed', { item: { id: 'file', type: 'fileChange', changes: [{ path: 'evidence', diff: patch }] } });
+  observer.event({ method: 'item/agentMessage/delta', params: { threadId: 'another', itemId: 'foreign', delta: 'wrong session' } });
+  const output = events.filter(event => event.kind === 'output').map(event => event.text).join('');
+  assert(output.startsWith('visible completefirst\nlast\n')); assert(output.includes(patch));
+  assert(!output.includes('private reasoning') && !output.includes('wrong session'));
+  send('thread/status/changed', { status: { type: 'active', activeFlags: ['waitingOnUserInput'] } });
+  assert.equal(events.at(-1)?.kind, 'state');
+  assert.equal((events.at(-1) as Extract<RuntimeObservationEvent, { kind: 'state' }>).observation.state, 'waiting-answer');
+});
+
+test('owner output is lazy and durable; one latest-room typing lease expires without renewal', async scope => {
+  const clock = testClock(scope), native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock);
+  const stop = new AbortController(), file = matrix.cursorFile + '.observation';
+  const options = { agentId: matrix.id, userId: SELF, file, storage: localState, clock,
+    transport: (signal: AbortSignal, timeoutMs: number) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    coordination: matrix.coordination, historyMode: 'shared' as const, maximum: 100000 };
+  let observer = ownerObservation(options, stop.signal);
+  const state = (value: 'idle' | 'working' | 'waiting-answer') => observer.observe({ kind: 'state', observation: {
+    sessionId: 'original', roomId: null, runtime: 'codex', state: value, observedAt: clock.now(), settings: [], errorMessage: null } });
+  state('working');
+  assert(!matrix.requests.some(request => request.path.endsWith('/owner-conversation')));
+  observer.observe({ kind: 'output', sessionId: 'original', id: 'visible', streamId: null, text: '😀'.repeat(13000) });
+  await observer.close();
+  assert(!matrix.requests.some(request => request.path.includes('/send/')));
+  observer = ownerObservation(options, stop.signal);
+  observer.start(randomUUID());
+  cleanup(scope, async () => { stop.abort(); await clock.complete(observer.close()); });
+  await until(() => matrix.requests.filter(request => request.path.includes('/send/') && request.path.includes(OWNER_DM)).length === 2);
+  const posted = matrix.requests.filter(request => request.path.includes('/send/') && request.path.includes(OWNER_DM));
+  assert.equal(posted.map(request => (request.body as { body: string }).body).join(''), '😀'.repeat(13000));
+  state('working'); await observer.delivered(ROOM, 'original');
+  state('waiting-answer');
+  const typing = () => matrix.requests.filter(request => request.path.includes('/typing/'));
+  assert.deepEqual(typing().map(request => request.body), [{ typing: true, timeout: 30000 }]);
+  await clock.advance(30001); state('working');
+  assert.equal(typing().length, 1, 'Native expiry is not extended by polling or state changes');
+  await observer.delivered(ROOM, 'original'); await observer.delivered(OWNER_DM, 'original');
+  assert.deepEqual(typing().slice(-3).map(request => request.body), [{ typing: true, timeout: 30000 }, { typing: false }, { typing: true, timeout: 30000 }]);
+  state('idle'); await until(() => !!typing().at(-1)?.body && (typing().at(-1)!.body as { typing: boolean }).typing === false);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+});
+
+test('owner streams coalesce before publication and uncertain delivery retries an immutable body', async scope => {
+  const clock = testClock(scope), native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock);
+  const stop = new AbortController();
+  let uncertain = true;
+  const transport: Transport = (signal, timeoutMs) => {
+    const client = matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs });
+    return { ...client, async put<Value>(path: string, body: unknown): Promise<Value> {
+      const result = await client.put<Value>(path, body);
+      if (path.includes('/send/') && uncertain) { uncertain = false; throw new Error('Receipt lost after native publication'); }
+      return result;
+    } };
+  };
+  const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
+    transport, coordination: matrix.coordination, historyMode: 'shared', maximum: 100000 }, stop.signal);
+  cleanup(scope, async () => { stop.abort(); await clock.complete(observer.close()); });
+  for (let position = 0; position < 100; position++) observer.observe({ kind: 'output', sessionId: 'original', streamId: 'native-item',
+    id: 'delta-' + position, text: 'word-' + position + ' ' });
+  observer.start(randomUUID());
+  const sent = () => matrix.requests.filter(request => request.path.includes('/send/') && request.path.includes(OWNER_DM));
+  await until(() => !uncertain);
+  const first = sent()[0]!;
+  observer.observe({ kind: 'output', sessionId: 'original', streamId: 'native-item', id: 'later-delta', text: 'later' });
+  await clock.until(() => sent().length === 3);
+  assert.equal(sent()[1]?.path, first.path);
+  assert.deepEqual(sent()[1]?.body, first.body);
+  assert.equal((first.body as { body: string }).body, Array.from({ length: 100 }, (_, position) => 'word-' + position + ' ').join(''));
+  assert.equal((sent()[2]!.body as { body: string }).body, 'later');
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+});

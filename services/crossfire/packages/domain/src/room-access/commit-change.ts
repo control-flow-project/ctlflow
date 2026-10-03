@@ -6,7 +6,7 @@ import type { GrantAuthorization } from './authorize-change.js';
 import type { AgentRoomGrant } from './types.js';
 import { protectOwnerConversation } from '../owner-conversation/protect.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'runtime'>;
 export function recheckGrantAuthorization(services: Dependencies, actor: Actor, proof: GrantAuthorization): Result<void> {
   const protectedAccess = protectOwnerConversation(services, proof.input);
   if (!protectedAccess.ok) return protectedAccess;

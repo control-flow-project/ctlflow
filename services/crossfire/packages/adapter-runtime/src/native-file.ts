@@ -49,11 +49,13 @@ export function captureHistory(path: string): HistoryBoundary {
   });
 }
 
-export function historySince(path: string, boundary: HistoryBoundary): unknown[] {
+export function historySince(path: string, boundary: HistoryBoundary, through?: HistoryBoundary): unknown[] {
   return ownedFile(path, MAX_HISTORY, (descriptor, info) => {
     if (String(info.dev) + ':' + String(info.ino) !== boundary.key || info.size < boundary.position
       || prefix(descriptor, boundary.position) !== boundary.prefix) throw new Error('Native history lost its publication boundary');
-    const size = info.size - boundary.position;
+    if (through && (through.key !== boundary.key || through.position < boundary.position || through.position > info.size
+      || prefix(descriptor, through.position) !== through.prefix)) throw new Error('Native observation lost its captured interval');
+    const size = (through?.position ?? info.size) - boundary.position;
     if (size > MAX_INTERVAL) throw new Error('Native publication interval exceeds its verification bound');
     const bytes = readBytes(descriptor, size, boundary.position);
     const end = bytes.lastIndexOf(10);

@@ -10,7 +10,8 @@ export type Registry = {
   load(directory: string): Result<Configuration>;
   writeRoster(configuration: Configuration, roster: Roster): Result<Configuration>;
 };
-export type Running = { sessionId: string; signal: AbortSignal; attachment: RuntimeAttachment; control: ListenerControl; close(): Promise<void> };
+export type Running = { sessionId: string; signal: AbortSignal; attachment: RuntimeAttachment;
+  attachments(): Promise<{ context: string; attachment: RuntimeAttachment }[]>; control: ListenerControl; close(): Promise<void> };
 export type Execution = {
   connect(configuration: Configuration, signal: AbortSignal): Result<void>;
   connection(configuration: Configuration): ControllerState;

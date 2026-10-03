@@ -32,6 +32,10 @@ resets or unrequested deployment. Preserve credentials and shared source work.
 Do not delegate or start subagents without explicit authorization.
 
 ## Work discipline
+For isolated changes with confidently local impact, run the affected tests and
+necessary targeted checks. Run the full quality gates for cross-layer changes
+or whenever the impact is uncertain. Never weaken a gate or claim verification
+that was not performed.
 Keep the unified spec and .analysis/20260929-164420-fleet-handover/necessity-ledger.md
 aligned with decisions and evidence. .analysis/MEMORY.md is the local work memory.
 Do not stop at intermediate milestones when completion is authorized. Never

@@ -25,14 +25,16 @@ fleet [--root DIRECTORY | --remote NAME] activate|deactivate FLEET
 fleet [--root DIRECTORY | --remote NAME] message FLEET --text TEXT [--message-id UUID]
 fleet agent list FLEET
 fleet agent add FLEET INSTANCE --definition DEFINITION
-fleet agent start|stop|remove|attach FLEET INSTANCE`;
+fleet agent start|stop|remove|contexts FLEET INSTANCE
+fleet agent attach FLEET INSTANCE [--context CONTEXT]`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, remote: { type: 'string' },
-    name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, help: { type: 'boolean' } } });
+    name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, context: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, help: { type: 'boolean' } } });
   if (values.help || !positionals.length) { console.log(usage); return; }
   const allowed = new Set(['root', 'remote', ...(positionals[0] === 'remote' ? ['ssh'] : []),
     ...(positionals[0] === 'daemon' && positionals[1] === 'start' ? ['name'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'add' ? ['definition'] : []),
+    ...(positionals[0] === 'agent' && positionals[1] === 'attach' ? ['context'] : []),
     ...(positionals[0] === 'message' ? ['text', 'message-id'] : [])]);
   for (const option of Object.keys(values)) if (!allowed.has(option)) throw new Error('Option is not valid for this command: --' + option);
   const connections = loadConnections();
@@ -93,7 +95,8 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
         workarea: 'agents/' + definition + '/workarea/' + instanceKey } })).data); return;
     }
     if (agentCommand && command === 'remove') { output(value(await client.call(operations.removeAgent, { ...params, instanceKey: instanceKey! }, { expectedRevision: fleet.revision })).data); return; }
-    if (agentCommand && command === 'attach') { const pointer = value(await terminalPointer(client, fleet.fleetId, instanceKey!, { codex: codexTerminal() }, remote?.ssh)); process.stdout.write(pointer.command + '\n'); return; }
+    if (agentCommand && command === 'contexts') { output(value(await client.call(operations.contexts, { ...params, instanceKey: instanceKey! }, {})).data); return; }
+    if (agentCommand && command === 'attach') { const pointer = value(await terminalPointer(client, fleet.fleetId, instanceKey!, { codex: codexTerminal() }, remote?.ssh, values.context)); process.stdout.write(pointer.command + '\n'); return; }
     if (command !== 'start' && command !== 'stop') throw new Error(usage);
     const request = { operationId: randomUUID(), action: command as 'start' | 'stop', expectedRevision: fleet.revision,
       target: agentCommand ? { kind: 'agent' as const, fleetId: fleet.fleetId, instanceKey: instanceKey! } : { kind: 'fleet' as const, fleetId: fleet.fleetId } };

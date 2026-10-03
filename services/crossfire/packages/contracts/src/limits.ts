@@ -1,6 +1,7 @@
 export const DEFAULT_OUTPUT_BYTES = 64 * 1024;
 export const MAX_OUTPUT_BYTES = 96 * 1024;
 export const MAX_JSON_BYTES = 1024 * 1024;
+export const MAX_MESSAGE_BYTES = 50_000;
 export const DEFAULT_EVENTS = 20;
 export const MAX_EVENTS = 100;
 

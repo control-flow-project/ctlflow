@@ -2,6 +2,7 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,7 +21,6 @@ import { authenticateMember } from '@crossfire/domain/session/authenticate';
 import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
 import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
 import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { randomUUID } from 'node:crypto';
 import { publicRouter } from '../apps/server/src/router.js';
 import { releaseFixture, updatedRelease } from './release-fixture.js';
 import { enroll, connect } from '../apps/client/src/enrollment.js';
@@ -170,6 +170,7 @@ async function reviewLayouts(page: Page, origin: string, directory: string, role
 }
 
 test('real browser member/admin flows and project listener span native Conduit, SQLite and Codex WS', { timeout: 180_000 }, async scope => {
+  const element = elementAssets();
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), '.temp/browser-'));
   const jwtSecret = secret();
@@ -186,7 +187,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   service.listen(0, '127.0.0.1'); await once(service, 'listening');
   const address = service.address(); assert(address && typeof address === 'object');
   const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
-    web: join(process.cwd(), 'dist/web'), element: elementAssets() };
+    web: join(process.cwd(), 'dist/web'), element };
   const router = publicRouter(routes);
   router.listen(0, '127.0.0.1'); await once(router, 'listening');
   const publicAddress = router.address(); assert(publicAddress && typeof publicAddress === 'object');
@@ -373,9 +374,47 @@ test('real browser member/admin flows and project listener span native Conduit, 
   Object.assign(release, updatedRelease(release, 'SKILL.md', release.files['SKILL.md'].toString() + '\nFixture updated skill.\n'));
   await page.reload();
   await expect(software.getByText('Update available', { exact: true })).toBeVisible();
-  await expect(software.locator('tbody').getByText(installedRelease, { exact: true })).toBeVisible();
+  await expect(software.getByRole('table', { name: 'Current listener software', exact: true }).getByText(installedRelease, { exact: true })).toBeVisible();
   await expect(software.getByRole('link', { name: 'Update instructions for this server', exact: true })).toHaveAttribute('href', '/onboarding/' + release.manifest.release + '/README.md');
   assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Version discovery must not call the model');
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Runtime', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Runtime settings', exact: true })).toBeVisible();
+  await expect(page.getByText('100,000 UTF-8 bytes, including origin metadata', { exact: true })).toBeVisible();
+  await checkPaperLayout(page);
+  await page.screenshot({ path: join(directory, 'agent-runtime.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);
+  await page.screenshot({ path: join(directory, 'agent-runtime-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const run = value(services.collection.listenerRuns({ agentId: profile.id })).find(run => run.stoppedAt === null); assert(run);
+  const coordination = createCoordination({ origin, token: profile.account.access_token });
+  const decision = value(await coordination.createDecision(profile.id, { id: randomUUID(), runId: run.id, sessionId: engine.session,
+    runtime: 'codex', requestId: 'browser-question', turnId: 'original-turn', itemId: 'original-question', kind: 'question',
+    action: 'Select a destination', review: 'Complete original native scope', blocking: true, expiresAt: null,
+    questions: [{ id: 'destination', title: 'Destination', prompt: 'Select an option or enter a private answer.', secret: true, allowText: true,
+      options: [{ id: '0', label: 'A', description: 'First native choice' }, { id: '1', label: 'B', description: 'Second native choice' }] }] }));
+  const decisionUrl = origin + '/manage/agents/' + profile.id + '/decisions/' + decision.id + '?choice=1';
+  await page.goto(decisionUrl);
+  await expect(page.getByRole('radio')).toHaveCount(2);
+  for (const radio of await page.getByRole('radio').all()) await expect(radio).not.toBeChecked();
+  assert.equal(value(await coordination.pollDecision(profile.id, decision.id)).status, 'pending', 'A choice link GET cannot submit consent');
+  const denied = await page.request.post(origin + '/api/agents/' + profile.id + '/runtime-decisions/' + decision.id + '/answer',
+    { data: { answers: [{ questionId: 'destination', optionId: '1', text: null }] } });
+  assert.equal(denied.status(), 403, 'Answer POST requires explicit CSRF protection');
+  await page.getByLabel('Private answer').fill('private browser answer');
+  await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'agent-decision.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);
+  await page.screenshot({ path: join(directory, 'agent-decision-mobile.png'), fullPage: true });
+  const submission = page.waitForResponse(response => response.url().endsWith('/runtime-decisions/' + decision.id + '/answer') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Submit answer', exact: true }).click();
+  const answered = await submission;
+  assert.equal(answered.status(), 200, await answered.text());
+  await expect(page.getByText('Answer submitted. Native response publication is reported separately; this is not proof that execution has resumed.', { exact: true })).toBeVisible();
+  assert.equal(value(await coordination.pollDecision(profile.id, decision.id)).answers[0]?.text, 'private browser answer');
+  await expect(page.getByLabel('Private answer')).toHaveValue('');
+  assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Browser review and answer are ordinary code, not model housekeeping');
+  value(await coordination.receiptDecision(profile.id, decision.id, 'cancelled'));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(origin + '/manage/agents/' + profile.id + '/software');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Configured display name').fill('Unsaved name');
   await page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
@@ -405,6 +444,17 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert(status.activity.messagesDelivered >= 1);
   assert(status.activity.activeMs > 0);
   assert.equal(engine.child.exitCode, null, 'Stopping the listener must not stop the external engine');
+  await page.goto(origin + '/manage/agents/' + profile.id + '/software?runsPage=2');
+  const lastReported = page.getByRole('table', { name: 'Last reported listener software', exact: true });
+  await expect(lastReported.getByText(installedRelease, { exact: true })).toBeVisible();
+  await expect(page.getByText('Last reported installation. No listener is currently reporting.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Current listener software', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Update available', { exact: true })).toHaveCount(0);
+  await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'agent-software-offline.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);
+  await page.screenshot({ path: join(directory, 'agent-software-offline-mobile.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  assert.equal(provider.requests.length, requestsBeforeDisconnect, 'Offline software inspection must not call the model');
   await page.getByRole('link', { name: 'Invitations', exact: true }).click();
   await page.getByRole('button', { name: 'Create invitation', exact: true }).click();
   const invitation = await page.getByLabel('Share this private link once').inputValue();

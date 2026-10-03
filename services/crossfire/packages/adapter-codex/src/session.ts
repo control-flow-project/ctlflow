@@ -1,10 +1,12 @@
 import { realpathSync } from 'node:fs';
 import type { Json } from '@crossfire/contracts/json';
-import type { RuntimeApproval, RuntimeHooks } from '@crossfire/agent-core/runtime';
-import { codexPermission } from './approval.js';
+import type { RuntimeApproval, RuntimeHooks, RuntimeDecision } from '@crossfire/agent-core/runtime';
+import { codexPermission, permissionDenial } from './approval.js';
 import { object } from '@crossfire/contracts/validation';
 import { codexProtocol, type NativeEvent } from './protocol.js';
 import { approvalRouting } from './permission-policy.js';
+import { codexQuestion, validQuestionAnswer } from './questions.js';
+import { nativeObservation } from './observation.js';
 
 export type CodexOptions = {
   workspace: string; session: string; endpoint: string; token: string; receiptFile: string;
@@ -30,6 +32,8 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
   if (selection.kind !== 'create' && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu.test(sessionId)) throw new Error('Supply the exact Codex session UUID');
   const workspace = realpathSync(options.workspace);
   const changes = new Map<string, Json>();
+  const decisions = new Map<string, RuntimeDecision>();
+  const observer = nativeObservation(hooks, () => sessionId);
   const engine = codexProtocol({ endpoint: options.endpoint, token: options.token, timeoutMs: options.timeoutMs ?? 30_000,
     event: notice => {
       if (notice.params.threadId === sessionId && ['item/started', 'item/completed'].includes(notice.method)) {
@@ -38,37 +42,39 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
           if (typeof item.id !== 'string' || !item.id) throw new Error('Invalid pending native file identity');
           if (notice.method === 'item/completed') changes.delete(item.id);
           else {
-            if (changes.size >= 16 || Buffer.byteLength(JSON.stringify(item.changes)) > 12_000) throw new Error('Pending file approval exceeds its scope bound');
             changes.set(item.id, structuredClone(item.changes) as Json);
           }
         }
       }
-      event(notice);
+      observer.event(notice); event(notice);
+    },
+    responded: request => {
+      const decision = decisions.get(JSON.stringify(request.id));
+      if (decision) { hooks.decisionResponded?.(decision); decisions.delete(JSON.stringify(request.id)); }
     },
     approval: async (request, signal) => {
-      const decoded = codexPermission(request, sessionId, changes.get(String(request.params.itemId)));
+      const decoded = request.method === 'item/tool/requestUserInput' ? codexQuestion(request, sessionId)
+        : codexPermission(request, sessionId, changes.get(String(request.params.itemId)));
       if (!decoded.ok) throw new Error(decoded.error.message);
-      const response = await hooks.requestPermission(decoded.value, signal);
+      const response = await hooks.requestDecision(decoded.value, signal);
+      if (!response.ok && !decoded.value.questions) {
+        const denied = permissionDenial(decoded.value);
+        if (denied !== undefined) return denied;
+      }
       if (response.ok) {
-        if (!decoded.value.choices.some(choice => JSON.stringify(choice.value) === JSON.stringify(response.value))) throw new Error('Permission response is not a native available decision');
+        if (decoded.value.questions ? !validQuestionAnswer(decoded.value, response.value)
+          : !decoded.value.choices.some(choice => JSON.stringify(choice.value) === JSON.stringify(response.value))) throw new Error('Response is not a native available decision');
+        decisions.set(JSON.stringify(request.id), decoded.value);
         return response.value;
       }
-      if (response.error.code === 'invalid' || response.error.code === 'limit') throw new Error(response.error.message);
-      const denied = decoded.value.choices.find(choice => {
-        const value = object(choice.value);
-        return value.ok && value.value.decision === 'decline';
-      }) ?? decoded.value.choices.find(choice => {
-        const value = object(choice.value);
-        return value.ok && value.value.decision === 'cancel';
-      });
-      if (!denied) throw new Error('Native permission request offers no denial or cancellation decision');
-      return denied.value;
+      throw new Error(response.error.message);
     },
   }, stop);
   async function close(): Promise<void> { engine.close(); await engine.closed; }
   try {
-    await engine.request('initialize', { clientInfo: { name: 'crossfire', title: 'Crossfire listener', version: '0.1.0' },
-      capabilities: { experimentalApi: true } });
+    const initialized = object(await engine.request('initialize', { clientInfo: { name: 'crossfire', title: 'Crossfire listener', version: '0.1.0' },
+      capabilities: { experimentalApi: true } }));
+    const version = initialized.ok && typeof initialized.value.userAgent === 'string' ? initialized.value.userAgent : null;
     engine.notify('initialized');
     let approval: RuntimeApproval | undefined;
     if (selection.kind !== 'attach') {
@@ -83,6 +89,7 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
       if (!routing.ok) throw new Error(routing.error.message);
       approval = routing.value;
       if (selected.ok) {
+        observer.configure(selection.config, selected.value, version);
         const sandbox = object(selected.value.sandbox);
         const sandboxTypes: Record<string, string> = { 'danger-full-access': 'dangerFullAccess', 'workspace-write': 'workspaceWrite', 'read-only': 'readOnly' };
         if (selection.config.sandbox_mode !== undefined && (!sandbox.ok || sandbox.value.type !== sandboxTypes[String(selection.config.sandbox_mode)])
@@ -105,8 +112,13 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
       const routing = resumed.ok ? approvalRouting(resumed.value.approvalPolicy) : resumed;
       if (!routing.ok) throw new Error(routing.error.message);
       approval = routing.value;
+      if (resumed.ok) observer.configure({}, resumed.value, version);
     }
     if (!approval) throw new Error('Native approval policy was not selected');
+    observer.state(state.value.type === 'idle' ? 'idle' : 'working');
+    engine.signal.addEventListener('abort', () => {
+      if (!stop.aborted) observer.state('failed', engine.signal.reason instanceof Error ? engine.signal.reason.message.slice(0, 4000) : 'Native connection ended unexpectedly');
+    }, { once: true });
     return { sessionId, workspace, approval, signal: engine.signal, request: engine.request, close };
   } catch (error) { await close(); throw error; }
 }

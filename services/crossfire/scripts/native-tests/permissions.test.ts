@@ -14,7 +14,7 @@ import { prepareProject } from '@crossfire/adapter-filesystem/project';
 import { privateDir } from '@crossfire/adapter-filesystem/index';
 import { failure } from '@crossfire/kernel/result';
 
-test('a real native permission is answered only by the verified Matrix owner through the single receiver', { timeout: 30_000 }, async scope => {
+test('a real native permission is answered through the exact owner decision and single receiver', { timeout: 30_000 }, async scope => {
   const directory = temporary(scope);
   const home = join(directory, 'home'), workspace = join(directory, 'workspace');
   mkdirSync(home); mkdirSync(workspace);
@@ -27,11 +27,11 @@ test('a real native permission is answered only by the verified Matrix owner thr
   let failure: unknown;
   const receiving = listen({ ...fixture, reconcileMs: 120_000, limit: 20, pollMs: 100, debounceMs: 0,
     runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, timeoutMs: 10_000,
-      hooks: { requestPermission: (permission, cancelled) => {
+      hooks: { ...hooks, requestDecision: (permission, cancelled) => {
         nativeRequest = true;
         assert.equal(permission.runtime, 'codex');
         assert(JSON.stringify(permission.scope).includes('printf native-approved'));
-        return hooks.requestPermission(permission, cancelled);
+        return hooks.requestDecision(permission, cancelled);
       } },
     }, signal),
   }, stop.signal).catch(error => { failure = error; return error; });
@@ -45,13 +45,9 @@ test('a real native permission is answered only by the verified Matrix owner thr
   fixture.add(ROOM, message('$native-permission-input', OBSERVER, 'Run the isolated permission fixture'));
   await until(() => nativeRequest || failure !== undefined, 'Native permission was not observed');
   assert.equal(failure, undefined, String(failure));
-  await until(() => fixture.rooms.get(OWNER_DM)!.some(event => event.sender === SELF && String(event.content.body).includes('Permission needed')));
-  const request = fixture.rooms.get(OWNER_DM)!.find(event => event.sender === SELF && String(event.content.body).includes('Permission needed'))!;
-  const approval = { ...message('$native-owner-decision', OBSERVER, 'approve once'), content: { msgtype: 'm.text', body: 'approve once',
-    'm.relates_to': { 'm.in_reply_to': { event_id: request.event_id } } } };
-  fixture.add(OWNER_DM, { ...approval, event_id: '$native-outsider', sender: '@other:test.localhost' });
+  await until(() => fixture.rooms.get(OWNER_DM)!.some(event => event.sender === SELF && String(event.content.body).includes('review and answer')));
   assert.equal(provider.requests.some(request => JSON.stringify(request).includes('native-approved\n')), false);
-  fixture.add(OWNER_DM, approval);
+  fixture.answerDecision([...fixture.decisions.keys()][0]!);
   await until(() => provider.requests.some(request => JSON.stringify(request).includes('native-approved')
     && JSON.stringify(request).includes('function_call_output')), 'Native permission decision did not complete the command');
   assert(existsSync(fixture.cursorFile));
@@ -71,7 +67,7 @@ for (const reason of ['forbidden', 'unavailable'] as const) {
     const stop = new AbortController();
     let requests = 0;
     const runtime = await connectCodex({ ...engine, pollMs: 100, timeoutMs: 10_000,
-      hooks: { requestPermission: async () => { requests++; return failure(reason, 'Fixture approval is not available'); } } }, stop.signal);
+      hooks: { requestDecision: async () => { requests++; return failure(reason, 'Fixture approval is not available'); } } }, stop.signal);
     cleanup(scope, async () => { stop.abort(); await runtime.close(); });
     await engine.call('thread/unsubscribe', { threadId: engine.session });
     const marker = join(workspace, 'unapproved-command');
@@ -115,11 +111,9 @@ test('a real native owner approval permits an intentional verified-client Matrix
   provider.tool('exec_command', { cmd: arguments_.map(argument => "'" + argument.replaceAll("'", "'\\''") + "'").join(' '),
     sandbox_permissions: 'require_escalated', justification: 'May the isolated fixture send its exact Matrix reply?', yield_time_ms: 1000 });
   fixture.add(ROOM, message('$intentional-native-reply', OBSERVER, 'Reply through the verified project-local client'));
-  await until(() => fixture.rooms.get(OWNER_DM)!.some(event => String(event.content.body).includes('Permission needed')) || disconnected !== undefined);
+  await until(() => fixture.rooms.get(OWNER_DM)!.some(event => String(event.content.body).includes('review and answer')) || disconnected !== undefined);
   assert.equal(disconnected, undefined, String(disconnected));
-  const request = fixture.rooms.get(OWNER_DM)!.find(event => String(event.content.body).includes('Permission needed'))!;
-  fixture.add(OWNER_DM, { ...message('$approved-native-reply', OBSERVER, 'approve once'), content: { msgtype: 'm.text', body: 'approve once',
-    'm.relates_to': { 'm.in_reply_to': { event_id: request.event_id } } } });
+  fixture.answerDecision([...fixture.decisions.keys()][0]!);
   await until(async () => fixture.rooms.get(ROOM)!.some(event => event.sender === SELF && event.content.body === body.body)
     || provider.requests.some(request => JSON.stringify(request).includes('function_call_output')) && !(await runtime!.inspect()).busy,
   'Native Matrix reply did not complete');

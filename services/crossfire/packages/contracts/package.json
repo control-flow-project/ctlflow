@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@crossfire/domain": "0.1.0",
     "smol-toml": "1.8.0",
     "@crossfire/kernel": "0.1.0"
   },

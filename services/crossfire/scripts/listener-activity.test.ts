@@ -12,7 +12,7 @@ test('listener with only an owner DM reports activity without model input and ob
   matrix.reporting.disconnect = true;
   await assert.rejects(listen({ ...matrix, runtime: runtime.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, new AbortController().signal), /requested.*disconnect/);
   assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 0);
-  const beats = matrix.requests.filter(request => request.path.includes('/listener-runs/'));
+  const beats = matrix.requests.filter(request => request.path.includes('/listener-runs/') && !request.path.endsWith('/runtime'));
   assert.equal(beats.length, 2);
   const first = beats[0]!.body as { run: string; messagesDelivered: number; stopped: boolean };
   assert.equal(first.messagesDelivered, 0);

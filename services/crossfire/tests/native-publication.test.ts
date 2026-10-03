@@ -113,7 +113,7 @@ test('invalid journal identity, text and limits are refused before publication',
   assert.throws(() => nativeDelivery(native, check.integer(), { journal: join(directory, 'a'), pollMs: 1 }), /interval/);
   const connection = nativeDelivery(native, check.integer(), { journal: join(directory, 'a'), pollMs: 100 });
   cleanup(scope, () => connection.close());
-  await assert.rejects(connection.deliver('x'.repeat(98305), 'oversized'), /byte bound/);
+  await assert.rejects(connection.deliver('x'.repeat(4 * 1024 * 1024 + 1), 'oversized'), /byte bound/);
   await assert.rejects(connection.deliver('text', ''), /text/);
   assert.equal(published, 0);
 });

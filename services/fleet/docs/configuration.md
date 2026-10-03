@@ -15,8 +15,9 @@ research/
         analyst-west/
 ```
 
-A definition owns settings/instructions. Instances share a definition, not
-mutable sessions or work areas. Different settings require different definitions.
+A definition owns native settings/instructions. Instances share a definition,
+not mutable sessions or work areas. Different native settings require different
+definitions; listener history/input settings belong to each roster instance.
 Private `.fleet`, `.codex` and `.crossfire` state holds registry bindings,
 provider credentials, session history and delivery positions. Never commit it.
 
@@ -36,11 +37,19 @@ name = "analyst-east"
 definition = "analyst"
 workarea = "agents/analyst/workarea/analyst-east"
 
+[instances.listener_options]
+history_mode = "shared"
+max_input_bytes = 100000
+
 [[instances]]
 key = "analyst-west"
 name = "analyst-west"
 definition = "analyst"
 workarea = "agents/analyst/workarea/analyst-west"
+
+[instances.listener_options]
+history_mode = "per-room"
+max_input_bytes = 100000
 ```
 
 Keys/names start with a lowercase letter, contain lowercase letters, digits or
@@ -50,7 +59,34 @@ be distinct. Work areas are non-overlapping relative children of
 
 The coordination block supplies server/owner once. It contains no approval room,
 runtime transport, session UUID or secret. The private owner DM opens automatically
-on first owner contact or native permission request, not at fleet startup.
+on first owner contact, terminal output or native decision, not at fleet startup.
+
+### Listener options
+
+| Field | Accepted values | When omitted |
+| --- | --- | --- |
+| `history_mode` | `shared`, `per-room` | `shared` |
+| `max_input_bytes` | Integer 1024 through 4194304 | 100000 |
+
+The input budget counts the entire serialized UTF-8 message, including origin
+and verified sender metadata. Pending messages are delivered together when they
+fit; larger batches split at this bound without losing cursors or receipts. A
+single event that cannot fit fails explicitly without acknowledging it. Ordinary
+native tool/file output uses separate protocol and owner-output budgets, not
+this incoming limit or an approval-display limit.
+
+Shared history preserves context across all rooms, DMs and private operator
+input. Per-room history retains one exact native conversation per room ID and a
+separate private control history for fleet messages, schedules and maintenance.
+It is the same process, workarea and identity. Returning to a room resumes its
+history, not an empty conversation. Files/tools/credentials remain shared;
+terminal output still goes privately to the owner. This is not a security sandbox.
+Directly attached agents always retain their one native history.
+
+Listener changes apply on stopped-to-running transition. A pending publication
+must finish receipt recovery before its budget/history configuration changes.
+History-mode changes preserve old sessions/cursors without copying, merging,
+forking or replaying them. Pending native decisions also prevent a mode switch.
 
 ## agent.toml
 
@@ -76,6 +112,7 @@ options; fleetd does not interpret Codex-specific settings.
 | `sandbox_mode` | `read-only`, `workspace-write`, `danger-full-access` | `danger-full-access` |
 | `approval_policy` | `untrusted`, `on-failure`, `on-request`, `never` | `on-request` |
 | `dangerously_bypass_approvals_and_sandbox` | Boolean | Disabled |
+| `features.default_mode_request_user_input` | Boolean in `[runtime_options.features]` | Native default (off in verified Codex 0.160.0) |
 
 The selected model/provider must support the chosen effort and native policy.
 Unknown keys, wrong types, unavailable models and refused settings fail; they are
@@ -83,7 +120,7 @@ not silently ignored. Native effective settings are checked after create/resume.
 
 Full access is unsandboxed execution with the controller user's filesystem and
 network privileges, not root access. It does not imply automatic approval:
-`on-request` still routes native permission requests to the owner's private DM.
+`on-request` still routes native permission review links to the owner's private DM.
 Restricted sandbox choices remain available. Native restricted-policy defects
 are not repaired by changing one utility or weakening project privacy checks.
 
@@ -106,6 +143,27 @@ are allowed. `false` leaves ordinary values/defaults in effect. There is no
 `yolo` configuration alias. Use only when this unsandboxed, no-confirmation
 execution is intended.
 
+### Structured questions
+
+To offer native human questions in Codex Default mode:
+```toml
+[runtime_options.features]
+default_mode_request_user_input = true
+```
+
+This is an explicit native under-development feature, not global configuration
+or terminal prose interception. Enabling it requires the selected native binary
+to expose `default_mode_request_user_input` in `codex features list`. Startup
+checks the capability before spawning an engine, in addition to the baseline
+stock Codex 0.158.0+ requirement. Missing capabilities fail explicitly, never
+silently disable the option. All native questions
+in one request retain their identities, option/free/secret-answer flags and
+deadline. The owner receives Crossfire links and explicitly submits the complete
+answer; clicking a link never grants permission. Native Default-mode questions
+may be nonblocking and expire. Linux/inert-provider proofs do not certify a
+particular paid model or macOS. Unsupported interactive stdin is not emulated.
+- [Human decisions and disclosure boundaries](../../crossfire/docs/runtime.md)
+
 ### Apply changes
 
 Stop and start the affected agent:
@@ -115,7 +173,7 @@ fleet agent start research analyst-east
 ```
 
 Or stop/start the fleet. Current definition model, reasoning, sandbox and approval
-settings apply to the same saved session UUID; identity/cursors remain intact.
+settings apply to the original saved history/histories; identity/cursors remain intact.
 Editing a running definition does not hot-reconfigure an engine.
 Do not append native permission flags to a remote TUI resume command.
 

@@ -15,7 +15,7 @@ export type FleetMapRoom = { roomId: string; name: string | null; alias: string 
 export type FleetMapSource = { sourceId: string; mode: AgentRecord['agent']['wakeMode']; selectedPrincipalIds: string[]; eligiblePrincipalIds: string[] };
 export type FleetMap = { fleet: FleetDetails; capturedAt: number; agents: FleetMapAgent[]; rooms: FleetMapRoom[];
   connections: FleetMapConnection[]; sources: FleetMapSource[]; principals: PrincipalSummary[] };
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'roomGrantRead' | 'listenerRead' | 'matrix' | 'clock' | 'identity'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'roomGrantRead' | 'listenerRead' | 'matrix' | 'clock' | 'identity' | 'runtime'>;
 
 function roomConnections(grants: AgentRoomGrant[], applications: RoomGrantApplication[]): FleetMapConnection[] {
   const byKey = new Map<string, FleetMapConnection>();
