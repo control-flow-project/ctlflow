@@ -45,7 +45,7 @@ test('member labels retain every accepted signup username across requests and ow
 
 test('listener policy is explicit and rejects missing authority, self triggers and competing fields', () => {
   const policy = { agentId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', ownerMatrixId: '@owner:test.localhost', matrixUserId: '@agent:test.localhost',
-    status: 'active', ownerStatus: 'active', ownerConversation: null, roomGrants: [], wakeMode: 'owner', senderMatrixIds: ['@owner:test.localhost'] };
+    status: 'active', ownerStatus: 'active', ownerConversation: null, maxMessageBytes: 65536, roomGrants: [], wakeMode: 'owner', senderMatrixIds: ['@owner:test.localhost'] };
   assert(deliveryPolicy(policy).ok);
   assert(deliveryPolicy({ ...policy, wakeMode: 'nobody', senderMatrixIds: [] }).ok);
   assert.equal(deliveryPolicy({ ...policy, wakeMode: 'nobody' }).ok, false);
@@ -63,7 +63,7 @@ test("pagination rejects duplicate parameters and unbounded pages", () => {
 });
 
 test('administrator instructions are required plain text with an exact UTF-8 bound', () => {
-  const input = { revision: 0, maxOwnerAgents: 10, maxAgents: 100, maxPending: 100,
+  const input = { revision: 0, maxMessageBytes: 65536, maxOwnerAgents: 10, maxAgents: 100, maxPending: 100,
     enrollmentSeconds: 300, reconcileSeconds: 300, agentInstructions: DEFAULT_AGENT_INSTRUCTIONS, signupMode: 'invitation', invitationIssuers: 'administrators' };
   assert(policy(input).ok);
   for (const instructions of ['Keep replies concise.\nUse project tickets.\t東京', '<script>alert("plain text")</script>',

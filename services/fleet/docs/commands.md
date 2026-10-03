@@ -28,6 +28,7 @@ fleet agent attach research analyst-west
 fleet agent contexts research analyst-west
 fleet agent attach research analyst-west --context '!ORIGINAL_ROOM_ID:YOUR_SERVER'
 fleet agent stop research analyst-west
+fleet agent reset research analyst-west
 fleet agent remove research analyst-west
 fleet stop research
 fleet remove research
@@ -47,6 +48,13 @@ Contexts lists exact retained running histories and their native state. Attach
 without a context selects the shared history, or private control history in
 per-room mode. `--context` chooses an existing listed context; it never creates
 a new room conversation or reads credentials into public management output.
+
+Reset stops the owned process, verifies complete available authorized history and
+nonsecret configuration exports, then starts fresh native context with the same
+identity and current definition parameters. It is not normal resumption. Use
+`--operation-id UUID` to retry an uncertain explicit reset operation. A reset
+cannot target a whole fleet or a human-owned attached session.
+- [Export, boundaries and reset retention](../../crossfire/docs/history.md)
 
 ## Delivery control and broadcast
 

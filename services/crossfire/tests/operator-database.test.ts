@@ -18,9 +18,9 @@ test('operator database inspection is readonly, complete and proves protected re
   const agent = await fixture.agent(fixture.admin.actor, 'helper');
   copyFileSync(current, before);
   const bytes = readFileSync(current);
-  const report = value(inspectDatabase(current, { schemaVersion: 8, counts: { agent: 1, management_conversation: 0 } }, true));
-  assert.equal(Object.keys(report.counts).length, 43);
-  assert.equal(report.schema?.length, 43);
+  const report = value(inspectDatabase(current, { schemaVersion: 9, counts: { agent: 1, management_conversation: 0 } }, true));
+  assert.equal(Object.keys(report.counts).length, 48);
+  assert.equal(report.schema?.length, 48);
   assert.equal(report.integrity, 'ok');
   assert(!JSON.stringify(report).includes(agent.token));
   assert.deepEqual(readFileSync(current), bytes);

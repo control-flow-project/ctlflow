@@ -8,6 +8,7 @@ import { inspectDatabase, databaseExpectations, verifyPreservation } from './dat
 import { verifyServer, serverExpectations } from './server.js';
 import { hostPlan, verifyHost, verifyArchive } from './host.js';
 import { enrollmentPlan, reviewEnrollment } from './enrollment.js';
+import { fleetWakePlan, reviewFleetWake } from './fleet-wake.js';
 
 const usage = `Crossfire operator tools (run after npm run build)
 release --origin URL --release-directory PATH [--web-directory PATH]
@@ -20,15 +21,16 @@ archive --file PATH --sha256 HASH
 source --directory PATH [--revision SHA] [--tree SHA]
 host --plan PATH
 enrollment --origin URL --credentials PATH --plan PATH [--execute]
+fleet-wake --origin URL --credentials PATH --plan PATH [--execute]
 Every command accepts --output PATH. Inputs/evidence containing credentials must be private.`;
 
 export async function inspect(arguments_: string[], signal: AbortSignal): Promise<Result<unknown>> {
   const [command, ...args] = arguments_;
   const required: Record<string, string[]> = { release: ['origin', 'release-directory'], server: ['origin', 'credentials'], browser: ['origin', 'credentials', 'browser', 'evidence'],
-    database: ['file'], preservation: ['before', 'after'], files: ['plan'], archive: ['file', 'sha256'], source: ['directory'], host: ['plan'], enrollment: ['origin', 'credentials', 'plan'] };
+    database: ['file'], preservation: ['before', 'after'], files: ['plan'], archive: ['file', 'sha256'], source: ['directory'], host: ['plan'], enrollment: ['origin', 'credentials', 'plan'], 'fleet-wake': ['origin', 'credentials', 'plan'] };
   if (!command || !Object.hasOwn(required, command)) return failure('invalid', usage);
   const extra: Record<string, string[]> = { release: ['web-directory'], server: ['expect'], database: ['expect'], source: ['revision', 'tree'] };
-  const parsed = options(args, required[command]!, [...(extra[command] ?? []), 'output'], command === 'database' ? ['schema'] : command === 'enrollment' ? ['execute'] : []);
+  const parsed = options(args, required[command]!, [...(extra[command] ?? []), 'output'], command === 'database' ? ['schema'] : ['enrollment', 'fleet-wake'].includes(command) ? ['execute'] : []);
   if (!parsed.ok) return parsed;
   return saveReport(await selected(command, parsed.value, signal), parsed.value);
 }
@@ -47,6 +49,7 @@ async function selected(command: string, values: Options, signal: AbortSignal): 
   if (command === 'host') { const plan = inputFile(text('plan'), hostPlan); return plan.ok ? verifyHost(plan.value, signal) : plan; }
   const account = inputFile(text('credentials'), credentials); if (!account.ok) return account;
   if (command === 'enrollment') { const plan = inputFile(text('plan'), enrollmentPlan); return plan.ok ? reviewEnrollment(text('origin'), account.value, plan.value, values.execute === true, signal) : plan; }
+  if (command === 'fleet-wake') { const plan = inputFile(text('plan'), fleetWakePlan); return plan.ok ? reviewFleetWake(text('origin'), account.value, plan.value, values.execute === true, signal) : plan; }
   if (command === 'browser') {
     const { verifyBrowser } = await import('./browser/verify.js');
     return verifyBrowser(text('origin'), account.value, text('browser'), text('evidence'), signal);

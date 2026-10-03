@@ -9,6 +9,7 @@ import { matrix } from '@crossfire/adapter-matrix/http';
 import { acknowledge, loadCursors, readUnread, synchronize } from "@crossfire/agent-core/receive";
 import type { Settings } from "@crossfire/contracts/client";
 import { captureWake, collectBatch, pendingBatch, wakeEvent } from '@crossfire/agent-core/delivery';
+import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
 
 test("native unread recovery delivers selected state notices once and keeps receipts private", { timeout: 120_000 }, async scope => {
   mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
@@ -84,8 +85,9 @@ test("native unread recovery delivers selected state notices once and keeps rece
     contextIds.push(sent.event_id);
   }
   const allowed = new Set([room]), senders = new Set([ownerAccount.id]);
+  const artifacts = messageArtifacts(storage, cursorFile + '.messages', Date.now);
   const before = loadCursors(storage, cursorFile);
-  const waiting = await pendingBatch(storage, agent, settings, cursorFile, 2, undefined, 65536, undefined, allowed);
+  const waiting = await pendingBatch(storage, agent, settings, cursorFile, 2, undefined, 65536, undefined, allowed, undefined, artifacts);
   assert.equal(await wakeEvent(agent, waiting, senders, allowed, undefined, async () => true), undefined);
   assert.deepEqual(loadCursors(storage, cursorFile), before);
   const waking = await owner.put<{ event_id: string }>(path + '/send/m.room.message/wake', { msgtype: 'm.text', body: 'Owner wake' });
@@ -95,11 +97,20 @@ test("native unread recovery delivers selected state notices once and keeps rece
   assert.equal(trigger?.event_id, waking.event_id);
   const cycle = await captureWake(agent, trigger!, allowed, filtered.next_batch);
   const later = await guest.put<{ event_id: string }>(path + '/send/m.room.message/after-window', { msgtype: 'm.text', body: 'Wait for the next wake' });
-  const collection = await collectBatch(storage, agent, settings, cursorFile, waiting, 2, undefined, 65536, cycle, allowed);
-  assert.deepEqual(collection.events.map(event => event.event_id), [...contextIds, waking.event_id]);
+  const collection = await collectBatch(storage, agent, settings, cursorFile, 2, 65536, waiting, cycle, allowed, artifacts);
+  assert.deepEqual(collection.events.map(event => event.event_id), contextIds.slice(0, 2));
   assert.deepEqual(loadCursors(storage, cursorFile), before);
   await acknowledge(storage, agent, cursorFile, collection);
-  const pending = await pendingBatch(storage, agent, settings, cursorFile, 2, undefined, 65536, filtered.next_batch, allowed);
+  const seen = collection.events.map(event => event.event_id);
+  for (;;) {
+    const next = await collectBatch(storage, agent, settings, cursorFile, 2, 65536,
+      await pendingBatch(storage, agent, settings, cursorFile, 2, undefined, 65536, filtered.next_batch, allowed, cycle, artifacts), cycle, allowed, artifacts);
+    seen.push(...next.events.map(event => event.event_id));
+    await acknowledge(storage, agent, cursorFile, next);
+    if (!next.more_rooms.length) break;
+  }
+  assert.deepEqual(seen, [...contextIds, waking.event_id]);
+  const pending = await pendingBatch(storage, agent, settings, cursorFile, 2, undefined, 65536, filtered.next_batch, allowed, undefined, artifacts);
   assert.deepEqual(pending.events.map(event => event.event_id), [later.event_id]);
   assert.equal(await wakeEvent(agent, pending, senders, allowed, undefined, async () => true), undefined);
 });

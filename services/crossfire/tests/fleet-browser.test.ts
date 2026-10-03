@@ -50,6 +50,14 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   const instances = value(services.collection.fleetInstances({ ownerId: admin.actor.principalId, fleetKey: 'research' }));
   const alpha = instances.find(instance => instance.instanceKey === 'alpha')!;
   const roomId = value(await nativeOk({ base: fixture.native.base, token: admin.token }, 'POST', API + '/createRoom', { name: 'Research', preset: 'private_chat' })).room_id as string;
+  const reportTime = services.clock.now();
+  const reporting = value(reportListener(services, { kind: 'agent', principalId: alpha.agentId }, alpha.agentId, randomUUID(), {
+    release: 'browser', stopped: true, controllerBound: false, messagesDelivered: 12, statistics: { sequence: 1,
+      startedAt: reportTime - 300000, endedAt: reportTime, dropped: 2,
+      flows: Array.from({ length: 25 }, (_, index) => ({ roomId, senderMatrixId: admin.member.principal.matrixUserId,
+        messageType: 'type-' + index, observed: 1, delivered: 1, contentBytes: 1024, deliveredBytes: 1024, attachmentBytes: 0, largestBytes: 1024 })),
+      usage: [] } }, 'browser'));
+  assert(reporting.statisticsAccepted);
   await page.goto(origin + '/manage/fleets');
   await page.getByLabel('Search fleets or controllers').fill('workstation');
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Apply filters', exact: true }).click()]);
@@ -138,9 +146,19 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByLabel('Wake-up authority')).toHaveValue('selected');
   await expect(page.getByRole('list', { name: 'Selected wake-up identities' })).toContainText(guest.matrixUserId);
   assert.deepEqual(value(services.collection.wakeSenders({ agentId: alpha.agentId })).map(sender => sender.senderPrincipalId), [guest.id]);
+  await page.goto(origin + '/manage/fleets/' + fleet.id + '/statistics');
+  await expect(page.getByRole('table', { name: 'Message flows', exact: true }).locator('tbody tr')).toHaveCount(20);
+  await expect(page.getByRole('region', { name: 'Traffic', exact: true })).toContainText('25');
+  await expect(page.getByRole('region', { name: 'Native usage', exact: true })).toContainText('Not reported by this runtime');
+  await page.getByRole('navigation', { name: 'Pagination', exact: true }).getByRole('link', { name: 'Next', exact: true }).click();
+  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/statistics?page=2');
+  await expect(page.getByRole('table', { name: 'Message flows', exact: true }).locator('tbody tr')).toHaveCount(5);
+  await page.getByLabel('Period', { exact: true }).selectOption('168');
+  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/statistics?hours=168');
+  assert.equal((await page.request.get(origin + '/api/fleets/' + fleet.id + '/statistics?hours=0')).status(), 400);
   for (const width of [1920, 390]) {
     await page.setViewportSize({ width, height: 1000 });
-    for (const route of ['/manage/fleets', '/manage/fleets/' + fleet.id, ...['delivery', 'messages', 'rooms', 'settings'].map(section => '/manage/fleets/' + fleet.id + '/' + section), agentUrl, ...['wake', 'activity', 'software', 'settings'].map(section => agentUrl + '/' + section), agentUrl + '/rooms/' + encodeURIComponent(roomId)]) {
+    for (const route of ['/manage/fleets', '/manage/fleets/' + fleet.id, ...['delivery', 'messages', 'statistics', 'rooms', 'settings'].map(section => '/manage/fleets/' + fleet.id + '/' + section), agentUrl, ...['wake', 'activity', 'software', 'settings'].map(section => agentUrl + '/' + section), agentUrl + '/rooms/' + encodeURIComponent(roomId)]) {
       await page.goto(origin + route); await expect(page.locator('h1')).toBeVisible(); await expect(page.locator('.loading')).toHaveCount(0);
       await expect(page.getByRole('alert')).toHaveCount(0);
       await checkPaperLayout(page);
@@ -173,6 +191,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await checkPaperLayout(otherPage);
   assert.equal((await otherPage.request.get(origin + '/api/fleets/' + fleet.id)).status(), 403);
   assert.equal((await otherPage.request.get(origin + '/api/fleets/' + fleet.id + '/messages')).status(), 403);
+  assert.equal((await otherPage.request.get(origin + '/api/fleets/' + fleet.id + '/statistics')).status(), 403);
   await page.goto(origin + '/manage/fleets/' + fleet.id + '/settings');
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Remove fleet grouping' }).click();
   await expect(page.getByRole('heading', { name: 'No fleets' })).toBeVisible();
@@ -227,7 +246,7 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   assert(typeof created.room_id === 'string');
   const roomId = created.room_id, runtime = await fakeCodex(scope), stop = new AbortController();
   let ended: unknown;
-  const receiver = listen({ coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ binding: 'fixture', coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
     id: agent.id, release: release.manifest, cursorFile: join(runtime.directory, 'cursor.json'),
@@ -315,7 +334,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   for (let index = 0; index < instances.length; index++) {
     const id = instances[index]!.agentId!, principal = value(services.directory.agent(id))!.principal, mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: principal.revision, mode, senderIds: mode === 'selected' ? [other.actor.principalId] : [] }, randomUUID()));
-    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { release: 'browser-map', messagesDelivered: 0, controllerBound: false, stopped: false }, 'browser-map'));
+    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'browser-map', messagesDelivered: 0, controllerBound: false, stopped: false }, 'browser-map'));
     if (index >= 20) continue;
     const record = value(services.directory.agent(id))!, modeIndex = index % 3;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId: roomIds[index % roomIds.length]!, expectedRevision: record.principal.revision,

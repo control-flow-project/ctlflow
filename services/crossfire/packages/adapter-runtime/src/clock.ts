@@ -2,7 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import type { Clock } from '@crossfire/agent-core/port';
 
 export const nativeClock: Clock = {
-  now: () => performance.now(),
+  now: Date.now,
   delay: async (milliseconds, signal) => { await delay(milliseconds, undefined, { signal }); },
   deadline: milliseconds => AbortSignal.timeout(milliseconds),
   schedule: (callback, milliseconds, recurring = false) => {

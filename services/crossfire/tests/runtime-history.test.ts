@@ -2,7 +2,7 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import { trustWorkspace } from '@crossfire/test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
@@ -12,6 +12,7 @@ import { value } from './support/application.js';
 import type { RuntimeDecision, RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
 import { success } from '@crossfire/kernel/result';
 import { codexTerminal } from '@crossfire/adapter-codex/terminal';
+import type { UsageSample } from '@crossfire/contracts/statistics';
 
 async function environment(scope: Parameters<typeof nativeProvider>[0]) {
   const directory = mkdtempSync(join(process.cwd(), '.temp/native-histories-'));
@@ -23,11 +24,32 @@ async function environment(scope: Parameters<typeof nativeProvider>[0]) {
   return { workspace, provider, adapter: codexRuntime(process.env.CROSSFIRE_TEST_CODEX ?? 'codex') };
 }
 
+test('controller-owned reset creates a fresh native context without changing identity, parameters or provider authentication', { timeout: 60000 }, async scope => {
+  const { workspace, provider, adapter } = await environment(scope), usage: UsageSample[] = [];
+  const input = { name: 'reset-proof', workspace, instructions: 'Native reset proof.', options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'danger-full-access', approval_policy: 'never' },
+    hooks: { requestDecision: async () => { throw new Error('No decision expected'); }, usage: (sample: UsageSample) => usage.push(sample) } };
+  let runtime = value(await adapter.start(input, new AbortController().signal)); cleanup(scope, () => runtime.close());
+  const previous = runtime.sessionId, authentication = readFileSync(join(workspace, '.codex/auth.json'));
+  await runtime.deliver('Prior private context must not appear after reset.', 'before-reset');
+  await until(() => provider.held() !== undefined); provider.finish(); await until(async () => !(await runtime.inspect()).busy);
+  runtime.acknowledge(['before-reset']); await runtime.close();
+  assert(usage.length > 0, 'Native app-server token counters reach the optional adapter hook');
+  const resetId = randomUUID(); value(await adapter.reset({ workspace, resetId }));
+  assert(existsSync(join(workspace, '.codex/crossfire-archive', resetId, 'crossfire-session.json')));
+  runtime = value(await adapter.start(input, new AbortController().signal)); assert.notEqual(runtime.sessionId, previous);
+  const current = runtime.sessionId; assert.equal(provider.requests.length, 1, 'Reset and native startup make no model calls');
+  assert.deepEqual(readFileSync(join(workspace, '.codex/auth.json')), authentication);
+  value(await adapter.reset({ workspace, resetId }));
+  await runtime.deliver('Only the new context.', 'after-reset'); await until(async () => !(await runtime.inspect()).busy);
+  assert(!JSON.stringify(provider.requests[1]).includes('Prior private context must not appear after reset.'));
+  assert.equal(runtime.sessionId, current); assert.equal(provider.requests.length, 2);
+});
+
 test('stock Codex routes persistent room histories, protects unacknowledged work and retains exact terminal pointers across mode changes', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
   const observed: RuntimeObservationEvent[] = [], stop = new AbortController();
   const input = { name: 'room-proof', workspace, instructions: 'Inert history proof.', options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
-    listenerOptions: { history_mode: 'per-room' as 'per-room' | 'shared', max_input_bytes: 100000 },
+    listenerOptions: { history_mode: 'per-room' as 'per-room' | 'shared' },
     hooks: { requestDecision: async () => { throw new Error('No permission expected'); }, observe: (event: RuntimeObservationEvent) => observed.push(event) } };
   let runtime = value(await adapter.start(input, stop.signal));
   cleanup(scope, () => runtime.close());

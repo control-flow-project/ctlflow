@@ -1,4 +1,3 @@
-import { localState as storage } from '@crossfire/adapter-filesystem/state';
 import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { parseArgs } from "node:util";
 import { join } from "node:path";
@@ -9,9 +8,9 @@ import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import { emit } from './output.js';
 import { operations, option, selectOperation, executeOperation, operationOptions, type Arguments } from "@crossfire/adapter-matrix/commands";
-import { DEFAULT_EVENTS, MAX_EVENTS, integerOption, outputBytes } from "@crossfire/contracts/limits";
-import { readUnread, synchronize, loadSyncCursor, checkpointSync, membershipResets, retainJoinedCursors,
-  acknowledge, flushAcknowledgements, inbox, projectMessages, joinedRooms, type Sync } from "@crossfire/agent-core/receive";
+import { MAX_EVENTS, integerOption, outputBytes } from "@crossfire/contracts/limits";
+import { inbox, projectMessages, type Sync } from "@crossfire/agent-core/receive";
+import { readHistory } from './history.js';
 import { discoverRuntime, runtimeName } from './adapters.js';
 import { recordClaudeHook } from '@crossfire/adapter-claude/hook';
 import { connectProject, selectProfile } from './connect.js';
@@ -24,6 +23,7 @@ import { listenerOptions } from './listener-options.js';
 const globals = ["project", "profile", "max-output-bytes"];
 const localOptions: Record<string, readonly string[]> = {
   connect: ['server', 'owner', 'runtime'], disconnect: [], status: [], test: [], read: ["room", "limit"], directory: ['search', 'page', 'page-size'],
+  history: ['room', 'limit', 'direction', 'continuation'],
   listen: ["room", "limit", "runtime", "poll-ms", "debounce-ms", "reconcile-ms"],
 };
 
@@ -51,7 +51,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   if (values.help) {
     if (group === "matrix" && command) emit(selectOperation(command), maximum);
     else if (group === "matrix") emit({ namespace: "matrix", schema: "v1.12", operations: operations.map(operation => ({ command: operation.command, access: operation.access })) }, maximum);
-    else emit({ usage: "node .crossfire/client.mjs [--project DIRECTORY] [--profile NAME] agent connect|disconnect|status|test|read|directory", agent: Object.fromEntries(Object.entries(localOptions).filter(([name]) => name !== 'listen')), room: roomOptions,
+    else emit({ usage: "node .crossfire/client.mjs [--project DIRECTORY] [--profile NAME] agent connect|disconnect|status|test|read|history|directory", agent: Object.fromEntries(Object.entries(localOptions).filter(([name]) => name !== 'listen')), room: roomOptions,
       matrix: "Native Matrix operation IDs converted to kebab-case; use matrix COMMAND --help.",
       output: "64 KiB default; finite --max-output-bytes 1024..98304",
       identity: "Project-local profiles; private owner DM, explicit additional rooms. The runtime server remains user-owned." }, maximum);
@@ -92,6 +92,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   }
   const selected = readProfile(destination.profile);
   if (realpathSync(selected.workspace) !== destination.workspace) throw new Error("Profile belongs to another project");
+  if (group === 'agent' && (command === 'read' || command === 'history')) { await readHistory(destination, selected, command, values, maximum); return; }
   if (group === 'room' || group === 'agent' && command === 'directory') {
     const result = await runRoomCommand(selected, command, values);
     if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message);
@@ -111,30 +112,11 @@ export async function main(arguments_: string[], installation: () => Manifest, f
       emit(view === "inbox" ? inbox(result as Sync) : view === "messages" ? projectMessages(result) : result, maximum);
     } else if (command === "listen") {
         const room = option(values, 'room');
-        await runListener(destination, { ...selected, coordination, release: installed, cursorFile: destination.cursors, maximumBytes: maximum,
-          limit: integerOption(option(values, "limit"), DEFAULT_EVENTS, 1, MAX_EVENTS, "--limit"), ...(room ? { room } : {}),
+        await runListener(destination, { ...selected, binding: runtime!.binding, coordination, release: installed, cursorFile: destination.cursors,
+          limit: integerOption(option(values, "limit"), 100, 1, MAX_EVENTS, "--limit"), ...(room ? { room } : {}),
           pollMs: listener!.pollMs, debounceMs: listener!.debounceMs, reconcileMs: listener!.reconcileMs,
           runtime: runtime!.runtime,
         }, runtime!);
-    } else {
-      const view = await coordination.delivery(selected.id);
-      if (!view.ok) throw new Error(view.error.message);
-      if (view.value.ownerMatrixId !== selected.settings.owner || view.value.matrixUserId !== selected.account.user_id
-        || view.value.status !== "active" || view.value.ownerStatus !== "active") throw new Error("Agent access is not active");
-      await flushAcknowledgements(storage, client, destination.cursors);
-      const since = loadSyncCursor(storage, destination.cursors);
-      const synced = await synchronize(client, since);
-      const reset = await membershipResets(client, synced, selected.account, since);
-      const joined = await joinedRooms(client);
-      retainJoinedCursors(storage, destination.cursors, new Set(joined.filter(room => !reset.has(room))));
-      checkpointSync(storage, destination.cursors, synced.next_batch);
-      const rooms = new Set(view.value.roomGrants.filter(grant => !grant.muted).map(grant => grant.roomId));
-      const batch = await readUnread(storage, client, selected.settings, destination.cursors,
-        integerOption(option(values, "limit"), DEFAULT_EVENTS, 1, MAX_EVENTS, "--limit"),
-        option(values, "room"), maximum, synced.next_batch, rooms);
-      emit({ instance: selected.settings.instance, owner: selected.settings.owner, user_id: selected.account.user_id,
-        events: batch.events, more: batch.more_rooms.length > 0, more_rooms: batch.more_rooms }, maximum);
-      await acknowledge(storage, client, destination.cursors, batch);
     }
   } finally { await release?.(); }
 }

@@ -32,7 +32,7 @@ async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
     const mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: agent.principal.revision, mode,
       senderIds: mode === 'selected' ? [specialist.id, other.actor.principalId] : [] }, randomUUID()));
-    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { release: 'test', messagesDelivered: 0, controllerBound: false, stopped: false }, 'test'));
+    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'test', messagesDelivered: 0, controllerBound: false, stopped: false }, 'test'));
     if (index === instances.length - 1) continue;
     const roomId = rooms[index % rooms.length]!.roomId, current = value(services.directory.agent(id))!;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId, expectedRevision: current.principal.revision,

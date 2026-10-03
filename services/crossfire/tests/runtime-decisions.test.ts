@@ -15,7 +15,7 @@ import { setRoomPermission } from '@crossfire/domain/room-access/set-permission'
 async function fixture(scope: Parameters<typeof applicationFixture>[0]) {
   const fixture = await applicationFixture(scope), owner = await fixture.member('owner'), stranger = await fixture.member('stranger');
   const agent = await fixture.agent(owner.actor, 'ada'), runId = randomUUID();
-  value(reportListener(fixture.services, agent.actor, agent.id, runId, { release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(fixture.services, agent.actor, agent.id, runId, { statistics: null, release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
   const request: DecisionCreation = { id: randomUUID(), runId, runtime: 'codex', sessionId: randomUUID(), requestId: '42', turnId: 'turn-original', itemId: 'item-original',
     kind: 'question', action: 'Choose a destination', review: 'Exact native review', blocking: true, expiresAt: null,
     questions: [{ id: 'destination', title: 'Destination', prompt: 'Select one', allowText: true, secret: true,
@@ -90,7 +90,7 @@ test('idle heartbeat recovery restores contact without declaring a failed native
     sessionId: 'failed-history', kind: 'failure', message: 'Original failure' }));
   advance(90001); value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()).map(incident => incident.kind).sort(), ['contact', 'failure']);
-  value(reportListener(services, agent.actor, agent.id, runId, { release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
   value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()).map(incident => incident.kind), ['failure']);
   assert.equal(value(services.runtime.notifications(services.clock.now())).filter(notice => notice.phase === 'recovery').length, 1);
@@ -99,8 +99,8 @@ test('idle heartbeat recovery restores contact without declaring a failed native
 test('a newer intentional stop suppresses false lost-contact notices from an older abandoned run', async scope => {
   const { services, agent, advance } = await fixture(scope);
   advance(1); const next = randomUUID();
-  value(reportListener(services, agent.actor, agent.id, next, { release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
-  value(reportListener(services, agent.actor, agent.id, next, { release: 'fixture', stopped: true, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: true, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
   advance(90001); value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()), []);
 });

@@ -9,7 +9,9 @@ import type { RoomGrantReadRepository } from './room-grant-read.js';
 import type { RoomOperations } from './room-operations.js';
 import type { ScheduleCalculator } from './schedule.js';
 import type { RuntimeRepository } from '../runtime/types.js';
+import type { StatisticsRepository } from '../statistics/types.js';
 export type Services = {
+  statistics: StatisticsRepository;
   runtime: RuntimeRepository;
   repositories: Repositories;
   directory: DirectoryRepository;

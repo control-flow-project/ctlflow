@@ -1,10 +1,7 @@
-import { createServer } from 'node:http';
-import { once } from 'node:events';
-import { randomBytes } from 'node:crypto';
-import { existsSync, openSync, closeSync, unlinkSync } from 'node:fs';
+import { existsSync, openSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { readJson, writeJson, privateDir } from '@crossfire/adapter-filesystem/index';
+import { readJson, privateDir } from '@crossfire/adapter-filesystem/index';
 import { fields } from '@crossfire/contracts/validation';
 import { releaseName } from '@crossfire/contracts/release';
 import type { paths } from '@crossfire/adapter-filesystem/project';
@@ -12,6 +9,7 @@ import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import { emit } from './output.js';
 import type { ListenerOptions } from '@crossfire/adapter-crossfire/listener';
 import { listen } from '@crossfire/adapter-crossfire/listener';
+import { isListenerStop } from '@crossfire/agent-core/lifecycle';
 import type { ListenerTest } from '@crossfire/agent-core/diagnostic';
 import { wakePolicy } from '@crossfire/contracts/wake';
 
@@ -55,6 +53,10 @@ export async function localListener(destination: Destination, action: 'status' |
       || !['none', 'runtime', 'listener'].includes(String(result.value.approval))
       || typeof result.value.server !== 'string' || !releaseName(result.value.currentRelease) || typeof result.value.message !== 'string') throw new Error('Invalid live listener test result');
   }
+  if (action === 'stop') {
+    const released = await acquireProcessLock(join(destination.state, 'receiver'), 35);
+    await released();
+  }
   return status.value as LocalListener;
 }
 
@@ -85,51 +87,15 @@ export async function startListener(destination: Destination, file: string, prof
 }
 
 export async function runListener(destination: Destination, options: ListenerOptions, runtime: { binding: string; session: string; name: string }): Promise<void> {
-  const { binding, session } = runtime;
-  const release = await acquireProcessLock(join(destination.state, 'receiver'));
+  const { session } = runtime;
   const controller = new AbortController();
   const stop = () => controller.abort(new Error('Listener disconnected'));
-  const secret = randomBytes(32).toString('hex');
-  const state: LocalListener = { release: options.release.release, binding, session, ready: false };
-  let diagnose: (() => Promise<ListenerTest>) | undefined;
-  let complete: () => void = () => {};
-  const completed = new Promise<void>(resolve => { complete = resolve; });
-  const server = createServer(async (request, response) => {
-    response.setHeader('Connection', 'close');
-    if (request.method !== 'POST' || request.url !== '/control' || request.headers.authorization !== 'Bearer ' + secret) { response.writeHead(403).end(); return; }
-    try {
-      let body = '';
-      for await (const part of request) { body += String(part); if (body.length > 256) throw new Error('Control request too large'); }
-      const input = fields(JSON.parse(body) as unknown, ['action']);
-      if (!input.ok || !['status', 'stop', 'test'].includes(String(input.value.action))) throw new Error('Invalid control request');
-      if (input.value.action === 'stop') { stop(); await completed; }
-      response.setHeader('Content-Type', 'application/json');
-      if (input.value.action === 'test') {
-        if (!state.ready || !diagnose) throw new Error('Listener is not ready');
-        response.end(JSON.stringify({ ...state, test: await diagnose() }));
-      } else response.end(JSON.stringify(state));
-    } catch (error) {
-      response.writeHead(400, { 'Content-Type': 'application/json' });
-      response.end(JSON.stringify({ error: error instanceof Error ? error.message.slice(0, 1024) : 'Listener test could not complete; reconnect and test again' }));
-    }
-  });
-  server.requestTimeout = 5000;
-  const file = join(destination.state, 'listener.json');
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, stop);
   try {
-    server.listen(0, '127.0.0.1');
-    await once(server, 'listening');
-    const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('Cannot open private listener control');
-    writeJson(file, { port: address.port, secret });
-    await listen({ ...options, ready: test => { diagnose = test; state.ready = true;
+    await listen({ ...options, ready: () => {
       emit({ runtime: runtime.name, session, workspace: destination.workspace }); reportStartup({ ready: true }); } }, controller.signal);
-  } catch (error) { if (!controller.signal.aborted) throw error; }
+  } catch (error) { if (!controller.signal.aborted && !isListenerStop(error)) throw error; }
   finally {
-    state.ready = false; complete();
-    await new Promise<void>(resolve => server.close(() => resolve()));
-    if (existsSync(file)) unlinkSync(file);
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.removeListener(signal, stop);
-    await release();
   }
 }

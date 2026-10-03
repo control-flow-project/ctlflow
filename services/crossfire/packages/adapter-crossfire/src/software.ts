@@ -20,6 +20,14 @@ function installedClient(root: string): string | null {
   return client;
 }
 
+export function installedSoftware(root: string) {
+  const client = installedClient(root);
+  if (!client) throw new Error('Automatic recovery requires the previously approved project software');
+  const directory = dirname(client), release = loadRelease(directory);
+  return { manifest: release.manifest, file: client, activate: () => {},
+    skill: { path: join(directory, 'SKILL.md'), changed: false } };
+}
+
 export async function installSoftware(root: string, origin: string) {
   const release = await acquireProcessLock(join(root, 'software-install'), 35);
   try { return await prepareSoftware(root, origin); }

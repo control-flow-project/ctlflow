@@ -20,7 +20,7 @@ export function reportRuntime(services: Services, actor: Actor, agentId: string,
     const previous = services.runtime.observation(agentId);
     if (!previous.ok) return previous;
     const original = previous.value.find(value => value.runId === runId && value.sessionId === input.sessionId);
-    if (original && (original.roomId !== input.roomId || original.historyMode !== input.historyMode || original.maxInputBytes !== input.maxInputBytes
+    if (original && (original.roomId !== input.roomId || original.historyMode !== input.historyMode
       || original.runtime !== input.runtime)) return failure('conflict', 'Native history scope or listener configuration changed within the run');
     if (!original && previous.value.length >= 2002) return failure('limit', 'Too many native histories in this listener run');
     if (previous.value.some(value => value.runId === runId && value.sessionId === input.sessionId && value.observedAt > input.observedAt)) return failure('conflict', 'Runtime observation is older than the recorded state');

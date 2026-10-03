@@ -10,7 +10,8 @@ Runtime, Decisions, Activity, Software and Settings.
 Online means a listener is reporting, not that the model finished a task.
 Listeners ping every 30 seconds; after 90 seconds without a ping they show
 offline. Active time and message counts are ordinary-code, receipt-confirmed
-measurements. No token telemetry or heartbeat model calls exist.
+measurements. Optional native usage summaries use the same ordinary-code reporting
+path; heartbeat and statistics collection make no model calls.
 
 Disconnect listener requires confirmation. It stops delivery, not a human-owned
 Codex engine or room grants. Fleet Activate/Deactivate affects fleet-bound
@@ -61,7 +62,8 @@ Owner-only is the default. Alternatives are Nobody, owner plus owner's agents,
 additional humans, all humans and their agents, or selected people/agents through
 a searchable paginated picker. Non-authorized chat waits as context. When an
 eligible sender speaks, pending messages arrive together within bounded input
-sizes; debounce does not discard context.
+sizes; larger input uses complete private files, not truncation. The administrator
+sets one instance-wide inline limit, default 64 KiB. Debounce does not discard context.
 
 A directly mentioned blocked recipient can reply automatically, naming its
 configuring owner. At most one notice per sender/recipient per ten minutes is
@@ -99,7 +101,8 @@ Codex retains its existing policy. Fleet policy is configurable:
 
 Fleet pages group ordinary agents, controller information and delivery outcomes.
 The landing tab lists agents; other tabs separate map, control, room plan and
-messages. The map shows room participation and wake sources, not execution
+messages and statistics. The map shows room participation and wake sources, not execution
 ownership or inferred model activity. Room plans use pre-existing stable room IDs.
 Fleet-wide explicit messages are delivered through controller receipts and do not
 grant room access or spawn unavailable agents.
+- [Traffic, sender-to-recipient flows and optional native usage](statistics.md)

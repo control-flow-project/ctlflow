@@ -11,5 +11,6 @@ export type OwnedRuntimeInput = {
 };
 export type OwnedRuntimeAdapter = {
   validate(options: unknown): Result<{ options: Record<string, unknown>; approval: RuntimeApproval }>;
+  reset(input: { workspace: string; resetId: string }): Promise<Result<void>>;
   start(input: OwnedRuntimeInput, stop: AbortSignal): Promise<Result<OwnedRuntimeConnection>>;
 };

@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chatPublication } from '@crossfire/agent-core/chat-publication';
+import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
 import { eventView, type ReadBatch } from '@crossfire/agent-core/receive';
 import type { LocalState } from '@crossfire/agent-core/port';
 import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
 import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
 
-function fixture(mode: 'shared' | 'per-room' = 'per-room', maximum = 100000) {
+function fixture(mode: 'shared' | 'per-room' = 'per-room', maximum = 65536) {
   const values = new Map<string, unknown>(), opened: string[] = [], inputs: { session: string; text: string; id: string }[] = [];
   const receipts = new Set<string>(), targets = new Map<string, RuntimeConnection>(), delivered: string[] = [];
   const signal = new AbortController().signal;
@@ -32,7 +33,8 @@ function fixture(mode: 'shared' | 'per-room' = 'per-room', maximum = 100000) {
   const batch: ReadBatch = { events: [event('!alpha:test', '$alpha'), event('!beta:test', '$beta')],
     cursors: { '!alpha:test': 'cursor-alpha', '!beta:test': 'cursor-beta' }, latest: { '!alpha:test': '$alpha', '!beta:test': '$beta' }, more_rooms: [] };
   const options = { storage, file: 'publication', settings: { instance: 'proof', homeserver: 'https://matrix.test', server_name: 'test', owner, max_upload_bytes: 100000 },
-    runtime, mode, maximum, delivered: async (room: string) => { delivered.push(room); }, count: (count: number) => { messages += count; } };
+    runtime, mode, maximum, artifacts: messageArtifacts(storage, 'messages', Date.now), traffic: () => {},
+    delivered: async (room: string) => { delivered.push(room); }, count: (count: number) => { messages += count; } };
   const create = () => chatPublication(options);
   return { values, opened, inputs, targets, delivered, event, batch, options, create, signal, identities: new Map([[owner, identity]]),
     fail: () => { fail = true; }, messages: () => messages };
@@ -61,7 +63,7 @@ test('unpublished revoked rooms create no history or input and changed pending m
   const proof = fixture(), publisher = proof.create();
   publisher.prepare(proof.batch, proof.batch.events, proof.identities);
   assert.throws(() => chatPublication({ ...proof.options, mode: 'shared' }), /changed history/);
-  assert.throws(() => chatPublication({ ...proof.options, maximum: 100 }), /changed history/);
+  assert.throws(() => chatPublication({ ...proof.options, maximum: 100 }), /Invalid chat input/);
   const completed = await publisher.publish(new Set(['!alpha:test']), proof.signal);
   assert(completed); assert.deepEqual(completed.batch.cursors, { '!alpha:test': 'cursor-alpha' });
   assert.deepEqual(proof.opened, ['!alpha:test']); assert.equal(proof.inputs.length, 1);
@@ -77,7 +79,7 @@ test('uncertain publication cannot move to another room history', async () => {
   assert.equal(proof.inputs.length, 2);
 });
 
-test('shared default packs chat together and splits only at the complete serialized UTF-8 budget', async () => {
+test('shared history keeps a single bounded input and file-backs complete oversized UTF-8 messages', async () => {
   const proof = fixture('shared'), allowed = new Set(Object.keys(proof.batch.cursors));
   let publisher = proof.create(); publisher.prepare(proof.batch, proof.batch.events, proof.identities);
   await publisher.publish(allowed, proof.signal);
@@ -87,10 +89,17 @@ test('shared default packs chat together and splits only at the complete seriali
   proof.batch.events = [proof.event('!alpha:test', '$large-alpha', '😀'.repeat(18000)), proof.event('!beta:test', '$large-beta', '😀'.repeat(18000))];
   publisher = proof.create(); publisher.prepare(proof.batch, proof.batch.events, proof.identities);
   const completed = await publisher.publish(allowed, proof.signal);
-  assert(completed); assert.equal(proof.inputs.length, 3);
-  assert(proof.inputs.every(input => Buffer.byteLength(input.text) <= 100000));
-  assert(proof.inputs[1]!.text.includes('😀'.repeat(18000)));
+  assert(completed); assert.equal(proof.inputs.length, 2);
+  assert(proof.inputs.every(input => Buffer.byteLength(input.text) <= 65536));
+  assert(!proof.inputs[1]!.text.includes('😀'.repeat(18000)));
+  const pointer = JSON.parse(proof.inputs[1]!.text.split('\n').at(-1)!);
+  assert.equal(pointer.count, 2);
+  const manifest = proof.values.get(pointer.manifest) as { messages: { file: string }[] };
+  assert.deepEqual(manifest.messages.map(entry => (proof.values.get(entry.file) as { content: { body: string } }).content.body), ['😀'.repeat(18000), '😀'.repeat(18000)]);
   publisher.acknowledge();
   proof.batch.events = [proof.event('!alpha:test', '$oversized', '😀'.repeat(26000))];
-  assert.throws(() => publisher.prepare(proof.batch, proof.batch.events, proof.identities), /exceeds.*runtime input limit/);
+  publisher.prepare(proof.batch, proof.batch.events, proof.identities);
+  await publisher.publish(allowed, proof.signal);
+  assert.equal(proof.inputs.length, 3); assert(Buffer.byteLength(proof.inputs[2]!.text) <= 65536);
+  publisher.acknowledge();
 });

@@ -4,8 +4,7 @@ import type { DecisionCreation, DecisionView, DecisionSummary, DecisionAnswer, R
 export { INPUT_BYTES, MAX_INPUT_BYTES, MAX_REVIEW_BYTES } from '@crossfire/domain/runtime/values';
 export type { DecisionCreation, DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservation, RuntimeObservationView } from '@crossfire/domain/runtime/values';
 export const runtimeState = check.choice('idle', 'working', 'waiting-approval', 'waiting-answer', 'failed', 'unavailable');
-export const listenerOptions = check.object({ history_mode: check.optional(check.choice('shared', 'per-room')),
-  max_input_bytes: check.optional(check.integer(1024, MAX_INPUT_BYTES)) });
+export const listenerOptions = check.object({ history_mode: check.optional(check.choice('shared', 'per-room')) });
 const option = check.object({ id: check.text(255), label: check.text(1000), description: check.plainText(4000) });
 export const decisionQuestion = check.object({ id: check.text(255), title: check.text(1000), prompt: check.plainText(16000),
   secret: check.boolean, allowText: check.boolean, options: check.list(option, 100) });

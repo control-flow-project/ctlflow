@@ -53,8 +53,8 @@ function Route({ canInvite }: { canInvite: boolean }) {
   if (path === '/manage/fleets') return <Fleets/>;
   const fleetMap = /^\/manage\/fleets\/([a-f0-9-]{36})\/map$/u.exec(path);
   if (fleetMap) return <FleetMap id={fleetMap[1]!}/>;
-  const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})(?:\/(delivery|messages|rooms|settings))?$/u.exec(path);
-  if (fleet) { const section = fleet[2]; if (section === undefined || section === 'delivery' || section === 'messages' || section === 'rooms' || section === 'settings') return <FleetDetail id={fleet[1]!} section={section ?? 'agents'}/>; }
+  const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})(?:\/(delivery|messages|rooms|settings|statistics))?$/u.exec(path);
+  if (fleet) { const section = fleet[2]; if (section === undefined || section === 'delivery' || section === 'messages' || section === 'rooms' || section === 'settings' || section === 'statistics') return <FleetDetail id={fleet[1]!} section={section ?? 'agents'}/>; }
   if (viewer.member.roleCode === 'administrator') {
     if (path === '/manage/members') return <Members/>;
     if (path === '/manage/policy') return <Settings/>;

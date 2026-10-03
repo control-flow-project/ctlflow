@@ -4,9 +4,10 @@ import { startProcess } from './owned-process.js';
 import { prepareHome } from './home.js';
 import { ownedOptions } from './owned-options.js';
 import { codexHistories } from './histories.js';
+import { resetCodex } from './reset.js';
 
 export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
-  return { validate: ownedOptions, async start(input, stop) {
+  return { validate: ownedOptions, reset: resetCodex, async start(input, stop) {
     const parsed = ownedOptions(input.options);
     if (!parsed.ok) return parsed;
     let process: Awaited<ReturnType<typeof startProcess>> | undefined;

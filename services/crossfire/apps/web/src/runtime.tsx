@@ -11,14 +11,14 @@ export function Runtime({ agent }: { agent: AgentView }) {
         <header className="panel-heading"><div><h3>{context.runtime}</h3><p>Observed {timestamp(context.observedAt)}</p></div>
           <Status value={agent.activity.status === 'online' ? context.state : 'unavailable'}/></header>
         <dl className="detail-list"><dt>Session</dt><dd><code>{context.sessionId}</code></dd><dt>History</dt><dd>{context.historyMode === 'shared' ? 'Shared across rooms' : 'Separate native histories per room'}</dd>
-          <dt>Input budget</dt><dd>{context.maxInputBytes.toLocaleString()} UTF-8 bytes, including origin metadata</dd>
+          <dt>Inline message limit</dt><dd>{context.maxInputBytes.toLocaleString()} UTF-8 bytes, including origin metadata; larger input uses private files</dd>
           <dt>Controller</dt><dd>{agent.deployment?.controllerName ?? 'Direct connection'}</dd></dl>
         {context.errorMessage && <p role="alert" className="error">{context.errorMessage}</p>}
         <div className="table-wrap"><table aria-label="Runtime settings"><thead><tr><th>Setting</th><th>Configured</th><th>Effective</th></tr></thead>
           <tbody>{context.settings.map(setting => <tr key={setting.name}><td><code>{setting.name}</code></td><td>{setting.configured ?? 'Not explicitly configured'}</td><td>{setting.effective ?? 'Not reported by native runtime'}</td></tr>)}</tbody></table></div>
       </details>)}</PageItems>
       <Help title="Inspect the original session"><p>In the fleet CLI, run <code>fleet agent contexts FLEET AGENT</code> to list retained histories, then <code>fleet agent attach FLEET AGENT --context CONTEXT</code> for the exact native terminal command. Use the controller connection on the computer where this fleet runs.</p>
-        <p>Attaching does not start another agent or create a history. A stopped or failed runtime has no live terminal pointer. Inspect its recorded error and original workarea before explicitly restarting it.</p>
+        <p>Attaching does not start another agent or create a history. A stopped or failed runtime has no live terminal pointer. The controller retries transient failures using the original history; inspect its recorded error if recovery cannot proceed.</p>
         <p>Terminal-visible output is shared with the owner, including output derived from rooms the owner has not joined. Separate histories isolate conversation history, not files, tools or credentials.</p></Help>
     </> : <Empty title="No native observation yet">Reconnect the listener to report its runtime. An online heartbeat alone does not prove the model is working.</Empty>}</Loaded>
   </Panel>;

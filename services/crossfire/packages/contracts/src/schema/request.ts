@@ -3,6 +3,7 @@ import * as check from './validation.js';
 import type { Parser } from './validation.js';
 import { failure, success } from '@crossfire/kernel/result';
 import { HUMAN_SIGNUP } from '../policy.js';
+import { statisticsBatch } from '../statistics.js';
 const revision = check.integer();
 const accountProof = check.object({ agentId: check.identifier, accessToken: check.text(8192) });
 const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof) });
@@ -22,7 +23,7 @@ export const grantIntent = check.object({ roomId: check.roomId, accessMode: chec
 export const roomGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier), accessMode: check.choice('read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
 export const removeGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier) });
 export const roomPermissions = check.object({ expectedRevision: revision, expectedGeneration: check.identifier, permissions: check.list(check.choice('room.agent.invite'), 1) });
-export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean, controllerBound: check.boolean });
+export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean, controllerBound: check.boolean, statistics: check.nullable(statisticsBatch) });
 export const disconnection = check.object({ expectedRevision: revision, runIds: check.list(check.identifier, 100, 1) });
 export const wakeNotice = check.object({ roomId: check.roomId });
 export const principalResolution = check.object({ matrixUserIds: check.refine(check.list(check.matrixUserId, 100, 1),
@@ -32,6 +33,7 @@ export const planPreview = check.object({ plan });
 export const planChange = check.object({ plan, digest: check.text(64, 64), snapshots: check.list(check.object({ agentId: check.identifier, revision,
   grants: check.list(check.object({ roomId: check.roomId, generation: check.identifier, revision }), 100) }), 100, 1) });
 export const policy = check.object({ expectedRevision: revision, maxOwnerAgents: check.integer(1, 100), maxAgents: check.integer(1, 1000), maxPending: check.integer(1, 1000),
+  maxMessageBytes: check.integer(4096, 4194304),
   enrollmentSeconds: check.integer(60, 3600), reconcileSeconds: check.integer(30, 3600), agentInstructions: check.multiline,
   signupMode: check.choice('invitation', 'open'), invitationIssuers: check.choice('administrators', 'members') });
 

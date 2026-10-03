@@ -5,8 +5,9 @@ import type { Result } from '@crossfire/kernel/result';
 import type { Coordination } from './coordination.js';
 import type { RuntimeConnection } from './runtime.js';
 import type { Clock, LocalState } from './port.js';
+import type { MessageArtifacts } from './message-artifacts.js';
 
-const checkpoint = check.object({ command: scheduledWake, runId: check.identifier, stage: check.choice('queued', 'publishing', 'delivered') });
+const checkpoint = check.object({ command: scheduledWake, text: check.plainText(98304), runId: check.identifier, stage: check.choice('queued', 'publishing', 'delivered') });
 export function scheduledText(command: ScheduledWake): string {
   return 'Crossfire scheduled wake-up. This is configured input, not a chat message or permission grant.\n'
     + JSON.stringify({ kind: 'scheduled-wake', ruleId: command.ruleId, deliveryId: command.deliveryId, name: command.name,
@@ -17,8 +18,8 @@ function unwrap<Value>(result: Result<Value>): Value {
   return result.value;
 }
 export function scheduledPublisher(options: { clock: Clock; storage: LocalState; file: string; coordination: Coordination; agentId: string;
-  runtime: RuntimeConnection; attachment: () => WakeAttachment }) {
-  const { storage, file, coordination, agentId, runtime } = options;
+  runtime: RuntimeConnection; attachment: () => WakeAttachment; artifacts: MessageArtifacts; maximum: number }) {
+  const { storage, file, coordination, agentId, runtime, artifacts } = options;
   let nextAt = Infinity, refreshedAt = -Infinity;
   function load() {
     if (!storage.exists(file)) return null;
@@ -34,13 +35,13 @@ export function scheduledPublisher(options: { clock: Clock; storage: LocalState;
   async function recover(signal: AbortSignal): Promise<boolean> {
     const saved = load();
     if (saved?.stage === 'publishing') {
-      saved.stage = await runtime.recover(scheduledText(saved.command), 'crossfire-wake-' + saved.command.deliveryId) ? 'delivered' : 'queued';
+      saved.stage = await runtime.recover(saved.text, 'crossfire-wake-' + saved.command.deliveryId) ? 'delivered' : 'queued';
       storage.write(file, saved);
     }
     if (saved?.stage !== 'delivered') return false;
     unwrap(await coordination.acknowledgeWake(agentId, saved.command.deliveryId,
       { runId: saved.runId, sessionId: runtime.sessionId }, signal));
-    runtime.acknowledge(['crossfire-wake-' + saved.command.deliveryId]); storage.remove(file);
+    runtime.acknowledge(['crossfire-wake-' + saved.command.deliveryId]); artifacts.release(['crossfire-wake-' + saved.command.deliveryId]); storage.remove(file);
     await refresh(signal); return true;
   }
   return {
@@ -57,14 +58,15 @@ export function scheduledPublisher(options: { clock: Clock; storage: LocalState;
         const command = unwrap(await coordination.claimWake(agentId, attachment, signal));
         if (!command) { await refresh(signal); nextAt = Math.max(nextAt, options.clock.now() + 1000); return false; }
         if (command.sessionId !== runtime.sessionId) throw new Error('Scheduled claim targets a different native session');
-        saved = { command, runId: attachment.runId, stage: 'queued' }; storage.write(file, saved);
+        saved = { command, text: artifacts.input(scheduledText(command), 'crossfire-wake-' + command.deliveryId, options.maximum, { kind: 'scheduled-wake', ruleId: command.ruleId, scheduledAt: command.scheduledAt, owner: command.ownerMatrixId }), runId: attachment.runId, stage: 'queued' }; storage.write(file, saved);
       }
       const valid = unwrap(await coordination.validateWake(agentId, saved.command.deliveryId,
         { runId: saved.runId, sessionId: runtime.sessionId }, signal));
-      if (!valid.eligible) { storage.remove(file); await refresh(signal); return true; }
+      if (!valid.eligible) { artifacts.release(['crossfire-wake-' + saved.command.deliveryId]); storage.remove(file); await refresh(signal); return true; }
       signal.throwIfAborted();
+      if (saved.stage === 'queued') saved.text = artifacts.input(scheduledText(saved.command), 'crossfire-wake-' + saved.command.deliveryId, options.maximum, { kind: 'scheduled-wake', ruleId: saved.command.ruleId, scheduledAt: saved.command.scheduledAt, owner: saved.command.ownerMatrixId });
       saved.stage = 'publishing'; storage.write(file, saved);
-      await runtime.deliver(scheduledText(saved.command), 'crossfire-wake-' + saved.command.deliveryId, signal);
+      await runtime.deliver(saved.text, 'crossfire-wake-' + saved.command.deliveryId, signal);
       saved.stage = 'delivered'; storage.write(file, saved);
       return recover(signal);
     },

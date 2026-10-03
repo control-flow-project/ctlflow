@@ -28,6 +28,7 @@ export function agentRoutes() {
       status: value.record.principal.status, ownerStatus: value.record.owner.status, ownerConversation: value.ownerConversation,
       roomGrants: value.grants.map(grant => ({ roomId: grant.roomId, accessMode: grant.accessMode, powerLevel: grant.powerLevel, muted: grant.muted })),
       wakeMode: value.wake.mode, senderMatrixIds: value.wake.senders,
+      maxMessageBytes: value.maxMessageBytes,
     }))),
     bind(operations.listenerRuns, (context, params, query) => paged(readListenerRuns(context.services, actor(context), params.agentId, query), view.listenerRun)),
     bind(operations.reportListener, (context, params, _query, input) => reply(reportListener(context.services, actor(context), params.agentId, params.runId, input, context.manifest.release))),

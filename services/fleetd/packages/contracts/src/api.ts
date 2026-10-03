@@ -12,9 +12,9 @@ export const fleetView = check.object({ fleetId: check.identifier, fleetKey: che
   phase, instances: check.list(instanceView, 100), error: check.nullable(check.text(4096)),
   connection: check.object({ connected: check.boolean, deliveryEnabled: check.boolean, revision: check.nullable(check.integer()), error: check.nullable(check.text(4096)) }) });
 export const target = check.object({ kind: check.choice('fleet', 'agent', 'daemon'), fleetId: check.optional(check.identifier), instanceKey: check.optional(check.name) });
-export const operationInput = check.object({ operationId: check.identifier, target, action: check.choice('start', 'stop'), expectedRevision: check.integer() });
+export const operationInput = check.object({ operationId: check.identifier, target, action: check.choice('start', 'stop', 'reset'), expectedRevision: check.integer() });
 export const operationView = check.object({ ...{
-  operationId: check.identifier, target, action: check.choice('start', 'stop'), expectedRevision: check.integer(),
+  operationId: check.identifier, target, action: check.choice('start', 'stop', 'reset'), expectedRevision: check.integer(),
 }, status: check.choice('accepted', 'running', 'awaiting-approval', 'succeeded', 'failed'), createdAt: check.integer(), completedAt: check.nullable(check.integer()),
   approval: check.nullable(check.object({ url: check.text(2048), code: check.text(12, 12) })), errors: check.list(check.object({ instanceKey: check.nullable(check.name), code: check.text(100), message: check.text(4096) }), 100) });
 export type FleetView = check.Parsed<typeof fleetView>;

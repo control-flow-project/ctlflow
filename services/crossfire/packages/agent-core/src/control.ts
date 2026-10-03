@@ -3,7 +3,6 @@ import { API, segment } from '@crossfire/contracts/matrix';
 import type { Matrix } from './port.js';
 import type { Settings, Account, Event } from '@crossfire/contracts/client';
 import { eventView, incrementalEvents, type ReceivedEvent, type Sync } from './receive.js';
-import { MAX_JSON_BYTES } from '@crossfire/contracts/limits';
 import { createHash } from 'node:crypto';
 import { LISTENER_NOTICE } from '@crossfire/contracts/notices';
 import type { Coordination } from './coordination.js';
@@ -33,23 +32,19 @@ export function loadControl(storage: LocalState, path: string, thread: string): 
   return state;
 }
 
-export async function humanEvents(client: Matrix, settings: Settings, sync: Sync, since: string | undefined,
-  selector?: string): Promise<ReceivedEvent[]> {
-  if (!since) return [];
-  const result: ReceivedEvent[] = [];
+export async function* humanEvents(client: Matrix, settings: Settings, sync: Sync, since: string | undefined,
+  selector?: string): AsyncGenerator<ReceivedEvent> {
+  if (!since) return;
   for (const [room, data] of Object.entries(sync.rooms?.join ?? {})) {
     if (selector && selector !== room) continue;
     const timeline = data.timeline;
     if (!timeline) continue;
-    const events = await incrementalEvents(client, sync, since, room, { types: ['m.room.message'], senders: [settings.owner] });
-    for (const event of events) {
+    for await (const event of incrementalEvents(client, sync, since, room, { types: ['m.room.message'], senders: [settings.owner] })) {
       if (event.sender !== settings.owner || event.content.msgtype !== 'm.text'
         || typeof event.content.body !== 'string' || event.content['m.new_content']) continue;
-      result.push(eventView(event, room));
-      if (result.length > 1000 || Buffer.byteLength(JSON.stringify(result)) > MAX_JSON_BYTES) throw new Error('Human-control acquisition budget exceeded');
+      yield eventView(event, room);
     }
   }
-  return result.sort((left, right) => (left.timestamp ?? '').localeCompare(right.timestamp ?? ''));
 }
 
 export async function isControl(client: Matrix, settings: Settings, account: Account, event: ReceivedEvent): Promise<boolean> {

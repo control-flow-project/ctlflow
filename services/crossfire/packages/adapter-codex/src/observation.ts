@@ -1,5 +1,6 @@
 import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
 import type { NativeEvent } from './protocol.js';
+import { codexUsage } from './usage.js';
 
 export function nativeObservation(hooks: RuntimeHooks, session: () => string) {
   const streamed = new Map<string, string>();
@@ -26,6 +27,8 @@ export function nativeObservation(hooks: RuntimeHooks, session: () => string) {
     event(event: NativeEvent): void {
       const params = event.params;
       if (params.threadId !== session()) return;
+      const usage = codexUsage(event, session());
+      if (usage) hooks.usage?.(usage);
       if (event.method === 'thread/status/changed') {
         const native = params.status && typeof params.status === 'object' ? params.status as Record<string, unknown> : {};
         const flags = Array.isArray(native.activeFlags) ? native.activeFlags : [];

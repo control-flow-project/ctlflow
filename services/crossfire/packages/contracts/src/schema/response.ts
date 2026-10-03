@@ -45,6 +45,7 @@ export const grantView = check.object({ agentId: check.identifier, revision: che
 export const deliveryGrant = check.object({ roomId: check.roomId, accessMode: check.choice('read', 'reply', 'custom'),
   powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
 export const deliveryPolicy = check.refine(check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, ownerMatrixId: check.matrixUserId,
+  maxMessageBytes: check.integer(4096, 4194304),
   status: check.status, ownerStatus: check.status, ownerConversation: check.nullable(check.roomId), roomGrants: check.list(deliveryGrant, 101), wakeMode: check.wakeMode,
   senderMatrixIds: check.list(check.matrixUserId, 2000) }), policy =>
   new Set(policy.senderMatrixIds).size === policy.senderMatrixIds.length && !policy.senderMatrixIds.includes(policy.matrixUserId)
@@ -81,6 +82,7 @@ export const invitation = check.object({ invitationId: check.identifier, created
   createdAt: check.integer(), expiresAt: check.integer(), consumedByMemberId: check.nullable(check.identifier), revokedAt: check.nullable(check.integer()) });
 export const invitationCreated = check.object({ invitationId: check.identifier, claimSecret: check.secret, expiresAt: check.integer(), signupUrl: check.text(2048) });
 export const policy = check.object({ revision: check.integer(), maxOwnerAgents: check.integer(1, 100), maxAgents: check.integer(1, 1000),
+  maxMessageBytes: check.integer(4096, 4194304),
   maxPending: check.integer(1, 1000), enrollmentSeconds: check.integer(60, 3600), reconcileSeconds: check.integer(30, 3600), agentInstructions: check.multiline,
   signupMode: check.choice('invitation', 'open'), invitationIssuers: check.choice('administrators', 'members') });
 export const audit = check.object({ auditId: check.identifier, requestId: check.identifier, actorCredentialId: check.nullable(check.identifier), actorKind: check.choice('human', 'agent', 'controller', 'system', 'anonymous'),
@@ -90,7 +92,7 @@ export const audit = check.object({ auditId: check.identifier, requestId: check.
   addedById: check.nullable(check.identifier), permissionCode: check.nullable(check.text(100)), action: check.text(100),
   outcome: check.text(100), message: check.text(4096, 0), createdAt: check.integer() });
 export const acknowledged = check.object({ accepted: check.boolean });
-export const report = check.object({ disconnect: check.boolean, currentRelease: check.text(200) });
+export const report = check.object({ disconnect: check.boolean, currentRelease: check.text(200), statisticsAccepted: check.boolean });
 export const notice = check.object({ outcome: check.choice('pending', 'sent', 'denied', 'not-applicable', 'not-permitted', 'rate-limited') });
 export type AgentView = Parsed<typeof agent>;
 export type PrincipalIdentity = Parsed<typeof principalIdentity>;

@@ -9,6 +9,11 @@ import * as check from '@crossfire/contracts/schema/validation';
 
 function counts(database: Database.Database) {
   return {
+    listener_stat_checkpoint: () => executeSelect(database, schema, query => query.from('listener_stat_checkpoint').count()),
+    listener_stat_interval: () => executeSelect(database, schema, query => query.from('listener_stat_interval').count()),
+    listener_stat_flow: () => executeSelect(database, schema, query => query.from('listener_stat_flow').count()),
+    listener_stat_usage: () => executeSelect(database, schema, query => query.from('listener_stat_usage').count()),
+    runtime_usage_checkpoint: () => executeSelect(database, schema, query => query.from('runtime_usage_checkpoint').count()),
     principal: () => executeSelect(database, schema, query => query.from('principal').count()),
     member: () => executeSelect(database, schema, query => query.from('member').count()),
     agent: () => executeSelect(database, schema, query => query.from('agent').count()),

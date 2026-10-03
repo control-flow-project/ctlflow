@@ -15,6 +15,7 @@ export function failureReporter(directory: string, binding: Binding, signal: Abo
   const loaded = check.list(failureReport, 4096)(existsSync(file) ? readJson<unknown>(file, 32 * 1024 * 1024) : []);
   if (!loaded.ok) throw new Error(loaded.error.message);
   const reports = loaded.value;
+  const episodes = new Set(reports.map(report => report.agentId));
   let errorMessage: string | null = null;
   const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
   const client = createClient({ origin: binding.server, token: binding.controllerCredential!, signal: lifetime, timeoutMs: 5000 });
@@ -35,12 +36,15 @@ export function failureReporter(directory: string, binding: Binding, signal: Abo
   })().catch(error => { if (!lifetime.aborted) errorMessage = error instanceof Error ? error.message : 'Failure reporter unavailable'; });
   return {
     error: () => errorMessage,
+    recovered(agentId: string) { episodes.delete(agentId); },
     record(agentId: string, sessionId: string | null, error: unknown) {
+      if (episodes.has(agentId)) return success(undefined);
       const report = failureReport({ episodeId: randomUUID(), agentId, sessionId,
         message: (error instanceof Error ? error.message : 'Runtime or listener ended unexpectedly').slice(0, 4000) });
       if (!report.ok) return report;
       if (reports.length >= 4096) { errorMessage = 'Resolve queued failure reports before starting further native work'; return failure('limit', errorMessage); }
       reports.push(report.value);
+      episodes.add(agentId);
       try { save(); return success(undefined); }
       catch (error) { errorMessage = error instanceof Error ? error.message : 'Cannot persist the failure report'; return failure('unavailable', errorMessage); }
     },

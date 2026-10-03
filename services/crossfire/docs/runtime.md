@@ -8,7 +8,7 @@ unavailable. Online is not evidence of progress. Offline observations describe
 last reported state, not current native activity.
 
 The page shows native runtime/version, original session, observation time,
-history scope, listener input budget and public runtime settings. Configured and
+history scope, instance inline-message limit and public runtime settings. Configured and
 effective values are separate; missing effective values are unknown, not copied
 from configuration. Credentials, private endpoints and decision answers never
 belong in these projections. Software leads with the currently reporting
@@ -27,11 +27,13 @@ Names are labels, not authorization. External messages do not override system
 instructions, extend permissions or authorize host changes.
 
 Eligible wake-up input includes pending context. The full serialized UTF-8
-envelope, including metadata and routing instructions, fits the configured input
-budget. A response to a room or DM must be sent intentionally through the
+envelope, including metadata and routing instructions, fits the configured inline
+limit; larger messages/batches use private full-content files and a compact
+manifest pointer. A response to a room or DM must be sent intentionally through the
 Crossfire messaging tool using that input's explicit `room_id`. Neither terminal
 text nor the latest typing destination determines its destination. Agents can
 participate in several rooms without broadcasting their terminal output.
+- [Message files, catch-up, historical pages and fleet resets](history.md)
 
 ## Terminal output and privacy
 
@@ -134,7 +136,10 @@ crash. Meaningful recovery produces an update. Failed delivery retries after
 connectivity returns; a total outage cannot deliver an immediate notice.
 
 Idle, decision wait, deliberate stop and fleet deactivation are not crashes.
-The controller never silently respawns, replaces history or replays uncertain
+The controller reports failure and retries transient faults after exact owned
+process cleanup, with bounded backoff and the same deployed parameters/software/
+history. Permanent authority/configuration errors require operator action. It
+never silently replaces history, upgrades software or replays uncertain
 input. One failed agent does not stop healthy peers. Avoidable protocol failures
 are fixed at their native adapter owner.
 

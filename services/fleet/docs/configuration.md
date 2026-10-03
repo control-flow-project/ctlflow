@@ -17,7 +17,7 @@ research/
 
 A definition owns native settings/instructions. Instances share a definition,
 not mutable sessions or work areas. Different native settings require different
-definitions; listener history/input settings belong to each roster instance.
+definitions; listener history settings belong to each roster instance.
 Private `.fleet`, `.codex` and `.crossfire` state holds registry bindings,
 provider credentials, session history and delivery positions. Never commit it.
 
@@ -39,7 +39,6 @@ workarea = "agents/analyst/workarea/analyst-east"
 
 [instances.listener_options]
 history_mode = "shared"
-max_input_bytes = 100000
 
 [[instances]]
 key = "analyst-west"
@@ -49,7 +48,6 @@ workarea = "agents/analyst/workarea/analyst-west"
 
 [instances.listener_options]
 history_mode = "per-room"
-max_input_bytes = 100000
 ```
 
 Keys/names start with a lowercase letter, contain lowercase letters, digits or
@@ -66,14 +64,13 @@ on first owner contact, terminal output or native decision, not at fleet startup
 | Field | Accepted values | When omitted |
 | --- | --- | --- |
 | `history_mode` | `shared`, `per-room` | `shared` |
-| `max_input_bytes` | Integer 1024 through 4194304 | 100000 |
 
-The input budget counts the entire serialized UTF-8 message, including origin
-and verified sender metadata. Pending messages are delivered together when they
-fit; larger batches split at this bound without losing cursors or receipts. A
-single event that cannot fit fails explicitly without acknowledging it. Ordinary
-native tool/file output uses separate protocol and owner-output budgets, not
-this incoming limit or an approval-display limit.
+Crossfire instance policy owns the incoming inline-message threshold, default
+65536 UTF-8 bytes, including origin and verified sender metadata. It applies to
+every agent and is not a roster override. Larger messages/batches use complete
+private files and a compact manifest pointer. Ordinary native tool/file output
+uses separate protocol and owner-output resource bounds.
+- [Message files, catch-up and reset](../../crossfire/docs/history.md)
 
 Shared history preserves context across all rooms, DMs and private operator
 input. Per-room history retains one exact native conversation per room ID and a
@@ -84,7 +81,7 @@ terminal output still goes privately to the owner. This is not a security sandbo
 Directly attached agents always retain their one native history.
 
 Listener changes apply on stopped-to-running transition. A pending publication
-must finish receipt recovery before its budget/history configuration changes.
+must finish receipt recovery before its history configuration changes.
 History-mode changes preserve old sessions/cursors without copying, merging,
 forking or replaying them. Pending native decisions also prevent a mode switch.
 

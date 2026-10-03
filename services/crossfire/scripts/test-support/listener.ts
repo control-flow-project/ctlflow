@@ -234,7 +234,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       if (!decision) { send(response, { error: { code: 'missing', message: 'Decision not found' }, meta: { requestId: AGENT_ID } }, 404); return; }
       decision.status = (body as { status: string }).status; decision.answers = []; api(response, { accepted: true });
     } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
-      api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, wakeMode: waking.policy,
+      api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, maxMessageBytes: 65536, wakeMode: waking.policy,
         ownerConversation: joined.has(OWNER_DM) ? OWNER_DM : null,
         senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
         roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', powerLevel: null, muted: muted.has(room) })) });
@@ -253,7 +253,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && path.endsWith('/runtime') && request.method === 'PUT') {
       api(response, { accepted: true });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && request.method === 'PUT') {
-      api(response, { disconnect: reporting.disconnect, currentRelease: reporting.current.release });
+      api(response, { statisticsAccepted: true, disconnect: reporting.disconnect, currentRelease: reporting.current.release });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
       send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
     } else if (path === API + '/account/whoami') {
@@ -338,7 +338,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
+  return { binding: 'fixture', clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
     answerDecision(id: string, optionId = '0', text: string | null = null) {
       const decision = decisions.get(id)!; decision.status = 'answered';
       decision.answers = decision.questions.map(question => ({ questionId: question.id, optionId: text === null ? optionId : null, text }));

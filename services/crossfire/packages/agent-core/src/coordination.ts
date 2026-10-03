@@ -3,6 +3,7 @@ import type { Manifest } from '@crossfire/contracts/release';
 import type { Result } from '@crossfire/kernel/result';
 import type { WakeAttachment, ScheduledWake } from '@crossfire/contracts/wake-up';
 import type { DecisionCreation, DecisionView, DecisionAnswer, RuntimeObservation } from '@crossfire/contracts/runtime';
+import type { StatisticsBatch } from '@crossfire/contracts/statistics';
 
 export type Coordination = {
   origin: string;
@@ -15,7 +16,7 @@ export type Coordination = {
   ownerConversation(agentId: string, signal?: AbortSignal): Promise<Result<{ roomId: string }>>;
   acceptInvitation(agentId: string, roomId: string, signal?: AbortSignal): Promise<Result<{ accepted: boolean }>>;
   identities(matrixUserIds: readonly string[], signal?: AbortSignal): Promise<Result<PrincipalIdentity[]>>;
-  report(agentId: string, runId: string, input: { release: string; messagesDelivered: number; stopped: boolean; controllerBound: boolean }, signal?: AbortSignal): Promise<Result<{ disconnect: boolean; currentRelease: string }>>;
+  report(agentId: string, runId: string, input: { release: string; messagesDelivered: number; stopped: boolean; controllerBound: boolean; statistics: StatisticsBatch | null }, signal?: AbortSignal): Promise<Result<{ disconnect: boolean; currentRelease: string; statisticsAccepted: boolean }>>;
   notice(agentId: string, roomId: string, eventId: string, signal?: AbortSignal): Promise<Result<{ outcome: string }>>;
   wakeMetadata(agentId: string, attachment: WakeAttachment, signal?: AbortSignal): Promise<Result<{ now: number; nextDueAt: number | null }>>;
   claimWake(agentId: string, attachment: WakeAttachment, signal?: AbortSignal): Promise<Result<ScheduledWake | null>>;

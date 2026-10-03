@@ -91,7 +91,7 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
   }
   const stopped = () => { void clearTyping(); };
   stop.addEventListener('abort', stopped, { once: true });
-  return { observe, delivered,
+  return { observe, delivered, busy: () => [...active.values()].some(value => value),
     start(id: string): void {
       if (runId !== id) {
         for (const value of latest.values()) if (!journal.observations.some(pending => pending.sessionId === value.sessionId && pending.observedAt === value.observedAt)) journal.observations.push(value);

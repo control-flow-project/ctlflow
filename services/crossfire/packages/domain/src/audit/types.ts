@@ -6,6 +6,7 @@ export type InstancePolicy = {
   maxPending: number;
   enrollmentSeconds: number;
   reconcileSeconds: number;
+  maxMessageBytes: number;
   agentInstructions: string;
   signupMode: 'invitation' | 'open';
   invitationIssuers: 'administrators' | 'members';

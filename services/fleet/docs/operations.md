@@ -50,7 +50,12 @@ heartbeats. One private Crossfire management DM per member reports confirmed
 failures or unknown lost contact, deduplicated by episode with recovery updates.
 Controller failures persist in `.fleet/failures.json` until the scoped report is
 accepted. A reporting failure is visible in controller status; it does not
-silently discard the original failure or restart native execution.
+silently discard the original failure. The controller closes the exact failed
+generation and retries transient failures with one-to-sixty-second exponential
+backoff, preserving deployed parameters, installed software, identity and native
+history. Explicit stop cancels recovery. Permanent configuration/authorization
+errors and failed cleanup require operator action. Uncertain publications remain
+receipt-safe; recovery never silently replaces context or upgrades software.
 - [Runtime observation, privacy and decisions](../../crossfire/docs/runtime.md)
 
 Normal stop ends owned listeners and Codex engines. The product does not supervise
