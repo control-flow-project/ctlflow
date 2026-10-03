@@ -4,7 +4,7 @@ import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { API } from '@crossfire/contracts/matrix';
 import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
 import { listen, type ListenerOptions } from '@crossfire/adapter-crossfire/listener';
@@ -28,20 +28,26 @@ function content(native: Awaited<ReturnType<typeof fakeCodex>>) {
     const input = request.params!.input as { text: string }[];
     assert.equal(input.length, 1);
     const text = input[0]!.text;
-    assert(Buffer.byteLength(text) <= 100000);
-    return (JSON.parse(text.slice(text.indexOf('\n') + 1)) as { events: ReceivedEvent[] }).events;
+    assert(Buffer.byteLength(text) <= 65536);
+    const data = JSON.parse(text.slice(text.indexOf('\n') + 1)) as { kind?: string; manifest?: string; events: ReceivedEvent[] };
+    if (data.kind !== 'crossfire-message-files') return data.events;
+    assert(data.manifest);
+    const manifest = JSON.parse(readFileSync(data.manifest, 'utf8')) as { messages: (ReceivedEvent & { file: string; payload?: string })[] };
+    return manifest.messages.map(entry => entry.payload === 'content'
+      ? { ...entry, content: JSON.parse(readFileSync(entry.file, 'utf8')) } as ReceivedEvent
+      : JSON.parse(readFileSync(entry.file, 'utf8')) as ReceivedEvent);
   });
 }
 
 async function fixture(context: TestContext, clock: ReturnType<typeof testClock>,
-  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room' | 'maximumBytes'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner',
+  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner',
   prepare?: (matrix: Awaited<ReturnType<typeof matrixFixture>>) => void) {
   const native = await fakeCodex(context);
   const matrix = await matrixFixture(context, native.directory, clock);
   matrix.waking.policy = initialAuthority; matrix.waking.senders = initialAuthority === 'nobody' ? [] : [OBSERVER];
   prepare?.(matrix);
   const stop = new AbortController();
-  const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 120,
+  const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 120,
     ...controls, runtime: native.runtime };
   let failure: unknown;
   const result = listen(options, stop.signal).catch((error: unknown) => { failure = error; return error; });
@@ -69,7 +75,7 @@ test('five waiting messages and an owner burst reach the model together without 
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)),
     [[...Array.from({ length: 5 }, (_, index) => '$waiting-' + index), '$wake', '$during-window']]);
   assert(matrix.requests.filter(request => request.path === `${API}/rooms/${ROOM}/messages` && !request.query.has('filter'))
-    .every(request => Number(request.query.get('limit')) <= 2));
+    .every(request => Number(request.query.get('limit')) <= 100));
 }));
 
 test('all automatic wake policies use exact allowed identities, never self or names inside content', async context => {
@@ -147,14 +153,15 @@ test('selecting nobody during collection cancels an owner wake and preserves the
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$peer', '$owner']]);
 }));
 
-test('a wake beyond 125 pending messages releases one input even with two-event native pages and missed notifications', withClock(async (context, clock) => {
+test('a wake beyond 125 pending messages releases bounded fair batches despite missed notifications', withClock(async (context, clock) => {
 
   const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 });
   matrix.syncUpdates.enabled = false;
   matrix.add(ROOM, ...Array.from({ length: 125 }, (_, index) => message('$backlog-' + index)), message('$wake', OBSERVER));
   await clock.until(() => cursors()[ROOM] === '126');
+  const ids = [...Array.from({ length: 125 }, (_, index) => '$backlog-' + index), '$wake'];
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)),
-    [[...Array.from({ length: 125 }, (_, index) => '$backlog-' + index), '$wake']]);
+    [ids.slice(0, 50), ids.slice(50, 100), ids.slice(100)]);
 }));
 
 test('continuous traffic does not extend the fixed collection window or wake a second turn', withClock(async (context, clock) => {
@@ -201,7 +208,7 @@ test('an initial recent snapshot stays pinned while waiting and across listener 
   const native = await fakeCodex(context), matrix = await matrixFixture(context, native.directory, clock);
   matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
   matrix.add(ROOM, ...Array.from({ length: 5 }, (_, index) => message('$initial-' + index)));
-  const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 5, pollMs: 100, debounceMs: 0, runtime: native.runtime };
+  const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 0, runtime: native.runtime };
   const first = new AbortController();
   const firstResult = listen(options, first.signal).catch((error: unknown) => error);
   cleanup(context, async () => { first.abort(); await clock.complete(firstResult); });
@@ -219,7 +226,7 @@ test('an initial recent snapshot stays pinned while waiting and across listener 
 
 test('membership reset retires an initial snapshot and resumes delivery from the current membership', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0, limit: 2 }, 'owner', matrix => {
+  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, 'owner', matrix => {
     matrix.add(ROOM, message('$old-context'));
   });
   assert(existsSync(matrix.cursorFile + '.snapshot'));
@@ -235,7 +242,7 @@ test('membership reset retires an initial snapshot and resumes delivery from the
 
 test('a newly granted room can wake the listener without replacing another room’s pinned context', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0, limit: 2 }, 'owner', matrix => {
+  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, 'owner', matrix => {
     matrix.add(ROOM, message('$pinned-first'), message('$pinned-second'));
   });
   assert(existsSync(matrix.cursorFile + '.snapshot'));
@@ -276,14 +283,14 @@ test('bulk delivery advances only after its exact receipt and later unauthorized
   await clock.advance(200); assert.equal(submissions(native).length, 1); assert.equal(cursors()[ROOM], '2');
 }));
 
-test('only the byte ceiling splits large context and remaining chunks do not require more wake messages or windows', withClock(async (context, clock) => {
+test('large aggregate context reaches the model once through private files without truncation', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 100, maximumBytes: 64 * 1024 });
+  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 100 });
   matrix.add(ROOM, ...Array.from({ length: 5 }, (_, index) => message('$large-' + index, PEER, 'x'.repeat(45_000))), message('$wake', OBSERVER));
   const started = clock.now();
   await clock.until(() => cursors()[ROOM] === '6');
   assert(clock.now() - started < 1500);
-  assert.equal(content(native).length, 5);
+  assert.equal(content(native).length, 1);
   assert.deepEqual(content(native).flat().map(event => event.event_id),
     [...Array.from({ length: 5 }, (_, index) => '$large-' + index), '$wake']);
 }));
@@ -303,9 +310,9 @@ test('restricting authority during collection cancels the peer wake without losi
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$peer', '$owner']]);
 }));
 
-test('a saved wake drains remaining byte-sized context after restart without replaying its already received owner message', withClock(async (context, clock) => {
+test('a saved wake drains remaining record-bounded context after restart without replaying its owner message', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors, stop, options, result } = await fixture(context, clock, { debounceMs: 0, maximumBytes: 64 * 1024 });
+  const { native, matrix, cursors, stop, options, result } = await fixture(context, clock, { debounceMs: 0, limit: 1, room: ROOM });
   const barrier = matrix.hold(`${API}/rooms/${ROOM}/read_markers`);
   matrix.add(ROOM, message('$owner', OBSERVER, 'o'.repeat(40_000)), message('$peer', PEER, 'p'.repeat(40_000)));
   await clock.until(() => barrier.entered() && cursors()[ROOM] === '1');

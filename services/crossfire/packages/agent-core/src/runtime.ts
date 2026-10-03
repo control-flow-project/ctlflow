@@ -1,6 +1,7 @@
 import type { Json } from '@crossfire/contracts/json';
 import type { Result } from '@crossfire/kernel/result';
 import type { DecisionCreation, RuntimeObservation } from '@crossfire/contracts/runtime';
+import type { UsageSample } from '@crossfire/contracts/statistics';
 
 export type RuntimeApproval = 'none' | 'runtime' | 'listener';
 
@@ -42,6 +43,7 @@ export type RuntimeObservationEvent = { kind: 'output'; sessionId: string; id: s
   | { kind: 'state'; observation: Omit<RuntimeObservation, 'historyMode' | 'maxInputBytes'> };
 
 export type RuntimeHooks = {
+  usage?: (sample: UsageSample) => void;
   requestDecision: (permission: RuntimeDecision, signal: AbortSignal) => Promise<Result<Json>>;
   decisionResponded?: (decision: RuntimeDecision) => void;
   pendingDecisions?: () => boolean;

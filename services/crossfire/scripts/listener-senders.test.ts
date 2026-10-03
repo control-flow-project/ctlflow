@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, existsSync } from 'node:fs';
 import { chatBatches } from '@crossfire/agent-core/chat-batches';
+import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
+import { localState } from '@crossfire/adapter-filesystem/state';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { eventView } from '@crossfire/agent-core/receive';
 import { deliveryEvents, resolveSenders } from '@crossfire/agent-core/senders';
@@ -17,7 +19,8 @@ test('delivery batches carry one verified entry per emitted sender, with exact b
   const events = [message('$self', SELF), message('$owner', OBSERVER), message('$peer', peer), message('$foreign', foreign),
     message('$unknown', unknown), message('$again', peer)].map(event => eventView(event, ROOM));
   const identities = await resolveSenders(fixture.coordination, events.slice(1), new AbortController().signal);
-  const batches = chatBatches(deliveryEvents(events, SELF), fixture.settings, identities);
+  const artifacts = messageArtifacts(localState, fixture.cursorFile + '.messages', Date.now);
+  const batches = chatBatches(deliveryEvents(events, SELF), fixture.settings, identities, 65536, 'shared', artifacts);
   assert.equal(batches.length, 1);
   const data = JSON.parse(batches[0]!.text.split('\n').slice(1).join('\n'));
   assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' },
@@ -27,14 +30,16 @@ test('delivery batches carry one verified entry per emitted sender, with exact b
   assert.deepEqual(data.events.map((event: { event_id: string }) => event.event_id), ['$owner', '$peer', '$foreign', '$unknown', '$again']);
   assert.equal(fixture.requests.filter(request => request.path === '/api/principal-resolutions').length, 1);
   const large = Array.from({ length: 3 }, (_, index) => eventView(message('$large-' + index, index === 0 ? OBSERVER : peer, 'x'.repeat(500)), ROOM));
-  const divided = chatBatches(large, fixture.settings, identities, 2200);
-  assert(divided.length > 1);
+  const divided = chatBatches(large, fixture.settings, identities, 2200, 'shared', artifacts);
+  assert.equal(divided.length, 1);
   for (const batch of divided) {
     assert(Buffer.byteLength(batch.text) <= 2200);
-    const value = JSON.parse(batch.text.split('\n').slice(1).join('\n'));
+    const pointer = JSON.parse(batch.text.split('\n').slice(1).join('\n'));
+    const manifest = JSON.parse(readFileSync(pointer.manifest, 'utf8'));
+    const value = { ...manifest.metadata, events: manifest.messages.map((entry: { file: string }) => JSON.parse(readFileSync(entry.file, 'utf8'))) };
     assert.deepEqual(Object.keys(value.senders).sort(), [...new Set(value.events.map((event: { sender: string }) => event.sender))].sort());
   }
-  assert.throws(() => chatBatches(deliveryEvents(events, SELF), fixture.settings, new Map()), /Missing verified sender identity/);
+  assert.throws(() => chatBatches(deliveryEvents(events, SELF), fixture.settings, new Map(), 65536, 'shared', artifacts), /Missing verified sender identity/);
 });
 
 test('sender resolution rejects partial, substituted, duplicate and inconsistent metadata without inferred ownership', async scope => {

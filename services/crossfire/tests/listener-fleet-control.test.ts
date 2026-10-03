@@ -4,6 +4,7 @@ import test from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createListenerControl, controlledPublisher } from '@crossfire/agent-core/listener-control';
+import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
 import type { LocalState } from '@crossfire/agent-core/port';
 import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
 import { listen } from '@crossfire/adapter-crossfire/listener';
@@ -53,23 +54,41 @@ test('controller messages bypass room wake filtering without consuming room curs
 });
 
 test('controller checkpoint retries only receipts after native acceptance and rejects session retargeting', async () => {
-  const values = new Map<string, unknown>(), submitted: string[] = [], acked: string[] = [];
+  const values = new Map<string, unknown>(), submitted: string[] = [], inputs: string[] = [], acked: string[] = [];
   const storage: LocalState = { exists: file => values.has(file), read: <Value>(file: string) => structuredClone(values.get(file)) as Value,
     write: (file, value) => { values.set(file, structuredClone(value)); }, remove: file => { values.delete(file); } };
   let fail = true;
   const binding = createListenerControl(async () => { if (fail) throw Error('Lost receipt response'); binding.update({ active: true, input: null }); });
-  binding.update({ active: true, input: { messageId: 'message', text: 'Fleet task', expiresAt: Date.now() + 10000 } });
+  const text = 'Complete fleet task. '.repeat(500);
+  binding.update({ active: true, input: { messageId: 'message', text, expiresAt: Date.now() + 10000 } });
   const runtime: RuntimeConnection = { sessionId: 'same-session', approval: 'none', signal: new AbortController().signal,
-    deliver: async (_text, id) => { submitted.push(id); }, recover: async () => false, acknowledge: ids => { acked.push(...ids); }, inspect: async () => ({ busy: false }), settle: async () => false, close: () => {} };
-  const publisher = () => controlledPublisher(storage, 'checkpoint', binding.connection, runtime);
+    deliver: async (input, id) => { submitted.push(id); inputs.push(input); }, recover: async () => false, acknowledge: ids => { acked.push(...ids); }, inspect: async () => ({ busy: false }), settle: async () => false, close: () => {} };
+  const publisher = () => controlledPublisher({ storage, file: 'checkpoint', control: binding.connection, runtime, artifacts: messageArtifacts(storage, 'messages', Date.now), maximum: 4096 });
   await assert.rejects(publisher().publish(runtime.signal), /Lost receipt/);
   assert.deepEqual(submitted, ['message']); assert.deepEqual(acked, []);
+  assert(Buffer.byteLength(inputs[0]!) <= 4096);
+  const pointer = JSON.parse(inputs[0]!.split('\n')[1]!) as { kind: string; file: string };
+  assert.equal(pointer.kind, 'crossfire-input-file'); assert.equal(storage.read<{ text: string }>(pointer.file).text, text);
   fail = false; await publisher().publish(runtime.signal);
-  assert.deepEqual(submitted, ['message']); assert.deepEqual(acked, ['message']); assert.equal(values.size, 0);
+  assert.deepEqual(submitted, ['message']); assert.deepEqual(acked, ['message']); assert(!values.has('checkpoint'));
+  assert(storage.exists(pointer.file), 'Settled input files remain available for their retention period');
   binding.update({ active: true, input: { messageId: 'expired', text: 'Expired task', expiresAt: 1 } });
   await publisher().publish(runtime.signal); assert.deepEqual(submitted, ['message']);
-  values.set('checkpoint', { sessionId: 'other-session', input: { messageId: 'x', text: 'x', expiresAt: 1 }, stage: 'publishing' });
+  values.set('checkpoint', { sessionId: 'other-session', input: { messageId: 'x', text: 'x', expiresAt: 1 }, text: 'x', stage: 'publishing' });
   await assert.rejects(publisher().publish(runtime.signal), /retargeted/);
+});
+
+test('expired controller input recovers its exact accepted receipt rather than dropping or resubmitting it', async () => {
+  const values = new Map<string, unknown>(), receipts: string[] = [], recovered: string[] = [];
+  const storage: LocalState = { exists: file => values.has(file), read: <Value>(file: string) => structuredClone(values.get(file)) as Value,
+    write: (file, value) => { values.set(file, structuredClone(value)); }, remove: file => { values.delete(file); } };
+  values.set('checkpoint', { sessionId: 'native-session', input: { messageId: 'accepted', text: 'Exact input', expiresAt: 1 }, text: 'Exact input', stage: 'publishing' });
+  const binding = createListenerControl(async (id, status) => { receipts.push(id + ':' + status); });
+  const runtime: RuntimeConnection = { sessionId: 'native-session', approval: 'none', signal: new AbortController().signal,
+    deliver: async () => { assert.fail('Receipt recovery must not submit input'); }, recover: async (text, id) => { assert.equal(text, 'Exact input'); recovered.push(id); return true; },
+    acknowledge: ids => { assert.deepEqual(ids, ['accepted']); }, inspect: async () => ({ busy: false }), settle: async () => false, close: () => {} };
+  await controlledPublisher({ storage, file: 'checkpoint', control: binding.connection, runtime, artifacts: messageArtifacts(storage, 'messages', Date.now), maximum: 4096 }).publish(runtime.signal);
+  assert.deepEqual(recovered, ['accepted']); assert.deepEqual(receipts, ['accepted:delivered']); assert(!storage.exists('checkpoint'));
 });
 
 test('direct listeners remain independent when the same agent’s fleet-bound listener is inactive', async scope => {

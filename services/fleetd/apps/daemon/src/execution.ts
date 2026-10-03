@@ -6,16 +6,19 @@ import { listen } from '@crossfire/adapter-crossfire/listener';
 import { prepareProject, paths } from '@crossfire/adapter-filesystem/project';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import { privateDir, writeJson } from '@crossfire/adapter-filesystem/index';
-import { installSoftware } from '@crossfire/adapter-crossfire/software';
+import { installSoftware, installedSoftware } from '@crossfire/adapter-crossfire/software';
 import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { createClient } from '@crossfire/adapter-crossfire/client';
 import { createFleetControlConnection, type FleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
 import { operations } from '@crossfire/contracts/rest/operations';
+import { errorCode } from '@crossfire/contracts/rest/envelope';
 import { MAX_UPLOAD_BYTES } from '@crossfire/contracts/client';
+import { isListenerStop } from '@crossfire/agent-core/lifecycle';
 import { loadBinding, saveBinding, protectFleet } from '@fleetd/storage/binding';
 import type { Execution } from '@fleetd/domain/port';
 import { prepareEnrollment } from './enrollment.js';
 import { failureReporter } from './failures.js';
+import { resetInstance, resetInstructions } from './reset.js';
 
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
   const connections = new Map<string, FleetControlConnection>();
@@ -67,14 +70,22 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       try { protectFleet(configuration.directory); return await prepareEnrollment(configuration, controller, signal, approval); }
       catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Fleet enrollment failed'); }
     },
-    async start(configuration, instance, signal) {
+    async reset(configuration, instance, resetId, signal) {
+      const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
+      const binding = loadBinding(configuration);
+      if (!binding.ok) return binding;
+      const identity = binding.value.identities.find(item => item.instanceKey === instance.key);
+      if (!identity) return failure('missing', 'Instance has no enrolled identity');
+      return adapter ? resetInstance(configuration, instance, identity.agentId, resetId, adapter, signal) : failure('invalid', 'Unsupported runtime: ' + definition.runtime);
+    },
+    async start(configuration, instance, signal, reason) {
       let release: (() => Promise<void>) | undefined, destination: OwnedRuntimeConnection | undefined;
       let done: Promise<void> | undefined;
       let bindingControl: ReturnType<FleetControlConnection['listener']> | undefined;
       let enrolledId: string | undefined, reported = false;
       const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
       const report = (error: unknown) => {
-        if (reported || !enrolledId || signal.aborted || stop.signal.aborted) return;
+        if (reported || !enrolledId || signal.aborted || stop.signal.aborted || isListenerStop(error)) return;
         reported = true;
         reporters.get(configuration.directory)?.record(enrolledId, destination?.sessionId ?? null, error);
       };
@@ -93,7 +104,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         prepareProject(workspace);
         const local = paths(workspace, instance.name);
         release = await acquireProcessLock(join(local.state, 'listener'));
-        const software = await installSoftware(local.root, binding.server);
+        const software = reason === 'recovery' ? installedSoftware(local.root) : await installSoftware(local.root, binding.server);
         const client = createClient({ origin: binding.server, token: identity.account.access_token, signal: lifetime });
         const health = await client.call(operations.health, {}, {});
         if (!health.ok) { report(new Error('Instance startup failed: ' + health.error.message)); await release(); return health; }
@@ -101,19 +112,21 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         writeJson(local.profile, { id: identity.agentId, workspace, account: identity.account, settings });
         software.activate();
         const instructions = [definition.instructions, 'Crossfire identity: ' + instance.name + '. This instance is already enrolled and its listener is managed by the fleet controller. Do not reconnect, enroll or start another listener.',
-          'Use node .crossfire/client.mjs --profile ' + instance.name + ' for intentional Matrix replies and attachments. Connection and telemetry require no model action.', readFileSync(software.skill.path, 'utf8')].join('\n\n');
+          'Use node .crossfire/client.mjs --profile ' + instance.name + ' for intentional Matrix replies and attachments. Connection and telemetry require no model action.',
+          resetInstructions(local.state), readFileSync(software.skill.path, 'utf8')].join('\n\n');
         let ready!: () => void, rejectReady!: (error: unknown) => void;
         bindingControl = connection.listener(identity.agentId);
         const readiness = new Promise<void>((resolve, reject) => { ready = resolve; rejectReady = reject; });
         done = listen({ settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
+          binding: 'fleet-' + identity.agentId,
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
-          historyMode: instance.listener_options?.history_mode ?? 'shared', ...(instance.listener_options?.max_input_bytes === undefined ? {} : { maximumBytes: instance.listener_options.max_input_bytes }),
+          historyMode: instance.listener_options?.history_mode ?? 'shared',
           ready,
           runtime: async (runtimeStop, _poll, hooks) => {
             const started = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks,
               ...(instance.listener_options ? { listenerOptions: instance.listener_options } : {}) }, runtimeStop);
-            if (!started.ok) throw new Error(started.error.message);
+            if (!started.ok) throw Object.assign(new Error(started.error.message), { code: started.error.code });
             destination = started.value; return destination;
           },
         }, lifetime).then(() => { const error = new Error('Listener ended'); rejectReady(error); stop.abort(error); }, error => {
@@ -122,12 +135,17 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         });
         await readiness;
         if (!destination) throw new Error('Runtime did not report its session');
+        reporters.get(configuration.directory)?.recovered(identity.agentId);
         let closing: Promise<void> | undefined;
         const unlock = release;
         const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; bindingControl?.close(); await destination?.close(); await unlock(); })();
         return success({ sessionId: destination.sessionId, signal: stop.signal, attachment: destination.attachment,
           attachments: destination.attachments, control: bindingControl.control, close });
-      } catch (error) { report(error); stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.(); return failure('native', error instanceof Error ? error.message : 'Instance startup failed'); }
+      } catch (error) {
+        report(error); stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.();
+        const parsed = errorCode(error && typeof error === 'object' && 'code' in error ? error.code : undefined);
+        return failure(parsed.ok ? parsed.value : 'native', error instanceof Error ? error.message : 'Instance startup failed');
+      }
     },
     async detach(configuration, instance) {
       try {

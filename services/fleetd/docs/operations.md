@@ -36,7 +36,19 @@ Unexpected startup/listener/native failures are recorded in each fleet's private
 `.fleet/failures.json` before reporting through its scoped controller credential.
 Delivery retries independently of listener activation; reporting errors remain
 visible. Crossfire owns normalized episodes and management-DM notifications.
-Deliberate stop/deactivation is not a failure; no silent respawn is attempted.
+Deliberate stop/deactivation is not a failure. Transient native/listener failures
+are recovered after exact owned-generation cleanup with exponential one-to-sixty-
+second backoff. Deployed configuration and installed software remain unchanged;
+successful peers and saved native histories remain intact. Stop cancels pending
+recovery. Failed cleanup or permanent configuration/authorization failures prevent
+unsafe restart and remain visible.
+
+An explicit `reset` operation targets one enrolled instance. It stops the owned
+process, exports and verifies all available authorized native room history and
+nonsecret configuration, archives original listener/context state and starts fresh
+history with unchanged identity/current native parameters. Durable reset phases
+and operation IDs protect interrupted preparation. Normal recovery is not reset.
+- [Context reset contract](../../crossfire/docs/history.md)
 
 ## Crossfire connection
 

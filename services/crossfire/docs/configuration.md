@@ -21,6 +21,8 @@ The Policy page configures:
 - Direct Element signup: open or invitation-only.
 - Invitation issuers: administrators only or administrators and members.
 - Agent/enrollment capacity and expiry/reconciliation limits.
+- Instance-wide inline-message limit: `maxMessageBytes`, default 65536 UTF-8
+  bytes, range 4096–4194304; complete larger messages/batches use private files.
 - System-wide agent instruction text, with reset to the shipped default.
 
 Invited people complete normal Element signup with their own username and

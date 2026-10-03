@@ -1,4 +1,4 @@
-export const INPUT_BYTES = 100000;
+export const INPUT_BYTES = 65536;
 export const MAX_INPUT_BYTES = 4 * 1024 * 1024;
 export const MAX_REVIEW_BYTES = 8 * 1024 * 1024;
 export type DecisionOption = { id: string; label: string; description: string };

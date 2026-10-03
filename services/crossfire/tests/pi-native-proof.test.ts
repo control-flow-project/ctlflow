@@ -81,7 +81,7 @@ test('installed Pi native extension confirms idle/busy inputs, exact interruptio
     schedule: { kind: 'interval' as const, seconds: 1 }, enabled: true, agentIds: [scheduledAgent.id] };
   value(createWakeRule(fixture.services, fixture.admin.actor, ruleId, configuration, randomUUID()));
   const scheduledStop = new AbortController(); let scheduleError: unknown;
-  const scheduled = listen({ coordination: createCoordination({ origin: fixture.origin, token: scheduledAgent.token }), settings: {
+  const scheduled = listen({ binding: 'fixture', coordination: createCoordination({ origin: fixture.origin, token: scheduledAgent.token }), settings: {
     instance: 'tests', homeserver: fixture.origin, server_name: 'architecture.localhost', owner: fixture.admin.member.principal.matrixUserId, max_upload_bytes: 1024 },
     account: { user_id: scheduledAgent.matrixUserId, access_token: scheduledAgent.token, device_id: 'CROSSFIRE_AGENT' }, id: scheduledAgent.id,
     release: release.manifest, cursorFile: join(directory, 'scheduled-cursor.json'), reconcileMs: 10000, pollMs: 100, debounceMs: 0, limit: 20,

@@ -14,7 +14,7 @@ test('listener activity counts cumulative receipts once and excludes offline gap
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const agent = await fixture.agent(admin.actor, 'activity'), run = randomUUID(), another = randomUUID(), release = '0.1.0-test';
   const activity = () => value(readActivity(services, [agent.id])).get(agent.id)!;
-  const beat = (runId: string, messagesDelivered: number, stopped = false) => reportListener(services, agent.actor, agent.id, runId, { release, messagesDelivered, stopped, controllerBound: false }, release);
+  const beat = (runId: string, messagesDelivered: number, stopped = false) => reportListener(services, agent.actor, agent.id, runId, { statistics: null, release, messagesDelivered, stopped, controllerBound: false }, release);
   assert.equal(activity().status, 'offline');
   value(beat(run, 2)); fixture.advance(30_000); value(beat(run, 3)); value(beat(run, 1));
   assert.equal(activity().messagesDelivered, 3); assert.equal(activity().activeMs, 30_000);
@@ -28,12 +28,12 @@ test('listener activity counts cumulative receipts once and excludes offline gap
   const fresh = randomUUID(); value(beat(fresh, 0)); assert.equal(activity().status, 'online');
   value(changeAgent(services, admin.actor, agent.id, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
   assert.equal(beat(fresh, 0).ok, false);
-  for (const input of [{}, { release, messagesDelivered: 0, stopped: false }, { release, messagesDelivered: -1, controllerBound: false, stopped: false }, { release, messagesDelivered: 1.5, controllerBound: false, stopped: false }, { release, messagesDelivered: 0, controllerBound: false, stopped: false, extra: true }]) assert.equal(heartbeat(input).ok, false);
+  for (const input of [{}, { release, messagesDelivered: 0, stopped: false }, { statistics: null, release, messagesDelivered: -1, controllerBound: false, stopped: false }, { statistics: null, release, messagesDelivered: 1.5, controllerBound: false, stopped: false }, { statistics: null, release, messagesDelivered: 0, controllerBound: false, stopped: false, extra: true }]) assert.equal(heartbeat(input).ok, false);
 });
 
 test('listener version is immutable per run and current software is mandatory on registration', async scope => {
   const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'version'), run = randomUUID();
-  const input = { release: 'old', messagesDelivered: 7, controllerBound: false, stopped: false };
+  const input = { statistics: null, release: 'old', messagesDelivered: 7, controllerBound: false, stopped: false };
   assert.equal(reportListener(fixture.services, agent.actor, agent.id, run, input, 'new').ok, false);
   value(reportListener(fixture.services, agent.actor, agent.id, run, input, 'old'));
   value(reportListener(fixture.services, agent.actor, agent.id, run, input, 'new'));
@@ -46,7 +46,7 @@ test('listener version is immutable per run and current software is mandatory on
 test('HTTP heartbeat binds native identity; disconnect requires owner/admin, revision and CSRF', async scope => {
   const fixture = await applicationFixture(scope), { request, origin, headers } = await httpFixture(scope, fixture.application);
   const owner = await fixture.member('owner'), other = await fixture.member('other'), agent = await fixture.agent(owner.actor, 'listener');
-  const run = randomUUID(), path = '/api/agents/' + agent.id, input = { release: contractRelease().manifest.release, messagesDelivered: 0, controllerBound: false, stopped: false };
+  const run = randomUUID(), path = '/api/agents/' + agent.id, input = { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 0, controllerBound: false, stopped: false };
   for (const token of ['bad', owner.token, other.token]) assert.notEqual((await request(path + '/listener-runs/' + run, 'PUT', input, { Authorization: 'Bearer ' + token })).status, 200);
   const auth = { Authorization: 'Bearer ' + agent.token };
   assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, { ...auth, Cookie: 'crossfire=' + owner.secret })).status, 400);

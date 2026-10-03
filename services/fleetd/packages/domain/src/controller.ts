@@ -1,6 +1,7 @@
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services, Running } from './port.js';
 import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
+import { isListenerStop } from '@crossfire/agent-core/lifecycle';
 import type { Configuration, Registration, FleetState, InstanceState, Operation, OperationInput, Instance } from './model.js';
 
 export function createController(services: Services) {
@@ -16,6 +17,7 @@ export function createController(services: Services) {
   const states = new Map<string, InstanceState>(), running = new Map<string, Running>();
   const active = new Map<string, { stop: AbortController; done: Promise<void> }>();
   const deployed = new Map<string, Configuration>(), mutations = new Map<string, Promise<void>>();
+  const wanted = new Set<string>(), recovering = new Map<string, { stop: AbortController; done: Promise<void> }>();
   const lifetime = new AbortController();
   const connectionErrors = new Map<string, string>();
   let stopping = false;
@@ -30,6 +32,7 @@ export function createController(services: Services) {
     if (configuration.ok) connect(configuration.value);
   }
   const key = (fleetId: string, instanceKey: string) => fleetId + ':' + instanceKey;
+  const executing = (fleetId: string) => active.has(fleetId) || [...running.keys(), ...wanted].some(value => value.startsWith(fleetId + ':'));
   function persist(next: Registration[]): Result<void> {
     const result = services.registry.saveRegistrations(next);
     if (result.ok) records = next;
@@ -39,12 +42,12 @@ export function createController(services: Services) {
     const record = records.find(item => item.fleetId === fleetId);
     if (!record) return failure('missing', 'Fleet is not registered');
     const deployedConfiguration = deployed.get(fleetId);
-    if (deployedConfiguration && (active.has(fleetId) || [...running.keys()].some(value => value.startsWith(fleetId + ':')))) return success({ record, configuration: deployedConfiguration });
+    if (deployedConfiguration && executing(fleetId)) return success({ record, configuration: deployedConfiguration });
     const configuration = services.registry.load(record.directory);
     if (!configuration.ok) return configuration;
     if (configuration.value.roster.fleet !== record.fleetKey) return failure('conflict', 'A registered fleet key cannot change');
     if (configuration.value.digest !== record.digest) {
-      if (active.has(fleetId) || [...running.keys()].some(value => value.startsWith(fleetId + ':'))) return failure('conflict', 'Fleet files changed while active; stop it before applying edits');
+      if (executing(fleetId)) return failure('conflict', 'Fleet files changed while active; stop it before applying edits');
       const next = { ...record, digest: configuration.value.digest, revision: record.revision + 1 };
       const changed = persist(records.map(item => item === record ? next : item));
       if (!changed.ok) return changed;
@@ -112,7 +115,7 @@ export function createController(services: Services) {
     const current = inspect(fleetId);
     if (!current.ok) return current;
     if (current.value.record.revision !== revision) return failure('stale_revision', 'Refresh the fleet before changing it');
-    if (active.has(fleetId) || [...running.keys()].some(value => value.startsWith(fleetId + ':'))) return failure('conflict', 'Stop this fleet before changing its registry or roster');
+    if (executing(fleetId)) return failure('conflict', 'Stop this fleet before changing its registry or roster');
     return current;
   }
   function rename(fleetId: string, revision: number, label: string): Result<FleetState> {
@@ -159,12 +162,59 @@ export function createController(services: Services) {
     operations = next;
   }
   async function stopInstance(fleetId: string, instance: Instance): Promise<void> {
-    const identity = key(fleetId, instance.key), current = running.get(identity);
+    const identity = key(fleetId, instance.key);
+    wanted.delete(identity);
+    const recovery = recovering.get(identity);
+    recovery?.stop.abort(new Error('Automatic recovery cancelled by explicit stop'));
+    await recovery?.done;
+    const current = running.get(identity);
     if (current) {
       states.set(identity, { ...states.get(identity)!, phase: 'stopping' });
       await current.close(); running.delete(identity);
     }
     states.set(identity, { instance, phase: 'stopped', sessionId: states.get(identity)?.sessionId ?? null, startedAt: null, error: null });
+  }
+  function launched(fleetId: string, configuration: Configuration, instance: Instance, runtime: Running): void {
+    const identity = key(fleetId, instance.key);
+    running.set(identity, runtime);
+    states.set(identity, { instance, phase: 'running', sessionId: runtime.sessionId, startedAt: services.now(), error: null });
+    const failed = () => {
+      if (running.get(identity) !== runtime || states.get(identity)?.phase !== 'running') return;
+      const reason: unknown = runtime.signal.reason;
+      const detail = reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : 'Listener or runtime disconnected';
+      const message = detail.replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 4096);
+      const intentional = isListenerStop(reason);
+      if (intentional) wanted.delete(identity);
+      states.set(identity, { ...states.get(identity)!, phase: intentional ? 'stopping' : 'failed', error: intentional ? null : message });
+      const stop = new AbortController(), signal = AbortSignal.any([stop.signal, lifetime.signal]);
+      const done = Promise.resolve().then(async () => {
+        try { await runtime.close(); }
+        catch (error) {
+          const cleanup = error instanceof Error ? error.message : 'Runtime cleanup failed';
+          states.set(identity, { ...states.get(identity)!, phase: 'failed', error: (message + '; cleanup: ' + cleanup).slice(0, 4096) });
+          wanted.delete(identity); return;
+        } finally { if (running.get(identity) === runtime) running.delete(identity); }
+        if (intentional) { states.set(identity, { ...states.get(identity)!, phase: 'stopped', startedAt: null, error: null }); return; }
+        if (reason && typeof reason === 'object' && 'code' in reason && ['invalid', 'unauthorized', 'forbidden', 'missing', 'conflict', 'limit', 'stale_revision', 'name_collision', 'capacity'].includes(String(reason.code))) { wanted.delete(identity); return; }
+        for (let attempt = 0; wanted.has(identity) && !signal.aborted && !stopping; attempt++) {
+          await services.delay(Math.min(60000, 1000 * 2 ** Math.min(attempt, 6)), signal);
+          if (active.has(fleetId) || mutations.has(fleetId)) continue;
+          const result = await services.execution.start(configuration, instance, signal, 'recovery');
+          if (signal.aborted || !wanted.has(identity)) { if (result.ok) await result.value.close(); return; }
+          if (!result.ok) {
+            states.set(identity, { ...states.get(identity)!, error: result.error.message });
+            if (!['native', 'unavailable'].includes(result.error.code)) { wanted.delete(identity); return; }
+            continue;
+          }
+          recovering.delete(identity);
+          launched(fleetId, configuration, instance, result.value); return;
+        }
+      }).catch(error => { if (!signal.aborted) states.set(identity, { ...states.get(identity)!, phase: 'failed', error: error instanceof Error ? error.message : 'Recovery failed' }); })
+        .finally(() => { if (recovering.get(identity)?.stop === stop) recovering.delete(identity); });
+      recovering.set(identity, { stop, done });
+    };
+    runtime.signal.addEventListener('abort', failed, { once: true });
+    if (runtime.signal.aborted) failed();
   }
   async function execute(operation: Operation, configuration: Configuration, signal: AbortSignal): Promise<void> {
     const fleetId = operation.target.fleetId!, selected = configuration.roster.instances.filter(instance => operation.target.kind !== 'agent' || instance.key === operation.target.instanceKey);
@@ -172,8 +222,16 @@ export function createController(services: Services) {
     try {
       if (operation.action === 'stop') for (const instance of selected) await stopInstance(fleetId, instance);
       else {
+        for (const instance of selected) if (recovering.has(key(fleetId, instance.key))) await stopInstance(fleetId, instance);
         const valid = services.execution.validate(configuration);
         if (!valid.ok) throw new Error(valid.error.message);
+        if (operation.action === 'reset') {
+          for (const instance of selected) {
+            await stopInstance(fleetId, instance);
+            const reset = await services.execution.reset(configuration, instance, operation.operationId, signal);
+            if (!reset.ok) { operation.errors.push({ instanceKey: instance.key, ...reset.error }); return; }
+          }
+        }
         for (const instance of selected) if (!running.has(key(fleetId, instance.key))) states.set(key(fleetId, instance.key), { instance, phase: 'starting', error: null, sessionId: null, startedAt: null });
         const prepared = await services.execution.prepare(configuration, services.controller, signal, approval => {
           operation.status = 'awaiting-approval'; operation.approval = approval; saveOperation(operation);
@@ -190,30 +248,14 @@ export function createController(services: Services) {
           if (running.has(identity)) continue;
           const collision = prepared.value.failed.find(failed => failed.instanceKey === instance.key);
           if (collision) { states.set(identity, { instance, phase: 'failed', sessionId: null, startedAt: null, error: collision.message }); continue; }
-          const result = await services.execution.start(configuration, instance, AbortSignal.any([signal, lifetime.signal]));
+          const result = await services.execution.start(configuration, instance, AbortSignal.any([signal, lifetime.signal]), 'operator');
           if (!result.ok) { operation.errors.push({ instanceKey: instance.key, ...result.error }); states.set(identity, { instance, phase: 'failed', error: result.error.message, sessionId: null, startedAt: null }); continue; }
-          running.set(identity, result.value);
-          states.set(identity, { instance, phase: 'running', sessionId: result.value.sessionId, startedAt: services.now(), error: null });
-          const failed = () => {
-            const current = states.get(identity);
-            if (current?.phase !== 'running') return;
-            const reason: unknown = result.value.signal.reason;
-            const detail = reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : '';
-            const message = detail ? detail.replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 4096) : 'Listener or runtime disconnected; inspect and explicitly restart';
-            states.set(identity, { ...current, phase: 'failed', error: message });
-            void result.value.close().then(() => running.delete(identity), error => {
-              running.delete(identity);
-              const cleanup = error instanceof Error ? error.message.replace(/[\u0000-\u001f\u007f]/gu, ' ') : 'Runtime cleanup failed';
-              states.set(identity, { ...current, phase: 'failed', error: (message + '; cleanup: ' + cleanup).slice(0, 4096) });
-            });
-          };
-          result.value.signal.addEventListener('abort', failed, { once: true });
-          if (result.value.signal.aborted) failed();
+          wanted.add(identity); launched(fleetId, configuration, instance, result.value);
         }
       }
     } catch (error) { operation.errors.push({ instanceKey: null, code: 'unavailable', message: error instanceof Error ? error.message : 'Operation failed' }); }
     finally {
-      if (signal.aborted && operation.action === 'start') for (const instance of selected) await stopInstance(fleetId, instance);
+      if (signal.aborted && operation.action !== 'stop') for (const instance of selected) await stopInstance(fleetId, instance);
       for (const instance of selected) {
         const identity = key(fleetId, instance.key), state = states.get(identity);
         if (state && ['starting', 'awaiting-approval'].includes(state.phase)) states.set(identity, { ...state, phase: 'failed', error: operation.errors[0]?.message ?? 'Start did not complete' });
@@ -240,13 +282,14 @@ export function createController(services: Services) {
       return success(operation);
     }
     if (!target.fleetId || target.kind === 'agent' && !target.instanceKey || target.kind === 'fleet' && target.instanceKey !== undefined) return failure('invalid', 'Invalid lifecycle target');
+    if (input.action === 'reset' && target.kind !== 'agent') return failure('invalid', 'Context resets target exactly one fleet-owned agent');
     if (mutations.has(target.fleetId)) return failure('conflict', 'A roster change is in progress');
     const current = inspect(target.fleetId);
     if (!current.ok) return current;
     if (current.value.record.revision !== input.expectedRevision) return failure('stale_revision', 'Refresh the fleet before starting this operation');
     if (target.kind === 'agent' && !current.value.configuration.roster.instances.some(instance => instance.key === target.instanceKey)) return failure('missing', 'Instance not found');
     if (input.action === 'start' && current.value.configuration.roster.instances.length === 0) return failure('invalid', 'Add an instance before starting this fleet');
-    if (input.action === 'start' && current.value.configuration.roster.instances.some(instance =>
+    if (input.action !== 'stop' && current.value.configuration.roster.instances.some(instance =>
       (target.kind === 'fleet' || instance.key === target.instanceKey) && running.get(key(target.fleetId!, instance.key))?.signal.aborted)) {
       return failure('conflict', 'Runtime failure cleanup is still in progress; retry after it finishes');
     }

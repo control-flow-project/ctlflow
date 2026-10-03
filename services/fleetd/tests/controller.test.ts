@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { setTimeout as delay, setImmediate as yieldLoop } from 'node:timers/promises';
+import { setImmediate as yieldLoop } from 'node:timers/promises';
 import { createController } from '@fleetd/domain/controller';
 import type { Execution } from '@fleetd/domain/port';
 import type { Operation } from '@fleetd/domain/model';
@@ -14,8 +14,13 @@ import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
 import { fleetView, instanceView } from '@fleetd/contracts/api';
 import { success, failure, type Result } from '@crossfire/kernel/result';
 import { createListenerControl } from '@crossfire/agent-core/listener-control';
+import { listenerStop } from '@crossfire/agent-core/lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
+async function until(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while (!predicate()) { assert(Date.now() < deadline, 'Controller observation deadline exceeded'); await yieldLoop(); }
+}
 function fixture(execution?: Partial<Execution>) {
   const directory = mkdtempSync(join(tmpdir(), 'fleetd-test-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
   mkdirSync(join(fleet, 'agents', 'analyst'), { recursive: true, mode: 0o700 });
@@ -25,24 +30,24 @@ function fixture(execution?: Partial<Execution>) {
   writeFileSync(join(fleet, 'runtime.toml'), 'fleet = "research"\n[coordination]\nadapter = "crossfire"\nserver = "http://127.0.0.1:8098"\nowner = "@owner:test"\n[[instances]]\nkey = "analyst"\nname = "analyst"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n', { mode: 0o600 });
   const closed: string[] = [], started: string[] = [];
   const registry = createRegistry(root), services = { registry, controller: { name: 'desktop' }, now: Date.now, id: randomUUID,
+    delay: (_milliseconds: number, signal: AbortSignal) => new Promise<void>(resolve => {
+      if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
+    }),
     execution: { connect: () => success(undefined), connection: () => ({ connected: true, deliveryEnabled: true, revision: 0, error: null }),
       delivery: async () => failure('unavailable', 'Not connected'), message: async () => failure('unavailable', 'Not connected'), disconnect: async () => {}, close: async () => {},
       validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
+      reset: async () => success(undefined),
       start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success({ sessionId, signal: stop.signal,
         attachments: async () => [], attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
         close: async () => { closed.push(instance.key); stop.abort(); } }); }, ...execution } satisfies Execution };
   const controller = value(createController(services)), record = value(controller.add(fleet));
-  async function operation(action: 'start' | 'stop', instanceKey?: string) {
+  async function operation(action: 'start' | 'stop' | 'reset', instanceKey?: string) {
     const current = value(controller.view(record.fleetId));
     return value(await controller.operate({ operationId: randomUUID(), action, target: instanceKey ? { kind: 'agent', fleetId: record.fleetId, instanceKey } : { kind: 'fleet', fleetId: record.fleetId }, expectedRevision: current.revision }));
   }
   async function finish(operation: Operation) {
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const current = value(controller.operation(operation.operationId));
-      if (current.status === 'failed' || current.status === 'succeeded') return current;
-      await delay(10);
-    }
-    assert.fail('Operation did not finish');
+    await until(() => ['failed', 'succeeded'].includes(value(controller.operation(operation.operationId)).status));
+    return value(controller.operation(operation.operationId));
   }
   return { controller, services, registry, directory, fleet, definition, record, closed, started, operation, finish };
 }
@@ -72,6 +77,66 @@ test('controller owns runtimes, rejects duplicates and operation reuse with diff
   assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
 });
 const fixtureController = fixture;
+
+test('automatic recovery closes the exact failed generation, retains deployed configuration and stops on explicit intent', async scope => {
+  const native: AbortController[] = [], calls: string[] = [], waits: { milliseconds: number; release: () => void }[] = [];
+  const fixture = fixtureController({ start: async (_configuration, _instance, _signal, reason) => {
+    calls.push(reason); const stop = new AbortController(); native.push(stop);
+    return success({ sessionId: 'retained-native-session', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      attachment: { runtime: 'fixture', sessionId: 'retained-native-session', workspace: '/fixture', connection: {} }, attachments: async () => [],
+      close: async () => { stop.abort(); } });
+  } }); cleanup(scope, () => fixture.controller.close());
+  fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
+    if (signal.aborted) { resolve(); return; }
+    const release = () => { signal.removeEventListener('abort', release); resolve(); };
+    waits.push({ milliseconds, release }); signal.addEventListener('abort', release, { once: true });
+  });
+  await fixture.finish(await fixture.operation('start'));
+  native[0]!.abort(new Error('Original native disconnect'));
+  await until(() => waits.length > 0);
+  assert.equal(waits[0]!.milliseconds, 1000);
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).instances[0]!.error, 'Original native disconnect');
+  writeFileSync(join(fixture.definition, 'AGENTS.md'), 'Disk edits must not retarget recovery.');
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 0);
+  assert.equal((await fixture.controller.remove(fixture.record.fleetId, 0)).ok, false);
+  waits[0]!.release(); await until(() => calls.length >= 2);
+  assert.deepEqual(calls, ['operator', 'recovery']);
+  await until(() => value(fixture.controller.view(fixture.record.fleetId)).phase === 'running');
+  native[1]!.abort(new Error('Second native disconnect')); await until(() => waits.length >= 2);
+  assert.equal((await fixture.finish(await fixture.operation('stop'))).status, 'succeeded');
+  waits[1]!.release(); await yieldLoop(); assert.equal(calls.length, 2);
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+});
+
+test('owner disconnect is intentional, stops the owned generation and never automatically restarts it', async scope => {
+  const stop = new AbortController();
+  let starts = 0, closes = 0, waits = 0;
+  const fixture = fixtureController({ start: async () => {
+    starts++;
+    return success({ sessionId: 'retained', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      attachment: { runtime: 'fixture', sessionId: 'retained', workspace: '/fixture', connection: {} }, attachments: async () => [],
+      close: async () => { closes++; } });
+  } }); cleanup(scope, () => fixture.controller.close());
+  fixture.services.delay = async () => { waits++; };
+  await fixture.finish(await fixture.operation('start'));
+  stop.abort(listenerStop('The owner requested this listener to disconnect'));
+  await until(() => value(fixture.controller.view(fixture.record.fleetId)).phase === 'stopped');
+  assert.equal(starts, 1); assert.equal(closes, 1); assert.equal(waits, 0);
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).instances[0]!.error, null);
+});
+
+test('explicit context reset closes the owned process before reset and retains identity and configured startup', async scope => {
+  const calls: string[] = [], sessions: string[] = [];
+  const fixture = fixtureController({ reset: async (_configuration, instance) => { calls.push('reset-' + instance.key); return success(undefined); },
+    start: async (_configuration, instance) => { const stop = new AbortController(); calls.push('start-' + instance.key); const sessionId = randomUUID(); sessions.push(sessionId);
+      return success({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection, attachments: async () => [],
+        attachment: { runtime: 'fixture', workspace: '/fixture', sessionId, connection: {} }, close: async () => { calls.push('close-' + instance.key); stop.abort(); } }); } });
+  cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start'));
+  const reset = await fixture.operation('reset', 'analyst'); assert.equal((await fixture.finish(reset)).status, 'succeeded');
+  assert.deepEqual(calls, ['start-analyst', 'close-analyst', 'reset-analyst', 'start-analyst']); assert.notEqual(sessions[0], sessions[1]);
+  assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'reset', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 })).ok, false);
+});
 
 test('delivery deactivation retains owned engines and unregister closes the control connection', async scope => {
   const binding = createListenerControl(async () => {}); binding.update({ active: true, input: null });
@@ -127,10 +192,7 @@ test('approval waiting is model-free and stop cancels a pending start', async sc
     return failure('unavailable', 'Cancelled');
   } }); cleanup(scope, () => fixture.controller.close());
   const start = await fixture.operation('start');
-  const approvalDeadline = Date.now() + 5000;
-  while (value(fixture.controller.operation(start.operationId)).status !== 'awaiting-approval') {
-    assert(Date.now() < approvalDeadline); await delay(10);
-  }
+  await until(() => value(fixture.controller.operation(start.operationId)).status === 'awaiting-approval');
   const stop = await fixture.operation('stop'); assert.equal((await fixture.finish(stop)).status, 'succeeded');
   assert.equal((await fixture.finish(start)).status, 'failed'); assert.deepEqual(fixture.started, []);
 });

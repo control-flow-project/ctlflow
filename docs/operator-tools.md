@@ -21,6 +21,7 @@ services/
       auth.ts
       database.ts
       enrollment.ts
+      fleet-wake.ts
       host.ts
       release.ts
       server.ts
@@ -93,16 +94,16 @@ dumped. Screenshots may contain private application data and remain private.
 The checks inspect existing sessions without inference. They cannot certify
 provider execution, document-analysis accuracy or macOS behavior without that
 separate evidence. They do not infer native process ownership from process names,
-answer approvals or create conversations. Explicit enrollment approval is the
-single optional business mutation, guarded by `--execute` and the complete
-expected introduction. Authentication creates temporary native/Crossfire login
+answer approvals or create conversations. Enrollment approval and fleet wake
+configuration are optional business mutations, guarded by `--execute` and the
+complete expected introduction or fleet roster. Authentication creates temporary native/Crossfire login
 sessions and cleans them up through normal logout APIs.
 
 ## Engineering verification
 
 Operator tests cover boundary validation, cancellation, privacy, pagination,
 release tampering, readonly SQLite inspection/preservation, exact enrollment
-approval and native read-only protocol behavior. Browser geometry checks have
+approval, revision-checked fleet wake configuration and native read-only protocol behavior. Browser geometry checks have
 one owner shared by the operator and application browser tests.
 
 ```sh

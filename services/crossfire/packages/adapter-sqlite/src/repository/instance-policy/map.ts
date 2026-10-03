@@ -9,6 +9,7 @@ export function mapInstancePolicy(row: Tables['instance_policy']): InstancePolic
     maxPending: row.max_pending,
     enrollmentSeconds: row.enrollment_seconds,
     reconcileSeconds: row.reconcile_seconds,
+    maxMessageBytes: row.max_message_bytes,
     agentInstructions: row.agent_instructions,
     signupMode: row.signup_mode,
     invitationIssuers: row.invitation_issuers,

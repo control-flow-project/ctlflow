@@ -7,6 +7,7 @@ CREATE TABLE instance_policy (
   max_pending INTEGER NOT NULL,
   enrollment_seconds INTEGER NOT NULL,
   reconcile_seconds INTEGER NOT NULL,
+  max_message_bytes INTEGER NOT NULL CHECK(max_message_bytes BETWEEN 4096 AND 4194304),
   agent_instructions TEXT NOT NULL,
   signup_mode TEXT NOT NULL CHECK(signup_mode IN ('invitation','open')),
   invitation_issuers TEXT NOT NULL CHECK(invitation_issuers IN ('administrators','members')),

@@ -21,7 +21,9 @@ export type Execution = {
   close(): Promise<void>;
   validate(configuration: Configuration): Result<void>;
   prepare(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (approval: Approval) => void): Promise<Result<{ failed: { instanceKey: string; code: string; message: string }[] }>>;
-  start(configuration: Configuration, instance: Instance, signal: AbortSignal): Promise<Result<Running>>;
+  start(configuration: Configuration, instance: Instance, signal: AbortSignal, reason: 'operator' | 'recovery'): Promise<Result<Running>>;
+  reset(configuration: Configuration, instance: Instance, resetId: string, signal: AbortSignal): Promise<Result<void>>;
   detach(configuration: Configuration, instance: Instance): Promise<Result<void>>;
 };
-export type Services = { registry: Registry; execution: Execution; controller: Controller; now(): number; id(): string };
+export type Services = { registry: Registry; execution: Execution; controller: Controller; now(): number; id(): string;
+  delay(milliseconds: number, signal: AbortSignal): Promise<void> };

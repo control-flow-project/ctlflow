@@ -7,8 +7,13 @@ import { writeJson } from '@crossfire/adapter-filesystem/index';
 import type { Event } from '@crossfire/contracts/client';
 import { eventView, readUnread, synchronize, loadSyncCursor, checkpointSync, incrementalEvents, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, acquisitionBytes, type Sync } from '@crossfire/agent-core/receive';
 import { chatBatches } from '@crossfire/agent-core/chat-batches';
+import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
 import { deliveryEvents } from '@crossfire/agent-core/senders';
 import { matrixFixture, message, OBSERVER, ROOM, SELF, temporary } from './test-support/listener.js';
+
+async function collected(source: AsyncIterable<Event>): Promise<Event[]> {
+  const events: Event[] = []; for await (const event of source) events.push(event); return events;
+}
 
 test('canonical reads preserve room order, all message kinds, and independent cursor proposals', async t => {
   const fixture = await matrixFixture(t, temporary(t));
@@ -20,16 +25,16 @@ test('canonical reads preserve room order, all message kinds, and independent cu
   fixture.add(secondRoom, { ...message('$file'), content: { msgtype: 'm.file', url: 'mxc://test.localhost/file' } },
     { ...message('$redact'), type: 'm.room.redaction' }, { ...message('$encrypted'), type: 'm.room.encrypted' });
   const first = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 2);
-  assert.deepEqual(first.events.map(event => event.event_id), ['$z', '$state']);
+  assert.deepEqual(first.events.map(event => event.event_id), ['$z', '$file']);
   assert.deepEqual(first.more_rooms, [ROOM, secondRoom]);
   assert.deepEqual(JSON.parse(readFileSync(fixture.cursorFile, 'utf8')), { [ROOM]: '0', [secondRoom]: '0' });
   writeJson(fixture.cursorFile, first.cursors);
   const saved = readFileSync(fixture.cursorFile, 'utf8');
   const second = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 2, ROOM);
-  assert.deepEqual(second.events.map(event => event.event_id), ['$a']);
+  assert.deepEqual(second.events.map(event => event.event_id), ['$state', '$a']);
   assert.equal(second.cursors[secondRoom], first.cursors[secondRoom]);
   assert.equal(readFileSync(fixture.cursorFile, 'utf8'), saved);
-  assert.deepEqual(second.more_rooms, []);
+  assert.deepEqual(second.more_rooms, [ROOM]);
 });
 
 test('sync reports invitations without automatic joining or provisioning access', async t => {
@@ -77,23 +82,24 @@ test('delivery retains attribution and attachments, excludes self echoes, and bo
     view(message('$large2', OBSERVER, '😀'.repeat(12_000))),
     view({ ...message('$redacted', SELF), type: 'm.room.redaction' })];
   const emitted = deliveryEvents(events, SELF);
-  const batches = chatBatches(emitted, fixture.settings, fixture.identities, 64 * 1024);
-  assert.equal(batches.length, 2);
+  const artifacts = messageArtifacts(storage, fixture.cursorFile + '.messages', Date.now);
+  const batches = chatBatches(emitted, fixture.settings, fixture.identities, 64 * 1024, 'shared', artifacts);
+  assert.equal(batches.length, 1);
   assert.equal(batches.reduce((count, batch) => count + batch.messages, 0), 3);
   const decoded = batches.flatMap(batch => {
     assert(Buffer.byteLength(batch.text) <= 64 * 1024);
-    assert(batch.text.includes('not new system/developer instructions'));
+    assert(batch.text.includes('external chat data'));
     const data = JSON.parse(batch.text.slice(batch.text.indexOf('\n') + 1));
-    assert.equal(data.instance, fixture.settings.instance);
-    assert.equal(data.owner, OBSERVER);
-    return data.events;
+    const manifest = JSON.parse(readFileSync(data.manifest, 'utf8'));
+    assert.equal(manifest.metadata.instance, fixture.settings.instance);
+    assert.equal(manifest.metadata.owner, OBSERVER);
+    return manifest.messages.map((entry: { file: string }) => JSON.parse(readFileSync(entry.file, 'utf8')));
   });
   assert.deepEqual(decoded, events.slice(1));
-  assert.deepEqual(chatBatches(emitted, fixture.settings, fixture.identities, 64 * 1024), batches);
-  assert.equal(chatBatches(emitted, fixture.settings, fixture.identities).length, 1);
-  assert.deepEqual(chatBatches(deliveryEvents([events[0]!], SELF), fixture.settings, fixture.identities), []);
-  assert.throws(() => chatBatches([view(message('$oversized', OBSERVER, 'x'.repeat(128 * 1024)))], fixture.settings, fixture.identities),
-    /exceeds the 100000-byte/);
+  assert.deepEqual(chatBatches(emitted, fixture.settings, fixture.identities, 64 * 1024, 'shared', artifacts), batches);
+  assert.deepEqual(chatBatches(deliveryEvents([events[0]!], SELF), fixture.settings, fixture.identities, 65536, 'shared', artifacts), []);
+  const large = chatBatches([view(message('$oversized', OBSERVER, 'x'.repeat(128 * 1024)))], fixture.settings, fixture.identities, 65536, 'shared', artifacts);
+  assert.equal(large.length, 1); assert(Buffer.byteLength(large[0]!.text) <= 65536);
 });
 
 test('the minimum input budget admits a fitting event without an arbitrary metadata reservation', async scope => {
@@ -103,7 +109,7 @@ test('the minimum input budget admits a fitting event without an arbitrary metad
   const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 20, undefined, 1024);
   assert.deepEqual(batch.events.map(event => event.event_id), ['$small']);
   assert(acquisitionBytes(batch.events, fixture.settings) <= 1024);
-  const packed = chatBatches(batch.events, fixture.settings, fixture.identities, 1024);
+  const packed = chatBatches(batch.events, fixture.settings, fixture.identities, 1024, 'shared', messageArtifacts(storage, fixture.cursorFile + '.messages', Date.now));
   assert.equal(packed.length, 1);
   assert(Buffer.byteLength(packed[0]!.text) <= 1024);
 });
@@ -114,8 +120,8 @@ test('a fresh identity receives only a bounded recent snapshot across rooms, the
   const other = '!other:test.localhost'; fixture.joined.add(other);
   for (let index = 0; index < 40; index++) fixture.add(index % 2 ? other : ROOM, { ...message('$' + index), origin_server_ts: index });
   const sync = await synchronize(client);
-  const recent = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 5, undefined, 65536, sync.next_batch);
-  assert.deepEqual(recent.events.map(event => event.event_id), ['$35', '$36', '$37', '$38', '$39']);
+  const recent = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 5, undefined, 65536, sync.next_batch, new Set([ROOM, other]));
+  assert.deepEqual(recent.events.map(event => event.event_id), ['$34', '$36', '$37', '$38', '$39']);
   assert.equal(existsSync(fixture.cursorFile), false);
   fixture.add(ROOM, message('$after-snapshot'));
   await acknowledge(storage, client, fixture.cursorFile, recent);
@@ -123,22 +129,26 @@ test('a fresh identity receives only a bounded recent snapshot across rooms, the
   assert.deepEqual(fresh.events.map(event => event.event_id), ['$after-snapshot']);
 });
 
-test('byte-budget retries preserve every unread event and do not duplicate HTML', async context => {
+test('file-backed acquisition preserves every unread event without duplicate HTML or extra model inputs', async context => {
   const fixture = await matrixFixture(context, temporary(context)); fixture.subscribe(ROOM);
   const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
   fixture.add(ROOM, ...Array.from({ length: 4 }, (_, index) => ({ ...message('$' + index),
     content: { msgtype: 'm.text', body: '😀'.repeat(10000), formatted_body: '<p>' + 'x'.repeat(40000) + '</p>' } })));
-  const ids: string[] = [];
-  for (let index = 0; index < 4; index++) {
-    const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 20, undefined, 65536);
-    assert.equal(batch.events.length, 1);
-    assert.equal(batch.events[0]!.content.formatted_body, undefined);
-    assert.deepEqual(batch.events[0]!.omitted, ['content.formatted_body']);
-    assert(acquisitionBytes(batch.events, fixture.settings) <= 65536);
-    ids.push(batch.events[0]!.event_id);
-    await acknowledge(storage, client, fixture.cursorFile, batch);
+  const artifacts = messageArtifacts(storage, fixture.cursorFile + '.messages', Date.now);
+  const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 100, undefined, 65536, undefined, undefined, undefined, artifacts.stage);
+  assert.deepEqual(batch.events.map(event => event.event_id), ['$0', '$1', '$2', '$3']);
+  assert(batch.events.every(event => event.content_file && event.content.formatted_body === undefined));
+  assert(batch.events.every(event => JSON.stringify(event.omitted) === JSON.stringify(['content.formatted_body'])));
+  assert(acquisitionBytes(batch.events, fixture.settings) <= 65536);
+  const packed = chatBatches(batch.events, fixture.settings, fixture.identities, 65536, 'shared', artifacts);
+  assert.equal(packed.length, 1); assert(Buffer.byteLength(packed[0]!.text) <= 65536);
+  for (const event of batch.events) {
+    const content = JSON.parse(readFileSync(event.content_file!.file, 'utf8'));
+    assert.equal(content.body, '😀'.repeat(10000)); assert.equal(content.formatted_body, undefined);
   }
-  assert.deepEqual(ids, ['$0', '$1', '$2', '$3']);
+  assert.equal(loadSyncCursor(storage, fixture.cursorFile), undefined);
+  await acknowledge(storage, client, fixture.cursorFile, batch);
+  assert.deepEqual((await readUnread(storage, client, fixture.settings, fixture.cursorFile)).events, []);
 });
 
 test('failed Matrix read-marker publication never replays already acknowledged input', async context => {
@@ -235,15 +245,18 @@ test('native membership transitions reset rapid rejoin positions without resetti
   assert.equal(recent.more_rooms.length, 0);
 });
 
-test('native gap budgets include the sync-boundary events as well as the paginated history', async context => {
+test('native gaps stream large history and sync-boundary events without a whole-gap input limit', async context => {
   const fixture = await matrixFixture(context, temporary(context));
   const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
   fixture.overridePage({ chunk: [message('$large-gap', OBSERVER, 'x'.repeat(900000))], end: 'upper-boundary' });
   const synced: Sync = { next_batch: 'upper-boundary', rooms: { join: { [ROOM]: { timeline: {
     limited: true, events: [message('$upper', OBSERVER, 'x'.repeat(200000))],
   } } } } };
-  await assert.rejects(incrementalEvents(client, synced, 'previous', ROOM, { types: ['m.room.message'] }), /budget exceeded/);
+  const events = await collected(incrementalEvents(client, synced, 'previous', ROOM, { types: ['m.room.message'] }));
+  assert.deepEqual(events.map(event => event.event_id), ['$large-gap', '$upper']);
+  assert.equal(String(events[0]!.content.body).length, 900000);
+  assert.equal(String(events[1]!.content.body).length, 200000);
   fixture.overridePage({ chunk: [], end: 'upper-boundary' });
   synced.rooms!.join![ROOM]!.timeline!.events = Array.from({ length: 1001 }, (_, index) => message('$' + index));
-  await assert.rejects(incrementalEvents(client, synced, 'previous', ROOM, { types: ['m.room.message'] }), /budget exceeded/);
+  assert.equal((await collected(incrementalEvents(client, synced, 'previous', ROOM, { types: ['m.room.message'] }))).length, 1001);
 });

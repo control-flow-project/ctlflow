@@ -12,6 +12,7 @@ import { filterQuery } from './form.js';
 import { FleetDelivery, FleetMessages } from './fleet-control.js';
 import { FleetNavigation, type FleetSection } from './fleet-navigation.js';
 import { useFleetDirectory } from './fleet-directory.js';
+import { FleetStatistics } from './fleet-statistics.js';
 
 export function Fleets() {
   const viewer = useSession(), resource = useFleetDirectory(location.search);
@@ -70,6 +71,6 @@ export function FleetDetail({ id, section }: { id: string; section: Exclude<Flee
   const resource = useResource(operations.fleet, { fleetId: id }, '', 5000);
   return <Page title="Fleet details" description="Agents, delivery and room access." action={<button onClick={resource.refresh}>Refresh status</button>}><a className="back" href="/manage/fleets">← Fleets</a>
     <Loaded {...resource} retry={resource.refresh}>{({ data: fleet }) => <><SubjectHeading name={fleet.label} description={<>{fleet.owner.displayName} · Controller {fleet.controller.name}</>}><Status value={fleet.delivery.connection.status}/><Status value={fleet.delivery.deliveryEnabled ? 'Delivery enabled' : 'Delivery paused'}/></SubjectHeading>
-      <FleetNavigation id={id} section={section}/>{section === 'agents' && <FleetAgents id={id}/>}{section === 'delivery' && <FleetDelivery fleet={fleet}/>} {section === 'messages' && <FleetMessages fleet={fleet}/>} {section === 'rooms' && <RoomPlan fleet={fleet}/>} {section === 'settings' && <FleetSettings fleet={fleet}/>}
+      <FleetNavigation id={id} section={section}/>{section === 'agents' && <FleetAgents id={id}/>}{section === 'delivery' && <FleetDelivery fleet={fleet}/>} {section === 'messages' && <FleetMessages fleet={fleet}/>} {section === 'rooms' && <RoomPlan fleet={fleet}/>} {section === 'settings' && <FleetSettings fleet={fleet}/>} {section === 'statistics' && <FleetStatistics id={id}/>}
     </>}</Loaded></Page>;
 }

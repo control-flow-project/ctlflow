@@ -5,7 +5,7 @@ export const metadata = check.object({ requestId: check.identifier, page: check.
   pageSize: check.optional(check.integer(1, 100)), totalItems: check.optional(check.integer()), totalPages: check.optional(check.integer()) });
 export type Metadata = check.Parsed<typeof metadata>;
 export type Response<Value> = { data: Value; meta: Metadata };
-const errorCode = check.choice('invalid', 'unauthorized', 'forbidden', 'missing', 'conflict', 'limit', 'native', 'unavailable',
+export const errorCode = check.choice('invalid', 'unauthorized', 'forbidden', 'missing', 'conflict', 'limit', 'native', 'unavailable',
   'stale_revision', 'name_collision', 'capacity', 'rate_limit', 'body_too_large', 'method_not_allowed');
 
 export function decodeResponse<Value>(input: unknown, parse: check.Parser<Value>, collection: boolean): Result<Response<Value>> {

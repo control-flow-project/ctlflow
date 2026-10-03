@@ -67,24 +67,28 @@ counts, not just message bodies. Native JSON response collection is separately
 bounded to 1 MiB. Explicit output files use the configured file cap and exclusive
 0600 creation. No automatic file-to-context expansion exists.
 
-These are intentional tool-reading budgets. Automatic listener input has its own
-100000-byte complete UTF-8 budget, configurable per fleet instance from 1024 to
-4194304 bytes. Native terminal/tool output and complete permission review use
-separate resource bounds; they do not inherit these chat/tool-reading limits.
+These are intentional raw-tool reading budgets. Crossfire instance policy owns
+the automatic listener's complete inline UTF-8 limit, default 65536 bytes and
+configurable from 4096 to 4194304. Larger messages and batches use private complete
+files and a manifest pointer. Native terminal/tool output and complete permission
+review use separate resource bounds, not these chat/tool-reading limits.
 - [Runtime messages, histories and owner-output disclosure](runtime.md)
+- [Listener files, catch-up and historical browsing](history.md)
 
-Receive defaults to 20 events **total across rooms**, configurable 1..100.
+Listener receive and `agent read` default to a soft 100-record target, with at
+least ten available unseen records per authorized room even when the aggregate
+exceeds 100. Explicit limits accept 1..100 with a one-record per-room floor.
 Native query `limit` fields default to 20 with a maximum of 100. Search/public-room/
 user-directory body limits are similarly validated. Other native body filters
 remain the server's schema responsibility; oversized responses fail boundedly.
 
 Automatic receive strips duplicate HTML with explicit omission metadata and
-adapts page size by re-requesting the same native cursor. A single oversized
-event fails without advancing. Raw history/search never slices a returned page
+adapts page size by re-requesting the same native cursor. Large messages switch
+to files within separate finite transport bounds. Raw history/search never slices a returned page
 and then exposes its original continuation as though all events were consumed.
 Use smaller pages, projections, filters or explicit file output instead.
 
-Fresh identities get a recent snapshot bounded across rooms, followed by native
+Fresh identities get a recent snapshot with per-room fairness, followed by native
 forward continuation. Existing acknowledged cursors remain intact. Membership
 is authoritative: catalog reads and enrollment do not join rooms. A private
 owner DM is established on first contact or native permission request;

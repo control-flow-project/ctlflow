@@ -336,7 +336,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const stop = new AbortController();
   let listenerFailure: unknown;
   let listenerReady = false;
-  const receiving = listen({ coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile: join(destination.state, 'cursors.json'),
+  const receiving = listen({ binding: 'fixture', coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile: join(destination.state, 'cursors.json'),
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
     runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, hooks }, signal),
   }, stop.signal).catch(error => { listenerFailure = error; });
@@ -379,7 +379,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Version discovery must not call the model');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Runtime', exact: true }).click();
   await expect(page.getByRole('table', { name: 'Runtime settings', exact: true })).toBeVisible();
-  await expect(page.getByText('100,000 UTF-8 bytes, including origin metadata', { exact: true })).toBeVisible();
+  await expect(page.getByText('65,536 UTF-8 bytes, including origin metadata; larger input uses private files', { exact: true })).toBeVisible();
   await checkPaperLayout(page);
   await page.screenshot({ path: join(directory, 'agent-runtime.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);

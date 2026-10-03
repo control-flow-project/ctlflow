@@ -14,7 +14,7 @@ import { contractRelease } from './support/release.js';
 
 const input: WakeRuleInput = { name: 'Fetch data', message: 'Fetch the latest report.', schedule: { kind: 'interval', seconds: 60 }, enabled: true, agentIds: [] };
 function report(fixture: Awaited<ReturnType<typeof applicationFixture>>, agent: Awaited<ReturnType<Awaited<ReturnType<typeof applicationFixture>>['agent']>>, runId = randomUUID(), controllerBound = false) {
-  value(reportListener(fixture.services, agent.actor, agent.id, runId, { release: 'test', messagesDelivered: 0, stopped: false, controllerBound }, 'test'));
+  value(reportListener(fixture.services, agent.actor, agent.id, runId, { statistics: null, release: 'test', messagesDelivered: 0, stopped: false, controllerBound }, 'test'));
   return { runId, sessionId: 'native-session' };
 }
 test('normalized Wake-up CRUD is owner-scoped, revision-checked, idempotent, paginated and atomic', async scope => {
@@ -121,7 +121,7 @@ test('Wake-up REST validates strict payloads, human CSRF, owner scope and self-o
   assert.equal((await http.request('/api/wake-rules', 'POST', creation, { Cookie: 'crossfire=' + admin.secret })).status, 403);
   assert.equal((await http.request('/api/wake-rules', 'POST', { ...creation, surprise: true }, http.headers(admin))).status, 400);
   assert.equal((await http.request('/api/wake-rules', 'POST', { ...creation, ruleId: randomUUID(), schedule: { kind: 'cron', expression: 'bad', timeZone: 'UTC' } }, http.headers(admin))).status, 400);
-  const runId = randomUUID(); value(reportListener(services, agent.actor, agent.id, runId, { release: contractRelease().manifest.release, messagesDelivered: 0, stopped: false, controllerBound: false }, contractRelease().manifest.release));
+  const runId = randomUUID(); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 0, stopped: false, controllerBound: false }, contractRelease().manifest.release));
   const path = '/api/agents/' + agent.id + '/wake-deliveries';
   assert.equal((await http.request(path, 'POST', { runId, sessionId: 'native' }, { Authorization: 'Bearer ' + foreign.token })).status, 404);
   assert.equal((await http.request(path, 'POST', { runId, sessionId: 'native' }, { Authorization: 'Bearer ' + agent.token })).status, 200);
@@ -167,7 +167,7 @@ test('receipt recovery transfers only an expired same-session claim and current 
   assert.equal(value(services.repositories.wakeDelivery.find(due.deliveryId))?.status, 'cancelled');
   value(acknowledgeWake(services, agent.actor, agent.id, due.deliveryId, next));
   assert.equal(value(services.repositories.wakeDelivery.find(due.deliveryId))?.status, 'delivered');
-  assert.equal(reportListener(services, agent.actor, agent.id, next.runId, { release: 'test', messagesDelivered: 0, stopped: false, controllerBound: true }, 'test').ok, false);
+  assert.equal(reportListener(services, agent.actor, agent.id, next.runId, { statistics: null, release: 'test', messagesDelivered: 0, stopped: false, controllerBound: true }, 'test').ok, false);
   const run = value(services.repositories.listenerRun.find({ id: next.runId }))!;
   value(services.repositories.listenerRun.update({ ...run, disconnectRequestedAt: fixture.now() }));
   assert.equal(value(claimWake(services, agent.actor, agent.id, next)), null);

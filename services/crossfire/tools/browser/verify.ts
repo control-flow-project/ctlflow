@@ -20,7 +20,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
     const errors: string[] = [];
     const routes = ['/manage/agents', '/manage/fleets', '/manage/wake-ups', '/manage/wake-ups/new', '/manage/connect', '/manage/connect/fleet', '/manage/enrollments', '/manage/audit'];
     if (human.viewer.member.roleCode === 'administrator') routes.push('/manage/members', '/manage/invitations', '/manage/policy');
-    for (const fleet of fleets.value) for (const suffix of ['', '/map', '/delivery', '/messages', '/rooms', '/settings']) routes.push('/manage/fleets/' + fleet.fleetId + suffix);
+    for (const fleet of fleets.value) for (const suffix of ['', '/map', '/statistics', '/delivery', '/messages', '/rooms', '/settings']) routes.push('/manage/fleets/' + fleet.fleetId + suffix);
     const agent = agents.value[0];
     if (agent) for (const suffix of ['', '/wake', '/activity', '/runtime', '/decisions', '/software', '/settings']) routes.push('/manage/agents/' + agent.agentId + suffix);
     const abort = () => { void context.close().catch(() => {}); };
@@ -53,6 +53,10 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
           await expect(page.locator('.loading')).toHaveCount(0);
           await expect(page.getByRole('alert')).toHaveCount(0);
           await checkPaperLayout(page);
+          if (route.endsWith('/statistics')) {
+            await expect(page.getByLabel('Period', { exact: true })).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Refresh summaries', exact: true })).toBeVisible();
+          }
           if (route.endsWith('/software')) await expect(page.locator('details').filter({ has: page.locator('summary', { hasText: 'Run history' }) })).not.toHaveAttribute('open', '');
           if (route.endsWith('/map') && await page.locator('.map-node-agent').count()) {
             const node = page.locator('.map-node-agent').first();

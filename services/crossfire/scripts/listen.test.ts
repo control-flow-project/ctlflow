@@ -51,7 +51,7 @@ test('empty acquisition completion releases a blocked backlog reader without wai
   const matrix = await matrixFixture(context, native.directory);
   const stop = new AbortController();
   const receiving = listen({ ...matrix, reconcileMs: 120_000, limit: 1, pollMs: 10_000, debounceMs: 0,
-    maximumBytes: 64 * 1024,
+
     runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(context, async () => { stop.abort(); await receiving; });
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
@@ -121,7 +121,7 @@ test('active-turn acceptance leaves messages unread until native receipt, includ
   const native = await fakeCodex(context, { mode: 'accepted' });
   const matrix = await matrixFixture(context, native.directory);
   const controller = new AbortController();
-  const result = listen({ ...matrix, reconcileMs: 1000, limit: 1, pollMs: 100, debounceMs: 0, runtime: native.runtime }, controller.signal).catch(error => error);
+  const result = listen({ ...matrix, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 0, runtime: native.runtime }, controller.signal).catch(error => error);
   cleanup(context, async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
   matrix.add(ROOM, message('$first'), message('$second'));
@@ -154,19 +154,23 @@ test('transient Matrix errors retry bounded reads, never replaying acknowledged 
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
   matrix.failures.set(API + '/sync', [503, 503, 503, 503]);
   matrix.wake();
-  assert.match(String(await result), /HTTP 503/);
+  await until(() => (matrix.failures.get(API + '/sync')?.length ?? 0) === 0 && matrix.waiting() === 1);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
+  matrix.add(ROOM, message('$after-outage'));
+  await until(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '2');
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 2);
+  assert.equal(matrix.maximumWaiting(), 1);
 });
 
-test('permanent Matrix errors, suspended ownership, and oversized messages stop without native delivery', async t => {
-  for (const kind of ['authentication', 'ownership', 'oversized']) {
+test('permanent Matrix errors and suspended ownership stop without native delivery', async t => {
+  for (const kind of ['authentication', 'ownership']) {
     const native = await fakeCodex(t);
     const matrix = await matrixFixture(t, native.directory);
     if (kind === 'authentication') matrix.failures.set(API + '/sync', [401]);
     if (kind === 'ownership') matrix.access.ownerStatus = 'suspended';
-    matrix.add(ROOM, message('$one', undefined, kind === 'oversized' ? 'x'.repeat(128 * 1024) : 'normal'));
+    matrix.add(ROOM, message('$one', undefined, 'normal'));
     await assert.rejects(listen({ ...matrix, reconcileMs: 1000, limit: 50, pollMs: 100, debounceMs: 0, runtime: native.runtime }, new AbortController().signal),
-      kind === 'authentication' ? /HTTP 401/ : kind === 'ownership' ? /Agent and owner must be active/ : /100000-byte/);
+      kind === 'authentication' ? /HTTP 401/ : /Agent and owner must be active/);
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
     assert.equal(existsSync(matrix.cursorFile), false);
   }
@@ -184,9 +188,9 @@ test('foreground CLI emits one session record, stays quiet on idle polls, reject
   const stopped = once(child, 'close');
   cleanup(t, async () => { child.kill('SIGTERM'); await stopped; });
   await until(() => matrix.waiting() === 1, errors);
-  for (const command of ['read']) {
-    await assert.rejects(execute(process.execPath, [...base, 'agent', command], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already owns this private state/);
-  }
+  const liveRead = await execute(process.execPath, [...base, 'agent', 'read'], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } });
+  assert.deepEqual(JSON.parse(liveRead.stdout).events, []);
+  assert.equal(matrix.maximumWaiting(), 1);
   await assert.rejects(execute(process.execPath, args, { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already owns this private state/);
   const who = await execute(process.execPath, [...base, 'matrix', 'get-joined-members-by-room', '--room-id', ROOM], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } });
   assert(JSON.parse(who.stdout).joined[SELF]);

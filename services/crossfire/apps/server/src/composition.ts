@@ -15,12 +15,14 @@ import type { Services } from '@crossfire/domain/port/services';
 import type { MatrixAuthority } from '@crossfire/domain/port/matrix-authority';
 import { serviceUser, type Config } from './config.js';
 import { createRuntimeRepository } from '@crossfire/adapter-sqlite/repository/runtime/index';
+import { createStatisticsRepository } from '@crossfire/adapter-sqlite/repository/statistics/index';
 export type Application = { services: Services; config: Config; close(): void };
 export function createApplication(path: string, config: Config, options: { now?: () => number; matrix?: MatrixAuthority } = {}): Application {
   const database = openStore(path);
   const matrix = options.matrix ?? createMatrixAuthority({ ...config, serviceMatrixId: serviceUser(config) });
   function hash(value: string) { return createHash('sha256').update(value).digest('hex'); }
   const services: Services = {
+    statistics: createStatisticsRepository(database),
     runtime: createRuntimeRepository(database),
     repositories: createRepositories(database), directory: createDirectoryRepository(database), collection: createCollectionRepository(database),
     listenerRead: createListenerReadRepository(database), discovery: createDiscoveryRepository(database), roomGrantRead: createRoomGrantReadRepository(database),

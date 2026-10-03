@@ -26,6 +26,7 @@ them out of Git. Every command accepts `--output /absolute/private/report.json`.
 | `source` | `--directory` | `--revision`, `--tree` | Clean Git root and exact full revision/tree when supplied |
 | `host` | `--plan` | None | Rootless Docker, exact image/provenance, health, readonly filesystem, dropped capabilities, no-new-privileges and loopback published ports |
 | `enrollment` | `--origin`, `--credentials`, `--plan` | `--execute` | Exact pending owner/controller/roster/code, human authority and revision-checked approval only when explicitly selected |
+| `fleet-wake` | `--origin`, `--credentials`, `--plan` | `--execute` | Exact fleet/owner/controller/complete roster, current policies, optional revision-checked updates and complete result verification |
 
 ## Authentication
 
@@ -78,7 +79,7 @@ node services/crossfire/dist/tools/main.js browser --origin https://example.test
 ```
 
 Browser inspection uses the UI's normal login, all visible fleets' sections and
-one visible agent's detail sections. Administrator-only pages are visited only
+statistics and one visible agent's detail sections. Administrator-only pages are visited only
 for an administrator. Screenshots are private. It does not create users, rules,
 rooms or messages, pause fleets, select native answers or call a model. Element
 theme/signup/messaging checks remain application regression or deployment-owner
@@ -93,7 +94,7 @@ or missing files are created. Current normalized tables are queried through
 Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
 
 ```json
-{"schemaVersion":8,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0}}
+{"schemaVersion":9,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0}}
 ```
 
 The schema version and table counts are optional exact expectations. `--schema`
@@ -156,3 +157,47 @@ items or nonpending requests are refused. Without `--execute`, this is review
 only. With it, the tool invokes the existing revision-checked approval REST
 operation as the owner/administrator. It neither claims credentials nor starts
 listeners, creates rooms or bypasses native/user permissions.
+
+## Fleet wake configuration
+
+The plan specifies every enrolled instance in the fleet, not a subset:
+
+```json
+{"fleetId":"00000000-0000-4000-8000-000000000001","fleetKey":"research","ownerMatrixId":"@operator:example.test","controllerName":"laptop","instances":[{"instanceKey":"analyst","name":"analyst","mode":"owner-agents","senderIds":[]},{"instanceKey":"helper","name":"helper","mode":"owner-agents","senderIds":[]}]}
+```
+
+Use the actual immutable fleet ID and exact current owner, controller name,
+instance keys and enrolled agent names. Every instance selects one of the six
+canonical wake modes. Only `selected` accepts sender IDs: immutable registered
+principal UUIDs, not display names or Matrix IDs. Empty selection wakes nobody.
+Duplicate instances/senders, self-selection, unavailable senders, inactive agents,
+wrong owners/controllers and incomplete rosters fail before policy writes.
+
+```sh
+node services/crossfire/dist/tools/main.js fleet-wake --origin https://example.test --credentials /home/operator/evidence/credentials.json --plan /home/operator/evidence/fleet-wake.json --output /home/operator/evidence/fleet-wake-review.json
+node services/crossfire/dist/tools/main.js fleet-wake --origin https://example.test --credentials /home/operator/evidence/credentials.json --plan /home/operator/evidence/fleet-wake.json --execute --output /home/operator/evidence/fleet-wake-applied.json
+```
+
+The first command reviews current and desired policies without changing them.
+Verify a fresh consistent backup before execution. The second calls the existing
+audited `PUT /api/agents/{agentId}/wake-policy` as the human owner/administrator,
+using each reviewed revision. Identical policies are not rewritten. All policies
+and the exact identity-to-instance mapping are reread before success is reported.
+There is no fleet-wide transaction: a race or network failure stops execution,
+reports the verified writes and last attempted instance, and exits nonzero.
+An attempted write may have succeeded even if its response was lost. Review
+again before continuing; no automatic retry, rollback or permission overwrite.
+
+`owner-agents` allows the owner and all active agents belonging to that owner,
+including agents outside this fleet; self and other owners' agents are excluded.
+Use `selected` when a smaller or cross-owner set is required. Room membership,
+read/write access, mute state, invitation authority and wake authority stay
+separate. This command changes only wake policies: it neither enrolls, starts nor
+restarts agents, joins rooms, sends prompts or changes native settings.
+
+Listeners refresh policies automatically without restarting Codex. Previously
+non-waking unread messages remain pending and can wake an authorized listener
+after the change. The tool itself makes no model calls; enabling delivery may
+start ordinary model work on those messages. Wake modes are persisted Crossfire
+configuration, not `runtime.toml`, `agent.toml` or `rooms.toml` options. Apply them
+after enrollment, and review them again after intentionally replacing identities.

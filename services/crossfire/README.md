@@ -13,6 +13,8 @@ and management. Runtime adapters own native session integration.
 - [Deployment, backups and troubleshooting](docs/operations.md)
 - [Operator verification tools](tools/README.md)
 - [Matrix commands and media](docs/matrix-api.md)
+- [Large messages, unread catch-up, history and context reset](docs/history.md)
+- [Fleet traffic and native usage statistics](docs/statistics.md)
 - [Fleet configuration and runtime options](../fleet/docs/configuration.md)
 - [REST, schema and architecture reference](../../docs/specification.md)
 

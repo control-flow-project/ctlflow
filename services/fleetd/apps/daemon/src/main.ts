@@ -14,6 +14,7 @@ import { createController } from '@fleetd/domain/controller';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
 import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
+import { nativeClock } from '@crossfire/adapter-runtime/clock';
 
 export async function startDaemon(root: string, name: string) {
   if (process.platform !== 'linux') throw new Error('Fleet controller requires Linux');
@@ -45,7 +46,7 @@ export async function startDaemon(root: string, name: string) {
       if (current.ino !== information.ino || current.dev !== information.dev) throw new Error('Controller socket changed during startup');
       unlinkSync(socketPath);
     }
-    const created = createController({ registry: createRegistry(root), execution: createExecution({ codex: codexRuntime() }), controller: parsed.value, id: randomUUID, now: Date.now });
+    const created = createController({ registry: createRegistry(root), execution: createExecution({ codex: codexRuntime() }), controller: parsed.value, id: randomUUID, now: Date.now, delay: nativeClock.delay });
     if (!created.ok) throw new Error(created.error.message);
     const controller = created.value;
     let closing: Promise<void> | undefined;

@@ -9,6 +9,7 @@ import * as fleetControl from '../fleet-control.js';
 import { fleetMap } from '../schema/fleet-map.js';
 import * as wake from '../wake-up.js';
 import * as runtime from '../runtime.js';
+import { statisticsQuery, fleetStatistics } from '../statistics.js';
 export const operations = {
   runtimeObservations: operation({ method: 'GET', path: '/api/agents/{agentId}/runtime-observations', auth: 'either',
     params: check.object({ agentId: check.identifier }), query: query.none, input: check.empty, output: runtime.observations,
@@ -149,6 +150,9 @@ export const operations = {
   fleetMap: operation({ method: 'GET', path: '/api/fleets/{fleetId}/map', auth: 'human',
     params: check.object({ fleetId: check.identifier }), query: query.none, input: check.empty, output: fleetMap,
     status: 200, collection: false, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Fleet connection map' }),
+  fleetStatistics: operation({ method: 'GET', path: '/api/fleets/{fleetId}/statistics', auth: 'human',
+    params: check.object({ fleetId: check.identifier }), query: statisticsQuery, input: check.empty, output: fleetStatistics,
+    status: 200, collection: false, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Periodic fleet traffic and native usage summaries' }),
   fleetAgents: operation({ method: 'GET', path: '/api/fleets/{fleetId}/agents', auth: 'fleet',
     params: check.object({ fleetId: check.identifier }), query: query.page, input: check.empty, output: check.list(res.fleetAgent, 100),
     status: 200, collection: true, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Fleet members' }),

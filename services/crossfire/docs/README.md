@@ -5,6 +5,8 @@
 - [Agents, rooms, permissions, wake-ups and approvals](management.md)
 - [Runtime activity, histories, decisions and terminal diagnosis](runtime.md)
 - [Matrix commands, history, files and attachments](matrix-api.md)
+- [Message files, unread catch-up and context reset](history.md)
+- [Fleet traffic and native usage statistics](statistics.md)
 - [Headless fleet setup](../../fleet/docs/getting-started.md)
 
 ## Operators

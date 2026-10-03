@@ -1,6 +1,7 @@
 import * as check from '@crossfire/contracts/schema/validation';
 import type { LocalState } from './port.js';
 import type { RuntimeConnection } from './runtime.js';
+import type { MessageArtifacts } from './message-artifacts.js';
 
 export type DirectedInput = { messageId: string; text: string; expiresAt: number };
 export type ControllerState = { connected: boolean; deliveryEnabled: boolean; revision: number | null; error: string | null };
@@ -37,9 +38,11 @@ export async function waitForActivation(control: ListenerControl, signal: AbortS
   });
   signal.throwIfAborted();
 }
-const savedInput = check.object({ sessionId: check.text(200), input: check.object({ messageId: check.text(200), text: check.plainText(98304), expiresAt: check.integer() }),
-  stage: check.choice('queued', 'publishing', 'delivered') });
-export function controlledPublisher(storage: LocalState, file: string, control: ListenerControl, runtime: RuntimeConnection) {
+const directedInput = check.object({ messageId: check.text(200), text: check.plainText(98304), expiresAt: check.integer() });
+const savedInput = check.object({ sessionId: check.text(200), input: directedInput,
+  text: check.plainText(98304), stage: check.choice('queued', 'publishing', 'delivered') });
+export function controlledPublisher(options: { storage: LocalState; file: string; control: ListenerControl; runtime: RuntimeConnection; artifacts: MessageArtifacts; maximum: number }) {
+  const { storage, file, control, runtime, artifacts } = options;
   function load() {
     if (!storage.exists(file)) return null;
     const parsed = savedInput(storage.read<unknown>(file));
@@ -53,24 +56,31 @@ export function controlledPublisher(storage: LocalState, file: string, control: 
       let saved = load();
       if (!saved) {
         if (!incoming) return;
-        saved = { sessionId: runtime.sessionId, input: incoming, stage: 'queued' };
-        const parsed = savedInput(saved);
+        const parsed = directedInput(incoming);
         if (!parsed.ok || Buffer.byteLength(incoming.text) > 98304) throw new Error('Invalid controller input');
+        saved = { sessionId: runtime.sessionId, input: incoming, text: artifacts.input(incoming.text, incoming.messageId, options.maximum, { kind: 'controller-input', expiresAt: incoming.expiresAt }), stage: 'queued' };
+        storage.write(file, saved);
+      }
+      if (saved.stage === 'publishing') {
+        signal.throwIfAborted();
+        saved.stage = await runtime.recover(saved.text, saved.input.messageId) ? 'delivered' : 'queued';
         storage.write(file, saved);
       }
       if (saved.stage !== 'delivered' && saved.input.expiresAt <= Date.now()) {
-        if (saved.stage === 'publishing') throw new Error('Expired controller publication requires exact receipt recovery; it cannot be assumed absent or resubmitted');
         await control.acknowledge(saved.input.messageId, 'skipped', 'Message expired before publication');
+        artifacts.release([saved.input.messageId]);
         storage.remove(file); return;
       }
       if (saved.stage !== 'delivered') {
         signal.throwIfAborted();
+        if (saved.stage === 'queued') saved.text = artifacts.input(saved.input.text, saved.input.messageId, options.maximum, { kind: 'controller-input', expiresAt: saved.input.expiresAt });
         saved.stage = 'publishing'; storage.write(file, saved);
-        await runtime.deliver(saved.input.text, saved.input.messageId, signal);
+        await runtime.deliver(saved.text, saved.input.messageId, signal);
         saved.stage = 'delivered'; storage.write(file, saved);
       }
       await control.acknowledge(saved.input.messageId, 'delivered', null);
       runtime.acknowledge([saved.input.messageId]);
+      artifacts.release([saved.input.messageId]);
       storage.remove(file);
     },
   };

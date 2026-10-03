@@ -1,17 +1,18 @@
 import type { LocalState } from './port.js';
-import { API, segment } from '@crossfire/contracts/matrix';
 import type { Matrix } from './port.js';
-import type { Settings, Event } from '@crossfire/contracts/client';
+import type { Settings } from '@crossfire/contracts/client';
 import { roomId, userId } from '@crossfire/contracts/validation';
-import { acquisitionBytes, eventView, joinedRooms, loadCursors, readUnread, validatePage, type HistoryEnd, type ReadBatch, type ReceivedEvent } from './receive.js';
+import { eventView, joinedRooms, loadCursors, readUnread, roomQuota, validCursors, validReadBatch, validatePage, type HistoryEnd, type ReadBatch, type ReceivedEvent } from './receive.js';
+import type { MessageArtifacts } from './message-artifacts.js';
+import { historyPage, HISTORY_RESOURCE_BYTES } from './history-page.js';
 
 export type WakeCycle = { ends: Record<string, HistoryEnd>; sender: string; room: string };
 
 export function loadWake(storage: LocalState, file: string): WakeCycle | undefined {
   if (!storage.exists(file + '.wake')) return undefined;
-  const value = storage.read<WakeCycle>(file + '.wake');
+  const value = storage.read<WakeCycle>(file + '.wake', HISTORY_RESOURCE_BYTES);
   if (!value || !value.ends || Array.isArray(value.ends) || typeof value.ends !== 'object'
-    || !userId(value.sender) || !roomId(value.room) || Object.keys(value.ends).length > 100) throw new Error('Invalid saved wake-up cycle');
+    || !userId(value.sender) || !roomId(value.room) || Object.keys(value.ends).length > 1000) throw new Error('Invalid saved wake-up cycle');
   for (const [room, end] of Object.entries(value.ends)) {
     if (!roomId(room) || !end || typeof end.cursor !== 'string' || !end.cursor) throw new Error('Invalid saved wake-up boundary');
     if (end.event !== null) eventView(end.event, room);
@@ -22,7 +23,7 @@ export function loadWake(storage: LocalState, file: string): WakeCycle | undefin
 export async function captureWake(client: Matrix, trigger: ReceivedEvent, rooms: ReadonlySet<string>, boundary: string): Promise<WakeCycle> {
   const ends: Record<string, HistoryEnd> = {};
   for (const room of [...rooms].sort()) {
-    const page = await client.get<{ chunk: Event[]; end?: string }>(`${API}/rooms/${segment(room)}/messages`, { dir: 'b', limit: 1 });
+    const page = await historyPage(client, room, { dir: 'b', limit: 1 });
     validatePage(page, 1, undefined);
     const event = page.chunk[0] ?? null;
     if (event) eventView(event, room);
@@ -32,42 +33,48 @@ export async function captureWake(client: Matrix, trigger: ReceivedEvent, rooms:
 }
 
 export function saveWake(storage: LocalState, file: string, cycle?: WakeCycle): void {
-  if (cycle) storage.write(file + '.wake', cycle);
+  if (cycle) storage.write(file + '.wake', cycle, HISTORY_RESOURCE_BYTES);
   else if (storage.exists(file + '.wake')) storage.remove(file + '.wake');
 }
 
 export function retireSnapshot(storage: LocalState, file: string, rooms: ReadonlySet<string>): void {
   if (!storage.exists(file + '.snapshot')) return;
-  const value = storage.read<{ base: Record<string, string>; batch: ReadBatch }>(file + '.snapshot');
+  const value = storage.read<{ base: Record<string, string>; batch: ReadBatch }>(file + '.snapshot', HISTORY_RESOURCE_BYTES);
+  if (!value || !validCursors(value.base) || !validReadBatch(value.batch)) throw new Error('Invalid pinned delivery snapshot');
   value.batch.events = value.batch.events.filter(event => !rooms.has(event.room_id));
   for (const room of rooms) { delete value.base[room]; delete value.batch.cursors[room]; delete value.batch.latest[room]; }
   value.batch.more_rooms = value.batch.more_rooms.filter(room => !rooms.has(room));
-  if (Object.keys(value.batch.cursors).some(room => value.base[room] === undefined)) storage.write(file + '.snapshot', value);
+  if (Object.keys(value.batch.cursors).some(room => value.base[room] === undefined)) storage.write(file + '.snapshot', value, HISTORY_RESOURCE_BYTES);
   else storage.remove(file + '.snapshot');
 }
 
+export function snapshotContentFiles(storage: LocalState, file: string): string[] {
+  if (!storage.exists(file + '.snapshot')) return [];
+  const value = storage.read<{ base: Record<string, string>; batch: ReadBatch }>(file + '.snapshot', HISTORY_RESOURCE_BYTES);
+  if (!value || !validCursors(value.base) || !validReadBatch(value.batch)) throw new Error('Invalid pinned delivery snapshot');
+  return value.batch.events.flatMap(event => event.content_file ? [event.content_file.file] : []);
+}
+
 export async function pendingBatch(storage: LocalState, client: Matrix, settings: Settings, file: string, limit: number,
-  selected: string | undefined, maximum: number, boundary: string | undefined, allowed: ReadonlySet<string>, cycle?: WakeCycle): Promise<ReadBatch> {
+  selected: string | undefined, maximum: number, boundary: string | undefined, allowed: ReadonlySet<string>, cycle: WakeCycle | undefined, artifacts: MessageArtifacts): Promise<ReadBatch> {
   const base = loadCursors(storage, file);
   if (storage.exists(file + '.snapshot')) {
-    const saved = storage.read<{ base: Record<string, string>; batch: ReadBatch }>(file + '.snapshot');
-    if (!saved || !saved.base || !saved.batch || !Array.isArray(saved.batch.events) || !saved.batch.cursors
-      || !saved.batch.latest || !Array.isArray(saved.batch.more_rooms)) throw new Error('Invalid pinned delivery snapshot');
+    const saved = storage.read<{ base: Record<string, string>; batch: ReadBatch }>(file + '.snapshot', HISTORY_RESOURCE_BYTES);
+    if (!saved || !validCursors(saved.base) || !validReadBatch(saved.batch)) throw new Error('Invalid pinned delivery snapshot');
     if (JSON.stringify(saved.base) === JSON.stringify(base)) {
       const included = (room: string) => allowed.has(room) && (!selected || room === selected);
       if (!cycle) {
         const added = new Set((await joinedRooms(client)).filter(room => included(room) && saved.batch.cursors[room] === undefined));
         if (added.size) {
-          const initial = await readUnread(storage, client, settings, file, limit, selected, maximum, boundary, added);
+          const initial = await readUnread(storage, client, settings, file, limit, selected, maximum, boundary, added, undefined, artifacts.stage);
           saved.batch = { events: [...saved.batch.events, ...initial.events],
             cursors: { ...saved.batch.cursors, ...Object.fromEntries(Object.entries(initial.cursors).filter(([room]) => added.has(room))) },
             latest: { ...saved.batch.latest, ...initial.latest },
             more_rooms: [...new Set([...saved.batch.more_rooms, ...initial.more_rooms])] };
-          storage.write(file + '.snapshot', saved);
+          storage.write(file + '.snapshot', saved, HISTORY_RESOURCE_BYTES);
         }
       }
       const batch = saved.batch;
-      if (batch.events.some(event => acquisitionBytes([event], settings) > maximum)) throw new Error('Pinned event exceeds the input byte limit');
       return { ...batch, events: batch.events.filter(event => included(event.room_id)),
         cursors: { ...base, ...Object.fromEntries(Object.entries(batch.cursors).filter(([room]) => included(room))) },
         latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => included(room))),
@@ -76,8 +83,8 @@ export async function pendingBatch(storage: LocalState, client: Matrix, settings
     storage.remove(file + '.snapshot');
   }
   const batch = await readUnread(storage, client, settings, file, limit, selected, maximum, boundary, allowed,
-    cycle ? { cursors: base, ends: cycle.ends } : undefined);
-  if (Object.keys(batch.cursors).some(room => base[room] === undefined)) storage.write(file + '.snapshot', { base, batch });
+    cycle ? { cursors: base, ends: cycle.ends } : undefined, artifacts.stage);
+  if (Object.keys(batch.cursors).some(room => base[room] === undefined)) storage.write(file + '.snapshot', { base, batch }, HISTORY_RESOURCE_BYTES);
   return batch;
 }
 
@@ -93,7 +100,7 @@ export async function wakeEvent(client: Matrix, batch: ReadBatch, senders: Reado
       let from = start;
       const visited = new Set<string>();
       for (;;) {
-        const page = await client.get<{ chunk: Event[]; end?: string }>(`${API}/rooms/${segment(room)}/messages`, {
+        const page = await historyPage(client, room, {
           from, dir: 'f', limit: 100, filter: JSON.stringify({ types: ['m.room.message'], senders: identities.slice(offset, offset + 50) }),
         });
         validatePage(page, 100, from);
@@ -110,23 +117,19 @@ export async function wakeEvent(client: Matrix, batch: ReadBatch, senders: Reado
   return undefined;
 }
 
-export async function collectBatch(storage: LocalState, client: Matrix, settings: Settings, file: string, initial: ReadBatch,
-  limit: number, selected: string | undefined, maximum: number, cycle: WakeCycle, allowed: ReadonlySet<string>): Promise<ReadBatch> {
-  let result = initial;
-  for (;;) {
-    let pageLimit = limit;
-    let next: ReadBatch;
-    for (;;) {
-      next = await readUnread(storage, client, settings, file, pageLimit, selected, maximum, undefined, allowed,
-        { cursors: result.cursors, ends: cycle.ends });
-      if (acquisitionBytes([...result.events, ...next.events], settings) <= maximum - 1024) break;
-      if (pageLimit === 1) return { ...result, more_rooms: [...allowed],
-        events: result.events.sort((left, right) => (left.timestamp ?? '').localeCompare(right.timestamp ?? '')) };
-      pageLimit = Math.max(1, Math.floor(pageLimit / 2));
-    }
-    result = { events: [...result.events, ...next.events], cursors: next.cursors,
-      latest: { ...result.latest, ...next.latest }, more_rooms: next.more_rooms };
-    if (!next.more_rooms.length) return { ...result,
-      events: result.events.sort((left, right) => (left.timestamp ?? '').localeCompare(right.timestamp ?? '')) };
+export async function collectBatch(storage: LocalState, client: Matrix, settings: Settings, file: string, limit: number, maximum: number,
+  initial: ReadBatch, cycle: WakeCycle, allowed: ReadonlySet<string>, artifacts: MessageArtifacts): Promise<ReadBatch> {
+  let batch = initial;
+  const rooms = Object.keys(cycle.ends).filter(room => allowed.has(room)).sort();
+  for (const [position, room] of rooms.entries()) {
+    const remaining = roomQuota(limit, rooms.length, position) - batch.events.filter(event => event.room_id === room).length;
+    if (remaining <= 0 || batch.cursors[room] === cycle.ends[room]!.cursor) continue;
+    const next = await readUnread(storage, client, settings, file, remaining, room, maximum, undefined, new Set([room]),
+      { cursors: batch.cursors, ends: cycle.ends }, artifacts.stage);
+    let events = [...batch.events, ...next.events];
+    if (events.some(event => event.content_file) || events.reduce((bytes, event) => bytes + Buffer.byteLength(JSON.stringify(event)), 0) > maximum) events = artifacts.stage(events);
+    batch = { events, cursors: { ...batch.cursors, [room]: next.cursors[room]! }, latest: { ...batch.latest, ...next.latest }, more_rooms: [] };
   }
+  batch.events.sort((left, right) => (left.timestamp ?? '').localeCompare(right.timestamp ?? ''));
+  return { ...batch, more_rooms: rooms.filter(room => batch.cursors[room] !== cycle.ends[room]!.cursor) };
 }

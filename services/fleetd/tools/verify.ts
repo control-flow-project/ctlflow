@@ -7,7 +7,6 @@ import { loadBinding } from '@fleetd/storage/binding';
 import { nativeJson } from '@crossfire/adapter-matrix/http';
 import { command } from '@crossfire/operator-support/process';
 import { collectPages } from '@crossfire/operator-support/collections';
-import { INPUT_BYTES } from '@crossfire/contracts/runtime';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import * as check from '@crossfire/contracts/schema/validation';
 import { inspectNative, preserveNative } from './runtime/inspect.js';
@@ -91,7 +90,7 @@ export async function verifyFleet(input: { root: string; directory: string; runn
       if (!preserved.ok) return preserved;
       files.push(...preserved.value);
       instances.push({ instanceKey: configured.key, name: configured.name, phase: instance.phase, listenerActive: instance.listenerActive,
-        historyMode: configured.listener_options?.history_mode ?? 'shared', maxInputBytes: configured.listener_options?.max_input_bytes ?? INPUT_BYTES,
+        historyMode: configured.listener_options?.history_mode ?? 'shared',
         histories: inspected });
     }
     identities.sort((left, right) => left.instanceKey.localeCompare(right.instanceKey)); files.sort((left, right) => left.path.localeCompare(right.path));

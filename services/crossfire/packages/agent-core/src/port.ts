@@ -12,7 +12,7 @@ export type LocalState = {
   remove(path: string): void;
 };
 export type Matrix = {
-  get<Value = JsonObject>(path: string, query?: Record<string, string | number>): Promise<Value>;
+  get<Value = JsonObject>(path: string, query?: Record<string, string | number>, maximumBytes?: number): Promise<Value>;
   post<Value = JsonObject>(path: string, body: unknown): Promise<Value>;
   put<Value = JsonObject>(path: string, body: unknown): Promise<Value>;
   message(text: string): JsonObject;

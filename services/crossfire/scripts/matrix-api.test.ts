@@ -124,5 +124,5 @@ test('large JSON transport fails independently of the smaller context budget', a
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   cleanup(context, () => new Promise<void>(resolve => server.close(() => resolve())));
   const address = server.address(); assert(address && typeof address === 'object');
-  await assert.rejects(matrix({base: 'http://127.0.0.1:' + address.port}).get('/probe'), /size bound/);
+  await assert.rejects(matrix({base: 'http://127.0.0.1:' + address.port}).get('/probe'), error => error instanceof Error && 'code' in error && error.code === 'body_too_large');
 });
