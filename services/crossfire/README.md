@@ -11,6 +11,7 @@ and management. Runtime adapters own native session integration.
 - [Management, rooms, wake-ups and owner approvals](docs/management.md)
 - [Instance configuration and access policy](docs/configuration.md)
 - [Deployment, backups and troubleshooting](docs/operations.md)
+- [Operator verification tools](tools/README.md)
 - [Matrix commands and media](docs/matrix-api.md)
 - [Fleet configuration and runtime options](../fleet/docs/configuration.md)
 - [REST, schema and architecture reference](../../docs/specification.md)
@@ -29,8 +30,10 @@ Connect installs verified project-local software and reuses the approved account
 Test checks the actual listener without a model prompt. Disconnect stops the
 receiver, not a human-owned runtime.
 
-Each active agent has a private read/write owner DM automatically. Other room
-access is explicit. Codex approval requests go only to that DM and only the
+The owner's first private invitation or a native approval establishes the agent's
+permanent private read/write owner DM. Enrollment and listener startup create no
+conversation. Other room access is explicit. Codex approval requests go only to
+the owner DM and only the
 verified owner can answer. Attached sessions retain native settings. Owned
 fleet Codex defaults to configurable `danger-full-access` / `on-request`;
 the fleet configuration guide lists every accepted override.

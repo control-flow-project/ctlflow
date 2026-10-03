@@ -11,6 +11,10 @@ root owns documentation and workspace/build verification only. There is no globa
 package pool. Cross-service reuse uses declared package exports; application-source
 reach-through is prohibited. Follow each service's AGENTS.md.
 
+Reusable operator checks follow these service owners, not deployment projects.
+Keep host, owner, fleet and release expectations explicit; site-specific branding,
+TLS and deployment configuration remain site-owned.
+
 ## Engineering
 Use functional modules, strict types without any, named exports, explicit .js
 relative imports, Result for expected failures and boundary validation. Split

@@ -7,6 +7,7 @@
 
 ## Engineering
 - [Development and verification](development.md)
+- [Operator verification tools](operator-tools.md)
 - [Canonical specification](specification.md)
 - [Runtime approval diagnosis and native dependency evidence](runtime-approval-readiness.md)
 - [Native feasibility and verification boundaries](../services/crossfire/docs/architecture/feasibility.md)

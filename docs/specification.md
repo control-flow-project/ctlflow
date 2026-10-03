@@ -19,6 +19,7 @@ services/
     packages/
     tests/
     scripts/
+    tools/
     docs/
     skills/
   fleetd/
@@ -27,6 +28,7 @@ services/
     packages/contracts/
     packages/storage/
     tests/
+    tools/
   fleet/
     apps/cli/
     packages/daemon-client/
@@ -60,6 +62,15 @@ their individual-agent adapters.
   public controller port or external execution scheduler is installed.
 - GAAP owns its deployment/Element theme and domain-specific fleet definitions.
   Burrow is outside this implementation.
+
+Generic operator checks are service-owned `tools/` modules in this monorepo,
+not GAAP scripts. Crossfire owns release/API/browser/database/host verification
+and the exported operator support package. fleetd owns exact controller/binding
+and adapter-dispatched native-history inspection. Lifecycle remains in Fleet's
+existing CLI. Private expectations are explicit inputs; checks neither call a
+model, answer native decisions nor create rooms. Enrollment approval requires
+explicit execution and an exact pending introduction. The operator guide records
+coverage, bounds, historical script disposition and evidence limits.
 
 Three product package manifests and their nested workspaces share one root npm
 lockfile. Each product has coherent build/test commands. Named exports, strict
@@ -1704,6 +1715,13 @@ bindings. Enrollment does not own host execution configuration. Public-safe
 configured/effective runtime observations are reported separately for management;
 private local paths, native credentials and connection secrets are not exposed
 through those projections.
+
+The shared observation publisher retains the last observed state/settings for
+each exact native history. A new reporting run republishes those snapshots with
+their original observation timestamps, including after fleet delivery pause and
+resume without restarting an engine. No model turn, owner conversation, guessed
+state or extra native subscription is needed. Coalescing cannot replace an
+in-flight snapshot before its receipt; new observations remain queued behind it.
 
 Expiry/rejection releases pending name claims. Assigned names and fleet
 bindings survive request retention, suspension and revocation. Public keys

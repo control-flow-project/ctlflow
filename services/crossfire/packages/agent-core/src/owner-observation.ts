@@ -18,10 +18,12 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
     || !Array.isArray(journal.observations) || journal.observations.some(item => !observation(item).ok)) throw new Error('Invalid owner observation journal');
   let runId: string | undefined;
   const active = new Map<string, boolean>();
+  const latest = new Map(journal.observations.map(value => [value.sessionId, value]));
   let deliveredSession: string | undefined;
   let typingRoom: string | undefined;
   let cancelTyping: (() => void) | undefined;
   let running: Promise<void> | undefined;
+  let publishing: RuntimeObservation | undefined;
   const pendingSources = new Set(journal.output.flatMap(item => item.sources));
   function save(): void { options.storage.write(options.file, journal, journalBytes); }
   async function typing(room: string, enabled: boolean): Promise<void> {
@@ -46,8 +48,10 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
       active.set(event.observation.sessionId, busy);
       if (!busy && deliveredSession === event.observation.sessionId) void clearTyping();
       const previous = journal.observations.at(-1);
-      if (previous?.sessionId === event.observation.sessionId && previous.state === event.observation.state && previous.state !== 'failed') journal.observations.pop();
-      journal.observations.push({ ...event.observation, historyMode: options.historyMode, maxInputBytes: options.maximum });
+      if (previous !== publishing && previous?.sessionId === event.observation.sessionId && previous.state === event.observation.state && previous.state !== 'failed') journal.observations.pop();
+      const value = { ...event.observation, historyMode: options.historyMode, maxInputBytes: options.maximum };
+      latest.set(value.sessionId, value);
+      journal.observations.push(value);
     } else {
       let position = 0;
       const streamId = event.streamId === null ? null : JSON.stringify([event.sessionId, event.streamId]);
@@ -67,7 +71,8 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
     if (!runId) return;
     while (journal.observations.length) {
       const pending = journal.observations[0]!;
-      const result = await options.coordination.runtime(options.agentId, runId, pending, scope);
+      publishing = pending;
+      const result = await options.coordination.runtime(options.agentId, runId, pending, scope).finally(() => { publishing = undefined; });
       if (!result.ok && result.error.code !== 'conflict') return;
       journal.observations.shift(); save();
     }
@@ -88,6 +93,10 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
   stop.addEventListener('abort', stopped, { once: true });
   return { observe, delivered,
     start(id: string): void {
+      if (runId !== id) {
+        for (const value of latest.values()) if (!journal.observations.some(pending => pending.sessionId === value.sessionId && pending.observedAt === value.observedAt)) journal.observations.push(value);
+        save();
+      }
       runId = id;
       running ??= (async () => { while (!stop.aborted) {
         try { await flush(); } catch { if (stop.aborted) break; }

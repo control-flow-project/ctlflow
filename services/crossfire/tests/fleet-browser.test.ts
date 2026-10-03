@@ -13,7 +13,7 @@ import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
 import { createFleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
 import { API } from '@crossfire/contracts/matrix';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { checkPaperLayout } from './support/browser-layout.js';
+import { checkPaperLayout } from '../tools/browser/layout.js';
 import { mapFleet } from './support/map-fleet.js';
 import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
 import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';

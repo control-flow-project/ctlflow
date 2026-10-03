@@ -4,7 +4,7 @@ import { expect, type Page } from '@playwright/test';
 import type { Services, Actor } from '@crossfire/domain/port/services';
 import { createMemberInvitation } from '@crossfire/domain/member/invitation';
 import { value } from './application.js';
-import { checkPaperLayout } from './browser-layout.js';
+import { checkPaperLayout } from '../../tools/browser/layout.js';
 
 async function configure(page: Page, origin: string, signup: 'open' | 'invitation', issuers: 'members' | 'administrators') {
   await page.goto(origin + '/manage/policy');
