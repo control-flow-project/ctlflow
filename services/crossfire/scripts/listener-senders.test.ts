@@ -2,10 +2,10 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, existsSync } from 'node:fs';
-import { deliveryBatches } from '@crossfire/agent-core/listen';
+import { chatBatches } from '@crossfire/agent-core/chat-batches';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { eventView } from '@crossfire/agent-core/receive';
-import { resolveSenders } from '@crossfire/agent-core/senders';
+import { deliveryEvents, resolveSenders } from '@crossfire/agent-core/senders';
 import { success } from '@crossfire/kernel/result';
 import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
 import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, SELF, temporary, until } from './test-support/listener.js';
@@ -13,34 +13,36 @@ import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, SELF, temporary, unt
 test('delivery batches carry one verified entry per emitted sender, with exact byte accounting and no self-chat metadata', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope));
   const peer = '@agent-holmes:test.localhost', foreign = '@agent-foreign:test.localhost', unknown = '@agent-lookalike:remote.test';
-  fixture.identities.set(foreign, { matrixUserId: foreign, kind: 'agent', ownerMatrixId: '@other:test.localhost' });
+  fixture.identities.set(foreign, { matrixUserId: foreign, kind: 'agent', ownerMatrixId: '@other:test.localhost', displayName: null, ownerDisplayName: null });
   const events = [message('$self', SELF), message('$owner', OBSERVER), message('$peer', peer), message('$foreign', foreign),
     message('$unknown', unknown), message('$again', peer)].map(event => eventView(event, ROOM));
   const identities = await resolveSenders(fixture.coordination, events.slice(1), new AbortController().signal);
-  const batches = deliveryBatches(events, fixture.settings, SELF, identities);
+  const batches = chatBatches(deliveryEvents(events, SELF), fixture.settings, identities);
   assert.equal(batches.length, 1);
   const data = JSON.parse(batches[0]!.text.split('\n').slice(1).join('\n'));
-  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human' }, [peer]: { kind: 'agent', owner: OBSERVER },
-    [foreign]: { kind: 'agent', owner: '@other:test.localhost' }, [unknown]: { kind: 'unknown' } });
+  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' },
+    [peer]: { kind: 'agent', owner: OBSERVER, display_name: null, owner_display_name: null, relationship: 'owners-agent' },
+    [foreign]: { kind: 'agent', owner: '@other:test.localhost', display_name: null, owner_display_name: null, relationship: 'other-owners-agent' },
+    [unknown]: { kind: 'unknown', display_name: null, relationship: 'unknown' } });
   assert.deepEqual(data.events.map((event: { event_id: string }) => event.event_id), ['$owner', '$peer', '$foreign', '$unknown', '$again']);
   assert.equal(fixture.requests.filter(request => request.path === '/api/principal-resolutions').length, 1);
   const large = Array.from({ length: 3 }, (_, index) => eventView(message('$large-' + index, index === 0 ? OBSERVER : peer, 'x'.repeat(500)), ROOM));
-  const divided = deliveryBatches(large, fixture.settings, SELF, identities, 1400);
+  const divided = chatBatches(large, fixture.settings, identities, 2200);
   assert(divided.length > 1);
   for (const batch of divided) {
-    assert(Buffer.byteLength(batch.text) <= 1400);
+    assert(Buffer.byteLength(batch.text) <= 2200);
     const value = JSON.parse(batch.text.split('\n').slice(1).join('\n'));
     assert.deepEqual(Object.keys(value.senders).sort(), [...new Set(value.events.map((event: { sender: string }) => event.sender))].sort());
   }
-  assert.throws(() => deliveryBatches(events, fixture.settings, SELF, new Map()), /Missing verified sender identity/);
+  assert.throws(() => chatBatches(deliveryEvents(events, SELF), fixture.settings, new Map()), /Missing verified sender identity/);
 });
 
 test('sender resolution rejects partial, substituted, duplicate and inconsistent metadata without inferred ownership', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope));
   const events = [eventView(message('$owner', OBSERVER), ROOM)];
-  const invalid: PrincipalIdentity[][] = [[], [{ matrixUserId: '@other:test.localhost', kind: 'human', ownerMatrixId: null }],
-    [{ matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: OBSERVER }],
-    [{ matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null }, { matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null }]];
+  const invalid: PrincipalIdentity[][] = [[], [{ matrixUserId: '@other:test.localhost', kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }],
+    [{ matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: OBSERVER, displayName: null, ownerDisplayName: null }],
+    [{ matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }, { matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }]];
   for (const response of invalid) {
     await assert.rejects(resolveSenders({ ...fixture.coordination, identities: async () => success(response) }, events, new AbortController().signal));
   }
@@ -72,7 +74,7 @@ test('sender resolution retains its exact request while the independent receiver
   await until(() => native.requests().some(request => request.method === 'turn/start'));
   const input = native.requests().find(request => request.method === 'turn/start')!.params!.input as { text: string }[];
   const data = JSON.parse(input[0]!.text.split('\n').slice(1).join('\n'));
-  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human' } });
+  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' } });
 });
 
 test('idle and blocked traffic perform no sender lookups; authorized delivery includes buffered verified ownership', async scope => {
@@ -89,7 +91,8 @@ test('idle and blocked traffic perform no sender lookups; authorized delivery in
   await until(() => native.requests().some(request => request.method === 'turn/start'));
   const input = native.requests().find(request => request.method === 'turn/start')!.params!.input as { text: string }[];
   const data = JSON.parse(input[0]!.text.split('\n').slice(1).join('\n'));
-  assert.deepEqual(data.senders, { '@agent-holmes:test.localhost': { kind: 'agent', owner: OBSERVER }, [OBSERVER]: { kind: 'human' } });
+  assert.deepEqual(data.senders, { '@agent-holmes:test.localhost': { kind: 'agent', owner: OBSERVER, display_name: null, owner_display_name: null, relationship: 'owners-agent' },
+    [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' } });
   assert.deepEqual(data.events.map((event: { event_id: string }) => event.event_id), ['$peer', '$owner']);
   assert.equal(fixture.requests.filter(request => request.path === '/api/principal-resolutions').length, 1);
 });

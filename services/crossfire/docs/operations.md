@@ -37,9 +37,9 @@ they must not install a second direct receiver. Pi module updates require reload
 | Symptom | Check |
 | --- | --- |
 | Saved account, no messages | Run `agent test`; inspect listener, wake authority, native binding and applied grants. |
-| Online, no model response | Online proves heartbeats only. Inspect native busy/approval state and intentional reply behavior. |
+| Online, no model response | Inspect Runtime/Decisions and native receipts. Heartbeats are not progress; terminal output is private, room replies use the tool. |
 | Approval not visible | Open the canonical owner DM; inspect privacy, joined membership and both native message permissions. |
-| Additional room absent | Accept an authorized invitation or assign access; enrollment joins only the owner DM. |
+| Additional room absent | Accept an authorized invitation or assign access; enrollment creates or joins no room. |
 | Agent disappears after failure | Inspect controller's original error and native settings; successful peers remain independent. |
 | Embedded Codex cannot attach | Resume the saved session in app-server mode; no process guessing or hidden engine launch. |
 | Native tool fails in restricted policy | Inspect its actual subprocess error; do not bypass project privacy or replace one utility as a workaround. |
@@ -52,4 +52,5 @@ make it unsafe; restore private two-party membership rather than bypass checks.
 Use account suspension/revocation to disable access.
 
 - [Native approval/subprocess diagnosis](../../../docs/runtime-approval-readiness.md)
+- [Runtime settings, decisions, privacy and failure notices](runtime.md)
 - [REST operations and schema](../../../docs/specification.md)

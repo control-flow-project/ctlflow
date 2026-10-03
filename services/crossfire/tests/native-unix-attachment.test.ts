@@ -32,7 +32,7 @@ test('stock Codex native Unix socket attaches the exact existing session without
   const started = await owner.request('thread/start', { cwd: workspace }) as { thread: { id: string } };
   await materialize({ session: started.thread.id, call: async (method, params) => await owner.request(method, params) as Record<string, unknown>, notifications: notices }, provider);
   const adapter = discoverCodex(workspace, { CODEX_HOME: home, CODEX_THREAD_ID: started.thread.id });
-  const connection = await adapter.runtime(stop.signal, 100, { requestPermission: async () => { throw Error('Unexpected permission'); } });
+  const connection = await adapter.runtime(stop.signal, 100, { requestDecision: async () => { throw Error('Unexpected permission'); } });
   assert.equal((await connection.inspect()).busy, false);
   assert.equal(connection.sessionId, started.thread.id);
   assert.equal(provider.requests.length, 0);

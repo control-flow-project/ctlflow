@@ -86,7 +86,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   trustWorkspace(nativeHome, workspace);
   const runtime = await codexRuntime().start({ name: 'ssh-native', workspace, instructions: 'Inert verification. No work is requested.',
     options: { model: 'gpt-5.1', model_reasoning_effort: 'medium', sandbox_mode: 'read-only', approval_policy: 'never' },
-    hooks: { requestPermission: async () => { throw new Error('No tool approval is expected'); } } }, scope.signal);
+    hooks: { requestDecision: async () => { throw new Error('No tool approval is expected'); } } }, scope.signal);
   assert(runtime.ok); nativeRuntime = runtime.value;
   const realPointer = codexTerminal().command(nativeRuntime.attachment); assert(realPointer.ok);
   const realRemote = sshTerminalCommand('fixture', realPointer.value);

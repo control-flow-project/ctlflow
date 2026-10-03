@@ -20,7 +20,7 @@ test('stock Codex default and native bypass execute synchronous subprocess IPC a
   const provider = await nativeProvider(scope, home), adapter = codexRuntime(), stop = new AbortController();
   trustWorkspace(home, workspace);
   const input = { name: 'native-options', workspace, instructions: 'Inert native option proof.',
-    options: {} as Record<string, unknown>, hooks: { requestPermission: async () => { throw new Error('Unexpected fixture approval'); } } };
+    options: {} as Record<string, unknown>, hooks: { requestDecision: async () => { throw new Error('Unexpected fixture approval'); } } };
   let runtime = value(await adapter.start(input, stop.signal));
   cleanup(scope, () => runtime.close());
   const sessionId = runtime.sessionId;
@@ -61,7 +61,7 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   trustWorkspace(home, workspace);
   const input = { name: 'native-proof', workspace, instructions: 'Inert native verification. Never contact external services.',
     options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'read-only', approval_policy: 'never' },
-    hooks: { requestPermission: async () => { throw new Error('No approvals are expected'); } } };
+    hooks: { requestDecision: async () => { throw new Error('No approvals are expected'); } } };
   let runtime = value(await adapter.start(input, stop.signal));
   cleanup(scope, () => runtime.close());
   assert.equal(provider.requests.length, 0);

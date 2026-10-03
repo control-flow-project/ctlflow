@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
 import { success } from '@crossfire/kernel/result';
+import { ownedVersion, ownedQuestionCapability } from '@crossfire/adapter-codex/owned-options';
 
 test('owned Codex defaults to full access with owner-routed on-request approval', () => {
   const adapter = codexRuntime();
@@ -22,5 +23,23 @@ test('native bypass conflicts and unknown options are rejected instead of silent
     { dangerously_bypass_approvals_and_sandbox: 'true' }, { sandbox_mode: 'invalid' },
     { approval_policy: 'invalid' }, { endpoint: 'ws://unowned:1234' }, { yolo: true }]) {
     assert.equal(adapter.validate(input).ok, false, JSON.stringify(input));
+  }
+});
+
+test('native question configuration checks the actual binary capability before process startup', () => {
+  assert(ownedVersion('codex-cli 0.158.0').ok);
+  assert(ownedVersion('codex-cli 0.159.2').ok);
+  assert(ownedVersion('codex-cli 0.160.0').ok);
+  assert(ownedVersion('codex-cli 1.0.0').ok);
+  for (const version of ['codex-cli 0.157.9', 'unexpected version']) assert.equal(ownedVersion(version).ok, false);
+  for (const listing of ['default_mode_request_user_input\tunder development\tfalse\n',
+    'unrelated stable true\ndefault_mode_request_user_input stable true\n']) assert(ownedQuestionCapability(listing).ok);
+  const unsupported = ownedQuestionCapability('unrelated stable true\n');
+  assert(!unsupported.ok && unsupported.error.message.includes('features.default_mode_request_user_input'));
+  for (const listing of ['default_mode_request_user_input false', 'default_mode_request_user_input stable unknown',
+    'default_mode_request_user_input stable true\ndefault_mode_request_user_input stable false']) assert.equal(ownedQuestionCapability(listing).ok, false);
+  assert(codexRuntime().validate({ features: { default_mode_request_user_input: true } }).ok);
+  for (const input of [{ features: { unknown_feature: true } }, { features: { default_mode_request_user_input: 'true' } }]) {
+    assert.equal(codexRuntime().validate(input).ok, false);
   }
 });

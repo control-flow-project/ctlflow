@@ -6,7 +6,7 @@ import { reconcileRoomGrant } from '../room-access/reconcile-grant.js';
 import { recordEvent } from '../audit/record-event.js';
 import type { RoomInvitation } from '../port/matrix-authority.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'roomOperations'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
 
 export function ensureOwnerConversation(services: Dependencies, agentId: string, invitation: RoomInvitation | null = null) {
   return services.roomOperations.run('agent:' + agentId, async () => {

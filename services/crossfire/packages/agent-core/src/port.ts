@@ -7,8 +7,8 @@ export type Clock = {
 };
 export type LocalState = {
   exists(path: string): boolean;
-  read<Value>(path: string): Value;
-  write(path: string, value: unknown): void;
+  read<Value>(path: string, maximumBytes?: number): Value;
+  write(path: string, value: unknown, maximumBytes?: number): void;
   remove(path: string): void;
 };
 export type Matrix = {

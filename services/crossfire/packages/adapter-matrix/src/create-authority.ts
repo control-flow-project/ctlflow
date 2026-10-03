@@ -2,7 +2,7 @@ import { authority, type Config } from './account/authority.js';
 import { joined, roomFacts } from './room/facts.js';
 import { roomCreators, roomPowers } from '@crossfire/contracts/matrix-room';
 import { createInvitationReader, invitationEvent } from './room/invitation.js';
-import { createOwnerConversations, verifyOwnerConversation } from './room/owner-conversation.js';
+import { createOwnerConversations, verifyOwnerConversation, markDirect } from './room/owner-conversation.js';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { MatrixAuthority, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';
 import { API, segment } from '@crossfire/contracts/matrix';
@@ -13,6 +13,10 @@ import { LISTENER_NOTICE, isListenerNotice } from '@crossfire/contracts/notices'
 export function createMatrixAuthority(config: Config): MatrixAuthority {
   const accounts = authority(config);
   const invitationState = createInvitationReader();
+  async function direct(matrixUserId: string, counterpartMatrixId: string, roomId: string): Promise<Result<void>> {
+    const client = await accounts.asUser(matrixUserId);
+    return client.ok ? markDirect(client.value, matrixUserId, counterpartMatrixId, roomId) : client;
+  }
   async function room(matrixUserId: string, roomId: string): Promise<Result<RoomFacts>> {
     const client = await accounts.asUser(matrixUserId);
     if (!client.ok) return client;
@@ -72,6 +76,7 @@ export function createMatrixAuthority(config: Config): MatrixAuthority {
   }
   return {
     ownerConversation: createOwnerConversations(accounts, config.serverName),
+    markDirect: direct,
     verifyOwnerConversation: (owner, agent, room) => verifyOwnerConversation(accounts, owner, agent, room),
     identify: accounts.identify, exists: accounts.exists, deactivate: accounts.deactivate, discard: accounts.discard, profileName: accounts.profileName, close: accounts.close,
     async provision(matrixUserId, password, deviceId) {

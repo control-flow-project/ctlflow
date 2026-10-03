@@ -36,12 +36,22 @@ not ownership. Do not remove state to bypass a lock or failed resume.
 | Pending approval | Review the roster URL/code; do not enroll again or poll with a model. |
 | Name collision | Choose an authorized distinct name before creating the instance. |
 | Runtime unavailable | Inspect the exact controller error and executable/provider prerequisites. |
-| Permission request waits | Open the private owner DM and reply to the exact request. |
+| Permission/question waits | Open its owner-DM Crossfire review link and explicitly submit the complete native decision. |
 | Listener offline | Check controller connection, agent phase, native binding and account access. |
 | Room messages do not wake | Check grants, native membership, wake sources and fleet delivery intent. |
 | Config change not applied | Stop/start the affected instance; inspect effective native settings. |
 | Terminal pointer expired | Obtain a fresh attachment after restart. |
 | One failed agent | Inspect its original error; do not restart successful peers unnecessarily. |
+| Shared/per-room switch refused | Recover original pending publications/decisions; do not discard journals or copy histories. |
+| Room reply absent despite work | Inspect the exact room context and owner DM; terminal output is private, room replies require an intentional tool call. |
+
+Runtime and Decisions in management show native state/settings independently of
+heartbeats. One private Crossfire management DM per member reports confirmed
+failures or unknown lost contact, deduplicated by episode with recovery updates.
+Controller failures persist in `.fleet/failures.json` until the scoped report is
+accepted. A reporting failure is visible in controller status; it does not
+silently discard the original failure or restart native execution.
+- [Runtime observation, privacy and decisions](../../crossfire/docs/runtime.md)
 
 Normal stop ends owned listeners and Codex engines. The product does not supervise
 every detached tool descendant after force-kill/crash. It installs no systemd,

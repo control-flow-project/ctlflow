@@ -4,13 +4,13 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import test from 'node:test';
 import { listen } from '@crossfire/adapter-crossfire/listener';
-import type { RuntimeHooks, Permission } from '@crossfire/agent-core/runtime';
+import type { RuntimeHooks, RuntimeDecision } from '@crossfire/agent-core/runtime';
 import { isListenerNotice } from '@crossfire/contracts/notices';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import { success } from '@crossfire/kernel/result';
 import { fakeCodex, matrixFixture, temporary, message, ROOM, OWNER_DM, AGENT_ID, OBSERVER, SELF, THREAD } from './test-support/listener.js';
 
-const permission: Permission = { runtime: 'codex', session: THREAD, request: 'fixture-request', action: 'command',
+const permission: RuntimeDecision = { runtime: 'codex', session: THREAD, request: 'fixture-request', action: 'command', turn: 'original-turn', item: 'original-item', blocking: true,
   scope: { command: 'npm install', cwd: '/work/project' },
   choices: [{ label: 'approve once', value: { decision: 'accept' } }, { label: 'deny', value: { decision: 'decline' } }] };
 
@@ -38,15 +38,14 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
     await clock.until(() => existsSync(fixture.cursorFile + '.control') && readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused);
   }
   assert(hooks);
-  const pending = hooks.requestPermission(permission, stop.signal);
-  await clock.until(() => fixture.rooms.get(OWNER_DM)!.some(event => event.sender === SELF && String(event.content.body).includes('Permission needed')));
-  const request = fixture.rooms.get(OWNER_DM)!.find(event => event.sender === SELF && String(event.content.body).includes('Permission needed'))!;
+  const pending = hooks.requestDecision(permission, stop.signal);
+  await clock.until(() => fixture.rooms.get(OWNER_DM)!.some(event => event.sender === SELF && String(event.content.body).includes('review and answer')));
+  const request = fixture.rooms.get(OWNER_DM)!.find(event => event.sender === SELF && String(event.content.body).includes('review and answer'))!;
   assert(isListenerNotice(request), 'Automatic native approvals cannot wake peer models');
-  const reply = { ...message('$approval', OBSERVER, 'approve once'), content: { msgtype: 'm.text', body: 'approve once',
-    'm.relates_to': { 'm.in_reply_to': { event_id: request.event_id } } } };
-  fixture.add(OWNER_DM, { ...reply, event_id: '$outsider', sender: '@administrator:elsewhere' });
-  fixture.add(OWNER_DM, reply);
+  assert(String(request.content.body).includes('/manage/agents/' + AGENT_ID + '/decisions/'));
+  fixture.answerDecision([...fixture.decisions.keys()][0]!);
   assert.deepEqual(await clock.complete(pending), success({ decision: 'accept' }));
+  hooks.decisionResponded?.(permission);
   assert.equal(readJson<{ paused: boolean }>(fixture.cursorFile + '.control').paused, mode === 'paused');
   assert.equal(delivered.length, 0);
   fixture.add(ROOM, message('$resume', OBSERVER, 'Continue the project'));
@@ -81,7 +80,7 @@ test('an unavailable first-use owner DM denies only that permission request, not
   await clock.until(() => ready && fixture.waiting() > 0);
   assert(hooks);
   assert.equal(fixture.requests.some(request => request.path.endsWith('/owner-conversation')), false);
-  const result = await clock.complete(hooks.requestPermission(permission, stop.signal));
+  const result = await clock.complete(hooks.requestDecision(permission, stop.signal));
   assert.equal(result.ok, false);
   assert.equal(ready, true);
   assert.equal(closed, false);

@@ -15,14 +15,14 @@ test('exact authenticated WS attachment leaves the external engine and sessions 
   mkdirSync(home); mkdirSync(workspace);
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, workspace);
-  await assert.rejects(connectCodex({ ...engine, hooks: { requestPermission: async () => { throw new Error('Unexpected permission'); } } },
+  await assert.rejects(connectCodex({ ...engine, hooks: { requestDecision: async () => { throw new Error('Unexpected permission'); } } },
     new AbortController().signal), /no rollout found|not found/);
   assert.equal(provider.requests.length, 0, 'Attachment cannot insert a synthetic first model turn');
   await materialize(engine, provider);
   const other = await engine.call('thread/start', { cwd: workspace });
   const stop = new AbortController();
   const options = { ...engine, timeoutMs: 10_000, pollMs: 100,
-    hooks: { requestPermission: async () => { throw new Error('Unexpected permission in inert attachment proof'); } } };
+    hooks: { requestDecision: async () => { throw new Error('Unexpected permission in inert attachment proof'); } } };
   await assert.rejects(connectCodex({ ...options, token: 'incorrect-token' }, stop.signal), /connection failed/);
   const attached = await connectCodex(options, stop.signal);
   cleanup(scope, attached.close);

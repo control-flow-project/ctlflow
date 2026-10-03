@@ -2,7 +2,8 @@ import { Marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 import type { JsonObject } from '@crossfire/contracts/json';
 
-export const MAX_MESSAGE_BYTES = 50_000;
+import { MAX_MESSAGE_BYTES } from '@crossfire/contracts/limits';
+export { MAX_MESSAGE_BYTES } from '@crossfire/contracts/limits';
 
 const markdown = new Marked({
   gfm: true,

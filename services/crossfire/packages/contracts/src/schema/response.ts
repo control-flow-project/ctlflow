@@ -6,7 +6,7 @@ import { fleetControl } from '../fleet-control.js';
 export const principal = check.object({ principalId: check.identifier, matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent'),
   displayName: check.text(255), ownerId: check.identifier, ownerMatrixId: check.matrixUserId });
 export const principalIdentity = check.refine(check.object({ matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent', 'unknown'),
-  ownerMatrixId: check.nullable(check.matrixUserId) }), identity => (identity.kind === 'agent') === (identity.ownerMatrixId !== null),
+  ownerMatrixId: check.nullable(check.matrixUserId), displayName: check.nullable(check.text(255)), ownerDisplayName: check.nullable(check.text(255)) }), identity => (identity.kind === 'agent') === (identity.ownerMatrixId !== null),
   'Only registered agents have an owner');
 export const principalIdentities = check.refine(check.list(principalIdentity, 100, 1),
   identities => new Set(identities.map(identity => identity.matrixUserId)).size === identities.length, 'Resolved identities must be unique');

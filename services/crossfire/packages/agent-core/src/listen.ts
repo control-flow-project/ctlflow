@@ -1,49 +1,30 @@
 import type { Clock, LocalState, Transport } from './port.js';
-import { createHash } from 'node:crypto';
 import { API, segment } from '@crossfire/contracts/matrix';
 import type { Matrix } from './port.js';
 import { selectRoom } from '@crossfire/contracts/validation';
 import type { Account, Settings, Event } from '@crossfire/contracts/client';
 import type { Coordination } from './coordination.js';
-import { synchronize, loadSyncCursor, checkpointSync, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, deliveryText, eventView, joinedRooms, type ReceivedEvent } from './receive.js';
+import { synchronize, loadSyncCursor, loadCursors, checkpointSync, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, eventView, joinedRooms, type ReceivedEvent } from './receive.js';
 import { captureWake, collectBatch, pendingBatch, wakeEvent, loadWake, saveWake, retireSnapshot } from './delivery.js';
+import { eventOrigins } from './origins.js';
 import type { RuntimeAdapter } from './runtime.js';
-import { DEFAULT_OUTPUT_BYTES, MAX_OUTPUT_BYTES } from '@crossfire/contracts/limits';
 import { loadControl, saveControl, humanEvents, humanText, isControl, publishControlNotice } from './control.js';
-import { permissions } from './permissions.js';
+import { decisions } from './decisions.js';
+import { ownerObservation } from './owner-observation.js';
+import { INPUT_BYTES } from '@crossfire/contracts/runtime';
 import { reportActivity } from './activity.js';
 import { requireCurrentRelease } from './release.js';
 import type { Manifest } from '@crossfire/contracts/release';
 import { isListenerNotice, mentionsAgent } from '@crossfire/contracts/notices';
 import { incrementalEvents } from './receive.js';
-import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
 import { deliveryEvents, resolveSenders } from './senders.js';
 import { testListener, type ListenerTest } from './diagnostic.js';
 import { releaseUpdates } from './updates.js';
 import { controlledPublisher, waitForActivation, type ListenerControl } from './listener-control.js';
 import type { ReadBatch } from './receive.js';
 import { scheduledPublisher } from './scheduled.js';
-
-export function deliveryBatches(events: readonly ReceivedEvent[], settings: Settings, self: string,
-  identities: ReadonlyMap<string, PrincipalIdentity>, maximum = DEFAULT_OUTPUT_BYTES) {
-  if (!Number.isSafeInteger(maximum) || maximum < 1024 || maximum > MAX_OUTPUT_BYTES) throw new Error('Invalid runtime input budget');
-  const batches: { text: string; messageId: string; messages: number }[] = [];
-  let current: ReceivedEvent[] = [];
-  function flush(): void {
-    if (!current.length) return;
-    batches.push({ text: deliveryText(current, settings, identities), messageId: 'crossfire-' + createHash('sha256')
-      .update(JSON.stringify([settings.instance, ...current.map(event => [event.room_id, event.event_id])])).digest('hex'),
-    messages: current.filter(event => event.type === 'm.room.message').length });
-    current = [];
-  }
-  for (const event of deliveryEvents(events, self)) {
-    if (Buffer.byteLength(deliveryText([event], settings, identities)) > maximum) throw new Error(`A chat event exceeds the ${maximum}-byte runtime input limit; retrieve it explicitly`);
-    if (Buffer.byteLength(deliveryText([...current, event], settings, identities)) > maximum) flush();
-    current.push(event);
-  }
-  flush();
-  return batches;
-}
+import { chatPublication } from './chat-publication.js';
+import { chatBatches } from './chat-batches.js';
 
 export type ListenerOptions = {
   clock: Clock;
@@ -60,6 +41,7 @@ export type ListenerOptions = {
   room?: string;
   limit: number;
   maximumBytes?: number;
+  historyMode?: 'shared' | 'per-room';
   pollMs: number;
   debounceMs: number;
   runtime: RuntimeAdapter;
@@ -82,24 +64,36 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   if (!current.ok) throw new Error(current.error.message);
   const failed = new AbortController();
   const lifetime = AbortSignal.any([stop, failed.signal]);
-  const approval = permissions({
+  let reportingRun: string | undefined;
+  let runReady!: () => void;
+  const reporting = new Promise<void>(resolve => { runReady = resolve; });
+  const observer = ownerObservation({ agentId: options.id, userId: options.account.user_id, file: options.cursorFile + '.observation', storage,
+    clock: options.clock, transport: options.transport, coordination: options.coordination, historyMode: options.historyMode ?? 'shared', maximum: options.maximumBytes ?? INPUT_BYTES }, lifetime);
+  const approval = decisions({
     client: options.transport(lifetime, 45_000),
     clock: options.clock,
-    coordination: options.coordination, settings: options.settings, account: options.account, agent: options.id, expiresMs: 300_000,
+    coordination: options.coordination, settings: options.settings, matrixUserId: options.account.user_id, agent: options.id,
+    run: async () => { await reporting; lifetime.throwIfAborted(); if (!reportingRun) throw new Error('Listener reporting is not ready'); return reportingRun; },
+    storage, file: options.cursorFile + '.decisions',
   }, lifetime);
   let destination: Awaited<ReturnType<RuntimeAdapter>>;
   try {
     destination = await options.runtime(lifetime, options.pollMs, {
-      requestPermission: async (permission, cancelled) => {
+      observe: observer.observe,
+      decisionResponded: approval.responded,
+      pendingDecisions: approval.unresolved,
+      requestDecision: async (permission, cancelled) => {
         return approval.request(permission, cancelled);
       },
     });
-  } catch (error) { failed.abort(error); approval?.close(); throw error; }
+  } catch (error) { failed.abort(error); runReady(); await approval.close(); await observer.close(); throw error; }
+  let activity: Awaited<ReturnType<typeof reportActivity>> | undefined;
+  try {
   const updates = releaseUpdates(storage, options.cursorFile, options.release.release, options.settings.owner, destination.sessionId);
   const controlled = options.control ? controlledPublisher(storage, options.cursorFile + '.controller-input', options.control, destination) : undefined;
   const signal = AbortSignal.any([stop, destination.signal, failed.signal]);
   const client = options.transport(signal, 45_000);
-  const maximum = options.maximumBytes ?? DEFAULT_OUTPUT_BYTES;
+  const maximum = options.maximumBytes ?? INPUT_BYTES;
   const controlFile = options.cursorFile + '.control';
   const state = loadControl(storage, controlFile, destination.sessionId);
   let since = loadSyncCursor(storage, options.cursorFile);
@@ -117,13 +111,14 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let membershipRevision = 0;
   const retiredRooms = new Set<string>();
   let sending: { cancel: AbortController; done: Promise<boolean> } | undefined;
-  let activity: Awaited<ReturnType<typeof reportActivity>> | undefined;
   const scheduled = scheduledPublisher({ storage, clock: options.clock, file: options.cursorFile + '.wake-input', coordination: options.coordination,
     agentId: options.id, runtime: destination, attachment: () => {
       if (!activity) throw new Error('Scheduled delivery requires a reporting listener');
       return { runId: activity.runId, sessionId: destination.sessionId };
     } });
   let completed: { batch: ReadBatch; messageIds: string[]; membership: number } | undefined;
+  const chat = chatPublication({ storage, file: options.cursorFile + '.chat-publication', settings: options.settings, runtime: destination,
+    mode: options.historyMode ?? 'shared', maximum, delivered: observer.delivered, count: messages => activity?.delivered(messages) });
   let pendingMessages = 0;
   const invitations = new Map<string, number>();
   let lastInvitationCheck = -Infinity;
@@ -188,13 +183,17 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     if (!senders.size) return { accepted: false, messageIds: [] };
     let messageIds: string[] = [];
     const accepted = await send(async scope => {
-      const emitted = deliveryEvents(events, options.account.user_id);
+      const emitted = await eventOrigins(options.transport(scope, 30000), options.account.user_id, deliveryEvents(events, options.account.user_id));
       const identities = await resolveSenders(options.coordination, emitted, scope);
-      const batches = deliveryBatches(emitted, options.settings, options.account.user_id, identities, maximum);
+      const batches = chatBatches(emitted, options.settings, identities, maximum, options.historyMode);
       messageIds = batches.map(batch => batch.messageId);
       for (const batch of batches) {
         pendingMessages = batch.messages;
-        await destination.deliver(batch.text, batch.messageId, scope);
+        const target = batch.room && destination.conversation ? await destination.conversation(batch.room) : destination;
+        if (batch.room && !destination.conversation) throw new Error('The selected native runtime does not support room histories');
+        await target.deliver(batch.text, batch.messageId, scope);
+        const lastRoom = batch.events.findLast(event => event.type === 'm.room.message')?.room_id;
+        if (lastRoom) await observer.delivered(lastRoom, target.sessionId);
         activity?.delivered(pendingMessages);
         pendingMessages = 0;
       }
@@ -247,6 +246,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     catch (error) { if (options.control && retryable(error)) options.control.unavailable('Fleet listener heartbeat is unavailable'); throw error; }
     activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
+    reportingRun = activity.runId; runReady(); approval.start(); observer.start(activity.runId);
   }
   try {
     if (approval) {
@@ -325,7 +325,6 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         for (const event of humans) {
           if (!joined.has(event.room_id) || !membership.has(event.room_id) || reset.has(event.room_id)) continue;
           if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id)) continue;
-          if (await approval?.consume(event)) continue;
           if (!await isControl(client, options.settings, options.account, event)) {
             if (state.paused && humanText(event, options.settings.owner)) { state.paused = false; changed(); }
             continue;
@@ -339,7 +338,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
               await publishControlNotice(client, options.coordination, options.id, options.settings, options.account, event, scope);
               continue;
             }
-            const turn = await destination.turnControl.activeTurn();
+            const turn = await destination.turnControl.activeTurn(options.historyMode === 'per-room' ? event.room_id : undefined);
             for (const earlier of state.controls) if (earlier.status === 'interrupted') earlier.status = 'superseded';
             const control = { room: event.room_id, event: event.event_id, stop: String(event.content.body).trim() === '!!',
               turn, status: 'interrupting' as const };
@@ -393,7 +392,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         await work((client, scope) => retry(() => acknowledge(storage, client, options.cursorFile, { ...value.batch,
           cursors: Object.fromEntries(Object.entries(value.batch.cursors).filter(([room]) => !retiredRooms.has(room))),
           latest: Object.fromEntries(Object.entries(value.batch.latest).filter(([room]) => !retiredRooms.has(room))) }), scope));
-        destination.acknowledge(value.messageIds); completed = undefined;
+        destination.acknowledge(value.messageIds); chat.acknowledge(); completed = undefined;
         if (value.membership !== membershipRevision) continue;
         state.controls = state.controls.filter(control => !value.batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
         saveControl(storage, controlFile, state);
@@ -404,6 +403,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       let recoveredWake = false;
       await send(async scope => { recoveredWake = await scheduled.recover(scope); });
       if (recoveredWake) continue;
+      if (chat.pending()) {
+        const recovered = await chat.recover(new Set([...allowed].filter(room => joined.has(room))));
+        if (recovered) { completed = { ...recovered, membership: membershipRevision }; continue; }
+      }
       if (state.paused) { await wait(previous); continue; }
       if (controlling) { await wait(previous, options.reconcileMs, true); continue; }
       const urgent = urgentControl();
@@ -421,6 +424,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         continue;
       }
       retiredRooms.clear();
+      if (chat.pending()) {
+        let published: Awaited<ReturnType<typeof chat.publish>>;
+        const accepted = await send(async scope => { published = await chat.publish(new Set([...allowed].filter(room => joined.has(room))), scope); });
+        if (accepted && published) completed = { ...published, membership: membershipRevision };
+        continue;
+      }
       if (controlled?.pending()) { await send(scope => controlled.publish(scope)); continue; }
       if (updates.pending()) { await send(scope => updates.publish(destination, scope)); continue; }
       let scheduledHandled = false;
@@ -438,7 +447,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         if (isListenerNotice(event)) return false;
         if (event.sender === options.account.user_id && event.type === 'm.room.message') return false;
         if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id && control.status === 'delivered')) return false;
-        return !await approval?.consume(event);
+        return true;
       }
       const pending: ReceivedEvent[] = [];
       for (const event of batch.events) if (await accept(event)) pending.push(event);
@@ -449,18 +458,26 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           if (!windowEnd) windowEnd = now + options.debounceMs;
           if (now < windowEnd) { await wait(previous, Math.ceil(windowEnd - now)); continue; }
           cycle = await work(client => captureWake(client, trigger,
-            new Set(Object.keys(batch.cursors).filter(room => allowed.has(room) && (!selected || room === selected))), since!));
+            new Set(Object.keys(batch.cursors).filter(room => allowed.has(room) && (!selected || room === selected)
+              && (options.historyMode !== 'per-room' || room === trigger.room_id))), since!));
           saveWake(storage, options.cursorFile, cycle); windowEnd = 0;
         } else if (pending.length) { windowEnd = 0; await wait(previous); continue; }
       }
-      if (cycle) batch = await work(client => collectBatch(storage, client, options.settings, options.cursorFile, batch, options.limit,
-        selected, maximum, cycle!, allowed));
+      if (cycle) {
+        const eligible = options.historyMode === 'per-room' ? new Set(Object.keys(cycle.ends).filter(room => allowed.has(room))) : allowed;
+        if (options.historyMode === 'per-room') batch = { events: batch.events.filter(event => eligible.has(event.room_id)),
+          cursors: { ...loadCursors(storage, options.cursorFile), ...Object.fromEntries(Object.entries(batch.cursors).filter(([room]) => eligible.has(room))) },
+          latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => eligible.has(room))), more_rooms: batch.more_rooms.filter(room => eligible.has(room)) };
+        batch = await work(client => collectBatch(storage, client, options.settings, options.cursorFile, batch, options.limit,
+          selected, maximum, cycle!, eligible));
+      }
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       const events: ReceivedEvent[] = [];
       for (const event of batch.events) if (await accept(event)) events.push(event);
-      const attempt = await deliver(events);
-      if (!attempt.accepted && !await settle()) continue;
-      completed = { batch, messageIds: attempt.messageIds, membership: membershipAtRead };
+      const emitted = await eventOrigins(client, options.account.user_id, deliveryEvents(events, options.account.user_id));
+      const identities = await resolveSenders(options.coordination, emitted, signal);
+      if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
+      chat.prepare(batch, emitted, identities);
       } catch (error) {
         if (options.control && (generation?.aborted || !options.control.current().active) && !signal.aborted) continue;
         throw error;
@@ -471,10 +488,14 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     cancelBackstop();
     unsubscribe?.();
     failed.abort(new Error('Listener stopped'));
-    approval?.close();
+    runReady();
     wake?.();
     await acquisition;
-    try { await activity?.close(); }
+  }
+  } finally {
+    failed.abort(new Error('Listener stopped'));
+    runReady();
+    try { await approval.close(); await observer.close(); await activity?.close(); }
     finally { await destination.close(); }
   }
 }

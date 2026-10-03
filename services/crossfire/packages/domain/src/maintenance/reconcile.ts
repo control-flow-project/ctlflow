@@ -4,7 +4,13 @@ import { expireEnrollments } from '../enrollment/expire.js';
 import { reconcilePrincipal } from '../principal/reconcile.js';
 import { reconcileRoomGrant } from '../room-access/reconcile-grant.js';
 import { publishWakeNotice } from '../notice/publish-notice.js';
+import { reconcileRuntime } from '../runtime/incidents.js';
+import { expireDecisions } from '../runtime/decisions.js';
 export async function reconcile(services: Services, stopped: () => boolean): Promise<Result<void>> {
+  const decisions = expireDecisions(services);
+  if (!decisions.ok) return decisions;
+  const runtime = await reconcileRuntime(services, stopped);
+  if (!runtime.ok) return runtime;
   const expired = services.unitOfWork.run(() => {
     const requests = expireEnrollments(services);
     return requests.ok ? services.collection.removeExpiredSessions(services.clock.now()) : requests;

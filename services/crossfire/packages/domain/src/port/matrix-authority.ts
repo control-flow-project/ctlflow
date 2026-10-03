@@ -24,6 +24,7 @@ export type MatrixAuthority = {
   joined(matrixUserId: string): Promise<Result<string[]>>;
   ownerConversation(ownerMatrixId: string, agentMatrixId: string, roomId: string | null): Promise<Result<string>>;
   verifyOwnerConversation(ownerMatrixId: string, agentMatrixId: string, roomId: string): Promise<Result<void>>;
+  markDirect(matrixUserId: string, counterpartMatrixId: string, roomId: string): Promise<Result<void>>;
   room(matrixUserId: string, roomId: string): Promise<Result<RoomFacts>>;
   membership(matrixUserId: string, targetMatrixId: string, roomId: string): Promise<Result<RoomMembership>>;
   invitation(matrixUserId: string, roomId: string): Promise<Result<RoomInvitation | null>>;

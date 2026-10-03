@@ -1,12 +1,20 @@
 import { fields, object, text } from '@crossfire/contracts/validation';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Json } from '@crossfire/contracts/json';
-import type { Permission } from '@crossfire/agent-core/runtime';
+import type { RuntimeDecision } from '@crossfire/agent-core/runtime';
 import type { NativeRequest } from './protocol.js';
 
 const choices = new Map<string, string>([
   ['accept', 'approve once'], ['acceptForSession', 'approve session'], ['decline', 'deny'], ['cancel', 'cancel turn'],
 ]);
+
+export function permissionDenial(permission: RuntimeDecision): Json | undefined {
+  const choice = permission.choices.find(choice => {
+    const value = object(choice.value);
+    return value.ok && (value.value.decision === 'decline' || value.value.decision === 'cancel');
+  });
+  return choice === undefined ? undefined : structuredClone(choice.value);
+}
 
 function nativeText(value: unknown, maximum: number): value is string {
   return typeof value === 'string' && value.length > 0 && Buffer.byteLength(value) <= maximum && !value.includes('\0');
@@ -36,15 +44,15 @@ function decision(value: unknown): Result<{ label: string; value: Json }> {
   return failure('invalid', 'Invalid native permission amendment');
 }
 
-export function codexPermission(request: NativeRequest, session: string, fileChanges?: Json): Result<Permission> {
+export function codexPermission(request: NativeRequest, session: string, fileChanges?: Json): Result<RuntimeDecision> {
   const params = request.params;
   if (params.threadId !== session || !text(params.turnId, 255) || !text(params.itemId, 255)
-    || typeof request.id !== 'string' && !Number.isSafeInteger(request.id)) return failure('invalid', 'Permission belongs to an invalid native session');
+    || typeof request.id !== 'string' && !Number.isSafeInteger(request.id)) return failure('invalid', 'RuntimeDecision belongs to an invalid native session');
   let available: unknown[];
   let action: string;
   let scope: Json;
   if (request.method === 'item/commandExecution/requestApproval') {
-    if (!nativeText(params.command, 8192) || !text(params.cwd, 4096) || !Array.isArray(params.availableDecisions)) {
+    if (!nativeText(params.command, 8 * 1024 * 1024) || !text(params.cwd, 4096) || !Array.isArray(params.availableDecisions)) {
       return failure('invalid', 'Native command approval needs its exact command, workspace and available decisions');
     }
     available = params.availableDecisions;
@@ -60,13 +68,13 @@ export function codexPermission(request: NativeRequest, session: string, fileCha
     scope = { request: JSON.parse(JSON.stringify(params)) as Json, changes: structuredClone(fileChanges) };
   } else return failure('invalid', 'Unsupported native permission request');
   if (!available.length || available.length > 16) return failure('invalid', 'Invalid native permission choice count');
-  const decoded: Permission['choices'] = [];
+  const decoded: RuntimeDecision['choices'] = [];
   for (const value of available) {
     const choice = decision(value);
     if (!choice.ok) return choice;
     if (decoded.some(previous => previous.label === choice.value.label)) return failure('invalid', 'Duplicate native permission choices');
     decoded.push(choice.value);
   }
-  const permission: Permission = { runtime: 'codex', session, request: JSON.stringify([typeof request.id, request.id]), action, scope, choices: decoded };
-  return Buffer.byteLength(JSON.stringify(permission)) <= 12_000 ? success(permission) : failure('invalid', 'Native permission exceeds the bounded chat scope');
+  return success({ runtime: 'codex', session, request: JSON.stringify([typeof request.id, request.id]), action, scope, choices: decoded,
+    turn: params.turnId as string, item: params.itemId as string, blocking: true, expiresMs: null });
 }

@@ -31,7 +31,8 @@ export function localEndpoint(value: string): string {
 }
 
 export function codexProtocol(options: { endpoint: string; token: string; timeoutMs: number;
-  event: (event: NativeEvent) => void; approval: (request: NativeRequest, signal: AbortSignal) => Promise<unknown> }, stop: AbortSignal) {
+  event: (event: NativeEvent) => void; approval: (request: NativeRequest, signal: AbortSignal) => Promise<unknown>;
+  responded?: (request: NativeRequest) => void }, stop: AbortSignal) {
   stop.throwIfAborted();
   const endpoint = localEndpoint(options.endpoint);
   const unix = endpoint.startsWith('unix://');
@@ -41,7 +42,7 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
     perMessageDeflate: false, maxPayload: MAX_FRAME_BYTES, handshakeTimeout: options.timeoutMs, followRedirects: false });
   const failure = new AbortController();
   const pending = new Map<number, Pending>();
-  const approvals = new Set<number | string>();
+  const approvals = new Map<number | string, { cancel: AbortController; thread: unknown; turn: unknown }>();
   let sequence = 0;
   let closing = false;
   const ready = new Promise<void>((resolve, reject) => {
@@ -58,6 +59,7 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
     if (!failure.signal.aborted) failure.abort(error);
     for (const request of pending.values()) { clearTimeout(request.timer); request.reject(error); }
     pending.clear();
+    for (const request of approvals.values()) request.cancel.abort(error);
     if (closing) return;
     closing = true;
     socket.terminate();
@@ -66,24 +68,41 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
   stop.addEventListener('abort', onAbort, { once: true });
   socket.on('error', () => fail(new Error('Codex WebSocket connection failed')));
   void ready.catch(fail);
-  function write(message: unknown): void {
+  function write(message: unknown): Promise<void> {
     failure.signal.throwIfAborted();
     const encoded = JSON.stringify(message);
     if (Buffer.byteLength(encoded) > MAX_FRAME_BYTES || socket.bufferedAmount > MAX_FRAME_BYTES) throw new Error('Codex request exceeds the native frame budget');
-    socket.send(encoded, error => { if (error) fail(new Error('Codex WebSocket write failed')); });
+    return new Promise((resolve, reject) => socket.send(encoded, error => {
+      if (error) { const failure = new Error('Codex WebSocket write failed'); fail(failure); reject(failure); }
+      else resolve();
+    }));
   }
   function receive(value: unknown): void {
     const message = object(value);
     if (typeof message.method === 'string') {
       const params = object(message.params);
-      if (!('id' in message)) { options.event({ method: message.method, params }); return; }
+      if (!('id' in message)) {
+        if (message.method === 'serverRequest/resolved') approvals.get(params.requestId as string | number)?.cancel.abort(new Error('Native request was resolved or withdrawn'));
+        if (message.method === 'turn/completed' || message.method === 'thread/closed') {
+          const turn = params.turn && typeof params.turn === 'object' ? (params.turn as Record<string, unknown>).id : undefined;
+          for (const request of approvals.values()) if (request.thread === params.threadId && (message.method === 'thread/closed' || request.turn === turn)) request.cancel.abort(new Error('Original native turn ended'));
+        }
+        options.event({ method: message.method, params }); return;
+      }
       if ((typeof message.id !== 'string' && !Number.isSafeInteger(message.id)) || approvals.size >= 16) throw new Error('Invalid or excessive native approval requests');
       const id = message.id as string | number;
       if (approvals.has(id)) throw new Error('Duplicate native approval identity');
-      approvals.add(id);
-      void options.approval({ id, method: message.method, params }, failure.signal).then(result => {
-        if (!failure.signal.aborted) write({ id, result });
-      }).catch(error => fail(error instanceof Error ? error : new Error('Native approval failed'))).finally(() => approvals.delete(id));
+      const cancel = new AbortController();
+      approvals.set(id, { cancel, thread: params.threadId, turn: params.turnId });
+      const signal = AbortSignal.any([failure.signal, cancel.signal]);
+      const request = { id, method: message.method, params };
+      void options.approval(request, signal).then(async result => {
+        if (!signal.aborted) { await write({ id, result }); options.responded?.(request); }
+      }, error => {
+        if (!signal.aborted) return write({ id, error: { code: -32602, message: error instanceof Error ? error.message : 'Unsupported native request' } });
+      }).catch(error => {
+        if (!failure.signal.aborted) fail(error instanceof Error ? error : new Error('Native response write failed'));
+      }).finally(() => approvals.delete(id));
       return;
     }
     if (!Number.isSafeInteger(message.id)) throw new Error('Invalid Codex response identity');
@@ -114,6 +133,6 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
       void ready.then(() => write({ id, method, params })).catch(error => fail(error instanceof Error ? error : new Error('Native request failed')));
     });
   }
-  return { signal: failure.signal, request, notify: (method: string) => write({ method }),
+  return { signal: failure.signal, request, notify: (method: string) => { void write({ method }).catch(fail); },
     close: () => fail(new Error('Codex connection closed')), closed };
 }

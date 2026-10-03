@@ -15,7 +15,7 @@ test('external app-server owns model, reasoning and workspace settings', async s
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, workspace, ['-c', 'model="fixture-selected"', '-c', 'model_reasoning_effort="high"']);
   await materialize(engine, provider);
-  const attached = await connectCodex({ ...engine, hooks: { requestPermission: async () => { throw new Error('Unexpected permission'); } } }, new AbortController().signal);
+  const attached = await connectCodex({ ...engine, hooks: { requestDecision: async () => { throw new Error('Unexpected permission'); } } }, new AbortController().signal);
   cleanup(scope, attached.close);
   assert.equal(engine.thread.cwd, workspace);
   assert.equal(engine.thread.model, 'fixture-selected');

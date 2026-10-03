@@ -25,8 +25,8 @@ async function readText(request: IncomingMessage, contentType: string, limit: nu
   }
   return success(Buffer.concat(chunks).toString('utf8'));
 }
-export async function readBody(request: IncomingMessage): Promise<Result<unknown>> {
-  const body = await readText(request, 'application/json', HTTP_LIMITS.requestBytes);
+export async function readBody(request: IncomingMessage, maximum: number = HTTP_LIMITS.requestBytes): Promise<Result<unknown>> {
+  const body = await readText(request, 'application/json', maximum);
   if (!body.ok) return body;
   try { return success(JSON.parse(body.value)); }
   catch { return failure('invalid', 'Invalid JSON'); }

@@ -17,14 +17,19 @@ export function createDiscoveryRepository(database: Database.Database): Discover
     identities(matrixUserIds) {
       return stored(() => {
         const humans = executeSelect(database, schema, (query, params) => query.from('principal')
+          .join(query.from('member'), principal => principal.id, member => member.principal_id, (principal, member) => ({ ...principal, member }))
           .where(principal => principal.kind === 'human' && params.matrixUserIds.includes(principal.matrix_user_id))
-          .select(principal => ({ matrixUserId: principal.matrix_user_id, kind: principal.kind, ownerMatrixId: null })), { matrixUserIds });
+          .select(principal => ({ matrixUserId: principal.matrix_user_id, kind: principal.kind, ownerMatrixId: null, displayName: principal.member.display_name, ownerDisplayName: null })), { matrixUserIds });
         const agents = executeSelect(database, schema, (query, params) => query.from('agent')
           .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
           .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id, (row, owner) => ({ ...row, owner }))
+          .join(query.from('member'), row => row.agent.owner_id, member => member.principal_id, (row, member) => ({ ...row, member }))
+          .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
           .where(row => params.matrixUserIds.includes(row.principal.matrix_user_id))
-          .select(row => ({ matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind, ownerMatrixId: row.owner.matrix_user_id })), { matrixUserIds });
-        return success([...humans, ...agents]);
+          .select(row => ({ matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind, ownerMatrixId: row.owner.matrix_user_id,
+            name: row.name.name, ownerDisplayName: row.member.display_name, override: row.agent.display_name_override })), { matrixUserIds });
+        const named = agents.map(({ name, override, ...identity }) => ({ ...identity, displayName: agentDisplayName(name, identity.ownerDisplayName, override) }));
+        return success([...humans, ...named]);
       });
     },
     selected(principalIds) {

@@ -25,6 +25,8 @@ fleet agent list research
 fleet agent add research analyst-west --definition analyst
 fleet agent start research analyst-west
 fleet agent attach research analyst-west
+fleet agent contexts research analyst-west
+fleet agent attach research analyst-west --context '!ORIGINAL_ROOM_ID:YOUR_SERVER'
 fleet agent stop research analyst-west
 fleet agent remove research analyst-west
 fleet stop research
@@ -40,6 +42,11 @@ it removes grouping, not the account. Closing the CLI does not cancel daemon wor
 Operation results distinguish pending approval, success and per-instance failure.
 Idempotency keys and expected revisions prevent conflicting replays.
 Name collisions, missing credentials and invalid native settings stay errors.
+
+Contexts lists exact retained running histories and their native state. Attach
+without a context selects the shared history, or private control history in
+per-room mode. `--context` chooses an existing listed context; it never creates
+a new room conversation or reads credentials into public management output.
 
 ## Delivery control and broadcast
 

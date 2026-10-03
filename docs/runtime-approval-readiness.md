@@ -23,7 +23,8 @@ subprocess capabilities.
   is disabled by an explicit native policy. Live Codex policy comes from the
   actual selected native thread, not a Crossfire default.
 - The first owner contact or real native approval request establishes the
-  protected private read/write owner DM. Starting, reconnecting and testing
+  protected private read/write owner DM. Real visible terminal output uses the
+  same lazy conversation. Starting, reconnecting and testing
   creates no chats; a roomless authenticated listener is ready. No global
   approval-room configuration exists. Established channels are checked for
   current applied grants, unmuted delivery, active identities, both joined
@@ -34,8 +35,15 @@ subprocess capabilities.
   adapter selects an exact offered native denial or cancellation; approval
   expiry, unavailable transport or lost authorization does not terminate an
   otherwise healthy session. Invalid native requests remain fatal.
-- Only the verified owner can choose a native decision by replying to the exact
-  pending request. The reply is consumed as control input, never model input.
+- Only the verified owner can answer the original pending native request through
+  its authenticated Crossfire review form. Choice links and GET requests never
+  approve; explicit submission requires CSRF protection and all required answers.
+  Ordinary DM replies are chat, not approvals. The listener returns the response
+  to the exact native request as control input, never a new model prompt.
+- Command/file approvals and structured native questions share this one decision
+  owner. A received native response is not proof the subsequent task succeeded.
+  Expiry and cancellation erase private answers; lists, URLs, audit and activity
+  never contain submitted answer values.
 - Runtime failure immediately makes the listener inactive. The controller keeps
   the bounded actual cause, preserves successful peers and excludes restart
   during failure cleanup. Secondary cleanup failure does not erase the cause.
@@ -55,8 +63,13 @@ npm run verify:architecture
 
 The focused cases live in:
 
-- `services/crossfire/tests/permissions.test.ts`: native powers, exact owner,
-  revoked authority, expiry, concurrent decisions and publication races.
+- `services/crossfire/tests/runtime-decisions.test.ts`: immutable request binding,
+  exact owner, private answers, expiry, receipts, incident recovery and private
+  management-DM permission enforcement.
+- `services/crossfire/tests/runtime-observation.test.ts`: complete visible output,
+  no reasoning, coalesced streams, immutable retry bodies and typing expiry.
+- `services/crossfire/tests/runtime-history.test.ts`: actual native structured
+  questions and persistent exact-context history/terminal attachment proofs.
 - `services/crossfire/scripts/listener-permissions.test.ts`: roomless listeners
   report readiness without creating chats; failed first-use routing denies only
   the pending request; unauthorized established routes do not report ready;

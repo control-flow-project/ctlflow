@@ -5,14 +5,15 @@ import * as check from '@crossfire/contracts/schema/validation';
 import { success, failure } from '@crossfire/kernel/result';
 import { fields } from '@crossfire/contracts/validation';
 import { acquireFileLock } from '@crossfire/adapter-filesystem/lock';
+import { MAX_INPUT_BYTES } from '@crossfire/contracts/runtime';
 
-export const deliveryText: check.Parser<string> = value => typeof value === 'string' && Buffer.byteLength(value) <= 98304
+export const deliveryText: check.Parser<string> = value => typeof value === 'string' && Buffer.byteLength(value) <= MAX_INPUT_BYTES
   ? success(value) : failure('invalid', 'Native delivery text exceeds its byte bound');
 
 export function deliveryJournal<Pending extends { text: string; messageId: string }>(file: string, sessionId: string, pending: check.Parser<Pending>) {
   const release = acquireFileLock(file);
   try {
-    const parsed = fields(existsSync(file) ? readJson<unknown>(file) : { sessionId, pending: null, confirmed: [] }, ['sessionId', 'pending', 'confirmed']);
+    const parsed = fields(existsSync(file) ? readJson<unknown>(file, 32 * 1024 * 1024) : { sessionId, pending: null, confirmed: [] }, ['sessionId', 'pending', 'confirmed']);
     if (!parsed.ok || !check.text(200)(parsed.value.sessionId).ok || parsed.value.sessionId !== sessionId) throw new Error('Invalid native delivery journal or session binding');
     const delivery = check.nullable(pending)(parsed.value.pending);
     const confirmed = check.list(check.object({ messageId: check.text(200),
@@ -22,7 +23,7 @@ export function deliveryJournal<Pending extends { text: string; messageId: strin
     const state = { sessionId, pending: delivery.value, confirmed: confirmed.value };
     let closed = false;
     const owned = () => { if (closed) throw new Error('Native delivery journal is closed'); };
-    const save = () => { owned(); writeJson(file, state); };
+    const save = () => { owned(); writeJson(file, state, 32 * 1024 * 1024); };
     const digest = (text: string) => createHash('sha256').update(text).digest('hex');
     return {
       close: () => { closed = true; release(); },

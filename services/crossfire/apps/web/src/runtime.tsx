@@ -1,0 +1,25 @@
+import { operations, useResource } from './api.js';
+import { Empty, Help, Loaded, Panel, PageItems, Status, timestamp } from './ui.js';
+import type { AgentView } from '@crossfire/contracts/schema/response';
+
+export function Runtime({ agent }: { agent: AgentView }) {
+  const observed = useResource(operations.runtimeObservations, { agentId: agent.agentId }, '', 10000);
+  return <Panel title="Runtime" description="Native activity and applied settings. Listener contact is reported separately.">
+    <Loaded {...observed} retry={observed.refresh}>{response => response.data.length ? <>
+      <PageItems items={response.data} parameter="contextsPage">{contexts => contexts.map(context => <details className="runtime-context" key={context.sessionId} open={response.data.length === 1}>
+        <summary>{context.roomId ? 'Room history · ' + context.roomId : context.historyMode === 'shared' ? 'Shared history' : 'Private control history'} · <Status value={agent.activity.status === 'online' ? context.state : 'unavailable'}/></summary>
+        <header className="panel-heading"><div><h3>{context.runtime}</h3><p>Observed {timestamp(context.observedAt)}</p></div>
+          <Status value={agent.activity.status === 'online' ? context.state : 'unavailable'}/></header>
+        <dl className="detail-list"><dt>Session</dt><dd><code>{context.sessionId}</code></dd><dt>History</dt><dd>{context.historyMode === 'shared' ? 'Shared across rooms' : 'Separate native histories per room'}</dd>
+          <dt>Input budget</dt><dd>{context.maxInputBytes.toLocaleString()} UTF-8 bytes, including origin metadata</dd>
+          <dt>Controller</dt><dd>{agent.deployment?.controllerName ?? 'Direct connection'}</dd></dl>
+        {context.errorMessage && <p role="alert" className="error">{context.errorMessage}</p>}
+        <div className="table-wrap"><table aria-label="Runtime settings"><thead><tr><th>Setting</th><th>Configured</th><th>Effective</th></tr></thead>
+          <tbody>{context.settings.map(setting => <tr key={setting.name}><td><code>{setting.name}</code></td><td>{setting.configured ?? 'Not explicitly configured'}</td><td>{setting.effective ?? 'Not reported by native runtime'}</td></tr>)}</tbody></table></div>
+      </details>)}</PageItems>
+      <Help title="Inspect the original session"><p>In the fleet CLI, run <code>fleet agent contexts FLEET AGENT</code> to list retained histories, then <code>fleet agent attach FLEET AGENT --context CONTEXT</code> for the exact native terminal command. Use the controller connection on the computer where this fleet runs.</p>
+        <p>Attaching does not start another agent or create a history. A stopped or failed runtime has no live terminal pointer. Inspect its recorded error and original workarea before explicitly restarting it.</p>
+        <p>Terminal-visible output is shared with the owner, including output derived from rooms the owner has not joined. Separate histories isolate conversation history, not files, tools or credentials.</p></Help>
+    </> : <Empty title="No native observation yet">Reconnect the listener to report its runtime. An online heartbeat alone does not prove the model is working.</Empty>}</Loaded>
+  </Panel>;
+}

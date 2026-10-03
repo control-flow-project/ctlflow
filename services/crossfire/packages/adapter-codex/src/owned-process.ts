@@ -4,18 +4,25 @@ import { once } from 'node:events';
 import { writeFileSync, unlinkSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { privateDir } from '@crossfire/adapter-filesystem/index';
+import { ownedVersion, ownedQuestionCapability } from './owned-options.js';
 
-export async function startProcess(home: string, workspace: string, stop: AbortSignal, binary = 'codex') {
+export async function startProcess(home: string, workspace: string, stop: AbortSignal, binary = 'codex', questions = false) {
   stop.throwIfAborted();
-  const version = execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 10000, maxBuffer: 4096 }).trim();
-  const matched = /^codex-cli (\d+)\.(\d+)\.(\d+)$/u.exec(version);
-  if (!matched || Number(matched[1]) === 0 && Number(matched[2]) < 158) throw new Error('Stock Codex 0.158.0 or newer is required');
+  const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: realpathSync(home) };
+  for (const name of Object.keys(environment)) if (name === 'CODEX_THREAD_ID' || name.startsWith('RUNCODEX_')) delete environment[name];
+  const version = execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 10000, maxBuffer: 4096, env: environment, cwd: workspace }).trim();
+  const supported = ownedVersion(version);
+  if (!supported.ok) throw new Error(supported.error.message);
+  if (questions) {
+    const listing = execFileSync(binary, ['features', 'list'], { encoding: 'utf8', timeout: 10000, maxBuffer: 65536, env: environment, cwd: workspace });
+    const capability = ownedQuestionCapability(listing);
+    if (!capability.ok) throw new Error(capability.error.message);
+  }
+  stop.throwIfAborted();
   const path = process.env.PATH;
   if (!path || path.length > 4096 || /[\x00-\x1f\x7f]/u.test(path)) throw new Error('Codex requires a bounded native executable search path');
   const token = randomBytes(32).toString('hex'), tokenFile = join(privateDir(home), '.crossfire-token-' + randomBytes(12).toString('hex'));
   writeFileSync(tokenFile, token, { flag: 'wx', mode: 0o600 });
-  const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: realpathSync(home) };
-  for (const name of Object.keys(environment)) if (name === 'CODEX_THREAD_ID' || name.startsWith('RUNCODEX_')) delete environment[name];
   const child = spawn(binary, ['app-server', '--listen', 'ws://127.0.0.1:0', '--ws-auth', 'capability-token', '--ws-token-file', tokenFile], { cwd: workspace, env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
   const lifetime = new AbortController();
   const ended = once(child, 'close').then(() => { lifetime.abort(new Error('Owned Codex process exited')); }, () => { lifetime.abort(new Error('Owned Codex process could not start')); });

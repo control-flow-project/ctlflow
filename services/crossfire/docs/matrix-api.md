@@ -67,6 +67,12 @@ counts, not just message bodies. Native JSON response collection is separately
 bounded to 1 MiB. Explicit output files use the configured file cap and exclusive
 0600 creation. No automatic file-to-context expansion exists.
 
+These are intentional tool-reading budgets. Automatic listener input has its own
+100000-byte complete UTF-8 budget, configurable per fleet instance from 1024 to
+4194304 bytes. Native terminal/tool output and complete permission review use
+separate resource bounds; they do not inherit these chat/tool-reading limits.
+- [Runtime messages, histories and owner-output disclosure](runtime.md)
+
 Receive defaults to 20 events **total across rooms**, configurable 1..100.
 Native query `limit` fields default to 20 with a maximum of 100. Search/public-room/
 user-directory body limits are similarly validated. Other native body filters

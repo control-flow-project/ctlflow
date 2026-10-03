@@ -51,6 +51,7 @@ test('empty acquisition completion releases a blocked backlog reader without wai
   const matrix = await matrixFixture(context, native.directory);
   const stop = new AbortController();
   const receiving = listen({ ...matrix, reconcileMs: 120_000, limit: 1, pollMs: 10_000, debounceMs: 0,
+    maximumBytes: 64 * 1024,
     runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(context, async () => { stop.abort(); await receiving; });
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
@@ -165,7 +166,7 @@ test('permanent Matrix errors, suspended ownership, and oversized messages stop 
     if (kind === 'ownership') matrix.access.ownerStatus = 'suspended';
     matrix.add(ROOM, message('$one', undefined, kind === 'oversized' ? 'x'.repeat(128 * 1024) : 'normal'));
     await assert.rejects(listen({ ...matrix, reconcileMs: 1000, limit: 50, pollMs: 100, debounceMs: 0, runtime: native.runtime }, new AbortController().signal),
-      kind === 'authentication' ? /HTTP 401/ : kind === 'ownership' ? /not currently authorized/ : /65536-byte/);
+      kind === 'authentication' ? /HTTP 401/ : kind === 'ownership' ? /Agent and owner must be active/ : /100000-byte/);
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
     assert.equal(existsSync(matrix.cursorFile), false);
   }

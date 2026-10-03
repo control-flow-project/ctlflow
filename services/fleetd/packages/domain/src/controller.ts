@@ -76,14 +76,22 @@ export function createController(services: Services) {
     }
     return success(values);
   }
-  function attachment(fleetId: string, instanceKey: string): Result<RuntimeAttachment> {
+  async function attachment(fleetId: string, instanceKey: string, context?: string): Promise<Result<RuntimeAttachment>> {
     const current = view(fleetId);
     if (!current.ok) return current;
     const instance = current.value.instances.find(value => value.instance.key === instanceKey);
     if (!instance) return failure('missing', 'Instance not found');
     const runtime = running.get(key(fleetId, instanceKey));
     if (stopping || instance.phase !== 'running' || !runtime || runtime.signal.aborted) return failure('conflict', 'Start this agent before attaching its terminal');
-    return success(structuredClone(runtime.attachment));
+    if (context === undefined) return success(structuredClone(runtime.attachment));
+    const selected = (await runtime.attachments()).find(item => item.context === context);
+    return selected ? success(structuredClone(selected.attachment)) : failure('missing', 'Retained native history not found; attaching never creates one');
+  }
+  async function contexts(fleetId: string, instanceKey: string) {
+    const available = await attachment(fleetId, instanceKey);
+    if (!available.ok) return available;
+    const runtime = running.get(key(fleetId, instanceKey))!;
+    return success((await runtime.attachments()).map(item => ({ context: item.context, runtime: item.attachment.runtime, sessionId: item.attachment.sessionId })));
   }
   function add(directory: string): Result<FleetState> {
     if (stopping) return failure('unavailable', 'Controller is stopping');
@@ -273,7 +281,7 @@ export function createController(services: Services) {
     running.clear(); lifetime.abort(new Error('Controller stopped'));
     await services.execution.close();
   }
-  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), list, view, attachment, add, rename, remove, editInstance, operate, close,
+  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), list, view, attachment, contexts, add, rename, remove, editInstance, operate, close,
     async delivery(fleetId: string, input: { expectedRevision: number; enabled: boolean }) {
       const current = inspect(fleetId); if (!current.ok) return current;
       if (stopping) return failure('unavailable', 'Controller is stopping');

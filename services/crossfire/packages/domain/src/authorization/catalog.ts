@@ -1,4 +1,6 @@
 export const permissionCatalog = [
+  { code: 'runtime.report.self', grantScope: 'role', description: 'Report own native runtime observations and decisions', roles: ['agent'] },
+  { code: 'runtime.decision.answer.owned', grantScope: 'role', description: 'Answer native decisions of owned agents', roles: ['member', 'administrator'] },
   { code: 'wake-rule.read.owned', grantScope: 'role', description: 'Read owned scheduled wake-up rules', roles: ['member', 'administrator'] },
   { code: 'wake-rule.read.any', grantScope: 'role', description: 'Read every scheduled wake-up rule', roles: ['administrator'] },
   { code: 'wake-rule.manage.owned', grantScope: 'role', description: 'Manage owned scheduled wake-up rules', roles: ['member', 'administrator'] },

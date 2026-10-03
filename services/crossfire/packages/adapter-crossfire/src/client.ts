@@ -16,7 +16,7 @@ export function createClient(options: ClientOptions) {
       const checkedParams = operation.params(params), checkedInput = operation.input(input), checkedQuery = operation.query(query);
       if (!checkedParams.ok) return checkedParams; if (!checkedInput.ok) return checkedInput; if (!checkedQuery.ok) return checkedQuery;
       const serialized = JSON.stringify(checkedInput.value);
-      if (new TextEncoder().encode(serialized).byteLength > HTTP_LIMITS.requestBytes) return failure('body_too_large', 'Request exceeds the API input bound');
+      if (new TextEncoder().encode(serialized).byteLength > (operation.requestBytes ?? HTTP_LIMITS.requestBytes)) return failure('body_too_large', 'Request exceeds the API input bound');
       const signals = [AbortSignal.timeout(options.timeoutMs ?? HTTP_LIMITS.requestMilliseconds)];
       if (options.signal) signals.push(options.signal); if (signal) signals.push(signal);
       try {

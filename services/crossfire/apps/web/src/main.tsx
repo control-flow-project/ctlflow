@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Session, useSession } from './session.js';
 import { Agents, AgentDetail } from './agents.js';
 import { AgentRoomDetail } from './agent-rooms.js';
+import { DecisionDetail } from './decisions.js';
 import { Enrollments } from './enrollments.js';
 import { Connect } from './connect.js';
 import { Members, Invitations, Settings, Audit } from './administration.js';
@@ -36,8 +37,10 @@ function Route({ canInvite }: { canInvite: boolean }) {
   if (path === '/manage/wake-ups/new') return <WakeUpDetail/>;
   const wakeUp = /^\/manage\/wake-ups\/([a-f0-9-]{36})$/u.exec(path);
   if (wakeUp) return <WakeUpDetail id={wakeUp[1]!}/>;
-  const agent = /^\/manage\/agents\/([a-f0-9-]{36})(?:\/(wake|activity|software|settings))?$/u.exec(path);
-  if (agent) { const section = agent[2]; if (section === undefined || section === 'wake' || section === 'activity' || section === 'software' || section === 'settings') return <AgentDetail id={agent[1]!} section={section ?? 'rooms'}/>; }
+  const decision = /^\/manage\/agents\/([a-f0-9-]{36})\/decisions\/([a-f0-9-]{36})$/u.exec(path);
+  if (decision) return <DecisionDetail agentId={decision[1]!} decisionId={decision[2]!}/>;
+  const agent = /^\/manage\/agents\/([a-f0-9-]{36})(?:\/(wake|activity|runtime|decisions|software|settings))?$/u.exec(path);
+  if (agent) { const section = agent[2]; if (section === undefined || section === 'wake' || section === 'activity' || section === 'runtime' || section === 'decisions' || section === 'software' || section === 'settings') return <AgentDetail id={agent[1]!} section={section ?? 'rooms'}/>; }
   const agentRoom = /^\/manage\/agents\/([a-f0-9-]{36})\/rooms\/([^/]+)$/u.exec(path);
   if (agentRoom) return <AgentRoomDetail id={agentRoom[1]!} room={decodeURIComponent(agentRoom[2]!)}/>;
   if (path === '/manage/enrollments') return <Enrollments/>;

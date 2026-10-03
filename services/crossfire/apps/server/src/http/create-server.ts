@@ -21,6 +21,7 @@ import { wakeUpRoutes } from './routes/wake-up.js';
 import { roomRoutes } from './routes/room.js';
 import { memberRoutes } from './routes/member.js';
 import { instanceRoutes } from './routes/instance.js';
+import { runtimeRoutes } from './routes/runtime.js';
 import { registrationTransport, invitationCookie, setInvitationCookie, registrationStage } from './registration.js';
 import { verifyInvitation } from '@crossfire/domain/member/registration';
 import { searchMatrixDirectory } from './matrix-directory.js';
@@ -29,7 +30,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
   const register = registrationTransport(services);
   const fleetChanges = createFleetChanges();
   const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...wakeUpRoutes(), ...roomRoutes(), ...memberRoutes(),
-    ...instanceRoutes(config.instance, services.clock.now())];
+    ...runtimeRoutes(), ...instanceRoutes(config.instance, services.clock.now())];
   const limits = new Map<string, { count: number; expiresAt: number }>();
   function rate(request: IncomingMessage): boolean {
     const now = services.clock.now();
@@ -133,7 +134,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (endpoint.path.endsWith('/claim') && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }
       const authenticated = await authenticate(request, endpoint, requestId, stop.signal);
       if (!authenticated.ok) { send(response, requestId, authenticated); return; }
-      const input = method === 'GET' ? success({}) : await readBody(request);
+      const input = method === 'GET' ? success({}) : await readBody(request, endpoint.requestBytes);
       if (!input.ok) { send(response, requestId, input); return; }
       const result: Result<Reply> = await endpoint.invoke(authenticated.value, params, url.searchParams, input.value);
       if (result.ok && result.value.cookie !== undefined) setCookie(response, result.value.cookie, config.publicOrigin);

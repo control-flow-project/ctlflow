@@ -23,6 +23,9 @@ test('all services have one strict implementation and declared package-export bo
     for (const file of files(join(root, owner, 'src')).filter(file => /\.tsx?$/u.test(file))) {
       const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
       function dependency(name: string) {
+        if (owner === 'services/crossfire/packages/contracts' && name.startsWith('@crossfire/domain')) {
+          assert.equal(name, '@crossfire/domain/runtime/values', 'Wire contracts share only pure domain runtime value definitions');
+        }
         if (name.startsWith('.')) {
           assert(/\.(js|json|css)$/u.test(name), 'Explicit runtime import: ' + name);
           const target = relative(root, resolve(dirname(file), name)).split('/').slice(0, 4).join('/');
@@ -46,7 +49,7 @@ test('all services have one strict implementation and declared package-export bo
   const dependencies = (service: string, name: string) => Object.keys(manifests.get('services/' + service + '/packages/' + name)!.dependencies ?? {});
   assert.deepEqual(dependencies('crossfire', 'domain'), ['@crossfire/kernel']);
   assert.deepEqual(dependencies('crossfire', 'agent-core').sort(), ['@crossfire/contracts', '@crossfire/kernel']);
-  assert.deepEqual(dependencies('crossfire', 'contracts').sort(), ['@crossfire/kernel', 'smol-toml']);
+  assert.deepEqual(dependencies('crossfire', 'contracts').sort(), ['@crossfire/domain', '@crossfire/kernel', 'smol-toml']);
   for (const name of ['files', 'matrix']) assert.equal(files(join(root, 'services/crossfire/packages', name, 'src')).length, 0);
   for (const manifest of manifests.values()) if (manifest.name.startsWith('@crossfire/')) {
     assert(!Object.keys(manifest.dependencies ?? {}).some(name => name.startsWith('@fleet')));

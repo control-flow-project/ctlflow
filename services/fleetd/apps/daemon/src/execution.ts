@@ -15,9 +15,11 @@ import { MAX_UPLOAD_BYTES } from '@crossfire/contracts/client';
 import { loadBinding, saveBinding, protectFleet } from '@fleetd/storage/binding';
 import type { Execution } from '@fleetd/domain/port';
 import { prepareEnrollment } from './enrollment.js';
+import { failureReporter } from './failures.js';
 
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
   const connections = new Map<string, FleetControlConnection>();
+  const reporters = new Map<string, ReturnType<typeof failureReporter>>();
   function connect(configuration: Parameters<Execution['connect']>[0], signal: AbortSignal) {
     try {
       const binding = loadBinding(configuration); if (!binding.ok) return binding;
@@ -25,14 +27,21 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       if (binding.value.server !== configuration.roster.coordination.server || binding.value.owner !== configuration.roster.coordination.owner
         || binding.value.fleetKey !== configuration.roster.fleet) return failure('conflict', 'Fleet binding does not match its coordination configuration');
       if (connections.has(configuration.directory)) return success(undefined);
-      connections.set(configuration.directory, createFleetControlConnection({ origin: binding.value.server, credential: binding.value.controllerCredential,
-        fleetId: binding.value.fleetId, owner: binding.value.owner, signal }));
+      const reporter = failureReporter(configuration.directory, binding.value, signal);
+      try {
+        const connection = createFleetControlConnection({ origin: binding.value.server, credential: binding.value.controllerCredential,
+          fleetId: binding.value.fleetId, owner: binding.value.owner, signal });
+        reporters.set(configuration.directory, reporter); connections.set(configuration.directory, connection);
+      } catch (error) { void reporter.close(); throw error; }
       return success(undefined);
     } catch (error) { return failure('invalid', error instanceof Error ? error.message : 'Invalid fleet controller binding'); }
   }
   return {
     connect,
-    connection(configuration) { return connections.get(configuration.directory)?.status() ?? { connected: false, deliveryEnabled: false, revision: null, error: 'Fleet has no approved controller binding' }; },
+    connection(configuration) {
+      const status = connections.get(configuration.directory)?.status() ?? { connected: false, deliveryEnabled: false, revision: null, error: 'Fleet has no approved controller binding' };
+      return { ...status, error: reporters.get(configuration.directory)?.error() ?? status.error };
+    },
     async delivery(configuration, input) {
       const connection = connections.get(configuration.directory);
       return connection ? connection.delivery(input) : failure('conflict', 'Enroll this fleet before changing its delivery');
@@ -41,8 +50,10 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       const connection = connections.get(configuration.directory);
       return connection ? connection.message(input) : failure('conflict', 'Enroll this fleet before sending messages');
     },
-    async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear(); },
-    async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close(); },
+    async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear();
+      await Promise.all([...reporters.values()].map(reporter => reporter.close())); reporters.clear(); },
+    async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close();
+      const reporter = reporters.get(configuration.directory); reporters.delete(configuration.directory); await reporter?.close(); },
     validate(configuration) {
       for (const definition of Object.values(configuration.definitions)) {
         const adapter = adapters[definition.runtime];
@@ -60,12 +71,19 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       let release: (() => Promise<void>) | undefined, destination: OwnedRuntimeConnection | undefined;
       let done: Promise<void> | undefined;
       let bindingControl: ReturnType<FleetControlConnection['listener']> | undefined;
+      let enrolledId: string | undefined, reported = false;
       const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
+      const report = (error: unknown) => {
+        if (reported || !enrolledId || signal.aborted || stop.signal.aborted) return;
+        reported = true;
+        reporters.get(configuration.directory)?.record(enrolledId, destination?.sessionId ?? null, error);
+      };
       try {
         const loaded = loadBinding(configuration);
         if (!loaded.ok) return loaded;
         const binding = loaded.value, identity = binding.identities.find(item => item.instanceKey === instance.key);
         if (!identity) return failure('missing', 'Instance has no enrolled identity');
+        enrolledId = identity.agentId;
         const connection = connections.get(configuration.directory);
         if (!connection) return failure('conflict', 'Fleet controller connection is not initialized');
         const definition = configuration.definitions[instance.definition]!;
@@ -78,7 +96,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         const software = await installSoftware(local.root, binding.server);
         const client = createClient({ origin: binding.server, token: identity.account.access_token, signal: lifetime });
         const health = await client.call(operations.health, {}, {});
-        if (!health.ok) { await release(); return health; }
+        if (!health.ok) { report(new Error('Instance startup failed: ' + health.error.message)); await release(); return health; }
         const settings = { instance: health.value.data.instance, homeserver: binding.server, server_name: binding.owner.slice(binding.owner.indexOf(':') + 1), owner: binding.owner, max_upload_bytes: MAX_UPLOAD_BYTES };
         writeJson(local.profile, { id: identity.agentId, workspace, account: identity.account, settings });
         software.activate();
@@ -90,20 +108,26 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         done = listen({ settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
+          historyMode: instance.listener_options?.history_mode ?? 'shared', ...(instance.listener_options?.max_input_bytes === undefined ? {} : { maximumBytes: instance.listener_options.max_input_bytes }),
           ready,
           runtime: async (runtimeStop, _poll, hooks) => {
-            const started = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks }, runtimeStop);
+            const started = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks,
+              ...(instance.listener_options ? { listenerOptions: instance.listener_options } : {}) }, runtimeStop);
             if (!started.ok) throw new Error(started.error.message);
             destination = started.value; return destination;
           },
-        }, lifetime).then(() => { const error = new Error('Listener ended'); rejectReady(error); stop.abort(error); }, error => { rejectReady(error); stop.abort(error); });
+        }, lifetime).then(() => { const error = new Error('Listener ended'); rejectReady(error); stop.abort(error); }, error => {
+          report(error);
+          rejectReady(error); stop.abort(error);
+        });
         await readiness;
         if (!destination) throw new Error('Runtime did not report its session');
         let closing: Promise<void> | undefined;
         const unlock = release;
         const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; bindingControl?.close(); await destination?.close(); await unlock(); })();
-        return success({ sessionId: destination.sessionId, signal: stop.signal, attachment: destination.attachment, control: bindingControl.control, close });
-      } catch (error) { stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.(); return failure('native', error instanceof Error ? error.message : 'Instance startup failed'); }
+        return success({ sessionId: destination.sessionId, signal: stop.signal, attachment: destination.attachment,
+          attachments: destination.attachments, control: bindingControl.control, close });
+      } catch (error) { report(error); stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.(); return failure('native', error instanceof Error ? error.message : 'Instance startup failed'); }
     },
     async detach(configuration, instance) {
       try {

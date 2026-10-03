@@ -14,6 +14,7 @@ export type Context = { services: Services; requestId: string; actor: Actor | nu
   session: { member: MemberRecord; csrfSecret: string; permissions: string[] } | null; credential: string };
 export type Endpoint = {
   method: string; path: string; auth: 'public' | 'human' | 'agent' | 'either' | 'fleet'; status: number; collection: boolean;
+  requestBytes?: number;
   match(pathname: string): Record<string, string> | null;
   invoke(context: Context, params: unknown, query: URLSearchParams, input: unknown): Promise<Result<Reply>>;
 };
@@ -23,6 +24,7 @@ export function bind<Params, Query, Input, Output>(operation: Operation<Params, 
   const expression = new RegExp('^' + operation.path.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
     .replace(/\\\{([A-Za-z]+)\\\}/gu, (_match, key: string) => { keys.push(key); return '([^/]+)'; }) + '$', 'u');
   return { method: operation.method, path: operation.path, auth: operation.auth, status: operation.status, collection: operation.collection,
+    ...(operation.requestBytes === undefined ? {} : { requestBytes: operation.requestBytes }),
     match(pathname) {
       const matched = expression.exec(pathname);
       if (!matched) return null;

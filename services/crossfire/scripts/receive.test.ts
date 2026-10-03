@@ -6,7 +6,8 @@ import { matrix } from '@crossfire/adapter-matrix/http';
 import { writeJson } from '@crossfire/adapter-filesystem/index';
 import type { Event } from '@crossfire/contracts/client';
 import { eventView, readUnread, synchronize, loadSyncCursor, checkpointSync, incrementalEvents, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, acquisitionBytes, type Sync } from '@crossfire/agent-core/receive';
-import { deliveryBatches } from '@crossfire/agent-core/listen';
+import { chatBatches } from '@crossfire/agent-core/chat-batches';
+import { deliveryEvents } from '@crossfire/agent-core/senders';
 import { matrixFixture, message, OBSERVER, ROOM, SELF, temporary } from './test-support/listener.js';
 
 test('canonical reads preserve room order, all message kinds, and independent cursor proposals', async t => {
@@ -75,7 +76,8 @@ test('delivery retains attribution and attachments, excludes self echoes, and bo
     view(message('$large', OBSERVER, '😀'.repeat(12_000))),
     view(message('$large2', OBSERVER, '😀'.repeat(12_000))),
     view({ ...message('$redacted', SELF), type: 'm.room.redaction' })];
-  const batches = deliveryBatches(events, fixture.settings, SELF, fixture.identities);
+  const emitted = deliveryEvents(events, SELF);
+  const batches = chatBatches(emitted, fixture.settings, fixture.identities, 64 * 1024);
   assert.equal(batches.length, 2);
   assert.equal(batches.reduce((count, batch) => count + batch.messages, 0), 3);
   const decoded = batches.flatMap(batch => {
@@ -87,10 +89,23 @@ test('delivery retains attribution and attachments, excludes self echoes, and bo
     return data.events;
   });
   assert.deepEqual(decoded, events.slice(1));
-  assert.deepEqual(deliveryBatches(events, fixture.settings, SELF, fixture.identities), batches);
-  assert.deepEqual(deliveryBatches([events[0]!], fixture.settings, SELF, fixture.identities), []);
-  assert.throws(() => deliveryBatches([view(message('$oversized', OBSERVER, 'x'.repeat(128 * 1024)))], fixture.settings, SELF, fixture.identities),
-    /exceeds the 65536-byte/);
+  assert.deepEqual(chatBatches(emitted, fixture.settings, fixture.identities, 64 * 1024), batches);
+  assert.equal(chatBatches(emitted, fixture.settings, fixture.identities).length, 1);
+  assert.deepEqual(chatBatches(deliveryEvents([events[0]!], SELF), fixture.settings, fixture.identities), []);
+  assert.throws(() => chatBatches([view(message('$oversized', OBSERVER, 'x'.repeat(128 * 1024)))], fixture.settings, fixture.identities),
+    /exceeds the 100000-byte/);
+});
+
+test('the minimum input budget admits a fitting event without an arbitrary metadata reservation', async scope => {
+  const fixture = await matrixFixture(scope, temporary(scope)); fixture.subscribe(ROOM);
+  const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token });
+  fixture.add(ROOM, message('$small', OBSERVER, 'Hi'));
+  const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 20, undefined, 1024);
+  assert.deepEqual(batch.events.map(event => event.event_id), ['$small']);
+  assert(acquisitionBytes(batch.events, fixture.settings) <= 1024);
+  const packed = chatBatches(batch.events, fixture.settings, fixture.identities, 1024);
+  assert.equal(packed.length, 1);
+  assert(Buffer.byteLength(packed[0]!.text) <= 1024);
 });
 
 test('a fresh identity receives only a bounded recent snapshot across rooms, then exact live continuation', async context => {
@@ -115,7 +130,7 @@ test('byte-budget retries preserve every unread event and do not duplicate HTML'
     content: { msgtype: 'm.text', body: '😀'.repeat(10000), formatted_body: '<p>' + 'x'.repeat(40000) + '</p>' } })));
   const ids: string[] = [];
   for (let index = 0; index < 4; index++) {
-    const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 20);
+    const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 20, undefined, 65536);
     assert.equal(batch.events.length, 1);
     assert.equal(batch.events[0]!.content.formatted_body, undefined);
     assert.deepEqual(batch.events[0]!.omitted, ['content.formatted_body']);

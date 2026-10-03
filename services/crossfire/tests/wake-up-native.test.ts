@@ -36,7 +36,7 @@ test('real Conduit and stock Codex deliver idle-only scheduled input without cre
     release: release.manifest,
     cursorFile: join(directory, 'cursor.json'), limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000,
     ready: () => { ready = true; }, runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, timeoutMs: 10000,
-      hooks: hooks ?? { requestPermission: async () => { throw new Error('Unexpected fixture permission'); } } }, signal),
+      hooks: hooks ?? { requestDecision: async () => { throw new Error('Unexpected fixture permission'); } } }, signal),
   }, stop.signal).catch(error => { ended = error; });
   cleanup(scope, async () => { stop.abort(); await clock.complete(receiver); });
   const inputs = () => engine.notifications.filter(notice => notice.method === 'item/completed'

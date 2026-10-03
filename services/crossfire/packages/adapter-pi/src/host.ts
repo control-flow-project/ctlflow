@@ -7,6 +7,7 @@ import { object } from '@crossfire/contracts/validation';
 import { writeJson, readJson } from '@crossfire/adapter-filesystem/index';
 import { piRequest, piDescriptor } from './protocol.js';
 import type { PiApi, PiContext } from './native.js';
+import { visibleOutput } from '@crossfire/adapter-runtime/visible-output';
 
 async function body(request: IncomingMessage): Promise<unknown> {
   let size = 0;
@@ -14,7 +15,7 @@ async function body(request: IncomingMessage): Promise<unknown> {
   for await (const chunk of request) {
     const bytes = Buffer.from(chunk as Uint8Array);
     size += bytes.length;
-    if (size > 128 * 1024) throw new Error('Pi native request exceeds its byte bound');
+    if (size > 8 * 1024 * 1024) throw new Error('Pi native request exceeds its byte bound');
     chunks.push(bytes);
   }
   return JSON.parse(Buffer.concat(chunks).toString()) as unknown;
@@ -66,6 +67,15 @@ export async function piHost(api: PiApi, context: PiContext, software: string) {
       if (value.session !== session || value.generation !== generation) { response.writeHead(409).end('{}'); return; }
       let result: unknown = null;
       switch (value.method) {
+        case 'observe': {
+          const branch = context.sessionManager.getBranch();
+          if (branch.length > 100000) throw new Error('Pi native branch exceeds its verification bound');
+          const position = value.after === null ? -1 : branch.findIndex(entry => object(entry).ok && (entry as Record<string, unknown>).id === value.after);
+          if (value.after !== null && position < 0) throw new Error('Pi native observation boundary is no longer in this history');
+          const window = branch.slice(position + 1, position + 257);
+          result = { cursor: window.length ? (window.at(-1) as { id: string }).id : value.after, busy: !context.isIdle(), output: window.flatMap(entry => visibleOutput(entry, 'pi')) };
+          break;
+        }
         case 'verify': result = true; break;
         case 'boundary': result = { leaf: context.sessionManager.getLeafId() }; break;
         case 'publish':

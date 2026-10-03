@@ -4,7 +4,7 @@ import type { Principal } from '../identity/types.js';
 import { agentDisplayName } from '../identity/display-name.js';
 import { ensureOwnerConversation } from '../owner-conversation/ensure.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'identity' | 'clock' | 'unitOfWork' | 'roomOperations'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'identity' | 'clock' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
 export async function reconcilePrincipal(services: Dependencies, principalId: string): Promise<Result<void>> {
   const applied = await services.roomOperations.run('agent:' + principalId, () => applyPrincipal(services, principalId));
   if (!applied.ok) return applied;

@@ -28,7 +28,7 @@ export async function nativeCodex(context: TestContext) {
   const acknowledgements: { params: Record<string, unknown>; turn: { id: string } }[] = [];
   let adapter: CodexConnection | undefined;
   const session = await connectSession({ ...fixture, timeoutMs: 10_000 }, stop.signal, {
-    requestPermission: async () => { throw new Error('Unexpected permission in inert native delivery fixture'); },
+    requestDecision: async () => { throw new Error('Unexpected permission in inert native delivery fixture'); },
   }, notice => { notifications.push(notice); adapter?.event(notice); });
   cleanup(context, async () => {
     stop.abort(); if (adapter) await adapter.close(); else await session.close();

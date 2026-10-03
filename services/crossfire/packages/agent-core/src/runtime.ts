@@ -1,10 +1,11 @@
 import type { Json } from '@crossfire/contracts/json';
 import type { Result } from '@crossfire/kernel/result';
+import type { DecisionCreation, RuntimeObservation } from '@crossfire/contracts/runtime';
 
 export type RuntimeApproval = 'none' | 'runtime' | 'listener';
 
 export type TurnControl = {
-  activeTurn: () => Promise<string | null>;
+  activeTurn: (room?: string) => Promise<string | null>;
   interrupt: (turnId: string, recovery?: boolean) => Promise<void>;
 };
 
@@ -18,19 +19,31 @@ export type RuntimeConnection = {
   recover: (text: string, messageId: string) => Promise<boolean>;
   acknowledge: (messageIds: readonly string[]) => void;
   turnControl?: TurnControl;
+  conversation?: (room: string) => Promise<RuntimeConnection>;
   close: () => void | Promise<void>;
 };
 
 export type RuntimeAdapter = (stop: AbortSignal, pollMs: number, hooks: RuntimeHooks) => Promise<RuntimeConnection>;
-export type Permission = {
+export type RuntimeDecision = {
   runtime: string;
   session: string;
   request: string;
   action: string;
   scope: Json;
   choices: { label: string; value: Json }[];
+  turn?: string;
+  item?: string;
+  blocking?: boolean;
+  expiresMs?: number | null;
+  questions?: DecisionCreation['questions'];
 };
 
+export type RuntimeObservationEvent = { kind: 'output'; sessionId: string; id: string; streamId: string | null; text: string }
+  | { kind: 'state'; observation: Omit<RuntimeObservation, 'historyMode' | 'maxInputBytes'> };
+
 export type RuntimeHooks = {
-  requestPermission: (permission: Permission, signal: AbortSignal) => Promise<Result<Json>>;
+  requestDecision: (permission: RuntimeDecision, signal: AbortSignal) => Promise<Result<Json>>;
+  decisionResponded?: (decision: RuntimeDecision) => void;
+  pendingDecisions?: () => boolean;
+  observe?: (event: RuntimeObservationEvent) => void;
 };

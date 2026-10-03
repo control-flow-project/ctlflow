@@ -2,7 +2,7 @@ import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import type { PageRequest } from '../port/directory.js';
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'roomGrantRead' | 'clock' | 'matrix'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'roomGrantRead' | 'clock' | 'matrix' | 'runtime'>;
 export function listRoomGrants(services: Dependencies, actor: Actor, agentId: string, page: PageRequest & { roomIds?: string[] }) {
   const target = authorizeAgent(services, actor, agentId, 'read');
   if (!target.ok) return target;

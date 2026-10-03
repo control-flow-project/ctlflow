@@ -10,10 +10,15 @@ import { fleetControlSchema } from './fleet-control.js';
 import { wakeUpSchema } from './wake-up.js';
 import { ownerConversationSchema } from './owner-conversation.js';
 import { ownerConversationGuards, ownerConversationExclusivityCheck } from './owner-conversation-guards.js';
+import { runtimeSchema } from './runtime.js';
 export function createSchema(database: Database.Database): void {
   const application = database.pragma('application_id', { simple: true });
   const version = database.pragma('user_version', { simple: true });
-  if (application === 1129465426 && version === 7) return;
+  if (application === 1129465426 && version === 8) return;
+  if (application === 1129465426 && version === 7) {
+    database.transaction(() => { database.exec(runtimeSchema); seedReferenceData(database); database.pragma('user_version = 8'); }).immediate();
+    return;
+  }
   if (application === 1129465426 && (version === 1 || version === 2 || version === 3 || version === 4 || version === 5 || version === 6)) {
     database.transaction(() => {
       if (version === 1) database.exec("ALTER TABLE instance_policy ADD COLUMN signup_mode TEXT NOT NULL DEFAULT 'invitation' CHECK(signup_mode IN ('invitation','open')); ALTER TABLE instance_policy ADD COLUMN invitation_issuers TEXT NOT NULL DEFAULT 'administrators' CHECK(invitation_issuers IN ('administrators','members')); CREATE INDEX ix_member_invitation_creator_created ON member_invitation(created_by_member_id, created_at DESC, id);");
@@ -34,17 +39,18 @@ export function createSchema(database: Database.Database): void {
         database.exec(ownerConversationGuards);
       }
       seedReferenceData(database);
-      database.pragma('user_version = 7');
+      database.exec(runtimeSchema);
+      database.pragma('user_version = 8');
     }).immediate();
     return;
   }
   const existing = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
   if (existing.length || application !== 0 || version !== 0) throw new Error('This database does not contain the current Crossfire schema; initialize a fresh development database');
   database.transaction(() => {
-    database.exec(identitySchema + authorizationSchema + enrollmentSchema + roomAccessSchema + activitySchema + auditSchema + fleetControlSchema + wakeUpSchema + ownerConversationSchema);
+    database.exec(identitySchema + authorizationSchema + enrollmentSchema + roomAccessSchema + activitySchema + auditSchema + fleetControlSchema + wakeUpSchema + ownerConversationSchema + runtimeSchema);
     seedReferenceData(database);
     database.exec('CREATE INDEX ix_member_invitation_creator_created ON member_invitation(created_by_member_id, created_at DESC, id)');
     database.pragma('application_id = 1129465426');
-    database.pragma('user_version = 7');
+    database.pragma('user_version = 8');
   }).immediate();
 }

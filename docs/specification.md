@@ -218,7 +218,8 @@ The CLI supports:
 - fleet agent add KEY INSTANCE --definition DEFINITION
 - fleet agent start KEY INSTANCE; fleet agent stop KEY INSTANCE
 - fleet agent remove KEY INSTANCE
-- fleet agent attach KEY INSTANCE
+- fleet agent contexts KEY INSTANCE
+- fleet agent attach KEY INSTANCE [--context EXISTING_CONTEXT]
 - fleet activate KEY; fleet deactivate KEY
 - fleet message KEY --text TEXT [--message-id UUID]
 
@@ -331,7 +332,9 @@ No model calls perform control, reconnection, fan-out, reporting or acknowledgme
 
 Incoming Matrix events are filtered and batched by ordinary code before model
 delivery. The model chooses intentional replies/attachments through Crossfire's
-messaging capability; arbitrary model output is never automatically broadcast.
+messaging capability. Native terminal output is mirrored only to the private
+owner DM under the owner-observation contract; it is never automatically sent to
+a shared room or inferred destination.
 Agent account, runtime state, reporting listener and applied room access remain
 distinct observations. An agent with only its owner DM is not advertised as receiving shared-room tasks.
 
@@ -429,6 +432,11 @@ HTTP framework, database driver, Tinqer expression, concrete adapter, UI type or
 process launcher. An adapter implements a domain/core-owned port; it does not
 define the application's authority rules.
 
+Pure runtime decision/observation values are domain-owned. Contracts may import
+only that pure value module and own wire validation/operation declarations;
+domain code does not import contracts or validate HTTP payloads. The architecture
+gate enforces this direction and the narrow declared export.
+
 The useful reference patterns are Lesser's singular relational names, explicit
 repository interfaces, functional per-operation modules and row/entity mappers;
 and Snapped's transport/domain separation, composition, per-operation permission
@@ -522,7 +530,8 @@ not another operation implementation. Unknown fields/routes/methods fail.
 | POST /api/fleets/{fleetId}/messages | Submit an idempotent direct fleet message through Crossfire. |
 | GET, POST /api/fleets/{fleetId}/agents | List or add an instance using a validated existing definition. |
 | GET, PATCH, DELETE /api/fleets/{fleetId}/agents/{instanceKey} | Inspect/update/remove an instance. |
-| GET /api/fleets/{fleetId}/agents/{instanceKey}/attachment | Private current running-session pointer; no lifecycle mutation or model turn. |
+| GET /api/fleets/{fleetId}/agents/{instanceKey}/contexts | Existing shared/control/room histories and observed native state; no new history or model turn. |
+| GET /api/fleets/{fleetId}/agents/{instanceKey}/attachment | Private exact running-session pointer; optional `context` selects an existing history, never creates one. |
 | POST /api/operations | Idempotent start/stop request for a fleet, instance or daemon shutdown. |
 | GET /api/operations/{operationId} | Observe accepted/running/awaiting-approval/succeeded/failed results. |
 
@@ -553,6 +562,7 @@ Only owned process handles may be signalled; no process-name scanning/killing.
 | GET /api/fleets/{fleetId}/control | Controller-only bounded long poll of intent and pending direct messages. |
 | GET, POST /api/fleets/{fleetId}/messages | Scoped paginated history or idempotent message creation. |
 | PUT /api/fleets/{fleetId}/messages/{messageId}/deliveries/{agentId} | Controller-only exact recipient acknowledgment; no native launch. |
+| POST /api/fleets/{fleetId}/runtime-incidents | Controller-only immutable failure episode for an associated agent/native session; durable deduplicated notification, no lifecycle mutation. |
 
 Crossfire has no native fleet execution/start/stop, SSH, host-control or runtime-options
 routes. Its fleet page shows members, named controller, approved identities,
@@ -584,11 +594,19 @@ name = "ocr-east"
 definition = "document-converter"
 workarea = "agents/document-converter/workarea/ocr-east"
 
+[instances.listener_options]
+history_mode = "shared"
+max_input_bytes = 100000
+
 [[instances]]
 key = "ocr-west"
 name = "ocr-west"
 definition = "document-converter"
 workarea = "agents/document-converter/workarea/ocr-west"
+
+[instances.listener_options]
+history_mode = "per-room"
+max_input_bytes = 100000
 ```
 
 - `fleet` is stable within the authenticated owner.
@@ -599,6 +617,13 @@ workarea = "agents/document-converter/workarea/ocr-west"
   access token, runtime endpoint or thread ID.
 - Model, reasoning, sandbox and approval settings belong to the definition,
   not to instance overrides in the roster.
+- Runtime-independent listener settings belong to each instance's optional
+  `listener_options` table, not to native `runtime_options`. `history_mode` is
+  `shared` by default or explicitly `per-room`. `max_input_bytes` defaults to
+  100000 UTF-8 bytes, accepts integers 1024–4194304 and bounds the complete serialized listener input, including
+  origin and sender metadata. Invalid or unsupported settings fail preflight.
+  Configuration changes apply at the next stopped-to-running transition, not
+  silently to an already running agent.
 
 Fleet, definition and instance keys, and registered agent names, use the
 project-local profile identifier form: a lowercase letter followed by lowercase
@@ -640,10 +665,21 @@ definition's current model, reasoning and permissions apply to the same saved
 session. No TUI resume permission flags or new identity are required. Editing
 definition files does not silently reconfigure an already running engine.
 
-Instances sharing a definition share its settings and instructions, not mutable
-session state. Different settings require a different definition. Secrets and
+Instances sharing a definition share native settings/instructions, not mutable
+history. Different native settings require a different definition; per-instance
+listener options do not. Secrets and
 shell command strings are not part of these tracked files. Runtime transport,
 authentication and process ownership remain controller-controlled.
+
+Native Codex Default-mode structured questions use the optional
+`[runtime_options.features] default_mode_request_user_input = true`. This
+under-development native option requires the selected binary to expose that
+capability in `codex features list`, checked before process startup. The baseline
+stock Codex 0.158.0+ requirement still applies. It is not enabled globally, a collaboration-mode switch or a prose
+question parser. Native blocking state/deadline remain authoritative. Native
+question/answer continuation is proven on Linux with an inert provider; this is
+not certification of paid models or macOS. Missing native capabilities fail
+startup explicitly; no question feature is silently disabled or emulated.
 
 ### Room plan: `rooms.toml`
 
@@ -895,8 +931,9 @@ changes wake policy, fleet delivery intent, identity or model permissions.
 
 Each agent can establish one canonical private DM with its verified owner on
 first use. Native Matrix integration adopts the exact verified owner-created
-direct invitation, or reuses/creates a DM idempotently for an actual native
-permission request, and updates both participants' `m.direct` account data.
+direct invitation, or reuses/creates a DM idempotently for actual terminal-visible
+output or a native human-action request, and updates both participants' `m.direct`
+account data.
 No private conversation is required to enroll, start, reconnect, test or report
 a listener. Existing conversation bindings are repaired, not replaced.
 Generated conversations have a readable native name from the agent's verified
@@ -1003,6 +1040,52 @@ outcomes remain independently verified rather than assumed from a database write
 
 ## 10. Listener delivery and human interaction
 
+### Conversation history and routing
+
+Shared context across people, rooms and DMs is the normal product model. Each
+agent has its own history; agents do not automatically share histories with one
+another. Regular directly connected agents always retain one shared native
+conversation. Fleet-managed agents also default to that model, but may explicitly
+select `history_mode = "per-room"` for an individual instance.
+
+Shared mode delivers eligible collected input across conversations into the
+agent's one existing history. Per-room mode routes each immutable Matrix room ID,
+including each DM, to a distinct persistent native conversation. Room renames,
+aliases and leaving/rejoining do not replace that history. A new room ID is a
+different conversation even if its display name matches. Separate histories are
+not per-message resets, additional agent identities, another listener or extra
+model calls for routing. Role instructions and configured native settings apply
+to every conversation belonging to the agent.
+
+In per-room mode an authorized message releases its own room's pending context,
+not another room's non-waking trail. Ordering, debounce, byte batching and native
+receipt recovery remain owned by the same shared receiver. Inputs and receipt
+journals bind their exact conversation; no uncertain publication is moved to a
+different history or resubmitted under another identity. Idle room histories
+create no inference work. Non-chat operator, controller, scheduled and maintenance
+input uses an explicit private control conversation, never the last active room.
+
+Native conversation references are adapter-owned opaque IDs. Fleet configuration
+and shared routing contain no Codex dispatch. One owned runtime may host multiple
+native conversations; native support is validated before startup rather than
+emulated. Private durable state preserves the exact mapping across restarts.
+The terminal pointer can select an existing room conversation explicitly; its
+default is the shared conversation or, in per-room mode, the private control
+conversation. Attachment never creates or forks a history or guesses a session.
+
+Changing modes takes effect only after the previous run's pending publication
+has been resolved. Existing histories and unread positions are retained. New
+per-room histories start fresh; shared history is not copied or forked into them.
+Returning to shared mode resumes the retained shared conversation without
+merging room histories. Previously delivered input is not replayed to seed a
+different history. Native resume failure is explicit, not a fresh replacement.
+
+History separation does not isolate files, tools, credentials or the native
+process. Shared mode deliberately makes information from different conversations
+available in one context. Neither mode grants permission to publish information
+to a different audience. Room access and wake authority retain their separate
+owners; typing destination never selects an output audience.
+
 ### Sender provenance
 
 Each model-visible input contains `instance`, the verified receiving agent's
@@ -1013,6 +1096,20 @@ Registered humans have `{ kind: "human" }`; registered agents have
 `{ kind: "unknown" }`. Human and unknown entries contain no agent owner field.
 The model can compare an event's sender and its directory entry against the
 envelope owner to distinguish the owner, the owner's agents and other senders.
+
+Every event retains its exact sender, room ID, event ID and native timestamp.
+Readable room/sender labels and explicit DM/room classification accompany the
+verified origin when observable. Missing labels, ambiguous classification and
+missing native timestamps are reported as unavailable, not guessed from text,
+participant count or the listener's clock. Origin enrichment is batched by
+distinct identity/conversation and accounted for in the publication byte budget.
+
+Shared coordination instructions explicitly distinguish native terminal output
+from chat replies: a response to room/DM input must use the messaging tool with
+an explicit destination. Terminal text is an owner observation, not a room
+reply. Source information is descriptive, never an elevated instruction or new
+permission. Deliberate silence remains possible; no model retries or forced
+acknowledgements compensate for a missing tool invocation.
 
 The domain resolves kind and ownership from canonical indexed principal/agent
 relations, never from display names, Matrix ID prefixes, message content or wake
@@ -1117,6 +1214,14 @@ the listener delivers accumulated ordered context together with the trigger in
 one batch whenever it fits the configured bounds. Debouncing coalesces messages;
 it does not turn a collected trail into one model call per event. Larger input
 uses the established bounded ordered batching without dropping context.
+
+The listener owns its incoming model-input byte budget. The default is 100000
+UTF-8 bytes; fleet instances configure it through `listener_options.max_input_bytes`.
+The complete serialized input must fit, including metadata. Collected trails
+are delivered together whenever they fit and otherwise split without dropping
+or truncating events. A single event that cannot fit produces an explicit limit
+failure with unread positions unchanged. Native patches, terminal output,
+permission scopes and protocol frames do not inherit this chat-input budget.
 
 Room membership, role titles and invitation authority do not create wake
 authority. A director-to-worker workflow needs an explicit compatible wake
@@ -1233,10 +1338,20 @@ paused receiver, and peer automatic notices causing no model call or lost contex
 
 ### Native tool approvals
 
-The Codex runtime adapter decodes exact native permission requests. The Crossfire
-permission path sends them only to the canonical private owner DM and accepts
-only the verified owner's explicit matching native decision. No approval-room
-selection exists in the CLI or fleet configuration.
+Ordinary native file-change/activity notifications are not permission requests.
+They must not fail because of chat-derived scope, display or input limits.
+Actual permission requests retain their complete native scope and exact choices.
+Large review material uses the complete authenticated decision detail,
+not truncated actionable scope. Native transport/resource safety remains
+separate. Presentation or owner-channel failure denies/cancels only the affected
+request through a supported native outcome, not an otherwise healthy listener.
+
+The native runtime adapter decodes exact permission requests. The shared human-
+decision path sends them only to the canonical private owner DM and accepts only
+the verified owner's explicit matching native decision through authenticated
+review. Permission requests and structured questions use that same decision
+owner, not separate approval transports. No approval-room selection exists in
+the CLI or fleet configuration.
 
 Each affected listener validates active owner and agent access before advertising
 readiness or creating an online reporting run. A missing conversation is a
@@ -1287,6 +1402,158 @@ a deliberate choice, not the default or model-authorized elevation. Owned Codex
 defaults to full access with on-request approval. Attached sessions retain their
 human-owned native model, sandbox and approval policy.
 
+### Runtime failures and management conversations
+
+Prevent avoidable failures by validating and classifying native events at their
+owner and returning expected failures without killing healthy execution.
+Contain genuine process/protocol failures to the affected instance; preserve
+successful peers, the original cause and saved native conversation identities.
+No system can guarantee that a process or host never crashes. This contract
+requires observable, actionable failure rather than silent agent disappearance.
+
+Each human member has one canonical private management DM with the existing
+Crossfire service identity, named **Crossfire**. It is separate from every agent's
+owner DM and aggregates operational notices across that member's agents, fleets
+and controllers. Establish it lazily on the first real notice or explicit human
+request, not at signup, enrollment, fleet startup or heartbeat. Bind and reuse
+the exact verified conversation; no per-fleet/controller notification rooms,
+hash-named display titles or preemptive agent chats. Only the member and service
+identity participate; notices are not published to shared rooms or models.
+The room is not an agent assignment: discovery excludes it from every agent's
+room picker, and canonical grant/permission/invitation operations reject all
+agent admission. Indexed database guards enforce the same boundary, including
+binding order; the management conversation's owner and room binding are immutable.
+
+For fleet-managed execution the controller reports actual agent exits/failures
+through its authenticated fleet-scoped coordination channel. Crossfire owns
+durable incident state, authorization, deduplication and native management-DM
+delivery using its existing service identity. The controller does not acquire
+owner credentials, create a second Matrix listener or become a new chat agent.
+Each notice identifies the affected agent/fleet, descriptive controller label,
+observation time, safe original reason and an authenticated management link for
+diagnosis/action. Agent terminal output and native questions/permissions remain
+in that agent's separate owner DM.
+
+Crossfire independently detects expired controller/listener liveness. A controller
+that has died cannot report its own death. Lost contact is reported as unknown
+execution state, not an invented confirmed crash. Directly connected agents use
+the same management-incident owner, with native failure when reported and lost
+contact otherwise. Intentional stop/disconnection, disabled fleet delivery,
+ordinary idle and native decision waits are not unexpected crashes.
+
+One incident episode produces one initial notice, with recovery or material state
+change updates rather than repeated heartbeat alerts. Persist undelivered notices
+and retry native delivery idempotently after recovery. Crossfire/Matrix unavailability
+necessarily delays delivery; do not promise an immediate DM during a total outage.
+Keep failure causes useful without exposing credentials or hidden protocol data.
+Acknowledging a notice is not permission approval, model input or an automatic
+restart. Preserve uncertain publications and pending native decisions; never
+replay work, replace a saved conversation or silently restart an engine to hide
+a fault. Diagnosis and explicit recovery remain available through management and
+the existing fleet lifecycle/terminal APIs.
+
+### Owner terminal observation and decisions
+
+All visible non-thinking native terminal content is forwarded to the agent's
+canonical private owner DM: assistant commentary/final answers, visible tool
+results and stdout/stderr, progress, warnings, errors and requests for human
+input. Native reasoning items, reasoning summaries and hidden thinking traces
+are excluded by their native event types, not by text heuristics. Private
+protocol credentials and hidden secret-entry values are not terminal content
+and are never copied into DMs, links, URLs or logs.
+
+The owner is an explicitly trusted recipient of this transcript, including
+content derived from rooms the owner has not joined. Shared history can combine
+information from several rooms; source-room membership is not a confidentiality
+filter. Mirroring never forwards output to a shared room, guesses an audience
+from the last delivered message or claims history isolation. The DM is created
+on first real output/request if absent, not during enrollment, startup,
+diagnostics or heartbeats.
+
+Native event identity and per-conversation sequencing own ordered, idempotent
+mirroring. Streamed output may be coalesced and large output split into complete
+native-sized literal messages; visible content is not silently discarded or capped
+by the listener's incoming message budget. Terminal repaint bytes are not a
+second transcript. Mirroring and control notices do not wake agents, re-enter
+model context or form loops. It uses the existing owner-conversation authority,
+native Matrix adapter and live listener/controller lifecycle, not another
+receiver, transcript-inference model or Element fork.
+
+The durable private owner-output journal has a 64 MiB resource budget. Exhaustion
+fails explicitly, not by truncation or silent deletion. Exact encoded native
+message size determines Unicode-safe chunks; Markdown/HTML expansion is not
+applied to terminal text. Native protocol/review resource limits are independent
+of ordinary chat input and the former approval-display cap.
+
+Native permission requests and structured yes/no, multiple-choice or free-text
+questions use one runtime-independent human-decision owner. Adapters decode and
+answer supported native requests; the shared listener owns delivery/cancellation,
+and Crossfire owns authenticated human review and normalized decision state.
+An ordinary sentence resembling a question is not converted into a native
+request. Agent instructions require the native structured question capability
+when execution must wait for a human decision. Runtime support is explicit;
+arbitrary interactive subprocess prompts and missing native capabilities are
+not approximated with terminal scraping or text matching.
+
+Each decision binds its immutable agent/owner, listener run, native connection
+generation, conversation, turn and request identity. Only the currently active
+owner may answer. The owner DM presents the exact question and offered choices,
+with one Crossfire review link per choice. Opening a link is read-only; the
+authenticated page submits an explicit CSRF-protected decision. GET requests,
+link previews, crawlers and possession of a URL never approve or answer anything.
+Free-text input uses the same authenticated decision page. Secret answers are
+not echoed into Matrix, audit records or ordinary activity projections.
+
+Selection returns the exact supported native response to the original pending
+request, even when that question came from a different room history. It is not
+an unrelated owner-DM model prompt, new turn or second answer path. A native
+permission answer is control traffic; a structured question answer is the
+runtime's own tool response. No model call parses, routes or acknowledges the
+human selection. Resumed authorized model work remains normal native inference.
+
+Decision state distinguishes `pending`, `answered`, `responded`, `cancelled` and
+`expired`. Answered means recorded selection; Responded means the exact native
+socket-write callback confirmed transmission, not execution. A native request-clear
+notification alone must not claim successful model resumption. Native resolution,
+turn completion/interruption, disconnection and owner/agent revocation retire
+obsolete requests; stale links cannot answer a later request. Uncertain native
+responses are surfaced, never replayed automatically under a new request ID.
+No timeout, default/preselected option or missing owner reply grants consent.
+
+Native question availability, blocking state and expiration are distinct
+capabilities. Preflight and management expose the supported native mode/feature
+configuration; no silent collaboration-mode switch or imitation question tool
+is introduced. Preserve each request's native blocking/nonblocking state and
+deadline. An outstanding nonblocking question is not proof that execution is
+waiting. A request cleared by native execution cannot later accept an answer,
+and silence never selects a default or approves an operation.
+
+A native request may contain multiple questions. Review preserves their exact
+identities and offered values and submits one complete native answer set, not
+partial responses that accidentally resolve the entire request. Choice links
+identify the request and question without granting authority or exposing secret
+answers. Native resolution notifications can mean cancellation/cleanup as well
+as an answer; they alone cannot certify that the selected answer was applied.
+
+### Native activity and typing
+
+Observed native activity distinguishes working, idle, waiting for approval,
+waiting for an answer, failure and unavailable observation. A heartbeat means
+only a connected reporting listener; it is not proof of model progress.
+Pending questions/permissions remain visible to the owner while the runtime
+waits. A busy runtime without a structured request is not declared to be waiting
+for a decision merely because it has been quiet.
+
+Typing is native Matrix ephemeral state, published only to the latest room/DM
+whose chat was actually delivered to the agent. Filtered/unpublished traffic
+does not select a destination. Responding starts one 30-second lease. A newly
+delivered message clears the previous destination, moves the indicator and
+starts a fresh window. Ongoing work alone never renews it. Completion,
+interruption or disconnection clears it earlier; native expiry still bounds it
+if the publisher dies. This rule is identical in shared/per-room history modes
+and never changes explicit response destinations. No Element modification or
+model call is required for typing.
+
 ### Releases and listener activity
 
 Reconnect checks the manifest and verifies artifact sizes/hashes before starting
@@ -1322,12 +1589,16 @@ to kill unrelated or externally owned runtimes.
 
 One canonical schema and permission catalog own current state. Fresh development
 stores initialize that schema directly. Deployed stores advance transactionally
-to schema version 7 after a verified backup; existing identities, native access,
+to schema version 8 after a verified backup; existing identities, native access,
 credentials, controller authority, policy and audit remain intact. Runtime code
 has no historical-schema reader, importer, compatibility handler or dual
 read/write path. Production resets and automatic reset-on-startup-error are
 prohibited. Source work, operator configuration, external credentials and other
 projects remain intact.
+
+The canonical schema has 43 singular tables. Migration 7→8 adds normalized native
+decision, observation, incident and management-conversation relations/indexes;
+it preserves existing principal, access, listener, credential and audit rows.
 
 ### Relational conventions
 
@@ -1392,6 +1663,10 @@ Scheduled input adds `wake-rule.read.owned`, `wake-rule.manage.owned`,
 `wake-rule.read.any`, `wake-rule.manage.any` and `wake-delivery.receive.self`.
 Owners have the owned rule permissions; administrators also have the any rule
 permissions. Only the agent baseline role has self-delivery authority.
+Native reporting adds `runtime.report.self` to the agent baseline. Humans have
+`runtime.decision.answer.owned`; administrators gain no other-owner decision
+authority. Controller failure reports use the existing exact fleet credential
+boundary, not a human role or a controller-label permission.
 The implemented operation catalog and permission catalog must cover each other
 in an architecture test. A role permission does not erase ownership checks or
 pretend an administrator approved enrollment as another owner.
@@ -1425,7 +1700,10 @@ A request's fleet key is a proposed input, not authority or a reservation of
 another owner's fleet. `fleet` and `fleet_instance` are established with
 authenticated existing identity proof or the owner's approval, not through
 anonymous lookup/preflight. The composite owner FK prevents cross-owner fleet
-bindings. Runtime options, local paths and native sessions are not server data.
+bindings. Enrollment does not own host execution configuration. Public-safe
+configured/effective runtime observations are reported separately for management;
+private local paths, native credentials and connection secrets are not exposed
+through those projections.
 
 Expiry/rejection releases pending name claims. Assigned names and fleet
 bindings survive request retention, suspension and revocation. Public keys
@@ -1535,6 +1813,31 @@ Crossfire does not duplicate Matrix's room/event/media/power database or a
 runtime's native session store. Opaque external IDs and native facts are handled
 by their adapters. Database normalization does not authorize new platform scope.
 
+### Runtime decision, observation and incident tables
+
+| Table | Complete logical columns and keys |
+| --- | --- |
+| `runtime_decision` | `id PK`, `agent_id FK agent`, `run_id FK listener_run`, `runtime`, `session_id`, `request_id`, `turn_id`, `item_id`, `kind` (permission/question), `action`, `review_text`, `blocking`, `expires_at?`, `created_at`, `status` (pending/answered/responded/cancelled/expired); UQ `(run_id,session_id,request_id)`, composite FK `(run_id,agent_id)` to listener_run. |
+| `runtime_decision_question` | `decision_id FK runtime_decision`, `question_id`, `position`, `title`, `prompt`, `secret`, `allow_text`; PK `(decision_id,question_id)`, UQ `(decision_id,position)`. |
+| `runtime_decision_option` | `decision_id`, `question_id`, `option_id`, `position`, `label`, `description`; PK `(decision_id,question_id,option_id)`, UQ `(decision_id,question_id,position)`, composite FK to runtime_decision_question. |
+| `runtime_decision_answer` | `decision_id`, `question_id`, `option_id?`, `answer_text?`; PK/FK `(decision_id,question_id)` to question, optional composite FK to offered option; exactly one option or text. |
+| `runtime_observation` | `run_id`, `agent_id FK agent`, `session_id`, `room_id?`, `runtime`, `state`, `observed_at`, `history_mode`, `max_input_bytes`, `error_message?`; PK `(run_id,session_id)`, composite FK `(run_id,agent_id)` to listener_run. |
+| `runtime_setting` | `run_id`, `session_id`, `name`, `configured_value?`, `effective_value?`; PK `(run_id,session_id,name)`, composite FK to runtime_observation. |
+| `runtime_incident` | `id PK`, `owner_id FK member`, `agent_id? FK agent`, `fleet_id? FK fleet`, `run_id? FK listener_run`, `session_id?`, `kind` (failure/contact), `message`, `created_at`, `recovered_at?`; exactly one agent or fleet target. |
+| `incident_notification` | `incident_id FK runtime_incident`, `phase` (initial/recovery), `body`, `next_attempt_at`, `event_id?`; PK `(incident_id,phase)`. |
+| `management_conversation` | `owner_id PK/FK member`, `room_id UQ`, `created_at`; native room has only the member and existing service account, named Crossfire. |
+
+Questions/options/answers/settings are ordered indexed relations, never JSON
+permission bags. Complete review text is descriptive native evidence, not a
+serialized authority model. Answers are unavailable in human GET/list/audit
+projections; only the original agent's pending native exchange reads them.
+Receipt/cancellation/expiry removes answer rows, including secrets. Decisions
+remain attributable historical evidence. GET computes stale/expired status
+without writing; maintenance performs cleanup. Episode IDs are immutable even
+when an active target/session episode already exists. Notification bodies and
+native transaction identities are stable across retries. Recovery notices
+cannot overtake undelivered initial notices.
+
 ### Index and query contract
 
 Every PK/UQ supplies its constraint index. Additional indexes follow
@@ -1563,7 +1866,11 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `wake_delivery` | partial UQ `(agent_id)` for pending status; `(rule_id, created_at DESC, id)`, `(agent_id, created_at DESC, id)` | One pending claim per receiver and indexed receipt history. |
 | `member_invitation` | `(created_at, id)`, `(expires_at, id)`, `(created_by_member_id, created_at DESC, id)` | Instance-wide administrator and scoped issuer listings/expiry. |
 | `member_session` | `(member_id, expires_at)`, `(expires_at)` | Session limits/revocation/expiry. |
-| `listener_run` | `(agent_id, last_seen_at DESC, id)`; partial `(last_seen_at, agent_id, id)` for unstopped runs | History, totals and online selection. |
+| `listener_run` | `(agent_id, last_seen_at DESC, id)`, `(agent_id, started_at DESC, id DESC)`; partial `(last_seen_at, agent_id, id)` for unstopped runs; UQ `(id,agent_id)` | History, latest-run observation/contact selection and exact runtime FK binding. |
+| `runtime_decision` | `(agent_id,created_at DESC,id)`, `(status,expires_at,run_id)` | Paginated summaries without full review hydration, expiry maintenance. |
+| `runtime_observation` | `(agent_id,observed_at DESC,run_id)` | Latest run and all native contexts. |
+| `runtime_incident` | `(recovered_at,owner_id,created_at,id)`; partial UQ active `(agent_id,COALESCE(session_id,''),kind)` and `(fleet_id,kind)` | Episode selection/deduplication and recovery. |
+| `incident_notification` | `(event_id,next_attempt_at,incident_id)` | Pending durable delivery. |
 | `wake_notice` | `(receiver_agent_id, sender_matrix_id, reserved_at DESC)`; partial UQ on receiver/sender for unresolved status; `(status, next_attempt_at)` | Ten-minute cooldown and retry ownership. |
 | `audit_event` | `(created_at DESC, id DESC)`, `(actor_principal_id, created_at DESC, id DESC)`, `(owner_id, created_at DESC, id DESC)`, `(target_kind, target_id, created_at DESC, id DESC)`, `(request_id, id)` | Global/scoped history and one operation's records. |
 
@@ -1576,6 +1883,12 @@ Owner-scoped queries do not contain a parameterized administrator-OR-owner
 condition that prevents an owner seek. Distinct authorized scopes select
 explicit query shapes inside one repository implementation. Activity summaries
 are page-wide aggregate projections, never several queries per agent.
+
+Runtime observation hydration uses three constant queries for latest run,
+contexts and settings, never one query per room. Contact detection selects
+latest-started runs by indexed aggregate joins so an older abandoned run cannot
+mark an agent offline after a newer run intentionally stopped. Decision pages
+project summaries first; full native scope/questions load only for review.
 
 Room-grant collections accept an optional `roomIds` query value: a JSON array of
 at most 100 distinct opaque native room IDs, bounded to 16 KiB before parsing.
@@ -1674,6 +1987,13 @@ ownership. The management website remains under `/manage`.
 | `POST /api/sessions` | Human login; establish private cookie and CSRF state. |
 | `GET, DELETE /api/sessions/current` | Read/end this human session. |
 | `GET /api/principals` | Authorized, bounded identity discovery for wake selection and invitation targets; minimal directory projection. |
+| `GET /api/agents/{agentId}/runtime-observations` | Public-safe native contexts/settings from the latest run, authorized agent/self/owner/admin read. |
+| `PUT /api/agents/{agentId}/listener-runs/{runId}/runtime` | Exact live reporting agent/run, immutable session scope/configuration, public-setting allowlist and monotonic native observation. |
+| `GET, POST /api/agents/{agentId}/runtime-decisions` | Paginated authorized summaries; creation only by the same active native reporting agent with exact run/session/turn/item/request. |
+| `GET /api/agents/{agentId}/runtime-decisions/{decisionId}` | Complete authorized read-only review; contains no answer values. |
+| `POST /api/agents/{agentId}/runtime-decisions/{decisionId}/answer` | Active verified owner explicitly submits all answers under browser authentication/CSRF. No other-owner administrator approval. |
+| `GET /api/agents/{agentId}/runtime-decisions/{decisionId}/answer` | Same active reporting agent retrieves the original pending private native response; humans cannot read secret answers. |
+| `PUT /api/agents/{agentId}/runtime-decisions/{decisionId}/receipt` | Same agent records responded/cancelled; exact live run and pending/native status required. |
 | `POST /_matrix/client/v3/user_directory/search` | Native Matrix bearer-authenticated projection of the same authorized active registered-principal directory, without shared-room membership. Standard `results`/`limited` response; no room admission or grant. |
 | `POST /api/principal-resolutions` | Authorized bulk resolution of exact Matrix sender IDs to registered kind and agent owner; unknown IDs are explicit. |
 | `GET /api/roles`, `GET /api/permissions` | Read the fixed catalog, filtered by appropriate human/agent applicability. |
@@ -1784,7 +2104,18 @@ room topics and protocol details do not displace access controls.
 Fleet detail opens on its agent roster. Shared accessible navigation exposes
 durable URLs for agents (the fleet base path), `map`, `delivery`, `messages`,
 `rooms` (room-plan review) and `settings`. Agent detail opens on room access;
-its other durable views are `wake`, `activity`, `software` and `settings`.
+its other durable views are `wake`, `activity`, `runtime`, `decisions`, `software` and `settings`.
+Decision detail lives at `/manage/agents/{agentId}/decisions/{decisionId}`. Choice
+query hints do not preselect or submit. Review preserves all required questions,
+uses private inputs for secret text, and requires explicit owner confirmation.
+No human GET reads saved answers.
+The durable `runtime` view shows all supported public configured and observed
+effective native settings, model, reasoning effort, permission policy, native
+version, history mode and listener input budget. Configured and observed values
+are distinct, with observation time and explicit unavailable fields. Per-room
+native observations retain their conversation attribution. Controller/deployment
+labels are descriptive; credentials, private endpoints and authentication fields
+are absent from public-safe REST projections.
 Only the selected task mounts and reads its resources. Links work with direct
 navigation, reload, browser history and keyboard navigation; unknown sections
 are unavailable, not aliases. Primary list pages link to the base detail path.
@@ -1793,6 +2124,20 @@ selections survive searches and changes of mode. Native room permission threshol
 remain available in an explicit disclosure, below the current authority summary.
 Empty software history explains how to begin reporting rather than showing an
 empty table.
+Software opens on the actively reported installed release, the latest release
+offered by this server, observation/check times and the normal consent-based
+update instructions. An offline agent's last reported installation is labelled
+as such, not presented as a currently running listener. Historical runs live in
+an inspectable paginated section and are not marked as needing updates. Opaque
+release IDs are compared for equality, not ordered as semantic versions.
+Activity shows native waiting state, pending decisions and the bounded original
+failure cause. Self-debugging guidance uses fleet show and the native attachment
+pointer on the actual controller; an unavailable/stopped engine is reported
+explicitly rather than launching a competing runtime or changing identity.
+Decision links open durable authenticated review pages with clear agent, origin,
+scope, choices and lifecycle state. Obsolete/answered requests cannot be
+submitted again. These views use the shared management theme and paper-like
+hierarchy, not the deployed Element theme.
 Identity/status context stays compact above navigation. Forms and explicit
 confirmations retain native permission checks, scoped REST mutations, revisions,
 CSRF and request idempotency. Policy sections distinguish signup, capacity,
@@ -1904,6 +2249,30 @@ owner, minimality/performance rationale and exact evidence. The checked-in spec
 is normative; execution notes never substitute for implementation verification.
 
 Required banks:
+- Large ordinary native file changes/output, complete actual approval review,
+  structured native questions, exact choice/free-text response routing and
+  unsupported request classification without killing healthy listeners.
+- Shared history defaults and direct-session single-history enforcement;
+  independent fleet instance modes, per-room/DM resumption, mode changes without
+  context copying/replay, scoped wake trails, same identity/process/listener and
+  zero model work for routing or attachment.
+- Owner-only complete non-thinking terminal mirroring, reasoning/secret-field
+  exclusion, stream ordering, retry/deduplication, large output/artifacts,
+  cross-owner disclosure policy, decision expiry/disconnection and no loops.
+- Authenticated owner decision links, read-only GET/prefetch, CSRF-protected
+  submissions, native request generations, duplicate/racing answers, obsolete
+  requests, exact original-conversation responses and truthful native resolution.
+- Latest-delivered-chat typing, exactly 30-second native expiry, no work-driven
+  renewal, source changes, completion/interrupt/disconnect and controlled clocks.
+- Lazy private management-DM creation/reuse with readable naming and only its
+  member/service participants; no signup/startup/heartbeat conversation creation.
+  Authenticated scoped failure reports, contained peer execution, independently
+  detected lost contact, intentional-stop/idle/wait exclusions, one-episode
+  notification deduplication and durable native delivery after outage recovery.
+  Original sessions/publication uncertainty survive; no silent restart or replay.
+- Public-safe configured/effective runtime observations and original failures;
+  current/latest software summary, honest offline/history state and native
+  desktop/mobile decision/configuration/activity views.
 - Schema integrity, typed repositories, foreign keys, indexes/query plans,
   pagination/query counts, transaction rollback, no serialized domain state.
 - Interval cadence, weekly/advanced cron schedules, IANA time zones, DST gaps and

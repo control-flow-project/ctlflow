@@ -8,6 +8,8 @@ import { piDescriptor, piBoundary, piCall, type PiDescriptor } from './protocol.
 import { setTimeout as delay } from 'node:timers/promises';
 import { artifactHash } from '@crossfire/adapter-filesystem/release';
 import { ignoreProjectPaths } from '@crossfire/adapter-filesystem/project';
+import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
+import * as check from '@crossfire/contracts/schema/validation';
 
 const projectEntry = `import { realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -46,15 +48,35 @@ export function installPiExtension(workspace: string): void {
   finally { if (existsSync(temporary)) unlinkSync(temporary); }
 }
 
-export async function connectPi(descriptor: PiDescriptor, journal: string, pollMs: number, stop: AbortSignal) {
+export async function connectPi(descriptor: PiDescriptor, journal: string, pollMs: number, stop: AbortSignal, hooks?: RuntimeHooks) {
   const stopped = new AbortController(), signal = AbortSignal.any([stop, stopped.signal]);
   const verify = async () => { if (await piCall(descriptor, { method: 'verify' }, signal) !== true) throw new Error('Pi native attachment is unavailable'); };
   await verify(); signal.throwIfAborted();
+  const boundary = piBoundary(await piCall(descriptor, { method: 'boundary' }, signal));
+  if (!boundary.ok) throw new Error(boundary.error.message);
+  let cursor = boundary.value.leaf;
+  let observed: boolean | undefined;
+  const observation = check.object({ cursor: check.nullable(check.text(200)), busy: check.boolean,
+    output: check.list(check.object({ id: check.text(255), text: check.plainText(8 * 1024 * 1024) }), 1024) });
+  const observe = async () => {
+    const result = observation(await piCall(descriptor, { method: 'observe', after: cursor }, signal));
+    if (!result.ok) throw new Error(result.error.message);
+    for (const output of result.value.output) hooks?.observe?.({ kind: 'output', sessionId: descriptor.session, streamId: null, ...output });
+    cursor = result.value.cursor;
+    if (observed !== result.value.busy) {
+      observed = result.value.busy;
+      hooks?.observe?.({ kind: 'state', observation: { roomId: null, sessionId: descriptor.session, runtime: 'pi', state: observed ? 'working' : 'idle', observedAt: Date.now(), settings: [], errorMessage: null } });
+    }
+  };
+  await observe();
   let checking = false;
   const timer = setInterval(() => {
     if (checking) return;
     checking = true;
-    void verify().catch(error => stopped.abort(error)).finally(() => { checking = false; });
+    void observe().catch(error => {
+      hooks?.observe?.({ kind: 'state', observation: { roomId: null, sessionId: descriptor.session, runtime: 'pi', state: 'failed', observedAt: Date.now(), settings: [], errorMessage: String(error).slice(0, 4000) } });
+      stopped.abort(error);
+    }).finally(() => { checking = false; });
   }, 1000);
   const clear = () => { clearInterval(timer); signal.removeEventListener('abort', clear); };
   signal.addEventListener('abort', clear, { once: true });
@@ -95,6 +117,6 @@ export function discoverPi(workspace: string, environment: NodeJS.ProcessEnv = p
   const current = join(dirname(realpathSync(join(workspace, '.crossfire/client.mjs'))), 'crossfire-pi.mjs');
   if (descriptor.software !== artifactHash(readFileSync(current))) throw new Error('The Pi native extension needs this verified update. Use /reload once in Pi, then reconnect; the existing identity is unchanged.');
   const binding = createHash('sha256').update(JSON.stringify(descriptor)).digest('hex');
-  const runtime: RuntimeAdapter = (stop, pollMs) => connectPi(descriptor, join(workspace, '.crossfire/runtime/pi', descriptor.session + '.receipt'), pollMs, stop);
+  const runtime: RuntimeAdapter = (stop, pollMs, hooks) => connectPi(descriptor, join(workspace, '.crossfire/runtime/pi', descriptor.session + '.receipt'), pollMs, stop, hooks);
   return { name: 'pi', session: descriptor.session, binding, runtime };
 }

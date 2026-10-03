@@ -150,10 +150,10 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const deliveredContext = JSON.parse(input.slice(input.indexOf('\n') + 1)) as { owner: string;
     senders: Record<string, { kind: 'human' | 'agent' | 'unknown'; owner?: string }> };
   assert.equal(deliveredContext.owner, admin.member.principal.matrixUserId);
-  assert.deepEqual(deliveredContext.senders[admin.member.principal.matrixUserId], { kind: 'human' });
-  assert.deepEqual(deliveredContext.senders[other.member.principal.matrixUserId], { kind: 'human' });
-  assert.deepEqual(deliveredContext.senders[guest.matrixUserId], { kind: 'agent', owner: other.member.principal.matrixUserId });
-  assert.deepEqual(deliveredContext.senders[outsider.id], { kind: 'unknown' });
+  assert.deepEqual(deliveredContext.senders[admin.member.principal.matrixUserId], { kind: 'human', display_name: 'admin', relationship: 'owner' });
+  assert.deepEqual(deliveredContext.senders[other.member.principal.matrixUserId], { kind: 'human', display_name: 'other', relationship: 'other-human' });
+  assert.deepEqual(deliveredContext.senders[guest.matrixUserId], { kind: 'agent', owner: other.member.principal.matrixUserId, display_name: 'guest (other)', owner_display_name: 'other', relationship: 'other-owners-agent' });
+  assert.deepEqual(deliveredContext.senders[outsider.id], { kind: 'unknown', display_name: null, relationship: 'unknown' });
   assert(!input.includes(north.account.access_token) && !input.includes(guest.token));
   assert.equal(providers[1]!.requests.length, 0); providers[0]!.finish();
   await acknowledged();

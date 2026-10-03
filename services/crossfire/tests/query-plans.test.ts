@@ -8,6 +8,7 @@ import { createDirectoryRepository } from '@crossfire/adapter-sqlite/repository/
 import { createDiscoveryRepository } from '@crossfire/adapter-sqlite/repository/discovery/index';
 import { createListenerReadRepository } from '@crossfire/adapter-sqlite/repository/listener-read/index';
 import { createRoomGrantReadRepository } from '@crossfire/adapter-sqlite/repository/room-grant-read/index';
+import { createRuntimeRepository } from '@crossfire/adapter-sqlite/repository/runtime/index';
 import { roomGrants } from '@crossfire/contracts/schema/query';
 import type { Result } from '@crossfire/kernel/result';
 
@@ -109,6 +110,20 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
     assert.equal(roomGrants(new URLSearchParams({ roomIds: source })).ok, false);
   }
   assert.equal(roomGrants(new URLSearchParams('roomIds=[]&roomIds=[]')).ok, false);
+  const runtime = createRuntimeRepository(database);
+  for (const contexts of [1, 100]) {
+    for (let position = 0; position < contexts; position++) value(runtime.saveObservation(agentId, {
+      runId: agentId + '-run-2', sessionId: 'context-' + position, roomId: '!context-' + position + ':test', runtime: 'codex',
+      state: 'idle', observedAt: position, historyMode: 'per-room', maxInputBytes: 100000, errorMessage: null,
+      settings: [{ name: 'model', configured: 'configured', effective: 'effective' }] }));
+    statements = [];
+    const observed = value(runtime.observation(agentId));
+    assert.equal(observed.length, contexts);
+    assert(observed.every(context => context.settings.length === 1));
+    assert.equal(statements.length, 3, 'Runtime contexts and settings hydrate in three indexed queries, not one per history');
+    const runPlan = database.prepare('EXPLAIN QUERY PLAN ' + statements[0]).all() as { detail: string }[];
+    assert(runPlan.some(step => step.detail.includes('ix_listener_run_agent_started')), JSON.stringify(runPlan));
+  }
   assert.deepEqual(database.pragma('foreign_key_check'), []);
 });
 
@@ -128,6 +143,7 @@ test('sender identity batches seek exact Matrix indexes across large human and a
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
       value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
+      value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
     }
   })();
   database.exec('ANALYZE');

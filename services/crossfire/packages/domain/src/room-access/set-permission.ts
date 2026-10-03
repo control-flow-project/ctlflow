@@ -2,13 +2,14 @@ import { failure, success } from '@crossfire/kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { authorizeAgent } from '../authorization/authorize.js';
 import { recordEvent } from '../audit/record-event.js';
-export function setRoomPermission(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'unitOfWork'>,
+import { privateConversation } from '../owner-conversation/protect.js';
+export function setRoomPermission(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'unitOfWork' | 'runtime'>,
   actor: Actor, input: { agentId: string; roomId: string; expectedRevision: number; expectedGeneration: string; permissions: string[] }, requestId: string) {
   return services.unitOfWork.run(() => {
     if (actor.kind !== 'human') return failure('forbidden', 'Agents cannot delegate invitation permission onward');
     const target = authorizeAgent(services, actor, input.agentId, 'room-grant.manage');
     if (!target.ok) return target;
-    const conversation = services.repositories.ownerConversation.findByRoom({ roomId: input.roomId });
+    const conversation = privateConversation(services, input.roomId);
     if (!conversation.ok) return conversation;
     if (conversation.value) return failure('forbidden', 'Owner DMs are private channels and cannot delegate invitations');
     if (target.value.principal.revision !== input.expectedRevision) return failure('conflict', 'Agent revision changed');
