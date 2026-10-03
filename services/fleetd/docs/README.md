@@ -1,6 +1,7 @@
 # Controller guides
 
 - [Controller roots, lifecycle, execution and security](operations.md)
+- [Native fleet inspection and preservation](../tools/README.md)
 - [CLI command and SSH guide](../../fleet/docs/commands.md)
 - [Fleet configuration and native runtime settings](../../fleet/docs/configuration.md)
 - [Canonical private API, operations and storage contracts](../../../docs/specification.md)

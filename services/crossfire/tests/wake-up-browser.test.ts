@@ -10,7 +10,7 @@ import { readWakeRule } from '@crossfire/domain/wake-up/read';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { checkPaperLayout } from './support/browser-layout.js';
+import { checkPaperLayout } from '../tools/browser/layout.js';
 
 test('Wake-ups browser CRUD, calendar selection, assignments, pagination and role visibility use the real APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin } = fixture;

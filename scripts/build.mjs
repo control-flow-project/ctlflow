@@ -48,7 +48,7 @@ async function buildPackages() {
 async function buildProduct(service) {
   const root = join(repository, 'services', service), entries = [];
   rmSync(join(root, 'dist'), { recursive: true, force: true });
-  for (const directory of ['apps', 'tests', 'scripts']) {
+  for (const directory of ['apps', 'tests', 'scripts', 'tools']) {
     const base = join(root, directory);
     if (!existsSync(base)) continue;
     for (const file of readdirSync(base, { recursive: true })) {

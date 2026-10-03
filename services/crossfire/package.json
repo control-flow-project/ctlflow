@@ -7,7 +7,7 @@
   },
   "type": "module",
   "description": "Human-led Matrix coordination and agent management",
-  "devDependencies": { "@crossfire/test-support": "0.1.0" },
+  "devDependencies": { "@crossfire/test-support": "0.1.0", "@crossfire/operator-support": "0.1.0", "@crossfire/adapter-crossfire": "0.1.0", "@crossfire/adapter-matrix": "0.1.0", "@crossfire/adapter-sqlite": "0.1.0", "@crossfire/adapter-filesystem": "0.1.0", "@crossfire/contracts": "0.1.0", "@crossfire/kernel": "0.1.0", "@tinqerjs/better-sqlite3-adapter": "0.0.28", "better-sqlite3": "13.0.3", "@playwright/test": "1.63.0" },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"
@@ -21,6 +21,7 @@
     "generate:matrix": "npm run build && node dist/scripts/generate-matrix-api.js",
     "start": "node crossfire start",
     "crossfire": "node crossfire",
+    "tools": "node dist/tools/main.js",
     "verify:architecture": "node scripts/verify-architecture.ts",
     "verify:installation": "node scripts/verify-architecture.ts installation",
     "verify:container": "node dist/scripts/verify-container.js"

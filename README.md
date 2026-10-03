@@ -10,6 +10,7 @@ behavior has one functional adapter owner and declared package exports.
 
 ## Documentation
 - [Documentation index](docs/README.md)
+- [Reusable operator verification](docs/operator-tools.md)
 - [Crossfire: installation, agents, permissions and administration](services/crossfire/README.md)
 - [fleet: configuration, commands, remote access and operations](services/fleet/README.md)
 - [fleetd: controller lifecycle and private API](services/fleetd/README.md)

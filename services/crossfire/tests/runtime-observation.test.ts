@@ -92,3 +92,50 @@ test('owner streams coalesce before publication and uncertain delivery retries a
   assert.equal((sent()[2]!.body as { body: string }).body, 'later');
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
 });
+
+test('a new reporting run republishes every retained native state without another native event or owner message', async scope => {
+  const clock = testClock(scope), native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock);
+  const stop = new AbortController();
+  const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
+    transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    coordination: matrix.coordination, historyMode: 'per-room', maximum: 100000 }, stop.signal);
+  cleanup(scope, async () => { stop.abort(); await clock.complete(observer.close()); });
+  for (const sessionId of ['shared', 'room-one', 'room-two']) observer.observe({ kind: 'state', observation: {
+    sessionId, roomId: sessionId === 'shared' ? null : '!' + sessionId + ':test', runtime: 'codex', state: 'idle', observedAt: clock.now(),
+    settings: [{ name: 'model', configured: 'example', effective: 'example' }], errorMessage: null } });
+  const run = randomUUID(); observer.start(run);
+  const posted = () => matrix.requests.filter(request => request.path.endsWith('/runtime'));
+  await clock.until(() => posted().length === 3);
+  const next = randomUUID(); observer.start(next);
+  await clock.until(() => posted().length === 6);
+  assert(posted().slice(0, 3).every(request => request.path.includes(run)));
+  assert(posted().slice(3).every(request => request.path.includes(next)));
+  assert.deepEqual(posted().slice(3).map(request => request.body), posted().slice(0, 3).map(request => request.body));
+  observer.start(next); await clock.advance(1001);
+  assert.equal(posted().length, 6, 'The same run does not generate another snapshot');
+  assert.equal(matrix.requests.filter(request => request.path.includes('/owner-conversation')).length, 0);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+});
+
+test('observation coalescing never removes a snapshot while its publication is awaiting a receipt', async scope => {
+  const clock = testClock(scope), native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock);
+  const stop = new AbortController();
+  let received!: () => void, proceed!: () => void;
+  const publication = new Promise<void>(resolve => { received = resolve; }), receipt = new Promise<void>(resolve => { proceed = resolve; });
+  let first = true;
+  const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
+    transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    coordination: { ...matrix.coordination, async runtime(...args) {
+      if (first) { first = false; received(); await receipt; }
+      return matrix.coordination.runtime(...args);
+    } }, historyMode: 'shared', maximum: 100000 }, stop.signal);
+  cleanup(scope, async () => { proceed(); stop.abort(); await clock.complete(observer.close()); });
+  const state = (observedAt: number) => observer.observe({ kind: 'state', observation: {
+    sessionId: 'original', roomId: null, runtime: 'codex', state: 'idle', observedAt, settings: [], errorMessage: null } });
+  state(1); observer.start(randomUUID()); await publication;
+  state(2); proceed();
+  const posted = () => matrix.requests.filter(request => request.path.endsWith('/runtime'));
+  await clock.until(() => posted().length === 2);
+  assert.deepEqual(posted().map(request => (request.body as { observedAt: number }).observedAt), [1, 2]);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+});

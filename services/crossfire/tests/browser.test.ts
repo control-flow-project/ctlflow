@@ -35,7 +35,7 @@ import { listen } from '@crossfire/adapter-crossfire/listener';
 import { until } from '../scripts/test-support/listener.js';
 import { ARTIFACTS } from '@crossfire/contracts/release';
 import { onboardingUrl } from '@crossfire/contracts/onboarding';
-import { checkPaperLayout } from './support/browser-layout.js';
+import { checkPaperLayout } from '../tools/browser/layout.js';
 import { elementAssets } from './support/element.js';
 import { checkOnboardingPolicy } from './support/onboarding-browser.js';
 
