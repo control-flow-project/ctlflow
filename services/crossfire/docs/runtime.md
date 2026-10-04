@@ -49,6 +49,19 @@ when that owner is not a member of the room.** Invite an agent only if that
 disclosure is authorized. Separate histories prevent conversational carry-over;
 they do not isolate files, tools, credentials or same-user processes.
 
+Machine-specific paths and diagnostics are allowed in that verified private
+owner DM. Shared agent instructions prohibit disclosing execution-machine
+home/workspace paths, OS usernames, private hosts/IPs/ports, internal endpoints,
+socket/token paths, process/session identifiers, environment dumps or connection
+strings in any other DM or room, even a private room containing the owner.
+Use workarea-relative paths, neutral temporary references or authorized uploaded
+attachments; label agent-local references because they do not grant file access.
+Review reports, filenames, archive members, logs and metadata before sharing.
+Intended public URLs, native Matrix identities and source citations are retained.
+Private tool execution may still use absolute paths. Literal owner mirroring is
+unchanged; credentials and secret answers remain protected everywhere. This is
+agent communication guidance, not guaranteed model-output redaction or isolation.
+
 The private owner DM opens on first actual owner contact, terminal output or
 native human decision. Enrollment, startup, diagnostics and heartbeats create
 no chat. Native names identify the agent; an existing human-assigned title is

@@ -11,6 +11,7 @@ import { until } from '../scripts/test-support/listener.js';
 import { value } from './support/application.js';
 import { codexTerminal } from '@crossfire/adapter-codex/terminal';
 import { openTerminal } from '../scripts/test-support/terminal.js';
+import { builtRelease } from '../scripts/test-support/release.js';
 
 test('stock Codex default and native bypass execute synchronous subprocess IPC and resume the same session', { timeout: 60000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/owned-options-'));
@@ -59,8 +60,11 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
   const provider = await nativeProvider(scope, home), adapter = codexRuntime(), stop = new AbortController();
   trustWorkspace(home, workspace);
-  const input = { name: 'native-proof', workspace, instructions: 'Inert native verification. Never contact external services.',
-    options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'read-only', approval_policy: 'never' },
+  const instructions = readFileSync(join(builtRelease().directory, 'SKILL.md'), 'utf8');
+  assert(instructions.includes('Machine-specific diagnostics belong only in your verified private owner DM.'));
+  assert(instructions.includes('Credentials and secret answers remain protected everywhere.'));
+  const input = { name: 'native-proof', workspace, instructions: instructions + '\nInert native verification. Never contact external services.',
+    options: { model: 'gpt-6.1-sol', model_reasoning_effort: 'max', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No approvals are expected'); } } };
   let runtime = value(await adapter.start(input, stop.signal));
   cleanup(scope, () => runtime.close());
@@ -75,7 +79,8 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   await runtime.deliver('Native owned runtime proof', 'owned-native-proof-1', stop.signal);
   await until(() => provider.requests.length === 1);
   const request = provider.requests[0] as { model: string; reasoning: { effort: string } };
-  assert.equal(request.model, 'gpt-5.2'); assert.equal(request.reasoning.effort, 'high', JSON.stringify(request.reasoning));
+  assert.equal(request.model, 'gpt-6.1-sol'); assert.equal(request.reasoning.effort, 'max', JSON.stringify(request.reasoning));
+  assert(JSON.stringify(request).includes('Machine information and recipients'));
   provider.finish();
   let deadline = performance.now() + 5000;
   while (await runtime.turnControl.activeTurn() !== null) { assert(performance.now() < deadline, 'Native work did not become idle'); await delay(50); }

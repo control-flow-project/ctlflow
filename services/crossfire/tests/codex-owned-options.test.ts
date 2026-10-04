@@ -26,6 +26,18 @@ test('native bypass conflicts and unknown options are rejected instead of silent
   }
 });
 
+test('owned Codex preserves native reasoning efforts without aliases or delegation changes', () => {
+  const adapter = codexRuntime();
+  for (const effort of ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']) {
+    const native = { model: 'gpt-6.1-sol', model_reasoning_effort: effort,
+      sandbox_mode: 'danger-full-access', approval_policy: 'on-request' };
+    assert.deepEqual(adapter.validate(native), success({ options: native, approval: 'listener' }), effort);
+  }
+  for (const effort of ['maximum', 'very-high', 'MAX', '', 1]) {
+    assert.equal(adapter.validate({ model_reasoning_effort: effort }).ok, false, String(effort));
+  }
+});
+
 test('native question configuration checks the actual binary capability before process startup', () => {
   assert(ownedVersion('codex-cli 0.158.0').ok);
   assert(ownedVersion('codex-cli 0.159.2').ok);

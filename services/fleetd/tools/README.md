@@ -58,7 +58,11 @@ Treat IDs/paths/digests as operator evidence, not public telemetry.
   archive is not a substitute for the native Git-based project boundary.
 - Optional native membership checks require zero joined rooms for each account.
 - Preservation retains exact enrolled account IDs, all context/session IDs and
-  native provider-authentication file fingerprints. History content and provider
+  native provider-authentication file fingerprints for every earlier instance.
+  New instances/files may be appended after the ordinary roster/enrollment
+  review; the complete current roster and native state are still validated.
+  Missing or changed earlier entries and duplicate snapshot identities/paths fail.
+  History content and provider
   behavior are not inferred from these fingerprints.
 
 Native inspection lives under `tools/runtime/` with explicit supported-runtime

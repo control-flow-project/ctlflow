@@ -68,9 +68,12 @@ their individual-agent adapters.
 Generic operator checks are service-owned `tools/` modules in this monorepo,
 not GAAP scripts. Crossfire owns release/API/browser/database/host verification
 and the exported operator support package. fleetd owns exact controller/binding
-and adapter-dispatched native-history inspection. Lifecycle remains in Fleet's
-existing CLI. Private expectations are explicit inputs; checks neither call a
-model, answer native decisions nor create rooms. Enrollment approval requires
+and adapter-dispatched native-history inspection. Preservation allows reviewed
+appended instances while retaining every earlier account, exact context/session
+binding and provider-file fingerprint; missing, changed or duplicate evidence fails.
+Lifecycle remains in Fleet's existing CLI. Private expectations are explicit
+inputs; checks neither call a model, answer native decisions nor create rooms.
+Enrollment approval requires
 explicit execution and an exact pending introduction. Fleet wake configuration
 requires an exact owner/controller/complete roster plan and explicit execution.
 It uses existing revision-checked per-agent wake-policy REST operations, preserves
@@ -723,6 +726,10 @@ next start. Detachment removes future defaults, not current grants or wake state
 
 The runtime adapter owns the typed `runtime_options` schema and native settings
 translation. Model/reasoning settings reach the headless native session directly.
+Codex reasoning efforts are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`,
+`max` and `ultra`, subject to the selected native model's actual support. Values
+are passed unchanged; `max` neither aliases `xhigh` nor enables `ultra`'s native
+automatic delegation. Unknown efforts fail boundary validation.
 The roster's work area supplies native cwd. Permission settings retain native
 semantics; unsupported settings fail rather than being ignored or elevated.
 Codex defaults to `sandbox_mode = "danger-full-access"` and
@@ -1615,6 +1622,20 @@ filter. Mirroring never forwards output to a shared room, guesses an audience
 from the last delivered message or claims history isolation. The DM is created
 on first real output/request if absent, not during enrollment, startup,
 diagnostics or heartbeats.
+
+Machine-specific paths and diagnostics are permitted in this verified private
+owner DM. The shared agent skill prohibits incidental execution-machine disclosure
+in any other DM or room, including private rooms and rooms containing the owner:
+home/workspace paths, OS usernames, private hosts/IPs/ports, internal endpoints,
+socket/token paths, process/session identifiers, environment dumps and connection
+strings. Replies use workarea-relative paths, neutral temporary references or
+authorized uploaded attachments. Agent-local references do not grant recipient
+access. Generated reports, filenames, archive members, logs and metadata require
+the same review before sharing. Intended public product URLs, native Matrix
+identities and source citations remain intact. Private tool execution and exact
+owner-facing review scope may retain absolute paths. Credentials and secret
+answers remain protected everywhere. This is communication guidance, not a
+guarantee of model compliance, an output scrubber or a confidentiality sandbox.
 
 Native event identity and per-conversation sequencing own ordered, idempotent
 mirroring. Streamed output may be coalesced and large output split into complete

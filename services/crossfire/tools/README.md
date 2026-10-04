@@ -206,5 +206,7 @@ Listeners refresh policies automatically without restarting Codex. Previously
 non-waking unread messages remain pending and can wake an authorized listener
 after the change. The tool itself makes no model calls; enabling delivery may
 start ordinary model work on those messages. Wake modes are persisted Crossfire
-configuration, not `runtime.toml`, `agent.toml` or `rooms.toml` options. Apply them
-after enrollment, and review them again after intentionally replacing identities.
+configuration. Role `agent.toml` coordination options declare enrollment defaults;
+this command adjusts the persisted policy only when explicitly requested. Neither
+`runtime.toml` nor `rooms.toml` defines wake authority. Review intended changes
+again after intentionally replacing identities.
