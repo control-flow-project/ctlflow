@@ -1,0 +1,14 @@
+{
+  "timeline|typing_indicator|one_user": {
+    "en": "%(displayName)s is thinking …"
+  },
+  "timeline|typing_indicator|two_users": {
+    "en": "%(names)s and %(lastPerson)s are thinking …"
+  },
+  "timeline|typing_indicator|more_users|one": {
+    "en": "%(names)s and one other are thinking …"
+  },
+  "timeline|typing_indicator|more_users|other": {
+    "en": "%(names)s and %(count)s others are thinking …"
+  }
+}

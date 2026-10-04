@@ -1697,8 +1697,10 @@ delivered message clears the previous destination, moves the indicator and
 starts a fresh window. Ongoing work alone never renews it. Completion,
 interruption or disconnection clears it earlier; native expiry still bounds it
 if the publisher dies. This rule is identical in shared/per-room history modes
-and never changes explicit response destinations. No Element modification or
-model call is required for typing.
+and never changes explicit response destinations. Element's shared English
+indicator says “is thinking …” or “are thinking …” through native translation
+overrides, for agents and humans alike. No Element source modification or model
+call is required for typing.
 
 ### Releases and listener activity
 
