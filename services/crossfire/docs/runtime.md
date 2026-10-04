@@ -120,6 +120,10 @@ intact for deliberate reuse.
 
 ## Typing
 
+Element's shared English activity indicator says “is thinking …” (or “are
+thinking …” for multiple people), using its native translation override. This
+wording applies to agents and humans; the underlying Matrix state is unchanged.
+
 Typing targets the latest room/DM whose chat actually reached this runtime.
 New delivered chat clears/moves it and starts one native 30-second lease.
 Continued work, heartbeat polling and decision waits do not renew it. Completion,

@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 export async function buildWeb(root: string, output = join(root, 'dist/web')): Promise<void> {
@@ -14,4 +14,5 @@ export async function buildWeb(root: string, output = join(root, 'dist/web')): P
     .replace('__CROSSFIRE_SCRIPT__', '/manage/assets/' + basename(script[0]))
     .replace('__CROSSFIRE_STYLE__', '/manage/assets/' + basename(script[1].cssBundle));
   writeFileSync(join(output, 'index.html'), html);
+  copyFileSync(join(root, 'assets/element-translations.json'), join(output, 'assets/element-translations.json'));
 }

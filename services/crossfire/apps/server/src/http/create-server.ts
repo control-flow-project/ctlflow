@@ -92,6 +92,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
         const invited = claim && verifyInvitation(services, claim.id, claim.secret).ok;
         response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
         response.end(method === 'HEAD' ? undefined : JSON.stringify({ brand: 'Crossfire', default_theme: 'light', ...presentation,
+          custom_translations_url: '/manage/assets/element-translations.json',
           default_server_config: { 'm.homeserver': { base_url: config.publicOrigin, server_name: config.serverName } },
           disable_custom_urls: true, disable_guests: true, disable_login_language_selector: true, disable_3pid_login: true,
           disable_registration: !invited && !(policy.ok && policy.value?.signupMode === 'open'), room_directory: { servers: [] } })); return;

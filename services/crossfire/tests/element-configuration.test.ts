@@ -1,6 +1,6 @@
 import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -29,7 +29,8 @@ test('Element presentation owns branding, not instance origin or access policy',
 
 test('both Element configuration URLs preserve branding and reflect enforced signup policy and invitations', { timeout: 120000 }, async scope => {
   const presentation = { brand: 'GAAP', default_theme: 'custom-Paper', setting_defaults: { custom_themes: [{ name: 'Paper' }] },
-    disable_registration: false, disable_custom_urls: false, default_server_config: { 'm.homeserver': { base_url: 'https://elsewhere.test' } } };
+    disable_registration: false, disable_custom_urls: false, custom_translations_url: 'https://elsewhere.test/translations.json',
+    default_server_config: { 'm.homeserver': { base_url: 'https://elsewhere.test' } } };
   const { origin, services, admin } = await nativeServer(scope, await releaseFixture(), presentation);
   const configuration = async (path: string, disabled: boolean, cookie = '') => {
     const response = await fetch(origin + path, { headers: { Cookie: cookie } });
@@ -39,12 +40,18 @@ test('both Element configuration URLs preserve branding and reflect enforced sig
     assert.equal(body.brand, 'GAAP');
     assert.equal(body.default_theme, 'custom-Paper');
     assert.deepEqual(body.setting_defaults, presentation.setting_defaults);
+    assert.equal(body.custom_translations_url, '/manage/assets/element-translations.json');
     assert.equal(body.disable_registration, disabled);
     assert.equal(body.disable_custom_urls, true);
     assert.deepEqual(body.default_server_config, { 'm.homeserver': { base_url: origin, server_name: services.instance.serverName } });
   };
   const paths = ['/config.json', '/config.' + new URL(origin).hostname + '.json'];
   for (const path of paths) await configuration(path, true);
+  const translations = await fetch(origin + '/manage/assets/element-translations.json');
+  assert.equal(translations.status, 200);
+  assert.equal(translations.headers.get('content-type'), 'application/json');
+  assert.equal(translations.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(await translations.json(), JSON.parse(readFileSync(join(process.cwd(), 'assets/element-translations.json'), 'utf8')));
   const policy = value(services.repositories.instancePolicy.find({ id: 'instance' }))!;
   value(changeInstancePolicy(services, admin.actor, { ...policy, expectedRevision: policy.revision, signupMode: 'open' }, 'open'));
   for (const path of paths) await configuration(path, false);
