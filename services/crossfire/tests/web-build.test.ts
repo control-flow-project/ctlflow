@@ -10,6 +10,9 @@ test('management updates publish content-addressed assets without reusing stale 
   const source = join(root, 'apps/web/src');
   mkdirSync(source, { recursive: true });
   copyFileSync(join(process.cwd(), 'apps/web/index.html'), join(root, 'apps/web/index.html'));
+  mkdirSync(join(root, 'assets'));
+  const translations = readFileSync(join(process.cwd(), 'assets/element-translations.json'));
+  writeFileSync(join(root, 'assets/element-translations.json'), translations);
   const script = join(source, 'main.tsx');
   const stylesheet = join(source, 'style.css');
   writeFileSync(script, 'import "./style.css"; document.title = "First";');
@@ -17,6 +20,7 @@ test('management updates publish content-addressed assets without reusing stale 
   async function compile(name: string) {
     const output = join(root, name);
     await buildWeb(root, output);
+    assert.equal(readFileSync(join(output, 'assets/element-translations.json')).equals(translations), true);
     const html = readFileSync(join(output, 'index.html'), 'utf8');
     const javascript = /src="(\/manage\/assets\/app-[A-Z0-9]+\.js)"/u.exec(html)?.[1];
     const css = /href="(\/manage\/assets\/app-[A-Z0-9]+\.css)"/u.exec(html)?.[1];

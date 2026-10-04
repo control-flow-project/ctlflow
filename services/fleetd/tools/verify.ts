@@ -17,6 +17,19 @@ export const preservation = check.object({ identities: check.list(check.object({
   files: check.list(check.object({ path: check.text(4096), bytes: check.integer(), sha256: check.text(64, 64) }), 1000) });
 export type Preservation = check.Parsed<typeof preservation>;
 
+export function verifyRetainedState(previous: Preservation, current: Preservation): Result<void> {
+  for (const snapshot of [previous, current]) {
+    if (new Set(snapshot.identities.map(identity => identity.instanceKey)).size !== snapshot.identities.length
+      || new Set(snapshot.identities.map(identity => identity.agentId)).size !== snapshot.identities.length
+      || new Set(snapshot.files.map(file => file.path)).size !== snapshot.files.length) return failure('invalid', 'Preservation snapshots must contain unique identities and file paths');
+  }
+  const identities = new Map(current.identities.map(identity => [identity.instanceKey, identity]));
+  const files = new Map(current.files.map(file => [file.path, file]));
+  if (previous.identities.some(identity => !isDeepStrictEqual(identities.get(identity.instanceKey), identity))
+    || previous.files.some(file => !isDeepStrictEqual(files.get(file.path), file))) return failure('conflict', 'Enrolled accounts, native histories or provider-file fingerprints changed');
+  return success(undefined);
+}
+
 export async function verifyFleet(input: { root: string; directory: string; running: boolean; fresh: boolean; noRooms: boolean;
   skills: string[]; previous?: Preservation }, signal: AbortSignal, native: NativeInspector = inspectNative): Promise<Result<unknown>> {
   if (input.fresh && !input.running) return failure('invalid', 'Fresh native history verification requires --running');
@@ -95,7 +108,10 @@ export async function verifyFleet(input: { root: string; directory: string; runn
     }
     identities.sort((left, right) => left.instanceKey.localeCompare(right.instanceKey)); files.sort((left, right) => left.path.localeCompare(right.path));
     const current: Preservation = { identities, files };
-    if (input.previous && !isDeepStrictEqual(current, input.previous)) return failure('conflict', 'Enrolled accounts, native histories or provider-file fingerprints changed');
+    if (input.previous) {
+      const retained = verifyRetainedState(input.previous, current);
+      if (!retained.ok) return retained;
+    }
     return success({ checkedAt: new Date().toISOString(), controller: fleet.controller.name, localFleetId: fleet.fleetId, crossfireFleetId: binding.fleetId,
       fleetKey: fleet.fleetKey, projectRoot, connected: fleet.connection.connected, deliveryEnabled: fleet.connection.deliveryEnabled,
       instances, preservation: current, modelCalls: 0 });

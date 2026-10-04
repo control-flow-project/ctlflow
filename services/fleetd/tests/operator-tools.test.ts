@@ -12,12 +12,36 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import { saveBinding } from '@fleetd/storage/binding';
 import { success, type Result } from '@crossfire/kernel/result';
 import type { FleetView } from '@fleetd/contracts/api';
-import { verifyFleet, preservation } from '../tools/verify.js';
+import { verifyFleet, preservation, verifyRetainedState, type Preservation } from '../tools/verify.js';
 import { inspectNative } from '../tools/runtime/inspect.js';
 import { inspectCodex } from '../tools/runtime/codex.js';
 import type { NativeInspector, Attachment } from '../tools/runtime/types.js';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.code + ': ' + result.error.message); return result.value; }
+
+test('fleet growth preserves every earlier account, exact history and provider file without requiring a reset', () => {
+  const original = { instanceKey: 'helper', agentId: randomUUID(), contexts: [{ context: 'shared', sessionId: randomUUID() }] };
+  const credential = { path: '/private/helper/.codex/auth.json', bytes: 20, sha256: 'a'.repeat(64) };
+  const previous: Preservation = { identities: [original], files: [credential] };
+  const added = { instanceKey: 'helper-max', agentId: randomUUID(), contexts: [{ context: 'shared', sessionId: randomUUID() }] };
+  const current: Preservation = { identities: [added, original], files: [{ ...credential, path: '/private/helper-max/.codex/auth.json' }, credential] };
+  assert.equal(verifyRetainedState(previous, previous).ok, true);
+  assert.equal(verifyRetainedState(previous, current).ok, true);
+  for (const invalid of [
+    { ...current, identities: [added] },
+    { ...current, identities: [added, { ...original, agentId: randomUUID() }] },
+    { ...current, identities: [added, { ...original, contexts: [{ context: 'shared', sessionId: randomUUID() }] }] },
+    { ...current, identities: [added, { ...original, contexts: [...original.contexts, { context: 'room', sessionId: randomUUID() }] }] },
+    { ...current, files: [] },
+    { ...current, files: [{ ...credential, bytes: 21 }] },
+    { ...current, files: [{ ...credential, sha256: 'b'.repeat(64) }] },
+    { ...current, identities: [...current.identities, original] },
+    { ...current, identities: [...current.identities, { ...added, instanceKey: 'other' }] },
+    { ...current, files: [...current.files, credential] },
+  ]) assert.equal(verifyRetainedState(previous, invalid).ok, false);
+  assert.equal(verifyRetainedState({ ...previous, identities: [original, original] }, current).ok, false);
+  assert.equal(verifyRetainedState({ ...previous, files: [credential, credential] }, current).ok, false);
+});
 
 test('fleet verification uses only daemon GETs, exact native identities and the actual ancestor Git skill boundary', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleetd-operator-')), root = join(directory, 'controller'), fleetDirectory = join(directory, 'fleet');

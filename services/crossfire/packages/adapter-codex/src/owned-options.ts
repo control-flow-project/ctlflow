@@ -4,7 +4,7 @@ import { approvalRouting } from './permission-policy.js';
 
 const options = check.object({
   model: check.optional(check.text(200)),
-  model_reasoning_effort: check.optional(check.choice('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'ultra')),
+  model_reasoning_effort: check.optional(check.choice('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')),
   sandbox_mode: check.optional(check.choice('read-only', 'workspace-write', 'danger-full-access')),
   approval_policy: check.optional(check.choice('untrusted', 'on-failure', 'on-request', 'never')),
   dangerously_bypass_approvals_and_sandbox: check.optional(check.boolean),

@@ -117,7 +117,7 @@ manual room-specific edits. Configuration grants no room membership or native po
 | Field | Accepted values | When omitted |
 | --- | --- | --- |
 | `model` | Nonempty native model ID, up to 200 characters | Native provider/config selection |
-| `model_reasoning_effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `ultra` | Native config selection |
+| `model_reasoning_effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | Native config selection |
 | `sandbox_mode` | `read-only`, `workspace-write`, `danger-full-access` | `danger-full-access` |
 | `approval_policy` | `untrusted`, `on-failure`, `on-request`, `never` | `on-request` |
 | `dangerously_bypass_approvals_and_sandbox` | Boolean | Disabled |
@@ -126,6 +126,9 @@ manual room-specific edits. Configuration grants no room membership or native po
 The selected model/provider must support the chosen effort and native policy.
 Unknown keys, wrong types, unavailable models and refused settings fail; they are
 not silently ignored. Native effective settings are checked after create/resume.
+`max` is passed unchanged to Codex; it is not an alias for `xhigh` or `ultra`.
+Check the selected native model catalog before choosing it. `ultra` can enable
+native automatic delegation and is not selected by requesting `max`.
 
 Full access is unsandboxed execution with the controller user's filesystem and
 network privileges, not root access. It does not imply automatic approval:
