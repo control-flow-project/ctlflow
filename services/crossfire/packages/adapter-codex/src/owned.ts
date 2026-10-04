@@ -5,6 +5,7 @@ import { prepareHome } from './home.js';
 import { ownedOptions } from './owned-options.js';
 import { codexHistories } from './histories.js';
 import { resetCodex } from './reset.js';
+import { errorCode } from '@crossfire/contracts/rest/envelope';
 
 export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
   return { validate: ownedOptions, reset: resetCodex, async start(input, stop) {
@@ -22,7 +23,7 @@ export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
         config: parsed.value.options, hooks: { ...input.hooks, observe: event => input.hooks.observe?.(event.kind === 'state' && input.options.dangerously_bypass_approvals_and_sandbox !== undefined
           ? { ...event, observation: { ...event.observation, settings: [...event.observation.settings,
             { name: 'dangerously_bypass_approvals_and_sandbox', configured: String(input.options.dangerously_bypass_approvals_and_sandbox), effective: null }] } } : event) }, mode: input.listenerOptions?.history_mode ?? 'shared',
-        endpoint: owner.endpoint, token: owner.token, attachment }, AbortSignal.any([stop, owner.signal]));
+        endpoint: owner.endpoint, token: owner.token, attachment, allowNewHistory: input.allowNewHistory ?? false }, AbortSignal.any([stop, owner.signal]));
       const contexts = histories;
       const primary = await contexts.open(input.listenerOptions?.history_mode === 'per-room' ? 'control' : 'shared');
       return success({ ...primary, signal: contexts.signal, attachment: { ...attachment, sessionId: primary.sessionId },
@@ -30,6 +31,8 @@ export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
         ...(input.listenerOptions?.history_mode === 'per-room' ? { conversation: (room: string) => contexts.open(room) } : {}),
         settle: contexts.settle, acknowledge: contexts.acknowledge, turnControl: { activeTurn: contexts.activeTurn, interrupt: contexts.interrupt },
         close: async () => { await contexts.close(); await owner.close(); } });
-    } catch (error) { await histories?.close(); await process?.close(); return failure('native', error instanceof Error ? error.message : 'Codex startup failed'); }
+    } catch (error) { await histories?.close(); await process?.close();
+      const code = errorCode(error && typeof error === 'object' && 'code' in error ? error.code : undefined);
+      return failure(code.ok ? code.value : 'native', error instanceof Error ? error.message : 'Codex startup failed'); }
   } };
 }

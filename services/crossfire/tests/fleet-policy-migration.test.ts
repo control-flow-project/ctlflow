@@ -25,6 +25,7 @@ function previousStore() {
   value(repositories.agentRoomPermission.insert({ agentId: 'ada', roomId: '!matter:test', generation: 'generation',
     permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'owner', grantedAt: 10 }));
   for (const table of [...relations].reverse()) database.exec('DROP TABLE ' + table);
+  database.exec('DROP TABLE fleet_runtime_operation;');
   database.pragma('user_version = 9');
   return database;
 }
@@ -36,7 +37,7 @@ test('fleet policy migration preserves every existing row and native credential 
     const before = new Map(tables.map(table => [table, database.prepare('SELECT * FROM ' + table).all()]));
     assert.equal(tables.length, 48);
     createSchema(database);
-    assert.equal(database.pragma('user_version', { simple: true }), 10);
+    assert.equal(database.pragma('user_version', { simple: true }), 11);
     for (const table of tables) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), before.get(table), table);
     for (const table of relations) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), [], table);
     assert.equal(value(createRepositories(database).fleetPolicy.approved('ada')), null);

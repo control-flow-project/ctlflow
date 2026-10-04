@@ -135,7 +135,85 @@ test('explicit context reset closes the owned process before reset and retains i
   await fixture.finish(await fixture.operation('start'));
   const reset = await fixture.operation('reset', 'analyst'); assert.equal((await fixture.finish(reset)).status, 'succeeded');
   assert.deepEqual(calls, ['start-analyst', 'close-analyst', 'reset-analyst', 'start-analyst']); assert.notEqual(sessions[0], sessions[1]);
-  assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'reset', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 })).ok, false);
+  assert.equal((await fixture.finish(await fixture.operation('reset'))).status, 'succeeded');
+  assert.deepEqual(calls.slice(-3), ['close-analyst', 'reset-analyst', 'start-analyst']);
+});
+
+test('fleet fresh history stops all targets before reset and reports partial failure without restarting failed peers', async scope => {
+  const calls: string[] = [];
+  const fixture = fixtureController({ reset: async (_configuration, instance) => {
+    calls.push('reset-' + instance.key); return instance.key === 'analyst' ? failure('missing', 'Missing authorized reset export') : success(undefined);
+  }, start: async (_configuration, instance) => {
+    calls.push('start-' + instance.key); const stop = new AbortController();
+    return success({ sessionId: randomUUID(), signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      attachments: async () => [], attachment: { runtime: 'fixture', sessionId: randomUUID(), workspace: '/fixture', connection: {} },
+      close: async () => { calls.push('close-' + instance.key); stop.abort(); } });
+  } }); cleanup(scope, () => fixture.controller.close());
+  value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
+  await fixture.finish(await fixture.operation('start')); calls.length = 0;
+  const operation = await fixture.finish(await fixture.operation('reset'));
+  assert.equal(operation.status, 'failed'); assert.equal(operation.errors[0]!.instanceKey, 'analyst');
+  assert.deepEqual(calls, ['close-analyst', 'close-peer', 'reset-analyst', 'reset-peer', 'start-peer']);
+  const state = value(fixture.controller.view(fixture.record.fleetId));
+  assert.equal(state.instances.find(item => item.instance.key === 'analyst')!.phase, 'failed');
+  assert.equal(state.instances.find(item => item.instance.key === 'peer')!.phase, 'running');
+});
+
+for (const action of ['stop', 'reset'] as const) test('fleet ' + action + ' isolates cleanup failures and never resets a process whose stop failed', async scope => {
+  const calls: string[] = []; let cleanupFails = true;
+  const fixture = fixtureController({ reset: async (_configuration, instance) => { calls.push('reset-' + instance.key); return success(undefined); },
+    start: async (_configuration, instance) => {
+      calls.push('start-' + instance.key); const stop = new AbortController(), sessionId = randomUUID();
+      return success({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection, attachments: async () => [],
+        attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} }, close: async () => {
+          calls.push('close-' + instance.key);
+          if (cleanupFails && instance.key === 'analyst') throw new Error('Exact owned process could not be cleaned up');
+          stop.abort();
+        } });
+    } });
+  cleanup(scope, async () => { cleanupFails = false; await fixture.controller.close(); });
+  value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
+  await fixture.finish(await fixture.operation('start')); calls.length = 0;
+  const result = await fixture.finish(await fixture.operation(action));
+  assert.equal(result.status, 'failed'); assert.equal(result.errors.length, 1); assert.equal(result.errors[0]!.instanceKey, 'analyst');
+  assert.deepEqual(calls, action === 'stop' ? ['close-analyst', 'close-peer'] : ['close-analyst', 'close-peer', 'reset-peer', 'start-peer']);
+  const states = value(fixture.controller.view(fixture.record.fleetId)).instances;
+  assert.equal(states.find(instance => instance.instance.key === 'analyst')?.phase, 'failed');
+  assert.equal(states.find(instance => instance.instance.key === 'peer')?.phase, action === 'stop' ? 'stopped' : 'running');
+});
+
+test('remote commands use the same native lifecycle journal and retain uncertain reset identities across history pruning and restart', async scope => {
+  let control: Parameters<Execution['connect']>[2] | undefined, resets = 0;
+  const fixture = fixtureController({ connect: (_configuration, _signal, incoming) => { control = incoming; return success(undefined); },
+    reset: async () => { resets++; return success(undefined); } });
+  cleanup(scope, () => fixture.controller.close()); assert(control);
+  const command = { operationId: randomUUID(), instanceKey: 'analyst', action: 'reset' as const };
+  assert.equal(value(await control.execute(command)).status, 'succeeded');
+  assert.equal(value(await control.execute(command)).status, 'succeeded'); assert.equal(resets, 1);
+  const pinned = value(fixture.controller.operation(command.operationId)); assert.equal(pinned.receiptPending, true);
+  await fixture.controller.close();
+  const past: Operation[] = Array.from({ length: 400 }, () => ({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: fixture.record.fleetId },
+    expectedRevision: 0, status: 'succeeded', createdAt: 1, completedAt: 2, approval: null, errors: [] }));
+  value(fixture.registry.saveOperations([pinned, ...past]));
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); assert(control);
+  const stop = value(await restarted.operate({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 }));
+  await until(() => value(restarted.operation(stop.operationId)).completedAt !== null);
+  assert.equal(value(restarted.operation(command.operationId)).receiptPending, true, 'Ordinary CLI retention must not evict an uncertain remote reset');
+  assert.equal(value(await control.execute(command)).status, 'succeeded'); assert.equal(resets, 1, 'Reconnecting may retrieve the exact outcome, never repeat reset');
+  value(control.acknowledged(command.operationId)); assert.equal(value(restarted.operation(command.operationId)).receiptPending, undefined);
+});
+
+test('an interrupted remote operation becomes a recorded failure, never an automatic second fresh-history action', async scope => {
+  let control: Parameters<Execution['connect']>[2] | undefined, resets = 0;
+  const fixture = fixtureController({ connect: (_configuration, _signal, incoming) => { control = incoming; return success(undefined); },
+    reset: async () => { resets++; return success(undefined); } });
+  await fixture.controller.close();
+  const interrupted: Operation = { operationId: randomUUID(), action: 'reset', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0,
+    receiptPending: true, status: 'running', createdAt: 1, completedAt: null, approval: null, errors: [] };
+  value(fixture.registry.saveOperations([interrupted]));
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); assert(control);
+  const result = value(await control.execute({ operationId: interrupted.operationId, action: 'reset', instanceKey: null }));
+  assert.equal(result.status, 'failed'); assert(result.errorMessage?.includes('Controller stopped')); assert.equal(resets, 0);
 });
 
 test('delivery deactivation retains owned engines and unregister closes the control connection', async scope => {

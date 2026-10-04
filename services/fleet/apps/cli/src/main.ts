@@ -21,21 +21,26 @@ fleet daemon status|stop --root DIRECTORY
 fleet remote add NAME --ssh USER@HOST --root DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] add DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] list|show|start|stop|remove [FLEET]
+fleet [--root DIRECTORY | --remote NAME] start FLEET [--fresh-history] [--operation-id UUID]
+fleet [--root DIRECTORY | --remote NAME] stop FLEET [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] activate|deactivate FLEET
 fleet [--root DIRECTORY | --remote NAME] message FLEET --text TEXT [--message-id UUID]
 fleet agent list FLEET
 fleet agent add FLEET INSTANCE --definition DEFINITION
-fleet agent start|stop|reset|remove|contexts FLEET INSTANCE [--operation-id UUID]
+fleet agent start FLEET INSTANCE [--fresh-history] [--operation-id UUID]
+fleet agent stop FLEET INSTANCE [--operation-id UUID]
+fleet agent remove|contexts FLEET INSTANCE
 fleet agent attach FLEET INSTANCE [--context CONTEXT]`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, remote: { type: 'string' },
-    name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, context: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, 'operation-id': { type: 'string' }, help: { type: 'boolean' } } });
+    name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, context: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, 'operation-id': { type: 'string' }, 'fresh-history': { type: 'boolean' }, help: { type: 'boolean' } } });
   if (values.help || !positionals.length) { console.log(usage); return; }
   const allowed = new Set(['root', 'remote', ...(positionals[0] === 'remote' ? ['ssh'] : []),
     ...(positionals[0] === 'daemon' && positionals[1] === 'start' ? ['name'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'add' ? ['definition'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'attach' ? ['context'] : []),
-    ...(positionals[0] === 'agent' && positionals[1] === 'reset' ? ['operation-id'] : []),
+    ...((['start', 'stop'].includes(positionals[0] ?? '') || positionals[0] === 'agent' && ['start', 'stop'].includes(positionals[1] ?? '')) ? ['operation-id'] : []),
+    ...((positionals[0] === 'start' || positionals[0] === 'agent' && positionals[1] === 'start') ? ['fresh-history'] : []),
     ...(positionals[0] === 'message' ? ['text', 'message-id'] : [])]);
   for (const option of Object.keys(values)) if (!allowed.has(option)) throw new Error('Option is not valid for this command: --' + option);
   const connections = loadConnections();
@@ -98,11 +103,11 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     if (agentCommand && command === 'remove') { output(value(await client.call(operations.removeAgent, { ...params, instanceKey: instanceKey! }, { expectedRevision: fleet.revision })).data); return; }
     if (agentCommand && command === 'contexts') { output(value(await client.call(operations.contexts, { ...params, instanceKey: instanceKey! }, {})).data); return; }
     if (agentCommand && command === 'attach') { const pointer = value(await terminalPointer(client, fleet.fleetId, instanceKey!, { codex: codexTerminal() }, remote?.ssh, values.context)); process.stdout.write(pointer.command + '\n'); return; }
-    if (command !== 'start' && command !== 'stop' && !(agentCommand && command === 'reset')) throw new Error(usage);
-    const request = { operationId: value(identifier(values['operation-id'] ?? randomUUID())), action: command as 'start' | 'stop' | 'reset', expectedRevision: fleet.revision,
+    if (command !== 'start' && command !== 'stop') throw new Error(usage);
+    const request = { operationId: value(identifier(values['operation-id'] ?? randomUUID())), action: values['fresh-history'] ? 'reset' as const : command === 'stop' ? 'stop' as const : 'start' as const, expectedRevision: fleet.revision,
       target: agentCommand ? { kind: 'agent' as const, fleetId: fleet.fleetId, instanceKey: instanceKey! } : { kind: 'fleet' as const, fleetId: fleet.fleetId } };
+    output({ operationId: request.operationId });
     let operation = value(await client.call(operations.operate, {}, request)).data, notified = '';
-    output({ operationId: operation.operationId, status: operation.status });
     for (;;) {
       if (operation.approval && operation.approval.code !== notified) { output({ status: 'awaiting-approval', ...operation.approval }); notified = operation.approval.code; }
       if (operation.status === 'failed') { output(operation); throw new Error('Operation failed; successful peers are retained. Inspect fleet status.'); }

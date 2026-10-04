@@ -2,7 +2,7 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import { trustWorkspace } from '@crossfire/test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
@@ -26,7 +26,7 @@ async function environment(scope: Parameters<typeof nativeProvider>[0]) {
 
 test('controller-owned reset creates a fresh native context without changing identity, parameters or provider authentication', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope), usage: UsageSample[] = [];
-  const input = { name: 'reset-proof', workspace, instructions: 'Native reset proof.', options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'danger-full-access', approval_policy: 'never' },
+  const input = { name: 'reset-proof', workspace, instructions: 'Native reset proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'danger-full-access', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No decision expected'); }, usage: (sample: UsageSample) => usage.push(sample) } };
   let runtime = value(await adapter.start(input, new AbortController().signal)); cleanup(scope, () => runtime.close());
   const previous = runtime.sessionId, authentication = readFileSync(join(workspace, '.codex/auth.json'));
@@ -45,13 +45,43 @@ test('controller-owned reset creates a fresh native context without changing ide
   assert.equal(runtime.sessionId, current); assert.equal(provider.requests.length, 2);
 });
 
+test('default native start resumes complete history and refuses absent or broken bindings without a fresh fallback', { timeout: 60000 }, async scope => {
+  const { workspace, provider, adapter } = await environment(scope);
+  const input = { name: 'resume-proof', workspace, instructions: 'Inert retained history proof.', options: { sandbox_mode: 'read-only', approval_policy: 'never' },
+    hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } };
+  const missing = await adapter.start(input, new AbortController().signal);
+  assert.equal(missing.ok, false); if (!missing.ok) assert.equal(missing.error.code, 'missing');
+  assert.equal(provider.requests.length, 0);
+  let runtime = value(await adapter.start({ ...input, allowNewHistory: true }, new AbortController().signal)); cleanup(scope, () => runtime.close());
+  const sessionId = runtime.sessionId;
+  await runtime.deliver('Retain this exact historical fact: blue orchard 729.', 'retained-fact');
+  await until(() => provider.held() !== undefined); provider.finish(); await until(async () => !(await runtime.inspect()).busy);
+  runtime.acknowledge(['retained-fact']); await runtime.close();
+  runtime = value(await adapter.start(input, new AbortController().signal)); assert.equal(runtime.sessionId, sessionId);
+  provider.hold();
+  await runtime.deliver('Use the earlier historical fact.', 'resumed-followup');
+  await until(() => provider.held() !== undefined);
+  assert(JSON.stringify(provider.requests.at(-1)).includes('blue orchard 729'), 'Native resume retains full conversation history despite excludeTurns in the RPC response');
+  provider.finish(); await until(async () => !(await runtime.inspect()).busy); runtime.acknowledge(['resumed-followup']); await runtime.close();
+  const binding = join(workspace, '.codex/crossfire-session.json'), contexts = join(workspace, '.codex/crossfire-contexts.json');
+  renameSync(binding, binding + '.saved'); renameSync(contexts, contexts + '.saved');
+  const lost = await adapter.start(input, new AbortController().signal); assert.equal(lost.ok, false);
+  assert.equal(existsSync(binding), false); assert.equal(existsSync(contexts), false); assert.equal(provider.requests.length, 2);
+  renameSync(binding + '.saved', binding); renameSync(contexts + '.saved', contexts);
+  writeFileSync(binding, JSON.stringify({ sessionId: randomUUID() }));
+  const broken = await adapter.start(input, new AbortController().signal); assert.equal(broken.ok, false);
+  assert.equal(JSON.parse(readFileSync(binding, 'utf8')).sessionId === sessionId, false, 'A failed resume never overwrites the binding with a new history');
+  assert.equal(provider.requests.length, 2);
+});
+
 test('stock Codex routes persistent room histories, protects unacknowledged work and retains exact terminal pointers across mode changes', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
   const observed: RuntimeObservationEvent[] = [], stop = new AbortController();
-  const input = { name: 'room-proof', workspace, instructions: 'Inert history proof.', options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
+  const input = { name: 'room-proof', workspace, instructions: 'Inert history proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
     listenerOptions: { history_mode: 'per-room' as 'per-room' | 'shared' },
     hooks: { requestDecision: async () => { throw new Error('No permission expected'); }, observe: (event: RuntimeObservationEvent) => observed.push(event) } };
   let runtime = value(await adapter.start(input, stop.signal));
+  input.allowNewHistory = false;
   cleanup(scope, () => runtime.close());
   assert.equal(provider.requests.length, 0);
   assert(runtime.conversation);
@@ -95,7 +125,7 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
 test('stock Codex structured questions preserve native attribution and exact responses without a routing model call', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
   const requests: RuntimeDecision[] = [], observed: RuntimeObservationEvent[] = [];
-  const runtime = value(await adapter.start({ name: 'question-proof', workspace, instructions: 'Use native structured questions when a human decision is necessary.',
+  const runtime = value(await adapter.start({ name: 'question-proof', workspace, instructions: 'Use native structured questions when a human decision is necessary.', allowNewHistory: true,
     options: { features: { default_mode_request_user_input: true } },
     listenerOptions: { history_mode: 'per-room' },
     hooks: { observe: (event: RuntimeObservationEvent) => observed.push(event), requestDecision: async request => {

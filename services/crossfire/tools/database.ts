@@ -49,6 +49,7 @@ function counts(database: Database.Database) {
     fleet_connection: () => executeSelect(database, schema, query => query.from('fleet_connection').count()),
     fleet_message: () => executeSelect(database, schema, query => query.from('fleet_message').count()),
     fleet_message_delivery: () => executeSelect(database, schema, query => query.from('fleet_message_delivery').count()),
+    fleet_runtime_operation: () => executeSelect(database, schema, query => query.from('fleet_runtime_operation').count()),
     wake_rule: () => executeSelect(database, schema, query => query.from('wake_rule').count()),
     wake_rule_agent: () => executeSelect(database, schema, query => query.from('wake_rule_agent').count()),
     wake_delivery: () => executeSelect(database, schema, query => query.from('wake_delivery').count()),

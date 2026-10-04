@@ -9,6 +9,7 @@ import { AgentRooms } from './agent-rooms.js';
 import { AgentWake } from './agent-wake.js';
 import { ListenerVersions } from './listener-versions.js';
 import { AgentNavigation, type AgentSection } from './agent-navigation.js';
+import { AgentSessions } from './fleet-sessions.js';
 
 export function Agents() {
   const resource = useResource(operations.agents, {}, location.search, HEARTBEAT_MS);
@@ -57,7 +58,7 @@ export function AgentDetail({ id, section }: { id: string; section: AgentSection
   return <Page title="Agent details" description="Listener activity, room access and account settings." action={<button onClick={resource.refresh}>Refresh status</button>}>
     <a className="back" href="/manage/agents">← Agents</a><Loaded {...resource} retry={resource.refresh}>{({ data: agent }) => <>
       <SubjectHeading name={agent.displayName} description={<>{agent.owner.displayName} · {agent.owner.matrixUserId}{agent.deployment && <span className="subline">Fleet <a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></span>}</>}><Status value={agent.activity.status}/><Status value={agent.status}/><Status value={applied(agent)}/></SubjectHeading>
-      <AgentNavigation id={id} section={section}/>{section === 'rooms' && <AgentRooms agent={agent}/>} {section === 'wake' && <AgentWake agent={agent}/>} {section === 'activity' && <Activity agent={agent}/>} {section === 'runtime' && <Runtime agent={agent}/>} {section === 'decisions' && <Decisions id={id}/>} {section === 'software' && <ListenerVersions agentId={id}/>} {section === 'settings' && <Lifecycle agent={agent}/>}
+      <AgentNavigation id={id} section={section} fleet={agent.deployment !== null}/>{section === 'rooms' && <AgentRooms agent={agent}/>} {section === 'wake' && <AgentWake agent={agent}/>} {section === 'activity' && <Activity agent={agent}/>} {section === 'runtime' && <Runtime agent={agent}/>} {section === 'sessions' && <AgentSessions agent={agent}/>} {section === 'decisions' && <Decisions id={id}/>} {section === 'software' && <ListenerVersions agentId={id}/>} {section === 'settings' && <Lifecycle agent={agent}/>}
     </>}</Loaded>
   </Page>;
 }

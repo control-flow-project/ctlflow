@@ -12,7 +12,7 @@ export type FleetConnectionView = { status: 'online' | 'offline'; lastSeenAt: nu
 export type FleetMessageCommand = { messageId: string; fleetId: string; body: string; createdAt: number; expiresAt: number;
   sender: { kind: 'human' | 'controller'; matrixUserId: string | null }; agentIds: string[] };
 export type FleetControlView = { fleetId: string; revision: number; deliveryEnabled: boolean; connection: FleetConnectionView };
-export type FleetControlSnapshot = FleetControlView & { agentIds: string[]; messages: FleetMessageCommand[] };
+export type FleetControlSnapshot = FleetControlView & { agentIds: string[]; messages: FleetMessageCommand[]; runtimeOperations: import('./runtime-types.js').RuntimeOperationView[] };
 export type FleetConnectionRepository = {
   find(fleetId: string): Result<FleetConnection | null>;
   findMany(fleetIds: string[]): Result<FleetConnection[]>;

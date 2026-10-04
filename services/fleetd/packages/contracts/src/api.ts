@@ -1,7 +1,7 @@
 import * as check from '@crossfire/contracts/schema/validation';
 import { controller } from '@crossfire/contracts/schema/controller';
 import { operation } from '@crossfire/contracts/rest/operation';
-import { failure } from '@crossfire/kernel/result';
+import { failure, success } from '@crossfire/kernel/result';
 import { page, none } from '@crossfire/contracts/schema/query';
 import { instance } from './configuration.js';
 import { attachment } from './attachment.js';
@@ -15,7 +15,8 @@ export const target = check.object({ kind: check.choice('fleet', 'agent', 'daemo
 export const operationInput = check.object({ operationId: check.identifier, target, action: check.choice('start', 'stop', 'reset'), expectedRevision: check.integer() });
 export const operationView = check.object({ ...{
   operationId: check.identifier, target, action: check.choice('start', 'stop', 'reset'), expectedRevision: check.integer(),
-}, status: check.choice('accepted', 'running', 'awaiting-approval', 'succeeded', 'failed'), createdAt: check.integer(), completedAt: check.nullable(check.integer()),
+}, receiptPending: check.optional<true>(input => input === true ? success(true) : failure('invalid', 'Only unacknowledged controller requests are pinned')),
+  status: check.choice('accepted', 'running', 'awaiting-approval', 'succeeded', 'failed'), createdAt: check.integer(), completedAt: check.nullable(check.integer()),
   approval: check.nullable(check.object({ url: check.text(2048), code: check.text(12, 12) })), errors: check.list(check.object({ instanceKey: check.nullable(check.name), code: check.text(100), message: check.text(4096) }), 100) });
 export type FleetView = check.Parsed<typeof fleetView>;
 export type InstanceView = check.Parsed<typeof instanceView>;

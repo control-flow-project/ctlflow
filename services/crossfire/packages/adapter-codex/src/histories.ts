@@ -12,7 +12,7 @@ import { codexDelivery, type CodexConnection } from './connection.js';
 const contexts = check.object({ mode: check.choice('shared', 'per-room'), control: check.nullable(check.identifier),
   rooms: check.list(check.object({ room: check.roomId, sessionId: check.identifier }), 2000) });
 export function codexHistories(options: { home: string; workspace: string; name: string; instructions: string; config: Record<string, unknown>;
-  hooks: RuntimeHooks; mode: 'shared' | 'per-room'; endpoint: string; token: string; attachment: Omit<RuntimeAttachment, 'sessionId'> }, signal: AbortSignal) {
+  hooks: RuntimeHooks; mode: 'shared' | 'per-room'; endpoint: string; token: string; attachment: Omit<RuntimeAttachment, 'sessionId'>; allowNewHistory?: boolean }, signal: AbortSignal) {
   const file = join(options.home, 'crossfire-contexts.json');
   const loaded = contexts(existsSync(file) ? readJson<unknown>(file) : { mode: 'shared', control: null, rooms: [] });
   if (!loaded.ok) throw new Error(loaded.error.message);
@@ -21,9 +21,14 @@ export function codexHistories(options: { home: string; workspace: string; name:
   const saved = existsSync(sharedFile) ? check.object({ sessionId: check.identifier })(readJson<unknown>(sharedFile)) : success(null);
   if (!saved.ok) throw new Error(saved.error.message);
   const sharedSessionId = saved.value?.sessionId;
+  const primary = options.mode === 'shared' ? sharedSessionId : state.control;
+  const changingMode = existsSync(file) && state.mode !== options.mode && (state.mode === 'shared' ? sharedSessionId : state.control);
   const sessions = [sharedSessionId, state.control, ...state.rooms.map(room => room.sessionId)].filter((id): id is string => id != null);
   if (new Set(state.rooms.map(room => room.room)).size !== state.rooms.length || new Set(sessions).size !== sessions.length) {
     throw new Error('Native history bindings require unique rooms and distinct session identities');
+  }
+  if (!primary && !changingMode && (!options.allowNewHistory || existsSync(file))) {
+    throw Object.assign(new Error('Saved native history is missing. Resume cannot create a new history; use the explicit fresh-history operation if intended.'), { code: 'missing' });
   }
   const opened = new Map<string, CodexConnection>();
   const initializing = new Map<string, Promise<CodexConnection>>();

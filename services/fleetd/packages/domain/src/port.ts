@@ -13,7 +13,9 @@ export type Registry = {
 export type Running = { sessionId: string; signal: AbortSignal; attachment: RuntimeAttachment;
   attachments(): Promise<{ context: string; attachment: RuntimeAttachment }[]>; control: ListenerControl; close(): Promise<void> };
 export type Execution = {
-  connect(configuration: Configuration, signal: AbortSignal): Result<void>;
+  connect(configuration: Configuration, signal: AbortSignal,
+    control: { execute: (input: { operationId: string; instanceKey: string | null; action: 'start' | 'stop' | 'reset' }) => Promise<Result<{ status: 'succeeded' | 'failed'; errorMessage: string | null }>>;
+      acknowledged(operationId: string): Result<void> }): Result<void>;
   connection(configuration: Configuration): ControllerState;
   delivery(configuration: Configuration, input: { expectedRevision: number; enabled: boolean }): Promise<Result<FleetDelivery>>;
   message(configuration: Configuration, input: { messageId: string; body: string }): Promise<Result<FleetMessageResult>>;

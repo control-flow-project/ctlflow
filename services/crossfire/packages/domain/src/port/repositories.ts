@@ -201,6 +201,7 @@ export type EnrollmentControllerMetadataRepository = {
 };
 
 export type Repositories = {
+  fleetRuntimeOperation: import('../fleet/runtime-types.js').RuntimeOperationRepository;
   fleetPolicy: FleetPolicyRepository;
   ownerConversation: OwnerConversationRepository;
   wakeRule: WakeRuleRepository;

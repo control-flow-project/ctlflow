@@ -2,6 +2,7 @@ import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Page, PageRequest } from '../port/directory.js';
 import type { Services } from '../port/services.js';
 import type { FleetActor } from './authority.js';
+import { runtimeOperationView } from './runtime-types.js';
 import { authorizedFleet, liveFleetConnection, controlView, connectionView, type FleetControlServices } from './control.js';
 import { recordEvent } from '../audit/record-event.js';
 import { FLEET_MESSAGE_LIFETIME_MS, MAX_FLEET_MESSAGE_BYTES, type FleetMessage, type FleetMessageDelivery, type FleetMessageCommand, type FleetControlSnapshot } from './control-types.js';
@@ -62,7 +63,9 @@ export function listFleetMessages(services: MessageServices, actor: FleetActor, 
 }
 export function readFleetControl(services: MessageServices, actor: FleetActor, fleetId: string, connectionId: string): Result<FleetControlSnapshot> {
   const current = liveFleetConnection(services, actor, fleetId, connectionId); if (!current.ok) return current;
-  const view = controlView(current.value.fleet, current.value.connection, services.clock.now());
+  const pendingOperation = services.repositories.fleetRuntimeOperation.pending(fleetId); if (!pendingOperation.ok) return pendingOperation;
+  const view = { ...controlView(current.value.fleet, current.value.connection, services.clock.now()),
+    runtimeOperations: pendingOperation.value ? [runtimeOperationView(pendingOperation.value)] : [] };
   const instances = services.collection.fleetInstances(current.value.fleet); if (!instances.ok) return instances;
   const eligible = services.directory.agents({ agentIds: instances.value.map(instance => instance.agentId), page: 1, pageSize: 100,
     statuses: ['active'], search: '' });

@@ -1,6 +1,9 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  fleet_runtime_operation: { id: string; fleet_id: string; agent_id: string | null; author_principal_id: string;
+    action: 'start' | 'stop' | 'reset'; expected_revision: number; status: 'pending' | 'running' | 'succeeded' | 'failed';
+    created_at: number; completed_at: number | null; error_message: string | null; connection_id: string | null; credential_id: string | null };
   enrollment_item_policy: { request_id: string; instance_key: string; wake_mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected'; expected_agent_revision: number | null };
   enrollment_item_permission: { request_id: string; instance_key: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room' };
   enrollment_item_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string };

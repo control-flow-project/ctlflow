@@ -8,6 +8,7 @@
 - [Message files, unread catch-up and context reset](history.md)
 - [Fleet traffic and native usage statistics](statistics.md)
 - [Headless fleet setup](../../fleet/docs/getting-started.md)
+- [Fleet sessions, saved-history resume and fresh-history confirmation](../../fleet/docs/sessions.md)
 
 ## Operators
 - [Installation and first administrator](getting-started.md)

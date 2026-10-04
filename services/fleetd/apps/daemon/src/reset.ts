@@ -12,6 +12,7 @@ import { exportResetHistory } from '@crossfire/agent-core/reset-history';
 import type { OwnedRuntimeAdapter } from '@crossfire/agent-core/owned-runtime';
 import type { Configuration, Instance } from '@fleetd/domain/model';
 import * as check from '@crossfire/contracts/schema/validation';
+import { initializeHistory } from '@fleetd/storage/history';
 
 const resetState = check.object({ resetId: check.identifier, phase: check.choice('collecting', 'prepared', 'retired', 'reset'), manifest: check.text(4096),
   cursors: check.list(check.object({ room: check.roomId, cursor: check.text(4096) }), 1000) });
@@ -66,6 +67,7 @@ export async function resetInstance(configuration: Configuration, instance: Inst
       state = { ...state, phase: 'retired' }; writeJson(file, state);
     }
     writeJson(local.cursors, Object.fromEntries(state.cursors.map(entry => [entry.room, entry.cursor])));
+    initializeHistory(configuration.directory, agentId, generation);
     writeJson(file, { ...state, phase: 'reset' });
     return success(undefined);
   } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Context reset failed'); }

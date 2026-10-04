@@ -20,6 +20,7 @@ import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
 import { roomAccess } from '@crossfire/adapter-crossfire/room-access';
 import { createClient } from '@crossfire/adapter-crossfire/client';
 import { operations } from '@crossfire/contracts/rest/operations';
+import { runtimeOperation, type FleetRuntimeOperation } from '@crossfire/contracts/fleet-runtime';
 import { API, segment } from '@crossfire/contracts/matrix';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
 import { readJson } from '@crossfire/adapter-filesystem/index';
@@ -214,6 +215,56 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await acquired(); await acknowledged(); assert.deepEqual(providers.map(provider => provider.requests.length), beforeRepeat, 'Control reconnection makes no model calls or duplicate deliveries');
   await cli('deactivate', 'research'); await observe(current => current.instances.every(instance => !instance.listenerActive));
   await cli('activate', 'research'); await observe(current => current.instances.every(instance => instance.listenerActive));
+  const sessionOperationsPath = '/api/fleets/' + binding.fleetId + '/session-operations';
+  async function requestSessions(action: FleetRuntimeOperation['action'], agentId: string | null) {
+    const input = { operationId: randomUUID(), action, agentId, expectedRevision: remoteFleet().revision, confirmFreshHistory: action === 'reset' };
+    const response = await fetch(origin + sessionOperationsPath, { method: 'POST', headers: { Cookie: 'crossfire=' + admin.secret, Origin: origin,
+      'X-Crossfire-CSRF': admin.csrfSecret, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+    const body = await response.text(); assert.equal(response.status, 202, body);
+    const accepted = value(runtimeOperation((JSON.parse(body) as { data: unknown }).data));
+    assert.equal(accepted.operationId, input.operationId);
+    await until(() => {
+      const current = value(services.repositories.fleetRuntimeOperation.find(input.operationId));
+      return current !== null && current.completedAt !== null;
+    });
+    const completed = value(services.repositories.fleetRuntimeOperation.find(input.operationId))!;
+    assert.equal(completed.status, 'succeeded', completed.errorMessage ?? 'Native session operation failed');
+    assert.equal(completed.action, action); assert.equal(completed.agentId, agentId);
+    return input;
+  }
+  const beforeSessionControls = providers.map(provider => provider.requests.length);
+  await requestSessions('stop', null);
+  const remotelyStopped = await observe(current => current.phase === 'stopped' && current.connection.connected);
+  assert(remotelyStopped.instances.every(instance => !instance.listenerActive));
+  assert.deepEqual(remotelyStopped.instances.map(instance => instance.sessionId), sessions);
+  await requestSessions('start', null);
+  const remotelyResumed = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  assert.deepEqual(remotelyResumed.instances.map(instance => instance.sessionId), sessions, 'Remote fleet resume retains the exact native histories');
+  await requestSessions('stop', north.agentId);
+  const individualStopped = await observe(current => current.instances.find(instance => instance.instance.key === 'north')?.phase === 'stopped');
+  assert.equal(individualStopped.connection.connected, true);
+  assert.equal(individualStopped.instances.find(instance => instance.instance.key === 'south')?.phase, 'running');
+  await requestSessions('start', north.agentId);
+  const individualResumed = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  assert.deepEqual(individualResumed.instances.map(instance => instance.sessionId), sessions, 'Remote individual resume preserves both histories');
+  await requestSessions('reset', north.agentId);
+  const individualFresh = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  assert.notEqual(individualFresh.instances[0]!.sessionId, sessions[0]);
+  assert.equal(individualFresh.instances[1]!.sessionId, sessions[1], 'Fresh individual history does not replace a peer history');
+  const wholeFleetReset = await requestSessions('reset', null);
+  const fleetFresh = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  assert(fleetFresh.instances.every((instance, index) => instance.sessionId !== individualFresh.instances[index]!.sessionId));
+  const repeatedReset = await fetch(origin + sessionOperationsPath, { method: 'POST', headers: { Cookie: 'crossfire=' + admin.secret, Origin: origin,
+    'X-Crossfire-CSRF': admin.csrfSecret, 'Content-Type': 'application/json' }, body: JSON.stringify(wholeFleetReset) });
+  assert.equal(repeatedReset.status, 202, await repeatedReset.text());
+  const unchanged = JSON.parse((await cli('show', 'research')).stdout) as Fleet;
+  assert.deepEqual(unchanged.instances.map(instance => instance.sessionId), fleetFresh.instances.map(instance => instance.sessionId), 'Retrying a confirmed reset cannot create another native history');
+  const retainedBinding = JSON.parse(readFileSync(join(fleet, '.fleet/binding.json'), 'utf8')) as Binding;
+  assert.deepEqual(retainedBinding, binding, 'Fresh history retains enrollment identities and credentials');
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: north.agentId, roomId }))!.accessMode, 'reply');
+  assert.deepEqual(value(services.collection.roomPermissions({ agentId: north.agentId, roomId })).map(permission => permission.permissionCode), ['room.agent.invite']);
+  await acquired(); await acknowledged();
+  assert.deepEqual(providers.map(provider => provider.requests.length), beforeSessionControls, 'Native remote session controls, resets and history exports are model-free');
   await cli('stop', 'research');
   await observe(current => current.phase === 'stopped' && current.connection.connected);
   const stoppedMessageId = randomUUID(), beforeStopped = providers.map(provider => provider.requests.length);

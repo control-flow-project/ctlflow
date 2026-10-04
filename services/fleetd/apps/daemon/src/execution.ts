@@ -19,11 +19,12 @@ import type { Execution } from '@fleetd/domain/port';
 import { prepareEnrollment } from './enrollment.js';
 import { failureReporter } from './failures.js';
 import { resetInstance, resetInstructions } from './reset.js';
+import { canInitializeHistory, initializedHistory } from '@fleetd/storage/history';
 
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
-  function connect(configuration: Parameters<Execution['connect']>[0], signal: AbortSignal) {
+  function connect(configuration: Parameters<Execution['connect']>[0], signal: AbortSignal, control: Parameters<Execution['connect']>[2]) {
     try {
       const binding = loadBinding(configuration); if (!binding.ok) return binding;
       if (!binding.value.fleetId || !binding.value.controllerCredential) return success(undefined);
@@ -33,7 +34,13 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       const reporter = failureReporter(configuration.directory, binding.value, signal);
       try {
         const connection = createFleetControlConnection({ origin: binding.value.server, credential: binding.value.controllerCredential,
-          fleetId: binding.value.fleetId, owner: binding.value.owner, signal });
+          fleetId: binding.value.fleetId, owner: binding.value.owner, signal, acknowledged: control.acknowledged, execute: async command => {
+            const current = loadBinding(configuration); if (!current.ok) return current;
+            if (current.value.fleetId !== command.fleetId) return failure('conflict', 'Session command is not for this enrolled fleet');
+            const identity = command.agentId === null ? null : current.value.identities.find(item => item.agentId === command.agentId);
+            if (command.agentId !== null && !identity) return failure('missing', 'The requested agent has no identity in this controller binding');
+            return control.execute({ operationId: command.operationId, action: command.action, instanceKey: identity?.instanceKey ?? null });
+          } });
         reporters.set(configuration.directory, reporter); connections.set(configuration.directory, connection);
       } catch (error) { void reporter.close(); throw error; }
       return success(undefined);
@@ -125,9 +132,12 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
           ready,
           runtime: async (runtimeStop, _poll, hooks) => {
             const started = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks,
+              allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
               ...(instance.listener_options ? { listenerOptions: instance.listener_options } : {}) }, runtimeStop);
             if (!started.ok) throw Object.assign(new Error(started.error.message), { code: started.error.code });
-            destination = started.value; return destination;
+            destination = started.value;
+            initializedHistory(configuration.directory, identity.agentId);
+            return destination;
           },
         }, lifetime).then(() => { const error = new Error('Listener ended'); rejectReady(error); stop.abort(error); }, error => {
           report(error);

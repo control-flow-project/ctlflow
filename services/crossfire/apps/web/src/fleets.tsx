@@ -13,6 +13,7 @@ import { FleetDelivery, FleetMessages } from './fleet-control.js';
 import { FleetNavigation, type FleetSection } from './fleet-navigation.js';
 import { useFleetDirectory } from './fleet-directory.js';
 import { FleetStatistics } from './fleet-statistics.js';
+import { FleetSessions } from './fleet-sessions.js';
 
 export function Fleets() {
   const viewer = useSession(), resource = useFleetDirectory(location.search);
@@ -22,7 +23,7 @@ export function Fleets() {
     <Loaded {...resource} retry={resource.refresh}>{fleets => fleets.length ? <><p className="collection-count">{fleets.length} {fleets.length === 1 ? 'fleet' : 'fleets'}</p><div className="table-wrap"><table aria-label="Fleets"><thead><tr><th scope="col">Fleet</th><th scope="col">Owner</th><th scope="col">Controller</th><th scope="col">Connection</th><th scope="col">Delivery</th></tr></thead><tbody>{fleets.map(fleet =>
       <tr key={fleet.fleetId}><td><a className="record-link" href={'/manage/fleets/' + fleet.fleetId}>{fleet.label}</a><span className="subline">{fleet.fleetKey}</span></td><td>{fleet.owner.displayName}<span className="subline">{fleet.owner.matrixUserId}</span></td><td>{fleet.controller.name}</td><td><Status value={fleet.delivery.connection.status}/></td><td><Status value={fleet.delivery.deliveryEnabled ? 'Enabled' : 'Deactivated'}/></td></tr>)}</tbody></table></div></>
       : <Empty title="No fleets">Connect a fleet with its controller to see its agents here.</Empty>}</Loaded>
-    <Help title="What can I manage here?"><p>Deactivate listeners or send a message to the fleet. Start and stop its engines through the fleet CLI; the controller’s connection status is separate from each agent’s listener status.</p></Help></Page>;
+    <Help title="What can I manage here?"><p>Manage delivery, stop or resume sessions, or send a message to the fleet. Session controls also work through the fleet CLI; the controller’s connection status is separate from each agent’s listener status.</p></Help></Page>;
 }
 function RoomPlan({ fleet }: { fleet: FleetView }) {
   const viewer = useSession(), action = useAction(), [source, setSource] = useState(''), [review, setReview] = useState<{ source: string; value: Parsed<typeof preview> }>();
@@ -71,6 +72,6 @@ export function FleetDetail({ id, section }: { id: string; section: Exclude<Flee
   const resource = useResource(operations.fleet, { fleetId: id }, '', 5000);
   return <Page title="Fleet details" description="Agents, delivery and room access." action={<button onClick={resource.refresh}>Refresh status</button>}><a className="back" href="/manage/fleets">← Fleets</a>
     <Loaded {...resource} retry={resource.refresh}>{({ data: fleet }) => <><SubjectHeading name={fleet.label} description={<>{fleet.owner.displayName} · Controller {fleet.controller.name}</>}><Status value={fleet.delivery.connection.status}/><Status value={fleet.delivery.deliveryEnabled ? 'Delivery enabled' : 'Delivery paused'}/></SubjectHeading>
-      <FleetNavigation id={id} section={section}/>{section === 'agents' && <FleetAgents id={id}/>}{section === 'delivery' && <FleetDelivery fleet={fleet}/>} {section === 'messages' && <FleetMessages fleet={fleet}/>} {section === 'rooms' && <RoomPlan fleet={fleet}/>} {section === 'settings' && <FleetSettings fleet={fleet}/>} {section === 'statistics' && <FleetStatistics id={id}/>}
+      <FleetNavigation id={id} section={section}/>{section === 'agents' && <FleetAgents id={id}/>}{section === 'delivery' && <FleetDelivery fleet={fleet}/>} {section === 'sessions' && <FleetSessions fleet={fleet} refresh={resource.refresh}/>} {section === 'messages' && <FleetMessages fleet={fleet}/>} {section === 'rooms' && <RoomPlan fleet={fleet}/>} {section === 'settings' && <FleetSettings fleet={fleet}/>} {section === 'statistics' && <FleetStatistics id={id}/>}
     </>}</Loaded></Page>;
 }

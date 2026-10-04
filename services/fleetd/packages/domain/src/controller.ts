@@ -23,7 +23,24 @@ export function createController(services: Services) {
   let stopping = false;
   const startedAt = services.now();
   function connect(configuration: Configuration): void {
-    const result = services.execution.connect(configuration, lifetime.signal);
+    const result = services.execution.connect(configuration, lifetime.signal, { execute: async input => {
+      const record = records.find(item => item.directory === configuration.directory);
+      if (!record) return failure('missing', 'This fleet is no longer registered');
+      const previous = operations.find(operation => operation.operationId === input.operationId);
+      for (const completed of operations.filter(operation => operation.target.fleetId === record.fleetId && operation.operationId !== input.operationId
+        && operation.receiptPending && operation.completedAt !== null)) {
+        const acknowledged = acknowledgeOperation(completed.operationId); if (!acknowledged.ok) return acknowledged;
+      }
+      const requested = await operate({ operationId: input.operationId, action: input.action,
+        target: input.instanceKey === null ? { kind: 'fleet', fleetId: record.fleetId } : { kind: 'agent', fleetId: record.fleetId, instanceKey: input.instanceKey },
+        expectedRevision: previous?.expectedRevision ?? record.revision }, true);
+      if (!requested.ok) return requested;
+      if (requested.value.completedAt === null) await active.get(record.fleetId)?.done;
+      const completed = operations.find(operation => operation.operationId === input.operationId);
+      if (!completed || completed.completedAt === null) return failure('unavailable', 'The native session operation did not complete');
+      return success({ status: completed.status === 'succeeded' ? 'succeeded' as const : 'failed' as const,
+        errorMessage: completed.status === 'succeeded' ? null : completed.errors.map(error => (error.instanceKey ? error.instanceKey + ': ' : '') + error.message).join('; ').slice(0, 4096) || 'Native session operation failed' });
+    }, acknowledged: acknowledgeOperation });
     if (!result.ok) connectionErrors.set(configuration.directory, result.error.message);
     else connectionErrors.delete(configuration.directory);
   }
@@ -161,6 +178,14 @@ export function createController(services: Services) {
     if (!saved.ok) throw new Error(saved.error.message);
     operations = next;
   }
+  function acknowledgeOperation(operationId: string): Result<void> {
+    const operation = operations.find(item => item.operationId === operationId);
+    if (!operation || operation.completedAt === null) return failure('conflict', 'Only completed native operations can release their receipt pin');
+    try {
+      const { receiptPending: _pending, ...completed } = operation; saveOperation(completed);
+      return success(undefined);
+    } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Session receipt persistence failed'); }
+  }
   async function stopInstance(fleetId: string, instance: Instance): Promise<void> {
     const identity = key(fleetId, instance.key);
     wanted.delete(identity);
@@ -173,6 +198,18 @@ export function createController(services: Services) {
       await current.close(); running.delete(identity);
     }
     states.set(identity, { instance, phase: 'stopped', sessionId: states.get(identity)?.sessionId ?? null, startedAt: null, error: null });
+  }
+  async function stopSelected(operation: Operation, selected: Instance[]): Promise<void> {
+    const fleetId = operation.target.fleetId!;
+    for (const instance of selected) {
+      try { await stopInstance(fleetId, instance); }
+      catch (error) {
+        const message = (error instanceof Error ? error.message : 'Native process cleanup failed').replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 4096);
+        operation.errors.push({ instanceKey: instance.key, code: 'unavailable', message });
+        const current = states.get(key(fleetId, instance.key));
+        states.set(key(fleetId, instance.key), { instance, phase: 'failed', sessionId: current?.sessionId ?? null, startedAt: current?.startedAt ?? null, error: message });
+      }
+    }
   }
   function launched(fleetId: string, configuration: Configuration, instance: Instance, runtime: Running): void {
     const identity = key(fleetId, instance.key);
@@ -220,22 +257,26 @@ export function createController(services: Services) {
     const fleetId = operation.target.fleetId!, selected = configuration.roster.instances.filter(instance => operation.target.kind !== 'agent' || instance.key === operation.target.instanceKey);
     operation.status = 'running'; saveOperation(operation);
     try {
-      if (operation.action === 'stop') for (const instance of selected) await stopInstance(fleetId, instance);
+      if (operation.action === 'stop') await stopSelected(operation, selected);
       else {
-        for (const instance of selected) if (recovering.has(key(fleetId, instance.key))) await stopInstance(fleetId, instance);
+        await stopSelected(operation, selected.filter(instance => recovering.has(key(fleetId, instance.key))));
         const valid = services.execution.validate(configuration);
         if (!valid.ok) throw new Error(valid.error.message);
         if (operation.action === 'reset') {
+          await stopSelected(operation, selected.filter(instance => !operation.errors.some(error => error.instanceKey === instance.key)));
           for (const instance of selected) {
-            await stopInstance(fleetId, instance);
+            if (operation.errors.some(error => error.instanceKey === instance.key)) continue;
             const reset = await services.execution.reset(configuration, instance, operation.operationId, signal);
-            if (!reset.ok) { operation.errors.push({ instanceKey: instance.key, ...reset.error }); return; }
+            if (!reset.ok) {
+              operation.errors.push({ instanceKey: instance.key, ...reset.error });
+              states.set(key(fleetId, instance.key), { instance, phase: 'failed', sessionId: null, startedAt: null, error: reset.error.message });
+            }
           }
         }
-        for (const instance of selected) if (!running.has(key(fleetId, instance.key))) states.set(key(fleetId, instance.key), { instance, phase: 'starting', error: null, sessionId: null, startedAt: null });
+        for (const instance of selected) if (!running.has(key(fleetId, instance.key)) && !operation.errors.some(error => error.instanceKey === instance.key)) states.set(key(fleetId, instance.key), { instance, phase: 'starting', error: null, sessionId: null, startedAt: null });
         const prepared = await services.execution.prepare(configuration, services.controller, signal, approval => {
           operation.status = 'awaiting-approval'; operation.approval = approval; saveOperation(operation);
-          for (const instance of selected) if (!running.has(key(fleetId, instance.key))) states.set(key(fleetId, instance.key), { ...states.get(key(fleetId, instance.key))!, phase: 'awaiting-approval' });
+          for (const instance of selected) if (!running.has(key(fleetId, instance.key)) && !operation.errors.some(error => error.instanceKey === instance.key)) states.set(key(fleetId, instance.key), { ...states.get(key(fleetId, instance.key))!, phase: 'awaiting-approval' });
         });
         if (!prepared.ok) { operation.errors.push({ instanceKey: null, ...prepared.error }); return; }
         connect(configuration);
@@ -246,6 +287,7 @@ export function createController(services: Services) {
           signal.throwIfAborted();
           const identity = key(fleetId, instance.key);
           if (running.has(identity)) continue;
+          if (operation.errors.some(error => error.instanceKey === instance.key)) continue;
           const collision = prepared.value.failed.find(failed => failed.instanceKey === instance.key);
           if (collision) { states.set(identity, { instance, phase: 'failed', sessionId: null, startedAt: null, error: collision.message }); continue; }
           const result = await services.execution.start(configuration, instance, AbortSignal.any([signal, lifetime.signal]), 'operator');
@@ -263,7 +305,7 @@ export function createController(services: Services) {
       operation.status = operation.errors.length ? 'failed' : 'succeeded'; operation.completedAt = services.now(); operation.approval = null; saveOperation(operation);
     }
   }
-  async function operate(input: OperationInput): Promise<Result<Operation>> {
+  async function operate(input: OperationInput, receiptPending = false): Promise<Result<Operation>> {
     const existing = operations.find(operation => operation.operationId === input.operationId);
     if (existing) {
       const previous = { operationId: existing.operationId, target: existing.target, action: existing.action, expectedRevision: existing.expectedRevision };
@@ -282,7 +324,6 @@ export function createController(services: Services) {
       return success(operation);
     }
     if (!target.fleetId || target.kind === 'agent' && !target.instanceKey || target.kind === 'fleet' && target.instanceKey !== undefined) return failure('invalid', 'Invalid lifecycle target');
-    if (input.action === 'reset' && target.kind !== 'agent') return failure('invalid', 'Context resets target exactly one fleet-owned agent');
     if (mutations.has(target.fleetId)) return failure('conflict', 'A roster change is in progress');
     const current = inspect(target.fleetId);
     if (!current.ok) return current;
@@ -295,8 +336,9 @@ export function createController(services: Services) {
     }
     const predecessor = active.get(target.fleetId);
     if (predecessor && input.action !== 'stop') return failure('conflict', 'Another operation is active for this fleet');
-    const operation: Operation = { ...input, status: 'accepted', createdAt: services.now(), completedAt: null, approval: null, errors: [] };
-    operations = [...operations.filter(item => !['succeeded', 'failed'].includes(item.status)).concat(operations.filter(item => ['succeeded', 'failed'].includes(item.status)).slice(-399)), operation];
+    const operation: Operation = { ...input, ...(receiptPending ? { receiptPending: true as const } : {}), status: 'accepted', createdAt: services.now(), completedAt: null, approval: null, errors: [] };
+    operations = [...operations.filter(item => item.completedAt === null || item.receiptPending),
+      ...operations.filter(item => item.completedAt !== null && !item.receiptPending).slice(-399), operation];
     const stored = services.registry.saveOperations(operations);
     if (!stored.ok) { operations = operations.filter(item => item !== operation); return stored; }
     const stop = new AbortController(); predecessor?.stop.abort(new Error('Start cancelled by explicit stop'));

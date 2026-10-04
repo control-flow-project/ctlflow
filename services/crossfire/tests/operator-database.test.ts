@@ -31,9 +31,9 @@ test('operator database inspection is readonly, complete and proves protected re
   }, randomUUID()));
   copyFileSync(current, before);
   const bytes = readFileSync(current);
-  const report = value(inspectDatabase(current, { schemaVersion: 10, counts: { agent: 1, management_conversation: 0, fleet_instance_permission: 1 } }, true));
-  assert.equal(Object.keys(report.counts).length, 53);
-  assert.equal(report.schema?.length, 53);
+  const report = value(inspectDatabase(current, { schemaVersion: 11, counts: { agent: 1, management_conversation: 0, fleet_instance_permission: 1 } }, true));
+  assert.equal(Object.keys(report.counts).length, 54);
+  assert.equal(report.schema?.length, 54);
   assert.equal(report.integrity, 'ok');
   assert(!JSON.stringify(report).includes(agent.token));
   assert.deepEqual(readFileSync(current), bytes);
