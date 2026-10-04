@@ -1,3 +1,4 @@
+import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -17,7 +18,7 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   async function enroll(owner: typeof admin, count: number, prefix: string) {
     const request = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
       fleetKey: 'research', controller: { name: prefix + '-computer', metadata: { site: prefix } },
-      instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + index, name: prefix + '-' + index })) };
+      instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy() })) };
     const introduced = value(await introduceEnrollment(services, request));
     value(decideEnrollment(services, owner.actor, request.enrollmentId,
       { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));

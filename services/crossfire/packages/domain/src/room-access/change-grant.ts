@@ -15,7 +15,7 @@ export async function changeRoomGrant(services: Dependencies, actor: Actor, inpu
     if (!grants.ok) return grants; if (!conversation.ok) return conversation;
     if (input.accessMode !== 'none' && (!authorized.value.previous || authorized.value.previous.accessMode === 'none')
       && grants.value.filter(grant => grant.accessMode !== 'none' && grant.roomId !== conversation.value?.roomId).length >= 100) return failure('limit', 'An agent can have at most 100 room grants in addition to its owner DM');
-    const saved = commitGrantChange(services, actor, authorized.value, requestId);
+    const saved = commitGrantChange(services, actor, authorized.value, requestId, 'room');
     if (!saved.ok) return saved;
     if (!authorized.value.changed) return success({ grant: saved.value, revision: input.expectedRevision });
     const principal = services.repositories.principal.find({ id: input.agentId });

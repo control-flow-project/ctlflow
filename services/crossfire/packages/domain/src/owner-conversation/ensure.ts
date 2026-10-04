@@ -43,13 +43,19 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
       expectedRevision: identity.principal.revision, expectedGeneration: grant.value?.generation ?? null,
       accessMode: 'reply', powerLevel: null, muted: false }, invitation);
     if (!proof.ok) return proof;
+    if (invitation) {
+      const current = await services.matrix.invitation(identity.principal.matrixUserId, roomId);
+      if (!current.ok) return current;
+      if (!current.value || !current.value.direct || current.value.eventId !== invitation.eventId
+        || current.value.senderMatrixId !== invitation.senderMatrixId) return failure('conflict', 'The owner DM invitation was withdrawn or replaced');
+    }
     const saved = services.unitOfWork.run(() => {
       const rechecked = recheckGrantAuthorization(services, actor, proof.value);
       if (!rechecked.ok) return rechecked;
       const bound = services.repositories.ownerConversation.find({ agentId });
       if (!bound.ok) return bound;
       if (bound.value?.roomId !== previous.value?.roomId) return failure('conflict', 'Owner conversation changed during native application');
-      const committed = commitGrantChange(services, actor, proof.value, services.identity.id());
+      const committed = commitGrantChange(services, actor, proof.value, services.identity.id(), 'owner-conversation');
       if (!committed.ok) return committed;
       if (!committed.value || committed.value.authorizerId !== identity.owner.id || committed.value.addedById !== identity.owner.id) return failure('forbidden', 'Owner conversation provenance does not match');
       let committedGrant = committed.value;
@@ -66,6 +72,11 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
         const audited = recordEvent(services, actor, services.identity.id(), { targetKind: 'agent', targetId: agentId,
           ownerId: identity.owner.id, roomId, action: 'owner-conversation.ensure' });
         if (!audited.ok) return audited;
+      }
+      if (!bound.value) {
+        const claimed = services.repositories.ownerConversation.insert({ agentId, ownerId: identity.owner.id,
+          roomId, createdAt: services.clock.now() });
+        if (!claimed.ok) return claimed;
       }
       if (proof.value.changed || permissions.value.length) {
         const revised = services.repositories.principal.update({ ...identity.principal, revision: identity.principal.revision + 1 });
@@ -88,9 +99,8 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
       if (!current.ok) return current; if (!existing.ok) return existing; if (!currentGrant.ok) return currentGrant;
       if (!current.value || current.value.principal.revision !== saved.value.revision || current.value.owner.revision !== identity.owner.revision
         || currentGrant.value?.generation !== saved.value.grant.generation || currentGrant.value.revision !== saved.value.grant.revision
-        || existing.value?.roomId !== previous.value?.roomId) return failure('conflict', 'Owner conversation authority changed during native application');
-      return existing.value ? success(undefined) : services.repositories.ownerConversation.insert({ agentId, ownerId: identity.owner.id,
-        roomId, createdAt: services.clock.now() });
+        || existing.value?.roomId !== roomId || existing.value.ownerId !== identity.owner.id) return failure('conflict', 'Owner conversation authority changed during native application');
+      return success(undefined);
     });
     return bound.ok ? success({ roomId }) : bound;
   });

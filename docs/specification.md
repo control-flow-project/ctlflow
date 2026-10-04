@@ -49,7 +49,9 @@ their individual-agent adapters.
 
 - Crossfire owns identity, enrollment, human authorization, room access, native
   reconciliation, wake policies, listener activity, fleet grouping and React UI.
-  Fleets do not confer room permissions, wake authority or a new agent kind.
+  Fleet membership alone confers no room permission, wake authority or new agent
+  kind. Owner-reviewed role coordination settings use the same wake and
+  generation-bound room-permission owners as individual agents.
 - fleetd owns user-scoped controller configuration, registered fleet directories,
   fleet execution operations, native runtime ownership, automatic resumption and
   assembling runtime/coordination/listener adapters.
@@ -258,7 +260,8 @@ First fleet start:
    start. A later atomic name-claim collision fails only its affected instance.
 3. Submit the exact roster through shared enrollment. Display one approval URL
    and code for the human, and wait in code without model polling.
-4. The owner approves the displayed new identities and fleet connection.
+4. The owner approves the displayed identities, fleet connection and exact role
+   wake/invitation settings. These apply automatically without another setup step.
    Room grants are a separate explicit human decision and start empty.
 5. Privately exchange credentials and persist stable identity/session bindings.
 6. Install verified project-local integration artifacts, start/resume each native
@@ -273,7 +276,8 @@ model calls. An authorized task/message is what starts model work.
 
 Later start reuses private credentials, the same immutable identities, native
 sessions and delivery positions automatically. No resume flag or replacement
-identity is invented. New agents alone need new identity approval. Invalid
+identity is invented. New agents need identity approval; changed/unapproved fleet
+coordination settings need exact owner policy approval, even for existing agents. Invalid
 credentials or failed native resume produces a concrete error, not a fresh session.
 A second live owner of the same local instance is denied. Portable-directory
 proof is explicitly outside this task; portability remains the storage contract.
@@ -419,7 +423,9 @@ approve enrollment, change roles/room permissions/wake policy, access other
 fleets or impersonate a human Matrix login. Owner suspension/revocation disables
 the credential. New agents still require explicit owner approval. Names and
 public IDs alone cannot recover credentials or replace fleet authority.
-The credential is controller-private, not model instructions.
+The credential is controller-private, not model instructions. A fleet request may
+include changed coordination settings, but only its human owner can approve them.
+Authenticated identity/controller proof never substitutes for policy approval.
 
 ## 4. Domain and adapters
 
@@ -677,12 +683,43 @@ model = "VERIFIED_MODEL_ID"
 model_reasoning_effort = "high"
 sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
+
+[coordination_options]
+wake_mode = "owner-agents"
+permissions = ["room.agent.invite"]
 ```
 
 `name` is the definition's human-readable label, not an account name. Its
 companion `AGENTS.md` supplies the shared role instructions through the native
 runtime's instruction mechanism. Identity-specific context, where needed, is
 generated deterministically rather than maintained as copied role documents.
+
+`coordination_options` is a runtime-independent, strict role configuration. It
+requires `wake_mode` and `permissions` when present; omission requests `owner`
+and an empty permission list. Modes are `nobody`, `owner`, `owner-agents`, `humans`,
+`everyone` and `selected`. Permissions are empty or exactly `room.agent.invite`.
+Only `selected` accepts the optional `sender_matrix_ids` array: up to 2000 unique
+registered immutable Matrix identities, resolved to active principals at request
+and approval. Empty selection wakes nobody; owner and self are not implicit.
+Unknown fields/capabilities, duplicate IDs or senders on another mode are rejected.
+All instances inherit their definition's complete policy; no instance override,
+native-option alias or per-fleet permission system exists.
+
+fleetd includes the resolved policy in each enrollment item. Owner review covers
+the exact complete roster and each requested policy, including existing identities.
+Approval applies canonical wake settings and invitation defaults to current
+ordinary grants and new admission generations without another management setup
+step. It grants no room membership, native power or extra owner approval ability.
+An invited target inherits its own independently approved defaults, not the
+inviter's authority. Owner and management DMs receive no third-agent delegation.
+
+Changed settings require a new owner review on stopped-to-running transition.
+Unchanged approved settings resume automatically without overwriting manual
+room-specific permission edits within the same generation. A fresh admission
+applies the approved defaults again. A changed policy review explicitly authorizes
+replacing defaults on existing ordinary grants. Management can adjust current
+wake/room policies; a wake edit differing from the file requires a new review on
+next start. Detachment removes future defaults, not current grants or wake state.
 
 The runtime adapter owns the typed `runtime_options` schema and native settings
 translation. Model/reasoning settings reach the headless native session directly.
@@ -753,7 +790,8 @@ ID; the TOML `fleet` key must match that selected fleet. An administrator can
 therefore review identically named fleets belonging to different owners without
 ambiguity. The human does not transcribe account UUIDs. This file contains no local
 paths, native settings, commands or credentials. Wake policies and invitation
-delegation are independent management settings, not implied by room grants.
+defaults come from separately owner-reviewed role coordination settings; management
+can adjust current policy. They are not implied by room grants or stored in this plan.
 
 ### Self-contained layout
 
@@ -838,7 +876,9 @@ revoked binding is not silently recycled into a new account.
 
 The approval page identifies claimed new entries, authenticated existing entries
 and collision failures separately. The one approval covers exactly the displayed
-new claimed roster. Changing that roster invalidates its review; a concurrent
+complete successful roster and its exact fleet coordination settings, including
+authenticated existing identities. Changing the roster or policies invalidates
+its review; a concurrent
 collision is not permission to approve a different hidden subset.
 
 
@@ -848,28 +888,42 @@ validation, expected failures and bounded payloads.
 | Route | Authority and effect |
 | --- | --- |
 | `POST /api/enrollments/preflight` | Bounded, rate-limited roster availability/capacity check. Existing-identity exemptions require its private authentication. No claims, credentials or runtime mutation. |
-| `POST /api/enrollments` | Introduce the roster with persisted private idempotency material. Return per-instance outcomes and one new-identity approval request for successfully claimed entries. |
+| `POST /api/enrollments` | Introduce the roster and fleet coordination policies with persisted private idempotency material. Return per-instance outcomes and one exact owner review for new identities or changed/unapproved policies. |
 | `GET /api/enrollments` | Paginated human owner view; administrators can inspect all. No private claim material. |
 | `GET /api/enrollments/{id}` | Human review of the exact roster, code, expiry, decision and per-instance provisioning status. |
-| `POST /api/enrollments/{id}/decision` | The named owner approves or rejects the reviewed new roster. An administrator may reject another owner's request, not approve it. |
+| `POST /api/enrollments/{id}/decision` | The named owner approves or rejects the reviewed roster and policies. Recheck captured existing-agent revisions and selected senders; apply all successful identities/settings atomically. An administrator may reject another owner's request, not approve it. |
 | `POST /api/enrollments/{id}/exchange` | The initiating private claim obtains status and ready credentials during a bounded recovery lifetime. Credentials never appear in human/browser responses. |
 
-Enrollment receives only coordination identity information: owner, fleet,
-instance keys, registered names the reporting controller descriptor and private request/authentication material.
+Enrollment receives coordination information: owner, fleet, instance keys,
+registered names, reporting controller descriptor, per-item coordination policies
+and private request/authentication material. Every fleet item requires the complete
+`coordinationPolicy: {wakeMode, senderMatrixIds, permissions}` shape; individual
+enrollment forbids that field. Read representations include the policy or `null`
+for an individual item. Selected identities persist as normalized principal IDs.
 It rejects definitions, model settings, work areas and local commands.
 
 The controller persists its private idempotency key and claim secret before
 submission. The server stores appropriate verifiers, not loggable credentials.
 The same authenticated private request and identical roster returns the same
 result; conflicting reuse fails. Exchange is repeatable within its bounded
-lifetime so an interrupted local write does not create another identity.
+lifetime so an interrupted local write does not create another identity. A correct
+private claim past expiry can read only `expired` status, never native credentials
+or controller authority. An incorrect claim remains unauthorized. fleetd checks
+saved request status on an explicit start, replaces a terminal request with a
+fresh reviewed request, and never retries owner rejection inside its wait loop.
 
 A lost claim with no surviving private proof is not recoverable through public
 roster lookup. Recovery must require the named owner's authenticated authority;
 it cannot use a Matrix password requested by an agent.
 
 Approval transactionally creates/reserves all reviewed successful new identities
-with owner-only wake policy. Active provisioning creates no conversations or
+with the reviewed fleet wake policy, or owner-only for individual enrollment.
+Fleet approval stores exact-owner defaults and materializes generation-bound
+permissions using the ordinary room-access domain. Existing-agent revisions and
+selected-sender access are rechecked before any identity, grouping or policy write;
+expected failure rolls the entire decision back. Unchanged existing fleet policies
+can resume without approval; per-room human edits are not compared or overwritten.
+Active provisioning creates no conversations or
 room grants. First private owner contact or a native permission request establishes
 the protected owner DM through the canonical room-grant/application path.
 Native account provisioning occurs
@@ -1012,6 +1066,16 @@ responses retain their observed native membership and power level.
 
 
 ### Required capability
+
+An owner-approved fleet definition may supply `room.agent.invite` as a room
+admission default. The room-access domain materializes it in the canonical
+permission table for each authorized new ordinary-room generation. First/changed
+policy approval also applies the reviewed default to current ordinary grants.
+Authorization never unions a global fleet permission with room permissions.
+Templates create no grant or native invitation. Current generation, provenance,
+owner access and native Matrix ceilings remain mandatory. Private owner/management
+bindings are established before application can expose delegation; a pending
+owner DM does not gain permanent native repair authority until admission succeeds.
 
 An explicitly authorized agent can add another existing registered agent to a
 room, including agents belonging to other owners. This permission authorizes the
@@ -1234,7 +1298,7 @@ The private per-session journal allows one pending publication and at most 128
 unacknowledged confirmations; it refuses excess rather than silently evicting
 unsettled evidence. This is runtime state, not a second Matrix cursor owner.
 
-Allowed wake authors are configured in management:
+Allowed wake authors are configured in management or approved fleet definitions:
 
 | Policy | Wake authority |
 | --- | --- |
@@ -1710,16 +1774,19 @@ analytics subscription, periodic model use or provider-billing polling exists.
 
 One canonical schema and permission catalog own current state. Fresh development
 stores initialize that schema directly. Deployed stores advance transactionally
-to schema version 9 after a verified backup; existing identities, native access,
+to schema version 10 after a verified backup; existing identities, native access,
 credentials, controller authority, policy and audit remain intact. Runtime code
 has no historical-schema reader, importer, compatibility handler or dual
 read/write path. Production resets and automatic reset-on-startup-error are
 prohibited. Source work, operator configuration, external credentials and other
 projects remain intact.
 
-The canonical schema has 48 singular tables. Forward migrations 7→9 and 8→9
+The canonical schema has 53 singular tables. Transactional forward migrations
 preserve existing principal, access, listener, credential and audit rows while
-adding required runtime/statistics relations and the instance inline-message policy.
+adding required runtime/statistics and fleet-policy relations. Requested policies
+and approved invitation defaults use normalized tables, not serialized settings.
+Existing fleets acquire no invented policy approval during migration; their next
+configured start requests owner review when approval is absent.
 
 ### Relational conventions
 
@@ -1802,6 +1869,9 @@ repository methods serve issuance and native account operations only.
 | --- | --- |
 | `enrollment_request` | `id PK`, `owner_id FK member`, `fleet_key?`, `verification_code UQ`, `claim_hash`, `controller_name?`, `controller_credential_hash?`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. |
 | `enrollment_item` | `request_id FK enrollment_request`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. |
+| `enrollment_item_policy` | `request_id`, `instance_key`, `wake_mode`, `expected_agent_revision?`; composite PK/FK to `enrollment_item ON DELETE CASCADE`. Exact review snapshot and stale-existing-agent guard. |
+| `enrollment_item_permission` | `request_id`, `instance_key`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; composite PK; item-policy FK with cascade; catalog FK `(permission_code, grant_scope)`. |
+| `enrollment_item_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`; composite PK; item-policy FK with cascade. Immutable selected-author review rows. |
 | `agent_name` | `name PK`, `request_id?`, `instance_key?`, `agent_id? UQ/FK agent`; pending-item composite FK; `UQ(request_id, instance_key)`. |
 | `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `delivery_enabled`, `revision`, `created_at`, `updated_at`; `PK(owner_id, fleet_key)`. |
 | `fleet_connection` | `fleet_id PK/FK fleet`, `connection_id UQ`, `credential_id FK fleet_credential`, `last_seen_at`, `expires_at`, `closed_at?`. One exclusive controller generation. |
@@ -1811,11 +1881,17 @@ repository methods serve issuance and native account operations only.
 | `fleet_credential` | `id PK`, `fleet_id FK fleet(id)`, `secret_hash`, `created_at`, `revoked_at?`. Fleet-scoped authority, not a human login. |
 | `enrollment_controller_metadata` | `enrollment_id FK enrollment_request`, `key`, `value`; `PK(enrollment_id, key)`. Exact approval snapshot. |
 | `fleet_instance` | `owner_id`, `fleet_key`, `instance_key`, `agent_id UQ`; `PK(owner_id, fleet_key, instance_key)`; composite FKs to `fleet(owner_id, fleet_key)` and `agent(principal_id, owner_id)`. |
+| `fleet_instance_policy` | `agent_id PK/FK fleet_instance(agent_id) ON DELETE CASCADE`, `approved_by_member_id FK member`, `approved_at`; composite FK `(agent_id, approved_by_member_id)` to `agent(principal_id, owner_id)` enforces exact owner. No duplicate wake mode/selection. |
+| `fleet_instance_permission` | `agent_id`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; composite PK; policy FK with cascade; catalog FK `(permission_code, grant_scope)`. Approved admission defaults, not effective room authorization. |
 
 One item or many items use the same request/decision/provisioning pipeline.
 `requested_name` is an immutable review snapshot. Only `agent_name` owns the
 current registered name. A name row points either to the complete pending item
-key or to an assigned agent, never both or neither.
+key or to an assigned agent, never both or neither. Fleet review hydrates all
+requested policies, permissions and selected Matrix identities in three indexed,
+request-wide queries, independent of roster or selection size. Empty requests
+require only the policy lookup. There are no per-instance or per-sender review
+queries.
 
 A request's fleet key is a proposed input, not authority or a reservation of
 another owner's fleet. `fleet` and `fleet_instance` are established with
@@ -1993,6 +2069,11 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `principal_application` | `(next_check_at, principal_id)` | Bounded reconciliation. |
 | `enrollment_request` | `(owner_id, created_at, id)`, `(created_at, id)`, `(status, expires_at, id)` | Review lists and pending expiry/capacity. |
 | `enrollment_item` | `(agent_id, request_id, instance_key)` | Existing identity and provisioning references. |
+| `enrollment_item_policy` | composite PK `(request_id, instance_key)` | Exact reviewed item and policy FK prefix. |
+| `enrollment_item_permission` | `(permission_code, grant_scope, request_id, instance_key)` | Catalog FK and reverse permission lookup; item-policy prefix covered by PK. |
+| `enrollment_item_wake_sender` | `(sender_principal_id, request_id, instance_key)` | Selected-sender FK/reverse lookup; item-policy prefix covered by PK. |
+| `fleet_instance_policy` | `(approved_by_member_id, agent_id)` | Exact-owner FK/lifecycle lookup; agent prefix covered by PK. |
+| `fleet_instance_permission` | `(permission_code, grant_scope, agent_id)` | Catalog FK/reverse lookup; agent-policy prefix covered by PK. |
 | `fleet` | `(created_at, fleet_key)` | Global fleet list. Owner lists use the composite primary-key prefix. |
 | `fleet_credential` | `(fleet_id, revoked_at)`; UQ `(id, fleet_id)` | Fleet credential lifecycle and exact fleet-scoped connection/message authority. |
 | `fleet_message` | `(fleet_id, created_at DESC, id DESC)` | Stable fleet-scoped message history and bounded paging. |
@@ -2284,7 +2365,11 @@ Identity/status context stays compact above navigation. Forms and explicit
 confirmations retain native permission checks, scoped REST mutations, revisions,
 CSRF and request idempotency. Policy sections distinguish signup, capacity,
 enrollment/reconciliation and onboarding, with one atomic settings save.
-Enrollment review includes the owner's current display identity. Activity shows
+Enrollment review includes the owner's current display identity and compact
+per-instance wake/invitation columns. Selected-author disclosure shows exact Matrix
+IDs. The page explains automatic application to existing/future ordinary grants,
+no membership grant and private-DM protection. No post-approval setup is required.
+Activity shows
 recognizable actors, affected principals and readable action labels, with exact
 record identifiers and provenance in a disclosure. Domain read models hydrate
 these identities in one page-wide directory batch, only after resource-scope
@@ -2333,8 +2418,11 @@ require confirmation; a disconnect targets observed listener run IDs only.
 The Connect page defaults to the single-agent flow, with three concise illustrated
 steps: paste one line, approve once, choose limited room access. Fleet setup has
 its own durable advanced tab. Requirements and the optional launcher live in a
-secondary inspectable area. New fleet approvals show exact names, failures,
-owner and controller. Reconnection is never described as re-enrollment.
+secondary inspectable area. Fleet approvals show exact names, failures, owner,
+controller, wake authors and room invitation defaults, including selected-identity
+disclosure. The review states the effect on existing and future ordinary room
+access and distinguishes permissions from membership. Reconnection is never
+described as re-enrollment.
 
 All data lists use one first/previous/page/next/last pagination treatment. Server
 queries are bounded and stably ordered with matching scoped counts. URL navigation
@@ -2426,6 +2514,9 @@ Required banks:
   Actual Codex, Claude Code and Pi publication through the shared listener with
   inert providers, including owner-DM-only/Nobody delivery, native busy and owner pause.
 - Enrollment name races, exact one-roster approval, private credential recovery,
+  complete role coordination review, stale-policy rollback, selected-sender
+  authority, unchanged restart preservation, automatic current/future room
+  permission materialization, cross-owner invitations and provenance-only removal,
   scoped fleet credentials, membership changes/controller updates and no leaks.
 - Native Conduit grants/invitations/removal, cross-owner authority/provenance,
   revocation, selected/nobody wake rules and durable blocked-mention cooldown.

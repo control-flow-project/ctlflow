@@ -5,6 +5,7 @@ import { recordEvent } from '../audit/record-event.js';
 import type { GrantAuthorization } from './authorize-change.js';
 import type { AgentRoomGrant } from './types.js';
 import { protectOwnerConversation } from '../owner-conversation/protect.js';
+import { applyFleetRoomPermissions } from '../fleet/policy.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'runtime'>;
 export function recheckGrantAuthorization(services: Dependencies, actor: Actor, proof: GrantAuthorization): Result<void> {
@@ -32,7 +33,8 @@ export function recheckGrantAuthorization(services: Dependencies, actor: Actor, 
   return success(undefined);
 }
 
-export function commitGrantChange(services: Dependencies, actor: Actor, proof: GrantAuthorization, requestId: string): Result<AgentRoomGrant | null> {
+export function commitGrantChange(services: Dependencies, actor: Actor, proof: GrantAuthorization, requestId: string,
+  purpose: 'room' | 'owner-conversation'): Result<AgentRoomGrant | null> {
   if (!proof.changed) return success(proof.previous);
   const { input, previous } = proof;
   const newGeneration = !previous || previous.accessMode === 'none' && input.accessMode !== 'none'
@@ -54,6 +56,10 @@ export function commitGrantChange(services: Dependencies, actor: Actor, proof: G
     revision: (previous?.revision ?? -1) + 1, accessRevision: (previous?.accessRevision ?? -1) + (accessChanged ? 1 : 0), updatedAt: services.clock.now() };
   const saved = previous ? services.repositories.agentRoomGrant.update(grant) : services.repositories.agentRoomGrant.insert(grant);
   if (!saved.ok) return saved;
+  if (purpose === 'room' && newGeneration && input.accessMode !== 'none') {
+    const assigned = applyFleetRoomPermissions(services, grant);
+    if (!assigned.ok) return assigned;
+  }
   const application = services.repositories.roomGrantApplication.find({ agentId: input.agentId, roomId: input.roomId });
   if (!application.ok) return application;
   const scheduled = application.value

@@ -73,7 +73,7 @@ export async function applyGrantPlan(services: Dependencies, actor: Actor,
       if (!checked.ok) return checked;
     }
     for (const change of preview.value.changes) {
-      const saved = commitGrantChange(services, actor, change, requestId);
+      const saved = commitGrantChange(services, actor, change, requestId, 'room');
       if (!saved.ok) return saved;
     }
     for (const snapshot of preview.value.snapshots) {

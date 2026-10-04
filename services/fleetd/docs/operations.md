@@ -62,6 +62,12 @@ Deactivate retains engines/sessions/controller connection; Stop ends owned
 listeners and processes. Direct listeners remain independent. Ordinary models do
 not enroll, poll for work, send telemetry or maintain controller credentials.
 
+Role `coordination_options` requests exact Crossfire wake rules and invitation
+defaults with enrollment. Owner review is required for new/changed settings;
+the controller credential cannot approve them. Approved settings apply through
+Crossfire's normal wake and room-access domains, not controller-side permissions.
+- [Configuration, approval, admission and removal](coordination.md)
+
 ## Source ownership
 
 - `apps/daemon`: Unix HTTP and composition.

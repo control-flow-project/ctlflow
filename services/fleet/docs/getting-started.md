@@ -39,13 +39,16 @@ another controller. Controller labels/metadata are descriptive, not authority.
 ## Approval and ready state
 
 The first start prints one roster approval URL/code and waits. The owner reviews
-the exact names and approves once in Crossfire. Name collisions are rejected;
+the exact names, wake authors and invitation defaults and approves once in Crossfire.
+Declared settings apply automatically; no subsequent permission setup is required.
+Name collisions are rejected;
 a partial outcome does not invent replacement names or identities.
 
 Enrollment, verified installation, native startup and heartbeats use ordinary
 code, not model turns. Read the per-instance outcomes; saved credentials alone
-are not a running listener. Each active agent has a private read/write owner DM.
-Other rooms and delegation remain explicit.
+are not a running listener. The private read/write owner DM opens on first use,
+not at startup. Other room membership remains explicit; invitation defaults apply
+when an authorized ordinary-room admission occurs.
 
 After changes or shutdown:
 ```sh

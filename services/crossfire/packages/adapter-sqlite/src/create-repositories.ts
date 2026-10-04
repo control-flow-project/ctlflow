@@ -31,9 +31,11 @@ import { createWakeRuleRepository } from './repository/wake-rule/index.js';
 import { createWakeRuleAgentRepository } from './repository/wake-rule-agent/index.js';
 import { createWakeDeliveryRepository } from './repository/wake-delivery/index.js';
 import { createOwnerConversationRepository } from './repository/owner-conversation/index.js';
+import { createFleetPolicyRepository } from './repository/fleet-policy/index.js';
 
 export function createRepositories(database: Database.Database): Repositories {
   return {
+    fleetPolicy: createFleetPolicyRepository(database),
     ownerConversation: createOwnerConversationRepository(database),
     wakeRule: createWakeRuleRepository(database),
     wakeRuleAgent: createWakeRuleAgentRepository(database),

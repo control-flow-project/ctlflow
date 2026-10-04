@@ -17,7 +17,6 @@ import { nativeProvider } from '../scripts/test-support/native-provider.js';
 import { openTerminal } from '../scripts/test-support/terminal.js';
 import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
 import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
 import { roomAccess } from '@crossfire/adapter-crossfire/room-access';
 import { createClient } from '@crossfire/adapter-crossfire/client';
 import { operations } from '@crossfire/contracts/rest/operations';
@@ -41,7 +40,8 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [cliPath, ...args], { env, timeout: 60000 });
   const definition = join(fleet, 'agents/analyst'); mkdirSync(definition, { recursive: true, mode: 0o700 });
-  writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.2"\nmodel_reasoning_effort = "high"\nsandbox_mode = "read-only"\napproval_policy = "never"\n', { mode: 0o600 });
+  const coordinationOptions = '\n[coordination_options]\nwake_mode = "owner-agents"\npermissions = ["room.agent.invite"]\n';
+  writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.2"\nmodel_reasoning_effort = "high"\nsandbox_mode = "read-only"\napproval_policy = "never"\n' + coordinationOptions, { mode: 0o600 });
   writeFileSync(join(definition, 'AGENTS.md'), 'Inert research fixture. Never contact an external provider.', { mode: 0o600 });
   const keys = ['north', 'south'];
   const providers: Awaited<ReturnType<typeof nativeProvider>>[] = [];
@@ -101,9 +101,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   value(await changeRoomGrant(services, admin.actor, { agentId: north.agentId, roomId, expectedRevision: value(services.directory.agent(north.agentId))!.principal.revision,
     expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
   await worker.drain();
-  const grant = value(services.repositories.agentRoomGrant.find({ agentId: north.agentId, roomId }))!;
-  value(setRoomPermission(services, admin.actor, { agentId: north.agentId, roomId, expectedRevision: value(services.directory.agent(north.agentId))!.principal.revision,
-    expectedGeneration: grant.generation, permissions: ['room.agent.invite'] }, randomUUID()));
+  assert.deepEqual(value(services.collection.roomPermissions({ agentId: north.agentId, roomId })).map(permission => permission.permissionCode), ['room.agent.invite']);
   const other = await fixture.member('other'), guest = await fixture.agent(other.actor, 'guest');
   const invitations = roomAccess({ origin, token: north.account.access_token });
   value(await invitations.change(guest.id, roomId, { accessMode: 'reply', powerLevel: null })); await worker.drain();
@@ -113,7 +111,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   value(await invitations.change(guest.id, roomId, null)); await worker.drain();
   assert.deepEqual(value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'GET', API + '/joined_rooms')).joined_rooms, []);
   await cli('stop', 'research');
-  writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.1"\nmodel_reasoning_effort = "medium"\nsandbox_mode = "danger-full-access"\napproval_policy = "never"\n', { mode: 0o600 });
+  writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.1"\nmodel_reasoning_effort = "medium"\nsandbox_mode = "danger-full-access"\napproval_policy = "never"\n' + coordinationOptions, { mode: 0o600 });
   await cli('start', 'research');
   const resumed = JSON.parse((await cli('show', 'research')).stdout) as Fleet;
   assert.deepEqual(resumed.instances.map(instance => instance.sessionId), first.instances.map(instance => instance.sessionId));

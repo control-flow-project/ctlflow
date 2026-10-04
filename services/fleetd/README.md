@@ -6,6 +6,7 @@ The guides cover controller ownership and the shared runtime configuration:
 - [Lifecycle, private API and execution boundaries](docs/operations.md)
 - [Read-only native fleet verification](tools/README.md)
 - [Fleet runtime defaults and overrides](../fleet/docs/configuration.md)
+- [Fleet-defined wake rules and invitation defaults](docs/coordination.md)
 
 Run it through the fleet CLI or directly:
 

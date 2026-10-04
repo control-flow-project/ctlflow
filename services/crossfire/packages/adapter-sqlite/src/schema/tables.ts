@@ -1,6 +1,11 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  enrollment_item_policy: { request_id: string; instance_key: string; wake_mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected'; expected_agent_revision: number | null };
+  enrollment_item_permission: { request_id: string; instance_key: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room' };
+  enrollment_item_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string };
+  fleet_instance_policy: { agent_id: string; approved_by_member_id: string; approved_at: number };
+  fleet_instance_permission: { agent_id: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room' };
   listener_stat_checkpoint: { run_id: string; sequence: number; digest: string; captured_at: number };
   listener_stat_interval: { run_id: string; bucket_at: number; agent_id: string; started_at: number; ended_at: number; captured_at: number; dropped: number };
   listener_stat_flow: { run_id: string; bucket_at: number; room_id: string; sender_matrix_id: string; message_type: string; observed: number; delivered: number; content_bytes: number; delivered_bytes: number; attachment_bytes: number; largest_bytes: number };

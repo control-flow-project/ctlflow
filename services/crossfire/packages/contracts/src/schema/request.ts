@@ -4,12 +4,17 @@ import type { Parser } from './validation.js';
 import { failure, success } from '@crossfire/kernel/result';
 import { HUMAN_SIGNUP } from '../policy.js';
 import { statisticsBatch } from '../statistics.js';
+import { coordinationPolicy } from '../coordination-policy.js';
 const revision = check.integer();
 const accountProof = check.object({ agentId: check.identifier, accessToken: check.text(8192) });
-const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof) });
+const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof), coordinationPolicy: check.optional(coordinationPolicy) });
 const roster = { controller: check.optional(controller), controllerCredential: check.optional(check.text(200)), ownerMatrixId: check.matrixUserId, fleetKey: check.nullable(check.name), instances: check.list(instance, 100, 1) };
-export const preflight = check.object(roster);
-export const enrollment = check.object({ ...roster, enrollmentId: check.identifier, claimSecret: check.secret });
+function hasCoordinationPolicies(value: { fleetKey: string | null; instances: { coordinationPolicy?: unknown }[] }) {
+  return value.instances.every(item => value.fleetKey === null ? item.coordinationPolicy === undefined : item.coordinationPolicy !== undefined);
+}
+export const preflight = check.refine(check.object(roster), hasCoordinationPolicies, 'Fleet instances require coordination policies; individual enrollment does not accept them');
+export const enrollment = check.refine(check.object({ ...roster, enrollmentId: check.identifier, claimSecret: check.secret }), hasCoordinationPolicies,
+  'Fleet instances require coordination policies; individual enrollment does not accept them');
 export const enrollmentDecision = check.object({ expectedRevision: revision, decision: check.choice('approve', 'reject'), verificationCode: check.text(12, 12) });
 export const exchange = check.object({ claimSecret: check.secret });
 export const session = check.object({ nativeAccessToken: check.text(8192) });

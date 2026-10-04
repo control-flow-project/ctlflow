@@ -1,3 +1,4 @@
+import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
 import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -30,7 +31,10 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   const directory = mkdtempSync(join(process.cwd(), '.temp/fleet-browser-'));
   const other = await fixture.member('alice'), guest = await fixture.agent(other.actor, 'visitor');
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId, fleetKey: 'research',
-    controller: { name: 'Research workstation', metadata: { site: 'local' } }, instances: [{ instanceKey: 'alpha', name: 'alpha' }, { instanceKey: 'beta', name: 'beta' }] };
+    controller: { name: 'Research workstation', metadata: { site: 'local' } }, instances: [
+      { instanceKey: 'alpha', name: 'alpha', coordinationPolicy: { ...defaultCoordinationPolicy(), wakeMode: 'owner-agents' as const, permissions: ['room.agent.invite' as const] } },
+      { instanceKey: 'beta', name: 'beta', coordinationPolicy: { ...defaultCoordinationPolicy(), wakeMode: 'selected' as const,
+        senderMatrixIds: [admin.member.principal.matrixUserId, guest.matrixUserId] } }] };
   const introduced = value(await introduceEnrollment(services, input));
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
   cleanup(scope, () => browser.close());
@@ -39,6 +43,23 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await page.goto(origin + '/manage/enrollments/' + input.enrollmentId);
   await expect(page.getByText('Research workstation', { exact: true })).toBeVisible();
   await expect(page.getByText('alpha', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Enrollment roster' }).getByRole('columnheader')).toHaveText(['Instance', 'Agent name', 'Outcome', 'Who can wake', 'Room coordination', 'Details']);
+  await expect(page.getByText(WAKE_LABELS['owner-agents'], { exact: true })).toBeVisible();
+  await expect(page.getByText('Remove only its own additions', { exact: true })).toBeVisible();
+  await page.getByText('2 selected identities', { exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(guest.matrixUserId);
+  await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(admin.member.principal.matrixUserId);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await checkPaperLayout(page);
+    await page.screenshot({ path: join(directory, 'coordination-review-' + width + '.png'), fullPage: true });
+    for (const identity of await page.getByRole('table', { name: 'Enrollment roster' }).locator('li').all()) {
+      const bounds = await identity.boundingBox();
+      assert(bounds && bounds.width >= 180 && bounds.height <= 60,
+        'Selected identities retain readable wrapping: ' + JSON.stringify({ viewport: width, bounds }));
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByLabel('Verification code').fill(introduced.request.verificationCode);
   await page.getByRole('button', { name: 'Approve roster', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Agent details →' })).toHaveCount(2); await worker.drain();
@@ -131,6 +152,10 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: alpha.agentId, roomId }))!.accessMode, 'reply');
   const agentUrl = '/manage/agents/' + alpha.agentId;
   await page.goto(origin + agentUrl + '/rooms/' + encodeURIComponent(roomId));
+  await expect(page.getByLabel('Allow this agent to invite other registered agents')).toBeChecked();
+  await page.getByLabel('Allow this agent to invite other registered agents').uncheck();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save invitation permission' }).click()]);
+  await expect(page.getByLabel('Allow this agent to invite other registered agents')).not.toBeChecked();
   await page.getByLabel('Allow this agent to invite other registered agents').check();
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save invitation permission' }).click()]);
   await expect(page.getByLabel('Allow this agent to invite other registered agents')).toBeChecked();
