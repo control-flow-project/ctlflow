@@ -4,8 +4,11 @@ import type { EnrollmentRoster } from './input.js';
 import { authenticateController } from '../fleet/authority.js';
 import { validateRoster } from './input.js';
 import { enrollmentCapacity } from './capacity.js';
+import { resolveCoordinationPolicy } from '../fleet/policy.js';
+import type { RequestedFleetPolicy } from '../port/fleet-policy.js';
 
-export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; revision: number }[] };
+export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; revision: number }[];
+  policies: { instanceKey: string; policy: RequestedFleetPolicy }[] };
 export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
   const valid = validateRoster(input);
   if (!valid.ok) return valid;
@@ -42,7 +45,15 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
     }
     existing.push({ instanceKey: item.instanceKey, agentId: item.identity.agentId, revision: record.value.principal.revision });
   }
-  return success({ ownerId: owner.value.id, ownerRevision: owner.value.revision, existing });
+  const policies: VerifiedRoster['policies'] = [];
+  for (const item of input.instances) {
+    if (!item.coordinationPolicy) continue;
+    const identity = existing.find(proof => proof.instanceKey === item.instanceKey);
+    const resolved = resolveCoordinationPolicy(services, item.coordinationPolicy, identity?.agentId ?? null, identity?.revision ?? null);
+    if (!resolved.ok) return resolved;
+    policies.push({ instanceKey: item.instanceKey, policy: resolved.value });
+  }
+  return success({ ownerId: owner.value.id, ownerRevision: owner.value.revision, existing, policies });
 }
 
 export async function preflightEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster) {

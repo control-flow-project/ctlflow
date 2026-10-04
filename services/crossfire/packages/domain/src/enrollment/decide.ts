@@ -7,8 +7,9 @@ import { bindRoster } from '../fleet/bind-roster.js';
 import { approveFleet } from '../fleet/approve-fleet.js';
 import { expireEnrollments } from './expire.js';
 import { enrollmentCapacity } from './capacity.js';
+import { applyCoordinationPolicy } from '../fleet/policy.js';
 
-export function decideEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'instance'>,
+export function decideEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'instance' | 'runtime'>,
   actor: Actor, enrollmentId: string, input: { expectedRevision: number; decision: 'approve' | 'reject'; verificationCode: string }, requestId: string) {
   return services.unitOfWork.run(() => {
     const expired = expireEnrollments(services);
@@ -57,6 +58,15 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
       if (request.fleetKey !== null) {
         const approved = services.collection.enrollmentItems({ requestId: enrollmentId }); if (!approved.ok) return approved;
         const bound = bindRoster(services, request.ownerId, request.fleetKey, approved.value); if (!bound.ok) return bound;
+        const requested = services.repositories.fleetPolicy.requested(enrollmentId); if (!requested.ok) return requested;
+        const policies = new Map(requested.value.map(policy => [policy.instanceKey, policy]));
+        for (const item of approved.value) {
+          if (item.outcome === 'failed' || !item.agentId) continue;
+          const policy = policies.get(item.instanceKey);
+          if (!policy) return failure('conflict', 'Fleet coordination policy is missing; submit a new request');
+          const applied = applyCoordinationPolicy(services, actor, item.agentId, policy, requestId);
+          if (!applied.ok) return applied;
+        }
       }
     } else {
       const names = services.collection.agentNamesByRequest({ requestId: enrollmentId });

@@ -96,11 +96,23 @@ model = "YOUR_SUPPORTED_MODEL"
 model_reasoning_effort = "high"
 sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
+
+[coordination_options]
+wake_mode = "owner-agents"
+permissions = ["room.agent.invite"]
 ```
 
 The roster work area supplies native cwd. The companion `AGENTS.md` supplies
 role instructions. The functional Codex adapter alone validates/translates native
 options; fleetd does not interpret Codex-specific settings.
+
+The role's separate `coordination_options` declares Crossfire wake authority and
+invitation defaults for every instance. Owner approval applies the exact policy
+to current ordinary grants and future admissions without another setup step.
+Omitting the whole block requests owner-only wake and no invitation delegation.
+Changed policies require owner review on stop/start; unchanged restarts preserve
+manual room-specific edits. Configuration grants no room membership or native power.
+- [Fields, selected identities, approval and removal rules](../../fleetd/docs/coordination.md)
 
 | Field | Accepted values | When omitted |
 | --- | --- | --- |
@@ -194,7 +206,8 @@ Open the fleet Room plan tab, submit the plan, review its diff and explicitly
 confirm. Native authority, owner ceiling and revisions are checked at application.
 Read-only, reply and custom-power grants remain separate from wake selection.
 Custom access uses `access = "custom"` with an integer `level`. Invitation
-delegation is assigned separately in management, not in `rooms.toml`.
+defaults come from owner-approved `agent.toml` coordination settings; management
+can adjust a room's applied permission set. Neither belongs in `rooms.toml`.
 Empty grants remove discretionary access for included instances; the built-in
 owner DM is preserved. Omitted instances are untouched. Owner DM access and
 delegation cannot be edited through this plan.

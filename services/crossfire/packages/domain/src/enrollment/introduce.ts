@@ -8,18 +8,28 @@ import { expireEnrollments } from './expire.js';
 import type { EnrollmentRequest, EnrollmentItem } from './types.js';
 import { enrollmentCapacity } from './capacity.js';
 import { enrollmentOverviews, type EnrollmentOverview } from './overview.js';
+import { validateRoster } from './input.js';
+import { coordinationPolicyMatches } from '../fleet/policy.js';
+import { validateWakeSenders } from '../wake/replace-policy.js';
+import { enrollmentItemViews, type EnrollmentItemView } from './item-view.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'matrix' | 'unitOfWork' | 'identity' | 'clock'>;
-export type EnrollmentReceipt = EnrollmentOverview & { instances: EnrollmentItem[] };
+export type EnrollmentReceipt = EnrollmentOverview & { instances: EnrollmentItemView[] };
 function receipt(services: Dependencies, request: EnrollmentRequest, instances: EnrollmentItem[]): Result<EnrollmentReceipt> {
   const overview = enrollmentOverviews(services, [request]);
-  return overview.ok ? success({ ...overview.value[0]!, instances }) : overview;
+  if (!overview.ok) return overview;
+  const views = enrollmentItemViews(services, instances);
+  return views.ok ? success({ ...overview.value[0]!, instances: views.value }) : views;
 }
 export async function introduceEnrollment(services: Dependencies, input: EnrollmentIntroduction): Promise<Result<EnrollmentReceipt>> {
   if (!/^[a-f0-9-]{36}$/u.test(input.enrollmentId) || !/^[A-Za-z0-9_-]{43}$/u.test(input.claimSecret)) return failure('invalid', 'Persist a request UUID and private 32-byte claim before enrollment');
+  const valid = validateRoster(input);
+  if (!valid.ok) return valid;
   const rosterDigest = services.identity.hash(JSON.stringify({ owner: input.ownerMatrixId, fleet: input.fleetKey,
     controller: input.controller ? { name: input.controller.name, metadata: Object.entries(input.controller.metadata ?? {}).sort(([left], [right]) => left.localeCompare(right)) } : null,
-    items: input.instances.map(item => [item.instanceKey, item.name, item.identity?.agentId ?? null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))) }));
+    items: input.instances.map(item => [item.instanceKey, item.name, item.identity?.agentId ?? null,
+      item.coordinationPolicy ? { wakeMode: item.coordinationPolicy.wakeMode, senderMatrixIds: [...item.coordinationPolicy.senderMatrixIds].sort(),
+        permissions: [...item.coordinationPolicy.permissions].sort() } : null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))) }));
   const prior = services.repositories.enrollmentRequest.find({ id: input.enrollmentId }); if (!prior.ok) return prior;
   if (prior.value) {
     if (prior.value.expiresAt <= services.clock.now() || prior.value.rosterDigest !== rosterDigest || !services.identity.matches(input.claimSecret, prior.value.claimHash)) return failure('conflict', 'Enrollment request belongs to different credentials or roster, or has expired');
@@ -73,6 +83,13 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
         outcome: existing ? 'existing' : failureCode ? 'failed' : 'claimed', agentId: existing?.agentId ?? null, failureCode };
       const added = services.repositories.enrollmentItem.insert(record);
       if (!added.ok) return added;
+      const requestedPolicy = verified.value.policies.find(entry => entry.instanceKey === item.instanceKey)?.policy;
+      if (requestedPolicy) {
+        const valid = validateWakeSenders(services, existing?.agentId ?? null, requestedPolicy.wakeMode, requestedPolicy.senderIds);
+        if (!valid.ok) return valid;
+        const savedPolicy = services.repositories.fleetPolicy.insertRequested(record, requestedPolicy);
+        if (!savedPolicy.ok) return savedPolicy;
+      }
       if (record.outcome === 'claimed') {
         const claimed = services.repositories.agentName.insert({ name: item.name, requestId: request.id, instanceKey: item.instanceKey, agentId: null });
         if (!claimed.ok) return claimed;
@@ -82,11 +99,20 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
     }
     const existingFleet = input.fleetKey === null ? success(null) : services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey: input.fleetKey });
     if (!existingFleet.ok) return existingFleet;
-    if (existingFleet.value) {
-      const bound = bindRoster(services, owner.value.id, existingFleet.value.fleetKey, instances.filter(item => item.outcome === 'existing'));
-      if (!bound.ok) return bound;
+    let unchanged = true;
+    for (const item of instances) {
+      if (input.fleetKey === null || item.outcome !== 'existing' || !item.agentId) continue;
+      const requestedPolicy = verified.value.policies.find(entry => entry.instanceKey === item.instanceKey)?.policy;
+      if (!requestedPolicy) return failure('invalid', 'Fleet instance coordination policy is missing');
+      const matches = coordinationPolicyMatches(services, item.agentId, requestedPolicy);
+      if (!matches.ok) return matches;
+      unchanged = unchanged && matches.value;
     }
-    if ((input.fleetKey === null || existingFleet.value) && !instances.some(item => item.outcome === 'claimed')) {
+    if ((input.fleetKey === null || existingFleet.value && unchanged) && !instances.some(item => item.outcome === 'claimed')) {
+      if (existingFleet.value) {
+        const bound = bindRoster(services, owner.value.id, existingFleet.value.fleetKey, instances);
+        if (!bound.ok) return bound;
+      }
       const finished = services.repositories.enrollmentRequest.update({ ...request, status: 'approved', revision: 1 });
       if (!finished.ok) return finished;
       request.status = 'approved'; request.revision = 1;

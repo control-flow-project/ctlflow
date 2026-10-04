@@ -1,6 +1,7 @@
 import { failure, success } from '@crossfire/kernel/result';
+import { validateCoordinationPolicy, type CoordinationPolicy } from '../fleet/coordination-policy.js';
 export type EnrollmentIdentityProof = { agentId: string; accessToken: string };
-export type EnrollmentEntry = { instanceKey: string; name: string; identity?: EnrollmentIdentityProof };
+export type EnrollmentEntry = { instanceKey: string; name: string; identity?: EnrollmentIdentityProof; coordinationPolicy?: CoordinationPolicy };
 export type ControllerDescriptor = { name: string; metadata?: Record<string, string> };
 export type EnrollmentRoster = { controller?: ControllerDescriptor; controllerCredential?: string; ownerMatrixId: string; fleetKey: string | null; instances: EnrollmentEntry[] };
 export type EnrollmentIntroduction = EnrollmentRoster & { enrollmentId: string; claimSecret: string };
@@ -18,5 +19,9 @@ export function validateRoster(roster: EnrollmentRoster) {
     || new Set(roster.instances.map(item => item.name)).size !== roster.instances.length) return failure('invalid', 'Supply one owner and a unique roster of valid lowercase names and instance keys');
   if (roster.fleetKey === null ? roster.controller !== undefined || roster.controllerCredential !== undefined : !roster.controller) return failure('invalid', 'Fleet enrollment requires exactly one controller descriptor');
   if (roster.controller) { const controller = validateController(roster.controller); if (!controller.ok) return controller; }
+  for (const item of roster.instances) {
+    if (roster.fleetKey === null ? item.coordinationPolicy !== undefined : item.coordinationPolicy === undefined) return failure('invalid', 'Coordination policies are required for fleet instances and are not individual enrollment fields');
+    if (item.coordinationPolicy) { const valid = validateCoordinationPolicy(item.coordinationPolicy); if (!valid.ok) return valid; }
+  }
   return success(roster);
 }

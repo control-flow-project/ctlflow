@@ -94,7 +94,7 @@ or missing files are created. Current normalized tables are queried through
 Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
 
 ```json
-{"schemaVersion":9,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0}}
+{"schemaVersion":10,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0}}
 ```
 
 The schema version and table counts are optional exact expectations. `--schema`
@@ -106,7 +106,7 @@ canonical schema as the selected snapshots.
 principals, members, agents/credentials/names, policy, permission/role relations,
 selected wake senders, room grants/permissions, invitations, owner/management
 conversations, wake rules/assignments, fleets/instances/controller metadata/
-credentials and existing audit events. Credential refresh timestamps and wake
+credentials, requested/approved fleet coordination policies and existing audit events. Credential refresh timestamps and wake
 assignment deadlines are intentionally not immutable fields. Existing protected
 rows must still exist unchanged; additions are allowed. Volatile listener,
 session, reconciliation, delivery, observation, decision and incident rows are
@@ -148,17 +148,24 @@ container restart, extraction, privileged command or package installation occurs
 ## Enrollment review
 
 ```json
-{"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","requestedName":"helper"}]}
+{"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","requestedName":"helper","coordinationPolicy":{"wakeMode":"owner-agents","senderMatrixIds":[],"permissions":["room.agent.invite"]}}]}
 ```
 
-Individual enrollment uses `null` for both fleet key and controller name. The
-complete pending roster, exact owner, controller and code must match; failed
+Individual enrollment uses `null` for fleet key, controller name and each item's
+`coordinationPolicy`. Fleet plans specify each exact requested policy, including
+selected Matrix IDs and permission codes. The complete pending roster, policy,
+exact owner, controller and code must match; failed
 items or nonpending requests are refused. Without `--execute`, this is review
 only. With it, the tool invokes the existing revision-checked approval REST
-operation as the owner/administrator. It neither claims credentials nor starts
+operation only as the intended owner. An administrator cannot approve another
+owner's enrollment. It neither claims credentials nor starts
 listeners, creates rooms or bypasses native/user permissions.
 
 ## Fleet wake configuration
+
+This command is an explicit human adjustment, not a fleet setup requirement.
+Role `coordination_options` applies reviewed defaults during enrollment; use the
+management editor or this tool only when intentionally adjusting current policies.
 
 The plan specifies every enrolled instance in the fleet, not a subset:
 

@@ -7,7 +7,7 @@ import { openStore } from '@crossfire/adapter-sqlite/open-store';
 import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
 
-function previousDatabase(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 1) {
+function previousDatabase(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 = 1) {
   mkdirSync('.temp', { recursive: true });
   const file = join(mkdtempSync(join(process.cwd(), '.temp/policy-migration-')), 'management.sqlite');
   const database = openStore(file), repositories = createRepositories(database);
@@ -19,7 +19,8 @@ function previousDatabase(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 = 1) {
   database.exec("INSERT INTO member_invitation(id, created_by_member_id, claim_hash, role_code, principal_kind, created_at, expires_at) VALUES('invitation', 'owner', 'private-hash', 'member', 'human', 12, 600);");
   database.exec("INSERT INTO audit_event(id, request_id, actor_kind, actor_principal_id, owner_id, target_kind, target_id, action, outcome, message, created_at) VALUES('audit', 'request', 'human', 'owner', 'owner', 'member', 'owner', 'member.change', 'accepted', '', 12);");
   const before = { principal: database.prepare('SELECT * FROM principal').all(), invitation: database.prepare('SELECT * FROM member_invitation').all(), audit: database.prepare('SELECT * FROM audit_event').all() };
-  database.exec('DROP TABLE listener_stat_flow; DROP TABLE listener_stat_usage; DROP TABLE listener_stat_interval; DROP TABLE listener_stat_checkpoint; DROP TABLE runtime_usage_checkpoint; ALTER TABLE instance_policy DROP COLUMN max_message_bytes;');
+  database.exec('DROP TABLE fleet_instance_permission; DROP TABLE fleet_instance_policy; DROP TABLE enrollment_item_wake_sender; DROP TABLE enrollment_item_permission; DROP TABLE enrollment_item_policy;');
+  if (version < 9) database.exec('DROP TABLE listener_stat_flow; DROP TABLE listener_stat_usage; DROP TABLE listener_stat_interval; DROP TABLE listener_stat_checkpoint; DROP TABLE runtime_usage_checkpoint; ALTER TABLE instance_policy DROP COLUMN max_message_bytes;');
   if (version < 8) {
   database.exec('DROP TRIGGER protect_management_conversation_grant_insert; DROP TRIGGER protect_management_conversation_grant_update; DROP TRIGGER protect_management_conversation_permission_insert; DROP TRIGGER protect_management_conversation_permission_update; DROP TRIGGER protect_management_conversation_owner_insert; DROP TRIGGER protect_management_conversation_owner_update;');
   database.exec('DROP TABLE runtime_setting; DROP TABLE runtime_observation; DROP TABLE runtime_decision_answer; DROP TABLE runtime_decision_option; DROP TABLE runtime_decision_question; DROP TABLE runtime_decision; DROP TABLE incident_notification; DROP TABLE runtime_incident; DROP TABLE management_conversation; DROP INDEX ux_listener_run_agent_binding; DROP INDEX ix_listener_run_agent_started;');
@@ -46,7 +47,7 @@ test('statistics migration preserves every version eight row and configures the 
   const rows = new Map(tables.map(table => [table, previous.prepare('SELECT * FROM ' + table).all()])); previous.close();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 9);
+    assert.equal(database.pragma('user_version', { simple: true }), 10);
     for (const table of tables) preservedRows(database, table, rows.get(table));
     assert.deepEqual(database.pragma('foreign_key_check'), []); assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
     assert.equal(value(createRepositories(database).instancePolicy.find({ id: 'instance' }))!.maxMessageBytes, 65536);
@@ -70,7 +71,7 @@ test('policy forward migration preserves identities, invitation claims, audit an
   const { file, before } = previousDatabase();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 9);
+    assert.equal(database.pragma('user_version', { simple: true }), 10);
     assert.deepEqual(database.prepare('SELECT * FROM principal').all(), before.principal);
     assert.deepEqual(database.prepare('SELECT * FROM member_invitation').all(), before.invitation);
     assert.deepEqual(database.prepare('SELECT * FROM audit_event').all(), before.audit);
@@ -95,7 +96,7 @@ test('owner conversation migration preserves version five data and only adds ref
   previous.close();
   const migrated = openStore(file);
   try {
-    assert.equal(migrated.pragma('user_version', { simple: true }), 9);
+    assert.equal(migrated.pragma('user_version', { simple: true }), 10);
     for (const table of tables) preservedRows(migrated, table, before.get(table));
     assert.deepEqual(migrated.prepare('SELECT * FROM agent_owner_conversation').all(), []);
     assert.deepEqual(migrated.prepare("SELECT role_code FROM role_permission WHERE permission_code='owner-conversation.ensure.self'").all(), [{ role_code: 'agent' }]);
@@ -123,7 +124,7 @@ test('fleet control forward migration preserves prior fleets and private control
   const credentials = old.prepare('SELECT * FROM fleet_credential').all(); old.close();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 9);
+    assert.equal(database.pragma('user_version', { simple: true }), 10);
     assert.deepEqual(database.prepare('SELECT * FROM fleet_credential').all(), credentials);
     const fleet = value(createRepositories(database).fleet.findById('fleet'))!;
     assert.equal(fleet.revision, 5); assert.equal(fleet.deliveryEnabled, true);
@@ -153,7 +154,7 @@ test('native invitation migration preserves managed grants, delegation, credenti
   old.close();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 9);
+    assert.equal(database.pragma('user_version', { simple: true }), 10);
     for (const table of tables) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), before.get(table));
     assert.deepEqual(database.prepare('SELECT * FROM agent_room_grant').all(), grants);
     assert.deepEqual(database.prepare("SELECT role_code FROM role_permission WHERE permission_code='room-invitation.accept.self'").all(), [{ role_code: 'agent' }]);
@@ -202,7 +203,7 @@ test('Wake-up schema migration preserves existing native access, controller auth
   const runs = old.prepare('SELECT *, 0 AS controller_bound FROM listener_run').all(); old.close();
   const database = openStore(file);
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), 9);
+    assert.equal(database.pragma('user_version', { simple: true }), 10);
     for (const table of tables) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), before.get(table));
     assert.deepEqual(database.prepare('SELECT * FROM listener_run').all(), runs);
     for (const table of ['wake_rule', 'wake_rule_agent', 'wake_delivery']) assert.deepEqual(database.prepare('SELECT * FROM ' + table).all(), []);
@@ -248,7 +249,7 @@ test('owner conversation exclusivity migration preserves every row and adds inde
   database.close();
   const migrated = openStore(file);
   try {
-    assert.equal(migrated.pragma('user_version', { simple: true }), 9);
+    assert.equal(migrated.pragma('user_version', { simple: true }), 10);
     for (const table of tables) preservedRows(migrated, table, before.get(table));
     assert.throws(() => migrated.exec("INSERT INTO agent_room_grant(agent_id,room_id,generation,authorizer_id,added_by_id,access_mode,muted,revision,access_revision,updated_at) VALUES('jo','!owner:test','other','owner','owner','reply',0,0,0,12)"), /Another agent cannot join/);
     assert.deepEqual(migrated.pragma('foreign_key_check'), []);
@@ -279,9 +280,9 @@ test('runtime forward migration preserves every version seven application row an
   database.close();
   const migrated = openStore(file);
   try {
-    assert.equal(migrated.pragma('user_version', { simple: true }), 9);
+    assert.equal(migrated.pragma('user_version', { simple: true }), 10);
     for (const table of tables) preservedRows(migrated, table, before.get(table));
-    assert.equal((migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'").get() as { count: number }).count, 48);
+    assert.equal((migrated.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%'").get() as { count: number }).count, 53);
     assert.deepEqual(migrated.pragma('foreign_key_check'), []);
     assert.equal(migrated.pragma('integrity_check', { simple: true }), 'ok');
   } finally { migrated.close(); }

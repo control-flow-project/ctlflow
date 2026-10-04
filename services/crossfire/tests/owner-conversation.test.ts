@@ -98,10 +98,36 @@ test('withdrawal during first owner DM verification never binds or re-invites th
   };
   assert.equal((await acceptRoomInvitation(services, agent.actor, agent.id, roomId, randomUUID())).ok, false);
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id })), null);
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId })), null);
   assert.equal(native.rooms.size, 1, 'No alternate approval conversation is created');
   assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
-  value(await reconcileRoomGrant(services, agent.id, roomId));
+  const reconciled = await reconcileRoomGrant(services, agent.id, roomId);
+  assert(!reconciled.ok); assert.equal(reconciled.error.code, 'missing');
   assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+});
+
+test('withdrawal after a private DM claim never acquires confirmed owner-conversation repair authority', async scope => {
+  const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
+  const agent = await fixture.agent(admin.actor, 'ada'), owner = admin.member.principal.matrixUserId;
+  const roomId = value(await native.createRoom(owner, 'Private matter')).roomId;
+  const membership = { matrixUserId: agent.matrixUserId, displayName: 'Ada', membership: 'invite' as const, creator: false as const, powerLevel: 0 };
+  native.rooms.get(roomId)!.members.set(agent.matrixUserId, membership);
+  native.invitations.set(roomId + ':' + agent.matrixUserId, { roomId, senderMatrixId: owner, eventId: '$owner-dm', direct: true });
+  const apply = services.matrix.setRoomAccess;
+  services.matrix.setRoomAccess = async (...input) => {
+    assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId, roomId);
+    native.invitations.delete(roomId + ':' + agent.matrixUserId);
+    native.rooms.get(roomId)!.members.set(agent.matrixUserId, { ...membership, membership: 'leave' });
+    return apply(...input);
+  };
+  assert.equal((await acceptRoomInvitation(services, agent.actor, agent.id, roomId, randomUUID())).ok, false);
+  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId }))!.lastSuccessAt, null);
+  value(await reconcileRoomGrant(services, agent.id, roomId));
+  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId }))!.lastSuccessAt, null);
+  value(await reconcilePrincipal(services, agent.id));
+  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId }))!.lastSuccessAt, null);
+  assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+  assert.equal(native.rooms.size, 1);
 });
 
 test('binding an existing private owner DM retires its discretionary invitation delegation atomically', async scope => {

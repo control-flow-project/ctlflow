@@ -1,3 +1,4 @@
+import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -18,7 +19,7 @@ import { createFleetChanges } from '../apps/server/src/http/fleet-changes.js';
 async function enroll(fixture: Awaited<ReturnType<typeof applicationFixture>>, owner = fixture.admin, name = 'team') {
   const { services } = fixture;
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId, fleetKey: name,
-    controller: { name: 'desktop' }, instances: [{ instanceKey: 'one', name: name + '-one' }, { instanceKey: 'two', name: name + '-two' }] };
+    controller: { name: 'desktop' }, instances: [{ instanceKey: 'one', name: name + '-one', coordinationPolicy: defaultCoordinationPolicy() }, { instanceKey: 'two', name: name + '-two', coordinationPolicy: defaultCoordinationPolicy() }] };
   const proposed = value(await introduceEnrollment(services, input));
   value(decideEnrollment(services, owner.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: proposed.request.verificationCode }, randomUUID()));
   for (const item of value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))) value(await reconcilePrincipal(services, item.agentId!));

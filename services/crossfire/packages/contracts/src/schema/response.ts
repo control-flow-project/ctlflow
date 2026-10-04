@@ -3,6 +3,7 @@ import { HUMAN_SIGNUP } from '../policy.js';
 import * as check from './validation.js';
 import type { Parsed } from './validation.js';
 import { fleetControl } from '../fleet-control.js';
+import { coordinationPolicy } from '../coordination-policy.js';
 export const principal = check.object({ principalId: check.identifier, matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent'),
   displayName: check.text(255), ownerId: check.identifier, ownerMatrixId: check.matrixUserId });
 export const principalIdentity = check.refine(check.object({ matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent', 'unknown'),
@@ -62,7 +63,7 @@ export const roomAuthority = check.refine(check.object({ matrixUserId: check.mat
 export const room = check.object({ roomId: check.roomId, name: check.text(255), topic: check.text(4096, 0), alias: check.nullable(check.text(255)),
   authority: check.nullable(roomAuthority) });
 export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, outcome: check.choice('claimed', 'existing', 'failed'),
-  agentId: check.nullable(check.identifier), failureCode: check.nullable(check.text(100)) });
+  agentId: check.nullable(check.identifier), failureCode: check.nullable(check.text(100)), coordinationPolicy: check.nullable(coordinationPolicy) });
 export const enrollment = check.object({ owner: principal, controllerName: check.nullable(check.text(100)), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.nullable(check.name),
   verificationCode: check.text(12, 12), status: check.choice('pending', 'approved', 'rejected', 'expired'), revision: check.integer(),
   createdAt: check.integer(), expiresAt: check.integer(), decidedByMemberId: check.nullable(check.identifier), decidedAt: check.nullable(check.integer()) });

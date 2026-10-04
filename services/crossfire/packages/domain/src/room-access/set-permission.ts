@@ -3,6 +3,7 @@ import type { Services, Actor } from '../port/services.js';
 import { authorizeAgent } from '../authorization/authorize.js';
 import { recordEvent } from '../audit/record-event.js';
 import { privateConversation } from '../owner-conversation/protect.js';
+import { assignRoomPermissions } from './assign-permissions.js';
 export function setRoomPermission(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'unitOfWork' | 'runtime'>,
   actor: Actor, input: { agentId: string; roomId: string; expectedRevision: number; expectedGeneration: string; permissions: string[] }, requestId: string) {
   return services.unitOfWork.run(() => {
@@ -14,21 +15,11 @@ export function setRoomPermission(services: Pick<Services, 'repositories' | 'dir
     if (conversation.value) return failure('forbidden', 'Owner DMs are private channels and cannot delegate invitations');
     if (target.value.principal.revision !== input.expectedRevision) return failure('conflict', 'Agent revision changed');
     if (target.value.principal.status !== 'active' || target.value.owner.status !== 'active') return failure('forbidden', 'Agent and owner must be active');
-    if (input.permissions.length > 1 || input.permissions.some(code => code !== 'room.agent.invite')) return failure('invalid', 'Unsupported room-scoped permission');
     const grant = services.repositories.agentRoomGrant.find({ agentId: input.agentId, roomId: input.roomId });
     if (!grant.ok) return grant;
     if (!grant.value || grant.value.accessMode === 'none' || grant.value.generation !== input.expectedGeneration) return failure('conflict', 'An active matching room grant is required');
-    const previous = services.collection.roomPermissions(input);
-    if (!previous.ok) return previous;
-    for (const permission of previous.value) {
-      const removed = services.repositories.agentRoomPermission.remove(permission);
-      if (!removed.ok) return removed;
-    }
-    for (const permissionCode of input.permissions) {
-      const added = services.repositories.agentRoomPermission.insert({ agentId: input.agentId, roomId: input.roomId,
-        generation: grant.value.generation, permissionCode, grantScope: 'agent_room', grantedByMemberId: actor.principalId, grantedAt: services.clock.now() });
-      if (!added.ok) return added;
-    }
+    const assigned = assignRoomPermissions(services, grant.value, input.permissions, actor.principalId);
+    if (!assigned.ok) return assigned;
     const revised = services.repositories.principal.update({ ...target.value.principal, revision: input.expectedRevision + 1 });
     if (!revised.ok) return revised;
     const changed = services.repositories.agentRoomGrant.update({ ...grant.value, revision: grant.value.revision + 1, updatedAt: services.clock.now() });

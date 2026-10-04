@@ -12,16 +12,21 @@ import { ownerConversationSchema } from './owner-conversation.js';
 import { ownerConversationGuards, ownerConversationExclusivityCheck } from './owner-conversation-guards.js';
 import { runtimeSchema } from './runtime.js';
 import { statisticsSchema } from './statistics.js';
+import { fleetPolicySchema } from './fleet-policy.js';
 export function createSchema(database: Database.Database): void {
   const application = database.pragma('application_id', { simple: true });
   const version = database.pragma('user_version', { simple: true });
-  if (application === 1129465426 && version === 9) return;
+  if (application === 1129465426 && version === 10) return;
+  if (application === 1129465426 && version === 9) {
+    database.transaction(() => { database.exec(fleetPolicySchema); database.pragma('user_version = 10'); }).immediate();
+    return;
+  }
   if (application === 1129465426 && version === 8) {
-    database.transaction(() => { database.exec("ALTER TABLE instance_policy ADD COLUMN max_message_bytes INTEGER NOT NULL DEFAULT 65536 CHECK(max_message_bytes BETWEEN 4096 AND 4194304);" + statisticsSchema); database.pragma('user_version = 9'); }).immediate();
+    database.transaction(() => { database.exec("ALTER TABLE instance_policy ADD COLUMN max_message_bytes INTEGER NOT NULL DEFAULT 65536 CHECK(max_message_bytes BETWEEN 4096 AND 4194304);" + statisticsSchema + fleetPolicySchema); database.pragma('user_version = 10'); }).immediate();
     return;
   }
   if (application === 1129465426 && version === 7) {
-    database.transaction(() => { database.exec("ALTER TABLE instance_policy ADD COLUMN max_message_bytes INTEGER NOT NULL DEFAULT 65536 CHECK(max_message_bytes BETWEEN 4096 AND 4194304);" + runtimeSchema + statisticsSchema); seedReferenceData(database); database.pragma('user_version = 9'); }).immediate();
+    database.transaction(() => { database.exec("ALTER TABLE instance_policy ADD COLUMN max_message_bytes INTEGER NOT NULL DEFAULT 65536 CHECK(max_message_bytes BETWEEN 4096 AND 4194304);" + runtimeSchema + statisticsSchema + fleetPolicySchema); seedReferenceData(database); database.pragma('user_version = 10'); }).immediate();
     return;
   }
   if (application === 1129465426 && (version === 1 || version === 2 || version === 3 || version === 4 || version === 5 || version === 6)) {
@@ -45,18 +50,18 @@ export function createSchema(database: Database.Database): void {
       }
       seedReferenceData(database);
       database.exec("ALTER TABLE instance_policy ADD COLUMN max_message_bytes INTEGER NOT NULL DEFAULT 65536 CHECK(max_message_bytes BETWEEN 4096 AND 4194304);");
-      database.exec(runtimeSchema + statisticsSchema);
-      database.pragma('user_version = 9');
+      database.exec(runtimeSchema + statisticsSchema + fleetPolicySchema);
+      database.pragma('user_version = 10');
     }).immediate();
     return;
   }
   const existing = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
   if (existing.length || application !== 0 || version !== 0) throw new Error('This database does not contain the current Crossfire schema; initialize a fresh development database');
   database.transaction(() => {
-    database.exec(identitySchema + authorizationSchema + enrollmentSchema + roomAccessSchema + activitySchema + auditSchema + fleetControlSchema + wakeUpSchema + ownerConversationSchema + runtimeSchema + statisticsSchema);
+    database.exec(identitySchema + authorizationSchema + enrollmentSchema + roomAccessSchema + activitySchema + auditSchema + fleetControlSchema + wakeUpSchema + ownerConversationSchema + runtimeSchema + statisticsSchema + fleetPolicySchema);
     seedReferenceData(database);
     database.exec('CREATE INDEX ix_member_invitation_creator_created ON member_invitation(created_by_member_id, created_at DESC, id)');
     database.pragma('application_id = 1129465426');
-    database.pragma('user_version = 9');
+    database.pragma('user_version = 10');
   }).immediate();
 }

@@ -19,6 +19,8 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
   const conversation = services.repositories.ownerConversation.find({ agentId });
   if (!conversation.ok) return conversation;
   const ownerDirect = conversation.value?.roomId === roomId;
+  const repairOwnerDirect = ownerDirect && previous.observedGeneration === grant.generation
+    && previous.appliedAccessRevision === grant.accessRevision && previous.lastSuccessAt !== null;
   const authorizer = services.repositories.principal.find({ id: grant.authorizerId });
   if (!authorizer.ok) return authorizer;
   let observed: RoomMembership | null = null;
@@ -51,7 +53,7 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
   }
   async function apply(): Promise<Result<void>> {
     if (grant.accessMode === 'none' || agent.principal.status !== 'active' || agent.owner.status !== 'active') return remove();
-    if (ownerDirect) {
+    if (repairOwnerDirect) {
       const verified = await services.matrix.ownerConversation(agent.owner.matrixUserId, agent.principal.matrixUserId, roomId);
       if (!verified.ok) return verified;
       if (verified.value !== roomId) return failure('conflict', 'The owner DM changed during reconciliation');
@@ -79,7 +81,7 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
     const native = await services.matrix.membership(authorizer.value.matrixUserId, agent.principal.matrixUserId, roomId);
     if (!native.ok) return native;
     observed = native.value;
-    const command = ownerDirect || previous.observedGeneration !== grant.generation || previous.appliedAccessRevision !== grant.accessRevision;
+    const command = repairOwnerDirect || previous.observedGeneration !== grant.generation || previous.appliedAccessRevision !== grant.accessRevision;
     if (!command && native.value.membership !== 'join') { observed = native.value; return success(undefined); }
     const requested = requestedPower(facts.value, grant.accessMode === 'custom' && !facts.value.creator
       ? { ...grant, powerLevel: Math.min(grant.powerLevel!, facts.value.powerLevel) }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { EnrollmentView } from '@crossfire/contracts/schema/response';
+import { WAKE_LABELS } from '@crossfire/contracts/wake';
 import { call, operations, useResource, useAction } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Help, Loaded, Page, Panel, Pagination, PageItems, Status, timestamp } from './ui.js';
@@ -11,11 +12,14 @@ function Approval({ item }: { item: EnrollmentView }) {
     { expectedRevision: request.revision, decision, verificationCode: code }, viewer.csrfSecret);
   return <Panel title={request.fleetKey ? 'Fleet: ' + request.fleetKey : 'Agent enrollment'} description="Check this roster against the request in your terminal before approving.">
     <div className="enrollment-summary"><Status value={request.status}/><span>{request.controllerName ?? 'Project-local listener'}</span><span>Requested {timestamp(request.createdAt)}</span>{pending && <span>Approve by {timestamp(request.expiresAt)}</span>}</div>
-    <PageItems items={item.instances} parameter="rosterPage">{instances => <div className="table-wrap"><table aria-label="Enrollment roster"><thead><tr><th>Instance</th><th>Agent name</th><th>Outcome</th><th>Details</th></tr></thead><tbody>{instances.map(instance =>
-      <tr key={instance.instanceKey}><td>{instance.instanceKey}</td><td>{instance.requestedName}</td><td><Status value={instance.outcome}/></td><td>{instance.failureCode ?? ''}
+    <PageItems items={item.instances} parameter="rosterPage">{instances => <div className="table-wrap"><table aria-label="Enrollment roster" className={request.fleetKey ? 'coordination-roster' : undefined}><thead><tr><th>Instance</th><th>Agent name</th><th>Outcome</th>{request.fleetKey && <><th>Who can wake</th><th>Room coordination</th></>}<th>Details</th></tr></thead><tbody>{instances.map(instance =>
+      <tr key={instance.instanceKey}><td>{instance.instanceKey}</td><td>{instance.requestedName}</td><td><Status value={instance.outcome}/></td>{request.fleetKey && <><td><div className="wake-authority">{instance.coordinationPolicy ? WAKE_LABELS[instance.coordinationPolicy.wakeMode] : 'Policy missing'}
+        {instance.coordinationPolicy?.wakeMode === 'selected' && <Help title={instance.coordinationPolicy.senderMatrixIds.length + ' selected identities'}>{instance.coordinationPolicy.senderMatrixIds.length ? <ul>{instance.coordinationPolicy.senderMatrixIds.map(id => <li key={id} className="mono">{id}</li>)}</ul> : <p>No selected senders.</p>}</Help>}</div></td>
+        <td>{instance.coordinationPolicy?.permissions.includes('room.agent.invite') ? <>Invite agents<span className="subline">Remove only its own additions</span></> : 'No invitation permission'}</td></>}<td>{instance.failureCode ?? ''}
         {instance.agentId && <a href={'/manage/agents/' + instance.agentId}>Agent details →</a>}</td></tr>)}</tbody></table></div>}</PageItems>
     {pending && <form onSubmit={event => { event.preventDefault(); void action.run(() => decide('approve')); }}>
-      <p>Verify the exact roster and code printed by your project or fleet controller. New agents join no rooms. Your private DM opens on first use and keeps read/write access. Fleet approval authorizes its controller to manage this grouping, not shared-room access.</p>
+      <p>Verify the roster, settings and code printed by your project or fleet controller. New agents join no rooms. Your private DM opens on first use and keeps read/write access.</p>
+      {request.fleetKey && <p>Approval applies these wake settings and invitation defaults to existing room access and future admissions. It does not grant room membership or bypass Matrix permissions. Owner and management DMs never allow third-agent invitations.</p>}
       <label className="bounded-form">Verification code<input value={code} onChange={event => setCode(event.target.value.toUpperCase())} required minLength={12} maxLength={12} autoComplete="off" className="mono"/></label>
       <Alert>{action.error}</Alert><div className="actions"><button disabled={action.pending || request.ownerId !== viewer.member.memberId}>Approve roster</button>
         <button type="button" disabled={action.pending || code.length !== 12} onClick={() => { if (confirm('Reject this exact request?')) void action.run(() => decide('reject')); }}>Reject</button></div>

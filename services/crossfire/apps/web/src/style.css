@@ -156,6 +156,8 @@ input[type=radio]:disabled { opacity: .55; }
 @media (max-width: 700px) { .setup-step { display: block; } .setup-picture { width: 100px; margin: 0 0 12px; } .pagination-controls { gap: 5px; } }
 .pagination:empty { display: none; }
 .table-wrap { overflow-x: auto; min-width: 0; }
+.coordination-roster { min-width: 50rem; }
+.coordination-roster .wake-authority { min-width: 24rem; }
 .fleet-message-body { display: block; min-width: 12rem; max-width: 36rem; overflow-wrap: anywhere; white-space: pre-wrap; }
 .fleet-message-preview > summary { min-width: 12rem; max-width: 36rem; overflow-wrap: anywhere; }
 .fleet-message-preview[open] > p { margin-top: 16px; }

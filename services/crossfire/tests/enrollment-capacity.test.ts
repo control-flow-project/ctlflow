@@ -1,3 +1,4 @@
+import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -13,7 +14,7 @@ import { applicationFixture, secret, value } from './support/application.js';
 function introduction(ownerMatrixId: string, count: number, prefix: string) {
   return { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: 'team-' + prefix,
     controller: { name: prefix + '-controller' },
-    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: prefix + '-' + index, name: prefix + '-' + index })) };
+    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: prefix + '-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy() })) };
 }
 
 test('administrator default capacity is 100 while member owners retain the configured limit', async scope => {

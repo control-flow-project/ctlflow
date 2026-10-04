@@ -6,6 +6,7 @@ import type { AgentRoomGrant, AgentRoomPermission, RoomGrantApplication, AgentWa
 import type { MemberInvitation, MemberSession, ListenerRun, WakeNotice } from '../activity/types.js';
 import type { InstancePolicy, AuditEvent } from '../audit/types.js';
 import type { OwnerConversationRepository } from '../owner-conversation/types.js';
+import type { FleetPolicyRepository } from './fleet-policy.js';
 
 export type PrincipalKey = { id: string };
 export type PrincipalRepository = {
@@ -200,6 +201,7 @@ export type EnrollmentControllerMetadataRepository = {
 };
 
 export type Repositories = {
+  fleetPolicy: FleetPolicyRepository;
   ownerConversation: OwnerConversationRepository;
   wakeRule: WakeRuleRepository;
   wakeRuleAgent: WakeRuleAgentRepository;

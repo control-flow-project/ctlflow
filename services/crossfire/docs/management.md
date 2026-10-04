@@ -56,6 +56,14 @@ These operations still require applicable Matrix room authority. Membership does
 not itself confer delegation or change wake eligibility. Remove unneeded
 specialists to avoid unnecessary context and model calls.
 
+Fleets can declare wake rules and invitation defaults in each role's `agent.toml`.
+The owner reviews these settings with enrollment, including changes for existing
+agents. Approval applies them to current ordinary grants and future admissions;
+it never grants room membership or bypasses native permissions. Unchanged restarts
+preserve room-specific manual adjustments. Owner and management DMs never receive
+third-agent delegation.
+- [Fleet coordination configuration and lifecycle](../../fleetd/docs/coordination.md)
+
 ## Chat wake authority
 
 Owner-only is the default. Alternatives are Nobody, owner plus owner's agents,

@@ -7,10 +7,11 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
   enrollmentId: string, claimSecret: string): Result<{ status: string; ownerMatrixId: string; fleet: { fleetId: string; controllerCredential: string | null } | null; instances: ExchangedInstance[] }> {
   const request = services.repositories.enrollmentRequest.find({ id: enrollmentId });
   if (!request.ok) return request;
-  if (!request.value || request.value.expiresAt <= services.clock.now() || !services.identity.matches(claimSecret, request.value.claimHash)) return failure('unauthorized', 'Invalid or expired enrollment claim');
+  if (!request.value || !services.identity.matches(claimSecret, request.value.claimHash)) return failure('unauthorized', 'Invalid enrollment claim');
   const owner = services.repositories.principal.find({ id: request.value.ownerId });
   if (!owner.ok) return owner;
   if (!owner.value || owner.value.status !== 'active') return failure('forbidden', 'Owner access is no longer active');
+  if (request.value.expiresAt <= services.clock.now()) return success({ status: 'expired', ownerMatrixId: owner.value.matrixUserId, fleet: null, instances: [] });
   if (request.value.status !== 'approved') return success({ status: request.value.status, ownerMatrixId: owner.value.matrixUserId, fleet: null, instances: [] });
   const items = services.collection.enrollmentItems({ requestId: enrollmentId });
   if (!items.ok) return items;

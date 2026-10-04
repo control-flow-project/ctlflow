@@ -6,7 +6,8 @@ export type FleetMessageResult = { messageId: string; body: string; createdAt: n
 export type Controller = { name: string; metadata?: Record<string, string> };
 export type Instance = { key: string; name: string; definition: string; workarea: string; listener_options?: import('@crossfire/contracts/runtime').ListenerOptions };
 export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string }; instances: Instance[] };
-export type Definition = { name: string; runtime: string; options: Record<string, unknown>; instructions: string };
+export type Definition = { name: string; runtime: string; options: Record<string, unknown>; instructions: string;
+  coordinationPolicy: import('@crossfire/contracts/coordination-policy').CoordinationPolicy };
 export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
 export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'stopping' | 'failed';

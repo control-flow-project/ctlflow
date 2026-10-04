@@ -163,3 +163,52 @@ test('sender identity batches seek exact Matrix indexes across large human and a
   }
   assert.deepEqual(database.pragma('foreign_key_check'), []);
 });
+
+test('fleet enrollment review hydrates the entire roster and selected identities in three indexed queries', scope => {
+  let statements: string[] = [];
+  const database = new Database(':memory:', { verbose(statement) {
+    if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
+  } });
+  cleanup(scope, () => database.close());
+  database.pragma('foreign_keys = ON');
+  createSchema(database);
+  const repositories = createRepositories(database);
+  database.transaction(() => {
+    value(repositories.principal.insert({ id: 'owner', matrixUserId: '@owner:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+    value(repositories.member.insert({ principalId: 'owner', principalKind: 'human', displayName: 'Owner' }));
+    for (let index = 0; index < 100; index++) value(repositories.principal.insert({ id: 'sender-' + index,
+      matrixUserId: '@sender-' + index + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+    for (const [requestId, count] of [['one', 1], ['twenty', 20], ['hundred', 100], ['other', 100]] as const) {
+      value(repositories.enrollmentRequest.insert({ id: requestId, ownerId: 'owner', fleetKey: requestId, controllerName: 'Computer',
+        controllerCredentialHash: 'hash', verificationCode: requestId, claimHash: 'hash', rosterDigest: 'digest', status: 'pending',
+        revision: 0, createdAt: 1, expiresAt: 100, decidedByMemberId: null, decidedAt: null }));
+      for (let index = 0; index < count; index++) {
+        const instanceKey = 'agent-' + String(index).padStart(3, '0');
+        value(repositories.enrollmentItem.insert({ requestId, instanceKey, requestedName: requestId + '-' + instanceKey,
+          agentId: null, outcome: 'claimed', failureCode: null }));
+        value(repositories.fleetPolicy.insertRequested({ requestId, instanceKey }, { wakeMode: 'selected', expectedAgentRevision: null,
+          permissions: ['room.agent.invite'], senderIds: Array.from({ length: 100 }, (_, senderIndex) => 'sender-' + senderIndex) }));
+      }
+    }
+  })();
+  database.exec('ANALYZE');
+  for (const [requestId, count] of [['one', 1], ['twenty', 20], ['hundred', 100]] as const) {
+    statements = [];
+    const policies = value(repositories.fleetPolicy.requested(requestId));
+    assert.equal(policies.length, count);
+    assert(policies.every(policy => policy.senderIds.length === 100 && policy.senderMatrixIds.length === 100
+      && policy.senderMatrixIds.every(matrixId => matrixId.startsWith('@sender-'))
+      && policy.permissions.length === 1 && policy.permissions[0] === 'room.agent.invite'));
+    assert.equal(statements.length, 3, 'Policy, permission and selected-sender queries are roster-wide');
+    for (const statement of statements) {
+      const plan = (database.prepare('EXPLAIN QUERY PLAN ' + statement).all() as { detail: string }[]).map(row => row.detail).join('\n');
+      assert.match(plan, /SEARCH .*request_id=/u);
+      assert(!plan.includes('SCAN '), 'Fleet policy hydration must seek request indexes, not scan policy or principal tables');
+    }
+    scope.diagnostic(JSON.stringify({ requestId, instances: count, sendersPerInstance: 100, statements: statements.length }));
+  }
+  statements = [];
+  assert.deepEqual(value(repositories.fleetPolicy.requested('missing')), []);
+  assert.equal(statements.length, 1);
+  assert.deepEqual(database.pragma('foreign_key_check'), []);
+});

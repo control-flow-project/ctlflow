@@ -2,21 +2,24 @@ import * as check from '@crossfire/contracts/schema/validation';
 import { operations } from '@crossfire/contracts/rest/operations';
 import { failure, success } from '@crossfire/kernel/result';
 import { withHuman, type Credentials } from './auth.js';
+import { coordinationPolicy } from '@crossfire/contracts/coordination-policy';
 
 export const enrollmentPlan = check.object({ enrollmentId: check.identifier, ownerMatrixId: check.matrixUserId,
   verificationCode: check.text(12, 12), fleetKey: check.nullable(check.name), controllerName: check.nullable(check.text(100)),
-  instances: check.list(check.object({ instanceKey: check.name, requestedName: check.name }), 100, 1) });
+  instances: check.list(check.object({ instanceKey: check.name, requestedName: check.name, coordinationPolicy: check.nullable(coordinationPolicy) }), 100, 1) });
 
 export async function reviewEnrollment(origin: string, account: Credentials, plan: check.Parsed<typeof enrollmentPlan>, execute: boolean, signal: AbortSignal) {
   return withHuman(origin, account, signal, async human => {
     const current = await human.client.call(operations.enrollment, { enrollmentId: plan.enrollmentId }, {});
     if (!current.ok) return current;
     const review = current.value.data, record = review.enrollment;
-    const roster = (instances: typeof plan.instances) => JSON.stringify(instances.map(item => [item.instanceKey, item.requestedName]).sort());
+    const roster = (instances: typeof plan.instances) => JSON.stringify(instances.map(item => [item.instanceKey, item.requestedName,
+      item.coordinationPolicy ? { wakeMode: item.coordinationPolicy.wakeMode, senderMatrixIds: [...item.coordinationPolicy.senderMatrixIds].sort(),
+        permissions: [...item.coordinationPolicy.permissions].sort() } : null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))));
     if (record.status !== 'pending' || record.owner.matrixUserId !== plan.ownerMatrixId || record.fleetKey !== plan.fleetKey
       || record.controllerName !== plan.controllerName || record.verificationCode !== plan.verificationCode
-      || roster(review.instances) !== roster(plan.instances) || review.instances.some(item => item.outcome === 'failed')) return failure('conflict', 'Enrollment differs from the exact supplied owner/controller/roster/code; no approval sent');
-    if (human.viewer.member.matrixUserId !== plan.ownerMatrixId && human.viewer.member.roleCode !== 'administrator') return failure('forbidden', 'Only the owner or administrator may approve this enrollment');
+      || roster(review.instances) !== roster(plan.instances) || review.instances.some(item => item.outcome === 'failed')) return failure('conflict', 'Enrollment differs from the supplied owner, controller, roster, coordination policies or code; no approval sent');
+    if (human.viewer.member.matrixUserId !== plan.ownerMatrixId) return failure('forbidden', 'Only the intended owner may approve this enrollment');
     if (execute) {
       const decision = await human.client.call(operations.decideEnrollment, { enrollmentId: plan.enrollmentId }, {
         expectedRevision: record.revision, decision: 'approve', verificationCode: plan.verificationCode,

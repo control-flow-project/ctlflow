@@ -13,12 +13,20 @@ export async function prepareEnrollment(configuration: Configuration, controller
   if (binding.server !== roster.coordination.server || binding.owner !== roster.coordination.owner || binding.fleetKey !== roster.fleet) return failure('conflict', 'Fleet connection differs from its saved identity; it cannot be silently replaced');
   const instances = roster.instances.map(instance => {
     const existing = binding.identities.find(item => item.instanceKey === instance.key);
-    return { instanceKey: instance.key, name: instance.name, ...(existing ? { identity: { agentId: existing.agentId, accessToken: existing.account.access_token } } : {}) };
+    return { instanceKey: instance.key, name: instance.name, coordinationPolicy: configuration.definitions[instance.definition]!.coordinationPolicy,
+      ...(existing ? { identity: { agentId: existing.agentId, accessToken: existing.account.access_token } } : {}) };
   });
   if (roster.instances.some(instance => binding.identities.some(identity => identity.instanceKey === instance.key && identity.name !== instance.name))) return failure('conflict', 'An enrolled instance name is immutable');
   const client = createClient({ origin: binding.server, signal });
   const input = { ownerMatrixId: binding.owner, fleetKey: binding.fleetKey, controller, instances, ...(binding.controllerCredential ? { controllerCredential: binding.controllerCredential } : {}) };
   const digest = createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  if (binding.request?.digest === digest) {
+    const resumed = await client.call(operations.exchangeEnrollment, { enrollmentId: binding.request.enrollmentId }, { claimSecret: binding.request.claimSecret });
+    if (!resumed.ok) return resumed;
+    if (resumed.value.data.status === 'rejected' || resumed.value.data.status === 'expired') {
+      binding.request = null; saveBinding(configuration.directory, binding);
+    }
+  }
   if (!binding.request || binding.request.digest !== digest) {
     const checked = await client.call(operations.preflight, {}, input);
     if (!checked.ok) return checked;
@@ -34,7 +42,10 @@ export async function prepareEnrollment(configuration: Configuration, controller
     const result = await client.call(operations.exchangeEnrollment, { enrollmentId: binding.request.enrollmentId }, { claimSecret: binding.request.claimSecret });
     if (!result.ok) return result;
     const exchanged = result.value.data;
-    if (exchanged.status === 'rejected' || exchanged.status === 'expired') return failure('forbidden', 'Fleet enrollment is ' + exchanged.status);
+    if (exchanged.status === 'rejected' || exchanged.status === 'expired') {
+      binding.request = null; saveBinding(configuration.directory, binding);
+      return failure('forbidden', 'Fleet enrollment is ' + exchanged.status + '; start again to request a new owner review');
+    }
     if (exchanged.status === 'pending' && !waiting) {
       waiting = true; approval({ url: introduced.value.data.approvalUrl, code: introduced.value.data.enrollment.enrollment.verificationCode });
     }

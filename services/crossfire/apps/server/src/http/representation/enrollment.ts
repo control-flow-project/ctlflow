@@ -1,4 +1,4 @@
-import type { EnrollmentItem } from '@crossfire/domain/enrollment/types';
+import type { EnrollmentItemView } from '@crossfire/domain/enrollment/item-view';
 import type { EnrollmentOverview } from '@crossfire/domain/enrollment/overview';
 import type { EnrollmentReceipt } from '@crossfire/domain/enrollment/introduce';
 import type { FleetDetails } from '@crossfire/domain/fleet/read-fleet';
@@ -7,8 +7,9 @@ export function enrollment({ request: value, owner }: EnrollmentOverview) {
   return { owner, controllerName: value.controllerName, enrollmentId: value.id, ownerId: value.ownerId, fleetKey: value.fleetKey, verificationCode: value.verificationCode, status: value.status,
     revision: value.revision, createdAt: value.createdAt, expiresAt: value.expiresAt, decidedByMemberId: value.decidedByMemberId, decidedAt: value.decidedAt };
 }
-export function enrollmentItem(value: EnrollmentItem) {
-  return { instanceKey: value.instanceKey, requestedName: value.requestedName, outcome: value.outcome, agentId: value.agentId, failureCode: value.failureCode };
+export function enrollmentItem(value: EnrollmentItemView) {
+  return { instanceKey: value.instanceKey, requestedName: value.requestedName, outcome: value.outcome, agentId: value.agentId,
+    failureCode: value.failureCode, coordinationPolicy: value.coordinationPolicy };
 }
 export function enrollmentDetails(value: EnrollmentReceipt) {
   return { enrollment: enrollment(value), instances: value.instances.map(enrollmentItem) };

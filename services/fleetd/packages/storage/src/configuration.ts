@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { parseToml, validateRoster, definition } from '@fleetd/contracts/configuration';
 import type { Configuration, Definition } from '@fleetd/domain/model';
 import { failure, success, type Result } from '@crossfire/kernel/result';
+import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
 
 export function readText(file: string, maximum = 1024 * 1024): string {
   const path = resolve(file);
@@ -32,7 +33,9 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
         const role = parseToml(text, definition);
         if (!role.ok) return role;
         const instructions = readText(join(root, 'AGENTS.md'), 128 * 1024);
-        definitions[item.definition] = { name: role.value.name, runtime: role.value.runtime, options: role.value.runtime_options, instructions };
+        const policy = role.value.coordination_options;
+        definitions[item.definition] = { name: role.value.name, runtime: role.value.runtime, options: role.value.runtime_options, instructions,
+          coordinationPolicy: policy ? { wakeMode: policy.wake_mode, senderMatrixIds: policy.sender_matrix_ids ?? [], permissions: policy.permissions } : defaultCoordinationPolicy() };
         hash.update(item.definition).update(text).update(instructions);
       }
       const segments = item.workarea.split('/');

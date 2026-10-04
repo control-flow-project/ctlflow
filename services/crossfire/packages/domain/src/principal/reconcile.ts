@@ -2,7 +2,7 @@ import { failure, success, type Result } from '@crossfire/kernel/result';
 import type { Services } from '../port/services.js';
 import type { Principal } from '../identity/types.js';
 import { agentDisplayName } from '../identity/display-name.js';
-import { ensureOwnerConversation } from '../owner-conversation/ensure.js';
+import { reconcileRoomGrant } from '../room-access/reconcile-grant.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'identity' | 'clock' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
 export async function reconcilePrincipal(services: Dependencies, principalId: string): Promise<Result<void>> {
@@ -17,8 +17,7 @@ export async function reconcilePrincipal(services: Dependencies, principalId: st
   const bound = services.repositories.ownerConversation.find({ agentId: principalId });
   if (!bound.ok) return bound;
   if (!bound.value) return applied;
-  const conversation = await ensureOwnerConversation(services, principalId);
-  return conversation.ok ? success(undefined) : conversation;
+  return reconcileRoomGrant(services, principalId, bound.value.roomId);
 }
 
 async function applyPrincipal(services: Dependencies, principalId: string): Promise<Result<void>> {

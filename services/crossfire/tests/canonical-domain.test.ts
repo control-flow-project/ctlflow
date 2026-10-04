@@ -1,3 +1,4 @@
+import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -26,7 +27,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   const { services, admin } = fixture;
   const other = await fixture.member('other');
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
-    fleetKey: 'research', controller: { name: 'desktop', metadata: { zone: 'local' } }, instances: [{ instanceKey: 'first', name: 'first' }, { instanceKey: 'second', name: 'second' }] };
+    fleetKey: 'research', controller: { name: 'desktop', metadata: { zone: 'local' } }, instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy() }, { instanceKey: 'second', name: 'second', coordinationPolicy: defaultCoordinationPolicy() }] };
   value(await preflightEnrollment(services, input));
   const introduced = value(await introduceEnrollment(services, input));
   assert.deepEqual(value(await introduceEnrollment(services, input)), introduced);
@@ -34,7 +35,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   assert.equal(value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: 'research' })), null, 'An anonymous roster does not reserve a fleet');
   assert.equal((await preflightEnrollment(services, { ...input, ownerMatrixId: other.member.principal.matrixUserId })).ok, false);
   const late = value(await introduceEnrollment(services, { ...input, enrollmentId: randomUUID(), claimSecret: secret(),
-    instances: [{ instanceKey: 'first', name: 'first' }, { instanceKey: 'third', name: 'third' }] }));
+    instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy() }, { instanceKey: 'third', name: 'third', coordinationPolicy: defaultCoordinationPolicy() }] }));
   assert.equal(late.instances[0]?.failureCode, 'name_collision');
   assert.equal(late.instances[1]?.outcome, 'claimed');
   assert.equal(decideEnrollment(services, other.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()).ok, false);
@@ -45,7 +46,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   assert.equal(ready.status, 'ready');
   assert.equal(exchangeEnrollment(services, input.enrollmentId, secret()).ok, false);
   const restored = { ...input, controllerCredential: ready.fleet!.controllerCredential!, enrollmentId: randomUUID(), claimSecret: secret(),
-    instances: ready.instances.map(item => ({ instanceKey: item.instanceKey, name: item.name, identity: { agentId: item.agentId!, accessToken: item.account!.accessToken } })) };
+    instances: ready.instances.map(item => ({ instanceKey: item.instanceKey, name: item.name, coordinationPolicy: defaultCoordinationPolicy(), identity: { agentId: item.agentId!, accessToken: item.account!.accessToken } })) };
   value(await preflightEnrollment(services, restored));
   assert.equal(value(await introduceEnrollment(services, restored)).request.status, 'approved');
   assert.equal(value(services.directory.activeAgentCount()), 2);
