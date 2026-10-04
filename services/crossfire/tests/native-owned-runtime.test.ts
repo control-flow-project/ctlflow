@@ -20,9 +20,10 @@ test('stock Codex default and native bypass execute synchronous subprocess IPC a
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
   const provider = await nativeProvider(scope, home), adapter = codexRuntime(), stop = new AbortController();
   trustWorkspace(home, workspace);
-  const input = { name: 'native-options', workspace, instructions: 'Inert native option proof.',
+  const input = { name: 'native-options', workspace, instructions: 'Inert native option proof.', allowNewHistory: true,
     options: {} as Record<string, unknown>, hooks: { requestDecision: async () => { throw new Error('Unexpected fixture approval'); } } };
   let runtime = value(await adapter.start(input, stop.signal));
+  input.allowNewHistory = false;
   cleanup(scope, () => runtime.close());
   const sessionId = runtime.sessionId;
   assert.equal(runtime.approval, 'listener');
@@ -63,10 +64,11 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   const instructions = readFileSync(join(builtRelease().directory, 'SKILL.md'), 'utf8');
   assert(instructions.includes('Machine-specific diagnostics belong only in your verified private owner DM.'));
   assert(instructions.includes('Credentials and secret answers remain protected everywhere.'));
-  const input = { name: 'native-proof', workspace, instructions: instructions + '\nInert native verification. Never contact external services.',
+  const input = { name: 'native-proof', workspace, instructions: instructions + '\nInert native verification. Never contact external services.', allowNewHistory: true,
     options: { model: 'gpt-6.1-sol', model_reasoning_effort: 'max', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No approvals are expected'); } } };
   let runtime = value(await adapter.start(input, stop.signal));
+  input.allowNewHistory = false;
   cleanup(scope, () => runtime.close());
   assert.equal(provider.requests.length, 0);
   const sessionId = runtime.sessionId;

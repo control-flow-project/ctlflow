@@ -108,9 +108,12 @@ Codex retains its existing policy. Fleet policy is configurable:
 ## Fleets
 
 Fleet pages group ordinary agents, controller information and delivery outcomes.
-The landing tab lists agents; other tabs separate map, control, room plan and
-messages and statistics. The map shows room participation and wake sources, not execution
+The landing tab lists agents; other tabs separate map, delivery, sessions, room plan,
+messages and statistics. Sessions offers history-preserving resume and stop plus
+explicit confirmed fresh history, for the fleet or an individual fleet-managed
+agent. The map shows room participation and wake sources, not execution
 ownership or inferred model activity. Room plans use pre-existing stable room IDs.
 Fleet-wide explicit messages are delivered through controller receipts and do not
 grant room access or spawn unavailable agents.
+- [Session controls and history boundaries](../../fleet/docs/sessions.md)
 - [Traffic, sender-to-recipient flows and optional native usage](statistics.md)

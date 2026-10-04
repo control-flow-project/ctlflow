@@ -6,11 +6,24 @@ import * as query from '../schema/query.js';
 import * as plan from '../schema/plan.js';
 import { manifest } from '../release.js';
 import * as fleetControl from '../fleet-control.js';
+import * as fleetRuntime from '../fleet-runtime.js';
 import { fleetMap } from '../schema/fleet-map.js';
 import * as wake from '../wake-up.js';
 import * as runtime from '../runtime.js';
 import { statisticsQuery, fleetStatistics } from '../statistics.js';
 export const operations = {
+  fleetRuntimeOperations: operation({ method: 'GET', path: '/api/fleets/{fleetId}/session-operations', auth: 'either',
+    params: check.object({ fleetId: check.identifier }), query: query.page, input: check.empty, output: check.list(fleetRuntime.runtimeOperation, 100),
+    status: 200, collection: true, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Native session operation outcomes' }),
+  requestFleetRuntime: operation({ method: 'POST', path: '/api/fleets/{fleetId}/session-operations', auth: 'human',
+    params: check.object({ fleetId: check.identifier }), query: query.none, input: fleetRuntime.runtimeRequest, output: fleetRuntime.runtimeOperation,
+    status: 202, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Request stop, resume or confirmed fresh history through the controller' }),
+  claimFleetRuntime: operation({ method: 'PUT', path: '/api/fleets/{fleetId}/session-operations/{operationId}/claim', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier, operationId: check.identifier }), query: query.none, input: fleetRuntime.runtimeClaim, output: fleetRuntime.runtimeOperation,
+    status: 200, collection: false, permissions: [], description: 'Claim an authorized session operation on the live controller generation' }),
+  receiptFleetRuntime: operation({ method: 'PUT', path: '/api/fleets/{fleetId}/session-operations/{operationId}/receipt', auth: 'fleet',
+    params: check.object({ fleetId: check.identifier, operationId: check.identifier }), query: query.none, input: fleetRuntime.runtimeReceipt, output: fleetRuntime.runtimeOperation,
+    status: 200, collection: false, permissions: [], description: 'Record the actual native session outcome' }),
   runtimeObservations: operation({ method: 'GET', path: '/api/agents/{agentId}/runtime-observations', auth: 'either',
     params: check.object({ agentId: check.identifier }), query: query.none, input: check.empty, output: runtime.observations,
     status: 200, collection: false, permissions: ['agent.read.self', 'agent.read.owned', 'agent.read.any'], description: 'Public configured and effective native runtime settings' }),

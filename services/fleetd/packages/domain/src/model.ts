@@ -18,4 +18,5 @@ export type Target = { kind: 'fleet' | 'agent' | 'daemon'; fleetId?: string; ins
 export type OperationInput = { operationId: string; target: Target; action: 'start' | 'stop' | 'reset'; expectedRevision: number };
 export type Approval = { url: string; code: string };
 export type Operation = OperationInput & { status: 'accepted' | 'running' | 'awaiting-approval' | 'succeeded' | 'failed'; createdAt: number; completedAt: number | null;
+  receiptPending?: true;
   approval: Approval | null; errors: { instanceKey: string | null; code: string; message: string }[] };

@@ -2,6 +2,7 @@ import { authenticateController } from '@crossfire/domain/fleet/authority';
 import { createServer, type IncomingMessage } from 'node:http';
 import { failure, success, type Result } from '@crossfire/kernel/result';
 import { HTTP_LIMITS } from '@crossfire/contracts/rest/limits';
+import { operations } from '@crossfire/contracts/rest/operations';
 import { matrixUserId } from '@crossfire/contracts/schema/validation';
 import { onboardingGuide } from '@crossfire/contracts/onboarding';
 import { authenticateMember, authenticateAgent } from '@crossfire/domain/session/authenticate';
@@ -132,7 +133,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
         send(response, requestId, failure('rate_limit', 'Request rate exceeded')); return;
       }
       if (endpoint.path === '/api/sessions' && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin human login required')); return; }
-      if (endpoint.path.endsWith('/claim') && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }
+      if (endpoint.path === operations.claimInvitation.path && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }
       const authenticated = await authenticate(request, endpoint, requestId, stop.signal);
       if (!authenticated.ok) { send(response, requestId, authenticated); return; }
       const input = method === 'GET' ? success({}) : await readBody(request, endpoint.requestBytes);

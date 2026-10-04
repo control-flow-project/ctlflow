@@ -4,6 +4,7 @@ import { createClient } from '@crossfire/adapter-crossfire/client';
 import { operations } from '@crossfire/contracts/rest/operations';
 import { failure, success } from '@crossfire/kernel/result';
 import { loadBinding, saveBinding } from '@fleetd/storage/binding';
+import { initializeHistory } from '@fleetd/storage/history';
 import type { Configuration, Controller, Approval } from '@fleetd/domain/model';
 
 export async function prepareEnrollment(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (value: Approval) => void) {
@@ -61,6 +62,9 @@ export async function prepareEnrollment(configuration: Configuration, controller
         if (instance.status === 'failed') { failed.push({ instanceKey: instance.instanceKey, code: instance.errorCode ?? 'native', message: instance.name + ': ' + (instance.errorCode ?? 'Enrollment failed') }); continue; }
         if (!instance.agentId || !instance.account) return failure('native', 'Approved identity is not ready');
         const account = { user_id: instance.account.matrixUserId, access_token: instance.account.accessToken, device_id: instance.account.deviceId };
+        const existing = binding.identities.find(item => item.instanceKey === instance.instanceKey);
+        if (existing && existing.agentId !== instance.agentId) return failure('conflict', 'An enrolled agent identity cannot be replaced');
+        if (!existing) initializeHistory(configuration.directory, instance.agentId, null);
         binding.identities = [...binding.identities.filter(item => item.instanceKey !== instance.instanceKey), { instanceKey: instance.instanceKey, name: instance.name, agentId: instance.agentId, account }];
       }
       binding.request = null; saveBinding(configuration.directory, binding);

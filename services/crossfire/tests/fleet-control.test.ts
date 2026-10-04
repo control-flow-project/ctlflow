@@ -15,6 +15,8 @@ import { createFleetMessage, readFleetControl, listFleetMessages, acknowledgeFle
 import { controlQuery, messagePage, fleetControlSnapshot } from '@crossfire/contracts/fleet-control';
 import { failure } from '@crossfire/kernel/result';
 import { createFleetChanges } from '../apps/server/src/http/fleet-changes.js';
+import { requestFleetRuntime, listFleetRuntime, claimFleetRuntime, receiptFleetRuntime } from '@crossfire/domain/fleet/runtime';
+import { runtimeRequest, runtimeOperation, runtimeReceipt } from '@crossfire/contracts/fleet-runtime';
 
 async function enroll(fixture: Awaited<ReturnType<typeof applicationFixture>>, owner = fixture.admin, name = 'team') {
   const { services } = fixture;
@@ -125,4 +127,86 @@ test('controller long polls retain notifications and release their owner on time
   const cancelled = changes.wait(fleetId, changes.version(fleetId), 10000, stop.signal);
   stop.abort(); assert.equal((await cancelled).ok, false);
   assert.equal((await changes.wait(fleetId, changes.version(fleetId), 1, new AbortController().signal)).ok, true);
+});
+
+test('session requests are human-authorized, confirmed, atomic, revision-checked and idempotent across controller generations', async scope => {
+  const fixture = await applicationFixture(scope), { services, admin } = fixture, fleet = await enroll(fixture);
+  const stranger = await fixture.member('stranger'), agentId = fleet.ready.instances[0]!.agentId!;
+  const params = [services, fleet.controller, fleet.fleetId] as const, connectionId = randomUUID();
+  const input = { operationId: randomUUID(), agentId: null, action: 'reset' as const,
+    expectedRevision: value(readFleet(services, admin.actor, fleet.fleetId)).revision, confirmFreshHistory: true };
+  assert.equal(requestFleetRuntime(services, admin.actor, fleet.fleetId, input, randomUUID()).ok, false, 'Offline controllers cannot accept lifecycle changes');
+  value(reportFleetConnection(...params, connectionId, false));
+  for (const actor of [stranger.actor, fleet.controller, { kind: 'agent' as const, principalId: agentId }]) {
+    assert.equal(requestFleetRuntime(services, actor, fleet.fleetId, input, randomUUID()).ok, false);
+  }
+  assert.equal(requestFleetRuntime(services, admin.actor, fleet.fleetId, { ...input, confirmFreshHistory: false }, randomUUID()).ok, false);
+  assert.equal(requestFleetRuntime(services, admin.actor, fleet.fleetId, { ...input, expectedRevision: input.expectedRevision + 1 }, randomUUID()).ok, false);
+  assert.equal(requestFleetRuntime(services, admin.actor, fleet.fleetId, { ...input, agentId: randomUUID() }, randomUUID()).ok, false);
+  const update = services.repositories.fleet.update;
+  services.repositories.fleet.update = () => failure('unavailable', 'Synthetic revision persistence failure');
+  assert.equal(requestFleetRuntime(services, admin.actor, fleet.fleetId, input, randomUUID()).ok, false);
+  services.repositories.fleet.update = update;
+  assert.equal(value(services.repositories.fleetRuntimeOperation.find(input.operationId)), null, 'A failed transaction cannot leave a destructive command');
+  const accepted = value(requestFleetRuntime(services, admin.actor, fleet.fleetId, input, randomUUID()));
+  assert(runtimeOperation(accepted).ok); assert.equal(accepted.status, 'pending');
+  assert.deepEqual(value(requestFleetRuntime(services, admin.actor, fleet.fleetId, input, randomUUID())), accepted);
+  assert.equal(requestFleetRuntime(services, admin.actor, fleet.fleetId, { ...input, action: 'start', confirmFreshHistory: false }, randomUUID()).ok, false);
+  const revision = value(readFleet(services, admin.actor, fleet.fleetId)).revision;
+  assert.equal(requestFleetRuntime(services, admin.actor, fleet.fleetId, { ...input, operationId: randomUUID(), expectedRevision: revision }, randomUUID()).ok, false);
+  assert.deepEqual(value(readFleetControl(...params, connectionId)).runtimeOperations, [accepted]);
+  const outcome = { connectionId, status: 'succeeded' as const, errorMessage: null };
+  assert.equal(receiptFleetRuntime(...params, input.operationId, outcome).ok, false, 'Publication requires a claimed native operation');
+  assert.equal(claimFleetRuntime(services, admin.actor, fleet.fleetId, input.operationId, connectionId).ok, false);
+  assert.equal(claimFleetRuntime(...params, input.operationId, randomUUID()).ok, false);
+  const claimed = value(claimFleetRuntime(...params, input.operationId, connectionId)); assert.equal(claimed.status, 'running');
+  value(changeFleetDelivery(services, admin.actor, fleet.fleetId, { expectedRevision: revision, enabled: false }, randomUUID()));
+  assert.equal(value(readFleetControl(...params, connectionId)).runtimeOperations[0]!.operationId, input.operationId, 'Paused delivery does not disable session control');
+  fixture.advance(30001);
+  const next = randomUUID(); value(reportFleetConnection(...params, next, false));
+  assert.equal(receiptFleetRuntime(...params, input.operationId, outcome).ok, false, 'An old connection cannot report a native result');
+  assert.equal(receiptFleetRuntime(...params, input.operationId, { ...outcome, connectionId: next }).ok, false, 'A new connection must reclaim the same operation');
+  assert.equal(value(claimFleetRuntime(...params, input.operationId, next)).operationId, input.operationId);
+  value(receiptFleetRuntime(...params, input.operationId, { ...outcome, connectionId: next }));
+  value(receiptFleetRuntime(...params, input.operationId, { ...outcome, connectionId: next }));
+  assert.equal(receiptFleetRuntime(...params, input.operationId, { connectionId: next, status: 'failed', errorMessage: 'Different outcome' }).ok, false);
+  assert.deepEqual(value(readFleetControl(...params, next)).runtimeOperations, []);
+  const page = value(listFleetRuntime(services, admin.actor, fleet.fleetId, { page: 1, pageSize: 10 }));
+  assert.equal(page.totalItems, 1); assert.equal(page.items[0]!.status, 'succeeded');
+  const currentRevision = value(readFleet(services, admin.actor, fleet.fleetId)).revision;
+  const perAgent = value(requestFleetRuntime(services, admin.actor, fleet.fleetId, { ...input, operationId: randomUUID(), agentId,
+    action: 'start', confirmFreshHistory: false, expectedRevision: currentRevision }, randomUUID()));
+  assert.equal(perAgent.agentId, agentId);
+  assert.equal(value(readFleetControl(...params, next)).runtimeOperations[0]!.operationId, perAgent.operationId);
+});
+
+test('session admission rechecks changed revisions and human authority before any native operation can execute', async scope => {
+  const fixture = await applicationFixture(scope), { services, admin } = fixture, owner = await fixture.member('session-owner');
+  const fleet = await enroll(fixture, owner, 'sessions'), params = [services, fleet.controller, fleet.fleetId] as const;
+  const connectionId = randomUUID(); value(reportFleetConnection(...params, connectionId, false));
+  const create = () => value(requestFleetRuntime(services, owner.actor, fleet.fleetId, { operationId: randomUUID(), agentId: null, action: 'start',
+    confirmFreshHistory: false, expectedRevision: value(readFleet(services, owner.actor, fleet.fleetId)).revision }, randomUUID()));
+  const stale = create();
+  value(changeFleetDelivery(services, owner.actor, fleet.fleetId, { expectedRevision: stale.expectedRevision + 1, enabled: false }, randomUUID()));
+  assert.equal(value(claimFleetRuntime(...params, stale.operationId, connectionId)).status, 'failed');
+  const request = value(requestFleetRuntime(services, admin.actor, fleet.fleetId, { operationId: randomUUID(), agentId: null, action: 'stop', confirmFreshHistory: false,
+    expectedRevision: value(readFleet(services, admin.actor, fleet.fleetId)).revision }, randomUUID()));
+  const permissions = services.directory.permissions;
+  services.directory.permissions = () => failure('unavailable', 'Synthetic authority storage failure');
+  assert.equal(claimFleetRuntime(...params, request.operationId, connectionId).ok, false);
+  assert.equal(value(services.repositories.fleetRuntimeOperation.pending(fleet.fleetId))?.status, 'pending', 'Storage uncertainty cannot permanently reject a queued command');
+  services.directory.permissions = permissions;
+  const principal = value(services.repositories.principal.find({ id: admin.actor.principalId }))!;
+  value(services.repositories.principal.update({ ...principal, status: 'suspended', revision: principal.revision + 1 }));
+  const denied = value(claimFleetRuntime(...params, request.operationId, connectionId));
+  assert.equal(denied.status, 'failed'); assert(denied.errorMessage?.includes('authority'));
+  assert.equal(value(services.repositories.fleetRuntimeOperation.pending(fleet.fleetId)), null);
+});
+
+test('session API validators reject ambiguous destructive intent and inconsistent native receipts', () => {
+  const request = { operationId: randomUUID(), agentId: null, action: 'start', expectedRevision: 0, confirmFreshHistory: false };
+  assert(runtimeRequest(request).ok);
+  for (const input of [{ ...request, confirmFreshHistory: true }, { ...request, action: 'reset' }, { ...request, extra: true }, { ...request, action: 'resume' }]) assert.equal(runtimeRequest(input).ok, false);
+  assert.equal(runtimeReceipt({ connectionId: randomUUID(), status: 'succeeded', errorMessage: 'Untrue success' }).ok, false);
+  assert.equal(runtimeReceipt({ connectionId: randomUUID(), status: 'failed', errorMessage: null }).ok, false);
 });

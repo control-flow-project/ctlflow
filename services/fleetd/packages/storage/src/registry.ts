@@ -11,7 +11,7 @@ import { failure, success, type Result } from '@crossfire/kernel/result';
 import { loadConfiguration } from './configuration.js';
 
 const registrations = check.list(check.object({ fleetId: check.identifier, fleetKey: check.name, directory: check.text(4096), label: check.text(100), revision: check.integer(), digest: check.text(64, 64) }), 100);
-const operations = check.list(operationView, 500);
+const operations = check.list(operationView, 700);
 function attempt<Value>(action: () => Result<Value>): Result<Value> {
   try { return action(); } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Private controller storage failed'); }
 }

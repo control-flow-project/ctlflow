@@ -5,8 +5,11 @@ import { operations } from '@crossfire/contracts/rest/operations';
 import type { FleetControlSnapshot } from '@crossfire/contracts/fleet-control';
 import { createListenerControl, type ControllerState } from '@crossfire/agent-core/listener-control';
 import { createClient } from './client.js';
+import { createFleetRuntimeWorker, type FleetRuntimeExecutor } from './fleet-runtime.js';
+import type { Result } from '@crossfire/kernel/result';
 
-export function createFleetControlConnection(options: { origin: string; credential: string; fleetId: string; owner: string; signal: AbortSignal }) {
+export function createFleetControlConnection(options: { origin: string; credential: string; fleetId: string; owner: string; signal: AbortSignal; execute: FleetRuntimeExecutor;
+  acknowledged(operationId: string): Result<void> }) {
   const stop = new AbortController(), lifetime = AbortSignal.any([stop.signal, options.signal]);
   const client = createClient({ origin: options.origin, token: options.credential, signal: lifetime, timeoutMs: 15000 });
   let state: ControllerState = { connected: false, deliveryEnabled: false, revision: null, error: 'Connecting to Crossfire' };
@@ -25,10 +28,14 @@ export function createFleetControlConnection(options: { origin: string; credenti
     }
   }
   function disconnect(message: string): void {
+    if (requests.signal.aborted) return;
     clearTimeout(watchdog);
     state = { ...state, connected: false, error: message };
     refresh(); requests.abort(new Error(message));
   }
+  const runtimeWorker = createFleetRuntimeWorker({ client, fleetId: options.fleetId, execute: options.execute,
+    acknowledged: options.acknowledged,
+    connection: () => ({ connected: state.connected, id: connectionId }), fail: disconnect });
   function apply(value: FleetControlSnapshot): void {
     if (value.fleetId !== options.fleetId || value.connection.status !== 'online') throw new Error('Invalid controller lease response');
     if (state.revision !== null && value.revision < state.revision) return;
@@ -39,6 +46,7 @@ export function createFleetControlConnection(options: { origin: string; credenti
     const messages = new Set(value.messages.map(message => message.messageId));
     for (const identity of completed) if (!messages.has(identity.slice(0, identity.indexOf(':')))) completed.delete(identity);
     refresh();
+    for (const operation of value.runtimeOperations) runtimeWorker.receive(operation);
   }
   async function receipt(messageId: string, agentId: string, status: 'delivered' | 'failed' | 'skipped', errorMessage: string | null): Promise<void> {
     const result = await client.call(operations.acknowledgeFleetMessage, { fleetId: options.fleetId, messageId, agentId }, { status, errorMessage });
@@ -73,7 +81,7 @@ export function createFleetControlConnection(options: { origin: string; credenti
         for (const message of response.value.data.messages) for (const agentId of message.agentIds) {
           if (!listeners.has(agentId) || !response.value.data.agentIds.includes(agentId)) await receipt(message.messageId, agentId, 'skipped', 'No eligible running fleet-bound listener for this agent');
         }
-        if (response.value.data.messages.length) await delay(1000, undefined, { signal: scope });
+        if (response.value.data.messages.length || response.value.data.runtimeOperations.length) await delay(1000, undefined, { signal: scope });
       } catch (error) {
         disconnect(error instanceof Error ? error.message : 'Controller connection unavailable');
         if (!lifetime.aborted) await delay(1000, undefined, { signal: lifetime });
@@ -106,7 +114,7 @@ export function createFleetControlConnection(options: { origin: string; credenti
       const result = await client.call(operations.createFleetMessage, { fleetId: options.fleetId }, input);
       return result.ok ? success(result.value.data) : result;
     },
-    close(): Promise<void> { return closing ??= (async () => { stop.abort(); await running;
+    close(): Promise<void> { return closing ??= (async () => { stop.abort(); await running; await runtimeWorker.close();
       try { if (releaseRequired) await closeLease(connectionId); }
       finally { lifetime.removeEventListener('abort', onClose); listeners.clear(); }
     })(); },

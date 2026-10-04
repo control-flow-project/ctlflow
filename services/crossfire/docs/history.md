@@ -92,11 +92,14 @@ tool call to its `room_id`. Terminal output goes privately to the owner.
 ## Fleet context reset
 
 ```sh
-fleet agent reset FLEET INSTANCE
-fleet agent reset FLEET INSTANCE --operation-id YOUR_UUID
+fleet agent start FLEET INSTANCE --fresh-history
+fleet agent start FLEET INSTANCE --fresh-history --operation-id YOUR_UUID
+fleet start FLEET --fresh-history
 ```
 
-Only fleetd can reset its owned agent. It stops the exact process, exports all
+Only fleetd can reset its owned agents. A request targets an individual agent or
+all agents in a fleet; management requires confirmation at either scope. It stops
+all selected processes before resetting histories, then exports all
 available authorized room history/state and nonsecret configuration, verifies
 complete files and current authority, and starts fresh native history with the
 same identity, credentials and current startup parameters. Private exports retain
@@ -111,3 +114,4 @@ new input after the exported boundaries. Retrying an interrupted reset uses its
 saved preparation; changed or incomplete exports cannot discard context. The
 old native history files remain archived. Direct attached sessions have no reset
 command; their owner controls native context.
+- [Stop, full-history resume and fresh-history controls](../../fleet/docs/sessions.md)

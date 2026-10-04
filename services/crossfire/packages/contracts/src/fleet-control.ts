@@ -2,6 +2,7 @@ import * as check from './schema/validation.js';
 import { listQuery } from './schema/request.js';
 import { failure, success } from '@crossfire/kernel/result';
 import type { Parsed } from './schema/validation.js';
+import { runtimeOperation } from './fleet-runtime.js';
 
 export const fleetControl = check.object({ fleetId: check.identifier, revision: check.integer(), deliveryEnabled: check.boolean,
   connection: check.object({ status: check.choice('online', 'offline'), lastSeenAt: check.nullable(check.integer()) }) });
@@ -12,9 +13,10 @@ export const fleetMessageCommand = check.object({ messageId: check.identifier, f
   agentIds: check.list(check.identifier, 100) });
 export const fleetControlSnapshot = check.refine(check.object({ fleetId: check.identifier, revision: check.integer(), deliveryEnabled: check.boolean,
   connection: check.object({ status: check.choice('online', 'offline'), lastSeenAt: check.nullable(check.integer()) }),
-  agentIds: check.list(check.identifier, 100), messages: check.list(fleetMessageCommand, 1) }), snapshot =>
+  agentIds: check.list(check.identifier, 100), messages: check.list(fleetMessageCommand, 1), runtimeOperations: check.list(runtimeOperation, 1) }), snapshot =>
   new Set(snapshot.agentIds).size === snapshot.agentIds.length && snapshot.messages.every(message => message.fleetId === snapshot.fleetId
-    && message.expiresAt > message.createdAt && new Set(message.agentIds).size === message.agentIds.length), 'Invalid fleet control snapshot');
+    && message.expiresAt > message.createdAt && new Set(message.agentIds).size === message.agentIds.length)
+  && snapshot.runtimeOperations.every(operation => operation.fleetId === snapshot.fleetId && (operation.status === 'pending' || operation.status === 'running')), 'Invalid fleet control snapshot');
 export const fleetMessageSummary = check.object({ messageId: check.identifier, body: messageBody, createdAt: check.integer(), expiresAt: check.integer(),
   total: check.integer(0, 100), delivered: check.integer(0, 100), failed: check.integer(0, 100), skipped: check.integer(0, 100), pending: check.integer(0, 100), expired: check.integer(0, 100) });
 export const fleetMessageReceipt = check.object({ messageId: check.identifier, agentId: check.identifier, status: check.choice('pending', 'delivered', 'failed', 'skipped'),

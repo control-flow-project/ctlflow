@@ -1,9 +1,20 @@
 import { failure, success } from '@crossfire/kernel/result';
 import type { Actor, Services } from '../port/services.js';
 import { authorize } from '../authorization/authorize.js';
+import type { PermissionCode } from '../authorization/catalog.js';
 import type { Fleet } from '../enrollment/types.js';
 
 export type FleetActor = Actor | { kind: 'controller'; fleetId: string; credentialId: string };
+function fleetPermission(fleet: Fleet, principalId: string, write: boolean): PermissionCode {
+  const own = principalId === fleet.ownerId;
+  return write ? own ? 'agent.configure.owned' : 'agent.configure.any' : own ? 'agent.read.owned' : 'agent.read.any';
+}
+export function fleetRequesterAuthorized(services: Pick<Services, 'repositories' | 'directory'>, principalId: string, fleet: Fleet) {
+  const principal = services.repositories.principal.find({ id: principalId }); if (!principal.ok) return principal;
+  if (principal.value?.kind !== 'human' || principal.value.status !== 'active') return success(false);
+  const permissions = services.directory.permissions(principalId); if (!permissions.ok) return permissions;
+  return success(permissions.value.includes(fleetPermission(fleet, principalId, true)));
+}
 export function controllerToken(services: Pick<Services, 'identity'>, enrollmentId: string, claimSecret: string): string {
   return 'fleet.' + enrollmentId + '.' + services.identity.hash('crossfire-controller:' + claimSecret);
 }
@@ -30,6 +41,5 @@ export function authorizeFleet(services: Pick<Services, 'repositories' | 'direct
     return actor.fleetId === fleet.id && credential.value?.fleetId === fleet.id && credential.value.revokedAt === null && owner.value?.status === 'active'
       ? success(undefined) : failure('forbidden', 'Controller authority does not cover this fleet');
   }
-  const own = actor.principalId === fleet.ownerId;
-  return authorize(services, actor, write ? own ? 'agent.configure.owned' : 'agent.configure.any' : own ? 'agent.read.owned' : 'agent.read.any');
+  return authorize(services, actor, fleetPermission(fleet, actor.principalId, write));
 }

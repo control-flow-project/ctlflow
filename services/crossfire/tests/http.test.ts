@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { request as httpRequest } from 'node:http';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { applicationFixture } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contractRelease } from './support/release.js';
@@ -10,6 +11,9 @@ test("HTTP management enforces cookie, origin, CSRF, strict requests and removed
   const fixture = await applicationFixture(scope), { request, origin } = await httpFixture(scope, fixture.application);
   const release = contractRelease(), ctx = { config: fixture.application.config };
   assert.equal((await request("/api/agents")).status, 401);
+  assert.equal((await request('/api/member-invitations/' + randomUUID() + '/claim', 'POST', {})).status, 403);
+  assert.equal((await request('/api/fleets/' + randomUUID() + '/session-operations/' + randomUUID() + '/claim', 'PUT', {},
+    { Authorization: 'Bearer invalid-controller-credential' })).status, 401, 'Controller claims use bearer authentication, not invitation origin policy');
   for (const path of ["/_coord/install.mjs", "/_coord/client", "/_coord/dm", "/_coord/rooms", "/_matrix/client/v3/sync"]) {
     assert.equal((await request(path)).status, 404);
   }

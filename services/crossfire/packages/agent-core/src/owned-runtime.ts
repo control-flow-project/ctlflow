@@ -8,6 +8,7 @@ export type OwnedRuntimeInput = {
   name: string; workspace: string; instructions: string;
   options: Record<string, unknown>; hooks: RuntimeHooks;
   listenerOptions?: ListenerOptions;
+  allowNewHistory?: boolean;
 };
 export type OwnedRuntimeAdapter = {
   validate(options: unknown): Result<{ options: Record<string, unknown>; approval: RuntimeApproval }>;

@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { operations } from '@crossfire/contracts/rest/operations';
 import { createFleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
 import { until } from '../scripts/test-support/listener.js';
+import { success } from '@crossfire/kernel/result';
 
 test('controller retains uncertain acquisition ownership and closes that exact generation before reconnecting', async scope => {
   const fleetId = randomUUID(), agentId = randomUUID(), stop = new AbortController();
@@ -44,14 +45,14 @@ test('controller retains uncertain acquisition ownership and closes that exact g
       }
       const view = { fleetId, revision: 0, deliveryEnabled: true, connection: { status: 'online', lastSeenAt: Date.now() } };
       response.writeHead(200, { 'Content-Type': 'application/json' });
-      response.end(JSON.stringify({ data: request.method === 'PUT' ? view : { ...view, agentIds: [agentId], messages: [] }, meta }));
+      response.end(JSON.stringify({ data: request.method === 'PUT' ? view : { ...view, agentIds: [agentId], messages: [], runtimeOperations: [] }, meta }));
     } catch (error) { errors.push(error); response.destroy(); }
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   cleanup(scope, () => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
   const address = server.address(); assert(address && typeof address !== 'string');
   const control = createFleetControlConnection({ origin: 'http://127.0.0.1:' + address.port, credential: 'private-fixture',
-    fleetId, owner: '@owner:fixture.localhost', signal: stop.signal });
+    fleetId, owner: '@owner:fixture.localhost', signal: stop.signal, execute: async () => success({ status: 'succeeded', errorMessage: null }), acknowledged: () => success(undefined) });
   cleanup(scope, () => control.close());
   const listener = control.listener(agentId);
   await until(() => listener.control.current().active, 'Unknown native acquisition blocked its own reconnect');
@@ -62,7 +63,7 @@ test('controller retains uncertain acquisition ownership and closes that exact g
   assert.equal(lease, null);
   assert.deepEqual(released, acquired);
   const disconnected = createFleetControlConnection({ origin: 'http://127.0.0.1:' + address.port, credential: 'private-fixture',
-    fleetId, owner: '@owner:fixture.localhost', signal: stop.signal });
+    fleetId, owner: '@owner:fixture.localhost', signal: stop.signal, execute: async () => success({ status: 'succeeded', errorMessage: null }), acknowledged: () => success(undefined) });
   cleanup(scope, () => disconnected.close());
   const stopping = disconnected.listener(agentId);
   await until(() => stopping.control.current().active);

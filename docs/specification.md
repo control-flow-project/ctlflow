@@ -303,6 +303,45 @@ an empty session without a dummy prompt, allowing zero-turn resumption.
 Normal stop closes the listener and owned Codex process. Descendant-process
 supervision and crash-proof tool cleanup are not product guarantees.
 
+### Fleet session controls
+
+Management exposes controller-owned **Stop**, **Resume** and **Start with fresh
+history** at fleet and individual fleet-managed-agent scope. Ordinary UI/CLI start
+always resumes the full saved native history, identity, configured parameters and
+unread positions. Native response pagination/excluded turn payloads do not truncate
+the runtime's own conversation context. First enrollment and an explicit reset
+authorize primary-history initialization. Per-room mode creates a new history
+when a room is first used; an explicitly configured history-mode change may open
+its other primary context while retaining existing histories. An established
+missing/broken binding fails rather than silently substituting a fresh session.
+
+Fresh history requires explicit human confirmation in management and an explicit
+`--fresh-history` flag on CLI start at either scope. It calls the controller's
+single reset implementation and retains identity, permissions and Matrix data.
+Both CLI scopes accept `--operation-id UUID` on start and stop for exact retries
+after uncertain submission; the ID is printed before submission.
+Native archived histories are not erased. Stop closes listeners and owned native
+processes, not the controller; resume reconnects the same saved histories. It does
+not freeze or resurrect an unfinished operating-system command. Delivery pause
+remains a separate reversible gate and never creates or closes native histories.
+
+Crossfire accepts revision-checked, idempotent fleet runtime-operation requests
+from the fleet owner/administrator, at whole-fleet or exact bound-agent scope.
+A normalized indexed `fleet_runtime_operation` relation owns the bounded pending
+command and its controller receipt, not native execution. The authenticated live
+controller consumes it through its existing control connection and invokes the
+same durable native lifecycle owner used by the CLI. Lease renewal remains
+independent of lengthy lifecycle work. A reconnect recovers the exact original
+operation ID; uncertain or failed reset is never replayed as another operation.
+Management reports pending/running/succeeded/failed outcomes, not speculative
+success, and clearly distinguishes controller connectivity from native execution.
+The initial claim rechecks current human account/permissions, bound target and
+unchanged revision. It does not impersonate a login session or require the human
+to remain logged in. Storage failures leave the command pending. A running claim
+may move to a new authenticated lease generation with the same operation ID.
+Native operations pin their completed outcome until the Crossfire receipt is
+confirmed; ordinary operation-history pruning cannot discard that retry authority.
+
 ### Fleet controller connection and delivery
 
 Every enrolled fleet has one authenticated live controller connection, maintained
@@ -557,7 +596,7 @@ not another operation implementation. Unknown fields/routes/methods fail.
 | GET, PATCH, DELETE /api/fleets/{fleetId}/agents/{instanceKey} | Inspect/update/remove an instance. |
 | GET /api/fleets/{fleetId}/agents/{instanceKey}/contexts | Existing shared/control/room histories and observed native state; no new history or model turn. |
 | GET /api/fleets/{fleetId}/agents/{instanceKey}/attachment | Private exact running-session pointer; optional `context` selects an existing history, never creates one. |
-| POST /api/operations | Idempotent start/stop request for a fleet, instance or daemon shutdown; reset targets exactly one enrolled fleet instance. |
+| POST /api/operations | Idempotent start/stop request for a fleet, instance or daemon shutdown; explicit reset targets one enrolled fleet instance or the entire fleet. |
 | GET /api/operations/{operationId} | Observe accepted/running/awaiting-approval/succeeded/failed results. |
 
 Operation creation accepts a client-generated UUID idempotency key, a typed target,
@@ -579,7 +618,8 @@ prevents an unsafe replacement process. Intentional listener stops are distinct
 from crashes at the shared lifecycle boundary and cannot be silently restarted.
 Failure and recovery remain visible through the existing management incident path.
 
-An explicit agent reset stops its owned execution, exports complete available
+An explicit agent or fleet reset stops all selected owned execution before any
+selected history is retired, then exports complete available
 authorized Matrix history and nonsecret configuration into private files, verifies
 their hashes and current authority, then retires the original local context/cursor
 state and starts a fresh native history. The account, credentials, workarea and
@@ -589,6 +629,12 @@ receives the export manifest as native instructions, not a paid bootstrap turn.
 Saved phase/operation identities make interrupted preparation retryable. Incomplete
 or changed exports cannot replace a context. Normal recovery/start is not reset.
 This capability exists only for controller-owned fleet agents, not attached sessions.
+Each instance's reset preparation/outcome remains independent: a failed export
+cannot start that instance fresh, and successful peers retain truthful outcomes.
+One receipt-pinned native operation per fleet plus unfinished operations and the
+latest 400 unpinned outcomes bound the controller journal at 700 entries for 100
+registered fleets. Receipt acknowledgment releases the pin; a newer verified
+remote command also proves that the prior command's server receipt finalized.
 
 ## 6. Crossfire fleet REST API
 
@@ -606,13 +652,18 @@ This capability exists only for controller-owned fleet agents, not attached sess
 | PUT, DELETE /api/fleets/{fleetId}/agents/{agentId} | Authorized, revision-checked association/detachment. |
 | PUT /api/fleets/{fleetId}/delivery | Owner/admin/controller changes delivery intent with expectedRevision. |
 | PUT /api/fleets/{fleetId}/controller-connections/{connectionId} | Controller-only exclusive lease acquisition, renewal or closure. |
-| GET /api/fleets/{fleetId}/control | Controller-only bounded long poll of intent and pending direct messages. |
+| GET /api/fleets/{fleetId}/control | Controller-only bounded long poll of intent, pending direct messages and at most one session operation, including while delivery is paused. |
+| GET /api/fleets/{fleetId}/session-operations | Authorized paginated requested native-session outcomes. |
+| POST /api/fleets/{fleetId}/session-operations | Human owner/admin revision-checked request; UUID `operationId`, nullable `agentId` (null means whole fleet), `action` start/stop/reset, `expectedRevision`, `confirmFreshHistory` true only for reset; returns 202 with the operation. |
+| PUT /api/fleets/{fleetId}/session-operations/{operationId}/claim | Current controller-only lease claim/reclaim with `connectionId`; human authority and target are rechecked. |
+| PUT /api/fleets/{fleetId}/session-operations/{operationId}/receipt | Claimed current controller generation reports succeeded/failed with nullable `errorMessage`; identical final receipt is idempotent. |
 | GET, POST /api/fleets/{fleetId}/messages | Scoped paginated history or idempotent message creation. |
 | PUT /api/fleets/{fleetId}/messages/{messageId}/deliveries/{agentId} | Controller-only exact recipient acknowledgment; no native launch. |
 | POST /api/fleets/{fleetId}/runtime-incidents | Controller-only immutable failure episode for an associated agent/native session; durable deduplicated notification, no lifecycle mutation. |
 
-Crossfire has no native fleet execution/start/stop, SSH, host-control or runtime-options
-routes. Its fleet page shows members, named controller, approved identities,
+Crossfire stores authorized lifecycle requests/receipts but never executes native
+fleet processes or provides SSH, host-control or runtime-options routes. Its fleet
+page shows members, named controller, approved identities,
 reporting listeners and ordinary room/wake controls. Humans see their fleets;
 administrators can inspect all. A controller credential is restricted to its
 exact fleet; neither fleet grouping nor controller metadata grants room access.
@@ -1797,16 +1848,16 @@ analytics subscription, periodic model use or provider-billing polling exists.
 
 One canonical schema and permission catalog own current state. Fresh development
 stores initialize that schema directly. Deployed stores advance transactionally
-to schema version 10 after a verified backup; existing identities, native access,
+to schema version 11 after a verified backup; existing identities, native access,
 credentials, controller authority, policy and audit remain intact. Runtime code
 has no historical-schema reader, importer, compatibility handler or dual
 read/write path. Production resets and automatic reset-on-startup-error are
 prohibited. Source work, operator configuration, external credentials and other
 projects remain intact.
 
-The canonical schema has 53 singular tables. Transactional forward migrations
+The canonical schema has 54 singular tables. Transactional forward migrations
 preserve existing principal, access, listener, credential and audit rows while
-adding required runtime/statistics and fleet-policy relations. Requested policies
+adding required runtime/statistics, fleet-policy and session-operation relations. Requested policies
 and approved invitation defaults use normalized tables, not serialized settings.
 Existing fleets acquire no invented policy approval during migration; their next
 configured start requests owner review when approval is absent.
@@ -1898,6 +1949,7 @@ repository methods serve issuance and native account operations only.
 | `agent_name` | `name PK`, `request_id?`, `instance_key?`, `agent_id? UQ/FK agent`; pending-item composite FK; `UQ(request_id, instance_key)`. |
 | `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `delivery_enabled`, `revision`, `created_at`, `updated_at`; `PK(owner_id, fleet_key)`. |
 | `fleet_connection` | `fleet_id PK/FK fleet`, `connection_id UQ`, `credential_id FK fleet_credential`, `last_seen_at`, `expires_at`, `closed_at?`. One exclusive controller generation. |
+| `fleet_runtime_operation` | `id PK`, `fleet_id FK fleet ON DELETE CASCADE`, `agent_id? FK agent`, `author_principal_id FK member`, `action` start/stop/reset, `expected_revision`, `status` pending/running/succeeded/failed, `created_at`, `completed_at?`, `error_message?`, `connection_id?`, `credential_id?`; composite credential/fleet FK, matching terminal/error/claim checks. One pending/running operation per fleet. |
 | `fleet_message` | `id PK`, `fleet_id FK fleet`, `author_principal_id? FK member`, `author_credential_id? FK fleet_credential`, `body`, `created_at`, `expires_at`; exactly one author; `(fleet_id, created_at, id)` index. |
 | `fleet_message_delivery` | `message_id FK fleet_message`, `agent_id FK agent`, `status`, `completed_at?`, `error_message?`; composite PK; status is pending/delivered/failed/skipped; `(status, message_id, agent_id)` index. |
 | `fleet_controller_metadata` | `fleet_id FK fleet(id)`, `key`, `value`; `PK(fleet_id, key)`. |
@@ -2099,6 +2151,7 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `fleet_instance_permission` | `(permission_code, grant_scope, agent_id)` | Catalog FK/reverse lookup; agent-policy prefix covered by PK. |
 | `fleet` | `(created_at, fleet_key)` | Global fleet list. Owner lists use the composite primary-key prefix. |
 | `fleet_credential` | `(fleet_id, revoked_at)`; UQ `(id, fleet_id)` | Fleet credential lifecycle and exact fleet-scoped connection/message authority. |
+| `fleet_runtime_operation` | partial UQ `(fleet_id)` for pending/running; `(fleet_id, created_at DESC, id DESC)`, `(agent_id, created_at DESC)`, `(author_principal_id)`, `(credential_id, fleet_id)` | Exclusive native-operation admission, stable paginated outcomes and target/author/credential FK lookups. |
 | `fleet_message` | `(fleet_id, created_at DESC, id DESC)` | Stable fleet-scoped message history and bounded paging. |
 | `fleet_message_delivery` | `(status, message_id, agent_id)` | Pending message selection and capacity; message-prefix PK covers roster receipts. |
 | `agent_room_grant` | `(room_id, agent_id)`, `(authorizer_id, agent_id, room_id)`, `(added_by_id, agent_id, room_id)` | Room views, authority loss, provenance. |
@@ -2256,6 +2309,7 @@ ownership. The management website remains under `/manage`.
 | `GET /api/fleets`, `GET, PATCH, DELETE /api/fleets/{fleetId}`, `GET /api/fleets/{fleetId}/agents`, `PUT, DELETE /api/fleets/{fleetId}/agents/{agentId}` | Authorized durable fleet/instance views; not native process control. |
 | `GET /api/fleets/{fleetId}/map` | Human-authorized complete fleet topology: wake sources, agents, desired room access and last observed application. No controller access or mutation. |
 | `GET /api/fleets/{fleetId}/statistics` | Fleet owner/admin hourly summaries, bounded period selection, SQL-paginated sender/recipient flows and optional native usage; approximate counts and unknown billing remain explicit. |
+| `GET, POST /api/fleets/{fleetId}/session-operations`, `PUT /api/fleets/{fleetId}/session-operations/{operationId}/claim`, `PUT /api/fleets/{fleetId}/session-operations/{operationId}/receipt` | Human-authorized paginated session requests and controller-only generation-bound outcomes; Crossfire never launches native processes. |
 | `GET /api/agents`, `GET, PATCH /api/agents/{agentId}` | Scoped list/details and configuration/lifecycle changes. |
 | `GET, PUT /api/agents/{agentId}/wake-policy` | One complete mode/selected-sender configuration. |
 | `GET /api/agents/{agentId}/delivery-policy` | This authenticated agent's resolved native delivery policy. |
@@ -2332,6 +2386,11 @@ explanations remain visible.
 
 Fleet list/detail and durable agent/room routes show names first,
 not opaque IDs. Owners see their scope; administrators may filter all owners.
+Fleet `/manage/fleets/{fleetId}/sessions` and fleet-managed-agent
+`/manage/agents/{agentId}/sessions` expose the same controller-owned actions:
+resume defaults to full saved native history; stop retains it; fresh history is
+separate, scope-labelled and confirmed before submission. Direct agents have no
+native-session tab. Paginated outcomes distinguish requested work from completion.
 Agent and fleet directories use compact tables, not cards. Lists have useful
 status/search filters and pagination, except the fleet directory: it displays
 the complete authorized filtered collection without page controls, by reading
@@ -2348,9 +2407,10 @@ Paginated message history shows recipient outcomes without claiming model comple
 Long message bodies have compact previews with inspectable, exact full text;
 room topics and protocol details do not displace access controls.
 Fleet detail opens on its agent roster. Shared accessible navigation exposes
-durable URLs for agents (the fleet base path), `map`, `delivery`, `messages`, `statistics`,
+durable URLs for agents (the fleet base path), `map`, `delivery`, `sessions`, `messages`, `statistics`,
 `rooms` (room-plan review) and `settings`. Agent detail opens on room access;
-its other durable views are `wake`, `activity`, `runtime`, `decisions`, `software` and `settings`.
+its other durable views are `wake`, `activity`, `runtime`, `decisions`, `software` and `settings`,
+plus `sessions` for fleet-managed agents only.
 Decision detail lives at `/manage/agents/{agentId}/decisions/{decisionId}`. Choice
 query hints do not preselect or submit. Review preserves all required questions,
 uses private inputs for secret text, and requires explicit owner confirmation.

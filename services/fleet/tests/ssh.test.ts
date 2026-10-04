@@ -84,7 +84,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   const providerAddress = provider.address(); assert(providerAddress && typeof providerAddress !== 'string');
   writeFileSync(join(nativeHome, 'config.toml'), 'model_provider = "fixture"\n[model_providers.fixture]\nname = "Inert SSH fixture"\nbase_url = "http://127.0.0.1:' + providerAddress.port + '/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n', { mode: 0o600 });
   trustWorkspace(nativeHome, workspace);
-  const runtime = await codexRuntime().start({ name: 'ssh-native', workspace, instructions: 'Inert verification. No work is requested.',
+  const runtime = await codexRuntime().start({ name: 'ssh-native', workspace, instructions: 'Inert verification. No work is requested.', allowNewHistory: true,
     options: { model: 'gpt-5.1', model_reasoning_effort: 'medium', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No tool approval is expected'); } } }, scope.signal);
   assert(runtime.ok); nativeRuntime = runtime.value;

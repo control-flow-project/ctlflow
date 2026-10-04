@@ -43,11 +43,15 @@ successful peers and saved native histories remain intact. Stop cancels pending
 recovery. Failed cleanup or permanent configuration/authorization failures prevent
 unsafe restart and remain visible.
 
-An explicit `reset` operation targets one enrolled instance. It stops the owned
-process, exports and verifies all available authorized native room history and
+An explicit `reset` operation targets one enrolled instance or all fleet instances.
+It stops selected owned processes before resetting any history, then exports and
+verifies all available authorized Matrix room history and
 nonsecret configuration, archives original listener/context state and starts fresh
 history with unchanged identity/current native parameters. Durable reset phases
 and operation IDs protect interrupted preparation. Normal recovery is not reset.
+Default start requires saved native history unless first enrollment or an explicit
+reset authorized initialization; losing established bindings cannot create new
+contexts. A failed instance does not discard successful peers' outcomes.
 - [Context reset contract](../../crossfire/docs/history.md)
 
 ## Crossfire connection
@@ -61,6 +65,13 @@ permissions, manage another fleet or act as human credentials.
 Deactivate retains engines/sessions/controller connection; Stop ends owned
 listeners and processes. Direct listeners remain independent. Ordinary models do
 not enroll, poll for work, send telemetry or maintain controller credentials.
+Management session requests arrive through this same connection. A separate
+worker claims the current lease generation and calls the existing durable
+lifecycle domain, so long native operations do not block lease renewal. Receipt
+uncertainty retains the identical operation ID and pins its native outcome until
+acknowledged. A restart marks unfinished operations failed; it never guesses or
+replays destructive work under a replacement ID.
+- [UI/CLI session controls and confirmation](../../fleet/docs/sessions.md)
 
 Role `coordination_options` requests exact Crossfire wake rules and invitation
 defaults with enrollment. Owner review is required for new/changed settings;

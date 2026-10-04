@@ -25,6 +25,7 @@ import { elementAssets } from './support/element.js';
 import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { fakeCodex, until } from '../scripts/test-support/listener.js';
+import { success } from '@crossfire/kernel/result';
 
 test('browser fleet review, room-plan confirmation, invitation delegation and selected wake identities share canonical APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
@@ -65,8 +66,11 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByRole('link', { name: 'Agent details →' })).toHaveCount(2); await worker.drain();
   const fleet = value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: 'research' }))!;
   const ready = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
+  const runtimeCommands: { action: string; agentId: string | null }[] = [];
   const control = createFleetControlConnection({ origin, credential: ready.fleet!.controllerCredential!, fleetId: fleet.id,
-    owner: admin.member.principal.matrixUserId, signal: new AbortController().signal });
+    owner: admin.member.principal.matrixUserId, signal: new AbortController().signal, acknowledged: () => success(undefined), execute: async command => {
+      runtimeCommands.push({ action: command.action, agentId: command.agentId }); return success({ status: 'succeeded', errorMessage: null });
+    } });
   cleanup(scope, () => control.close());
   const instances = value(services.collection.fleetInstances({ ownerId: admin.actor.principalId, fleetKey: 'research' }));
   const alpha = instances.find(instance => instance.instanceKey === 'alpha')!;
@@ -104,6 +108,42 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   page.once('dialog', dialog => dialog.accept());
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Activate fleet' }).click()]);
   await expect(page.getByRole('button', { name: 'Deactivate fleet', exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Sessions', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Resume sessions', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Resume sessions', exact: true }).click();
+  try { await expect(page.getByRole('table', { name: 'Session operations', exact: true })).toContainText('succeeded'); }
+  catch (error) { scope.diagnostic('Controller session-control status: ' + JSON.stringify(control.status())); throw error; }
+  assert.deepEqual(runtimeCommands, [{ action: 'start', agentId: null }], 'Default UI start is resume, not reset');
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Stop sessions', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({ hasText: 'Stop' })).toContainText('succeeded');
+  assert.deepEqual(runtimeCommands.at(-1), { action: 'stop', agentId: null });
+  page.once('dialog', async dialog => { assert(dialog.message().includes('replaces their model contexts')); await dialog.dismiss(); });
+  await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
+  assert.equal(runtimeCommands.length, 2, 'Cancelling destructive confirmation sends no operation');
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({ hasText: 'Fresh history' })).toContainText('succeeded');
+  assert.deepEqual(runtimeCommands.at(-1), { action: 'reset', agentId: null });
+  for (const width of [1440, 390]) { await page.setViewportSize({ width, height: 1000 }); await checkPaperLayout(page);
+    await page.screenshot({ path: join(directory, 'fleet-sessions-' + width + '.png'), fullPage: true }); }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(origin + '/manage/agents/' + alpha.agentId + '/sessions');
+  await expect(page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Sessions', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('button', { name: 'Resume session', exact: true })).toBeEnabled();
+  const individualOperations = page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({
+    has: page.locator('a[href="/manage/agents/' + alpha.agentId + '/sessions"]') });
+  await page.getByRole('button', { name: 'Resume session', exact: true }).click();
+  await expect(individualOperations.filter({ hasText: 'Resume' })).toContainText('succeeded');
+  assert.deepEqual(runtimeCommands.at(-1), { action: 'start', agentId: alpha.agentId });
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Stop session', exact: true }).click();
+  await expect(individualOperations.filter({ hasText: 'Stop' })).toContainText('succeeded');
+  assert.deepEqual(runtimeCommands.at(-1), { action: 'stop', agentId: alpha.agentId });
+  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
+  assert.equal(runtimeCommands.length, 5);
+  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
+  await expect(individualOperations.filter({ hasText: 'Fresh history' })).toContainText('succeeded');
+  assert.deepEqual(runtimeCommands.at(-1), { action: 'reset', agentId: alpha.agentId });
+  await page.goto(origin + '/manage/fleets/' + fleet.id + '/delivery');
   await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Messages', exact: true }).click();
   await page.getByLabel('Message the fleet').fill('Browser-reviewed explicit fleet task');
   page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Send to fleet', exact: true }).click();
