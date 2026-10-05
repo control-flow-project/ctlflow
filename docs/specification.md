@@ -6,6 +6,16 @@ Unburdened By What Has Been), one implementation per capability, no compatibilit
 interfaces, aliases, hidden fallbacks or duplicated policy. A checkpoint is not
 certification. Production data is never reset by these products.
 
+Legacy support, backward compatibility and dual old/new paths are prohibited,
+including temporary paths, unless the user explicitly authorizes a specific
+exception. Replacements update every owned consumer and remove the superseded
+implementation. Necessary forward data conversion preserves production state
+without retaining old runtime models.
+
+The following review is non-normative: its proposed features are not yet implemented
+and do not replace the current contracts below.
+- [Listener architecture, 30-minute idle sleep and report publication proposal](proposals/20261005-listener-and-publication-architecture.md)
+
 ## 1. Products and source ownership
 
 The repository contains exactly three product roots:
