@@ -46,7 +46,7 @@ test('real shared-host readiness verifies on-request approval without creating o
   const receiving = listen({ ...fixture, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 100,
     ready: () => { ready = true; } }, stop.signal).catch(error => { failure = error; return error; });
   cleanup(scope, async () => { stop.abort(); await receiving; });
-  await until(() => { if (failure) throw failure; return ready && fixture.waiting() === 1; });
+  await until(() => { if (failure) throw failure; return ready && fixture.waiting() === 1 && existsSync(fixture.cursorFile); });
   const cursor = () => [fixture.cursorFile, fixture.cursorFile + '.sync'].map(file => existsSync(file) ? readFileSync(file, 'utf8') : null);
   const before = cursor(), resumes = native.requests().filter(request => request.method === 'thread/resume').length;
   for (let attempt = 0; attempt < 3; attempt++) {

@@ -6,9 +6,34 @@ import { createListenerControl, controlledPublisher } from '@ctlflow/crossfire-a
 import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
 import type { LocalState } from '@ctlflow/crossfire-agent-core/port';
 import type { RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
+import type { ControllerBinding } from '@ctlflow/crossfire-agent-core/listener-control-port';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, matrixFixture, message, ROOM, until, CONTROLLER } from '../scripts/test-support/listener.js';
 import { withClock } from '../scripts/test-support/clock.js';
+
+test('listener activity receipts retain the exact submitted controller capability across HTTP lease turnover', async scope => {
+  const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
+  let current = { ...CONTROLLER }, submitted = false;
+  const binding = createListenerControl(async () => {}, () => current);
+  binding.update({ active: true, input: null });
+  const receipts: { runId: string; binding: ControllerBinding }[] = [];
+  const coordination = { ...matrix.coordination, report: async (...parameters: Parameters<typeof matrix.coordination.report>) => {
+    const response = await matrix.coordination.report(...parameters);
+    if (!submitted) { submitted = true; current = { ...CONTROLLER, connectionId: 'dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee' }; }
+    return response;
+  } };
+  let failed: unknown;
+  const receiving = listen({ ...matrix, coordination, control: binding.connection, runtime: native.runtime,
+    reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20,
+    activity: (runId, controller) => receipts.push({ runId, binding: controller }),
+  }, stop.signal).catch(error => { failed = error; return error; });
+  cleanup(scope, async () => { stop.abort(); await receiving; });
+  await until(() => { if (failed) throw failed; return receipts.length === 1; });
+  assert.notDeepEqual(current, CONTROLLER);
+  assert.deepEqual(receipts[0]!.binding, CONTROLLER, 'Receipt binds to the lease accepted by the activity request, not a later controller getter');
+  const report = matrix.requests.find(request => request.path.endsWith('/listener-runs/' + receipts[0]!.runId));
+  assert.deepEqual((report?.body as { controller: ControllerBinding }).controller, receipts[0]!.binding);
+});
 
 test('fleet gate pauses one receiver, cancels pending publication and retains unread/native identity', withClock(async (scope, clock) => {
 

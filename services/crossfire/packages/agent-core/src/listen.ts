@@ -21,7 +21,7 @@ import { deliveryEvents, resolveSenders } from './senders.js';
 import { testListener, type ListenerTest } from './diagnostic.js';
 import { releaseUpdates } from './updates.js';
 import { controlledPublisher, waitForActivation } from './listener-control.js';
-import type { ListenerControl } from './listener-control-port.js';
+import type { ControllerBinding, ListenerControl } from './listener-control-port.js';
 import type { ReadBatch } from './receive.js';
 import { scheduledPublisher } from './scheduled.js';
 import { chatPublication } from './chat-publication.js';
@@ -38,7 +38,7 @@ export type ListenerOptions = {
   storage: LocalState;
   transport: Transport;
   invitationRooms: (signal: AbortSignal) => Promise<readonly string[]>;
-  activity?: (runId: string) => void;
+  activity?: (runId: string, binding: ControllerBinding) => void;
   ready?: (test: () => Promise<ListenerTest>, queries: HistoryQueries) => void;
   release: Manifest;
   coordination: Coordination;
@@ -274,12 +274,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   });
   async function startActivity(): Promise<void> {
     if (activity) return;
-    try { activity = await reportActivity(options.coordination, options.id, options.release, signal, { ...options.control.binding() }, options.clock, statistics, release => { updates.available(release); changed(); }); }
-    catch (error) { throw error; }
+    const binding = { ...options.control.binding() };
+    activity = await reportActivity(options.coordination, options.id, options.release, signal, binding, options.clock, statistics, release => { updates.available(release); changed(); });
     activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
     reportingRun = activity.runId; runReady(); approval.start(); observer.start(activity.runId);
-    options.activity?.(activity.runId);
+    options.activity?.(activity.runId, binding);
   }
   try {
     if (approval) {

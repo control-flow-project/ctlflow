@@ -48,7 +48,7 @@ wire_api = "responses"
 requires_openai_auth = false
 request_max_retries = 0
 stream_max_retries = 0
-`);
+`, { mode: 0o600 });
   return { requests, held: () => held,
     hold: () => { held = undefined; holdNext = true; },
     finish: () => { assert(held); finish(held); held = undefined; },
