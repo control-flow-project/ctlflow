@@ -15,6 +15,7 @@
 
 ## Architecture evidence
 - [Listener, sleep and report-publication review](proposals/20261005-listener-and-publication-architecture.md)
+- [Universal fleet controller verification](verification/20261005-universal-fleet-controller.md)
 
 The review records the inspected baseline and the current managed design. It is
 not a second specification or proof of deployment. fleetd owns the shared listener;

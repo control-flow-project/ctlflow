@@ -103,28 +103,37 @@ handoff. Workers do not publish, deploy, push or activate fleets.
 
 ## Sequenced plan
 
-1. **In progress — Lock contracts and shared base.** Verify latest merged source
+1. **Completed — Lock contracts and shared base.** Verify latest merged source
    and clean trees, inventory affected consumers and data, write this plan/ledger,
    establish a feature branch, convert all npm names consistently, update the
    standing instructions, and prove bounded build/test process groups before
    creating full-context workers.
-2. **Pending — Implement the universal controller model.** Complete fleet-only
+2. **Completed — Implement the universal controller model.** Complete fleet-only
    coordination, noninteractive setup/distribution and managed runtime ownership
    in disjoint worktrees. Preserve existing identities/history and remove the
    superseded implementation rather than layering a bridge around it.
-3. **Pending — Complete UI and consumer replacement.** Integrate simplified
+3. **Completed — Complete UI and consumer replacement.** Integrate simplified
    management, npm onboarding, intentional client tools, CLI examples, skills,
    release artifacts and all affected owned configuration/documentation.
-4. **Pending — Integrate and audit actual changes.** Review every worker diff,
+4. **Completed — Integrate and audit actual changes.** Review every worker diff,
    integrate into the feature branch, correct ownership/security/invariant gaps,
    and prove the removed routes/payloads/runtime values cannot still execute.
-5. **Pending — Verify the complete installed product.** Run the full bounded
+5. **Completed — Verify the complete installed product.** Run the full bounded
    typecheck/build/test/architecture/installation sequence, native Codex lifecycle
    and real browser checks, clean-directory public-package installation and
    read-only production-state inventory. Publish only verified public artifacts
    if authorized registry credentials permit; otherwise report the exact external
    dependency without claiming publication. No production deployment or fleet
    activation is authorized by this task.
+
+Implementation, integration, installed-package verification and read-only
+production preservation are complete. Registry publication is explicitly
+deferred: `npm whoami` returned E401 Unauthorized. No package was published and
+no production deployment, activation or migration occurred. Native Linux
+Codex/inert-provider evidence does not certify macOS or paid providers. Stock
+Codex's surviving writer after fleetd-only SIGKILL remains a demonstrated native
+limitation, not an implemented automatic-recovery guarantee. The complete final
+record is [the verification report](../verification/20261005-universal-fleet-controller.md).
 
 ## Verification and safety gates
 
