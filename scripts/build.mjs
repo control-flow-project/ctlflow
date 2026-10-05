@@ -58,6 +58,7 @@ async function buildProduct(service) {
   }
   await bundle({ entryPoints: entries, outdir: join(root, 'dist'), outbase: root, platform: 'node', format: 'esm', target: 'node26' });
   if (service === 'crossfire') await command(process.execPath, [join(root, 'dist/scripts/build-release.js'), '--root', root], root);
+  else await command(process.execPath, [join(root, 'scripts/build-package.mjs')], root);
 }
 
 export async function buildProducts(selected) {

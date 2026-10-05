@@ -1,12 +1,14 @@
 import type { Manifest } from './release.js';
+import * as check from './schema/validation.js';
+import { endpoint } from './origin.js';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 
-export type SetupDescriptor = {
-  schemaVersion: 1;
-  server: string;
-  ownerMatrixId: string;
-  package: { name: '@ctlflow/fleet'; version: string };
-  instructions: string;
-};
+export const setupVersion = check.refine(check.text(100), value => /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/u.test(value), 'Use one exact npm version');
+const setupOrigin = check.refine(check.text(2048), value => { const parsed = endpoint(value); return parsed.ok && parsed.value === value; }, 'Use an exact HTTPS or loopback HTTP origin');
+const schemaVersion: check.Parser<1> = value => value === 1 ? success(1) : failure('invalid', 'Unsupported setup descriptor');
+export const setupDescriptorSchema = check.object({ schemaVersion, server: setupOrigin, ownerMatrixId: check.matrixUserId,
+  package: check.object({ name: check.choice('@ctlflow/fleet'), version: setupVersion }), instructions: check.plainText(128 * 1024) });
+export type SetupDescriptor = check.Parsed<typeof setupDescriptorSchema>;
 
 function quote(value: string): string { return "'" + value.replaceAll("'", "'\\''") + "'"; }
 export function onboardingUrl(origin: string, owner: string): string {
@@ -66,7 +68,7 @@ export function onboardingGuide(origin: string, owner: string, release: Manifest
     'Repeated setup reuses the selected project, controller, fleet, identities and histories. It never silently upgrades software or activates explicitly stopped sessions. Errors are actionable failures, not prompts to guess another identity.',
     '',
     '## 3. Confirm readiness and room access',
-    'Setup returns the fleet identity and model-free readiness result. Use fleet status for a read-only follow-up. A controller process or saved credentials alone do not prove delivery is ready. Busy, paused, sleeping and stopped states are distinct; no artificial test message or model turn is needed.',
+    'Setup returns the fleet identity and model-free readiness result. Use fleet daemon status and fleet show FLEET_KEY for read-only follow-up, using the returned fleet key. A controller process or saved credentials alone do not prove delivery is ready. Busy, paused, sleeping and stopped states are distinct; no artificial test message or model turn is needed.',
     'Enrollment creates no rooms or conversations. Humans create rooms in Element and invite the agent; authorized invitations grant read/reply access. Wake-up rules separately determine which senders trigger a turn. The first owner DM, actual terminal output or pending decision establishes a protected private owner conversation.',
     'The managed agent can check its receiver using node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent test. It does not start a listener, make a model call or advance unread positions.',
     'Report the setup result and ' + origin + '/manage/fleets to the human. Lifecycle, fresh-history confirmations, model parameters, terminal pointers and software versions are available in management.',
