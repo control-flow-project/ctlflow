@@ -11,7 +11,7 @@ import { failure } from '@crossfire/kernel/result';
 import { listenerInput } from './listener-protocol.js';
 import { createListenerBudget } from '@crossfire/agent-core/budget';
 
-type BindingOptions = { cursorFile: string; release: string; binding: string; session: () => string; stop: () => Promise<void> };
+type BindingOptions = { cursorFile: string; release: string; binding: string; session: () => string; stop: () => void };
 type Binding = BindingOptions & { secret: string; file: string; diagnose?: () => Promise<ListenerTest>; queries?: HistoryQueries };
 export type ListenerHost = Awaited<ReturnType<typeof createListenerHost>>;
 
@@ -29,10 +29,12 @@ export async function createListenerHost() {
       || !timingSafeEqual(Buffer.from(token), Buffer.from(binding.secret))) { response.writeHead(403).end(); return; }
     if (inFlight >= 16) { response.writeHead(429).end(JSON.stringify({ error: 'Listener host request capacity reached' })); return; }
     inFlight++;
+    let queryAction = false;
     try {
       const parsed = listenerInput(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await collect(request, 65536))) as unknown);
       if (!parsed.ok) { response.writeHead(400).end(JSON.stringify({ error: parsed.error.message })); return; }
       const input = parsed.value;
+      queryAction = input.action === 'read' || input.action === 'acknowledge';
       const status = { release: binding.release, binding: binding.binding, session: binding.session(), ready: !!binding.diagnose };
       if (input.action === 'read' || input.action === 'acknowledge') {
         if (!binding.queries) { response.writeHead(409).end(JSON.stringify(failure('unavailable', 'Listener is not ready'))); return; }
@@ -41,13 +43,14 @@ export async function createListenerHost() {
         if (Buffer.byteLength(body) > 1024 * 1024) throw new Error('Listener query result exceeds its resource bound');
         response.writeHead(result.ok ? 200 : 409).end(body); return;
       }
-      if (input.action === 'stop') response.once('finish', () => { void binding.stop().catch(error => server.emit('error', error)); });
+      if (input.action === 'stop') binding.stop();
       if (input.action === 'test') {
         if (!binding.diagnose) throw new Error('Listener is not ready');
         response.end(JSON.stringify({ ...status, test: await binding.diagnose() }));
       } else response.end(JSON.stringify(status));
     } catch (error) {
-      response.writeHead(400).end(JSON.stringify({ error: error instanceof Error ? error.message.slice(0, 1024) : 'Listener control failed' }));
+      const message = error instanceof Error ? error.message.slice(0, 1024) : 'Listener control failed';
+      response.writeHead(400).end(JSON.stringify(queryAction ? failure('unavailable', message) : { error: message }));
     } finally { inFlight--; }
   });
   server.requestTimeout = 45000;
@@ -66,7 +69,7 @@ export async function createListenerHost() {
       return {
         ready(test: () => Promise<ListenerTest>, queries: HistoryQueries): void { binding.diagnose = test; binding.queries = queries; },
         close(): void {
-          bindings.delete(options.binding); binding.diagnose = undefined; binding.queries = undefined;
+          bindings.delete(options.binding); delete binding.diagnose; delete binding.queries;
           if (existsSync(binding.file)) unlinkSync(binding.file);
         },
       };

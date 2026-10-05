@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result, type Failure } from '@crossfire/kernel/result';
 import type { Clock } from '@crossfire/agent-core/port';
 import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState } from '@crossfire/agent-core/runtime';
 import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
@@ -39,6 +39,8 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   let activeCalls = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
   let cancelIdle: (() => void) | undefined;
   let failedEpisode = false;
+  let configured = false;
+  let initializationFailure: Failure | undefined;
 
   function report(error: unknown): void {
     if (lifetime.aborted) return;
@@ -73,9 +75,12 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   }
   async function refreshContexts(): Promise<void> {
     const saved = await services.saved();
-    if (!saved.ok) throw nativeError(saved.error.code, saved.error.message);
+    if (!saved.ok) { initializationFailure = saved.error; throw nativeError(saved.error.code, saved.error.message); }
     const primary = saved.value.find(context => context.context === services.primary);
-    if (!primary || primary.sessionId !== sessionId) throw nativeError('conflict', 'Saved native history changed while its listener binding was active');
+    if (!primary || primary.sessionId !== sessionId) {
+      initializationFailure = { code: 'conflict', message: 'Saved native history changed while its listener binding was active' };
+      throw nativeError(initializationFailure.code, initializationFailure.message);
+    }
     contexts = saved.value;
   }
   async function discard(connection: OwnedRuntimeConnection): Promise<void> {
@@ -94,10 +99,13 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       phase = 'waking';
       emit('waking', contexts.filter(context => context.context === services.primary));
       const started = await services.start(lifetime, observe);
-      if (!started.ok) throw nativeError(started.error.code, started.error.message);
+      if (!started.ok) { initializationFailure = started.error; throw nativeError(started.error.code, started.error.message); }
       const connection = started.value;
       if (lifetime.aborted) { await connection.close(); lifetime.throwIfAborted(); }
-      if (sessionId && connection.sessionId !== sessionId) { await connection.close(); throw nativeError('conflict', 'Resume returned a different native history; fresh history was not authorized'); }
+      if (sessionId && connection.sessionId !== sessionId) {
+        await connection.close(); initializationFailure = { code: 'conflict', message: 'Resume returned a different native history; fresh history was not authorized' };
+        throw nativeError(initializationFailure.code, initializationFailure.message);
+      }
       sessionId = connection.sessionId;
       native = connection;
       await refreshContexts();
@@ -168,8 +176,9 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     return {
       sessionId: expectedSession, signal: lifetime, approval: native?.approval ?? 'runtime',
       lifecycle: { current: () => ({ phase, lastActivityAt, historyAvailable: !!sessionId }), configureIdle: seconds => {
-        if (!Number.isSafeInteger(seconds) || seconds < 0 || seconds > 86400 * 365) throw new Error('Invalid native idle timeout');
+        if (!Number.isSafeInteger(seconds) || seconds < 0 || seconds > 604800) throw new Error('Invalid native idle timeout');
         idleSeconds = seconds; schedule();
+        if (!configured) { configured = true; for (const observation of observations.values()) services.hooks.observe?.({ kind: 'state', observation }); }
       } },
       inspect: async () => {
         if (!native || native.signal.aborted) return { busy: phase === 'waking' || phase === 'failed' || !!opening || activeCalls > 0 };
@@ -182,7 +191,9 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       },
       recover: async (text, messageId) => {
         unsettled.add(messageId);
-        return call(async connection => (await selected(connection)).recover(text, messageId), true);
+        const received = await call(async connection => (await selected(connection)).recover(text, messageId), true);
+        if (!received) { unsettled.delete(messageId); schedule(); }
+        return received;
       },
       settle: async () => {
         if (!native && !services.hooks.pendingInput?.() && !services.hooks.pendingDecisions?.()) return false;
@@ -238,7 +249,6 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       }, close });
   } catch (error) {
     await close();
-    return failure(error instanceof Error && 'code' in error && permanent(error) ? 'conflict' : 'native',
-      error instanceof Error ? error.message : 'Native listener binding could not initialize');
+    return initializationFailure ? { ok: false, error: initializationFailure } : failure('native', error instanceof Error ? error.message : 'Native listener binding could not initialize');
   }
 }

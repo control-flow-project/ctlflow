@@ -19,7 +19,7 @@ export async function listen(options: ListenerOptions, signal: AbortSignal): Pro
   try {
     host = options.host ?? await createListenerHost();
     endpoint = host.bind({ cursorFile: options.cursorFile, release: options.release.release, binding: options.binding, session: () => session,
-      stop: async () => { stop.abort(listenerStop('Listener disconnected by its local control')); } });
+      stop: () => { stop.abort(listenerStop('Listener disconnected by its local control')); } });
     await receive({ ...options, budget: host.budget, runtime: async (...arguments_) => { const runtime = await options.runtime(...arguments_); session = runtime.sessionId; return runtime; },
     ready: (test, queries) => { endpoint!.ready(test, queries); options.ready?.(test, queries); },
     clock: options.clock ?? nativeClock, storage: localState, invitationRooms: async scope => {

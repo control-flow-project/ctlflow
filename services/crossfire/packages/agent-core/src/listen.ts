@@ -143,7 +143,8 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let lastInvitationCheck = -Infinity;
   const changed = () => { revision++; wake?.(); };
   pendingInput = () => acquiring || controlling || sending !== undefined || completed !== undefined || chat.pending()
-    || !!controlled?.pending() || queries.pending() || cycle !== undefined;
+    || !!controlled?.pending() || scheduled.pending() || queries.pending() || cycle !== undefined
+    || state.controls.some(control => control.status === 'interrupting' || control.status === 'interrupted');
   async function retry<Result>(operation: () => Promise<Result>, scope = signal): Promise<Result> {
     for (let failures = 0; ; failures++) {
       try { return await operation(); }
@@ -155,9 +156,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     }
   }
   async function work<Result>(operation: (client: Matrix, scope: AbortSignal) => Promise<Result>): Promise<Result> {
+    const base = AbortSignal.any([signal, ...(options.control ? [options.control.current().signal] : [])]);
+    const release = await budget.acquire('acquisition', base);
     const deadline = options.clock.deadline(options.reconcileMs);
-    const scope = AbortSignal.any([signal, deadline, ...(options.control ? [options.control.current().signal] : [])]);
-    const release = await budget.acquire('acquisition', scope);
+    const scope = AbortSignal.any([base, deadline]);
     try {
       return await operation(options.transport(scope, Math.min(45_000, options.reconcileMs)), scope);
     } catch (error) {

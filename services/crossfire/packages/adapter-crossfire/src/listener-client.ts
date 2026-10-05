@@ -7,7 +7,8 @@ import { failure, type Result } from '@crossfire/kernel/result';
 import { listenerRecord, listenerStatus, historyResult, type ListenerRequest, type LocalListener, type HistoryResult } from './listener-protocol.js';
 export type { LocalListener } from './listener-protocol.js';
 
-export function listenerRequest(state: string, input: Extract<ListenerRequest, { action: 'read' | 'acknowledge' }>): Promise<Result<HistoryResult> | null>;
+export function listenerRequest(state: string, input: Extract<ListenerRequest, { action: 'read' }>): Promise<Result<Extract<HistoryResult, { text: string }>> | null>;
+export function listenerRequest(state: string, input: Extract<ListenerRequest, { action: 'acknowledge' }>): Promise<Result<Extract<HistoryResult, { accepted: true }>> | null>;
 export function listenerRequest(state: string, input: Extract<ListenerRequest, { action: 'status' | 'stop' | 'test' }>): Promise<Result<LocalListener> | null>;
 export async function listenerRequest(state: string, input: ListenerRequest): Promise<Result<LocalListener | HistoryResult> | null> {
   const file = join(state, 'listener.json');
