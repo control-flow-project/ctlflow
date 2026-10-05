@@ -5,7 +5,6 @@ import { once } from 'node:events';
 import { promisify } from 'node:util';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { readProfile } from '@ctlflow/crossfire-adapter-filesystem/project';
@@ -16,6 +15,7 @@ import { fleetView } from '@ctlflow/fleetd-contracts/api';
 import { nativeServer } from './support/native-server.js';
 import { value } from './support/application.js';
 import { ownerSession } from './support/owner-session.js';
+import { installedFleet } from './support/public-fleet.js';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { until } from '../scripts/test-support/listener.js';
 import { builtRelease } from '../scripts/test-support/release.js';
@@ -36,7 +36,7 @@ test('public fleet setup starts a separate native history, reuses identity and p
   const { services, origin, worker, admin } = fixture;
   const environment = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'configuration'),
     CODEX_THREAD_ID: existing.session, RUNCODEX_CONNECTION_FILE: join(home, 'connection.json') };
-  const executable = fileURLToPath(import.meta.resolve('@ctlflow/fleet/executable'));
+  const executable = await installedFleet();
   const cli = (...args: string[]) => execute(process.execPath, [executable, '--root', root, ...args], {
     cwd: project, env: environment, timeout: 70_000, maxBuffer: 256 * 1024,
   });
@@ -129,6 +129,17 @@ test('public fleet setup starts a separate native history, reuses identity and p
   assert.equal(resumed.instances[0]!.phase, 'running');
   assert.equal(resumed.instances[0]!.sessionId, agent.sessionId, 'Default start resumes the exact managed native history');
   assert.deepEqual(readFileSync(profilePath), profileBytes);
+  assert.equal(provider.requests.length, 0);
+  assert.equal(existing.child.exitCode, null);
+  await cli('stop', first.fleetKey);
+  const preservedHistory = readFileSync(join(privateState, '.codex/crossfire-session.json'));
+  await cli('remove', first.fleetKey);
+  const archived = value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: first.fleetKey }));
+  assert(archived?.archivedAt !== null && archived?.archivedAt !== undefined, 'CLI removal archives through the same receipt-gated domain operation as management');
+  assert.deepEqual(readFileSync(profilePath), profileBytes);
+  assert.deepEqual(readFileSync(join(privateState, '.codex/crossfire-session.json')), preservedHistory);
+  assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1, 'Archival retains the enrolled identity');
+  await assert.rejects(cli('setup'), 'Repeated setup cannot reactivate an archived fleet');
   assert.equal(provider.requests.length, 0);
   assert.equal(existing.child.exitCode, null);
 });

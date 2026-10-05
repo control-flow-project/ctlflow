@@ -23,7 +23,7 @@ export function enrollmentRoutes() {
     bind(operations.fleets, (context, _params, query) => paged(listFleets(context.services, actor(context), query), view.fleet)),
     bind(operations.fleet, (context, params) => reply(readFleet(context.services, fleetActor(context), params.fleetId), view.fleet)),
     bind(operations.changeFleet, (context, params, _query, input) => reply(changeFleet(context.services, fleetActor(context), params.fleetId, input, context.requestId), view.fleet)),
-    bind(operations.archiveFleet, (context, params, _query, input) => acknowledged(archiveFleet(context.services, actor(context), params.fleetId, input.expectedRevision, context.requestId))),
+    bind(operations.archiveFleet, (context, params, _query, input) => acknowledged(archiveFleet(context.services, fleetActor(context), params.fleetId, input.expectedRevision, context.requestId))),
     bind(operations.fleetAgents, (context, params, query) => paged(listFleetAgents(context.services, fleetActor(context), params.fleetId, query),
       value => ({ instanceKey: value.instanceKey, agent: agent(value.agent) }))),
     bind(operations.removeFleetAgent, async (context, params, _query, input) => acknowledged(await removeFleetAgent(context.services, fleetActor(context), params.fleetId, params.agentId, input, context.requestId))),
