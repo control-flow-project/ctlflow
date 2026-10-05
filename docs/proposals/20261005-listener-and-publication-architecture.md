@@ -58,6 +58,12 @@ architecture case, duplicated control decoding and per-binding host resources,
 GET-time controller configuration mutation and unsafe coupling between native
 engine lifetime and receiver lifetime.
 
+The baseline also did not establish whole-child supervision after native failure:
+owning the engine/process group alone does not prove escaped or orphaned tool
+children are reclaimed. The supervisor correction remains pending integrated
+native evidence. Neither this historical audit nor the current design certifies
+complete descendant containment before that proof.
+
 Earlier isolated browser evidence showed parent-domain cookie injection with
 ordinary names and rejection with host-prefixed names. It also showed that
 response-sandboxed scripts execute with an opaque origin and cannot access
@@ -88,6 +94,13 @@ adapter-supplied exact receipt proof. A socket write, process start or heartbeat
 cannot acknowledge a Matrix message. Old-generation events cannot update a new
 run. Superseded lifecycle/installer/control exports are removed, not hidden
 behind a compatibility flag.
+
+Managed role/skill/admin instructions use the native adapter's single
+receipt-confirmed developer-item producer on create/resume/change. Codex must
+support `thread/inject_items`; no spoofed user prompt, ignored native setting or
+manual history writer can substitute. Content-digest idempotence, durable native
+history and exact item receipt require current integrated native proof, which is
+pending rather than implied by this review.
 
 ## Native sleep, wake and recovery
 

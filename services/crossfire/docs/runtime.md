@@ -27,6 +27,27 @@ paginated evidence, not current installation or outstanding-update claims.
 
 ## Messages and replies
 
+### Managed instructions
+
+Role, installed skill and administrator instructions use one adapter-owned
+native instruction producer for new and resumed histories and changed revisions.
+For Codex it invokes supported `thread/inject_items` with a real native
+`role: "developer"` message containing `input_text`, not a disguised user prompt
+or a model-dependent setting. This creates no turn/model call and persists in
+the exact native history.
+
+The private journal compares a stable content digest and confirms the exact
+session/history/item ID, developer role and text. Unchanged confirmed instructions
+are not appended again; lost replies require receipt recovery before any append.
+Changing skills/roles uses this same producer, never a direct native-history edit
+or settings-update fallback. These receipts do not consume unread Matrix input.
+Native capability inspection rejects a binary without the required method before
+enrollment/start; there is no guessed additional minimum version. The normative
+behavior requires the pending integrated native proof, not a documentation claim
+that every native version/model has already been certified.
+
+### Delivered context
+
 Delivered chat includes the coordination instance and verified owner, native
 room/event/sender IDs, native event time or explicit unknown, room/DM
 classification, observable name/alias and verified sender relationships:

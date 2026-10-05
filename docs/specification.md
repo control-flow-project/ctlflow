@@ -329,7 +329,8 @@ First fleet start:
 No agent is asked to discover ports, UUIDs, tokens, download releases, approve
 itself, poll enrollment or report telemetry. Runtime connection metadata is passed
 directly between code components, never copied through prompts. Codex receives
-role/coordination instructions through native configuration. Starting, enrollment,
+role/coordination instructions through the adapter's receipt-confirmed native
+developer-instruction producer. Starting, enrollment,
 connection, release verification, filtering, approvals and heartbeats make zero
 model calls. An authorized task/message is what starts model work.
 
@@ -357,9 +358,10 @@ histories, workspace trust or approval bypasses from the coding session.
 Subsequent starts retain the managed home's authentication. Optional workspace
 configuration changes native cwd, not private identity/state ownership.
 No controller credential enters model context.
-Native thread creation and resumption receive the validated model, reasoning,
-permission and instruction configuration. An initial native history read persists
-an empty session without a dummy prompt, allowing zero-turn resumption.
+Native thread creation and resumption receive validated model, reasoning and
+permission configuration. Instructions use the separate canonical native producer
+below, not a model-dependent configuration setting. Its durable developer item
+materializes a zero-turn native history without a dummy user prompt or model call.
 Normal stop closes the listener and owned Codex process. Descendant-process
 supervision and crash-proof tool cleanup are not product guarantees.
 
@@ -1625,10 +1627,31 @@ calling coding session, discover arbitrary processes or ask for a name.
 An explicitly selected profile or the uniquely saved profile must be unambiguous.
 
 First startup creates the managed native history; later startup resumes that
-exact history. Initial native history materialization persists an empty history
-without a dummy user message. No runtime-session import or history copying is
-part of setup. Model, sandbox, approval and role instructions come through the
-same validated native options owner on creation and resumption.
+exact history. Initial instruction publication materializes zero-turn native
+history without a dummy user message. No runtime-session import or history copying is
+part of setup. Model, sandbox and approval use validated native configuration;
+role/skill/admin instruction text uses the single receipt-confirmed developer
+producer on creation, exact resumption and changed instruction revisions.
+
+The Codex adapter's canonical `applyNativeInstructions` producer uses supported
+`thread/inject_items` with an actual native message `role: "developer"` and
+`content: [{type: "input_text", text}]`. It runs only against the exact idle owned
+context before task publication and makes no turn/model call. Native generated-
+schema capability inspection requires this actual method before enrollment/start;
+unsupported binaries fail with an actionable prerequisite error. No additional
+minimum-version claim substitutes for the selected binary's protocol capability.
+
+A private durable instruction journal owns the stable content digest and exact
+submission identity. Confirmation requires the matching native history path,
+session, developer role, item ID and unchanged text. Lost responses recover from
+that exact receipt before another append; unchanged confirmed revisions do not
+append duplicates. Changed role, skill or administrator text uses the same
+producer and remains in retained native history across resume. Instruction
+receipts do not acknowledge Matrix input or advance unread cursors. There is no
+`developerInstructions`/settings-update fallback, spoofed user message,
+model-dependent branch or direct rollout-file writer. Integrated native proof
+must establish these guarantees; documentation or a worker fixture alone is not
+certification of the shipped protocol behavior.
 
 Shared bounded publication journals and native-file validation belong to
 `adapter-runtime`; native transport, settings, history, permissions and terminal
@@ -1937,7 +1960,8 @@ runs `fleet daemon restart` with the selected private root.
 Controller update verifies local bundled artifacts, stops/switches the selected
 execution and resumes only previously desired-active targets with their exact
 saved histories. Explicitly stopped targets remain stopped. Changed skill content
-is read through the native instruction path. Identity, grants, unread positions,
+is applied through the same receipt-confirmed native developer-instruction
+producer, including when resuming an existing history. Identity, grants, unread positions,
 pending receipts and stop intent are preserved; no new identity or competing
 receiver is created. Detection, installation and reporting are model-free.
 Remote CLI update requires `--release-directory` naming already installed remote

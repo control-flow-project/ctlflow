@@ -19,8 +19,16 @@ hardware.
 The Codex adapter validates the installed executable, selected features and
 provider prerequisites without a model call. It launches stock Codex with a
 private authenticated loopback WebSocket and creates or resumes the exact saved
-native history. Role/model/reasoning/permission settings reach native thread
+native history. Model/reasoning/permission settings reach native thread
 configuration directly; the daemon does not interpret provider-specific settings.
+Role, skill and administrator text uses one adapter-owned native instruction
+producer with supported `thread/inject_items`, an actual developer-role
+`input_text` message and no turn/model call. Creation, exact resume and changed
+instructions share that producer. Stable content digests and exact native
+session/history/item/role/text receipts prevent duplicate append after lost
+responses or unchanged revisions; native capability inspection rejects binaries
+without the method. No additional minimum-version claim, settings-update fallback,
+spoofed user prompt or direct history writer replaces native support.
 
 The mandatory private instance `stateDirectory` owns credentials, delivery state,
 tool release and native home. Native cwd normally uses that work area, or an
@@ -30,8 +38,8 @@ cwd is not identity discovery. First-use provider/model configuration and privat
 login may be copied into the managed home, but coding-session histories, workspace
 trust and approval bypasses are not. Subsequent starts use retained private state.
 
-An initial native history read materializes a new empty session without synthetic
-input, so zero-turn startup can later resume. Existing saved histories are never
+The durable native developer item materializes history without a synthetic user
+prompt or model turn, so zero-turn startup can later resume. Existing saved histories are never
 silently replaced. Shared mode uses one conversation across eligible rooms/DMs;
 per-room mode selects distinct retained native histories behind the same agent
 binding. It does not create another agent/process per room or replay one history
@@ -58,6 +66,11 @@ retaining history. Transient failure recovery first verifies cleanup, then resum
 the same parameters, installed release and receipt state with bounded backoff.
 Permanent authority/configuration failures require action; uncertain cleanup
 cannot start a competing engine.
+
+Whole-child/orphan supervision is not certified by native process-group ownership.
+The baseline descendant-cleanup limitation and its proposed supervisor correction
+remain pending integrated native evidence; do not infer complete tool-process
+containment from a stopped engine or a clean protocol connection.
 
 Idle sleep defaults to thirty minutes and stops native processes only after every
 history is confirmed idle with settled input/publication/decisions. fleetd remains
@@ -108,6 +121,10 @@ Separate histories do not isolate shared workarea files, tools or an unrestricte
 OS user. Public reports remain public regardless of their unguessable link.
 
 ## Verification owners
+
+The instruction producer and whole-child/orphan supervision corrections require
+current integrated native evidence. This documentation records their contract and
+the pending proof boundary, not successful release or platform certification.
 
 Protocol and lifecycle evidence belongs to maintained native/runtime tests,
 not a launcher demo or documentation assertion:
