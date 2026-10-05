@@ -10,6 +10,12 @@ import { withHuman, type Credentials } from '../auth.js';
 import { checkPaperLayout } from './layout.js';
 import { managementViews, managementViewports } from './views.js';
 
+export function browserFailureMessage(error: unknown, secrets: readonly (string | undefined)[]): string {
+  let message = error instanceof Error ? error.message : 'Unknown browser verification failure';
+  for (const secret of secrets) if (secret) message = message.replaceAll(secret, '[redacted]');
+  return message.slice(0, 8192);
+}
+
 export async function verifyBrowser(origin: string, account: Credentials, executable: string, evidence: string, signal: AbortSignal) {
   const directory = privateDir(evidence);
   return withHuman(origin, account, signal, async human => {
@@ -83,16 +89,15 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
           await page.screenshot({ path: join(directory, viewport.width + '-' + view.route.replaceAll('/', '-') + '.png'), fullPage: true });
         }
       }
-      await page.goto(origin + '/manage/connect');
       phase = 'personalized setup guide';
+      await page.goto(origin + '/manage/connect');
       await page.getByText('Requirements & advanced configuration', { exact: true }).click();
       const link = await page.getByRole('link', { name: 'Read the full guide for your account →', exact: true }).getAttribute('href');
       if (!link || new URL(link, origin).searchParams.get('ownerMatrixId') !== account.matrixUserId) return failure('native', 'Onboarding link does not identify the signed-in user');
       if (errors.length) return failure('native', 'Management browser reported a page error');
       return success({ origin, human: account.matrixUserId, managementRoutes: views.length * managementViewports.length, screenshots: directory, modelCalls: 0 });
     } catch (error) {
-      let message = error instanceof Error ? error.message.slice(0, 8192) : 'Unknown browser verification failure';
-      for (const secret of [account.password, human.nativeAccessToken, token, csrf]) if (secret) message = message.replaceAll(secret, '[redacted]');
+      const message = browserFailureMessage(error, [account.password, human.nativeAccessToken, token, csrf]);
       writeJson(join(directory, 'failure.json'), { phase, message });
       return failure('native', 'Browser management verification failed at ' + phase + '; inspect the private evidence directory');
     }

@@ -5,13 +5,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { publicRouter } from '../apps/server/src/router.js';
-import { verifyBrowser } from '../tools/browser/verify.js';
+import { browserFailureMessage, verifyBrowser } from '../tools/browser/verify.js';
 import { managementViews, managementViewports } from '../tools/browser/views.js';
 import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { operatorFixture } from './support/operator.js';
 import { value } from './support/application.js';
 import { secureRouter, browserExecutable } from './support/tls.js';
+
+test('browser diagnostics redact complete credentials before bounding output, including a cutoff-crossing secret', () => {
+  const prefix = 'x'.repeat(8100), secret = 'sensitive'.repeat(32);
+  assert.equal(browserFailureMessage(new Error(prefix + secret + ' end'), [undefined, '', secret]), prefix + '[redacted] end');
+  assert.equal(browserFailureMessage(new Error('x'.repeat(9000)), []).length, 8192);
+  assert.equal(browserFailureMessage('untrusted message', []), 'Unknown browser verification failure');
+});
 
 test('operator browser waits for authenticated management, checks real views and logs out both sessions', { timeout: 120000 }, async scope => {
   const fixture = await operatorFixture(scope);

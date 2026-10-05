@@ -116,3 +116,23 @@ private dependencies/secrets, pinned tool bytes and installed commands. Registry
 publication is a separate authenticated action after those checks; a successful
 local pack is not a published release. npm setup is the sole user installation
 path, not an alternative to an HTTP bootstrap installer.
+
+After all gates pass, an operator with npm publishing authority for `@ctlflow`
+packs the two explicit products and publishes the daemon before its pinned CLI:
+
+```sh
+umask 077
+packages=$(mktemp -d)
+npm whoami
+npm pack ./services/fleetd --ignore-scripts --pack-destination "$packages"
+npm pack ./services/fleet --ignore-scripts --pack-destination "$packages"
+npm publish "$packages/ctlflow-fleetd-0.1.0.tgz" --access public --ignore-scripts
+npm publish "$packages/ctlflow-fleet-0.1.0.tgz" --access public --ignore-scripts
+```
+
+Use the actual coordinated version's verified filenames when releasing another
+version. Never publish all workspaces or an internal package. An authentication
+failure is a publication dependency, not permission to bypass registry controls
+or use another installation path. Publish both exact artifacts before deploying
+Crossfire's matching npm setup descriptor. Registry authentication may require a
+human; this is separate from zero-question product setup and enrollment approval.
