@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { AgentView, FleetView } from '@ctlflow/crossfire-contracts/schema/response';
 import type { InputOf } from '@ctlflow/crossfire-contracts/rest/operation';
 import { call, operations, useAction, useResource } from './api.js';
@@ -10,8 +10,15 @@ import { canManageFleet } from './fleet-authority.js';
 export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; agent?: AgentView; refresh(): void }) {
   const viewer = useSession(), action = useAction();
   const [request, setRequest] = useState<InputOf<typeof operations.requestFleetRuntime>>(), [accepted, setAccepted] = useState('');
+  const [pendingReceipt, setPendingReceipt] = useState<string>();
   const query = new URLSearchParams({ page: new URLSearchParams(location.search).get('sessionsPage') ?? '1', pageSize: '10' });
   const history = useResource(operations.fleetRuntimeOperations, { fleetId: fleet.fleetId }, query.toString(), 3000);
+  useEffect(() => {
+    if (!pendingReceipt || history.result?.ok !== true) return;
+    const operation = history.result.value.data.find(value => value.operationId === pendingReceipt);
+    if (operation?.status !== 'succeeded' && operation?.status !== 'failed') return;
+    setPendingReceipt(undefined); refresh();
+  }, [pendingReceipt, history.result, refresh]);
   const busy = history.result?.ok === true && history.result.value.data.some(operation => operation.status === 'pending' || operation.status === 'running');
   const allowed = canManageFleet(fleet) && (!agent || agent.allowedActions.includes('configure'));
   const disabled = action.pending || history.result?.ok !== true || busy || !allowed || fleet.delivery.connection.status !== 'online';
@@ -33,6 +40,7 @@ export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; age
       const query = new URLSearchParams(location.search); query.set('sessionsPage', '1');
       window.history.replaceState(null, '', location.pathname + '?' + query);
       setAccepted(operation.status === 'pending' || operation.status === 'running' ? 'Requested. The controller’s outcome appears below.' : 'This request has already completed. Its outcome appears below.');
+      setPendingReceipt(operation.status === 'pending' || operation.status === 'running' ? operation.operationId : undefined);
       setRequest(undefined); history.refresh(); refresh();
     });
   }
@@ -57,7 +65,8 @@ export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; age
       <p>Shared or per-room native history follows each agent’s fleet configuration. A reporting listener does not mean its native engine is running.</p></Help>
   </Panel>;
 }
-export function AgentSessions({ agent }: { agent: AgentView }) {
+export function AgentSessions({ agent, refresh }: { agent: AgentView; refresh(): void }) {
   const resource = useResource(operations.fleet, { fleetId: agent.deployment.fleetId }, '', 5000);
-  return <Loaded {...resource} retry={resource.refresh}>{({ data: fleet }) => <FleetSessions fleet={fleet} agent={agent} refresh={resource.refresh}/>}</Loaded>;
+  const refreshStatus = useCallback(() => { resource.refresh(); refresh(); }, [resource.refresh, refresh]);
+  return <Loaded {...resource} retry={resource.refresh}>{({ data: fleet }) => <FleetSessions fleet={fleet} agent={agent} refresh={refreshStatus}/>}</Loaded>;
 }

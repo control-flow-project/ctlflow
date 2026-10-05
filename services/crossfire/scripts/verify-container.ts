@@ -6,7 +6,7 @@ import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, expect } from '@playwright/test';
-import { main, imageName, runArguments } from '../apps/server/src/operator.js';
+import { main, imageName, runArguments, cgroupArguments } from '../apps/server/src/operator.js';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { ARTIFACTS } from '@ctlflow/crossfire-contracts/release';
 import { messageContent } from '@ctlflow/crossfire-adapter-matrix/message';
@@ -15,6 +15,9 @@ import { browserOptions, secureProxy } from '../tests/support/tls.js';
 
 const root = process.cwd();
 const repository = resolve(root, '../..');
+const cgroupParent = process.env.CROSSFIRE_TEST_CGROUP_PARENT ?? '';
+assert(cgroupParent, 'Run the repository-root verify:container command inside a verified bounded test scope');
+const resources = cgroupArguments(cgroupParent);
 const portProbe = createServer();
 portProbe.listen(0, '127.0.0.1'); await once(portProbe, 'listening');
 const address = portProbe.address(); assert(address && typeof address === 'object');
@@ -29,17 +32,17 @@ await main(['init', '--directory', directory, '--instance', 'verification', '--o
   '--content-origin', 'http://localhost:' + contentPort,
   '--server-name', 'verification.localhost', '--administrator', 'admin']);
 const image = imageName(repository);
-const arguments_ = runArguments(directory, image, port, contentPort);
+const arguments_ = runArguments(directory, image, port, contentPort, cgroupParent);
 const name = arguments_[arguments_.indexOf('--name') + 1]!;
 const secrets = readJson<{ administratorPassword: string }>(join(directory, 'bootstrap.json'));
 if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) {
   console.log('Building the verification image: ' + image);
-  const build = spawnSync('docker', ['build', '--file', join(root, 'Dockerfile'), '--tag', image, repository], { stdio: 'inherit', timeout: 1_800_000 });
+  const build = spawnSync('docker', ['build', ...resources, '--file', join(root, 'Dockerfile'), '--tag', image, repository], { stdio: 'inherit', timeout: 1_800_000 });
   assert.equal(build.status, 0, 'Verification image build failed');
 }
 
 async function start() {
-  const child = spawn(process.execPath, [join(root, 'crossfire'), 'start', '--directory', directory, '--port', String(port), '--content-port', String(contentPort)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(root, 'crossfire'), 'start', '--directory', directory, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', cgroupParent], { stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (data: Buffer) => { output = (output + data.toString()).slice(-24_000); });
   child.stderr.on('data', (data: Buffer) => { output = (output + data.toString()).slice(-24_000); });
@@ -78,6 +81,13 @@ try {
   for (const iteration of [0, 1]) {
     const stack = await start();
     try {
+      const parent = spawnSync('docker', ['inspect', '--format', '{{.HostConfig.CgroupParent}}', name], { encoding: 'utf8' });
+      assert.equal(parent.status, 0); assert.equal(parent.stdout.trim(), cgroupParent);
+      const containerId = spawnSync('docker', ['inspect', '--format', '{{.Id}}', name], { encoding: 'utf8' });
+      assert.equal(containerId.status, 0); assert.match(containerId.stdout.trim(), /^[a-f0-9]{64}$/u);
+      const actualGroup = spawnSync('systemctl', ['--user', 'show', 'docker-' + containerId.stdout.trim() + '.scope', '--property=ControlGroup', '--value'], { encoding: 'utf8' });
+      assert.equal(actualGroup.status, 0);
+      assert(actualGroup.stdout.trim().endsWith('/' + cgroupParent + '/docker-' + containerId.stdout.trim() + '.scope'), 'The actual runtime process group belongs to the finite Docker verification slice');
       const inspection = spawnSync('docker', ['inspect', '--format', '{{json .NetworkSettings.Ports}}', name], { encoding: 'utf8' });
       assert.equal(inspection.status, 0);
       assert.deepEqual(JSON.parse(inspection.stdout), { '8080/tcp': [{ HostIp: '127.0.0.1', HostPort: String(port) }], '8082/tcp': [{ HostIp: '127.0.0.1', HostPort: String(contentPort) }] });

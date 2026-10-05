@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
 import type { Parsed } from '@ctlflow/crossfire-contracts/schema/validation';
 import { preview } from '@ctlflow/crossfire-contracts/schema/plan';
@@ -64,12 +64,14 @@ function FleetSettings({ fleet }: { fleet: FleetView }) {
       <Help title="Technical identifiers and controller metadata"><dl><dt>Fleet key</dt><dd>{fleet.fleetKey}</dd><dt>Fleet ID</dt><dd className="mono">{fleet.fleetId}</dd>{Object.entries(fleet.controller.metadata ?? {}).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{value}</dd></Fragment>)}</dl></Help></Panel>
     <Help title="Bulk room access (advanced)"><RoomPlan fleet={fleet}/></Help><FleetRetirement fleet={fleet}/></>;
 }
-function FleetAgents({ id }: { id: string }) {
-  const agents = useResource(operations.fleetAgents, { fleetId: id }, pagingQuery(), 5000);
-  return <Panel title="Agents" description="Select an agent to manage its room access, wake-up rules or account."><Loaded {...agents} retry={agents.refresh}>{page => <>
+function FleetAgents({ fleet, refresh }: { fleet: FleetView; refresh(): void }) {
+  const agents = useResource(operations.fleetAgents, { fleetId: fleet.fleetId }, pagingQuery(), 5000);
+  const refreshStatus = useCallback(() => { agents.refresh(); refresh(); }, [agents.refresh, refresh]);
+  return <><Panel title="Agents" description="Select an agent to manage its room access, wake-up rules or account."><Loaded {...agents} retry={agents.refresh}>{page => <>
     {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Native session</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>
       <tr key={instance.instanceKey}><td><a className="record-link" href={'/manage/agents/' + instance.agent.agentId}>{instance.agent.displayName}</a></td><td>{instance.instanceKey}</td><td><Status value={instance.agent.activity.status}/></td><td><NativeRuntimeStatus agent={instance.agent}/></td><td><Status value={instance.agent.status}/></td></tr>)}</tbody></table></div>
-      : <Empty title="No agents">There are no agents on this page.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel>;
+      : <Empty title="No agents">There are no agents on this page.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel>
+    <FleetSessions fleet={fleet} refresh={refreshStatus}/></>;
 }
 function FleetActivity({ fleet }: { fleet: FleetView }) {
   const traffic = new URLSearchParams(location.search).get('view') === 'traffic', base = '/manage/fleets/' + fleet.fleetId + '/activity';
@@ -82,7 +84,7 @@ export function FleetDetail({ id, section }: { id: string; section: Exclude<Flee
   const resource = useResource(operations.fleet, { fleetId: id }, '', 5000);
   return <Page title="Fleet details" description="Agents, delivery and room access." action={<button onClick={resource.refresh}>Refresh status</button>}><a className="back" href="/manage/fleets">← Fleets</a>
     <Loaded {...resource} retry={resource.refresh}>{({ data: fleet }) => <><SubjectHeading name={fleet.label} description={<>{fleet.owner.displayName} · Controller {fleet.controller.name}</>}><Status value={fleet.delivery.connection.status}/><Status value={fleet.delivery.deliveryEnabled ? 'Delivery enabled' : 'Delivery paused'}/></SubjectHeading>
-      <FleetNavigation id={id} section={section}/>{section === 'agents' && <><FleetAgents id={id}/><FleetSessions fleet={fleet} refresh={resource.refresh}/></>}
+      <FleetNavigation id={id} section={section}/>{section === 'agents' && <FleetAgents fleet={fleet} refresh={resource.refresh}/>}
       {section === 'activity' && <FleetActivity fleet={fleet}/>} {section === 'settings' && <FleetSettings fleet={fleet}/>}
     </>}</Loaded></Page>;
 }

@@ -92,7 +92,12 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       for (const instance of instances) {
         if (command.agentId !== null && command.agentId !== instance.agentId) continue;
         const binding = control.listener(instance.agentId), proof = binding.control.binding(); binding.close();
-        const runId = command.action === 'stop' ? runtimeRuns.get(instance.agentId)! : randomUUID();
+        const previousId = runtimeRuns.get(instance.agentId);
+        const previous = previousId ? value(services.repositories.listenerRun.find({ id: previousId })) : null;
+        if (command.action === 'reset' && previous?.stoppedAt === null) value(reportListener(services,
+          { kind: 'agent', principalId: instance.agentId }, instance.agentId, previous.id,
+          { release: 'browser', controller: proof, stopped: true, messagesDelivered: 0, statistics: null }, 'browser'));
+        const runId = command.action === 'stop' ? previousId! : command.action === 'start' && previous?.stoppedAt === null ? previous.id : randomUUID();
         runtimeRuns.set(instance.agentId, runId);
         value(reportListener(services, { kind: 'agent', principalId: instance.agentId }, instance.agentId, runId,
           { release: 'browser', controller: proof, stopped: command.action === 'stop', messagesDelivered: 0, statistics: null }, 'browser'));
@@ -131,10 +136,16 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   catch (error) { scope.diagnostic('Controller session-control status: ' + JSON.stringify(control.status())); throw error; }
   assert.deepEqual(runtimeCommands, [{ action: 'start', agentId: null }], 'Default UI start is resume, not reset');
   await expect(page.getByRole('table', { name: 'Fleet agents', exact: true }).getByText('online', { exact: true })).toHaveCount(2);
+  await page.clock.install(); await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1000));
+  await page.reload();
+  await expect(page.getByRole('table', { name: 'Fleet agents', exact: true }).getByText('online', { exact: true })).toHaveCount(2);
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Stop sessions', exact: true }).click();
+  await until(() => value(services.repositories.fleetRuntimeOperation.page(fleet.id, { page: 1, pageSize: 10 })).items.some(operation => operation.action === 'stop' && operation.agentId === null && operation.status === 'succeeded'));
+  await page.clock.fastForward(3001);
   await expect(page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({ hasText: 'Stop' })).toContainText('succeeded');
   assert.deepEqual(runtimeCommands.at(-1), { action: 'stop', agentId: null });
   await expect(page.getByRole('table', { name: 'Fleet agents', exact: true }).getByText('offline', { exact: true })).toHaveCount(2);
+  await page.clock.resume();
   await page.getByText('Start over with fresh history', { exact: true }).click();
   page.once('dialog', async dialog => { assert(dialog.message().includes('replaces their model contexts')); await dialog.dismiss(); });
   await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
@@ -155,9 +166,15 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await page.getByRole('button', { name: 'Resume session', exact: true }).click();
   await expect(agentOperations.filter({ hasText: 'Resume' })).toContainText('succeeded');
   assert.deepEqual(runtimeCommands.at(-1), { action: 'start', agentId: alpha.agentId });
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1000)); await page.reload();
+  await expect(page.locator('.subject-status').getByText('online', { exact: true })).toBeVisible();
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Stop session', exact: true }).click();
+  await until(() => value(services.repositories.fleetRuntimeOperation.page(fleet.id, { page: 1, pageSize: 10 })).items.some(operation => operation.action === 'stop' && operation.agentId === alpha.agentId && operation.status === 'succeeded'));
+  await page.clock.fastForward(3001);
   await expect(agentOperations.filter({ hasText: 'Stop' })).toContainText('succeeded');
   assert.deepEqual(runtimeCommands.at(-1), { action: 'stop', agentId: alpha.agentId });
+  await expect(page.locator('.subject-status').getByText('offline', { exact: true })).toBeVisible();
+  await page.clock.resume();
   await page.getByText('Start over with fresh history', { exact: true }).click();
   page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
   assert.equal(runtimeCommands.length, 5);

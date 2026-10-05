@@ -10,6 +10,14 @@ systemd-run --user --scope --quiet \
   'npm ci --ignore-scripts && npm run typecheck && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
 ```
 
+The root container gate creates one temporary, finite user slice with the
+caller's verified memory, swap and task budget. Its test process, Docker build
+steps and runtime containers all use that exact slice; Docker does not inherit
+the calling CLI's cgroup. The gate verifies the slice and container parent and
+stops only that private test slice on completion. No persistent/global unit,
+daemon reconfiguration, production stack or fleet is touched. Run this gate
+from the root, not directly through the service workspace command.
+
 The lockfile and npm policy enforce engine versions, dependency age and disabled
 implicit installation scripts. `.npmrc` keeps a seven-day minimum release age
 with exact-name exclusions for the two verified public products,

@@ -54,6 +54,12 @@ budget plus database, filesystem and backup overhead. Expiry/deletion cleanup is
 bounded; reservations remain until cleanup succeeds.
 - [Publication limits, deletion fence and security](publications.md)
 
+The operator accepts `crossfire start --cgroup-parent EXISTING.slice` to place
+Docker build steps and its runtime container under an existing resource budget.
+It validates and passes that exact slice; it never creates host services or
+configures resource policy. Omit the flag when the operator supplies no budget.
+Repository container verification creates its own temporary bounded test slice.
+
 ## Software updates
 
 Running agent bindings report their installed tool release. A different offered

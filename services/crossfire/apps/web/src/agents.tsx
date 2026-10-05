@@ -60,7 +60,7 @@ export function AgentDetail({ id, section }: { id: string; section: AgentSection
     <a className="back" href="/manage/agents">← Agents</a><Loaded {...resource} retry={resource.refresh}>{({ data: agent }) => <>
       <SubjectHeading name={agent.displayName} description={<>{agent.owner.displayName} · {agent.owner.matrixUserId}<span className="subline">Fleet <a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a> · {agent.deployment.controllerName}</span></>}><Status value={agent.activity.status}/><NativeRuntimeStatus agent={agent} compact/><Status value={agent.status}/></SubjectHeading>
       <AgentNavigation id={id} section={section}/>{section === 'rooms' && <><AgentRooms agent={agent}/><AgentWake agent={agent}/></>}
-      {section === 'session' && <><Decisions id={id}/><AgentSessions agent={agent}/><Runtime agent={agent}/></>}
+      {section === 'session' && <><Decisions id={id}/><AgentSessions agent={agent} refresh={resource.refresh}/><Runtime agent={agent}/></>}
       {section === 'activity' && <Activity agent={agent}/>} {section === 'settings' && <><ListenerVersions agent={agent}/><Lifecycle agent={agent}/></>}
     </>}</Loaded>
   </Page>;

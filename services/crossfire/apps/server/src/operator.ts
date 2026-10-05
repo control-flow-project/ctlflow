@@ -31,22 +31,28 @@ async function command(args: string[]): Promise<void> {
     child.once('close', code => code === 0 ? resolveCommand() : reject(new Error('Docker command failed')));
   });
 }
-export function runArguments(directory: string, image: string, port: number, contentPort: number): string[] {
+export function cgroupArguments(parent?: string): string[] {
+  if (parent === undefined) return [];
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,180}\.slice$/u.test(parent)) throw new Error('Cgroup parent must be an existing systemd slice unit name');
+  return ['--cgroup-parent', parent];
+}
+export function runArguments(directory: string, image: string, port: number, contentPort: number, cgroupParent?: string): string[] {
   const name = 'crossfire-' + createHash('sha256').update(directory).digest('hex').slice(0, 16);
   return ['run', '--rm', '--name', name, '--label', 'org.crossfire.directory=' + directory,
     '--publish', '127.0.0.1:' + port + ':8080', '--publish', '127.0.0.1:' + contentPort + ':8082', '--mount', 'type=bind,"source=' + directory.replaceAll('"', '""') + '",target=/runtime',
-    '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image];
+    ...cgroupArguments(cgroupParent), '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image];
 }
 
 export async function main(args = process.argv.slice(2)): Promise<void> {
   const parsed = parseArgs({ args, allowPositionals: true, options: { directory: { type: 'string' }, instance: { type: 'string' },
     origin: { type: 'string' }, 'content-origin': { type: 'string' }, 'server-name': { type: 'string' }, administrator: { type: 'string' }, port: { type: 'string' }, 'content-port': { type: 'string' },
-    compile: { type: 'boolean' }, help: { type: 'boolean' } } });
+    'cgroup-parent': { type: 'string' }, compile: { type: 'boolean' }, help: { type: 'boolean' } } });
   const action = parsed.positionals[0];
-  if (parsed.values.help || !action) { console.log('crossfire init --directory DIR --instance NAME --origin URL --content-origin URL --server-name HOST --administrator USERNAME\ncrossfire start --directory DIR [--port PORT] [--content-port PORT] [--compile]\nPrivate files stay in DIR. Separate HTTPS main/content hosts must proxy to their respective loopback ports. Startup uses rootless Docker; Ctrl+C stops this stack.'); return; }
+  if (parsed.values.help || !action) { console.log('crossfire init --directory DIR --instance NAME --origin URL --content-origin URL --server-name HOST --administrator USERNAME\ncrossfire start --directory DIR [--port PORT] [--content-port PORT] [--compile] [--cgroup-parent EXISTING.slice]\nPrivate files stay in DIR. Separate HTTPS main/content hosts must proxy to their respective loopback ports. Startup uses rootless Docker; Ctrl+C stops this stack.'); return; }
   if (parsed.positionals.length !== 1 || !['init', 'start'].includes(action)) throw new Error('Use init or start; see --help');
-  const allowed = action === 'init' ? ['directory', 'instance', 'origin', 'content-origin', 'server-name', 'administrator'] : ['directory', 'port', 'content-port', 'compile'];
+  const allowed = action === 'init' ? ['directory', 'instance', 'origin', 'content-origin', 'server-name', 'administrator'] : ['directory', 'port', 'content-port', 'compile', 'cgroup-parent'];
   if (Object.keys(parsed.values).some(key => !allowed.includes(key))) throw new Error('Invalid option for ' + action + '; see --help');
+  const resources = cgroupArguments(parsed.values['cgroup-parent']);
   if (process.platform !== 'linux' || Number(process.versions.node.split('.')[0]) < 26) throw new Error('Linux and Node.js 26+ required');
   if (!parsed.values.directory) throw new Error('Supply an explicit --directory');
   const directory = resolve(parsed.values.directory);
@@ -73,8 +79,8 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const docker = spawnSync('docker', ['info', '--format', '{{json .SecurityOptions}}'], { encoding: 'utf8' });
   if (docker.status !== 0 || !docker.stdout.includes('rootless')) throw new Error('A working rootless Docker engine is required; no host changes are made by Crossfire');
   const image = imageName(repository);
-  if (parsed.values.compile || spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) await command(['build', '--file', join(root, 'Dockerfile'), '--tag', image, repository]);
-  const options = runArguments(directory, image, port, contentPort);
+  if (parsed.values.compile || spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) await command(['build', ...resources, '--file', join(root, 'Dockerfile'), '--tag', image, repository]);
+  const options = runArguments(directory, image, port, contentPort, parsed.values['cgroup-parent']);
   const name = options[options.indexOf('--name') + 1]!;
   let stopping = false;
   const stop = () => { if (!stopping) { stopping = true; void command(['stop', '--time', '15', name]).catch(error => console.error(String(error))); } };

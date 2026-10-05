@@ -408,6 +408,9 @@ independent of lengthy lifecycle work. A reconnect recovers the exact original
 operation ID; uncertain or failed reset is never replayed as another operation.
 Management reports pending/running/succeeded/failed outcomes, not speculative
 success, and clearly distinguishes controller connectivity from native execution.
+An observed terminal operation receipt refreshes the affected fleet agent list
+and exact agent details, not only the fleet record; polling is not the
+invalidation contract for a completed user action.
 The initial claim rechecks current human account/permissions, bound target and
 unchanged revision. It does not impersonate a login session or require the human
 to remain logged in. Storage failures leave the command pending. A running claim

@@ -20,7 +20,7 @@
     "verify:structure": "node scripts/verify-structure.mjs",
     "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@ctlflow/crossfire",
     "verify:installation": "npm run verify:installation --workspace=@ctlflow/crossfire",
-    "verify:container": "npm run verify:container --workspace=@ctlflow/crossfire"
+    "verify:container": "node scripts/verify-container.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
