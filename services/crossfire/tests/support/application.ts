@@ -10,6 +10,10 @@ import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introd
 import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
 import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
 import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
+import type { ControllerProof } from '@ctlflow/crossfire-domain/listener/controller';
 import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor } from '@ctlflow/crossfire-domain/port/services';
 import { matrixAuthorityFixture } from './matrix-authority.js';
@@ -29,6 +33,12 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
     return { ...session, actor: authenticated.actor, token };
   }
   const admin = await login(adminNative.accessToken);
+  function renewController(controller: ControllerProof) {
+    const actor = value(authenticateController(services, controller.credential));
+    const previous = value(services.repositories.fleetConnection.find(controller.fleetId));
+    if (previous && (previous.closedAt !== null || previous.expiresAt <= now)) controller.connectionId = randomUUID();
+    return value(reportFleetConnection(services, actor, controller.fleetId, controller.connectionId, false));
+  }
   async function member(name: string) {
     const account = value(await native.matrix.provision('@' + name + ':' + config.serverName, secret(), 'test'));
     const id = randomUUID();
@@ -42,7 +52,8 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
   async function agent(owner: Actor, name: string) {
     const ownerRecord = value(services.directory.member(owner.principalId))!;
     const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerRecord.principal.matrixUserId,
-      fleetKey: null, instances: [{ instanceKey: name, name }] };
+      fleetKey: 'test-' + name, controller: { name: 'Test controller' },
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy() }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, owner, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const item = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!;
@@ -50,8 +61,12 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
     value(await reconcilePrincipal(services, item.agentId));
     const exchanged = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
     assert.equal(exchanged.status, 'ready');
+    assert(exchanged.fleet?.controllerCredential);
+    const controller = { fleetId: exchanged.fleet.fleetId, connectionId: randomUUID(), credential: exchanged.fleet.controllerCredential };
+    renewController(controller);
     const account = exchanged.instances[0]!.account!;
-    return { id: item.agentId, matrixUserId: account.matrixUserId, token: account.accessToken, actor: { principalId: item.agentId, kind: 'agent' as const } };
+    return { id: item.agentId, matrixUserId: account.matrixUserId, token: account.accessToken, controller,
+      actor: { principalId: item.agentId, kind: 'agent' as const } };
   }
-  return { application, services, native, admin, member, agent, advance(milliseconds: number) { now += milliseconds; }, now: () => now, ok: success };
+  return { application, services, native, admin, member, agent, renewController, advance(milliseconds: number) { now += milliseconds; }, now: () => now, ok: success };
 }

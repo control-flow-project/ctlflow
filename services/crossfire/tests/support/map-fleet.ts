@@ -5,6 +5,8 @@ import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introd
 import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
 import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
 import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
 import { value, secret } from './application.js';
 
 export async function mapFleet(services: Services, owner: Actor, ownerMatrixId: string, count = 24) {
@@ -18,5 +20,7 @@ export async function mapFleet(services: Services, owner: Actor, ownerMatrixId: 
   for (const instance of instances) value(await reconcilePrincipal(services, instance.agentId!));
   const ready = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
   const fleet = value(services.repositories.fleet.find({ ownerId: owner.principalId, fleetKey: input.fleetKey }))!;
-  return { fleet, instances, ready };
+  const controller = { fleetId: fleet.id, connectionId: randomUUID(), credential: ready.fleet!.controllerCredential! };
+  value(reportFleetConnection(services, value(authenticateController(services, controller.credential)), fleet.id, controller.connectionId, false));
+  return { fleet, instances, ready, controller };
 }
