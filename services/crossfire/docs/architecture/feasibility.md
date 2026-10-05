@@ -67,10 +67,20 @@ the same parameters, installed release and receipt state with bounded backoff.
 Permanent authority/configuration failures require action; uncertain cleanup
 cannot start a competing engine.
 
-Whole-child/orphan supervision is not certified by native process-group ownership.
-The baseline descendant-cleanup limitation and its proposed supervisor correction
-remain pending integrated native evidence; do not infer complete tool-process
-containment from a stopped engine or a clean protocol connection.
+The stock Codex 0.160 Linux audit confirms that its WS app-server can survive
+fleetd's `SIGKILL`. Another native process using the exact private home and UUID
+refuses resume with `already has an active writer`. That is competing-writer
+fencing, not successful crash recovery; the surviving process can block resume.
+Audited help/schema and actual transports expose no supported parent-lifetime
+control retaining native remote-TUI access: stdio exits on EOF but exposes no
+remote control socket, multiple listeners are rejected, and Unix ignores stdin
+EOF. The `exec-server` stdin-close flag belongs to a different native product.
+This is a demonstrated external Codex dependency limitation, not a missing
+Crossfire implementation of an available native lifetime primitive.
+No proxy, watchdog or process-name guess emulates a missing lifetime primitive.
+Orderly awaited shutdown and a full machine restart with the former processes
+gone are separate cases. Neither native process-group ownership nor writer
+fencing establishes whole-child cleanup or automatic recovery after daemon death.
 
 Idle sleep defaults to thirty minutes and stops native processes only after every
 history is confirmed idle with settled input/publication/decisions. fleetd remains
@@ -122,9 +132,16 @@ OS user. Public reports remain public regardless of their unguessable link.
 
 ## Verification owners
 
-The instruction producer and whole-child/orphan supervision corrections require
-current integrated native evidence. This documentation records their contract and
-the pending proof boundary, not successful release or platform certification.
+The 2026-10-05 instruction source checkpoint passes ten focused pure checks and
+the actual stock Codex 0.160 Linux owned-runtime proof with Sol/max settings and
+an inert provider. It covers zero-model initial/resumed/changed developer items,
+exact retained history, duplicate/mismatched receipt rejection and bounded
+streaming recovery beyond 8 MiB. Confirmed instruction reuse does not rescan
+growing history. These are scoped source proofs; installed-artifact/native gates
+remain the integration owner's responsibility, not worker certification.
+The abrupt-daemon-death audit establishes the lifetime limitation above, not a
+supervision correction. Neither result certifies macOS, paid-model behavior or
+automatic recovery after force-killing fleetd.
 
 Protocol and lifecycle evidence belongs to maintained native/runtime tests,
 not a launcher demo or documentation assertion:

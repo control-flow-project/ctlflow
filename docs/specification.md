@@ -362,8 +362,19 @@ Native thread creation and resumption receive validated model, reasoning and
 permission configuration. Instructions use the separate canonical native producer
 below, not a model-dependent configuration setting. Its durable developer item
 materializes a zero-turn native history without a dummy user prompt or model call.
-Normal stop closes the listener and owned Codex process. Descendant-process
-supervision and crash-proof tool cleanup are not product guarantees.
+Normal stop closes the listener and owned Codex process. Abruptly killing fleetd
+can leave the native app-server running; the native history's active-writer lock
+then rejects another process attempting the same private home and session UUID.
+This prevents a competing writer but does not establish automatic crash recovery.
+Resume may remain blocked until that exact surviving process is stopped. A full
+machine restart, where the old processes no longer exist, is a different case;
+retained history still requires successful native resume. The audited stock
+Codex protocol has no supported parent-lifetime control retaining its required
+native remote TUI. This is an external native dependency limitation, not an
+unimplemented Crossfire supervision capability.
+No proxy, watchdog, process-name guess or orphan adoption substitutes for that
+limitation. Descendant-process supervision and crash-proof cleanup are not
+product guarantees.
 
 ### Fleet session controls
 
@@ -539,10 +550,13 @@ controller can archive; controller authorization additionally requires its curre
 live lease. Labels, public fleet IDs and another fleet's credential cannot grant
 this authority. Both operations recheck every relevant
 operation, native decision, scheduled delivery and fleet-message receipt before
-mutation. A never-started instance needs no invented stop proof. Otherwise the
-controller records actual native close for the exact current lease/run; sleeping,
-lost contact or a stopped database reporting row is insufficient. Renewed native
-observations invalidate prior proof. The server projects `Agent.canRetire`/
+mutation. The never-started exemption requires both no native observation and no
+listener run; it cannot treat a missing receipt as proof of inactivity. Otherwise
+the latest listener run must be stopped and have immutable actual native-close
+evidence bound to its exact current live controller connection and credential.
+The owner must remain active and the credential unrevoked. Sleeping, lost
+contact, an earlier run's close or a stopped database reporting row alone is
+insufficient. Renewed native observations invalidate prior proof. The server projects `Agent.canRetire`/
 `Fleet.canArchive` and authorized `retire`/`archive` actions from these same
 eligibility rules; a UI label cannot substitute for them. Current stop evidence
 is a separate normalized receipt, not a second lifecycle owner.
@@ -1645,13 +1659,18 @@ A private durable instruction journal owns the stable content digest and exact
 submission identity. Confirmation requires the matching native history path,
 session, developer role, item ID and unchanged text. Lost responses recover from
 that exact receipt before another append; unchanged confirmed revisions do not
-append duplicates. Changed role, skill or administrator text uses the same
+append duplicates or rescan growing native history. Pending receipt recovery
+streams the post-publication file snapshot once in bounded chunks with a bounded
+record buffer; additional history growth is not an arbitrary whole-file size
+failure. Changed role, skill or administrator text uses the same
 producer and remains in retained native history across resume. Instruction
 receipts do not acknowledge Matrix input or advance unread cursors. There is no
 `developerInstructions`/settings-update fallback, spoofed user message,
-model-dependent branch or direct rollout-file writer. Integrated native proof
-must establish these guarantees; documentation or a worker fixture alone is not
-certification of the shipped protocol behavior.
+model-dependent branch or direct rollout-file writer. Stock Codex 0.160 Linux
+source proofs with Sol/max settings and an inert provider cover zero-model
+creation, exact resume, changed instructions and receipt recovery. They do not
+certify an installed release, macOS or paid-model behavior; the integration owner
+must verify the produced artifacts and complete current native gates.
 
 Shared bounded publication journals and native-file validation belong to
 `adapter-runtime`; native transport, settings, history, permissions and terminal

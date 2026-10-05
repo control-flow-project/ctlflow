@@ -58,11 +58,15 @@ architecture case, duplicated control decoding and per-binding host resources,
 GET-time controller configuration mutation and unsafe coupling between native
 engine lifetime and receiver lifetime.
 
-The baseline also did not establish whole-child supervision after native failure:
-owning the engine/process group alone does not prove escaped or orphaned tool
-children are reclaimed. The supervisor correction remains pending integrated
-native evidence. Neither this historical audit nor the current design certifies
-complete descendant containment before that proof.
+The baseline also did not establish whole-child supervision after native failure.
+The current stock Codex 0.160 Linux audit confirms that a WS app-server can survive
+fleetd's `SIGKILL`; a replacement using the same private home and UUID is refused
+as an active second writer. Safe writer fencing is not automatic recovery or
+whole-child containment. The selected remote-TUI transport has no supported
+parent-lifetime primitive; the [native feasibility findings](../../services/crossfire/docs/architecture/feasibility.md)
+record the actual boundary without introducing an emulated alternate path.
+This is a demonstrated external native dependency limitation, not an unfinished
+Crossfire supervisor implementation.
 
 Earlier isolated browser evidence showed parent-domain cookie injection with
 ordinary names and rejection with host-prefixed names. It also showed that
@@ -98,9 +102,11 @@ behind a compatibility flag.
 Managed role/skill/admin instructions use the native adapter's single
 receipt-confirmed developer-item producer on create/resume/change. Codex must
 support `thread/inject_items`; no spoofed user prompt, ignored native setting or
-manual history writer can substitute. Content-digest idempotence, durable native
-history and exact item receipt require current integrated native proof, which is
-pending rather than implied by this review.
+manual history writer can substitute. The current stock Codex 0.160 Linux source
+proof verifies zero-model creation/resume/changed instructions with Sol/max
+settings and an inert provider, plus exact receipts and bounded growing-history
+recovery. It does not certify installed artifacts, macOS or paid-model behavior;
+the integration owner still verifies the complete current release.
 
 ## Native sleep, wake and recovery
 

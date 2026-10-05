@@ -39,12 +39,16 @@ the exact native history.
 The private journal compares a stable content digest and confirms the exact
 session/history/item ID, developer role and text. Unchanged confirmed instructions
 are not appended again; lost replies require receipt recovery before any append.
+Confirmed revisions require no growing-history rescan. Pending recovery scans
+the fixed post-publication snapshot with bounded chunk/record memory.
 Changing skills/roles uses this same producer, never a direct native-history edit
 or settings-update fallback. These receipts do not consume unread Matrix input.
 Native capability inspection rejects a binary without the required method before
-enrollment/start; there is no guessed additional minimum version. The normative
-behavior requires the pending integrated native proof, not a documentation claim
-that every native version/model has already been certified.
+enrollment/start; there is no guessed additional minimum version. Stock Codex
+0.160 Linux source verification with Sol/max settings and an inert provider
+confirms zero-model creation, exact resume and changed native developer items.
+Installed-release gates remain the integration owner's responsibility; this is
+not macOS or paid-model certification.
 
 ### Delivered context
 

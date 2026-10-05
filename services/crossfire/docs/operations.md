@@ -87,6 +87,7 @@ not implicit upgrades. An explicitly stopped instance stays stopped.
 | Approval absent | Inspect the canonical owner DM, privacy, current membership and both participants' native message permission. |
 | Additional room absent | Accept an authorized invitation or assign access; enrollment joins/creates no rooms. |
 | One agent fails | Inspect the original adapter/controller cause; successful peers remain independent. Transient recovery retains exact saved history. |
+| Resume says `already has an active writer` after daemon force-kill | The original native app-server may still hold that exact private history. Resolve the confirmed surviving owned process; never delete history/locks, guess ownership from process names or start a fresh conversation to bypass the refusal. |
 | Existing coding session unchanged | Expected: setup creates another managed conversation, not an attachment to that coding session. |
 | Terminal command stale | Get a fresh exact running-context pointer after Resume/restart. Run-local private credentials end with the old engine. |
 | Native tool denied | Inspect the actual subprocess/permission error. Fix the native capability owner; do not substitute one utility to evade policy. |
