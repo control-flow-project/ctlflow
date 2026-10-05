@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { API, segment } from '@crossfire/contracts/matrix';
 import { ownerNotice, ownerNoticeChunks, ownerNoticeFits } from './owner-notices.js';
 import type { RuntimeObservationEvent } from './runtime.js';
+import type { NativeSessionState } from './runtime.js';
 import { observation, type RuntimeObservation } from '@crossfire/contracts/runtime';
 import type { Clock, LocalState, Transport } from './port.js';
 import type { Coordination } from './coordination.js';
@@ -9,7 +10,8 @@ import type { Coordination } from './coordination.js';
 type Output = { id: string; text: string; sources: string[]; streamId: string | null; sealed: boolean };
 type Journal = { output: Output[]; observations: RuntimeObservation[] };
 export function ownerObservation(options: { agentId: string; userId: string; file: string; storage: LocalState; clock: Clock;
-  transport: Transport; coordination: Coordination; historyMode: 'shared' | 'per-room'; maximum: number }, stop: AbortSignal) {
+  transport: Transport; coordination: Coordination; historyMode: 'shared' | 'per-room'; maximum: number;
+  native?: () => NativeSessionState | undefined }, stop: AbortSignal) {
   const journalBytes = 64 * 1024 * 1024;
   const journal = options.storage.exists(options.file) ? options.storage.read<Journal>(options.file, journalBytes) : { output: [], observations: [] };
   if (!journal || !Array.isArray(journal.output) || journal.output.some(item => typeof item.id !== 'string' || typeof item.text !== 'string'
@@ -19,6 +21,7 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
   let runId: string | undefined;
   const active = new Map<string, boolean>();
   const latest = new Map(journal.observations.map(value => [value.sessionId, value]));
+  let lastActivityAt = Math.max(0, ...journal.observations.map(value => value.lastActivityAt ?? 0)) || null;
   let deliveredSession: string | undefined;
   let typingRoom: string | undefined;
   let cancelTyping: (() => void) | undefined;
@@ -49,10 +52,14 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
       if (!busy && deliveredSession === event.observation.sessionId) void clearTyping();
       const previous = journal.observations.at(-1);
       if (previous !== publishing && previous?.sessionId === event.observation.sessionId && previous.state === event.observation.state && previous.state !== 'failed') journal.observations.pop();
-      const value = { ...event.observation, historyMode: options.historyMode, maxInputBytes: options.maximum };
+      if (busy) lastActivityAt = options.clock.now();
+      const native = options.native?.();
+      const value = { ...event.observation, historyMode: options.historyMode, maxInputBytes: options.maximum,
+        lastActivityAt: native?.lastActivityAt ?? lastActivityAt, historyAvailable: native?.historyAvailable ?? null };
       latest.set(value.sessionId, value);
       journal.observations.push(value);
     } else {
+      lastActivityAt = options.clock.now();
       let position = 0;
       const streamId = event.streamId === null ? null : JSON.stringify([event.sessionId, event.streamId]);
       for (const part of ownerNoticeChunks(event.text)) {

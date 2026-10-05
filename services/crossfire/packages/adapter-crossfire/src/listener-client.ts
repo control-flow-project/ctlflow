@@ -1,36 +1,32 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readJson } from '@crossfire/adapter-filesystem/index';
+import { collect } from '@crossfire/adapter-matrix/http';
 import { fields } from '@crossfire/contracts/validation';
 import { failure, type Result } from '@crossfire/kernel/result';
-import { errorCode } from '@crossfire/contracts/rest/envelope';
-import type { HistoryRequest } from '@crossfire/agent-core/history-query';
+import { listenerRecord, listenerStatus, historyResult, type ListenerRequest, type LocalListener, type HistoryResult } from './listener-protocol.js';
+export type { LocalListener } from './listener-protocol.js';
 
-export async function listenerRequest(state: string, input: { action: 'read'; input: HistoryRequest } | { action: 'acknowledge'; queryId: string }): Promise<Result<{ queryId?: string | null; text?: string; accepted?: boolean }> | null> {
+export function listenerRequest(state: string, input: Extract<ListenerRequest, { action: 'read' | 'acknowledge' }>): Promise<Result<HistoryResult> | null>;
+export function listenerRequest(state: string, input: Extract<ListenerRequest, { action: 'status' | 'stop' | 'test' }>): Promise<Result<LocalListener> | null>;
+export async function listenerRequest(state: string, input: ListenerRequest): Promise<Result<LocalListener | HistoryResult> | null> {
   const file = join(state, 'listener.json');
   if (!existsSync(file)) return null;
-  const record = fields(readJson<unknown>(file), ['port', 'secret']);
-  if (!record.ok || !Number.isInteger(record.value.port) || Number(record.value.port) < 1 || Number(record.value.port) > 65535
-    || typeof record.value.secret !== 'string' || !/^[a-f0-9]{64}$/u.test(record.value.secret)) return failure('invalid', 'Invalid private listener control record');
+  const record = listenerRecord(readJson<unknown>(file));
+  if (!record.ok) return record;
   try {
-    const response = await fetch('http://127.0.0.1:' + record.value.port + '/control', { method: 'POST', redirect: 'error',
-      headers: { Authorization: 'Bearer ' + record.value.secret, 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(45000) });
-    if (!response.body) return failure('unavailable', 'Listener returned no query response');
-    const parts: Uint8Array[] = []; let size = 0;
-    for await (const part of response.body) { size += part.length; if (size > 1024 * 1024) return failure('invalid', 'Listener query response exceeds its resource limit'); parts.push(part); }
-    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(parts)));
-    const result = fields(parsed, ['ok'], ['value', 'error']);
-    if (!result.ok || typeof result.value.ok !== 'boolean') return failure('invalid', 'Invalid listener query response');
-    if (!result.value.ok) {
-      const error = fields(result.value.error, ['code', 'message']);
-      const code = error.ok ? errorCode(error.value.code) : error;
-      return error.ok && code.ok && typeof error.value.message === 'string'
-        ? failure(code.value, error.value.message) : failure('unavailable', 'Listener query failed');
+    const response = await fetch('http://127.0.0.1:' + record.value.port + '/bindings/' + record.value.binding + '/control', { method: 'POST', redirect: 'error',
+      headers: { Authorization: 'Bearer ' + record.value.secret, 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      signal: AbortSignal.timeout(input.action === 'status' ? 3000 : 45000) });
+    if (!response.body) return failure('unavailable', 'Listener returned no control response');
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await collect(response.body, 1024 * 1024)));
+    if (input.action === 'read' || input.action === 'acknowledge') return historyResult(parsed, input.action);
+    if (response.status !== 200) {
+      const error = fields(parsed, ['error']);
+      return failure('unavailable', error.ok && typeof error.value.error === 'string' ? error.value.error : 'Listener rejected the control request');
     }
-    const value = fields(result.value.value, [], ['queryId', 'text', 'accepted']);
-    if (!value.ok || input.action === 'read' && (typeof value.value.text !== 'string' || value.value.queryId !== null && typeof value.value.queryId !== 'string')
-      || input.action === 'acknowledge' && value.value.accepted !== true) return failure('invalid', 'Invalid listener query result');
-    return { ok: true, value: value.value as { queryId?: string | null; text?: string; accepted?: boolean } };
+    const result = listenerStatus(parsed, input.action);
+    return result.ok && result.value.binding !== record.value.binding ? failure('invalid', 'Listener response belongs to a different binding') : result;
   } catch (error) {
     const cause = error instanceof Error ? error.cause : null;
     if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ECONNREFUSED') return null;
