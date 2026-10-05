@@ -81,9 +81,11 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       if (mode === 'oversized') { socket.send('x'.repeat(8 * 1024 * 1024 + 1)); return; }
       send({ id: request.id, result: { userAgent: 'protocol fixture' } });
     } else if (['thread/start', 'thread/resume', 'thread/read'].includes(request.method)) {
-      send({ id: request.id, result: { approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
+      send({ id: request.id, result: { ...(configuration.selection as Record<string, unknown> | undefined), approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
         status: { type: configuration.status ?? 'idle' },
         canAcceptDirectInput: 'directInput' in configuration ? configuration.directInput : true } } });
+    } else if (request.method === 'thread/name/set') {
+      send({ id: request.id, result: {} });
     } else if (request.method === 'thread/turns/list') {
       if (configuration.unmaterialized && turns.size === 0) {
         send({ id: request.id, error: { code: -32600, message: `thread ${THREAD} is not materialized yet; thread/turns/list is unavailable before first user message` } });

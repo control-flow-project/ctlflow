@@ -24,8 +24,8 @@ export async function connectSession(options: CodexOptions, stop: AbortSignal, h
   return openSession(options, { kind: 'attach', id: options.session }, stop, hooks, event);
 }
 
-export type ThreadSelection = { kind: 'attach'; id: string } | { kind: 'create'; name: string; instructions: string; config: Record<string, unknown> }
-  | { kind: 'resume'; id: string; instructions: string; config: Record<string, unknown> };
+export type ThreadSelection = { kind: 'attach'; id: string } | { kind: 'create'; name: string; config: Record<string, unknown> }
+  | { kind: 'resume'; id: string; config: Record<string, unknown> };
 export async function openSession(options: Omit<CodexOptions, 'session' | 'receiptFile'>, selection: ThreadSelection, stop: AbortSignal, hooks: RuntimeHooks,
   event: (event: NativeEvent) => void): Promise<CodexSession> {
   let sessionId = selection.kind === 'create' ? '' : selection.id;
@@ -79,7 +79,7 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
     let approval: RuntimeApproval | undefined;
     if (selection.kind !== 'attach') {
       const selected = object(await engine.request(selection.kind === 'create' ? 'thread/start' : 'thread/resume', {
-        cwd: workspace, developerInstructions: selection.instructions, config: selection.config,
+        cwd: workspace, config: selection.config,
         ...(selection.kind === 'resume' ? { threadId: selection.id, excludeTurns: true } : { historyMode: 'paginated', ephemeral: false }),
       }));
       const thread = selected.ok ? object(selected.value.thread) : selected;
@@ -89,6 +89,8 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
       if (!routing.ok) throw new Error(routing.error.message);
       approval = routing.value;
       if (selected.ok) {
+        if (typeof selected.value.model !== 'string' || !selected.value.model
+          || selected.value.reasoningEffort !== null && typeof selected.value.reasoningEffort !== 'string') throw new Error('Codex did not expose its selected native model and reasoning settings');
         observer.configure(selection.config, selected.value, version);
         const sandbox = object(selected.value.sandbox);
         const sandboxTypes: Record<string, string> = { 'danger-full-access': 'dangerFullAccess', 'workspace-write': 'workspaceWrite', 'read-only': 'readOnly' };

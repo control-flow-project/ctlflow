@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { effectiveProvider, nativeConfiguration, nativeDirectories, prepareHome } from './home.js';
 import { ownedOptions, ownedQuestionCapability, ownedVersion } from './owned-options.js';
+import { inspectInstructionCapability } from './capability.js';
 
 export function nativeEnvironment(home: string, stateDirectory: string, name?: string): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home, CROSSFIRE_PROJECT: stateDirectory };
@@ -29,6 +30,8 @@ export async function inspectCodex(binary: string, input: { workspace: string; s
     const home = prepareHome(input.stateDirectory), environment = nativeEnvironment(home, input.stateDirectory);
     const version = ownedVersion((await command(binary, ['--version'], input.workspace, environment, stop)).trim());
     if (!version.ok) return version;
+    const instructions = await inspectInstructionCapability(binary, home, input.workspace, environment, stop);
+    if (!instructions.ok) return instructions;
     const listing = await command(binary, ['features', 'list'], input.workspace, environment, stop);
     if (parsed.value.options.features?.default_mode_request_user_input === true) {
       const supported = ownedQuestionCapability(listing);
