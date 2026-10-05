@@ -67,6 +67,15 @@ private. Public packages ship verified standalone builds with exact dependencies
 and never require publishing internal modules. The reviewed implementation plan
 is [Universal fleet controller](plans/20261005-universal-fleet-controller.md).
 
+Crossfire and both public products share one exact package version. The setup
+descriptor derives its pinned Fleet version from Crossfire's version; Fleet's
+public fleetd dependency is an exact pin. The seven-day npm release-age policy
+has only exact named product exclusions for `@ctlflow/fleet` and `@ctlflow/fleetd`
+alongside the existing named Tinqer exclusions. No organization wildcard, private
+package exemption, hook enablement or global age-policy disabling is allowed.
+Controlled-registry gates verify those named positives and nonexempt negatives;
+public installation cannot require publishing a private internal module.
+
 - Crossfire owns identity, enrollment, human authorization, room access, native
   reconciliation, wake policies, listener activity, fleet identity and React UI.
   Fleet membership alone confers no room permission, wake authority or new agent
@@ -522,7 +531,11 @@ operational credential or live lease. Restoration requires a new exact owner
 review and surviving private identity proof, not a name-based takeover.
 
 Retirement accepts `{expectedRevision, instanceKey}` with the fleet's current
-revision. Archive accepts `{expectedRevision}`. Both recheck every relevant
+revision. Archive accepts `{expectedRevision}` through one resource used by
+management and Fleet CLI. An authorized human or that fleet's authenticated
+controller can archive; controller authorization additionally requires its current
+live lease. Labels, public fleet IDs and another fleet's credential cannot grant
+this authority. Both operations recheck every relevant
 operation, native decision, scheduled delivery and fleet-message receipt before
 mutation. A never-started instance needs no invented stop proof. Otherwise the
 controller records actual native close for the exact current lease/run; sleeping,
@@ -537,8 +550,10 @@ receipt is a conflict, never a replacement generation's stop acknowledgment.
 
 One initial owner approval issues a private fleet-scoped controller credential
 alongside approved agent credentials. Its verifier is stored, never the secret.
-The credential can read/update that fleet's reporting metadata and introduce
-new enrollment requests for that fleet with proved identity material. It cannot
+The credential can read/update that fleet's reporting metadata, retire its exact
+instances, archive its own fleet with the current live lease, and introduce new
+enrollment requests for that fleet with proved identity material. Retirement and
+archive still require the settled native proof and expected revision above. It cannot
 approve enrollment, change roles/room permissions/wake policy, access other
 fleets or impersonate a human Matrix login. Owner suspension/revocation disables
 the credential. New agents still require explicit owner approval. Names and
@@ -789,7 +804,7 @@ remote command also proves that the prior command's server receipt finalized.
 | POST /api/enrollments/{enrollmentId}/exchange | Private request obtains status and ready credentials. |
 | GET /api/fleets | SQL-paginated own/all authorized views including controller and activity summaries. |
 | GET, PATCH /api/fleets/{fleetId} | Scoped read and revision-checked label/controller update. |
-| POST /api/fleets/{fleetId}/archive | Human owner/admin revision-checked decommission after confirmed native stop; retain identity/history, retire instances and revoke controller authority. |
+| POST /api/fleets/{fleetId}/archive | Authorized human or that fleet's authenticated current live controller performs the same expected-revision decommission after settled native-stop proof; retain identity/history, retire instances and revoke controller authority. |
 | GET /api/fleets/{fleetId}/agents | Paginated ordinary agent projections. |
 | GET /api/fleets/{fleetId}/statistics | Owner/admin read-only hourly traffic and optional native usage summaries; bounded time window and SQL pagination. |
 | DELETE /api/fleets/{fleetId}/agents/{agentId} | Scoped revision-checked retirement of the exact instance/agent after confirmed native stop; no detach or identity deletion. |
@@ -1721,9 +1736,9 @@ model turn verifies connection and authorization, not paid-model work or every
 native tool execution path.
 
 A user-selected native no-approval policy or explicit native bypass option is
-a deliberate choice, not the default or model-authorized elevation. Owned Codex
-defaults to full access with on-request approval. Attached sessions retain their
-human-owned native model, sandbox and approval policy.
+a deliberate choice, not the default or model-authorized elevation. Managed Codex
+defaults to full access with on-request approval. The independent coding session
+performing setup retains its own settings; fleetd does not attach or import it.
 
 ### Runtime failures and management conversations
 
@@ -2044,19 +2059,28 @@ transactionally after a verified backup. Versions 1–11, foreign stores and fut
 versions are refused without mutation; there is no historical migration ladder,
 historical runtime reader or reset-on-error behavior.
 
-The canonical schema has 59 singular tables. The forward migration preserves
+The canonical schema has 63 singular tables. The forward migration preserves
 immutable identities, native credentials and histories, room/access records,
 receipt and usage history, publications, policy and audit. It adds historical
 enrollment archives, fleet archive/instance retirement timestamps, exact immutable
 controller-generation identifiers and independent native-stop receipts.
 
-Historical requests without a controller move to `enrollment_archive` and
-`enrollment_archive_item`. Their pending name reservations and obsolete
-operational request relations are removed; historical outcomes and identity
-attribution remain readable as retained data, not through the current enrollment
-API. Their unbound identities are not invented into fleets, discarded or given
-live authority. Normal directories and operational authentication require an
-active nonretired binding in a nonarchived fleet. Restoration requires a newly
+Historical requests lacking a fleet key, controller name or controller credential
+hash, or lacking a policy for a successful item, move to `enrollment_archive` and
+its normalized item, policy, permission, selected-wake-sender and metadata
+relations. All fourteen original request fields and existing child rows retain
+exact values, including nullable historical controller fields. No fleet, policy
+or authority is fabricated to make incomplete historical requests operational.
+Complete managed requests remain in the current enrollment relations.
+
+After preserving history, the migration releases archived requests' pending name
+reservations and removes their current operational request rows. Foreign keys
+retain original owner, decider, identity, principal and permission attribution.
+Update/delete triggers protect all six archive relations. These are immutable
+historical data, not another enrollment reader, approval API or authority source.
+Unbound identities are not invented into fleets, discarded or given live
+authority. Normal directories and operational authentication require an active
+nonretired binding in a nonarchived fleet. Restoration requires a newly
 owner-reviewed fleet enrollment and surviving private identity proof.
 
 Current enrollment requires fleet/controller fields and a complete coordination
@@ -2176,8 +2200,17 @@ repository methods serve issuance and native account operations only.
 | `fleet_instance_policy` | `agent_id PK/FK fleet_instance(agent_id) ON DELETE CASCADE`, `approved_by_member_id FK member`, `approved_at`; composite FK `(agent_id, approved_by_member_id)` to `agent(principal_id, owner_id)` enforces exact owner. No duplicate wake mode/selection. |
 | `fleet_instance_permission` | `agent_id`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; composite PK; policy FK with cascade; catalog FK `(permission_code, grant_scope)`. Approved admission defaults, not effective room authorization. |
 | `fleet_native_stop` | `agent_id FK agent`, `receipt_id`, `sequence` (>0), `fleet_id FK fleet`, `run_id`, `connection_id`, `credential_id`, `native_stopped_at`, `invalidated_at?`; `PK(agent_id, receipt_id)`, `UQ(agent_id, sequence)`; composite FKs `(run_id, agent_id)` to `listener_run` and `(credential_id, fleet_id)` to `fleet_credential`. Immutable idempotent native-close evidence, invalidated by renewed native observations; not inferred from heartbeat or sleeping state. |
-| `enrollment_archive` | `id PK`, `owner_id FK member`, `verification_code`, `claim_hash`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. Historical non-controller requests only; paired decision fields retain their original constraints, with no current authorization API. |
+| `enrollment_archive` | `controller_name?`, `controller_credential_hash?`, `fleet_key?`, `id PK`, `owner_id FK member`, `verification_code`, `claim_hash`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. Exact fourteen-field historical request; original lifecycle, revision, expiry and paired-decision constraints, with no operational authorization API. |
 | `enrollment_archive_item` | `request_id FK enrollment_archive`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. Historical result/identity attribution; failed outcome requires failure code. |
+| `enrollment_archive_policy` | `request_id`, `instance_key`, `wake_mode`, `expected_agent_revision?`; composite PK/FK to `enrollment_archive_item`. Closed wake-mode domain and nonnegative expected revision retain the exact reviewed policy, not an effective current policy. |
+| `enrollment_archive_permission` | `request_id`, `instance_key`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; `PK(request_id, instance_key, permission_code)`; composite item-policy FK and catalog FK `(permission_code, grant_scope)`. Historical requested authority only. |
+| `enrollment_archive_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`; `PK(request_id, instance_key, sender_principal_id)`; composite FK to archive policy. Exact historical selected identities, not current wake eligibility. |
+| `enrollment_archive_metadata` | `enrollment_id FK enrollment_archive`, `key`, `value`; `PK(enrollment_id, key)`. Exact historical controller metadata, never routing/authentication authority. |
+
+All six enrollment archive relations have rejecting UPDATE/DELETE triggers.
+Their restrictive foreign keys prevent erasing referenced identity/catalog
+history. They are retained by the forward migration without any operational
+archive read/write path, JSON policy bag or compatibility enrollment mode.
 
 One item or many items use the same request/decision/provisioning pipeline.
 `requested_name` is an immutable review snapshot. Only `agent_name` owns the
@@ -2376,8 +2409,12 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `principal_application` | `(next_check_at, principal_id)` | Bounded reconciliation. |
 | `enrollment_request` | `(owner_id, created_at, id)`, `(created_at, id)`, `(status, expires_at, id)` | Review lists and pending expiry/capacity. |
 | `enrollment_item` | `(agent_id, request_id, instance_key)` | Existing identity and provisioning references. |
-| `enrollment_archive` | `(owner_id, created_at, id)` | Preserved historical request attribution, never current operational approval. |
+| `enrollment_archive` | `(owner_id, created_at, id)`, `(decided_by_member_id, id)` | Preserved owner/decider attribution and foreign-key lookups, never current operational approval. |
 | `enrollment_archive_item` | `(agent_id, request_id, instance_key)` | Historical result-to-identity references. |
+| `enrollment_archive_policy` | PK `(request_id, instance_key)` | Exact historical item-policy and composite foreign-key lookup. |
+| `enrollment_archive_permission` | `(permission_code, grant_scope, request_id, instance_key)`; PK request/item prefix | Historical catalog foreign-key/reverse lookup and requested permission identity. |
+| `enrollment_archive_wake_sender` | `(sender_principal_id, request_id, instance_key)`; PK request/item prefix | Historical principal reference and selected-author lookup. |
+| `enrollment_archive_metadata` | PK `(enrollment_id, key)` | Preserved metadata and historical request foreign-key lookup. |
 | `enrollment_item_policy` | composite PK `(request_id, instance_key)` | Exact reviewed item and policy FK prefix. |
 | `enrollment_item_permission` | `(permission_code, grant_scope, request_id, instance_key)` | Catalog FK and reverse permission lookup; item-policy prefix covered by PK. |
 | `enrollment_item_wake_sender` | `(sender_principal_id, request_id, instance_key)` | Selected-sender FK/reverse lookup; item-policy prefix covered by PK. |
@@ -2548,7 +2585,7 @@ ownership. The management website remains under `/manage`.
 | `POST /api/enrollments/{enrollmentId}/decision` | Owner approves/rejects; administrator may reject others' requests. |
 | `POST /api/enrollments/{enrollmentId}/exchange` | Private initiating claim obtains status/ready credentials. |
 | `GET /api/fleets`, `GET, PATCH /api/fleets/{fleetId}`, `GET /api/fleets/{fleetId}/agents` | Authorized durable fleet/instance views and revision-checked metadata; not native process control. |
-| `POST /api/fleets/{fleetId}/archive` | Human-authorized expected-revision archive after exact stop evidence; retires instances, closes the lease and revokes credentials, retaining histories/identities. |
+| `POST /api/fleets/{fleetId}/archive` | Authorized human or that fleet's authenticated current live controller uses the same expected-revision archive after settled native-stop proof; retires instances, closes the lease and revokes credentials, retaining histories/identities. |
 | `DELETE /api/fleets/{fleetId}/agents/{agentId}` | Authorized exact `instanceKey` and `expectedRevision` retirement after native stop; no unbinding, reassignment or identity deletion. |
 | `PUT /api/fleets/{fleetId}/agents/{agentId}/native-stop` | Current controller's exact live lease/run proof of actual native close, with settled receipts; records no guessed stop from heartbeat or idle state. |
 | `GET /api/fleets/{fleetId}/map` | Human-authorized complete fleet topology: wake sources, agents, desired room access and last observed application. No controller access or mutation. |

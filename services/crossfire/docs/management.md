@@ -145,6 +145,10 @@ shows the complete diff and applies revision-checked desired state through the
 ordinary grant domain. The controller label is descriptive, not authentication.
 Archive confirms decommissioning, retains identities/history, closes the lease
 and revokes fleet credentials. It is not a detach-to-independent workflow.
+Fleet CLI uses that same archive resource through its owning authenticated
+controller and current live lease, not a separate deletion path. Human management
+uses ordinary owner/admin authority; native-stop proof and revision checks remain
+identical for both callers.
 Retirement/archive are offered only when the canonical server projects the
 matching action and eligibility. Use Stop sessions first: sleeping/offline
 observations do not prove native close. The exact controller records native-stop

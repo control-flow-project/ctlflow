@@ -8,17 +8,20 @@
 ## Engineering
 - [Development and verification](development.md)
 - [Operator verification tools](operator-tools.md)
+- [Reusable operator check inventory](operator-script-inventory.md)
 - [Canonical specification](specification.md)
 - [Runtime approval diagnosis and native dependency evidence](runtime-approval-readiness.md)
 - [Native feasibility and verification boundaries](../services/crossfire/docs/architecture/feasibility.md)
 
-## Proposals
-- [Listener architecture audit, idle sleep and report publication](proposals/20261005-listener-and-publication-architecture.md)
+## Architecture evidence
+- [Listener, sleep and report-publication review](proposals/20261005-listener-and-publication-architecture.md)
 
-Proposals describe findings and recommended changes, not completed capabilities.
-The listener proposal uses one fleetd process and a 30-minute default idle timeout.
+The review records the inspected baseline and the current managed design. It is
+not a second specification or proof of deployment. fleetd owns the shared listener;
+the default native idle-sleep timeout is 30 minutes.
 
 The specification owns architecture, schemas, authorization and REST contracts.
 Product guides describe operator and user workflows. Runtime defaults and
-overrides are documented in the fleet configuration guide; attached coding
-sessions retain their native settings.
+overrides are documented in the fleet configuration guide. Every Crossfire agent
+is fleet-managed. The coding session performing setup remains independent and
+retains its own native settings.

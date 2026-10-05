@@ -11,8 +11,16 @@ systemd-run --user --scope --quiet \
 ```
 
 The lockfile and npm policy enforce engine versions, dependency age and disabled
-implicit installation scripts. SQLite is rebuilt explicitly. Root commands
-coordinate all three services; do not add a global package pool.
+implicit installation scripts. `.npmrc` keeps a seven-day minimum release age
+with exact-name exclusions for the two verified public products,
+`@ctlflow/fleet` and `@ctlflow/fleetd`, and the existing named Tinqer dependencies
+`@tinqerjs/tinqer` and `@tinqerjs/better-sqlite3-adapter`. The public-product
+exclusions allow installing a newly published pinned release on publication day.
+They are not namespace wildcards: fresh nonexempt third-party packages and other private
+`@ctlflow` names remain subject to the age policy. Installation lifecycle scripts
+remain disabled; no controller/agent starts from npm hooks. SQLite is rebuilt
+explicitly. Root commands coordinate all three services; do not add a global
+package pool.
 
 ## Test selection
 
@@ -79,6 +87,13 @@ applications and internal modules are private. Internal package names follow
 Public tarballs contain standalone executables, finite allowlisted assets and
 exact public dependency versions, not private-package registry dependencies or
 monorepo source links. No installation script starts a controller or agent.
+
+The Crossfire and both public product package versions must match exactly. The
+setup descriptor derives its pinned Fleet version from the Crossfire package
+version; Fleet's public daemon dependency uses that exact version, not a range.
+Package gates reject inconsistent versions, private registry dependencies and
+unapproved files. The controlled-registry installation gate covers the exact
+named public age exclusions and still rejects fresh nonexempt dependencies.
 
 The release checks pack and install the actual public artifacts in a clean
 directory outside workspace resolution. They verify manifests, absence of

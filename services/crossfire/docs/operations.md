@@ -29,11 +29,19 @@ Crossfire installs no systemd, global skills, certificates or host permissions.
 Schema 13 accepts a fresh store or the inventoried deployed schema 12 only.
 Versions 1–11 and foreign/future stores fail without mutation. Conversion retains
 identities, native credentials, histories, grants, publications, receipts and audit.
-Non-controller enrollment requests become history-only archive relations.
+Historical requests missing mandatory controller fields or successful-item policy
+become immutable history-only archive relations. All fourteen original request
+fields and normalized item/policy/permission/selected-sender/metadata rows retain
+their exact values. Complete managed requests remain current; no fleet or policy
+is invented during conversion. The current inventory has 63 singular tables.
 Unbound historical identities are excluded from operational authentication and
 directories until a new owner-reviewed fleet enrollment proves private identity.
 Every new reporting run requires its exact active fleet/current controller lease.
 Archive/retirement timestamps and native-stop receipts do not authorize data loss.
+Management and Fleet CLI use the same archive resource and expected revision.
+An authorized human or the owning authenticated controller can archive; controller
+archive also requires its current live lease. Both require settled native-stop
+evidence, then retain history, close the lease and revoke controller credentials.
 - [Normalized tables and migration contract](../../../docs/specification.md)
 
 Configure an explicit separate HTTPS `contentOrigin`. There is no hostname
