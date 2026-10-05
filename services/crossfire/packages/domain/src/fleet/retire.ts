@@ -3,16 +3,14 @@ import type { Services } from '../port/services.js';
 import type { FleetInstance } from '../enrollment/types.js';
 import { authorizeFleet, type FleetActor } from './authority.js';
 import { recordEvent } from '../audit/record-event.js';
-import { retirementEligible } from './native-stop.js';
+import { retirementEligible, retirementEligibility } from './native-stop.js';
 import { liveFleetConnection } from './control.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'listenerRead' | 'runtime' | 'unitOfWork' | 'clock' | 'identity'>;
 
-function retireInstance(services: Dependencies, fleetId: string, instance: FleetInstance) {
+function retireInstance(services: Dependencies, instance: FleetInstance) {
   const now = services.clock.now();
   if (instance.retiredAt !== null) return success(undefined);
-  const eligible = retirementEligible(services, fleetId, instance.agentId); if (!eligible.ok) return eligible;
-  if (!eligible.value) return failure('conflict', 'Stop the native session through its controller and settle all pending receipts before retirement');
   const retired = services.repositories.fleetInstance.update({ ...instance, retiredAt: now }); if (!retired.ok) return retired;
   const principal = services.repositories.principal.find({ id: instance.agentId }); if (!principal.ok) return principal;
   if (!principal.value) return failure('missing', 'Agent identity no longer exists');
@@ -36,10 +34,19 @@ export function removeFleetAgent(services: Dependencies, actor: FleetActor, flee
     const fleet = services.repositories.fleet.findById(fleetId); if (!fleet.ok) return fleet;
     if (!fleet.value || fleet.value.archivedAt !== null) return failure('missing', 'Current fleet not found');
     const authority = authorizeFleet(services, actor, fleet.value, true); if (!authority.ok) return authority;
+    if (actor.kind === 'controller') {
+      const connection = services.repositories.fleetConnection.find(fleetId); if (!connection.ok) return connection;
+      if (!connection.value) return failure('conflict', 'An authenticated current controller lease is required to retire');
+      const live = liveFleetConnection(services, actor, fleetId, connection.value.connectionId); if (!live.ok) return live;
+    }
     if (fleet.value.revision !== input.expectedRevision) return failure('stale_revision', 'Refresh the fleet before retiring an instance');
     const instance = services.repositories.fleetInstance.find({ ...fleet.value, instanceKey: input.instanceKey }); if (!instance.ok) return instance;
     if (!instance.value || instance.value.agentId !== agentId) return failure('conflict', 'Instance membership does not match');
-    const retired = retireInstance(services, fleetId, instance.value); if (!retired.ok) return retired;
+    if (instance.value.retiredAt === null) {
+      const eligible = retirementEligible(services, fleetId, agentId); if (!eligible.ok) return eligible;
+      if (!eligible.value) return failure('conflict', 'Stop the native session through its controller and settle all pending receipts before retirement');
+    }
+    const retired = retireInstance(services, instance.value); if (!retired.ok) return retired;
     const changed = services.repositories.fleet.update({ ...fleet.value, revision: fleet.value.revision + 1, updatedAt: services.clock.now() }); if (!changed.ok) return changed;
     return recordEvent(services, actor, requestId, { targetKind: 'agent', targetId: agentId, ownerId: fleet.value.ownerId,
       action: 'fleet.agent.retire', message: fleetId + '/' + input.instanceKey });
@@ -58,9 +65,14 @@ export function archiveFleet(services: Dependencies, actor: FleetActor, fleetId:
     }
     if (fleet.value.revision !== expectedRevision) return failure('stale_revision', 'Refresh the fleet before archiving');
     const instances = services.collection.fleetInstances(fleet.value); if (!instances.ok) return instances;
-    const pending = services.repositories.fleetRuntimeOperation.pending(fleetId); if (!pending.ok) return pending;
-    if (pending.value) return failure('conflict', 'Finish the pending session operation before archiving');
-    for (const instance of instances.value) { const retired = retireInstance(services, fleetId, instance); if (!retired.ok) return retired; }
+    const eligibility = retirementEligibility(services, { fleetIds: [fleetId] }); if (!eligibility.ok) return eligibility;
+    if (eligibility.value.pendingFleetIds.has(fleetId)) return failure('conflict', 'Finish the pending session operation before archiving');
+    for (const instance of instances.value) {
+      if (instance.retiredAt !== null) continue;
+      const eligible = eligibility.value.agents.get(instance.agentId);
+      if (eligible?.fleetId !== fleetId || !eligible.eligible) return failure('conflict', 'Stop the native sessions through their controller and settle all pending receipts before archiving');
+    }
+    for (const instance of instances.value) { const retired = retireInstance(services, instance); if (!retired.ok) return retired; }
     const credentials = services.repositories.fleetCredential.forFleet(fleetId); if (!credentials.ok) return credentials;
     const now = services.clock.now();
     for (const credential of credentials.value) {

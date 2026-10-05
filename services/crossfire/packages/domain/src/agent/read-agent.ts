@@ -5,7 +5,7 @@ import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import { readActivity, type AgentActivity } from '../listener/activity.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
 import type { NativeRuntimeSummary } from '../runtime/values.js';
-import { retirementEligible } from '../fleet/native-stop.js';
+import { retirementEligible, retirementEligibility } from '../fleet/native-stop.js';
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'listenerRead' | 'clock' | 'runtime'>;
 export type AgentDetails = { record: AgentRecord; activity: AgentActivity; nativeRuntime: NativeRuntimeSummary | null; deployment: DeploymentSummary; canRetire: boolean; allowedActions: string[] };
 export type AgentFilter = DirectoryFilter & { listener: 'all' | 'online' | 'offline' | 'disconnecting' };
@@ -51,12 +51,13 @@ export function listAgents(services: Dependencies, actor: Actor, filter: AgentFi
   const byAgent = new Map(deployments.value.map(deployment => [deployment.agentId, deployment]));
   if (records.value.items.some(record => !byAgent.has(record.principal.id))) return failure('unavailable', 'Current agent fleet binding is missing');
   const native = services.runtime.summaries(records.value.items.map(record => record.principal.id)); if (!native.ok) return native;
+  const eligibility = retirementEligibility(services, { agentIds: records.value.items.map(record => record.principal.id) }); if (!eligibility.ok) return eligibility;
   const items: AgentDetails[] = [];
   for (const record of records.value.items) {
     const deployment = byAgent.get(record.principal.id)!;
-    const eligible = retirementEligible(services, deployment.fleetId, record.principal.id); if (!eligible.ok) return eligible;
+    const retirement = eligibility.value.agents.get(record.principal.id), eligible = retirement?.fleetId === deployment.fleetId && retirement.eligible;
     items.push({ record, activity: activity.value.get(record.principal.id)!, deployment, nativeRuntime: native.value.get(record.principal.id) ?? null,
-      canRetire: eligible.value, allowedActions: agentActions(actor, record, permissions.value, eligible.value) });
+      canRetire: eligible, allowedActions: agentActions(actor, record, permissions.value, eligible) });
   }
   return success({ ...records.value, items });
 }

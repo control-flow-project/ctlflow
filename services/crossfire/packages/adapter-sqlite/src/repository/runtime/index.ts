@@ -89,8 +89,6 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
       executeUpdate(database, schema, (query, params) => query.update('runtime_decision').set({ status: 'answered' }).where(row => row.id === params.id), { id });
       return success(undefined);
     }); },
-    hasObservedRuntime(agentId) { return stored(() => success(executeSelect(database, schema, (query, params) => query.from('runtime_observation')
-      .where(row => row.agent_id === params.agentId).count(), { agentId }) > 0)); },
     observation(agentId) { return stored(() => {
       const latest = executeSelect(database, schema, (query, params) => query.from('listener_run').where(row => row.agent_id === params.agentId).orderByDescending(row => row.started_at).thenByDescending(row => row.id).firstOrDefault(), { agentId });
       if (!latest) return success([]);

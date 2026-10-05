@@ -14,7 +14,6 @@ export type RuntimeRepository = {
   answers(id: string): Result<DecisionAnswer[]>;
   answer(id: string, values: DecisionAnswer[]): Result<void>;
   observation(agentId: string): Result<RuntimeObservationView[]>;
-  hasObservedRuntime(agentId: string): Result<boolean>;
   summaries(agentIds: string[]): Result<Map<string, NativeRuntimeSummary>>;
   saveObservation(agentId: string, value: RuntimeObservationView): Result<void>;
   incident(id: string): Result<Incident | null>;

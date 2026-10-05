@@ -2,6 +2,7 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import type { Services } from '../port/services.js';
 import type { FleetActor } from './authority.js';
 import { liveFleetConnection } from './control.js';
+import type { RetirementAgent, RetirementSelection } from '../port/listener-read.js';
 
 export type NativeStop = { agentId: string; receiptId: string; sequence: number; fleetId: string; runId: string; connectionId: string;
   credentialId: string; nativeStoppedAt: number; invalidatedAt: number | null };
@@ -11,30 +12,50 @@ export type NativeStopRepository = {
   insert(value: NativeStop): Result<void>;
   invalidate(agentId: string, now: number): Result<void>;
 };
-export type RetirementServices = Pick<Services, 'repositories' | 'runtime' | 'listenerRead' | 'clock'>;
+export type RetirementServices = Pick<Services, 'listenerRead' | 'clock'>;
+export type RetirementEligibility = { agents: Map<string, { fleetId: string; eligible: boolean }>; fleets: Map<string, boolean>; pendingFleetIds: Set<string> };
+
+function receiptsSettled(agent: RetirementAgent): boolean {
+  return !agent.pendingDecision && !agent.pendingWake && !agent.pendingBroadcast;
+}
+
+export function canRetireAgent(agent: RetirementAgent, now: number): boolean {
+  if (agent.pendingOperation || !receiptsSettled(agent)) return false;
+  if (!agent.hasObservedRuntime && agent.latestRun === null) return true;
+  const run = agent.latestRun, proof = agent.nativeStop, controller = agent.controller;
+  return agent.ownerActive && run !== null && run.stoppedAt !== null && proof !== null && proof.invalidatedAt === null
+    && proof.agentId === agent.agentId && proof.fleetId === agent.fleetId && proof.runId === run.id
+    && run.controller !== null && run.controller.fleetId === agent.fleetId
+    && run.controller.connectionId === proof.connectionId && run.controller.credentialId === proof.credentialId
+    && controller !== null && controller.closedAt === null && controller.expiresAt > now && controller.fleetId === agent.fleetId
+    && controller.connectionId === proof.connectionId && controller.credentialId === proof.credentialId
+    && controller.credential !== null && controller.credential.id === proof.credentialId
+    && controller.credential.fleetId === agent.fleetId && controller.credential.revokedAt === null
+    && (agent.latestActiveObservationAt === null || agent.latestActiveObservationAt <= proof.nativeStoppedAt);
+}
+
+export function retirementEligibility(services: RetirementServices, selection: RetirementSelection): Result<RetirementEligibility> {
+  const now = services.clock.now(), snapshot = services.listenerRead.retirement(selection, now); if (!snapshot.ok) return snapshot;
+  const pendingFleetIds = new Set(snapshot.value.pendingFleetIds), agents = new Map<string, { fleetId: string; eligible: boolean }>();
+  const fleets = new Map((selection.fleetIds ?? []).map(fleetId => [fleetId, !pendingFleetIds.has(fleetId)]));
+  for (const agent of snapshot.value.agents) {
+    const eligible = canRetireAgent(agent, now);
+    agents.set(agent.agentId, { fleetId: agent.fleetId, eligible });
+    fleets.set(agent.fleetId, (fleets.get(agent.fleetId) ?? !pendingFleetIds.has(agent.fleetId)) && eligible);
+  }
+  return success({ agents, fleets, pendingFleetIds });
+}
 
 export function settledAgentReceipts(services: RetirementServices, agentId: string) {
-  const decisions = services.runtime.decisions(agentId, 1, 1, 'pending'); if (!decisions.ok) return decisions;
-  const answered = services.runtime.decisions(agentId, 1, 1, 'answered'); if (!answered.ok) return answered;
-  const wake = services.repositories.wakeDelivery.pending(agentId); if (!wake.ok) return wake;
-  const delivery = services.repositories.fleetMessageDelivery.pendingForAgent(agentId, services.clock.now()); if (!delivery.ok) return delivery;
-  return success(decisions.value.totalItems === 0 && answered.value.totalItems === 0 && wake.value === null && !delivery.value);
+  const snapshot = services.listenerRead.retirement({ agentIds: [agentId] }, services.clock.now()); if (!snapshot.ok) return snapshot;
+  const agent = snapshot.value.agents.find(agent => agent.agentId === agentId);
+  return success(agent !== undefined && receiptsSettled(agent));
 }
 
 export function retirementEligible(services: RetirementServices, fleetId: string, agentId: string) {
-  const pending = services.repositories.fleetRuntimeOperation.pending(fleetId); if (!pending.ok) return pending;
-  if (pending.value) return success(false);
-  const settled = settledAgentReceipts(services, agentId); if (!settled.ok || !settled.value) return settled;
-  const observations = services.runtime.observation(agentId); if (!observations.ok) return observations;
-  const runs = services.listenerRead.history(agentId, { page: 1, pageSize: 1 }); if (!runs.ok) return runs;
-  const newest = runs.value.items[0];
-  const observed = services.runtime.hasObservedRuntime(agentId); if (!observed.ok) return observed;
-  if (!observed.value && !newest) return success(true);
-  if (!newest || newest.stoppedAt === null) return success(false);
-  const receipt = services.repositories.nativeStop.find(agentId); if (!receipt.ok) return receipt;
-  if (!receipt.value || receipt.value.invalidatedAt !== null || receipt.value.fleetId !== fleetId || receipt.value.runId !== newest?.id) return success(false);
-  const stoppedAt = receipt.value.nativeStoppedAt;
-  return success(observations.value.every(value => value.state === 'sleeping' || value.state === 'unavailable' || value.observedAt <= stoppedAt));
+  const batch = retirementEligibility(services, { agentIds: [agentId] }); if (!batch.ok) return batch;
+  const agent = batch.value.agents.get(agentId);
+  return success(agent?.fleetId === fleetId && agent.eligible);
 }
 
 export function recordNativeStop(services: Pick<Services, 'repositories' | 'runtime' | 'listenerRead' | 'directory' | 'collection' | 'clock' | 'unitOfWork' | 'identity'>,

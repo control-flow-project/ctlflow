@@ -8,6 +8,7 @@ import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
 import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
 import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
 import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
 import { changeFleet } from '@ctlflow/crossfire-domain/fleet/change-fleet';
 import { removeFleetAgent, archiveFleet } from '@ctlflow/crossfire-domain/fleet/retire';
 import { listFleetAgents, listFleets, readFleet } from '@ctlflow/crossfire-domain/fleet/read-fleet';
@@ -43,6 +44,8 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   const audit = value(services.collection.audits({ page: 1, pageSize: 100 })).items.find(item => item.action === 'fleet.configure')!;
   assert.equal(audit.actorKind, 'controller'); assert.equal(audit.actorPrincipalId, null); assert.equal(audit.actorCredentialId, controller.credentialId);
   const agent = first.instances[0]!;
+  assert.equal(removeFleetAgent(services, controller, fleetId, agent.agentId!, { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey }, randomUUID()).ok, false);
+  value(reportFleetConnection(services, controller, fleetId, randomUUID(), false));
   value(removeFleetAgent(services, controller, fleetId, agent.agentId!, { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey }, randomUUID()));
   assert.equal(value(services.directory.agent(agent.agentId!))!.principal.status, 'suspended');
   assert(value(services.repositories.fleetInstance.findByAgent(agent.agentId!))?.retiredAt);

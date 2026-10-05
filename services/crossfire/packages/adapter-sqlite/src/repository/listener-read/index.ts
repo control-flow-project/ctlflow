@@ -6,8 +6,10 @@ import type { ListenerReadRepository } from '@ctlflow/crossfire-domain/port/list
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapListenerRun } from '../listener-run/map.js';
+import { readRetirement } from './retirement.js';
 export function createListenerReadRepository(database: Database.Database): ListenerReadRepository {
   return {
+    retirement(selection, now) { return stored(() => success(readRetirement(database, selection, now))); },
     activeCount(agentId, since, now) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('listener_run')
         .where(row => row.agent_id === params.agentId && row.stopped_at === null && row.last_seen_at > params.since)
