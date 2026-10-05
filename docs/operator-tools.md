@@ -58,8 +58,12 @@ Use the normal repository prerequisites and build:
 systemd-run --user --scope --quiet \
   --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
   --property=TasksMax=4096 /bin/bash -c \
-  'npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source && npm run typecheck && npm run build'
+  'npm ci --ignore-scripts && npm run typecheck && npm run build'
 ```
+
+Source compilation of SQLite is conditional on the target platform lacking a
+usable bundled binary; follow the [development prerequisites](development.md).
+This preparation builds tools without running the test suite.
 
 The tools require Node.js 26+, Unix ownership checks and the packages in the
 workspace lockfile. Git, tar, Docker and a Playwright-compatible Chromium

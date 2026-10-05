@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Use Node.js 26+, npm 11.17+, Git, a native SQLite build toolchain and an existing
+Use Node.js 26+, npm 11.17+, Git and an existing
 rootless Docker setup. Crossfire does not install services, alter firewall/DNS
 configuration or grant machine-wide permissions.
 
@@ -12,7 +12,7 @@ From the repository root:
 systemd-run --user --scope --quiet \
   --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
   --property=TasksMax=4096 /bin/bash -c \
-  'npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source && npm run typecheck && npm run build'
+  'npm ci --ignore-scripts && npm run typecheck && npm run build'
 cd services/crossfire
 node crossfire init --directory /absolute/private/crossfire-state \
   --instance team --origin http://127.0.0.1:8098 \
@@ -20,6 +20,11 @@ node crossfire init --directory /absolute/private/crossfire-state \
   --server-name team.localhost --administrator admin
 ./start.sh --directory /absolute/private/crossfire-state --port 8098 --content-port 8099
 ```
+
+The pinned SQLite package includes the verified Linux native binary. Only a
+platform without a usable bundled binary needs explicit source compilation;
+follow the [development prerequisites](../../../docs/development.md). The
+deployment image retains its own Alpine build requirements.
 
 Initialization refuses a nonempty state directory. Read its private
 `bootstrap.json` for the initial administrator password; do not publish it.

@@ -1,13 +1,13 @@
 # Development and verification
 
-Node.js 26+, npm 11.17+, Git and a native C/C++ toolchain are required.
+Node.js 26+, npm 11.17+ and Git are required.
 Install dependencies at the repository root:
 
 ```sh
 systemd-run --user --scope --quiet \
   --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
   --property=TasksMax=4096 /bin/bash -c \
-  'npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source && npm run typecheck && npm run build && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
+  'npm ci --ignore-scripts && npm run typecheck && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
 ```
 
 The lockfile and npm policy enforce engine versions, dependency age and disabled
@@ -18,9 +18,16 @@ with exact-name exclusions for the two verified public products,
 exclusions allow installing a newly published pinned release on publication day.
 They are not namespace wildcards: fresh nonexempt third-party packages and other private
 `@ctlflow` names remain subject to the age policy. Installation lifecycle scripts
-remain disabled; no controller/agent starts from npm hooks. SQLite is rebuilt
-explicitly. Root commands coordinate all three services; do not add a global
-package pool.
+remain disabled; no controller/agent starts from npm hooks. The pinned
+`better-sqlite3` 13.0.3 package includes a native binary verified to load on the
+Linux development host with installation scripts disabled. Do not rebuild it
+unconditionally. If the target platform has no usable bundled binary, install its
+native C/C++ toolchain and explicitly run
+`npm rebuild better-sqlite3 --build-from-source` inside the verified resource scope
+before typecheck/build/tests. This Linux result does not remove the deployment
+image's Alpine-specific build requirements. Root commands coordinate all three
+services; `npm test` includes the shared build, so do not precede it with a
+redundant `npm run build`. Do not add a global package pool.
 
 ## Test selection
 

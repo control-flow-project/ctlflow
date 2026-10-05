@@ -35,13 +35,15 @@ installation/build/test children inside one verified finite process-group scope:
 systemd-run --user --scope --quiet \
   --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
   --property=TasksMax=4096 /bin/bash -c \
-  'npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source && npm run typecheck && npm run build && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
+  'npm ci --ignore-scripts && npm run typecheck && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
 ```
 
 `npm test` builds once and runs isolated test files across available cores.
 It includes Codex, browser and fleet integration tests. Codex is the only
 implemented runtime; unsupported runtimes have no selectable product path or
 test flag. Builds/tests require a verified finite process-group resource scope.
+The pinned SQLite package includes the verified Linux native binary; source
+compilation is required only on platforms without a usable bundled binary.
 Tests use disposable private state, Conduit and inert providers, not production
 credentials or paid models.
 - [Test selection, prerequisites and evidence](docs/development.md)

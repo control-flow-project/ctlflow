@@ -99,10 +99,11 @@ Run the normal gates inside a verified finite process-group resource scope:
 systemd-run --user --scope --quiet \
   --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
   --property=TasksMax=4096 /bin/bash -c \
-  'npm run typecheck && npm run build && npm test && npm run verify:architecture'
+  'npm run typecheck && npm test && npm run verify:architecture'
 ```
 
-Focused cases use `MemoryMax=4294967296`, `MemorySwapMax=0` and `TasksMax=512`.
+`npm test` includes the shared build. Focused cases use `MemoryMax=4294967296`,
+`MemorySwapMax=0` and `TasksMax=512`.
 Runtime heap limits alone do not contain native/browser children. The integration
 owner verifies the complete current source; this guide does not claim a new run.
 
