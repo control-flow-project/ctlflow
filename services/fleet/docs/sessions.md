@@ -99,6 +99,6 @@ generation remains valid. After generation turnover, explicitly resume and stop
 the binding to obtain current evidence. Retirement and fleet archive stay refused
 until Crossfire confirms settled receipts and actual native stop.
 
-- [History exports, unread positions and reset preparation](../../crossfire/docs/history.md)
+- [History exports, unread positions and reset preparation](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
 - [Configured runtime parameters and history modes](configuration.md)
-- [Controller recovery and private API](../../fleetd/docs/operations.md)
+- [Controller recovery and private API](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)

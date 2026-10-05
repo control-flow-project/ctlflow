@@ -61,6 +61,10 @@ sleeping until input arrives. Manually stopped agents remain stopped.
 Startup restoration is bounded and generation-fenced. Missing histories,
 unreviewed configuration, invalid intent or failed process cleanup remain
 visible errors; they never authorize a new history or overlapping native owner.
+The private controller API opens independently of native restoration. Queued
+desired agents show `starting`; status and explicit stop remain available even
+when a large fleet's native starts are delayed. Controller API availability does
+not prove listener readiness: setup and `fleet test` check actual receivers.
 Read-only inspection never accepts changed files or increments revisions.
 Use an explicit revision-checked start/reset to apply configuration changes.
 No automatic host boot service is installed.
@@ -86,7 +90,7 @@ and operation IDs protect interrupted preparation. Normal recovery is not reset.
 Default start requires saved native history unless first enrollment or an explicit
 reset authorized initialization; losing established bindings cannot create new
 contexts. A failed instance does not discard successful peers' outcomes.
-- [Context reset contract](../../crossfire/docs/history.md)
+- [Context reset contract](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
 
 ## Crossfire connection
 
@@ -116,7 +120,7 @@ resume/stop before retirement; no stale lease or sleeping heartbeat proves stop.
 Instance retirement and fleet archive use the same canonical server operations
 and fail closed until actual native stop and all outstanding decisions/input
 receipts are confirmed. Neither operation detaches an agent or deletes history.
-- [UI/CLI session controls and confirmation](../../fleet/docs/sessions.md)
+- [UI/CLI session controls and confirmation](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/sessions.md)
 
 Role `coordination_options` requests exact Crossfire wake rules and invitation
 defaults with enrollment. Owner review is required for new/changed settings;

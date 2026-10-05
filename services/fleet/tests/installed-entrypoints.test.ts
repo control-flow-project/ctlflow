@@ -3,13 +3,23 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, symlinkSync, mkdirSync, readdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, symlinkSync, mkdirSync, readdirSync, readFileSync, existsSync, rmSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
+
+function installedFiles(directory: string): string[] {
+  return readdirSync(directory).flatMap(file => {
+    const selected = join(directory, file), information = lstatSync(selected);
+    assert.equal(information.isSymbolicLink(), false, 'Published package contains no symlink: ' + file);
+    if (information.isDirectory()) return installedFiles(selected).map(child => join(file, child));
+    assert.equal(information.isFile(), true, 'Published package contains only ordinary files: ' + file);
+    return [file];
+  });
+}
 
 test('installed fleetd symlink starts the exact private daemon and stops normally', { timeout: 15000 }, async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleetd-installed-'));
@@ -47,6 +57,24 @@ test('clean installed public tarballs resolve only public dependencies and own o
   }
   await execute('npm', ['install', '--prefix', prefix, '--ignore-scripts', '--omit=dev', '--offline', '--no-audit', '--no-fund', ...packages], { cwd: directory, env, timeout: 15000 });
   assert.deepEqual(readdirSync(join(prefix, 'node_modules', '@ctlflow')).sort(), ['fleet', 'fleetd']);
+  for (const name of ['fleet', 'fleetd']) {
+    const packageRoot = join(prefix, 'node_modules', '@ctlflow', name), sourceRoot = dirname(fileURLToPath(import.meta.resolve('@ctlflow/' + name + '/package.json')));
+    const guides = readdirSync(join(sourceRoot, 'docs')); for (const guide of guides) assert.match(guide, /^[A-Za-z0-9-]+\.md$/u, 'Published guides contain only Markdown');
+    const expected = ['README.md', 'package.json', join('dist', 'bin', name + '.mjs'), ...guides.map(file => join('docs', file)),
+      ...(name === 'fleetd' ? ['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'matrix-spec-LICENSE.txt'].map(file => join('dist', 'assets', file)) : [])];
+    assert.deepEqual(installedFiles(packageRoot).sort(), expected.sort(), 'Exact public files contain no source, tests, credentials or extra artifact path');
+    assert.deepEqual(readdirSync(join(packageRoot, 'docs')).sort(), guides.sort(), 'One canonical published guide directory');
+    for (const file of ['README.md', ...guides.map(file => join('docs', file))]) {
+      const content = readFileSync(join(packageRoot, file), 'utf8');
+      assert.equal(content, readFileSync(join(sourceRoot, file), 'utf8'), 'Published canonical documentation bytes: ' + name + '/' + file);
+      for (const match of content.matchAll(/\]\(([^)]+)\)/gu)) {
+        const address = match[1]!; if (address.startsWith('https://') || address.startsWith('#')) continue;
+        const target = resolve(dirname(join(packageRoot, file)), address.split('#')[0]!);
+        assert.equal(target.startsWith(packageRoot + '/'), true, 'Local guide link stays within published package: ' + address);
+        assert.equal(existsSync(target), true, 'Published guide link exists: ' + address);
+      }
+    }
+  }
   const installed = join(prefix, 'node_modules', '.bin', 'fleet');
   const cli = (...args: string[]) => execute(installed, args, { cwd: directory, env, timeout: 15000 });
   assert((await cli('--help')).stdout.includes('fleet setup'));

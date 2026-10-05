@@ -6,7 +6,7 @@
   "type": "module",
   "devDependencies": { "@ctlflow/crossfire-test-support": "0.1.0" },
   "bin": { "fleet": "./dist/bin/fleet.mjs" },
-  "files": ["dist/bin", "dist/docs", "README.md"],
+  "files": ["dist/bin", "docs", "README.md"],
   "exports": { "./executable": "./dist/bin/fleet.mjs", "./package.json": "./package.json" },
   "dependencies": { "@ctlflow/fleetd": "0.1.0" },
   "engines": {

@@ -17,6 +17,8 @@ import { fleetView, instanceView } from '@ctlflow/fleetd-contracts/api';
 import { success, failure, type Result } from '@ctlflow/crossfire-kernel/result';
 import { createListenerControl as listenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
 import { listenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
+import { createDaemonClient, operations as daemonOperations } from '@ctlflow/fleet-daemon-client/client';
+import { startDaemon } from '../apps/daemon/src/main.js';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 function createListenerControl(acknowledge: Parameters<typeof listenerControl>[0]) {
@@ -624,4 +626,38 @@ test('startup restoration uses at most four concurrent starts and never reenroll
   await until(() => pending.length === 8); assert.equal(maximum, 4);
   for (const complete of pending.slice(4)) complete();
   await restarted.ready(); assert.equal(active, 0); assert.equal(value(restarted.view(fixture.record.fleetId)).instances.filter(item => item.desiredActive).length, 8);
+});
+
+test('private controller API stays responsive while bounded native restoration is queued and explicit stop cancels it without enrollment', { timeout: 5000 }, async scope => {
+  const current = fixtureController(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  for (let index = 1; index < 8; index++) {
+    const key = 'queued-' + index, revision = value(current.controller.view(current.record.fleetId)).revision;
+    value(await current.controller.editInstance(current.record.fleetId, revision, { kind: 'add', instance: { key, name: key, definition: 'analyst', workarea: 'agents/analyst/workarea/' + key } }));
+  }
+  await current.finish(await current.operation('start')); await current.controller.close();
+  let started = 0, released = false; const completions = new Set<() => void>();
+  current.services.execution.prepare = async () => assert.fail('Restoration cannot reenroll a fleet');
+  current.services.execution.start = async (_configuration, _instance, signal, reason) => {
+    assert.equal(reason, 'recovery'); started++;
+    await new Promise<void>(resolve => {
+      const complete = () => { completions.delete(complete); signal.removeEventListener('abort', complete); resolve(); };
+      if (released || signal.aborted) complete(); else { completions.add(complete); signal.addEventListener('abort', complete, { once: true }); }
+    });
+    return failure('unavailable', 'Controlled native restoration stopped');
+  };
+  const starting = startDaemon(join(current.directory, 'controller'), 'desktop', current.services.execution);
+  cleanup(scope, async () => { released = true; for (const complete of completions) complete(); await (await starting).close(); });
+  const daemon = await starting, client = createDaemonClient(daemon.socketPath);
+  await until(() => started === 4);
+  assert.equal(value(await client.call(daemonOperations.status, {}, {})).data.stopping, false);
+  const restoring = value(await client.call(daemonOperations.fleet, { fleetId: current.record.fleetId }, {})).data;
+  assert.equal(restoring.instances.filter(instance => instance.desiredActive && instance.phase === 'starting').length, 8);
+  assert.equal((await client.call(daemonOperations.readiness, { fleetId: current.record.fleetId }, {})).ok, false, 'API availability does not claim native listener readiness');
+  const stopping = value(await client.call(daemonOperations.operate, {}, { operationId: randomUUID(), action: 'stop',
+    target: { kind: 'fleet', fleetId: current.record.fleetId }, expectedRevision: restoring.revision })).data;
+  await until(() => value(daemon.controller.operation(stopping.operationId)).completedAt !== null);
+  assert.equal(value(daemon.controller.operation(stopping.operationId)).status, 'succeeded');
+  const stopped = value(await client.call(daemonOperations.fleet, { fleetId: current.record.fleetId }, {})).data;
+  assert.equal(stopped.instances.filter(instance => !instance.desiredActive && instance.phase === 'stopped').length, 8);
+  assert.deepEqual(value(current.registry.desiredIntent()), []); assert.equal(started, 4, 'Queued native generations never start after explicit stop');
 });

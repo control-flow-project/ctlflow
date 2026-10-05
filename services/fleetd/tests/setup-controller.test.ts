@@ -101,6 +101,76 @@ test('repeat setup requires actual model-free listener readiness and refuses bus
   assert.equal(current.calls.filter(call => call.startsWith('start:')).length, 1); assert.equal(current.calls.includes('reset'), false);
 });
 
+test('repeat setup waits for its ongoing native restoration without another start, operation, enrollment or history', async scope => {
+  const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation);
+  const history = value(current.controller.view(first.fleet.fleetId)).instances[0]!.sessionId;
+  await current.controller.close();
+  let finish!: () => void, settled = false;
+  const start = current.services.execution.start;
+  current.services.execution.start = async (...args) => {
+    await new Promise<void>(resolve => { finish = resolve; args[2].addEventListener('abort', () => resolve(), { once: true }); });
+    return args[2].aborted ? failure('unavailable', 'Controlled restoration stopped') : start(...args);
+  };
+  const reopened = value(createController(current.services)); cleanup(scope, () => reopened.close());
+  await until(() => finish !== undefined); const inspected = current.calls.filter(call => call === 'inspect').length;
+  const repeated = reopened.setup(current.input).then(result => { settled = true; return result; });
+  await until(() => current.calls.filter(call => call === 'inspect').length > inspected); await yieldLoop();
+  assert.equal(settled, false, 'Setup cannot claim readiness or compete with the current native restoration');
+  finish(); const result = value(await repeated); assert.equal(result.status, 'ready'); assert.equal(result.operation, null);
+  assert.equal(result.fleet.instances[0]!.sessionId, history);
+  assert.deepEqual(current.calls.filter(call => call.startsWith('start:')).map(call => call.split(':').at(-1)), ['operator', 'recovery']);
+  assert.equal(current.calls.filter(call => call === 'prepare').length, 1); assert.equal(value(current.registry.operations()).length, 1);
+});
+
+test('setup awaits only its own restored fleet and does not wait for unrelated native initialization', async scope => {
+  const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation);
+  const otherWorkspace = join(current.directory, 'other'); mkdirSync(otherWorkspace, { mode: 0o755 });
+  const second = value(await current.controller.setup({ ...current.input, workspace: otherWorkspace })); assert(second.operation); await current.finish(second.operation);
+  const otherKey = value(current.controller.view(second.fleet.fleetId)).instances[0]!.instance.key;
+  await current.controller.close(); let finish!: () => void;
+  const start = current.services.execution.start;
+  current.services.execution.start = async (...args) => {
+    if (args[1].key === otherKey) await new Promise<void>(resolve => { finish = resolve; args[2].addEventListener('abort', () => resolve(), { once: true }); });
+    return args[2].aborted ? failure('unavailable', 'Controlled unrelated restoration stopped') : start(...args);
+  };
+  const reopened = value(createController(current.services)); cleanup(scope, () => reopened.close());
+  await until(() => finish !== undefined);
+  const repeated = value(await reopened.setup(current.input)); assert.equal(repeated.status, 'ready'); assert.equal(repeated.fleet.fleetId, first.fleet.fleetId);
+  assert.equal(value(reopened.view(second.fleet.fleetId)).instances[0]!.phase, 'starting'); finish(); await reopened.ready();
+  assert.equal(current.calls.filter(call => call === 'prepare').length, 2);
+});
+
+test('successful restoration finishes interrupted setup without repeating lifecycle or replacing its exact history', async scope => {
+  const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const complete = current.registry.completeSetup; let available = false;
+  current.registry.completeSetup = operationId => available ? complete(operationId) : failure('unavailable', 'Controlled setup completion persistence failure');
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); assert.equal((await current.finish(first.operation)).status, 'failed');
+  const history = value(current.controller.view(first.fleet.fleetId)).instances[0]!.sessionId; await current.controller.close(); available = true;
+  const reopened = value(createController(current.services)); cleanup(scope, () => reopened.close());
+  const repeated = value(await reopened.setup(current.input)); assert.equal(repeated.status, 'ready'); assert.equal(repeated.operation, null);
+  assert.equal(repeated.fleet.instances[0]!.sessionId, history); assert.equal(value(current.registry.setup(current.input)).completed, true);
+  assert.deepEqual(current.calls.filter(call => call.startsWith('start:')).map(call => call.split(':').at(-1)), ['operator', 'recovery']);
+  assert.equal(current.calls.filter(call => call === 'prepare').length, 1); assert.equal(value(current.registry.operations()).length, 1);
+});
+
+test('explicit stop during setup restoration stays stopped rather than restarting after its readiness wait', async scope => {
+  const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation); await current.controller.close();
+  let started = false;
+  current.services.execution.start = async (_configuration, _instance, signal) => {
+    started = true; await new Promise<void>(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true }); });
+    return failure('unavailable', 'Restoration cancelled by explicit stop');
+  };
+  const reopened = value(createController(current.services)); cleanup(scope, () => reopened.close()); await until(() => started);
+  const repeated = reopened.setup(current.input), stopping = value(await reopened.operate({ operationId: randomUUID(), action: 'stop',
+    target: { kind: 'fleet', fleetId: first.fleet.fleetId }, expectedRevision: value(reopened.view(first.fleet.fleetId)).revision }));
+  await until(() => value(reopened.operation(stopping.operationId)).completedAt !== null);
+  assert.equal(value(reopened.operation(stopping.operationId)).status, 'succeeded'); assert.equal(value(await repeated).status, 'stopped');
+  assert.deepEqual(value(current.registry.desiredIntent()), []); assert.equal(current.calls.filter(call => call === 'prepare').length, 1);
+});
+
 test('readiness checks sleeping bindings without native wake; stopped readiness cannot start a process', async scope => {
   const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
   const start = current.services.execution.start;

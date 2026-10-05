@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { mkdirSync, chmodSync, readFileSync, cpSync, rmSync } from 'node:fs';
+import { mkdirSync, chmodSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { buildAgentArtifacts } from '@ctlflow/crossfire-agent-tools/build';
@@ -13,4 +13,3 @@ await build({ entryPoints: [join(root, 'apps', 'daemon', 'src', 'main.ts')], out
 rmSync(join(root, 'dist', 'assets'), { recursive: true, force: true });
 await buildAgentArtifacts(join(root, 'dist', 'assets'), version);
 chmodSync(output, 0o755);
-cpSync(join(root, 'docs'), join(root, 'dist', 'docs'), { recursive: true });

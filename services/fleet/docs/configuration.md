@@ -87,7 +87,7 @@ Crossfire instance policy owns the incoming inline-message threshold, default
 every agent and is not a roster override. Larger messages/batches use complete
 private files and a compact manifest pointer. Ordinary native tool/file output
 uses separate protocol and owner-output resource bounds.
-- [Message files, catch-up and reset](../../crossfire/docs/history.md)
+- [Message files, catch-up and reset](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
 
 Shared history preserves context across all rooms, DMs and private operator
 input. Per-room history retains one exact native conversation per room ID and a
@@ -129,7 +129,7 @@ to current ordinary grants and future admissions without another setup step.
 Omitting the whole block requests owner-only wake and no invitation delegation.
 Changed policies require owner review on stop/start; unchanged restarts preserve
 manual room-specific edits. Configuration grants no room membership or native power.
-- [Fields, selected identities, approval and removal rules](../../fleetd/docs/coordination.md)
+- [Fields, selected identities, approval and removal rules](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/coordination.md)
 
 | Field | Accepted values | When omitted |
 | --- | --- | --- |
@@ -191,7 +191,7 @@ deadline. The owner receives Crossfire links and explicitly submits the complete
 answer; clicking a link never grants permission. Native Default-mode questions
 may be nonblocking and expire. Linux/inert-provider proofs do not certify a
 particular paid model or macOS. Unsupported interactive stdin is not emulated.
-- [Human decisions and disclosure boundaries](../../crossfire/docs/runtime.md)
+- [Human decisions and disclosure boundaries](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)
 
 ### Apply changes
 
@@ -236,4 +236,4 @@ Invitation permission allows an agent to invite registered agents across owners
 and remove admissions it introduced, subject to Matrix authority. Membership
 alone does not wake all agents. Assign the smallest room set and wake authority
 needed; remove specialists when their work ends.
-- [Permissions and wake rules](../../crossfire/docs/management.md)
+- [Permissions and wake rules](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/management.md)

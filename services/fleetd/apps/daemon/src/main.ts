@@ -12,12 +12,13 @@ import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { createRegistry } from '@ctlflow/fleetd-storage/registry';
 import { prepareControllerRoot } from '@ctlflow/fleetd-storage/controller-root';
 import { createController } from '@ctlflow/fleetd-domain/controller';
+import type { Execution } from '@ctlflow/fleetd-domain/port';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
 
-export async function startDaemon(root: string, name?: string) {
+export async function startDaemon(root: string, name?: string, execution?: Execution) {
   if (!['linux', 'darwin'].includes(process.platform)) throw new Error('Fleet controller requires Linux or macOS');
   let parsed = parseController({ name: name ?? 'local' });
   if (!parsed.ok) throw new Error(parsed.error.message);
@@ -47,7 +48,7 @@ export async function startDaemon(root: string, name?: string) {
       if (current.ino !== information.ino || current.dev !== information.dev) throw new Error('Controller socket changed during startup');
       unlinkSync(socketPath);
     }
-    const created = createController({ registry: createRegistry(root), execution: createExecution({ codex: codexRuntime() },
+    const created = createController({ registry: createRegistry(root), execution: execution ?? createExecution({ codex: codexRuntime() },
       dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts')))), controller: parsed.value, id: randomUUID, now: Date.now, delay: nativeClock.delay });
     if (!created.ok) throw new Error(created.error.message);
     const controller = created.value;
@@ -62,7 +63,6 @@ export async function startDaemon(root: string, name?: string) {
       }
     })();
     cleanup = close;
-    await controller.ready();
     server.listen(socketPath); await once(server, 'listening'); chmodSync(socketPath, 0o600);
     return { controller, close, socketPath };
   } catch (error) { await cleanup(); throw error; }

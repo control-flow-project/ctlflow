@@ -71,7 +71,7 @@ backoff, preserving deployed parameters, installed software, identity and native
 history. Explicit stop cancels recovery. Permanent configuration/authorization
 errors and failed cleanup require operator action. Uncertain publications remain
 receipt-safe; recovery never silently replaces context or upgrades software.
-- [Runtime observation, privacy and decisions](../../crossfire/docs/runtime.md)
+- [Runtime observation, privacy and decisions](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)
 
 Normal stop ends owned listeners and Codex engines. The product does not supervise
 every detached tool descendant after force-kill/crash. It installs no systemd,

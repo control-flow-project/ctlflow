@@ -72,7 +72,7 @@ It is not normal resumption. Use `--operation-id UUID` with the identical comman
 to retry an uncertain request. The independent coding session doing setup is
 never controlled here.
 - [Session controls, full-history resume and fresh-history confirmation](sessions.md)
-- [Export, boundaries and reset retention](../../crossfire/docs/history.md)
+- [Export, boundaries and reset retention](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
 
 ## Delivery control and broadcast
 

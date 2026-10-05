@@ -12,8 +12,8 @@ owns enrollment, room permissions, wake rules and listener activity.
 - [Command reference and lifecycle](docs/commands.md)
 - [Remote controllers and native terminal pointers](docs/remote.md)
 - [Updates, backups and troubleshooting](docs/operations.md)
-- [Controller API and ownership](../fleetd/README.md)
-- [Crossfire management](../crossfire/docs/management.md)
+- [Controller API and ownership](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/README.md)
+- [Crossfire management](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/management.md)
 
 ## First setup
 

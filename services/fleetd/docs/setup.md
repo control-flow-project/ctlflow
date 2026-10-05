@@ -44,6 +44,9 @@ the same initial operation until completion. Repeated setup observes pending
 approval, retries a failed incomplete operation or returns the existing ready or
 explicitly stopped binding. It never creates another account for a retry or
 silently reactivates a stopped instance.
+When its controller is restoring a saved fleet, setup awaits that fleet's current
+bounded restoration attempt. It does not start a competing native generation or
+wait for unrelated fleets. Status and explicit stop remain available throughout.
 
 `--config /absolute/runtime.toml` loads an ordinary existing roster. Its server
 and owner must match the descriptor; names are validated exactly, never

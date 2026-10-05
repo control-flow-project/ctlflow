@@ -5,8 +5,8 @@ The guides cover controller ownership and the shared runtime configuration:
 - [Controller documentation](docs/README.md)
 - [Noninteractive project setup and private workspace/state](docs/setup.md)
 - [Lifecycle, private API and execution boundaries](docs/operations.md)
-- [Read-only native fleet verification](tools/README.md)
-- [Fleet runtime defaults and overrides](../fleet/docs/configuration.md)
+- [Read-only native fleet verification](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
+- [Fleet runtime defaults and overrides](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
 - [Fleet-defined wake rules and invitation defaults](docs/coordination.md)
 
 The public `@ctlflow/fleet` CLI depends on the exact matching public
@@ -74,5 +74,5 @@ Whole descendant
 process supervision after a crash is not promised. No systemd, privileged daemon,
 global skill, host package installer or shell supervisor is installed.
 
-- [CLI and first-run workflow](../fleet/README.md)
-- [Canonical API, data and lifecycle specification](../../docs/specification.md)
+- [CLI and first-run workflow](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/README.md)
+- [Canonical API, data and lifecycle specification](https://github.com/control-flow-project/crossfire/blob/main/docs/specification.md)
