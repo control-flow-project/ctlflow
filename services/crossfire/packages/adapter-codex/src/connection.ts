@@ -3,10 +3,12 @@ import { setTimeout as delay } from 'node:timers/promises';
 import type { RuntimeConnection, RuntimeHooks, TurnControl } from '@crossfire/agent-core/runtime';
 import { connectSession, type CodexOptions, type CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
-import { deliveryState, type HistoryBoundary, type Delivery } from './delivery-state.js';
+import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
+import { nativeDelivery } from '@crossfire/adapter-runtime/delivery';
 
 export type { CodexOptions } from './session.js';
-export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>; event: (event: NativeEvent) => void };
+export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>;
+  inspectSession: (sessionId: string) => Promise<{ busy: boolean }>; unsettled: () => boolean; event: (event: NativeEvent) => void };
 
 function pollInterval(milliseconds: number): number {
   if (!Number.isInteger(milliseconds) || milliseconds < 100 || milliseconds > 30_000) throw new Error('Codex receipt poll interval must be 100..30000 ms');
@@ -22,20 +24,24 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
   const { sessionId, request } = session;
   const pollMs = pollInterval(options.pollMs), timeoutMs = options.timeoutMs;
   const failure = { signal: session.signal };
-  let receiveDelivery: ((message: NativeEvent) => void) | undefined;
-  const journal = deliveryState(options.receiptFile, sessionId);
-  let pendingDelivery: Delivery | undefined = journal.pending() ?? undefined;
-  async function verify(): Promise<void> {
-    const response = object(await request('thread/read', { threadId: sessionId, includeTurns: false }));
+  let revision = 0, checkedRevision = 0, unavailable = 0;
+  let wake: (() => void) | undefined;
+  async function nativeState(threadId: string): Promise<'idle' | 'active' | 'notLoaded'> {
+    const response = object(await request('thread/read', { threadId, includeTurns: false }));
     const thread = object(response.thread);
     const status = object(thread.status);
-    if (thread.id !== sessionId || thread.canAcceptDirectInput !== true
-        || !['idle', 'active'].includes(String(status.type))) {
+    if (thread.id !== threadId || !['idle', 'active', 'notLoaded'].includes(String(status.type))
+        || thread.canAcceptDirectInput !== (status.type === 'notLoaded' ? null : true)) {
       throw new Error('The selected native session is not loaded for direct input; delivery stopped.');
     }
     if (typeof thread.cwd !== 'string' || realpathSync(thread.cwd) !== realpathSync(session.workspace)) {
       throw new Error('The Codex thread workspace differs from this Crossfire identity; refusing delivery');
     }
+    return status.type as 'idle' | 'active' | 'notLoaded';
+  }
+
+  async function verify(): Promise<void> {
+    if (await nativeState(sessionId) === 'notLoaded') throw new Error('The selected native session is not loaded for direct input; delivery stopped.');
   }
 
   async function latestTurn() {
@@ -53,7 +59,12 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
 
   async function activeTurn(): Promise<string | null> {
     await verify();
-    const turn = await latestTurn();
+    let turn: Awaited<ReturnType<typeof latestTurn>>;
+    try { turn = await latestTurn(); }
+    catch (error) {
+      if (unmaterialized(error) && await nativeState(sessionId) === 'idle') return null;
+      throw error;
+    }
     return turn?.status === 'inProgress' ? turn.id : null;
   }
 
@@ -143,13 +154,17 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
       && 'detail' in error && typeof error.detail === 'string';
   }
 
+  function unmaterialized(error: unknown): boolean {
+    return protocolError(error, -32600) && error.detail === `thread ${sessionId} is not materialized yet; thread/turns/list is unavailable before first user message`;
+  }
+
   async function historyBoundary(): Promise<{ boundary: HistoryBoundary | null; initializing: boolean }> {
     try { return { boundary: (await historyPage(1)).entries[0]?.boundary ?? null, initializing: false }; }
     catch (error) {
       if (!protocolError(error, -32601)) throw error;
       try { await latestTurn(); }
       catch (state) {
-        if (protocolError(state, -32600) && state.detail === `thread ${sessionId} is not materialized yet; thread/turns/list is unavailable before first user message`) {
+        if (unmaterialized(state)) {
           return { boundary: null, initializing: true };
         }
         throw error;
@@ -203,125 +218,68 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     throw new Error('Codex input history exceeds the verification bound; read positions were not advanced');
   }
 
-  async function waitForReceipt(delivery: Delivery, deliverySignal: AbortSignal): Promise<boolean> {
-    if (receiveDelivery) throw new Error('Codex input delivery must be sequential');
-    let revision = 0;
-    let wake: (() => void) | undefined;
-    receiveDelivery = message => {
-      if (message.method !== 'thread/status/changed') return;
-      const params = object(message.params);
-      if (params.threadId !== sessionId) return;
-      if (!['idle', 'active'].includes(String(object(params.status).type))) {
-        throw new Error('The selected Codex thread is no longer available for input');
-      }
-      revision++;
-      wake?.();
-    };
-    async function wait(previousRevision: number): Promise<void> {
-      deliverySignal.throwIfAborted();
-      if (revision !== previousRevision) return;
-      await new Promise<void>(resolve => {
-        const finish = () => {
-          clearTimeout(timer);
-          deliverySignal.removeEventListener('abort', finish);
-          wake = undefined;
-          resolve();
-        };
-        const timer = setTimeout(finish, pollMs);
-        wake = finish;
-        deliverySignal.addEventListener('abort', finish, { once: true });
-      });
-      deliverySignal.throwIfAborted();
-    }
-    try {
-      let unavailable = 0;
-      for (;;) {
-        deliverySignal.throwIfAborted();
-        const previousRevision = revision;
-        let status: Awaited<ReturnType<typeof receipt>>['status'];
-        let checked: Awaited<ReturnType<typeof receipt>>;
-        try { checked = await receipt(delivery.turn, delivery.text, delivery.messageId, delivery.boundary); }
-        catch (error) {
-          if (!delivery.initializing || !protocolError(error, -32601) || ++unavailable >= 3) throw error;
-          await wait(previousRevision);
-          continue;
-        }
-        delivery.initializing = false;
-        status = checked.status;
-        if (status === 'received') return true;
-        if (delivery.turn === null) throw new Error('Native input publication is uncertain; retained delivery journal prevents resubmission');
-        delivery.boundary = checked.boundary;
-        if (status === 'unavailable') {
-          if (++unavailable >= 3) throw new Error('Codex did not retain the accepted turn; read positions were not advanced');
-          await wait(revision);
-          continue;
-        }
-        unavailable = 0;
-        if (status === 'interrupted') return false;
-        if (status === 'missing') throw new Error('Codex finished without recording the input; read positions were not advanced');
-        await wait(previousRevision);
-      }
-    } finally {
-      receiveDelivery = undefined;
-      wake?.();
-    }
+  async function wait(milliseconds: number, signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    if (revision !== checkedRevision) return;
+    await new Promise<void>(resolve => {
+      const finish = () => {
+        clearTimeout(timer); signal.removeEventListener('abort', finish); wake = undefined; resolve();
+      };
+      const timer = setTimeout(finish, milliseconds);
+      wake = finish;
+      signal.addEventListener('abort', finish, { once: true });
+      if (signal.aborted || revision !== checkedRevision) finish();
+    });
+    signal.throwIfAborted();
   }
 
-  async function settle(): Promise<boolean> {
-    if (!pendingDelivery) return false;
-    const received = await waitForReceipt(pendingDelivery, failure.signal);
-    journal.complete(pendingDelivery, received);
-    pendingDelivery = undefined;
-    return received;
-  }
-
-  async function deliver(text: string, messageId: string, cancelled?: AbortSignal): Promise<void> {
-    if (receiveDelivery) throw new Error('Codex input delivery must be sequential; settle the preceding delivery before submitting another');
-    if (pendingDelivery) {
-      if (pendingDelivery.messageId !== messageId || pendingDelivery.text !== text) throw new Error('Settle the preceding native delivery before submitting different input');
-      if (await settle()) return;
-    }
-    if (journal.confirmed(text, messageId)) return;
-    const deliverySignal = cancelled ? AbortSignal.any([failure.signal, cancelled]) : failure.signal;
-    for (;;) {
-      deliverySignal.throwIfAborted();
-      await verify();
-      const history = await historyBoundary();
-      deliverySignal.throwIfAborted();
-      pendingDelivery = { turn: null, text, messageId, ...history };
-      journal.prepare(pendingDelivery);
+  const delivery = nativeDelivery<CodexInput>({ sessionId, approval: session.approval, signal: session.signal, verify,
+    inspect: async () => ({ busy: await activeTurn() !== null || await nativeState(sessionId) === 'active' }), wait,
+    prepare: async (text, messageId) => {
+      unavailable = 0;
+      return { turn: null, text, messageId, ...await historyBoundary() };
+    },
+    publish: async (input, retain) => {
       const result = object(await request('turn/start', {
-        threadId: sessionId, clientUserMessageId: messageId,
-        input: [{ type: 'text', text, text_elements: [] }],
+        threadId: sessionId, clientUserMessageId: input.messageId,
+        input: [{ type: 'text', text: input.text, text_elements: [] }],
       }));
       const turn = object(result.turn);
       if (typeof turn.id !== 'string' || !turn.id) throw new Error('Codex did not acknowledge a turn; delivery may be uncertain');
-      pendingDelivery = { turn: turn.id, text, messageId, ...history };
-      journal.prepare(pendingDelivery);
-      const received = await waitForReceipt(pendingDelivery, deliverySignal);
-      journal.complete(pendingDelivery, received);
-      pendingDelivery = undefined;
-      if (received) return;
-    }
-  }
-
-  return { sessionId, approval: session.approval, signal: session.signal, verify,
-    inspect: async () => ({ busy: await activeTurn() !== null }),
-    close: async () => { try { await session.close(); } finally { journal.close(); } }, deliver, settle,
-    recover: async (text, messageId) => {
-      if (receiveDelivery) throw new Error('Codex receipt recovery must be sequential');
-      if (pendingDelivery) {
-        if (pendingDelivery.messageId !== messageId || pendingDelivery.text !== text) throw new Error('Receipt recovery does not match the pending native input');
-        return settle();
-      }
-      return journal.confirmed(text, messageId);
+      retain({ ...input, turn: turn.id });
     },
-    acknowledge: journal.acknowledge, turnControl: { activeTurn, interrupt },
-    event: message => {
-      if (message.method === 'thread/closed' && message.params.threadId === sessionId) {
-        throw new Error('The selected Codex thread closed; listener delivery stopped');
+    received: async (input, retain) => {
+      checkedRevision = revision;
+      let checked: Awaited<ReturnType<typeof receipt>>;
+      try { checked = await receipt(input.turn, input.text, input.messageId, input.boundary); }
+      catch (error) {
+        if (!input.initializing || !protocolError(error, -32601) || ++unavailable >= 3) throw error;
+        return false;
       }
-      receiveDelivery?.(message);
+      if (checked.status === 'received') return true;
+      if (input.turn === null) throw new Error('Native input publication is uncertain; retained delivery journal prevents resubmission');
+      if (input.initializing || checked.boundary?.key !== input.boundary?.key) retain({ ...input, initializing: false, boundary: checked.boundary });
+      if (checked.status === 'unavailable') {
+        if (++unavailable >= 3) throw new Error('Codex did not retain the accepted turn; read positions were not advanced');
+        return false;
+      }
+      unavailable = 0;
+      if (checked.status === 'interrupted') return 'interrupted';
+      if (checked.status === 'missing') throw new Error('Codex finished without recording the input; read positions were not advanced');
+      return 'waiting';
+    },
+    close: () => session.close(),
+  }, codexInput, { journal: options.receiptFile, pollMs, timeoutMs });
+  return { ...delivery, verify, inspectSession: async threadId => ({ busy: await nativeState(threadId) === 'active' }), turnControl: { activeTurn, interrupt },
+    event: message => {
+      if (message.params.threadId !== sessionId) return;
+      if (message.method === 'thread/closed') throw new Error('The selected Codex thread closed; listener delivery stopped');
+      if (message.method === 'thread/status/changed') {
+        if (delivery.unsettled() && !['idle', 'active'].includes(String(object(message.params.status).type))) {
+          throw new Error('The selected Codex thread is no longer available for input');
+        }
+        revision++; wake?.();
+      }
     },
   };
 }

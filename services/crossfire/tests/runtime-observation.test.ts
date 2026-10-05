@@ -3,6 +3,7 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { cleanup } from '@crossfire/test-support/cleanup';
 import { nativeObservation } from '@crossfire/adapter-codex/observation';
+import { observedEvent } from '@crossfire/adapter-codex/observed-event';
 import { ownerObservation } from '@crossfire/agent-core/owner-observation';
 import type { RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
 import { fakeCodex, matrixFixture, OWNER_DM, ROOM, SELF, until } from '../scripts/test-support/listener.js';
@@ -10,6 +11,43 @@ import { testClock } from '../scripts/test-support/clock.js';
 import { localState } from '@crossfire/adapter-filesystem/state';
 import { matrix as matrixClient } from '@crossfire/adapter-matrix/http';
 import type { Transport } from '@crossfire/agent-core/port';
+
+test('current native observations use exact discriminants and never guess alternative output fields', () => {
+  const events: RuntimeObservationEvent[] = [], observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => events.push(event) }, () => 'original');
+  const send = (method: string, params: Record<string, unknown>) => observer.event({ method, params: { threadId: 'original', ...params } });
+  for (const item of [
+    { type: 'mcpToolCall', id: 'mcp', tool: 'extract', result: { content: [{ text: 'extracted' }] }, error: null },
+    { type: 'dynamicToolCall', id: 'dynamic', tool: 'lookup', contentItems: [{ type: 'inputText', text: 'current output' }], success: true, result: 'wrong guessed output' },
+    { type: 'webSearch', id: 'web', query: 'source', action: { type: 'search', query: 'source' }, results: [], content: 'wrong guessed output' },
+    { type: 'imageGeneration', id: 'image', status: 'completed', revisedPrompt: null, result: 'image.png', failure: null },
+  ]) send('item/completed', { item });
+  send('item/mcpToolCall/progress', { itemId: 'mcp', message: 'progress', delta: 'wrong guessed output' });
+  send('item/dynamicToolCall/progress', { itemId: 'unsupported', message: 'uncontracted native progress' });
+  send('item/reasoning/textDelta', { delta: 'private reasoning' });
+  const output = events.filter(event => event.kind === 'output').map(event => event.text).join('');
+  assert(output.includes('current output')); assert(output.includes('progress')); assert(!output.includes('wrong guessed output'));
+  assert(!output.includes('uncontracted native progress')); assert(!output.includes('private reasoning'));
+  for (const params of [{ status: { type: 'other' } }, { status: { type: 'active', activeFlags: ['other'] } }]) {
+    assert.throws(() => observedEvent({ method: 'thread/status/changed', params }), /native thread/u);
+  }
+  assert.throws(() => send('item/mcpToolCall/progress', { itemId: 'mcp', delta: 'not message' }), /native observation/u);
+  assert.throws(() => send('item/completed', { item: { type: 'dynamicToolCall', id: 'd', tool: 'tool', result: 'old guessed output' } }), /native tool/u);
+  assert.throws(() => send('turn/completed', { turn: { status: 'unknown', error: null } }), /completion/u);
+  send('turn/completed', { turn: { status: 'failed', error: { message: 'native failure' } } });
+  const state = events.at(-1); assert(state?.kind === 'state'); assert.equal(state.observation.state, 'failed'); assert.equal(state.observation.errorMessage, 'native failure');
+});
+
+test('streamed unicode output uses bounded exact prefix evidence rather than retaining full native text', () => {
+  const output: string[] = [], observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => { if (event.kind === 'output') output.push(event.text); } }, () => 'original');
+  const send = (method: string, params: Record<string, unknown>) => observer.event({ method, params: { threadId: 'original', ...params } });
+  send('item/agentMessage/delta', { itemId: 'unicode', delta: '\ud83d' }); send('item/agentMessage/delta', { itemId: 'unicode', delta: '\ude00' });
+  send('item/completed', { item: { id: 'unicode', type: 'agentMessage', text: '😀 completed' } });
+  assert.equal(output.join(''), '😀 completed');
+  output.length = 0;
+  send('item/agentMessage/delta', { itemId: 'mismatch', delta: 'stream' });
+  send('item/completed', { item: { id: 'mismatch', type: 'agentMessage', text: 'different final output' } });
+  assert.deepEqual(output, ['stream', 'different final output']);
+});
 
 test('native terminal observation excludes reasoning and forwards complete streamed and large file output', () => {
   const events: RuntimeObservationEvent[] = [];
@@ -19,7 +57,7 @@ test('native terminal observation excludes reasoning and forwards complete strea
   send('item/agentMessage/delta', { itemId: 'reply', delta: 'visible ' });
   send('item/completed', { item: { id: 'reply', type: 'agentMessage', text: 'visible complete' } });
   send('item/commandExecution/outputDelta', { itemId: 'command', delta: 'first\n' });
-  send('item/completed', { item: { id: 'command', type: 'commandExecution', aggregatedOutput: 'first\nlast\n' } });
+  send('item/completed', { item: { id: 'command', type: 'commandExecution', command: 'fixture', cwd: '/fixture', aggregatedOutput: 'first\nlast\n' } });
   const patch = 'x'.repeat(26036);
   send('item/completed', { item: { id: 'file', type: 'fileChange', changes: [{ path: 'evidence', diff: patch }] } });
   observer.event({ method: 'item/agentMessage/delta', params: { threadId: 'another', itemId: 'foreign', delta: 'wrong session' } });

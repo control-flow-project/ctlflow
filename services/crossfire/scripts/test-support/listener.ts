@@ -90,7 +90,7 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
     } else if (request.method === 'turn/interrupt') {
       if (configuration.rejectInterrupt) { send({ id: request.id, error: { code: -32602, message: 'interruption refused' } }); return; }
       send({ id: request.id, result: {} });
-      if (!configuration.delayInterrupt) notify('turn/completed', { threadId: THREAD, turn: { id: request.params.turnId, status: 'interrupted' } });
+      if (!configuration.delayInterrupt) notify('turn/completed', { threadId: THREAD, turn: { id: request.params.turnId, status: 'interrupted', error: null } });
     } else if (request.method === 'turn/start') {
       if (mode === 'disconnect') { socket.terminate(); return; }
       if (mode === 'timeout') return;
