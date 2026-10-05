@@ -79,9 +79,11 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
     while (journal.observations.length) {
       const pending = journal.observations[0]!;
       publishing = pending;
-      const result = await options.coordination.runtime(options.agentId, runId, pending, scope).finally(() => { publishing = undefined; });
-      if (!result.ok && result.error.code !== 'conflict') return;
-      journal.observations.shift(); save();
+      try {
+        const result = await options.coordination.runtime(options.agentId, runId, pending, scope);
+        if (!result.ok && result.error.code !== 'conflict') return;
+        journal.observations.shift(); save();
+      } finally { publishing = undefined; }
     }
     while (journal.output.length) {
       const output = journal.output[0]!;
@@ -101,7 +103,8 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
   return { observe, delivered, busy: () => [...active.values()].some(value => value),
     start(id: string): void {
       if (runId !== id) {
-        for (const value of latest.values()) if (!journal.observations.some(pending => pending.sessionId === value.sessionId && pending.observedAt === value.observedAt)) journal.observations.push(value);
+        for (const value of latest.values()) if (!journal.observations.some(pending => pending !== publishing
+          && pending.sessionId === value.sessionId && pending.observedAt === value.observedAt)) journal.observations.push({ ...value });
         save();
       }
       runId = id;
