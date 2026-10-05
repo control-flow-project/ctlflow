@@ -176,7 +176,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const jwtSecret = secret();
   const matrix = await conduitFixture(scope, { jwtSecret });
   const config = { instance: 'browser', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1',
-    matrixOrigin: matrix.base, administrator: '@admin:architecture.localhost', registrationSecret: matrix.registrationToken, jwtSecret };
+    contentOrigin: 'http://localhost', matrixOrigin: matrix.base, administrator: '@admin:architecture.localhost', registrationSecret: matrix.registrationToken, jwtSecret };
   const password = secret();
   const initialized = await bootstrap(config, { servicePassword: secret(), administratorPassword: password });
   assert(initialized.ok, JSON.stringify(initialized));

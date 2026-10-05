@@ -1,6 +1,10 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  publication: { id: string; agent_id: string; public_key: string; title: string; state: 'staging' | 'published' | 'deleted';
+    revision: number; created_at: number; expires_at: number; published_at: number | null; deleted_at: number | null;
+    cleaned_at: number | null; total_bytes: number; file_count: number };
+  publication_file: { id: string; publication_id: string; path: string; media_type: string; bytes: number; sha256: string; uploaded: number };
   fleet_runtime_operation: { id: string; fleet_id: string; agent_id: string | null; author_principal_id: string;
     action: 'start' | 'stop' | 'reset'; expected_revision: number; status: 'pending' | 'running' | 'succeeded' | 'failed';
     created_at: number; completed_at: number | null; error_message: string | null; connection_id: string | null; credential_id: string | null };
@@ -245,6 +249,7 @@ export type Tables = {
     last_error: string | null;
   };
   instance_policy: {
+    fleet_idle_timeout_seconds: number;
     max_message_bytes: number;
     id: 'instance';
     revision: number;

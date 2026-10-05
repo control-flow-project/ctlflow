@@ -23,6 +23,8 @@ import { roomRoutes } from './routes/room.js';
 import { memberRoutes } from './routes/member.js';
 import { instanceRoutes } from './routes/instance.js';
 import { runtimeRoutes } from './routes/runtime.js';
+import { publicationRoutes } from './routes/publication.js';
+import { readBinary } from './binary.js';
 import { registrationTransport, invitationCookie, setInvitationCookie, registrationStage } from './registration.js';
 import { verifyInvitation } from '@crossfire/domain/member/registration';
 import { searchMatrixDirectory } from './matrix-directory.js';
@@ -31,7 +33,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
   const register = registrationTransport(services);
   const fleetChanges = createFleetChanges();
   const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...wakeUpRoutes(), ...roomRoutes(), ...memberRoutes(),
-    ...runtimeRoutes(), ...instanceRoutes(config.instance, services.clock.now())];
+    ...runtimeRoutes(), ...publicationRoutes(), ...instanceRoutes(config.instance, services.clock.now())];
   const limits = new Map<string, { count: number; expiresAt: number }>();
   function rate(request: IncomingMessage): boolean {
     const now = services.clock.now();
@@ -78,7 +80,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (url.pathname === '/_matrix/client/v3/user_directory/search') {
         await searchMatrixDirectory(services, request, response, url, requestId); return;
       }
-      if (/^\/_matrix\/client\/(?:v3|r0)\/register$/u.test(url.pathname)) {
+      if (url.pathname === '/_matrix/client/v3/register') {
         if (!rate(request)) { response.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); response.end(JSON.stringify({ errcode: 'M_LIMIT_EXCEEDED', error: 'Too many signup requests' })); return; }
         await register.register(request, response, requestId); if (response.statusCode === 200) worker.wake(); return;
       }
@@ -136,11 +138,12 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (endpoint.path === operations.claimInvitation.path && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }
       const authenticated = await authenticate(request, endpoint, requestId, stop.signal);
       if (!authenticated.ok) { send(response, requestId, authenticated); return; }
-      const input = method === 'GET' ? success({}) : await readBody(request, endpoint.requestBytes);
+      const input = method === 'GET' ? success({}) : endpoint.requestFormat === 'binary'
+        ? readBinary(request, endpoint.requestBytes!) : await readBody(request, endpoint.requestBytes);
       if (!input.ok) { send(response, requestId, input); return; }
       const result: Result<Reply> = await endpoint.invoke(authenticated.value, params, url.searchParams, input.value);
-      if (result.ok && result.value.cookie !== undefined) setCookie(response, result.value.cookie, config.publicOrigin);
-      if (result.ok && result.value.invitationCookie !== undefined) setInvitationCookie(response, result.value.invitationCookie, config.publicOrigin);
+      if (result.ok && result.value.cookie !== undefined) setCookie(response, result.value.cookie);
+      if (result.ok && result.value.invitationCookie !== undefined) setInvitationCookie(response, result.value.invitationCookie);
       send(response, requestId, result, endpoint.status);
       if (result.ok && method !== 'GET') { worker.wake(); fleetChanges.notify(params.fleetId); }
     } catch {

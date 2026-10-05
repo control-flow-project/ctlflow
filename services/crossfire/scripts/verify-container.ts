@@ -20,12 +20,14 @@ const address = portProbe.address(); assert(address && typeof address === 'objec
 const port = address.port;
 await new Promise<void>(resolve => portProbe.close(() => resolve()));
 const origin = 'http://127.0.0.1:' + port;
+const contentPort = port + 1;
 mkdirSync(join(root, '.temp'), { recursive: true });
 const directory = mkdtempSync(join(root, '.temp/container-verification-'));
 await main(['init', '--directory', directory, '--instance', 'verification', '--origin', origin,
+  '--content-origin', 'http://localhost:' + contentPort,
   '--server-name', 'verification.localhost', '--administrator', 'admin']);
 const image = imageName(repository);
-const arguments_ = runArguments(directory, image, port);
+const arguments_ = runArguments(directory, image, port, contentPort);
 const name = arguments_[arguments_.indexOf('--name') + 1]!;
 const secrets = readJson<{ administratorPassword: string }>(join(directory, 'bootstrap.json'));
 if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) {
@@ -35,7 +37,7 @@ if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status
 }
 
 async function start() {
-  const child = spawn(process.execPath, [join(root, 'crossfire'), 'start', '--directory', directory], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(root, 'crossfire'), 'start', '--directory', directory, '--content-port', String(contentPort)], { stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (data: Buffer) => { output = (output + data.toString()).slice(-24_000); });
   child.stderr.on('data', (data: Buffer) => { output = (output + data.toString()).slice(-24_000); });
@@ -76,7 +78,7 @@ try {
     try {
       const inspection = spawnSync('docker', ['inspect', '--format', '{{json .NetworkSettings.Ports}}', name], { encoding: 'utf8' });
       assert.equal(inspection.status, 0);
-      assert.deepEqual(JSON.parse(inspection.stdout), { '8080/tcp': [{ HostIp: '127.0.0.1', HostPort: String(port) }] });
+      assert.deepEqual(JSON.parse(inspection.stdout), { '8080/tcp': [{ HostIp: '127.0.0.1', HostPort: String(port) }], '8082/tcp': [{ HostIp: '127.0.0.1', HostPort: String(contentPort) }] });
       const discovery = await fetch(origin + '/.well-known/matrix/client');
       assert.deepEqual(await discovery.json(), { 'm.homeserver': { base_url: origin } });
       assert.equal((await fetch(origin + '/_matrix/client/versions')).status, 200);

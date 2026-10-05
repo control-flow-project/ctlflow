@@ -1,3 +1,34 @@
+export const runtimeObservationSchema = `
+CREATE TABLE runtime_observation (
+ run_id TEXT NOT NULL, agent_id TEXT NOT NULL REFERENCES agent(principal_id), session_id TEXT NOT NULL, room_id TEXT, runtime TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('idle','working','waiting-approval','waiting-answer','failed','unavailable','sleeping','waking')), observed_at INTEGER NOT NULL CHECK(observed_at >= 0),
+ history_mode TEXT NOT NULL CHECK(history_mode IN ('shared','per-room')), max_input_bytes INTEGER NOT NULL CHECK(max_input_bytes BETWEEN 1024 AND 4194304), error_message TEXT,
+ last_activity_at INTEGER CHECK(last_activity_at IS NULL OR last_activity_at >= 0), history_available INTEGER CHECK(history_available IS NULL OR history_available IN (0,1)),
+ PRIMARY KEY(run_id,session_id), FOREIGN KEY(run_id,agent_id) REFERENCES listener_run(id,agent_id)
+) STRICT;
+CREATE INDEX ix_runtime_observation_agent_time ON runtime_observation(agent_id,observed_at DESC,run_id);
+CREATE INDEX ix_runtime_observation_run_state ON runtime_observation(run_id,state);
+`;
+export const runtimeSettingSchema = `
+CREATE TABLE runtime_setting (
+ run_id TEXT NOT NULL, session_id TEXT NOT NULL, name TEXT NOT NULL, configured_value TEXT, effective_value TEXT,
+ PRIMARY KEY(run_id,session_id,name), FOREIGN KEY(run_id,session_id) REFERENCES runtime_observation(run_id,session_id)
+) STRICT;
+`;
+export const runtimeObservationMigration = runtimeObservationSchema.replaceAll('runtime_observation', 'runtime_observation_next')
+  + runtimeSettingSchema.replaceAll('runtime_setting', 'runtime_setting_next').replaceAll('runtime_observation', 'runtime_observation_next') + `
+INSERT INTO runtime_observation_next(run_id,agent_id,session_id,room_id,runtime,state,observed_at,history_mode,max_input_bytes,error_message,last_activity_at,history_available)
+ SELECT run_id,agent_id,session_id,room_id,runtime,state,observed_at,history_mode,max_input_bytes,error_message,NULL,NULL FROM runtime_observation;
+INSERT INTO runtime_setting_next SELECT * FROM runtime_setting;
+DROP TABLE runtime_setting;
+DROP TABLE runtime_observation;
+ALTER TABLE runtime_observation_next RENAME TO runtime_observation;
+ALTER TABLE runtime_setting_next RENAME TO runtime_setting;
+DROP INDEX ix_runtime_observation_next_agent_time;
+DROP INDEX ix_runtime_observation_next_run_state;
+CREATE INDEX ix_runtime_observation_agent_time ON runtime_observation(agent_id,observed_at DESC,run_id);
+CREATE INDEX ix_runtime_observation_run_state ON runtime_observation(run_id,state);
+`;
 export const runtimeSchema = `
 CREATE UNIQUE INDEX ux_listener_run_agent_binding ON listener_run(id,agent_id);
 CREATE INDEX ix_listener_run_agent_started ON listener_run(agent_id,started_at DESC,id DESC);
@@ -27,17 +58,7 @@ CREATE TABLE runtime_decision_answer (
  FOREIGN KEY(decision_id,question_id) REFERENCES runtime_decision_question(decision_id,question_id),
  FOREIGN KEY(decision_id,question_id,option_id) REFERENCES runtime_decision_option(decision_id,question_id,option_id)
 ) STRICT;
-CREATE TABLE runtime_observation (
- run_id TEXT NOT NULL, agent_id TEXT NOT NULL REFERENCES agent(principal_id), session_id TEXT NOT NULL, room_id TEXT, runtime TEXT NOT NULL,
- state TEXT NOT NULL CHECK(state IN ('idle','working','waiting-approval','waiting-answer','failed','unavailable')), observed_at INTEGER NOT NULL CHECK(observed_at >= 0),
- history_mode TEXT NOT NULL CHECK(history_mode IN ('shared','per-room')), max_input_bytes INTEGER NOT NULL CHECK(max_input_bytes BETWEEN 1024 AND 4194304), error_message TEXT,
- PRIMARY KEY(run_id,session_id), FOREIGN KEY(run_id,agent_id) REFERENCES listener_run(id,agent_id)
-) STRICT;
-CREATE INDEX ix_runtime_observation_agent_time ON runtime_observation(agent_id,observed_at DESC,run_id);
-CREATE TABLE runtime_setting (
- run_id TEXT NOT NULL, session_id TEXT NOT NULL, name TEXT NOT NULL, configured_value TEXT, effective_value TEXT,
- PRIMARY KEY(run_id,session_id,name), FOREIGN KEY(run_id,session_id) REFERENCES runtime_observation(run_id,session_id)
-) STRICT;
+${runtimeObservationSchema + runtimeSettingSchema}
 CREATE TABLE runtime_incident (
  id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES member(principal_id), agent_id TEXT REFERENCES agent(principal_id), fleet_id TEXT REFERENCES fleet(id),
  run_id TEXT REFERENCES listener_run(id), session_id TEXT, kind TEXT NOT NULL CHECK(kind IN ('failure','contact')), message TEXT NOT NULL,

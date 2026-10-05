@@ -13,6 +13,7 @@ import * as runtime from '../runtime.js';
 import { statisticsQuery, fleetStatistics } from '../statistics.js';
 import * as publication from '../publication.js';
 import { binaryInput } from './binary.js';
+import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
 export const operations = {
   createPublication: operation({ method: 'POST', path: '/api/publications', auth: 'agent',
     params: check.empty, query: query.none, input: publication.publicationCreation, output: publication.publicationDetails,
@@ -24,7 +25,7 @@ export const operations = {
     params: check.object({ publicationId: check.identifier }), query: query.none, input: check.empty, output: publication.publicationDetails,
     status: 200, collection: false, permissions: ['publication.publish.self', 'publication.read.owned', 'publication.read.any'], description: 'Report manifest and publication state' }),
   uploadPublicationFile: operation({ method: 'PUT', path: '/api/publications/{publicationId}/files/{fileId}', auth: 'agent', requestFormat: 'binary',
-    requestBytes: 8 * 1024 * 1024, params: check.object({ publicationId: check.identifier, fileId: check.identifier }), query: query.none,
+    requestBytes: PUBLICATION_LIMITS.fileBytes, params: check.object({ publicationId: check.identifier, fileId: check.identifier }), query: query.none,
     input: binaryInput, output: check.object({ uploaded: check.boolean }), status: 200, collection: false,
     permissions: ['publication.publish.self'], description: 'Stream exactly one declared static file' }),
   commitPublication: operation({ method: 'PUT', path: '/api/publications/{publicationId}/commit', auth: 'agent',

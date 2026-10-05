@@ -22,7 +22,7 @@ export function initializeInstance(services: Pick<Services, 'repositories' | 'di
     if (!policy.ok) return policy;
     if (!policy.value) {
       const added = services.repositories.instancePolicy.insert({ id: 'instance', revision: 0, maxOwnerAgents: 10, maxAgents: 100,
-        maxPending: 100, enrollmentSeconds: 600, reconcileSeconds: 300, maxMessageBytes: 65536, agentInstructions: '', signupMode: 'invitation', invitationIssuers: 'administrators' });
+        maxPending: 100, enrollmentSeconds: 600, reconcileSeconds: 300, maxMessageBytes: 65536, fleetIdleTimeoutSeconds: 1800, agentInstructions: '', signupMode: 'invitation', invitationIssuers: 'administrators' });
       if (!added.ok) return added;
     }
     const existing = services.directory.principalByMatrixId(administratorMatrixId);

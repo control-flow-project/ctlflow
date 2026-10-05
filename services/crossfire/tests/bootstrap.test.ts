@@ -20,7 +20,7 @@ test("private service bootstrap survives a human password change without resetti
   const jwtSecret = secret();
   const fixture = await conduitFixture(scope, { jwtSecret });
   const config: Config = { instance: "bootstrap", serverName: "architecture.localhost", publicOrigin: "http://127.0.0.1",
-    matrixOrigin: fixture.base, administrator: "@admin:architecture.localhost", registrationSecret: fixture.registrationToken, jwtSecret };
+    contentOrigin: 'http://localhost', matrixOrigin: fixture.base, administrator: "@admin:architecture.localhost", registrationSecret: fixture.registrationToken, jwtSecret };
   const credentials = { servicePassword: secret(), administratorPassword: secret() };
   value(await bootstrap(config, credentials));
   const native = authority({ ...config, serviceMatrixId: serviceUser(config) });

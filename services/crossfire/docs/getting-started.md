@@ -16,8 +16,9 @@ npm run build
 cd services/crossfire
 node crossfire init --directory /absolute/private/crossfire-state \
   --instance team --origin http://127.0.0.1:8098 \
+  --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
-./start.sh --directory /absolute/private/crossfire-state --port 8098
+./start.sh --directory /absolute/private/crossfire-state --port 8098 --content-port 8099
 ```
 
 Initialization refuses a nonempty state directory. Read its private
@@ -25,9 +26,12 @@ Initialization refuses a nonempty state directory. Read its private
 A password changed through Matrix is not reset at restart.
 
 The container contains Conduit, Element, REST/React applications and immutable
-client releases. Only its public port is published, on loopback:
+client releases. Its application and content ports are published only on loopback:
 - [Element](http://127.0.0.1:8098/)
 - [Management](http://127.0.0.1:8098/manage/)
+
+Published reports use `http://localhost:8099/OPAQUE_PUBLIC_KEY/index.html` in this
+local setup. The content root itself returns 404 and exposes no application API.
 
 First startup builds a content-addressed image. `--compile` explicitly rebuilds.
 Ctrl+C or orderly terminal closure stops this instance. A force-killed launcher
@@ -49,8 +53,12 @@ room creation or human membership management.
 
 ## Public HTTPS
 
-Use an operator-owned reverse proxy in front of the loopback port. Set the
-instance origin to the exact public HTTPS origin and preserve the Host header.
-The reverse proxy owns TLS, certificates and DNS. Private API/Matrix upstream
-ports must not be exposed. Crossfire makes no host-wide changes.
+Use an operator-owned reverse proxy with separate application and content HTTPS
+vhosts in front of their respective loopback ports. Set `publicOrigin` and required
+`contentOrigin` explicitly and preserve Host. The content hostname must differ
+from the application and Matrix hosts; do not expose private report storage as
+an nginx directory alias. The reverse proxy owns TLS, certificates and DNS.
+Private API/Matrix upstream ports must not be exposed. Crossfire makes no
+host-wide changes.
+- [Static content configuration and browser sandbox](publications.md)
 - [Deployment and backup rules](operations.md)

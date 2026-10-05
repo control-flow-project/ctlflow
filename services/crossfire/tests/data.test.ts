@@ -22,7 +22,7 @@ test('private normalized state survives reopen and transaction failures preserve
   assert.equal(database.pragma('journal_mode', { simple: true }), 'delete');
   const pageSize = database.pragma('page_size', { simple: true }), maxPages = database.pragma('max_page_count', { simple: true });
   assert(typeof pageSize === 'number' && typeof maxPages === 'number' && pageSize * maxPages <= 256 * 1024 * 1024);
-  const policy = { id: 'instance' as const, revision: 0, maxMessageBytes: 65536, maxOwnerAgents: 7, maxAgents: 50, maxPending: 35, enrollmentSeconds: 120, reconcileSeconds: 300, agentInstructions: 'Use project tickets. 東京', signupMode: 'invitation' as const, invitationIssuers: 'administrators' as const };
+  const policy = { id: 'instance' as const, revision: 0, fleetIdleTimeoutSeconds: 1800, maxMessageBytes: 65536, maxOwnerAgents: 7, maxAgents: 50, maxPending: 35, enrollmentSeconds: 120, reconcileSeconds: 300, agentInstructions: 'Use project tickets. 東京', signupMode: 'invitation' as const, invitationIssuers: 'administrators' as const };
   value(repositories.instancePolicy.insert(policy)); database.close();
   database = openStore(path); repositories = createRepositories(database);
   assert.deepEqual(value(repositories.principal.find({ id: principal.id })), principal);

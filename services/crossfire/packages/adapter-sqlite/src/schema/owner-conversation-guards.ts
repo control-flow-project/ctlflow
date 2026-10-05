@@ -19,10 +19,3 @@ CREATE TRIGGER protect_owner_conversation_permission_update BEFORE UPDATE ON age
 WHEN EXISTS (SELECT 1 FROM agent_owner_conversation WHERE room_id = NEW.room_id)
 BEGIN SELECT RAISE(ABORT, 'Owner conversations cannot delegate invitations'); END;
 `;
-
-export const ownerConversationExclusivityCheck = `
-SELECT 1 FROM agent_owner_conversation AS conversation
-WHERE EXISTS (SELECT 1 FROM agent_room_grant WHERE room_id = conversation.room_id AND agent_id != conversation.agent_id AND access_mode != 'none')
-  OR EXISTS (SELECT 1 FROM agent_room_permission WHERE room_id = conversation.room_id)
-LIMIT 1
-`;

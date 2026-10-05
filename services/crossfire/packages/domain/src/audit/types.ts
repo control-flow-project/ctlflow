@@ -7,6 +7,7 @@ export type InstancePolicy = {
   enrollmentSeconds: number;
   reconcileSeconds: number;
   maxMessageBytes: number;
+  fleetIdleTimeoutSeconds: number;
   agentInstructions: string;
   signupMode: 'invitation' | 'open';
   invitationIssuers: 'administrators' | 'members';

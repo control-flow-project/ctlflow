@@ -24,7 +24,7 @@ export type PublicationBudget = { instanceBytes: number; agentBytes: number; ins
 
 export function publicationPath(value: string): Result<string> {
   if (value.length < 1 || value.length > 240 || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(value)
-    || value.split('/').some(part => !part || part === '.' || part === '..' || part.length > 100 || part.endsWith('.')))
+    || value.split('/').some(part => !/^[A-Za-z0-9]/u.test(part) || part.length > 100 || part.endsWith('.')))
     return failure('invalid', 'Use a relative report path with letters, digits, dots, underscores, hyphens and forward slashes');
   return success(value);
 }

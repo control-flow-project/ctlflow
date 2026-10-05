@@ -5,9 +5,14 @@ explicit state directory. The instance label, public origin, Matrix server name
 and initial administrator belong to operator configuration. Credentials are not
 management form fields or public release data.
 
-`crossfire start --directory DIR --port PORT` selects the state directory and
-loopback host port (1024–65535). `--compile` rebuilds the runtime image.
-For public deployments use the exact HTTPS origin and an external reverse proxy.
+`crossfire start --directory DIR --port PORT --content-port CONTENT_PORT` selects
+the state directory and distinct loopback host ports (1024–65535); content defaults
+to port 8082. `--compile` rebuilds the runtime image. Required `contentOrigin`
+selects a dedicated content hostname, separate from the application and Matrix
+hosts. For public deployments use exact HTTPS origins and separate reverse-proxy
+vhosts; no origin is inferred. Optional `publicationBudget` configures finite
+reserved bytes, report counts and concurrent uploads.
+- [Content configuration, defaults and physical disk overhead](publications.md)
 
 ## Administration
 
@@ -23,6 +28,9 @@ The Policy page configures:
 - Agent/enrollment capacity and expiry/reconciliation limits.
 - Instance-wide inline-message limit: `maxMessageBytes`, default 65536 UTF-8
   bytes, range 4096–4194304; complete larger messages/batches use private files.
+- Fleet native-session idle timeout: `fleetIdleTimeoutSeconds`, default 1800
+  seconds (30 minutes), range 0–604800; zero disables automatic sleep. This policy
+  is delivered to fleetd and does not shut down individual human-owned sessions.
 - System-wide agent instruction text, with reset to the shipped default.
 
 Invited people complete normal Element signup with their own username and

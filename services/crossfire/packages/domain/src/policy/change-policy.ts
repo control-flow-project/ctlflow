@@ -11,6 +11,7 @@ export function changeInstancePolicy(services: Pick<Services, 'repositories' | '
     || !Number.isSafeInteger(input.enrollmentSeconds) || input.enrollmentSeconds < 60 || input.enrollmentSeconds > 3600
     || !Number.isSafeInteger(input.reconcileSeconds) || input.reconcileSeconds < 30 || input.reconcileSeconds > 3600
     || !Number.isSafeInteger(input.maxMessageBytes) || input.maxMessageBytes < 4096 || input.maxMessageBytes > 4 * 1024 * 1024
+    || !Number.isSafeInteger(input.fleetIdleTimeoutSeconds) || input.fleetIdleTimeoutSeconds < 0 || input.fleetIdleTimeoutSeconds > 604800
     || !['invitation', 'open'].includes(input.signupMode) || !['administrators', 'members'].includes(input.invitationIssuers)
     || new TextEncoder().encode(input.agentInstructions).length > 8192
     || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(input.agentInstructions)) return failure('invalid', 'Invalid bounded instance policy');
