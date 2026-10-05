@@ -69,6 +69,28 @@ Read-only inspection never accepts changed files or increments revisions.
 Use an explicit revision-checked start/reset to apply configuration changes.
 No automatic host boot service is installed.
 
+### Abrupt controller death
+
+Orderly controller shutdown awaits the owned Codex engine's close. A full machine
+restart or power failure ends that engine; the same private root and workareas
+retain desired activation and saved histories for normal restoration.
+
+Killing only fleetd with `SIGKILL` does not provide the same guarantee. The verified
+stock Codex WebSocket app-server can survive its controller and keep an active
+writer for the exact native history. A replacement rejects the conflicting
+writer. This prevents two owners, but is not successful automatic recovery.
+It is an owned-engine lifetime limitation, separate from detached tool children.
+
+Inspect the reported native error and safely stop the verified orphaned
+app-server on its owning machine. Preserve the controller root, native home,
+workarea, identities and histories. Normal restoration or explicit Resume can
+proceed only after native writer ownership and ordinary receipt/history checks
+succeed. Never delete lock/history state to force replacement, guess processes
+by name or PID, adopt the orphan, or use fresh history as an implicit recovery.
+There is no substitute supervisor, emulated native transport or hidden fallback.
+Linux inert-provider verification does not certify abrupt-death recovery or
+macOS behavior.
+
 Unexpected startup/listener/native failures are recorded in each fleet's private
 `.fleet/failures.json` before reporting through its scoped controller credential.
 Delivery retries independently of listener activation; reporting errors remain

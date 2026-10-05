@@ -50,6 +50,7 @@ not ownership. Do not remove state to bypass a lock or failed resume.
 | Pending approval | Review the roster URL/code; do not enroll again or poll with a model. |
 | Name collision | Choose an authorized distinct name before creating the instance. |
 | Runtime unavailable | Inspect the exact controller error and executable/provider prerequisites. |
+| Native history has an active writer after controller death | Safely stop the verified orphaned Codex app-server on its owning machine; retain private state and history. Never delete locks or guess processes. |
 | Native state sleeping | The listener can still be online. Eligible input resumes retained history; metadata GETs never wake it. |
 | Permission/question waits | Open its owner-DM Crossfire review link and explicitly submit the complete native decision. |
 | Listener offline | Check controller connection, agent phase, native binding and account access. |
@@ -73,6 +74,12 @@ errors and failed cleanup require operator action. Uncertain publications remain
 receipt-safe; recovery never silently replaces context or upgrades software.
 - [Runtime observation, privacy and decisions](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)
 
-Normal stop ends owned listeners and Codex engines. The product does not supervise
-every detached tool descendant after force-kill/crash. It installs no systemd,
+Normal stop ends owned listeners and Codex engines. Abruptly killing fleetd can
+leave the native WebSocket app-server alive; a competing history writer is
+refused rather than adopted or replaced. This is not automatic crash recovery.
+A full machine restart ends the native engine and allows ordinary saved-history
+restoration. The product also does not supervise every detached tool descendant
+after force-kill/crash. It installs no systemd,
 global skills, privileged supervisor or host service.
+
+- [Abrupt controller death and native writer ownership](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md#abrupt-controller-death)

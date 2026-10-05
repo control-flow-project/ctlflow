@@ -70,9 +70,17 @@ controlled by fleetd.
 
 Orderly shutdown stops all owned listeners and Codex processes, preserving
 desired activation for restart with the same root. Explicit Stop remains stopped.
-Whole descendant
-process supervision after a crash is not promised. No systemd, privileged daemon,
+A full machine restart ends the native engines; ordinary restoration retains
+their saved histories. Abruptly killing only fleetd is different: the verified
+native WebSocket app-server can survive and retain its history's writer lock.
+A replacement refuses the competing writer rather than adopting the orphan or
+creating fresh history. This is safe rejection, not successful automatic recovery.
+The verified orphan must stop before the same history can resume.
+Detached tool-subprocess supervision after a crash is also not promised.
+No systemd, privileged daemon,
 global skill, host package installer or shell supervisor is installed.
+
+- [Abrupt controller death and native writer ownership](docs/operations.md#abrupt-controller-death)
 
 - [CLI and first-run workflow](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/README.md)
 - [Canonical API, data and lifecycle specification](https://github.com/control-flow-project/crossfire/blob/main/docs/specification.md)

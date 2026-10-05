@@ -90,6 +90,11 @@ independent and is never adopted, stopped or reset. Native history is not a
 guarantee that an unfinished shell process survives a stop.
 This feature does not delete workarea files, Matrix chats or old native archives.
 
+A full machine restart and abruptly killing only fleetd are different. A native
+app-server can survive `SIGKILL` of fleetd and retain its history's writer lock.
+The replacement refuses that competing writer, not silently resumes or adopts
+it. Safely stop the verified orphan before ordinary saved-history restoration.
+
 Local stop records actual native close through the same current controller/run
 receipt used by management operations. If acknowledgment fails, native processes
 remain stopped and the error stays visible; automatic recovery is not blocked by
