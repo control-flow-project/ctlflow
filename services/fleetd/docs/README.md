@@ -1,5 +1,6 @@
 # Controller guides
 
+- [Noninteractive setup, persisted identity and private workspace/state](setup.md)
 - [Controller roots, lifecycle, execution and security](operations.md)
 - [Role coordination settings, owner review and room invitations](coordination.md)
 - [Native fleet inspection and preservation](../tools/README.md)

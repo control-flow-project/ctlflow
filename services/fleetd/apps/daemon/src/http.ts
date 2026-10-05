@@ -52,10 +52,12 @@ async function body(request: IncomingMessage): Promise<Result<unknown>> {
 }
 export function createDaemonHttp(controller: FleetController, stopped: () => void) {
   const routes = [
+    bind(operations.setup, async (_params, _query, input) => reply(await controller.setup(input))),
     bind(operations.status, () => reply(success(controller.status()))),
     bind(operations.fleets, (_params, query) => paged(controller.list(), query)),
     bind(operations.addFleet, (_params, _query, input) => reply(controller.add(input.directory))),
     bind(operations.fleet, params => reply(controller.view(params.fleetId))),
+    bind(operations.readiness, async params => acknowledged(await controller.test(params.fleetId))),
     bind(operations.changeFleet, (params, _query, input) => reply(controller.rename(params.fleetId, input.expectedRevision, input.label))),
     bind(operations.removeFleet, async (params, _query, input) => acknowledged(await controller.remove(params.fleetId, input.expectedRevision))),
     bind(operations.changeFleetDelivery, async (params, _query, input) => reply(await controller.delivery(params.fleetId, input))),

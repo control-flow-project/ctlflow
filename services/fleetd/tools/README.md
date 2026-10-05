@@ -27,7 +27,7 @@ ssh operator@controller-host 'node /home/operator/crossfire/services/fleetd/dist
 | Option | Meaning |
 | --- | --- |
 | `--root` | Exact existing private controller root |
-| `--directory` | Exact registered fleet directory, inside its actual Git project |
+| `--directory` | Exact registered fleet directory; each instance's native workspace determines its project boundary |
 | `--running` | Require connected/enabled delivery and every instance/listener running without an error |
 | `--fresh` | Require `--running`, authenticated idle histories and zero native turns |
 | `--no-rooms` | Check every enrolled agent's native joined-room list is empty |
@@ -54,8 +54,11 @@ Treat IDs/paths/digests as operator evidence, not public telemetry.
   are inspected. Configured model and reasoning effort must be available from
   the runtime's model catalog. This proves availability, not paid execution.
 - Native skill discovery must include every ancestor `.agents/skills/*/SKILL.md`
-  from the workarea to the actual Git root, plus requested skill names. A plain
-  archive is not a substitute for the native Git-based project boundary.
+  from each native workspace to its actual Git root, plus requested skill names.
+  The private fleet/state directory need not belong to that Git project. Workspaces
+  without Git metadata have no inferred ancestor Git boundary. Role/Crossfire
+  instructions delivered through native developer instructions are not discovered
+  project skills and are not falsely claimed as such.
 - Optional native membership checks require zero joined rooms for each account.
 - Preservation retains exact enrolled account IDs, all context/session IDs and
   native provider-authentication file fingerprints for every earlier instance.

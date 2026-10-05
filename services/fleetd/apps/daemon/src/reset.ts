@@ -28,7 +28,7 @@ export function resetInstructions(state: string): string {
     + 'New input begins after each exported room boundary. Use agent history to browse further; use Crossfire messaging tools for replies.';
 }
 export async function resetInstance(configuration: Configuration, instance: Instance, agentId: string, resetId: string, adapter: OwnedRuntimeAdapter, signal: AbortSignal) {
-  const workspace = privateDir(join(configuration.directory, instance.workarea)), local = paths(workspace, instance.name);
+  const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), workspace = instance.workspace ?? stateDirectory, local = paths(stateDirectory, instance.name);
   const release = await acquireProcessLock(join(local.state, 'listener'));
   let receiver: (() => Promise<void>) | undefined;
   try {
@@ -61,7 +61,7 @@ export async function resetInstance(configuration: Configuration, instance: Inst
         settings: profile.settings, account: profile.account, agentId: profile.id, runtime: definition.runtime, runtimeOptions: definition.options,
         historyMode: instance.listenerOptions?.historyMode ?? 'shared', signal });
       if (verified.manifest !== state.manifest || JSON.stringify(verified.cursors) !== JSON.stringify(Object.fromEntries(state.cursors.map(entry => [entry.room, entry.cursor])))) return failure('conflict', 'Reset history boundaries changed; context was not replaced');
-      const rotated = await adapter.reset({ workspace, resetId: generation });
+      const rotated = await adapter.reset({ workspace, stateDirectory, resetId: generation });
       if (!rotated.ok) return rotated;
       archiveState(local.state, join(root, 'listener-archive'), name => name === 'cursors.json' || name.startsWith('cursors.json.'));
       state = { ...state, phase: 'retired' }; writeJson(file, state);

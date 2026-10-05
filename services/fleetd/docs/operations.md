@@ -2,7 +2,7 @@
 
 Start through `fleet daemon start` or directly:
 ```sh
-node services/fleetd/dist/apps/daemon/src/main.js --name laptop --root /absolute/private/controller
+fleetd --name laptop --root /absolute/private/controller
 ```
 
 The private root contains descriptor, registry, desired binding intent, operation state, log and
@@ -18,8 +18,11 @@ process-name scan decides native ownership.
 
 ## Private API
 
-Resources include `/api/status`, `/api/fleets`, nested fleet `/agents`,
-`/delivery`, `/messages`, `/api/operations` and agent `/attachment`/`/contexts`.
+Resources include `/api/setup`, `/api/status`, `/api/fleets`, nested fleet `/agents`,
+`/delivery`, `/messages`, fleet `/readiness`, `/api/operations` and agent
+`/attachment`/`/contexts`. Setup and update use these domain operations, not CLI
+native-process orchestration. `GET /readiness` checks the actual shared listener's
+model-free diagnostic and never starts a stopped controller/session.
 Local and SSH CLI commands use the same typed requests. UUID operation keys and
 expected revisions reject conflicting reuse. Accepted operations continue after
 CLI disconnect and have per-instance outcomes.
@@ -46,7 +49,7 @@ idle; pending input, decisions, receipts, initialization, cleanup or unknown
 native activity prevent sleep. Heartbeats and policy checks do not count as work.
 Sleep closes the owned native process, not its listener/controller connection.
 Eligible room, DM, scheduled or broadcast input resumes the exact saved history.
-Directly attached coding sessions cannot be put to sleep by fleetd.
+The independent coding session performing setup is not owned by fleetd.
 
 `desired-intent.json` in the private controller root durably owns active binding
 intent. Start persists it before activation; explicit Stop removes it before
@@ -94,7 +97,7 @@ Scoped controller credentials cannot approve identities, change room/wake
 permissions, manage another fleet or act as human credentials.
 
 Deactivate retains engines/sessions/controller connection; Stop ends owned
-listeners and processes. Direct listeners remain independent. Ordinary models do
+listeners and processes. Every receiver is fleet-bound. Ordinary models do
 not enroll, poll for work, send telemetry or maintain controller credentials.
 Management session requests arrive through this same connection. A separate
 worker claims the current lease generation and calls the existing durable

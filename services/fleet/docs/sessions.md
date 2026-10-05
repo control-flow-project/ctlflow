@@ -84,9 +84,9 @@ another initialization only after the old context is safely retired. In per-room
 mode, a new room obtains its own history when first used; changing history mode is
 an explicit configuration change, not an ordinary restart fallback.
 
-Direct agents are not fleet-owned processes; their owners control native sessions
-in the coding application. Neither management nor this CLI resets them. Native
-history is not a guarantee that an unfinished shell process survives a stop.
+Every Crossfire agent is fleet-owned. The coding session performing setup remains
+independent and is never adopted, stopped or reset. Native history is not a
+guarantee that an unfinished shell process survives a stop.
 This feature does not delete workarea files, Matrix chats or old native archives.
 
 - [History exports, unread positions and reset preparation](../../crossfire/docs/history.md)

@@ -1,8 +1,9 @@
 # fleet
 
-The CLI manages named fleetd controllers locally or through SSH. The daemon owns
-agent processes; the CLI uses its private API. Crossfire owns enrollment, room
-permissions, wake rules and listener activity.
+The CLI manages user-scoped fleetd controllers locally or through SSH. Every
+Crossfire agent belongs to a fleet, including a one-agent project. fleetd owns
+the shared listener and native sessions; the CLI uses its private API. Crossfire
+owns enrollment, room permissions, wake rules and listener activity.
 
 ## Guides
 - [Guide index](docs/README.md)
@@ -14,17 +15,30 @@ permissions, wake rules and listener activity.
 - [Controller API and ownership](../fleetd/README.md)
 - [Crossfire management](../crossfire/docs/management.md)
 
-## Start and resume
+## First setup
+
+Open the personalized setup guide from Crossfire management. Its command installs
+the exact public `@ctlflow/fleet` release in private user storage and invokes:
+
 ```sh
-fleet daemon start --name laptop --root /absolute/private/controller
-fleet add /absolute/private/research
-fleet start research
+fleet setup --descriptor 'https://YOUR_SERVER/onboarding/setup.json?ownerMatrixId=ENCODED_OWNER_MATRIX_ID'
 ```
 
-First enrollment uses one human-approved roster. Later starts reuse identities,
-native sessions and unread positions automatically. Startup creates no chats.
-Private owner DMs open on first contact or native permission request;
-additional rooms are explicit.
+Run from the project directory. Setup asks no configuration questions. It starts
+or reuses the private controller, persists stable names, requests real human
+approval and verifies model-free listener readiness. The coding session doing
+setup stays independent; it is not adopted. Native project files and its existing
+`.codex` configuration/history are not overwritten. Optional
+`--config /absolute/runtime.toml` uses the same ordinary fleet model.
+
+Repeated setup reuses the controller, fleet, accounts and managed histories.
+Explicitly stopped agents stay stopped. Normal `fleet start FLEET` resumes full
+saved history; only `--fresh-history` requests replacement. Read-only commands
+never start a controller or wake a native session. `fleet test FLEET` checks
+actual listener/authentication/native readiness without a model turn.
+
+Startup creates no chats. Private owner DMs open on first contact, visible output
+or native permission request; additional room membership is explicit.
 
 Codex defaults to `danger-full-access` and `on-request`. Sandbox, approval
 policy, model and reasoning remain configurable in the definition's

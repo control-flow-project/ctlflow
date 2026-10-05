@@ -18,8 +18,9 @@ research/
 A definition owns native settings/instructions. Instances share a definition,
 not mutable sessions or work areas. Different native settings require different
 definitions; listener history settings belong to each roster instance.
-Private `.fleet`, `.codex` and `.crossfire` state holds registry bindings,
-provider credentials, session history and delivery positions. Never commit it.
+The fleet's private `.fleet` state holds bindings, desired enrollment and reset
+evidence. Each instance's private workarea holds `.codex` native provider/history
+and `.crossfire` delivery/tool state. Never commit private state.
 
 ## runtime.toml
 
@@ -55,6 +56,22 @@ hyphens, and are at most 40 characters. Instance names, keys and work areas must
 be distinct. Work areas are non-overlapping relative children of
 `agents/<definition>/workarea/`; symlinked or unsafe private paths fail.
 
+Optional `workspace = "/absolute/project"` on an instance changes only the native
+cwd. It defaults to that instance's private workarea. It must be canonical, owned
+and not writable by other users; existing project modes are not tightened.
+Private state remains in the workarea, passed separately to the native adapter as
+`stateDirectory`. The adapter's private native home retains the managed histories
+and intended provider configuration/authentication, without overwriting or
+importing the project's `.codex/config.toml`, history or coding session. Role
+instructions, administrator setup instructions and the pinned Crossfire skill
+are delivered via native developer instructions on both create and resume;
+external cwd does not rely on private workarea ancestor skill discovery.
+
+Default project setup generates this same roster with one `project` definition,
+the chosen project as `workspace` and a stable private workarea. Definitions
+without `workspace` keep their original private cwd; this is one configuration
+model, not another deployment mode.
+
 The coordination block supplies server/owner once. It contains no approval room,
 runtime transport, session UUID or secret. The private owner DM opens automatically
 on first owner contact, terminal output or native decision, not at fleet startup.
@@ -78,7 +95,6 @@ separate private control history for fleet messages, schedules and maintenance.
 It is the same process, workarea and identity. Returning to a room resumes its
 history, not an empty conversation. Files/tools/credentials remain shared;
 terminal output still goes privately to the owner. This is not a security sandbox.
-Directly attached agents always retain their one native history.
 
 Listener changes apply on stopped-to-running transition. A pending publication
 must finish receipt recovery before its history configuration changes.
@@ -102,7 +118,8 @@ wake_mode = "owner-agents"
 permissions = ["room.agent.invite"]
 ```
 
-The roster work area supplies native cwd. The companion `AGENTS.md` supplies
+The roster's optional workspace, or private workarea by default, supplies native
+cwd. The companion `AGENTS.md` supplies
 role instructions. The functional Codex adapter alone validates/translates native
 options; fleetd does not interpret Codex-specific settings.
 

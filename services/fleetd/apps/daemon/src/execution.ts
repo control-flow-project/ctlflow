@@ -1,11 +1,12 @@
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { createListenerHost, type ListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
 import { createNativeLifecycle } from '@ctlflow/fleetd-domain/native-lifecycle';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
 import { prepareProject, paths } from '@ctlflow/crossfire-adapter-filesystem/project';
 import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { privateDir, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
@@ -24,10 +25,23 @@ import { failureReporter } from './failures.js';
 import { resetInstance, resetInstructions } from './reset.js';
 import { canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storage/history';
 
-export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
+export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
   let host: Promise<ListenerHost> | undefined;
+  const inspect: Execution['inspect'] = async (configuration, signal) => {
+    try {
+      for (const instance of configuration.roster.instances) {
+        signal.throwIfAborted();
+        const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
+        if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
+        const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
+        const inspected = await adapter.inspect({ stateDirectory, workspace: instance.workspace ?? stateDirectory, options: definition.options }, signal);
+        if (!inspected.ok) return inspected;
+      }
+      return success(undefined);
+    } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Cannot inspect the configured native runtime'); }
+  };
   function connect(configuration: Parameters<Execution['connect']>[0], signal: AbortSignal, control: Parameters<Execution['connect']>[2]) {
     try {
       const binding = loadBinding(configuration); if (!binding.ok) return binding;
@@ -78,8 +92,28 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       }
       return success(undefined);
     },
+    inspect,
+    async test(configuration, instance) {
+      try {
+        const binding = loadBinding(configuration); if (!binding.ok) return binding;
+        const identity = binding.value.identities.find(item => item.instanceKey === instance.key);
+        if (!identity) return failure('missing', 'Instance has no enrolled identity');
+        const local = paths(join(configuration.directory, instance.workarea), instance.name);
+        const tested = await listenerRequest(local.state, { action: 'test' });
+        if (!tested) return failure('unavailable', 'The owning listener is not connected');
+        if (!tested.ok) return tested;
+        const diagnosis = tested.value.test;
+        if (!tested.value.ready || tested.value.binding !== 'fleet-' + identity.agentId
+          || !diagnosis || diagnosis.session !== tested.value.session || diagnosis.server !== configuration.roster.coordination.server
+          || diagnosis.busy || diagnosis.deliveryPaused) return failure('conflict', 'Listener authentication, exact native session or idle delivery readiness is not confirmed');
+        return success(undefined);
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Cannot verify the owning listener'); }
+    },
     async prepare(configuration, controller, signal, approval) {
-      try { protectFleet(configuration.directory); return await prepareEnrollment(configuration, controller, signal, approval); }
+      try {
+        const inspected = await inspect(configuration, signal); if (!inspected.ok) return inspected;
+        protectFleet(configuration.directory); return await prepareEnrollment(configuration, controller, signal, approval);
+      }
       catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Fleet enrollment failed'); }
     },
     async reset(configuration, instance, resetId, signal) {
@@ -93,7 +127,8 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
     async contexts(configuration, instance) {
       const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
       if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
-      const contexts = await adapter.savedContexts({ workspace: join(configuration.directory, instance.workarea) });
+      const stateDirectory = join(configuration.directory, instance.workarea);
+      const contexts = await adapter.savedContexts({ stateDirectory, workspace: instance.workspace ?? stateDirectory });
       return contexts.ok ? success(contexts.value.map(({ context, runtime, sessionId }) => ({ context, runtime, sessionId }))) : contexts;
     },
     async start(configuration, instance, signal, reason) {
@@ -119,20 +154,21 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         const definition = configuration.definitions[instance.definition]!;
         const adapter = adapters[definition.runtime];
         if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
-        const workspace = privateDir(join(configuration.directory, instance.workarea));
-        prepareProject(workspace);
-        const local = paths(workspace, instance.name);
+        const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
+        const workspace = instance.workspace ?? stateDirectory;
+        prepareProject(stateDirectory);
+        const local = paths(stateDirectory, instance.name);
         const listenerHost = await (host ??= createListenerHost());
         release = await acquireProcessLock(join(local.state, 'listener'));
-        const software = reason === 'recovery' ? installedSoftware(local.root) : await installSoftware(local.root, binding.server);
+        const software = reason === 'recovery' || existsSync(join(local.root, 'client.mjs')) ? installedSoftware(local.root) : await installSoftware(local.root, artifacts);
         const client = createClient({ origin: binding.server, token: identity.account.access_token, signal: lifetime });
         const health = await client.call(operations.health, {}, {});
         if (!health.ok) { report(new Error('Instance startup failed: ' + health.error.message)); await release(); return health; }
         const settings = { instance: health.value.data.instance, homeserver: binding.server, server_name: binding.owner.slice(binding.owner.indexOf(':') + 1), owner: binding.owner, max_upload_bytes: MAX_UPLOAD_BYTES };
-        writeJson(local.profile, { id: identity.agentId, workspace, account: identity.account, settings });
+        writeJson(local.profile, { id: identity.agentId, workspace: stateDirectory, account: identity.account, settings });
         software.activate();
         const instructions = [definition.instructions, 'Crossfire identity: ' + instance.name + '. This instance is already enrolled and its listener is managed by the fleet controller. Do not reconnect, enroll or start another listener.',
-          'Use node .crossfire/client.mjs --profile ' + instance.name + ' for intentional Matrix replies and attachments. Connection and telemetry require no model action.',
+          'Use the intentional Crossfire tools from CROSSFIRE_PROJECT: node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" --profile ' + instance.name + '. Connection and telemetry require no model action. Never disclose host paths or private machine configuration outside the owner DM.',
           resetInstructions(local.state), readFileSync(software.skill.path, 'utf8')].join('\n\n');
         let ready!: () => void, rejectReady!: (error: unknown) => void;
         bindingControl = connection.listener(identity.agentId);
@@ -152,13 +188,13 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
               initialSettings: publicSettings.filter(name => options.value.options[name] !== undefined)
                 .map(name => ({ name, configured: String(options.value.options[name]), effective: null })),
               initial: reason === 'operator' ? 'running' : 'sleeping',
-              saved: () => adapter.savedContexts({ workspace }),
+              saved: () => adapter.savedContexts({ workspace, stateDirectory }),
               failed: (sessionId, error) => reporters.get(configuration.directory)?.record(identity.agentId, sessionId, error),
               recovered: () => reporters.get(configuration.directory)?.recovered(identity.agentId),
               start: async (scope, observe) => {
                 const unlock = await listenerHost.budget.acquire('native-start', scope);
                 try {
-                  const opened = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks: { ...hooks, observe },
+                  const opened = await adapter.start({ name: instance.name, workspace, stateDirectory, instructions, options: definition.options, hooks: { ...hooks, observe },
                     allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
                     ...(instance.listenerOptions ? { listenerOptions: instance.listenerOptions } : {}) }, scope);
                   if (opened.ok) initializedHistory(configuration.directory, identity.agentId);
@@ -189,7 +225,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         return failure(parsed.ok ? parsed.value : 'native', error instanceof Error ? error.message : 'Instance startup failed');
       }
     },
-    async detach(configuration, instance) {
+    async remove(configuration, instance) {
       try {
         const loaded = loadBinding(configuration);
         if (!loaded.ok) return loaded;
@@ -199,11 +235,36 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         const client = createClient({ origin: binding.server, token: binding.controllerCredential });
         const current = await client.call(operations.fleet, { fleetId: binding.fleetId }, {});
         if (!current.ok) return current;
-        const removed = await client.call(operations.unbindFleetAgent, { fleetId: binding.fleetId, agentId: identity.agentId }, { expectedRevision: current.value.data.revision, instanceKey: instance.key });
+        const removed = await client.call(operations.removeFleetAgent, { fleetId: binding.fleetId, agentId: identity.agentId }, { expectedRevision: current.value.data.revision, instanceKey: instance.key });
         if (!removed.ok) return removed;
         saveBinding(configuration.directory, { ...binding, request: null });
         return success(undefined);
-      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not detach instance'); }
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not retire instance registration'); }
+    },
+    async update(configuration, instance, releaseDirectory, signal) {
+      let listener: (() => Promise<void>) | undefined, receiver: (() => Promise<void>) | undefined;
+      try {
+        signal.throwIfAborted();
+        const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), local = paths(stateDirectory, instance.name);
+        listener = await acquireProcessLock(join(local.state, 'listener'));
+        receiver = await acquireProcessLock(join(local.state, 'receiver'));
+        const software = await installSoftware(local.root, releaseDirectory);
+        signal.throwIfAborted(); software.activate();
+        return success(undefined);
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not install the explicitly requested agent software'); }
+      finally { await receiver?.(); await listener?.(); }
+    },
+    async archive(configuration) {
+      try {
+        const loaded = loadBinding(configuration); if (!loaded.ok) return loaded;
+        const binding = loaded.value;
+        if (!binding.fleetId) return success(undefined);
+        if (!binding.controllerCredential) return failure('forbidden', 'Fleet controller credential is missing');
+        const client = createClient({ origin: binding.server, token: binding.controllerCredential });
+        const current = await client.call(operations.fleet, { fleetId: binding.fleetId }, {}); if (!current.ok) return current;
+        const archived = await client.call(operations.archiveFleet, { fleetId: binding.fleetId }, { expectedRevision: current.value.data.revision });
+        return archived.ok ? success(undefined) : archived;
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not archive the stopped fleet registration'); }
     },
   };
 }

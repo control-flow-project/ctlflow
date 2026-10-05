@@ -13,6 +13,7 @@ import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 const execute = promisify(execFile);
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 const entry = fileURLToPath(new URL('../apps/cli/src/main.js', import.meta.url));
@@ -22,6 +23,7 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   const binaryDirectory = join(directory, 'bin'); mkdirSync(binaryDirectory, { mode: 0o700 });
   const installed = join(binaryDirectory, 'fleet'); symlinkSync(entry, installed);
   const home = join(directory, 'home'); mkdirSync(home, { mode: 0o700 });
+  const provider = await nativeProvider(scope, home);
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [installed, ...args], { env, timeout: 15000 });
   const client = createDaemonClient(join(root, 'fleetd.sock'));
@@ -32,7 +34,9 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   assert.equal(start.controller.name, 'native-test');
   assert.equal(statSync(root).mode & 0o777, 0o700); assert.equal(statSync(join(root, 'fleetd.sock')).mode & 0o777, 0o600);
   assert.equal(value(await client.call(operations.status, {}, {})).data.controller.name, 'native-test');
-  await assert.rejects(cli('daemon', 'start', '--root', root, '--name', 'native-test'), /already running/);
+  const repeated = JSON.parse((await cli('daemon', 'start', '--root', root, '--name', 'native-test')).stdout) as { controller: { name: string }; startedAt: number };
+  assert.equal(repeated.controller.name, 'native-test');
+  assert.equal(repeated.startedAt, value(await client.call(operations.status, {}, {})).data.startedAt);
   mkdirSync(join(fleet, 'agents', 'analyst'), { recursive: true, mode: 0o700 });
   let preflight = false;
   const waiting = createServer(incoming => { if (incoming.url === '/api/enrollments/preflight') preflight = true; });
@@ -85,4 +89,5 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   await cli('daemon', 'start', '--name', 'native-test');
   assert.equal((JSON.parse((await cli('list')).stdout) as unknown[]).length, 0);
   await cli('daemon', 'stop');
+  assert.equal(provider.requests.length, 0, 'Controller configuration, interrupted approval and restart never call a model');
 });

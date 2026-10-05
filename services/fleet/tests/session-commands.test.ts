@@ -25,7 +25,8 @@ test('CLI fleet and individual start resume by default; only --fresh-history sel
       sessionId: null, error: null, startedAt: null }] };
   const server = createServer(async (request, response) => {
     let data: unknown, meta: object = { requestId: randomUUID() }, status = 200;
-    if (request.method === 'GET') { data = [fleet]; meta = { ...meta, page: 1, pageSize: 100, totalItems: 1, totalPages: 1 }; }
+    if (request.url === '/api/status') data = { controller: { name: 'test' }, startedAt: 1, stopping: false };
+    else if (request.method === 'GET') { data = [fleet]; meta = { ...meta, page: 1, pageSize: 100, totalItems: 1, totalPages: 1 }; }
     else {
       const bytes: Buffer[] = []; for await (const chunk of request) bytes.push(Buffer.from(chunk));
       const parsed = operations.operate.input(JSON.parse(Buffer.concat(bytes).toString())); assert(parsed.ok);

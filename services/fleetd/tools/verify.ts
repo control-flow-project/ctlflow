@@ -29,6 +29,16 @@ export function verifyRetainedState(previous: Preservation, current: Preservatio
     || previous.files.some(file => !isDeepStrictEqual(files.get(file.path), file))) return failure('conflict', 'Enrolled accounts, native histories or provider-file fingerprints changed');
   return success(undefined);
 }
+async function projectBoundary(workspace: string, signal: AbortSignal): Promise<Result<string | null>> {
+  for (let current = workspace; ; current = dirname(current)) {
+    if (existsSync(join(current, '.git'))) {
+      const git = await command('git', ['-C', workspace, 'rev-parse', '--show-toplevel'], signal); if (!git.ok) return git;
+      const root = realpathSync(git.value.trim());
+      return workspace === root || workspace.startsWith(root + '/') ? success(root) : failure('conflict', 'Native workspace differs from its actual Git boundary');
+    }
+    if (current === dirname(current)) return success(null);
+  }
+}
 
 export async function verifyFleet(input: { root: string; directory: string; running: boolean; fresh: boolean; noRooms: boolean;
   skills: string[]; previous?: Preservation }, signal: AbortSignal, native: NativeInspector = inspectNative): Promise<Result<unknown>> {
@@ -42,9 +52,6 @@ export async function verifyFleet(input: { root: string; directory: string; runn
     const binding = saved.value;
     if (binding.server !== configuration.roster.coordination.server || binding.owner !== configuration.roster.coordination.owner
       || binding.fleetKey !== configuration.roster.fleet) return failure('conflict', 'Fleet binding differs from its configured identity');
-    const git = await command('git', ['-C', input.directory, 'rev-parse', '--show-toplevel'], signal); if (!git.ok) return git;
-    const projectRoot = realpathSync(git.value.trim());
-    if (input.directory !== projectRoot && !input.directory.startsWith(projectRoot + '/')) return failure('conflict', 'Fleet is outside its actual Git project boundary');
     const client = createDaemonClient(join(input.root, 'fleetd.sock'), signal);
     const all = await collectPages(query => client.call(operations.fleets, {}, {}, query), fleet => fleet.fleetId);
     if (!all.ok) return all;
@@ -63,6 +70,9 @@ export async function verifyFleet(input: { root: string; directory: string; runn
       if (!role || !configured || !isDeepStrictEqual(configured, instance.instance)) return failure('conflict', 'Controller instance differs from its exact current definition/roster');
       const identity = binding.identities.find(item => item.instanceKey === instance.instance.key && item.name === instance.instance.name);
       if (!identity) return failure('conflict', 'Registered instance has no exact enrolled account');
+      const workspace = configured.workspace ?? join(input.directory, configured.workarea), boundary = await projectBoundary(workspace, signal);
+      if (!boundary.ok) return boundary;
+      const projectRoot = boundary.value;
       const contexts = await client.call(operations.contexts, { fleetId: fleet.fleetId, instanceKey: instance.instance.key }, {}); if (!contexts.ok) return contexts;
       if (new Set(contexts.value.data.map(history => history.context)).size !== contexts.value.data.length || contexts.value.data.some(history => history.runtime !== role.runtime)) return failure('conflict', 'Controller history scopes do not match their configured runtime');
       for (const history of contexts.value.data) {
@@ -73,11 +83,11 @@ export async function verifyFleet(input: { root: string; directory: string; runn
       const inspected = [];
       if (instance.phase === 'running') for (const history of contexts.value.data) {
         const pointer = await client.call(operations.attachment, { fleetId: fleet.fleetId, instanceKey: instance.instance.key }, {}, new URLSearchParams({ context: history.context })); if (!pointer.ok) return pointer;
-        const attachment = pointer.value.data, workspace = join(input.directory, configured.workarea);
+        const attachment = pointer.value.data;
         if (attachment.workspace !== workspace || attachment.runtime !== role.runtime || attachment.sessionId !== history.sessionId) return failure('conflict', 'Native attachment differs from its registered exact history/workspace');
         const result = await native({ attachment, options: role.options, fresh: input.fresh, requiredSkills: input.skills }, signal); if (!result.ok) return result;
         const expectedPaths = [];
-        for (let parent = workspace; parent.startsWith(projectRoot + '/') || parent === projectRoot; parent = dirname(parent)) {
+        for (let parent = workspace; projectRoot !== null && (parent.startsWith(projectRoot + '/') || parent === projectRoot); parent = dirname(parent)) {
           const skills = join(parent, '.agents', 'skills');
           if (existsSync(skills)) for (const entry of readdirSync(skills)) {
             const file = join(skills, entry, 'SKILL.md');
@@ -102,7 +112,7 @@ export async function verifyFleet(input: { root: string; directory: string; runn
       const preserved = preserveNative(role.runtime, join(input.directory, configured.workarea));
       if (!preserved.ok) return preserved;
       files.push(...preserved.value);
-      instances.push({ instanceKey: configured.key, name: configured.name, phase: instance.phase, listenerActive: instance.listenerActive,
+      instances.push({ instanceKey: configured.key, name: configured.name, phase: instance.phase, listenerActive: instance.listenerActive, workspace, projectRoot,
         historyMode: configured.listenerOptions?.historyMode ?? 'shared',
         histories: inspected });
     }
@@ -113,7 +123,7 @@ export async function verifyFleet(input: { root: string; directory: string; runn
       if (!retained.ok) return retained;
     }
     return success({ checkedAt: new Date().toISOString(), controller: fleet.controller.name, localFleetId: fleet.fleetId, crossfireFleetId: binding.fleetId,
-      fleetKey: fleet.fleetKey, projectRoot, connected: fleet.connection.connected, deliveryEnabled: fleet.connection.deliveryEnabled,
+      fleetKey: fleet.fleetKey, connected: fleet.connection.connected, deliveryEnabled: fleet.connection.deliveryEnabled,
       instances, preservation: current, modelCalls: 0 });
   } catch { return failure('invalid', 'Cannot safely inspect this controller/fleet filesystem'); }
 }

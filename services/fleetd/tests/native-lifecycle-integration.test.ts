@@ -40,13 +40,13 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   }
   const options = { sandbox_mode: 'read-only', approval_policy: 'never' };
   const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'codex', approval: value(adapter.validate(options)).approval,
-    initial: 'running', initialSettings: [], saved: () => adapter.savedContexts({ workspace }),
+    initial: 'running', initialSettings: [], saved: () => adapter.savedContexts({ workspace, stateDirectory: workspace }),
     hooks: { observe: event => observations.push(event), pendingInput: () => false, pendingDecisions: () => false,
       requestDecision: async () => success(null) },
     failed: (_session, error) => { failures.push(error instanceof Error ? error.message : 'Unexpected native failure'); }, recovered: () => {},
     start: async (signal, observe) => {
       starts++;
-      const started = await adapter.start({ name: 'native-sleep-proof', workspace, instructions: 'Inert provider proof; do not access external services.',
+      const started = await adapter.start({ name: 'native-sleep-proof', workspace, stateDirectory: workspace, instructions: 'Inert provider proof; do not access external services.',
         options, allowNewHistory, hooks: { ...services.hooks, observe } }, signal);
       if (started.ok) allowNewHistory = false;
       return started;

@@ -2,21 +2,31 @@
 
 ## Update and deploy
 
-Use a verified committed build. Before deployment, stop addressed agents/controller
-and back up the private controller root, fleet directory and provider state.
-Verify checksums before replacement. Keep credentials out of logs and source.
+Use an exact verified public package release after human consent. Before changing
+production state, back up and verify the private controller root, fleet directory
+and provider state. Preserve private modes; keep credentials out of logs/source.
 
-Update controller/CLI code and the relevant definitions, then start the same
-controller/root. Desired active bindings restore automatically; explicitly
-stopped agents remain stopped. Use `fleet start` only when activation is intended.
-Each saved instance reuses its identity, session UUID
-and delivery state. Check all per-instance outcomes and effective native settings,
-not just controller connectivity. Native approval requests use the canonical
-owner DM. Do not assign shared-room access merely to make a test respond.
+Install the new matching `@ctlflow/fleet`/`@ctlflow/fleetd` release into the private
+durable user prefix. Merely installing a package does not replace live code.
+Using that new installed executable, run `fleet update FLEET` for each addressed
+fleet, or `fleet agent update FLEET INSTANCE`. The canonical lifecycle operation
+stops selected receivers/native processes, validates and installs the package's
+pinned local tools/skill assets, then resumes only previously desired agents.
+Stopped agents stay stopped. Exact identities, histories and unread positions are
+retained. Failures are per-instance, without discarding successful peers.
 
-Running listener releases are not silently replaced. Fleet-managed update notices
-ask the human to update the owning controller and restart affected instances;
-they must not create a competing direct listener.
+Then `fleet daemon restart` replaces the controller binary at the same private
+root, preserving desired activation and exact histories. Do not reverse this
+order and resume with old skills before update. Native approval requests use the
+protected owner DM. Check `fleet show FLEET`, `fleet test FLEET` and effective
+settings, not just controller connectivity. No room grants are needed for a
+model-free readiness check.
+
+Running releases are never silently replaced. Update notices ask for owner
+consent and direct the model to the controller-owned command; no standalone
+agent connect, second installer or competing receiver exists. The advanced
+`--release-directory` addresses an actual immutable installed artifact directory
+on the controller computer, including SSH targets; it is validated before use.
 
 ## Backup and portability
 
@@ -50,7 +60,7 @@ not ownership. Do not remove state to bypass a lock or failed resume.
 | Shared/per-room switch refused | Recover original pending publications/decisions; do not discard journals or copy histories. |
 | Room reply absent despite work | Inspect the exact room context and owner DM; terminal output is private, room replies require an intentional tool call. |
 
-Runtime and Decisions in management show native state/settings independently of
+Session in management shows native state/settings and decisions independently of
 heartbeats. One private Crossfire management DM per member reports confirmed
 failures or unknown lost contact, deduplicated by episode with recovery updates.
 Controller failures persist in `.fleet/failures.json` until the scoped report is

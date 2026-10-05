@@ -15,10 +15,13 @@ import { createRegistry } from '@ctlflow/fleetd-storage/registry';
 import { validateRoster, parseToml } from '@ctlflow/fleetd-contracts/configuration';
 import { fleetView, instanceView } from '@ctlflow/fleetd-contracts/api';
 import { success, failure, type Result } from '@ctlflow/crossfire-kernel/result';
-import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import { createListenerControl as listenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
 import { listenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
+function createListenerControl(acknowledge: Parameters<typeof listenerControl>[0]) {
+  return listenerControl(acknowledge, () => ({ fleetId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222', credential: 'fixture-controller-lease' }));
+}
 function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control: Running['control']; pointer: RuntimeAttachment;
   close: Running['close']; nativeState?: Running['nativeState']; resume?: Running['resume'] }): Running {
   const nativeState: Running['nativeState'] = input.nativeState ?? (() => ({ phase: 'running', lastActivityAt: 1, historyAvailable: true }));
@@ -46,7 +49,8 @@ function fixture(execution?: Partial<Execution>) {
     }),
     execution: { connect: () => success(undefined), connection: () => ({ connected: true, deliveryEnabled: true, revision: 0, error: null }),
       delivery: async () => failure('unavailable', 'Not connected'), message: async () => failure('unavailable', 'Not connected'), disconnect: async () => {}, close: async () => {},
-      validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
+      validate: () => success(undefined), inspect: async () => success(undefined), test: async () => success(undefined), prepare: async () => success({ failed: [] }), remove: async () => success(undefined),
+      archive: async () => success(undefined), update: async () => success(undefined),
       reset: async () => success(undefined),
       contexts: async () => success([]),
       start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success(runtimeFixture({ sessionId, signal: stop.signal,
@@ -287,9 +291,9 @@ test('approval waiting is model-free and stop cancels a pending start', async sc
   assert.equal((await fixture.finish(start)).status, 'failed'); assert.deepEqual(fixture.started, []);
 });
 
-test('roster edits serialize native detachment and retain files when removing the last instance', async scope => {
+test('roster edits serialize registration retirement and retain files when removing the last instance', async scope => {
   let release!: () => void;
-  const fixture = fixtureController({ detach: async () => { await new Promise<void>(resolve => { release = resolve; }); return success(undefined); } });
+  const fixture = fixtureController({ remove: async () => { await new Promise<void>(resolve => { release = resolve; }); return success(undefined); } });
   cleanup(scope, () => fixture.controller.close());
   const pending = fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'remove', instanceKey: 'analyst' });
   assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 })).ok, false);

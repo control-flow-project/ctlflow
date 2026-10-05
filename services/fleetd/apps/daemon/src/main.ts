@@ -1,33 +1,34 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
-import { resolve, join } from 'node:path';
+import { resolve, join, dirname } from 'node:path';
 import { existsSync, lstatSync, unlinkSync, chmodSync, realpathSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createConnection } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { controller as parseController } from '@ctlflow/crossfire-contracts/schema/controller';
-import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { createRegistry } from '@ctlflow/fleetd-storage/registry';
+import { prepareControllerRoot } from '@ctlflow/fleetd-storage/controller-root';
 import { createController } from '@ctlflow/fleetd-domain/controller';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
 
-export async function startDaemon(root: string, name: string) {
-  if (process.platform !== 'linux') throw new Error('Fleet controller requires Linux');
-  let parsed = parseController({ name });
+export async function startDaemon(root: string, name?: string) {
+  if (!['linux', 'darwin'].includes(process.platform)) throw new Error('Fleet controller requires Linux or macOS');
+  let parsed = parseController({ name: name ?? 'local' });
   if (!parsed.ok) throw new Error(parsed.error.message);
-  privateDir(root);
+  prepareControllerRoot(root);
   const unlock = await acquireProcessLock(join(root, 'daemon'));
   let cleanup = unlock;
   try {
     const file = join(root, 'controller.json');
     if (existsSync(file)) {
       const existing = parseController(readJson<unknown>(file));
-      if (!existing.ok || existing.value.name !== name) throw new Error('Controller root is already named differently');
+      if (!existing.ok || name !== undefined && existing.value.name !== name) throw new Error('Controller root is already named differently');
       parsed = existing;
     } else writeJson(file, parsed.value);
     const socketPath = join(root, 'fleetd.sock');
@@ -46,7 +47,8 @@ export async function startDaemon(root: string, name: string) {
       if (current.ino !== information.ino || current.dev !== information.dev) throw new Error('Controller socket changed during startup');
       unlinkSync(socketPath);
     }
-    const created = createController({ registry: createRegistry(root), execution: createExecution({ codex: codexRuntime() }), controller: parsed.value, id: randomUUID, now: Date.now, delay: nativeClock.delay });
+    const created = createController({ registry: createRegistry(root), execution: createExecution({ codex: codexRuntime() },
+      dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts')))), controller: parsed.value, id: randomUUID, now: Date.now, delay: nativeClock.delay });
     if (!created.ok) throw new Error(created.error.message);
     const controller = created.value;
     let closing: Promise<void> | undefined;
@@ -68,7 +70,7 @@ export async function startDaemon(root: string, name: string) {
 const invoked = process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invoked) {
   const { values } = parseArgs({ options: { root: { type: 'string' }, name: { type: 'string' } } });
-  if (!values.root || !values.name) throw new Error('fleetd --root ABSOLUTE_DIRECTORY --name NAME');
+  if (!values.root) throw new Error('fleetd --root ABSOLUTE_DIRECTORY [--name NAME]');
   const daemon = await startDaemon(resolve(values.root), values.name);
   console.log(JSON.stringify({ status: 'ready', controller: daemon.controller.status().controller, socket: daemon.socketPath }));
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => { void daemon.close(); });
