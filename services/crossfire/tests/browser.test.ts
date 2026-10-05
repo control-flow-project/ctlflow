@@ -362,6 +362,10 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await page.getByLabel('Configured display name').fill('Unsaved name');
   await page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
   await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
+  const statusRefresh = page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
+  await page.getByRole('button', { name: 'Refresh status', exact: true }).click();
+  await statusRefresh;
+  await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Activity', exact: true }).click();
   await expect(activity.getByText('online', { exact: true })).toBeVisible();
   const requestsBeforeStop = provider.requests.length;

@@ -12,24 +12,23 @@ export async function call<Params extends Record<string, string>, Query, Input, 
 }
 export function useResource<Params extends Record<string, string>, Query, Output>(operation: Operation<Params, Query, {}, Output>,
   params: Params, search = '', pollMs?: number) {
-  const [result, setResult] = useState<Result<Response<Output>>>();
+  const [resource, setResource] = useState<{ key: string; result: Result<Response<Output>> }>();
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(value => value + 1), []);
-  const key = JSON.stringify(params);
+  const key = JSON.stringify([operation.method, operation.path, params, search]);
   useEffect(() => {
     const stop = new AbortController();
-    setResult(undefined);
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function read() {
       const response = await createClient({ origin: location.origin, signal: stop.signal }).call(operation, params, {}, new URLSearchParams(search));
       if (stop.signal.aborted) return;
-      setResult(response);
+      setResource({ key, result: response });
       if (pollMs) timer = setTimeout(() => { void read(); }, pollMs);
     }
     void read();
     return () => { stop.abort(); clearTimeout(timer); };
   }, [operation, key, search, revision, pollMs]);
-  return { result, refresh };
+  return { result: resource?.key === key ? resource.result : undefined, refresh };
 }
 export function useAction() {
   const [error, setError] = useState('');
