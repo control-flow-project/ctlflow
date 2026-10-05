@@ -100,7 +100,7 @@ or missing files are created. Current normalized tables are queried through
 Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
 
 ```json
-{"schemaVersion":12,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
+{"schemaVersion":13,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
 ```
 
 The schema version and table counts are optional exact expectations. `--schema`
@@ -157,8 +157,8 @@ container restart, extraction, privileged command or package installation occurs
 {"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","requestedName":"helper","coordinationPolicy":{"wakeMode":"owner-agents","senderMatrixIds":[],"permissions":["room.agent.invite"]}}]}
 ```
 
-Individual enrollment uses `null` for fleet key, controller name and each item's
-`coordinationPolicy`. Fleet plans specify each exact requested policy, including
+Every enrollment supplies its fleet key, controller name and each item's complete
+`coordinationPolicy`, including a one-item roster. Plans specify exact policies, including
 selected Matrix IDs and permission codes. The complete pending roster, policy,
 exact owner, controller and code must match; failed
 items or nonpending requests are refused. Without `--execute`, this is review

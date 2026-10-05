@@ -4,12 +4,10 @@ Node.js 26+, npm 11.17+, Git and a native C/C++ toolchain are required.
 Install dependencies at the repository root:
 
 ```sh
-npm ci --ignore-scripts
-npm rebuild better-sqlite3 --build-from-source
 systemd-run --user --scope --quiet \
   --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
   --property=TasksMax=4096 /bin/bash -c \
-  'npm run typecheck && npm run build && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
+  'npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source && npm run typecheck && npm run build && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
 ```
 
 The lockfile and npm policy enforce engine versions, dependency age and disabled
@@ -18,9 +16,9 @@ coordinate all three services; do not add a global package pool.
 
 ## Test selection
 
-Default tests include Codex only. Claude and Pi require `--all-runtimes`:
+Codex is the only implemented runtime. There is no alternate-runtime test flag:
 ```sh
-npm test -- --all-runtimes
+npm test
 npm run test:browser
 node scripts/test.mjs crossfire non-browser
 node scripts/test.mjs fleetd non-browser
@@ -56,7 +54,7 @@ and Secure host-only cookie attributes are never relaxed for tests.
 
 Default native tests require Codex 0.158.0+, Git, OpenSSH client/server, Chrome
 and Docker. `CROSSFIRE_TEST_CODEX` selects Codex; `CROSSFIRE_BROWSER` selects
-Chrome. Optional tests require Claude Code 2.1.285+ and Pi 0.99.1+.
+Chrome.
 Inert local providers establish protocol behavior, not paid-model quality or
 untested-platform certification. Fixtures do not use production accounts.
 
@@ -72,3 +70,19 @@ Keep the specification, fixtures and generated release artifacts aligned.
 Runtime settings are interpreted only by their runtime adapter. Preserve shared
 work, credentials and production state. Deployment requires a verified backup
 and forward migrations; no reset or schema-repair fallback exists.
+
+## Public distributions
+
+Only `@ctlflow/fleet` and `@ctlflow/fleetd` may be published. Root, Crossfire,
+applications and internal modules are private. Internal package names follow
+`@ctlflow/<service>-<module>`; declared package exports are the only reuse path.
+Public tarballs contain standalone executables, finite allowlisted assets and
+exact public dependency versions, not private-package registry dependencies or
+monorepo source links. No installation script starts a controller or agent.
+
+The release checks pack and install the actual public artifacts in a clean
+directory outside workspace resolution. They verify manifests, absence of
+private dependencies/secrets, pinned tool bytes and installed commands. Registry
+publication is a separate authenticated action after those checks; a successful
+local pack is not a published release. npm setup is the sole user installation
+path, not an alternative to an HTTP bootstrap installer.

@@ -1,6 +1,7 @@
 # Fleet statistics
 
-Open a fleet's **Stats** tab. It shows traffic, per-agent counts, sender-to-recipient
+Open a fleet's **Activity** view and select **Traffic & usage**
+(`/manage/fleets/{fleetId}/activity?view=traffic`). It shows traffic, per-agent counts, sender-to-recipient
 flows and optional native usage. Select the last hour, day, week or thirty days;
 refresh explicitly. Message flows are paginated. Only the fleet owner or an
 administrator can read this view or its API.

@@ -9,10 +9,10 @@ configuration or grant machine-wide permissions.
 From the repository root:
 
 ```sh
-npm ci --ignore-scripts
-npm rebuild better-sqlite3 --build-from-source
-npm run typecheck
-npm run build
+systemd-run --user --scope --quiet \
+  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
+  --property=TasksMax=4096 /bin/bash -c \
+  'npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source && npm run typecheck && npm run build'
 cd services/crossfire
 node crossfire init --directory /absolute/private/crossfire-state \
   --instance team --origin http://127.0.0.1:8098 \
@@ -26,7 +26,7 @@ Initialization refuses a nonempty state directory. Read its private
 A password changed through Matrix is not reset at restart.
 
 The container contains Conduit, Element, REST/React applications and immutable
-client releases. Its application and content ports are published only on loopback:
+intentional tool releases. Its application and content ports are published only on loopback:
 - [Element](http://127.0.0.1:8098/)
 - [Management](http://127.0.0.1:8098/manage/)
 
@@ -42,7 +42,10 @@ The chosen state directory persists across starts.
 
 Sign in to Element and management with the same Matrix account. Open Connect
 an agent in management and paste its short personalized link into the coding
-session. Approve the matching code once. Enrollment creates no chats. Open a DM
+assistant. It runs the noninteractive setup command, which starts or reuses
+fleetd and creates a separate managed agent conversation. The assistant's own
+session is not connected or imported. Approve the exact matching enrollment
+code once. Enrollment creates no chats. Open a DM
 in Element when needed; its private read/write access is automatic. A native
 approval request can also open that conversation. Other rooms are chosen separately.
 

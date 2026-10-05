@@ -30,7 +30,8 @@ The Policy page configures:
   bytes, range 4096–4194304; complete larger messages/batches use private files.
 - Fleet native-session idle timeout: `fleetIdleTimeoutSeconds`, default 1800
   seconds (30 minutes), range 0–604800; zero disables automatic sleep. This policy
-  is delivered to fleetd and does not shut down individual human-owned sessions.
+  is delivered to fleetd. The shared receiver remains active while native
+  sessions sleep; explicitly stopped sessions do not wake on incoming messages.
 - System-wide agent instruction text, with reset to the shipped default.
 
 Invited people complete normal Element signup with their own username and
@@ -45,17 +46,23 @@ different authorities.
 
 ## Runtime settings
 
-Individual connections retain the existing native model, sandbox and approval
-settings. Crossfire does not elevate a human-owned session.
-
-Headless definitions configure those values in `agent.toml`. Owned Codex defaults
-to full access with on-request approval; every setting can be changed.
+Every agent uses a fleetd-owned native session. Definitions configure its
+model, reasoning, sandbox and approval policy in `agent.toml`. Codex defaults to
+full access with on-request approval; every accepted setting can be changed.
+Zero-question project setup uses the configured native model/provider defaults
+without importing the existing coding conversation or its approval bypasses.
+Optional `workspace` selects native tool cwd separately from private state.
+The Session tab shows configured/effective values and their observation times.
 - [Runtime fields, defaults, bypass option and restart behavior](../../fleet/docs/configuration.md)
 
 ## Releases
 
-The release includes the client, native Pi module, skill, onboarding instructions,
-Matrix license and optional Codex launcher, verified by artifact size and SHA-256.
-It is content-addressed and immutable. Hashes from a server verify bytes, not an
-independent publisher identity. No global skills are installed.
-- [Update consent and native activation](onboarding/README.md)
+The tool release contains exactly the client, skill, README and Matrix license,
+verified by artifact size and SHA-256. One private builder generates the same
+immutable release for Crossfire and the public fleetd distribution. The installed
+controller package supplies pinned local artifacts. Recovery/reconnect does not
+download or silently replace software. Only Fleet and fleetd are public npm
+packages; internal modules remain private and bundled. No global skills are
+installed. Settings shows current/latest releases; explicit consent precedes
+controller update.
+- [Setup and software updates](onboarding/README.md)

@@ -7,8 +7,9 @@ publication is public to anyone holding its link. The random 256-bit key prevent
 practical guessing; it is not an authenticated permission check.
 
 Publishing does not create a Matrix room, change room access or run server-side
-code. This capability is available to individual and fleet-managed agents through
-the same authenticated client and domain operations.
+code. Every active fleet-bound agent uses the same authenticated intentional tool
+and domain operations. Historical unbound/retired identities have no publishing
+authority.
 
 ## Prepare and publish
 
@@ -18,15 +19,16 @@ local JavaScript modules; resolve module-relative data with
 `new URL('../data.json', import.meta.url)`. Ordinary relative `fetch` URLs resolve
 against the document URL, not the JavaScript module.
 
-From the connected agent's project:
+Use the managed session's private instance state, not cwd-based discovery:
 
 ```sh
-node .crossfire/client.mjs --project "$PROJECT" --profile "$PROFILE" report publish \
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" report publish \
   --directory .private/public-report --title 'Credit agreement review'
 ```
 
-`--project` and `--profile` select the existing enrolled account; omit them only
-when the current project and its sole profile are unambiguous. The directory may
+`CROSSFIRE_PROJECT` identifies private state even when native cwd is a separate
+existing workspace. Operator invocations may explicitly select that state and
+its enrolled profile with `--project` and `--profile`. The directory may
 be relative or absolute for private command execution. Do not include the
 machine's absolute paths in the report or the message sharing its link.
 
@@ -184,12 +186,13 @@ application state.
 
 ## Migration and verification
 
-The current database is schema 12. Fresh stores initialize it directly. Only the
-inventoried deployed schema 11 has a transactional forward conversion; versions
-1–10, foreign stores and future versions are refused without changes. Conversion
-retains identities, credentials, room grants, histories and runtime settings,
-adds normalized `publication`/`publication_file` tables and new permissions, and
-adds the 1800-second idle policy and sleeping/waking observation fields. Verify
+The current database is schema 13. Fresh stores initialize it directly. Only the
+inventoried deployed schema 12 has a transactional forward conversion; versions
+1–11, foreign stores and future versions are refused without changes. Conversion
+retains publications/files, identities, credentials, room grants, native histories,
+runtime/usage/receipt records and audit. Historical non-controller enrollment
+becomes archive data; current operational agents require exact active fleet and
+controller-lease binding. The 1800-second idle policy remains unchanged. Verify
 an addressed production backup before running the new application. Never reset
 data or rewrite a version number to bypass validation.
 

@@ -55,10 +55,10 @@ do not start, stop, upgrade or resume an agent.
 Use the normal repository prerequisites and build:
 
 ```sh
-npm ci --ignore-scripts
-npm rebuild better-sqlite3 --build-from-source
-npm run typecheck
-npm run build
+systemd-run --user --scope --quiet \
+  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
+  --property=TasksMax=4096 /bin/bash -c \
+  'npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source && npm run typecheck && npm run build'
 ```
 
 The tools require Node.js 26+, Unix ownership checks and the packages in the
@@ -107,11 +107,13 @@ approval, revision-checked fleet wake configuration and native read-only protoco
 one owner shared by the operator and application browser tests.
 
 ```sh
-npm test
-npm run verify:architecture
-npm run verify:installation
-npm run verify:container
+systemd-run --user --scope --quiet \
+  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
+  --property=TasksMax=4096 /bin/bash -c \
+  'npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
 ```
 
-The default runtime selection remains Codex. Claude/Pi tests require the explicit
-`--all-runtimes` flag; adding operator tools does not enable those suites.
+Runtime verification is Codex only. Unsupported runtimes fail configuration
+validation; operator tools do not provide another lifecycle or runtime path.
+The development guide documents resource guards and evidence boundaries.
+- [Development and bounded verification](development.md)

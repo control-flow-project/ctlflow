@@ -1,160 +1,177 @@
-# Connect a coding agent to this server
+# Set up a managed agent
 
-Crossfire delivers authorized Matrix messages into an existing Codex, Claude Code
-or Pi session through a private project-local listener. It never starts another
-individual engine or changes native model/permission settings. Open the
-management Connect an agent page and paste its one-line personalized setup link
-into the coding session. The guide supplies the verified server and owner,
-prerequisite installation links and inspected bootstrap command.
+Every Crossfire agent belongs to a fleet. fleetd owns its native session and
+embeds the shared listener; a solo agent is an ordinary one-agent fleet.
+Codex is the only implemented runtime. Setup targets Linux or macOS through the
+same portable native ownership interfaces. Linux inert-provider checks do not
+certify paid providers or macOS hardware.
 
-Codex and Pi clients use Linux or macOS, Node.js 26+, Git, Bash and curl.
-The Claude Code adapter requires Linux native process-birth verification.
-Supported native versions are Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+.
-Linux native proofs use isolated inert providers; they do not certify macOS or
-paid-provider behavior. Fleets currently use the Codex adapter on Linux.
+## Start from management
 
-## First setup, reconnect and test
+Open **Connect an agent** at `/manage/connect`. Copy its one-line personalized
+instruction into the coding assistant working in the intended project. That
+instruction only directs the assistant to the server's setup guide.
 
-An approved Matrix account is saved privately in the project's Git-ignored
-`.crossfire/profiles/` directory. The client discovers and reuses it automatically.
-Ask for a lowercase name (letters, digits, hyphens) only when no profile exists.
-If several profiles exist, ask which one to connect. Runtime settings and
-pre-enrollment connection choices are private, separate records; activation never
-requires repeating a chosen name, server or owner.
+The guide supplies the dynamically verified server and active human owner,
+exact npm version, prerequisite instructions and one complete setup command.
+The assistant performing setup remains independent: its process, conversation
+and project-native settings are not attached or imported. fleetd creates a
+separate managed session.
 
-A `runtime-setup-required` result is not a ready listener. Claude's installation
-command must finish before native settings reload activates project hooks.
-A subsequent Bash tool call captures the exact native context; run connect again
-without choosing a new identity. Pi requires project trust and `/reload` to
-activate its verified project extension. Never wait inside the first tool call
-for its own completion hook or repeatedly poll with the model.
+Requires Node.js 26+, npm, Git, Bash and stock Codex 0.158.0+. Missing software
+produces actionable installation guidance. Native provider authentication is
+checked without inference; use the provider's normal authorized login if needed.
+Setup never requests Matrix passwords, administrator tokens, ports or session
+IDs, silently uses sudo, changes host services or installs global skills.
 
-When native activation is ready, the command prints one approval URL and code,
-then waits in ordinary code. Show both to the human immediately. Approval resumes
-connection automatically; no separate listener command or model polling.
-Approval provides a private read/write DM with your agent automatically. No
-additional room is joined. Invite the agent to an existing room in Element; an authorized invitation grants read-and-reply access. You can
-also assign limited access in management. Wake-up rules remain separate.
+## Noninteractive setup
+
+The generated guide installs the exact public `@ctlflow/fleet` version into
+private user-owned storage and invokes:
 
 ```sh
-node .crossfire/client.mjs agent connect
-node .crossfire/client.mjs agent test
-node .crossfire/client.mjs agent status
-node .crossfire/client.mjs agent disconnect
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test'
 ```
 
-Use `--project /absolute/project` and `--profile NAME` if needed.
-Native tool context selects the runtime; first Pi setup uses `--runtime pi`.
-Ambiguous native contexts require explicit selection. Connect verifies identity,
-installs the complete verified release, and starts or reuses exactly one listener.
-A suspended/revoked account fails; it is never replaced or re-enrolled automatically.
+Use your own personalized descriptor URL, not the example identity. The CLI
+validates the fixed path, exact origin/owner, descriptor version and installed
+package version; redirects and unexpected fields fail.
 
-`agent test` checks the actual receiver, exact native session, authenticated
-server access, active owner/agent and applied joined rooms. It sends no model
-prompt or test message and advances no cursor. Having only the owner DM does not
-authorize shared-room tasks; paused delivery and native busy state are reported explicitly.
-`agent status` reads local status. Heartbeats establish the management online
-indicator; credentials alone establish neither.
+Setup asks no naming, model, controller, room or history questions. It starts
+or reuses fleetd, persists stable project-derived identifiers and submits the
+exact enrollment. When awaiting approval it prints the URL and matching code.
+Show both to the human immediately. The controller waits in ordinary code;
+the assistant does not poll, approve itself or submit another enrollment.
 
-## Native attachment and lifecycle
+Approval is required authorization, not an optional configuration question.
+Its review includes the exact roster and requested coordination defaults.
+Enrollment creates no Matrix rooms or conversations and makes no dummy model
+call. The returned readiness result distinguishes controller contact, native
+binding and actual receiver readiness; credentials alone are insufficient.
 
-Codex uses its tool-provided exact thread ID and private native app-server Unix
-socket. Linux/macOS sessions attach without a launcher. The optional downloadable
-`runcodex.sh` starts a private loopback server and ordinary terminal together;
-it supplies the same native connection context. Embedded / `--no-daemon` sessions
-have no external transport. Ask the human to reopen/resume the saved session in
-native app-server-backed Codex. Native daemon startup is
-`codex app-server daemon start`; never silently launch another engine.
+Optional advanced overrides use the same setup/configuration owner:
 
-Claude validates the native session registry, process birth, workspace and
-authenticated peer Unix socket. Private project hooks capture its exact transcript
-path; existing hooks and native permission settings are preserved. Native peer
-protocol 1 on Claude Code 2.1.285 is a version-tested dependency, not a public SDK
-promise. Exact correlation ID, content and peer origin in bounded native history
-confirm delivery; a socket write is not a receipt. Peer sockets are opened per
-publication, so native idle timeouts do not expire an idle listener. Session or
-workspace changes, registry/endpoint removal and process death stop attachment.
-No restart, channels opt-in or global Claude configuration is required.
+```sh
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test' --config /absolute/runtime.toml --root /absolute/controller
+```
 
-Pi loads the verified `crossfire-pi.mjs` through
-`.pi/extensions/crossfire.js`. The stable entry resolves the current immutable
-release on every native load. Its extension creates an authenticated loopback
-connection and exact private session/generation descriptor for tools. The client
-checks the loaded module hash before claiming readiness. Native `custom_message`
-ID/content receipts confirm publication; queued input is not a receipt.
-Exit, reload, tree navigation and session replacement invalidate the old binding.
-An old listener never silently follows another session.
+The validated configuration must match the descriptor's server and owner.
+Do not create a config just to restate defaults. Repeated `fleet setup` from the
+same project reuses saved authority, identities and histories. Ambiguous or
+different saved authority fails rather than prompting or silently replacing
+identity. An explicitly stopped setup remains stopped until an explicit start.
 
-Management disconnect or `agent disconnect` stops only this receiver, not the
-human-owned native engine. Codex server closure stops delivery; TUI closure alone
-does not imply engine closure. The optional launcher owns its private server
-lifetime. Fleets own and stop their own listener/engine processes. Crossfire
-does not supervise detached tool descendants or use process-name matching.
+## Defaults and private state
 
-## Verified updates
+The default controller root is the user's `.ctlflow/controller` directory.
+The CLI saves a private project profile beneath `$XDG_CONFIG_HOME/fleet/projects`
+or the user's `.config/fleet/projects`. Generated configuration is kept under
+the selected controller's `projects` directory, keyed by the canonical workspace,
+server and owner. The stable registered name combines a bounded normalized
+project basename and a deterministic digest suffix; there is no collision retry
+that silently creates another name.
 
-The content-addressed release includes the client, Pi native module, skill,
-README, Matrix license and optional launcher. Size/SHA-256 verification covers
-every artifact using Node's built-in crypto on Linux and macOS. Server hashes
-verify bytes, not an independent publisher identity. The launcher is distributed
-from a pinned Scripts commit recorded in `assets/runcodex-source.json`.
+The generated role uses native model/provider defaults, shared history,
+`danger-full-access`, `on-request` and disabled approval/sandbox bypass.
+The instance-wide native idle timeout defaults to thirty minutes.
+Optional `agent.toml` configuration can change accepted settings.
 
-Version checks and heartbeats make no model calls. A new release delivers one
-receipt-confirmed maintenance notice per native session/release so the agent can
-ask for the human's consent. No heartbeat prompts or silent live replacement.
-After consent, run connect again and read changed skill content in its output.
-Verified staging precedes replacement; a failed download leaves the active
-installation/listener intact. Identity, grants, unread positions and receipts
-are preserved. Pi native-module updates also require `/reload`; downloading files
-does not hot-replace a loaded extension.
+The existing project is native tool cwd. Its managed state is a separate private
+workarea containing native home/history, approved identity, software and cursors.
+The original project is not chmodded private and its `.codex` is not replaced.
+Native authentication and supported model/provider configuration seed the managed
+home once; original conversation, project trust and approval bypasses are not
+copied. Normal self-contained role fleets use their private workarea as cwd too.
 
-Fleet-managed sessions ask the human to update the owning controller and restart
-the affected instance. They must not create a competing project listener.
-An installation without the stable client entry uses the management bootstrap
-command; existing private profiles and state are preserved.
+The adapter supplies `CROSSFIRE_PROJECT` (private state directory) and
+`CROSSFIRE_AGENT_NAME` to intentional tools. Do not infer private state from
+the native cwd or select the most recently used profile.
 
-## Access, messages and human controls
+## Inspect readiness
 
-Room IDs are opaque. The project skill owns bounded native history, Markdown,
-attachments and intentional replies. Assistant output is never automatically
-broadcast. Do not run manual `agent read` or mutate read markers alongside a live
-receiver; one lock owns acquisition and cursors.
+Use the returned fleet key for a read-only controller view:
 
-Wake rules choose trigger senders; other chat remains pending context.
-Codex and Pi expose native interruption: addressed owner `!!` interrupts/pauses;
-`!! New instruction` interrupts and redirects. Claude's peer connection exposes
-no native turn interruption. Either form pauses delivery and, when sending is
-permitted, posts a short automatic notice directing the owner to stop the turn
-in Claude. A denied notice never disconnects the paused receiver. These notices
-do not wake peers or enter later model context. A subsequent owner message resumes
-wake-eligible delivery. Cancellation is not rollback or detached-tool cleanup.
+```sh
+fleet show FLEET
+fleet test FLEET
+fleet agent contexts FLEET INSTANCE
+```
 
-Codex native approval requests are sent automatically to the verified private
-owner DM. Both participants must be joined and able to send messages; the agent
-must have applied unmuted read/reply access. The room must contain only owner and
-agent, with private join/history settings and no encryption. Invalid routing fails
-setup before online reporting. No approval-room CLI flag or fleet setting exists.
-Only the verified owner's explicit authenticated Crossfire submission answers
-the matching native decision; opening its link or replying in chat does not.
-Silence, general chat, other agents or administrator status cannot approve.
-Expired or unavailable approval denies the pending native command, not a healthy
-session. A deliberately selected native no-approval policy needs no approval
-response. Attached sessions retain their native settings; fleet-owned settings
-and defaults are documented in the fleet configuration guide. Claude and Pi keep
-native permission handling. Crossfire never broadens an attached session's access.
+Read-only commands do not start a controller, wake native sessions or create
+histories. `fleet test` uses the actual existing shared-host diagnostic, not
+credentials-only readiness or a model test message. Inside the managed native session:
 
-Enrollment and listener startup create no chats. The first owner-created DM
-or actual terminal output/native decision establishes a private owner conversation with
-permanent read and reply access. The listener remains ready with no joined rooms.
-Diagnostics never create a conversation. Management cannot mute, downgrade,
-remove or delegate an established channel.
-It cannot admit another agent, even one belonging to the same owner.
-Account suspension/revocation and chat wake policy remain separate. Authorized Element invitations and
-managed grants admit agents up to the inviter's native authority. Profiles,
-listener controls and credentials remain private and
-Git-ignored. Never print, commit or transfer credentials to another project.
-Account revocation removes server-side access; deleting local files does not.
-No systemd, machine-wide permissions, global skills, hidden engine fallback or
-unrequested host change is part of connection.
+```sh
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent test
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent status
+```
 
-- [Runtime activity, human decisions and owner-output privacy](../runtime.md)
+An operator can supply `--project /absolute/private/workarea --profile NAME`
+to the same tools. Test uses fleetd's existing receiver and checks native
+authentication, active accounts and applied room access without a prompt,
+test message or cursor advancement. Missing receiver is an error, not permission
+to launch a replacement. Sleeping, busy, paused and stopped are separate states.
+
+## Rooms, replies and human decisions
+
+Create ordinary rooms in Element. Invite the agent or assign existing-room
+access in management. Authorized invitations establish read/reply access;
+wake eligibility separately determines which senders trigger a turn.
+A coordinator needs approved invitation authority before summoning specialists.
+It can remove only additions attributed to it, subject to current native power.
+
+The first owner contact, actual terminal output or pending native decision
+establishes the canonical private owner DM. Enrollment, startup, heartbeats and
+diagnostics create no chat. Its established read/reply access cannot be muted,
+downgraded, removed or delegated through Crossfire. Suspension/revocation still
+disables account access.
+
+Responses to delivered room/DM input use the messaging tool and an explicit
+destination. Non-thinking terminal output is a private owner observation, not a
+room reply. This intentionally shares room-derived content with the owner even
+when the owner is not a room member.
+
+Native permission requests and structured questions use owner-DM review links.
+Opening a link is read-only; only the verified active owner can explicitly submit
+the matching authenticated, CSRF-protected decision. Chat replies, silence,
+another agent and administrator status do not approve. Unsupported native prompts
+are not approximated by terminal scraping.
+
+## Software updates
+
+Only `@ctlflow/fleet` and `@ctlflow/fleetd` are public npm packages. Their
+standalone builds include private internal modules and pinned tool assets.
+The tool release contains exactly README, skill, client and Matrix license,
+verified automatically by size and SHA-256. No model-led manual hashing is needed.
+
+Release/heartbeat checks make no model calls. A changed server release may issue
+one receipt-confirmed maintenance notice per managed history/release asking the
+human for consent. Recovery, repeated setup and sleep/wake do not download or
+silently replace installed artifacts.
+
+After consent, install the new version-pinned public package into the private
+installation location from the guide. Use that newly installed executable to
+update selected targets, then explicitly restart the controller:
+
+```sh
+fleet update FLEET
+fleet agent update FLEET INSTANCE
+fleet daemon restart --root /absolute/controller
+```
+
+Choose fleet-wide or per-agent update, not both for the same change. The explicit
+update consumes that package's local verified release, stops/switches selected
+execution and resumes only targets already desired active. Stopped targets stay
+stopped. The controller restart uses the new executable and retains desired
+stop/resume intent, exact saved histories, identities, grants, cursors and receipts.
+Remote CLI update requires `--release-directory /absolute/release` naming already
+installed remote assets, or run the installed CLI on the controller computer.
+There is no HTTP fallback.
+
+Read changed skill content after update. Settings shows current/latest releases
+and clearly labelled last reported installation for offline agents. A downloaded
+package is not proof that its running controller or listener has been updated.
+
+- [Runtime state, decisions and owner-output privacy](../runtime.md)
+- [Fleet configuration, native options and defaults](../../../fleet/docs/configuration.md)
+- [Stop, full-history resume and confirmed fresh history](../../../fleet/docs/sessions.md)

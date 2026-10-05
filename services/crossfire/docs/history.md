@@ -4,7 +4,7 @@
 
 The administrator sets the instance-wide **Inline message limit** in management
 Settings. `maxMessageBytes` defaults to 65536 UTF-8 bytes and accepts 4096 through
-4194304. It applies to direct and fleet agents. The full incoming envelope counts,
+4194304. It applies to every agent binding. The full incoming envelope counts,
 including sender, room, timestamp and routing instructions. Controller broadcasts
 and scheduled wake-up inputs use the same limit and private-file mechanism, with
 their configured origin preserved; they are not represented as Matrix messages.
@@ -46,11 +46,12 @@ acquisition errors retry locally without disconnecting the fleet controller.
 
 ## Explicit catch-up
 
-Run in the connected project:
+Managed sessions receive `CROSSFIRE_PROJECT` as their private instance state
+directory, independently of native cwd. Use its installed intentional tool:
 
 ```sh
-node .crossfire/client.mjs agent read
-node .crossfire/client.mjs agent read --room '!EXISTING_ROOM_ID:YOUR_SERVER' --limit 10
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent read
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent read --room '!EXISTING_ROOM_ID:YOUR_SERVER' --limit 10
 ```
 
 The command asks the sole active receiver for unread data. It acknowledges the
@@ -60,8 +61,9 @@ or browse history. Unacknowledged queries expire after five minutes without
 advancing cursors. Once acknowledgment begins, its exact checkpoint is retained
 and recovered until native read markers settle, without replaying output.
 Current active identity, native membership and room
-access are rechecked before acknowledgment. If no listener is active, the same
-query implementation acquires the exclusive receiver lock.
+access are rechecked before acknowledgment. Without the existing fleetd receiver,
+the tool fails with an actionable controller-readiness error; it cannot acquire
+another receiver lock or start a listener.
 
 This is an intentional tool read, not authorization to model-poll for work. The
 default is 100 with per-room fairness; `--limit` accepts 1 through 100.
@@ -69,9 +71,9 @@ default is 100 with per-room fairness; `--limit` accepts 1 through 100.
 ## Historical browsing
 
 ```sh
-node .crossfire/client.mjs agent history
-node .crossfire/client.mjs agent history --room '!EXISTING_ROOM_ID:YOUR_SERVER' --limit 20
-node .crossfire/client.mjs agent history --room '!EXISTING_ROOM_ID:YOUR_SERVER' --direction f --continuation '{"entries":[{"room":"!EXISTING_ROOM_ID:YOUR_SERVER","cursor":"EXACT_NATIVE_CURSOR"}]}'
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent history
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent history --room '!EXISTING_ROOM_ID:YOUR_SERVER' --limit 20
+node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent history --room '!EXISTING_ROOM_ID:YOUR_SERVER' --direction f --continuation '{"entries":[{"room":"!EXISTING_ROOM_ID:YOUR_SERVER","cursor":"EXACT_NATIVE_CURSOR"}]}'
 ```
 
 History is available globally or for one currently authorized joined room.
@@ -107,11 +109,11 @@ hashes and per-room high-water boundaries. The new context receives their manife
 location as native instructions and reads needed files to rebuild understanding;
 there is no automatic paid bootstrap turn.
 
-Normal reconnect and transient recovery preserve context. An owner-requested
-listener disconnect is an intentional stop, not a crash to restart. Reset deliberately
+Normal reconnect and transient recovery preserve context. Explicit Stop sessions
+removes desired activation and is not a crash to restart. Reset deliberately
 retires the old listener cursor/receipt state into a private archive and begins
 new input after the exported boundaries. Retrying an interrupted reset uses its
 saved preparation; changed or incomplete exports cannot discard context. The
-old native history files remain archived. Direct attached sessions have no reset
-command; their owner controls native context.
+old native history files remain archived. No reset adopts or replaces the
+independent coding session used to perform setup.
 - [Stop, full-history resume and fresh-history controls](../../fleet/docs/sessions.md)
