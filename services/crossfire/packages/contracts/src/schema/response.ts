@@ -4,6 +4,7 @@ import * as check from './validation.js';
 import type { Parsed } from './validation.js';
 import { fleetControl } from '../fleet-control.js';
 import { coordinationPolicy } from '../coordination-policy.js';
+import { nativeRuntimeSummary } from '../runtime.js';
 export const principal = check.object({ principalId: check.identifier, matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent'),
   displayName: check.text(255), ownerId: check.identifier, ownerMatrixId: check.matrixUserId });
 export const principalIdentity = check.refine(check.object({ matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent', 'unknown'),
@@ -27,7 +28,7 @@ export const activity = check.object({ status: check.choice('online', 'offline',
   messagesDelivered: check.integer(), lastSeenAt: check.nullable(check.integer()), activeRuns: check.list(listenerRun, 100) });
 export const owner = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(HUMAN_SIGNUP.labelMax), status: check.status });
 export const agent = check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, name: check.name, displayName: check.text(255),
-  owner, status: check.status, revision: check.integer(), createdAt: check.integer(), application, activity,
+  owner, status: check.status, revision: check.integer(), createdAt: check.integer(), application, activity, nativeRuntime: check.nullable(nativeRuntimeSummary),
   deployment: check.nullable(check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), controllerName: check.text(100), reportedAt: check.integer(), instanceKey: check.name })),
   allowedActions: check.list(check.choice('configure', 'room-grant.manage', 'listener.disconnect'), 3) });
 export const wakePolicy = check.object({ agentId: check.identifier, revision: check.integer(), mode: check.wakeMode, senders: check.list(principal, 2000) });

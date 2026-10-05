@@ -18,7 +18,7 @@ export type Tables = {
   runtime_decision_question: { decision_id: string; question_id: string; position: number; title: string; prompt: string; secret: number; allow_text: number };
   runtime_decision_option: { decision_id: string; question_id: string; option_id: string; position: number; label: string; description: string };
   runtime_decision_answer: { decision_id: string; question_id: string; option_id: string | null; answer_text: string | null };
-  runtime_observation: { run_id: string; agent_id: string; session_id: string; room_id: string | null; runtime: string; state: 'idle' | 'working' | 'waiting-approval' | 'waiting-answer' | 'failed' | 'unavailable'; observed_at: number; history_mode: 'shared' | 'per-room'; max_input_bytes: number; error_message: string | null };
+  runtime_observation: { run_id: string; agent_id: string; session_id: string; room_id: string | null; runtime: string; state: 'idle' | 'working' | 'waiting-approval' | 'waiting-answer' | 'failed' | 'unavailable' | 'sleeping' | 'waking'; observed_at: number; last_activity_at: number | null; history_available: number | null; history_mode: 'shared' | 'per-room'; max_input_bytes: number; error_message: string | null };
   runtime_setting: { run_id: string; session_id: string; name: string; configured_value: string | null; effective_value: string | null };
   runtime_incident: { id: string; owner_id: string; agent_id: string | null; fleet_id: string | null; run_id: string | null; session_id: string | null; kind: 'failure' | 'contact'; message: string; created_at: number; recovered_at: number | null };
   incident_notification: { incident_id: string; phase: 'initial' | 'recovery'; body: string; next_attempt_at: number; event_id: string | null };

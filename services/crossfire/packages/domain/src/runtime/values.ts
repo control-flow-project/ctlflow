@@ -9,8 +9,10 @@ export type DecisionStatus = 'pending' | 'answered' | 'responded' | 'cancelled' 
 export type DecisionView = DecisionCreation & { agentId: string; status: DecisionStatus; createdAt: number };
 export type DecisionSummary = Omit<DecisionView, 'review' | 'questions'>;
 export type DecisionAnswer = { questionId: string; optionId: string | null; text: string | null };
-export type RuntimeState = 'idle' | 'working' | 'waiting-approval' | 'waiting-answer' | 'failed' | 'unavailable';
+export type RuntimeState = 'idle' | 'working' | 'waiting-approval' | 'waiting-answer' | 'failed' | 'unavailable' | 'sleeping' | 'waking';
 export type RuntimeSetting = { name: string; configured: string | null; effective: string | null };
 export type RuntimeObservation = { sessionId: string; roomId: string | null; runtime: string; state: RuntimeState; observedAt: number;
+  lastActivityAt: number | null; historyAvailable: boolean | null;
   historyMode: 'shared' | 'per-room'; maxInputBytes: number; settings: RuntimeSetting[]; errorMessage: string | null };
+export type NativeRuntimeSummary = Pick<RuntimeObservation, 'state' | 'observedAt' | 'lastActivityAt' | 'historyAvailable'>;
 export type RuntimeObservationView = RuntimeObservation & { runId: string };

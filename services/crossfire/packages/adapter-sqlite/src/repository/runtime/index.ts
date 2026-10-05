@@ -3,6 +3,8 @@ import { executeSelect, executeInsert, executeUpdate, executeDelete } from '@tin
 import type { RuntimeRepository, Incident } from '@crossfire/domain/runtime/types';
 import type { DecisionView } from '@crossfire/domain/runtime/values';
 import { success } from '@crossfire/kernel/result';
+import { summarizeNative } from '@crossfire/domain/runtime/summary';
+import type { NativeRuntimeSummary } from '@crossfire/domain/runtime/values';
 import { schema, type Tables } from '../../schema/tables.js';
 import { stored } from '../stored.js';
 
@@ -22,6 +24,30 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
       kind: row.kind, message: row.message, createdAt: row.created_at, recoveredAt: row.recovered_at };
   }
   return {
+    summaries(agentIds) { return stored(() => {
+      if (!agentIds.length) return success(new Map<string, NativeRuntimeSummary>());
+      const runs = executeSelect(database, schema, (query, params) => query.from('listener_run')
+        .join(query.from('listener_run').where(row => params.agentIds.includes(row.agent_id)).groupBy(row => row.agent_id)
+          .select(group => ({ agentId: group.key, startedAt: group.max(row => row.started_at) })),
+          row => row.agent_id, latest => latest.agentId, (run, latest) => ({ run, latest }))
+        .where(row => row.run.started_at === row.latest.startedAt).orderByDescending(row => row.run.id)
+        .select(row => ({ id: row.run.id, agentId: row.run.agent_id })), { agentIds });
+      const selected = new Map<string, string>();
+      for (const run of runs) if (!selected.has(run.agentId)) selected.set(run.agentId, run.id);
+      const rows = executeSelect(database, schema, (query, params) => query.from('runtime_observation')
+        .where(row => params.runIds.includes(row.run_id))
+        .select(row => ({ agentId: row.agent_id, state: row.state, observedAt: row.observed_at, lastActivityAt: row.last_activity_at,
+          historyAvailable: row.history_available })), { runIds: [...selected.values()] });
+      const groups = new Map<string, Parameters<typeof summarizeNative>[0]>();
+      for (const row of rows) {
+        const group = groups.get(row.agentId) ?? [];
+        group.push({ ...row, historyAvailable: row.historyAvailable === null ? null : row.historyAvailable === 1 });
+        groups.set(row.agentId, group);
+      }
+      const summaries = new Map<string, NativeRuntimeSummary>();
+      for (const [agentId, values] of groups) { const summary = summarizeNative(values); if (summary) summaries.set(agentId, summary); }
+      return success(summaries);
+    }); },
     decision(id) { return stored(() => {
       const row = executeSelect(database, schema, (query, params) => query.from('runtime_decision').where(row => row.id === params.id).firstOrDefault(), { id });
       return success(row ? decision(row) : null);
@@ -76,16 +102,19 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
       }
       return success(rows.map(row => ({ runId: row.run_id, sessionId: row.session_id, roomId: row.room_id, runtime: row.runtime, state: row.state, observedAt: row.observed_at,
         historyMode: row.history_mode, maxInputBytes: row.max_input_bytes, errorMessage: row.error_message,
+        lastActivityAt: row.last_activity_at, historyAvailable: row.history_available === null ? null : row.history_available === 1,
         settings: (bySession.get(row.session_id) ?? [])
           .map(setting => ({ name: setting.name, configured: setting.configured_value, effective: setting.effective_value })) })));
     }); },
     saveObservation(agentId, value) { return stored(() => {
       const previous = executeSelect(database, schema, (query, params) => query.from('runtime_observation').where(row => row.run_id === params.id && row.session_id === params.sessionId).firstOrDefault(), { id: value.runId, sessionId: value.sessionId });
-      const params = { agentId, ...value };
+      const params = { agentId, ...value, historyAvailable: value.historyAvailable === null ? null : value.historyAvailable ? 1 : 0 };
       if (previous) executeUpdate(database, schema, (query, params) => query.update('runtime_observation').set({ session_id: params.sessionId, room_id: params.roomId, runtime: params.runtime, state: params.state,
-        observed_at: params.observedAt, history_mode: params.historyMode, max_input_bytes: params.maxInputBytes, error_message: params.errorMessage }).where(row => row.run_id === params.runId && row.session_id === params.sessionId), params);
+        observed_at: params.observedAt, last_activity_at: params.lastActivityAt, history_available: params.historyAvailable,
+        history_mode: params.historyMode, max_input_bytes: params.maxInputBytes, error_message: params.errorMessage }).where(row => row.run_id === params.runId && row.session_id === params.sessionId), params);
       else executeInsert(database, schema, (query, params) => query.insertInto('runtime_observation').values({ run_id: params.runId, agent_id: params.agentId, session_id: params.sessionId, room_id: params.roomId, runtime: params.runtime, state: params.state,
-        observed_at: params.observedAt, history_mode: params.historyMode, max_input_bytes: params.maxInputBytes, error_message: params.errorMessage }), params);
+        observed_at: params.observedAt, last_activity_at: params.lastActivityAt, history_available: params.historyAvailable,
+        history_mode: params.historyMode, max_input_bytes: params.maxInputBytes, error_message: params.errorMessage }), params);
       executeDelete(database, schema, (query, params) => query.deleteFrom('runtime_setting').where(row => row.run_id === params.id && row.session_id === params.sessionId), { id: value.runId, sessionId: value.sessionId });
       for (const setting of value.settings) executeInsert(database, schema, (query, params) => query.insertInto('runtime_setting').values({ run_id: params.id, session_id: params.sessionId, name: params.name, configured_value: params.configured, effective_value: params.effective }), { id: value.runId, sessionId: value.sessionId, ...setting });
       return success(undefined);

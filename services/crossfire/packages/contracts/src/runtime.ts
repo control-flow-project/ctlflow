@@ -3,7 +3,9 @@ import { MAX_INPUT_BYTES, MAX_REVIEW_BYTES } from '@crossfire/domain/runtime/val
 import type { DecisionCreation, DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservation, RuntimeObservationView } from '@crossfire/domain/runtime/values';
 export { INPUT_BYTES, MAX_INPUT_BYTES, MAX_REVIEW_BYTES } from '@crossfire/domain/runtime/values';
 export type { DecisionCreation, DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservation, RuntimeObservationView } from '@crossfire/domain/runtime/values';
-export const runtimeState = check.choice('idle', 'working', 'waiting-approval', 'waiting-answer', 'failed', 'unavailable');
+export const runtimeState = check.choice('idle', 'working', 'waiting-approval', 'waiting-answer', 'failed', 'unavailable', 'sleeping', 'waking');
+export const nativeRuntimeSummary = check.object({ state: runtimeState, observedAt: check.integer(),
+  lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean) });
 export const listenerOptions = check.object({ history_mode: check.optional(check.choice('shared', 'per-room')) });
 const option = check.object({ id: check.text(255), label: check.text(1000), description: check.plainText(4000) });
 export const decisionQuestion = check.object({ id: check.text(255), title: check.text(1000), prompt: check.plainText(16000),
@@ -24,7 +26,8 @@ export const decisionReceipt = check.object({ status: check.choice('responded', 
 export const decisionPoll = check.object({ status: decisionStatus, answers: check.list(decisionAnswer, 100) });
 export const setting = check.object({ name: check.text(100), configured: check.nullable(check.text(1000)), effective: check.nullable(check.text(1000)) });
 const observationFields = { sessionId: check.text(255), roomId: check.nullable(check.roomId), runtime: check.name, state: runtimeState,
-  observedAt: check.integer(), historyMode: check.choice('shared', 'per-room'), maxInputBytes: check.integer(1024, MAX_INPUT_BYTES),
+  observedAt: check.integer(), lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean),
+  historyMode: check.choice('shared', 'per-room'), maxInputBytes: check.integer(1024, MAX_INPUT_BYTES),
   settings: check.list(setting, 100), errorMessage: check.nullable(check.plainText(4000)) };
 export const observation = check.object(observationFields) satisfies check.Parser<RuntimeObservation>;
 export const observationView = check.object({ runId: check.identifier, ...observationFields }) satisfies check.Parser<RuntimeObservationView>;

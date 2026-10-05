@@ -4,8 +4,9 @@ import type { DirectoryFilter, AgentRecord, Page, DeploymentSummary } from '../p
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import { readActivity, type AgentActivity } from '../listener/activity.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'listenerRead' | 'clock'>;
-export type AgentDetails = { record: AgentRecord; activity: AgentActivity; deployment: DeploymentSummary | null; allowedActions: string[] };
+import type { NativeRuntimeSummary } from '../runtime/values.js';
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'listenerRead' | 'clock' | 'runtime'>;
+export type AgentDetails = { record: AgentRecord; activity: AgentActivity; nativeRuntime: NativeRuntimeSummary | null; deployment: DeploymentSummary | null; allowedActions: string[] };
 export type AgentFilter = DirectoryFilter & { listener: 'all' | 'online' | 'offline' | 'disconnecting' };
 export function agentActions(actor: Actor, record: AgentRecord, permissions: string[]): string[] {
   return ['configure', 'room-grant.manage', 'listener.disconnect'].filter(action =>
@@ -17,7 +18,9 @@ export function readAgent(services: Dependencies, actor: Actor, agentId: string)
   const activity = readActivity(services, [agentId]), permissions = services.directory.permissions(actor.principalId);
   if (!activity.ok) return activity; if (!permissions.ok) return permissions;
   const deployment = services.directory.deployments([agentId]); if (!deployment.ok) return deployment;
-  return success({ record: record.value, activity: activity.value.get(agentId)!, deployment: deployment.value[0] ?? null, allowedActions: agentActions(actor, record.value, permissions.value) });
+  const native = services.runtime.summaries([agentId]); if (!native.ok) return native;
+  return success({ record: record.value, activity: activity.value.get(agentId)!, nativeRuntime: native.value.get(agentId) ?? null,
+    deployment: deployment.value[0] ?? null, allowedActions: agentActions(actor, record.value, permissions.value) });
 }
 export function listAgents(services: Dependencies, actor: Actor, filter: AgentFilter): Result<Page<AgentDetails>> {
   const current = activeActor(services, actor);
@@ -42,7 +45,8 @@ export function listAgents(services: Dependencies, actor: Actor, filter: AgentFi
   if (!activity.ok) return activity;
   const deployments = services.directory.deployments(records.value.items.map(record => record.principal.id)); if (!deployments.ok) return deployments;
   const byAgent = new Map(deployments.value.map(deployment => [deployment.agentId, deployment]));
+  const native = services.runtime.summaries(records.value.items.map(record => record.principal.id)); if (!native.ok) return native;
   return success({ ...records.value, items: records.value.items.map(record => ({ record, activity: activity.value.get(record.principal.id)!,
-    deployment: byAgent.get(record.principal.id) ?? null,
+    deployment: byAgent.get(record.principal.id) ?? null, nativeRuntime: native.value.get(record.principal.id) ?? null,
     allowedActions: agentActions(actor, record, permissions.value) })) });
 }
