@@ -9,4 +9,3 @@ export function piExtension(api: PiApi): void {
   loadRelease(dirname(fileURLToPath(import.meta.url)));
   registerPi(api, artifactHash(readFileSync(fileURLToPath(import.meta.url))));
 }
-export { piExtension as default };

@@ -2,15 +2,7 @@ import * as check from '@crossfire/contracts/schema/validation';
 import type { LocalState } from './port.js';
 import type { RuntimeConnection } from './runtime.js';
 import type { MessageArtifacts } from './message-artifacts.js';
-
-export type DirectedInput = { messageId: string; text: string; expiresAt: number };
-export type ControllerState = { connected: boolean; deliveryEnabled: boolean; revision: number | null; error: string | null };
-export type ListenerControl = {
-  current(): { active: boolean; signal: AbortSignal; input: DirectedInput | null };
-  subscribe(changed: () => void): () => void;
-  unavailable(reason: string): void;
-  acknowledge(messageId: string, status: 'delivered' | 'skipped', errorMessage: string | null): Promise<void>;
-};
+import type { DirectedInput, ListenerControl } from './listener-control-port.js';
 export function createListenerControl(acknowledge: ListenerControl['acknowledge'], unavailable?: (reason: string) => void) {
   let active = false, input: DirectedInput | null = null, generation = new AbortController();
   generation.abort(new Error('Controller delivery is inactive'));

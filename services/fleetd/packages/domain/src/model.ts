@@ -1,4 +1,4 @@
-import type { ControllerState } from '@crossfire/agent-core/listener-control';
+import type { ControllerState } from '@crossfire/agent-core/listener-control-port';
 import type { ListenerOptions, SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
 import type { CoordinationPolicy } from '@crossfire/domain/coordination/values';
 export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled: boolean;

@@ -1,6 +1,6 @@
 import type { Result } from '@crossfire/kernel/result';
 import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
-import type { ControllerState, ListenerControl } from '@crossfire/agent-core/listener-control';
+import type { ControllerState, ListenerControl } from '@crossfire/agent-core/listener-control-port';
 import type { NativeSessionState } from '@crossfire/agent-core/runtime';
 import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, RetainedContext } from './model.js';
 export type Registry = {
