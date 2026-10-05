@@ -491,10 +491,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(confirmation.getByRole('heading', { name: 'Confirm your invitation', exact: true })).toBeVisible();
   await expect(confirmation.getByText('@alice:architecture.localhost', { exact: true })).toBeVisible();
   await confirmation.screenshot({ path: join(directory, 'element-invitation-confirmation.png'), fullPage: true });
-  const registration = memberPage.waitForResponse(response => response.request().method() === 'POST' && /^\/_matrix\/client\/(?:v3|r0)\/register$/u.test(new URL(response.url()).pathname));
+  const registration = memberPage.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/_matrix/client/v3/register');
   await confirmation.getByRole('button', { name: 'Confirm invitation', exact: true }).click();
   await expect(confirmation.getByRole('heading', { name: 'Account confirmed', exact: true })).toBeVisible();
-  assert.equal((await memberContext.cookies(origin)).filter(cookie => cookie.name === 'crossfire_invitation').length, 0, 'The browser stage clears its bound invitation before credential-omitting SDK requests');
+  assert.equal((await memberContext.cookies(origin)).filter(cookie => cookie.name === '__Host-crossfire-invitation').length, 0, 'The browser stage clears its bound invitation before credential-omitting SDK requests');
   const registered = await registration;
   assert.equal(registered.status(), 200, await registered.text());
   assert.equal((await registered.json() as { user_id: string }).user_id, '@alice:architecture.localhost');

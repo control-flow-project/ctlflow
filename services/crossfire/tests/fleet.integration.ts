@@ -169,7 +169,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   assert.equal(value(services.directory.activeAgentCount()), 3, 'Restarts preserve the two fleet identities and the invited guest');
   const sessions = (JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.map(instance => instance.sessionId);
   async function ownerCall(path: string, body: unknown) {
-    const response = await fetch(origin + path, { method: 'PUT', headers: { Cookie: 'crossfire=' + admin.secret, Origin: origin,
+    const response = await fetch(origin + path, { method: 'PUT', headers: { Cookie: '__Host-crossfire=' + admin.secret, Origin: origin,
       'X-Crossfire-CSRF': admin.csrfSecret, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     assert.equal(response.status, 200, await response.text());
   }
@@ -218,7 +218,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const sessionOperationsPath = '/api/fleets/' + binding.fleetId + '/session-operations';
   async function requestSessions(action: FleetRuntimeOperation['action'], agentId: string | null) {
     const input = { operationId: randomUUID(), action, agentId, expectedRevision: remoteFleet().revision, confirmFreshHistory: action === 'reset' };
-    const response = await fetch(origin + sessionOperationsPath, { method: 'POST', headers: { Cookie: 'crossfire=' + admin.secret, Origin: origin,
+    const response = await fetch(origin + sessionOperationsPath, { method: 'POST', headers: { Cookie: '__Host-crossfire=' + admin.secret, Origin: origin,
       'X-Crossfire-CSRF': admin.csrfSecret, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const body = await response.text(); assert.equal(response.status, 202, body);
     const accepted = value(runtimeOperation((JSON.parse(body) as { data: unknown }).data));
@@ -254,7 +254,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const wholeFleetReset = await requestSessions('reset', null);
   const fleetFresh = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
   assert(fleetFresh.instances.every((instance, index) => instance.sessionId !== individualFresh.instances[index]!.sessionId));
-  const repeatedReset = await fetch(origin + sessionOperationsPath, { method: 'POST', headers: { Cookie: 'crossfire=' + admin.secret, Origin: origin,
+  const repeatedReset = await fetch(origin + sessionOperationsPath, { method: 'POST', headers: { Cookie: '__Host-crossfire=' + admin.secret, Origin: origin,
     'X-Crossfire-CSRF': admin.csrfSecret, 'Content-Type': 'application/json' }, body: JSON.stringify(wholeFleetReset) });
   assert.equal(repeatedReset.status, 202, await repeatedReset.text());
   const unchanged = JSON.parse((await cli('show', 'research')).stdout) as Fleet;

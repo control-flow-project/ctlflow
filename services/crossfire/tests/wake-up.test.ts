@@ -118,7 +118,7 @@ test('Wake-up REST validates strict payloads, human CSRF, owner scope and self-o
   const created = await http.request('/api/wake-rules', 'POST', creation, http.headers(admin)); assert.equal(created.status, 201);
   const response = await created.json() as { data: { ruleId: string; agents: unknown[] } }; assert.equal(response.data.agents.length, 1);
   assert.equal((await http.request('/api/wake-rules/' + creation.ruleId, 'GET', undefined, http.headers(alice))).status, 404);
-  assert.equal((await http.request('/api/wake-rules', 'POST', creation, { Cookie: 'crossfire=' + admin.secret })).status, 403);
+  assert.equal((await http.request('/api/wake-rules', 'POST', creation, { Cookie: '__Host-crossfire=' + admin.secret })).status, 403);
   assert.equal((await http.request('/api/wake-rules', 'POST', { ...creation, surprise: true }, http.headers(admin))).status, 400);
   assert.equal((await http.request('/api/wake-rules', 'POST', { ...creation, ruleId: randomUUID(), schedule: { kind: 'cron', expression: 'bad', timeZone: 'UTC' } }, http.headers(admin))).status, 400);
   const runId = randomUUID(); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 0, stopped: false, controllerBound: false }, contractRelease().manifest.release));

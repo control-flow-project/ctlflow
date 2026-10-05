@@ -24,7 +24,7 @@ test('Matrix directory authenticates native principals, bounds searches and reta
     assert.deepEqual(await response.json(), { results: [{ user_id: agent.matrixUserId, display_name: 'bea (alice)' }], limited: false });
     assert.equal(response.headers.get('cache-control'), 'no-store');
   }
-  assert.equal((await search(owner.token, { search_term: 'BEA' }, { Cookie: 'crossfire=unrelated' })).status, 200, 'Element’s native authentication is independent of a management cookie');
+  assert.equal((await search(owner.token, { search_term: 'BEA' }, { Cookie: '__Host-crossfire=unrelated' })).status, 200, 'Element’s native authentication is independent of a management cookie');
   const exact = await search(other.token, { search_term: agent.matrixUserId });
   assert.equal((await exact.json() as MatrixDirectoryResult).results[0]?.user_id, agent.matrixUserId);
   assert.deepEqual(await (await search(owner.token, { search_term: 'absent' })).json(), { results: [], limited: false });

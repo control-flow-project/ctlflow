@@ -8,10 +8,9 @@ export const registrationStage = 'org.crossfire.login.registration';
 type Invitation = { id: string; secret: string };
 type RegistrationSession = { expiresAt: number; authorized: boolean; invitation: Invitation | null;
   details: { username: string; password: string; deviceId: string } | null; confirmation: { invitation: Invitation | null; nonce: string } | null };
-const invitationCookieName = 'crossfire_invitation';
-export function setInvitationCookie(response: ServerResponse, value: string | null, origin: string) {
-  response.setHeader('Set-Cookie', invitationCookieName + '=' + (value ?? '') + '; Path=/; HttpOnly; SameSite=Strict'
-    + (origin.startsWith('https:') ? '; Secure' : '') + '; Max-Age=' + (value === null ? 0 : 600));
+const invitationCookieName = '__Host-crossfire-invitation';
+export function setInvitationCookie(response: ServerResponse, value: string | null) {
+  response.setHeader('Set-Cookie', invitationCookieName + '=' + (value ?? '') + '; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=' + (value === null ? 0 : 600));
 }
 export function invitationCookie(request: IncomingMessage) {
   const parts = (request.headers.cookie ?? '').split(';').map(value => value.trim()).filter(value => value.startsWith(invitationCookieName + '='));
@@ -64,7 +63,7 @@ export function registrationTransport(services: Services) {
       if (!result.ok) { respond(result.error.code === 'forbidden' || result.error.code === 'unauthorized' ? 403 : result.error.code === 'conflict' ? 400 : result.error.code === 'native' ? 502 : 400,
         { errcode: result.error.code === 'conflict' ? 'M_USER_IN_USE' : result.error.code === 'forbidden' || result.error.code === 'unauthorized' ? 'M_FORBIDDEN' : 'M_UNKNOWN', error: result.error.message }); return; }
       sessions.delete(String(auth.session));
-      setInvitationCookie(response, null, services.instance.publicOrigin);
+      setInvitationCookie(response, null);
       respond(200, { user_id: result.value.userId, access_token: result.value.accessToken, device_id: result.value.deviceId,
         home_server: services.instance.serverName });
     } finally { pending.delete(details.username); }
@@ -91,7 +90,7 @@ export function registrationTransport(services: Services) {
     session.invitation = invitation;
     session.authorized = true;
     session.confirmation = null;
-    setInvitationCookie(response, null, services.instance.publicOrigin);
+    setInvitationCookie(response, null);
     registrationPage(response, 200, { completed: true });
   } };
 }

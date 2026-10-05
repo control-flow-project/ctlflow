@@ -62,7 +62,7 @@ test('canonical enrollment and activity HTTP contracts expose identities without
   const alice = await fixture.member('alice');
   const { origin } = await httpFixture(scope, fixture.application);
   const client = (session: { secret: string }) => createClient({ origin, fetch: (input, options) => fetch(input, {
-    ...options, headers: { ...options?.headers, Cookie: 'crossfire=' + session.secret },
+    ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + session.secret },
   }) });
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: alice.member.principal.matrixUserId,
     fleetKey: null, instances: [{ instanceKey: 'pending', name: 'pending' }] };

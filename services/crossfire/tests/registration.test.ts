@@ -54,7 +54,10 @@ test('normal Element signup requires a link in invitation mode and never grants 
   const claim = await fetch(origin + '/api/member-invitations/' + invitation.invitationId + '/claim', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ claimSecret: invitation.claimSecret }) });
   assert.equal(claim.status, 200);
   const cookie = claim.headers.get('set-cookie')!.split(';')[0]!;
-  assert(claim.headers.get('set-cookie')!.includes('HttpOnly'));
+  assert(claim.headers.get('set-cookie')!.startsWith('__Host-crossfire-invitation='));
+  for (const flag of ['HttpOnly', 'Secure', 'Path=/', 'SameSite=Strict']) assert(claim.headers.get('set-cookie')!.includes(flag));
+  assert.equal((await (await fetch(origin + '/config.json', { headers: { Cookie: cookie.replace('__Host-crossfire-invitation=', 'crossfire_invitation=') } })).json() as { disable_registration: boolean }).disable_registration, true);
+  assert.equal((await fetch(confirmationUrl(deniedSession), { headers: { Cookie: cookie + '; ' + cookie } })).status, 403);
   assert.equal((await (await fetch(origin + '/config.json', { headers: { Cookie: cookie } })).json() as { disable_registration: boolean }).disable_registration, false);
   const session = await challengeFor(account);
   assert.equal((await fetch(confirmationUrl(session), { method: 'POST', headers: { Origin: 'https://elsewhere.invalid', Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'nonce=invalid' })).status, 403);

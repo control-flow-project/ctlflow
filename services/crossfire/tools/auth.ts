@@ -41,7 +41,7 @@ export async function withHuman<Value>(origin: string, account: Credentials, sig
     if (cookie) headers.set('Cookie', cookie);
     const response = await fetch(url, { ...init, headers });
     if (destination.pathname === '/api/sessions' && init?.method === 'POST') {
-      const session = response.headers.getSetCookie().find(value => value.startsWith('crossfire='));
+      const session = response.headers.getSetCookie().find(value => value.startsWith('__Host-crossfire='));
       if (session) cookie = session.split(';')[0];
     }
     return response;
