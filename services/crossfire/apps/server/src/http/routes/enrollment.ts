@@ -7,6 +7,7 @@ import { listEnrollments, readEnrollment } from '@ctlflow/crossfire-domain/enrol
 import { listFleets, readFleet, listFleetAgents } from '@ctlflow/crossfire-domain/fleet/read-fleet';
 import { changeFleet } from '@ctlflow/crossfire-domain/fleet/change-fleet';
 import { archiveFleet, removeFleetAgent } from '@ctlflow/crossfire-domain/fleet/retire';
+import { recordNativeStop } from '@ctlflow/crossfire-domain/fleet/native-stop';
 import { bind, reply, paged, actor, fleetActor, acknowledged } from '../bind.js';
 import * as view from '../representation/enrollment.js';
 import { agent } from '../representation/identity.js';
@@ -26,5 +27,6 @@ export function enrollmentRoutes() {
     bind(operations.fleetAgents, (context, params, query) => paged(listFleetAgents(context.services, fleetActor(context), params.fleetId, query),
       value => ({ instanceKey: value.instanceKey, agent: agent(value.agent) }))),
     bind(operations.removeFleetAgent, async (context, params, _query, input) => acknowledged(await removeFleetAgent(context.services, fleetActor(context), params.fleetId, params.agentId, input, context.requestId))),
+    bind(operations.recordFleetNativeStop, (context, params, _query, input) => reply(recordNativeStop(context.services, fleetActor(context), params.fleetId, params.agentId, input))),
   ];
 }

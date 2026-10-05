@@ -27,5 +27,5 @@ export function agent(value: AgentDetails) {
     nativeRuntime: value.nativeRuntime,
     deployment: { fleetId: value.deployment.fleetId, fleetKey: value.deployment.fleetKey, label: value.deployment.label,
       controllerName: value.deployment.controllerName, reportedAt: value.deployment.reportedAt, instanceKey: value.deployment.instanceKey },
-    allowedActions: value.allowedActions };
+    canRetire: value.canRetire, allowedActions: value.allowedActions };
 }
