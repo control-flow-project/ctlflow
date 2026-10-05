@@ -4,6 +4,23 @@ Read docs/specification.md before implementation. It is the current architecture
 API, data and acceptance contract. Work is greenfield: WCBUBWHB, one current
 implementation, no compatibility shims, aliases, duplicate owners or hidden fallbacks.
 
+Backward compatibility, legacy support and dual paths are banned unless the user
+explicitly authorizes a specific exception. This includes temporary bridges,
+old/new API handlers, alternate state readers/writers, superseded implementations,
+compatibility aliases and hidden fallback behavior in every service and tool.
+Replace the owning model directly and update all affected callers, adapters,
+schemas, generated artifacts, fixtures, tests and documentation together. Remove
+the superseded path; do not leave it available behind a flag. Record any explicit
+exception and its exact scope in these instructions, local memory and the ledger.
+There are currently no project-wide compatibility exceptions.
+
+Necessary forward data migrations convert a verified deployed schema into the
+single current schema; they do not authorize concurrent old/new runtime paths.
+Preserve production data, credentials and native histories. Inventory actual
+stores before removing obsolete migration inputs; never reset production to avoid
+designing the correct migration. Required native protocol behavior is not an
+excuse for speculative support of older contracts.
+
 ## Source ownership
 All product code is under services/crossfire, services/fleetd or services/fleet.
 Each service owns apps, packages, tests and product-specific assets. The repository

@@ -20,6 +20,24 @@ Do not reset production data or restore a stale schema under current code.
 Keep verified backups and evidence private. Crossfire does not install systemd,
 global skills, certificates or machine-wide permissions.
 
+## Static report storage and upgrades
+
+Schema 12 accepts only a fresh store or the inventoried deployed schema 11;
+historical prototype versions 1–10 and foreign/future stores are refused without
+changes. The forward transaction preserves existing data and native histories.
+Before startup, add an explicit separate HTTPS `contentOrigin` to the verified
+private operator configuration. There is no hidden host derivation or legacy
+schema/configuration path.
+
+Back up `management.sqlite` and its adjacent `management.sqlite.publications`
+store together while stopped. The report store has a private exclusive owner
+lock and must not be exposed by a filesystem alias. The dedicated content vhost
+proxies only the content listener; it must not fall through to the main APIs or
+Matrix. Reserve disk for up to twice the configured payload budget, plus database,
+filesystem and backup overhead. Expired staging and deleted files are reclaimed
+in bounded maintenance batches; reservations are released only after cleanup.
+- [Publication limits, API, deletion fence and security](publications.md)
+
 ## Agent updates
 
 Running listeners report installed release IDs. A new release produces one

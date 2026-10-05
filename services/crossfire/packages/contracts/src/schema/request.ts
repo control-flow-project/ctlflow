@@ -39,6 +39,7 @@ export const planChange = check.object({ plan, digest: check.text(64, 64), snaps
   grants: check.list(check.object({ roomId: check.roomId, generation: check.identifier, revision }), 100) }), 100, 1) });
 export const policy = check.object({ expectedRevision: revision, maxOwnerAgents: check.integer(1, 100), maxAgents: check.integer(1, 1000), maxPending: check.integer(1, 1000),
   maxMessageBytes: check.integer(4096, 4194304),
+  fleetIdleTimeoutSeconds: check.integer(0, 604800),
   enrollmentSeconds: check.integer(60, 3600), reconcileSeconds: check.integer(30, 3600), agentInstructions: check.multiline,
   signupMode: check.choice('invitation', 'open'), invitationIssuers: check.choice('administrators', 'members') });
 

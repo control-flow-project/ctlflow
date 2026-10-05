@@ -3,6 +3,7 @@ import type { AuditEventDetails } from '@crossfire/domain/audit/read-events';
 export function policy(value: InstancePolicy) {
   return { revision: value.revision, maxOwnerAgents: value.maxOwnerAgents, maxAgents: value.maxAgents, maxPending: value.maxPending,
     maxMessageBytes: value.maxMessageBytes,
+    fleetIdleTimeoutSeconds: value.fleetIdleTimeoutSeconds,
     enrollmentSeconds: value.enrollmentSeconds, reconcileSeconds: value.reconcileSeconds, agentInstructions: value.agentInstructions,
     signupMode: value.signupMode, invitationIssuers: value.invitationIssuers };
 }

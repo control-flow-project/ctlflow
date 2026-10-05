@@ -1,4 +1,4 @@
-import type { DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservationView } from './values.js';
+import type { DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservationView, NativeRuntimeSummary } from './values.js';
 import type { Result } from '@crossfire/kernel/result';
 
 export type Incident = { id: string; ownerId: string; agentId: string | null; fleetId: string | null; runId: string | null; sessionId: string | null;
@@ -14,6 +14,7 @@ export type RuntimeRepository = {
   answers(id: string): Result<DecisionAnswer[]>;
   answer(id: string, values: DecisionAnswer[]): Result<void>;
   observation(agentId: string): Result<RuntimeObservationView[]>;
+  summaries(agentIds: string[]): Result<Map<string, NativeRuntimeSummary>>;
   saveObservation(agentId: string, value: RuntimeObservationView): Result<void>;
   incident(id: string): Result<Incident | null>;
   activeIncidents(): Result<Incident[]>;

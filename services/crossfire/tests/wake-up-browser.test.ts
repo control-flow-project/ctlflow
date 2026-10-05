@@ -11,15 +11,17 @@ import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';
+import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
+import { browserOptions } from './support/tls.js';
 
 test('Wake-ups browser CRUD, calendar selection, assignments, pagination and role visibility use the real APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin } = fixture;
   const alice = await fixture.member('alice'), agent = await fixture.agent(admin.actor, 'ada'), foreign = await fixture.agent(alice.actor, 'guest');
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/wake-browser-'));
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
-  await context.addCookies([{ name: 'crossfire', value: admin.secret, url: origin }]);
+  await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const page = await context.newPage(), errors: string[] = [], failures: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('response', response => { if (response.url().includes('/api/') && response.status() >= 400) failures.push(response.status() + ' ' + response.url()); });
@@ -86,7 +88,7 @@ test('Wake-ups browser CRUD, calendar selection, assignments, pagination and rol
   const removal = audit.getByRole('row').filter({ hasText: 'Delete Wake-up' });
   await removal.getByText('View details', { exact: true }).click(); await expect(removal).toContainText('Deleted Wake-up “Weekly reports”.');
   const memberContext = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
-  await memberContext.addCookies([{ name: 'crossfire', value: alice.secret, url: origin }]);
+  await memberContext.addCookies([{ name: COOKIE_NAME, value: alice.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const memberPage = await memberContext.newPage(); await memberPage.goto(origin + '/manage/wake-ups');
   await expect(memberPage.getByRole('table', { name: 'Wake-ups', exact: true }).locator('tbody tr')).toHaveCount(1);
   await expect(memberPage.getByRole('table', { name: 'Wake-ups', exact: true })).toContainText('Alice schedule');

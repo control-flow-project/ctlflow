@@ -10,6 +10,7 @@ import { Members, Invitations, Settings, Audit } from './administration.js';
 import { Fleets, FleetDetail } from './fleets.js';
 import { FleetMap } from './fleet-map/index.js';
 import { WakeUps, WakeUpDetail } from './wake-ups/index.js';
+import { Reports, ReportDetail } from './reports.js';
 import { Join } from './join.js';
 import { Alert, Page } from './ui.js';
 import { call, operations, useAction, useResource } from './api.js';
@@ -21,6 +22,7 @@ const sections = [
   { path: '/manage/agents', label: 'Agents', icon: '◉' },
   { path: '/manage/fleets', label: 'Fleets', icon: '▦' },
   { path: '/manage/wake-ups', label: 'Wake-ups', icon: '◷' },
+  { path: '/manage/reports', label: 'Reports', icon: '▤' },
   { path: '/manage/enrollments', label: 'Enrollments', icon: '↗' },
   { path: '/manage/connect', label: 'Connect an agent', icon: '+' },
   { path: '/manage/audit', label: 'Activity', icon: '≡' },
@@ -33,6 +35,11 @@ const administration = [
 function Route({ canInvite }: { canInvite: boolean }) {
   const viewer = useSession();
   if (path === '/manage' || path === '/manage/agents') return <Agents/>;
+  if (viewer.permissions.includes('publication.read.owned') || viewer.permissions.includes('publication.read.any')) {
+    if (path === '/manage/reports') return <Reports/>;
+    const report = /^\/manage\/reports\/([a-f0-9-]{36})(?:\/(files))?$/u.exec(path);
+    if (report) return <ReportDetail id={report[1]!} section={report[2] === 'files' ? 'files' : 'overview'}/>;
+  }
   if (path === '/manage/wake-ups') return <WakeUps/>;
   if (path === '/manage/wake-ups/new') return <WakeUpDetail/>;
   const wakeUp = /^\/manage\/wake-ups\/([a-f0-9-]{36})$/u.exec(path);
@@ -68,7 +75,8 @@ function Shell() {
   const policy = useResource(operations.policy, {});
   const canInvite = admin || policy.result?.ok === true && policy.result.value.data.invitationIssuers === 'members';
   const nav = (items: typeof sections) => items.map(item => <a key={item.path} href={item.path} aria-current={path.startsWith(item.path) || path === '/manage' && item.path === '/manage/agents' ? 'page' : undefined}><span aria-hidden="true">{item.icon}</span>{item.label}</a>);
-  return <div className={'shell' + (admin ? ' admin' : '')}><aside className="sidebar"><a className="brand" href="/manage/">crossfire<span>↗</span></a><div className="instance"><span className="instance-dot"/>{location.host}<small>MANAGEMENT</small></div><nav aria-label="Main navigation"><p className="nav-label">WORKSPACE</p>{nav(sections)}{!admin && canInvite && nav(administration.filter(item => item.path === '/manage/invitations'))}{admin && <><p className="nav-label">ADMINISTRATION</p>{nav(administration)}</>}</nav><a className="chat-link" href="/">Open Element <span>↗</span></a></aside><div className="main-column"><header className="topbar"><span>Management</span><div className="viewer"><span className="viewer-avatar">{viewer.member.displayName.slice(0, 1).toUpperCase()}</span><span>{viewer.member.displayName}<small>{admin ? 'Administrator' : 'Member'}</small></span><button disabled={action.pending} onClick={() => { void action.run(() => call(operations.endSession, {}, {}, viewer.csrfSecret), () => location.assign('/manage/')); }}>Sign out</button></div></header><main className="content"><Alert>{action.error}</Alert><Route canInvite={canInvite}/></main></div></div>;
+  const visibleSections = sections.filter(item => item.path !== '/manage/reports' || viewer.permissions.includes('publication.read.owned') || viewer.permissions.includes('publication.read.any'));
+  return <div className={'shell' + (admin ? ' admin' : '')}><aside className="sidebar"><a className="brand" href="/manage/">crossfire<span>↗</span></a><div className="instance"><span className="instance-dot"/>{location.host}<small>MANAGEMENT</small></div><nav aria-label="Main navigation"><p className="nav-label">WORKSPACE</p>{nav(visibleSections)}{!admin && canInvite && nav(administration.filter(item => item.path === '/manage/invitations'))}{admin && <><p className="nav-label">ADMINISTRATION</p>{nav(administration)}</>}</nav><a className="chat-link" href="/">Open Element <span>↗</span></a></aside><div className="main-column"><header className="topbar"><span>Management</span><div className="viewer"><span className="viewer-avatar">{viewer.member.displayName.slice(0, 1).toUpperCase()}</span><span>{viewer.member.displayName}<small>{admin ? 'Administrator' : 'Member'}</small></span><button disabled={action.pending} onClick={() => { void action.run(() => call(operations.endSession, {}, {}, viewer.csrfSecret), () => location.assign('/manage/')); }}>Sign out</button></div></header><main className="content"><Alert>{action.error}</Alert><Route canInvite={canInvite}/></main></div></div>;
 }
 const join = /^\/manage\/join\/([a-f0-9-]{36})$/u.exec(path);
 const invitationSecret = join ? location.hash.slice(1) : '';

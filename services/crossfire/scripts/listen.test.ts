@@ -64,7 +64,7 @@ test('empty acquisition completion releases a blocked backlog reader without wai
   const first = starts()[0]!.params!;
   native.update({ mode: 'normal' });
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(first.clientUserMessageId), first.input) });
-  native.notify('thread/status/changed', { threadId: THREAD, status: { type: 'active' } });
+  native.notify('thread/status/changed', { threadId: THREAD, status: { type: 'active', activeFlags: [] } });
   await until(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   assert.equal(starts().length, 1);
   barrier.release();
@@ -128,7 +128,7 @@ test('active-turn acceptance leaves messages unread until native receipt, includ
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
   await until(() => starts().length === 1);
   assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
-  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
+  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted', error: null } });
   await until(() => starts().length === 2);
   assert.deepEqual(starts()[0]!.params, starts()[1]!.params);
   assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');

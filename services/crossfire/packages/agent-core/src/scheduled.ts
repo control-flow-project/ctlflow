@@ -45,6 +45,7 @@ export function scheduledPublisher(options: { clock: Clock; storage: LocalState;
     await refresh(signal); return true;
   }
   return {
+    pending: () => storage.exists(file),
     recover,
     waitMs: () => Math.max(1, Math.ceil(Math.min(nextAt - options.clock.now(), 30_000 - (options.clock.now() - refreshedAt)))),
     async publish(signal: AbortSignal): Promise<boolean> {

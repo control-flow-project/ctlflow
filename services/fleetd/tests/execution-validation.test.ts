@@ -23,6 +23,7 @@ test('native policies are validated without manual approval-room configuration',
 
 test('fleet execution consumes adapter capabilities without interpreting native policy keys', () => {
   const adapter: OwnedRuntimeAdapter = {
+    savedContexts: async () => success([]),
     reset: async () => success(undefined),
     validate: input => success({ options: input as Record<string, unknown>, approval: 'listener' }),
     start: async () => failure('native', 'No process is used by validation'),

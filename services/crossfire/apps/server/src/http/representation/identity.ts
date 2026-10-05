@@ -24,6 +24,7 @@ export function agent(value: AgentDetails) {
     status: record.principal.status, revision: record.principal.revision, createdAt: record.principal.createdAt,
     application: application(record.application), activity: { status: activity.status, activeMs: activity.activeMs,
       messagesDelivered: activity.messagesDelivered, lastSeenAt: activity.lastSeenAt, activeRuns: activity.activeRuns.map(listenerRun) },
+    nativeRuntime: value.nativeRuntime,
     deployment: value.deployment ? { fleetId: value.deployment.fleetId, fleetKey: value.deployment.fleetKey, label: value.deployment.label,
       controllerName: value.deployment.controllerName, reportedAt: value.deployment.reportedAt, instanceKey: value.deployment.instanceKey } : null,
     allowedActions: value.allowedActions };

@@ -27,7 +27,7 @@ export function SubjectHeading({ name, description, children }: { name: string; 
 export function Help({ title, children }: { title: string; children: ReactNode }) {
   return <details className="context-help"><summary>{title}</summary><div>{children}</div></details>;
 }
-export function CopyText({ label, value, rows = 7, buttonLabel = 'Copy instructions', copiedMessage = 'Copied. Paste into your coding agent.' }: { label: string; value: string; rows?: number; buttonLabel?: string; copiedMessage?: string }) {
+export function CopyText({ label, value, rows = 7, buttonLabel = 'Copy instructions', copiedMessage = 'Copied. Paste into your coding agent.', failureMessage = 'Clipboard access was blocked. Select the instructions above and copy them manually.' }: { label: string; value: string; rows?: number; buttonLabel?: string; copiedMessage?: string; failureMessage?: string }) {
   const id = useId();
   const [state, setState] = useState<'idle' | 'copying' | 'copied' | 'failed'>('idle');
   async function copy() {
@@ -38,7 +38,7 @@ export function CopyText({ label, value, rows = 7, buttonLabel = 'Copy instructi
   return <div className="copy-text">
     <label htmlFor={id}>{label}</label><textarea id={id} readOnly value={value} rows={rows} spellCheck={false}/>
     <div className="actions"><button className="primary" type="button" disabled={state === 'copying'} onClick={() => { void copy(); }}>{buttonLabel}</button><span role="status">{state === 'copied' ? copiedMessage : ''}</span></div>
-    <Alert>{state === 'failed' ? 'Clipboard access was blocked. Select the instructions above and copy them manually.' : ''}</Alert>
+    <Alert>{state === 'failed' ? failureMessage : ''}</Alert>
   </div>;
 }
 export function Empty({ title, children }: { title: string; children: ReactNode }) {

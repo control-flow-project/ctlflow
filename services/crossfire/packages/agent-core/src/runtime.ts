@@ -9,6 +9,8 @@ export type TurnControl = {
   activeTurn: (room?: string) => Promise<string | null>;
   interrupt: (turnId: string, recovery?: boolean) => Promise<void>;
 };
+export type NativeSessionState = { phase: 'running' | 'sleeping' | 'waking' | 'failed'; lastActivityAt: number | null; historyAvailable: boolean };
+export type RuntimeLifecycle = { current: () => NativeSessionState; configureIdle: (seconds: number) => void };
 
 export type RuntimeConnection = {
   sessionId: string;
@@ -20,6 +22,7 @@ export type RuntimeConnection = {
   recover: (text: string, messageId: string) => Promise<boolean>;
   acknowledge: (messageIds: readonly string[]) => void;
   turnControl?: TurnControl;
+  lifecycle?: RuntimeLifecycle;
   conversation?: (room: string) => Promise<RuntimeConnection>;
   close: () => void | Promise<void>;
 };
@@ -40,12 +43,13 @@ export type RuntimeDecision = {
 };
 
 export type RuntimeObservationEvent = { kind: 'output'; sessionId: string; id: string; streamId: string | null; text: string }
-  | { kind: 'state'; observation: Omit<RuntimeObservation, 'historyMode' | 'maxInputBytes'> };
+  | { kind: 'state'; observation: Omit<RuntimeObservation, 'historyMode' | 'maxInputBytes' | 'lastActivityAt' | 'historyAvailable'> };
 
 export type RuntimeHooks = {
   usage?: (sample: UsageSample) => void;
   requestDecision: (permission: RuntimeDecision, signal: AbortSignal) => Promise<Result<Json>>;
   decisionResponded?: (decision: RuntimeDecision) => void;
   pendingDecisions?: () => boolean;
+  pendingInput?: () => boolean;
   observe?: (event: RuntimeObservationEvent) => void;
 };

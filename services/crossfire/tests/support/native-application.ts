@@ -17,7 +17,7 @@ export async function nativeApplication(scope: TestContext) {
   const started = performance.now();
   const jwtSecret = secret(), native = await conduitFixture(scope, { jwtSecret });
   const service = await native.register('crossfire-tests'), administrator = await native.register('admin');
-  const config = { instance: 'tests', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1', matrixOrigin: native.base,
+  const config = { instance: 'tests', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost', matrixOrigin: native.base,
     administrator: administrator.id, registrationSecret: native.registrationToken, jwtSecret };
   const application = createApplication(':memory:', config), { services } = application;
   cleanup(scope, () => application.close());

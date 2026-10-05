@@ -7,7 +7,7 @@ import test from 'node:test';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { connectCodex, type CodexConnection } from '@crossfire/adapter-codex/connection';
 import { nativeEngine, materialize } from '../test-support/native-engine.js';
-import { nativeProvider } from '../test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { matrixFixture, message, temporary, until, ROOM, OWNER_DM, SELF, OBSERVER } from '../test-support/listener.js';
 import { installTestRelease } from '../test-support/release.js';
 import { prepareProject } from '@crossfire/adapter-filesystem/project';

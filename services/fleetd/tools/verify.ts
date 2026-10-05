@@ -103,7 +103,7 @@ export async function verifyFleet(input: { root: string; directory: string; runn
       if (!preserved.ok) return preserved;
       files.push(...preserved.value);
       instances.push({ instanceKey: configured.key, name: configured.name, phase: instance.phase, listenerActive: instance.listenerActive,
-        historyMode: configured.listener_options?.history_mode ?? 'shared',
+        historyMode: configured.listenerOptions?.historyMode ?? 'shared',
         histories: inspected });
     }
     identities.sort((left, right) => left.instanceKey.localeCompare(right.instanceKey)); files.sort((left, right) => left.path.localeCompare(right.path));

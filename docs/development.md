@@ -6,11 +6,10 @@ Install dependencies at the repository root:
 ```sh
 npm ci --ignore-scripts
 npm rebuild better-sqlite3 --build-from-source
-npm run typecheck
-npm run build
-npm test
-npm run verify:architecture
-npm run verify:container
+systemd-run --user --scope --quiet \
+  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
+  --property=TasksMax=4096 /bin/bash -c \
+  'npm run typecheck && npm run build && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
 ```
 
 The lockfile and npm policy enforce engine versions, dependency age and disabled
@@ -33,10 +32,27 @@ Codex, Conduit and integration checks. It is useful when deployment must finish
 before browser verification. Run the full gates afterward.
 
 Tests use isolated processes across all available CPU cores. Build/typecheck
-and pinned stock Element extraction occur once per coordinated run. Timing logic
+and pinned stock Element/Conduit extraction occur once per coordinated run.
+Each native homeserver runs the image's unchanged static binary on loopback in
+its test's resource scope, with an isolated RocksDB directory and one async
+worker. Docker is not an unbounded execution escape for these native fixtures;
+the container gate separately checks the actual deployment image and lifecycle.
+Timing logic
 uses injected clocks. Native I/O waits for bounded observable conditions, not
 fixed-duration sleeps. Logs, per-file timings and summaries are written under
 `.temp/test-runs/`.
+
+The Linux runner verifies finite process-group memory, swap and task limits
+before building or testing. The scope above allows 24 GiB and 4096 tasks for an
+integrated run; size these finite limits to the host. For focused tests, use
+`MemoryMax=4294967296`, `MemorySwapMax=0` and `TasksMax=512`. A heap limit alone
+does not contain browser, native runtime and other child processes. Run each
+test-selection command inside a verified scope; an unbounded runner fails closed.
+This resource guard is Linux-specific and does not certify macOS test execution.
+
+Browser fixtures use real HTTPS and trust only their pinned test certificate;
+Node/curl child clients inherit that test authority. Production TLS verification
+and Secure host-only cookie attributes are never relaxed for tests.
 
 Default native tests require Codex 0.158.0+, Git, OpenSSH client/server, Chrome
 and Docker. `CROSSFIRE_TEST_CODEX` selects Codex; `CROSSFIRE_BROWSER` selects

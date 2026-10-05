@@ -1,58 +1,26 @@
-import { existsSync, openSync, closeSync } from 'node:fs';
+import { openSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { readJson, privateDir } from '@crossfire/adapter-filesystem/index';
-import { fields } from '@crossfire/contracts/validation';
-import { releaseName } from '@crossfire/contracts/release';
+import { privateDir } from '@crossfire/adapter-filesystem/index';
+import { listenerRequest, type LocalListener } from '@crossfire/adapter-crossfire/listener-client';
 import type { paths } from '@crossfire/adapter-filesystem/project';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import { emit } from './output.js';
 import type { ListenerOptions } from '@crossfire/adapter-crossfire/listener';
 import { listen } from '@crossfire/adapter-crossfire/listener';
-import { isListenerStop } from '@crossfire/agent-core/lifecycle';
-import type { ListenerTest } from '@crossfire/agent-core/diagnostic';
-import { wakePolicy } from '@crossfire/contracts/wake';
+import { isListenerStop } from '@crossfire/kernel/lifecycle';
 
 type Destination = ReturnType<typeof paths>;
-export type LocalListener = { release: string; binding: string; session: string; ready: boolean; test?: ListenerTest };
+export type { LocalListener } from '@crossfire/adapter-crossfire/listener-client';
 
 export function reportStartup(message: { ready: true } | { error: string }): void {
   if (process.connected) process.send?.(message, () => {});
 }
 
 export async function localListener(destination: Destination, action: 'status' | 'stop' | 'test'): Promise<LocalListener | null> {
-  const file = join(destination.state, 'listener.json');
-  if (!existsSync(file)) return null;
-  const record = fields(readJson<unknown>(file), ['port', 'secret']);
-  if (!record.ok || typeof record.value.port !== 'number' || !Number.isInteger(record.value.port) || record.value.port < 1 || record.value.port > 65535
-    || typeof record.value.secret !== 'string' || !/^[a-f0-9]{64}$/u.test(record.value.secret)) throw new Error('Invalid project listener control record');
-  let response: Response;
-  try {
-    response = await fetch('http://127.0.0.1:' + record.value.port + '/control', { method: 'POST', redirect: 'error',
-      headers: { Authorization: 'Bearer ' + record.value.secret, 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
-      signal: AbortSignal.timeout(action === 'stop' ? 20_000 : action === 'test' ? 35_000 : 3000) });
-  } catch (error) {
-    const cause = error instanceof Error ? error.cause : null;
-    if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ECONNREFUSED') return null;
-    throw new Error('Cannot contact the project listener; no replacement was started', { cause: error });
-  }
-  if (!response.body) throw new Error('Project listener control rejected the request');
-  let body = '';
-  for await (const part of response.body) { body += Buffer.from(part).toString('utf8'); if (Buffer.byteLength(body) > 4096) throw new Error('Invalid listener control size'); }
-  if (response.status !== 200) {
-    const failure = fields(JSON.parse(body || '{}') as unknown, ['error']);
-    throw new Error(failure.ok && typeof failure.value.error === 'string' ? failure.value.error : 'Project listener control rejected the request');
-  }
-  const status = fields(JSON.parse(body) as unknown, ['release', 'binding', 'session', 'ready'], ['test']);
-  if (!status.ok || !releaseName(status.value.release) || typeof status.value.binding !== 'string' || typeof status.value.session !== 'string' || typeof status.value.ready !== 'boolean') throw new Error('Invalid project listener status');
-  if (action === 'test') {
-    const result = fields(status.value.test, ['session', 'server', 'authenticated', 'rooms', 'joinedRooms', 'canReceiveRoomTasks', 'wakeMode', 'busy', 'deliveryPaused', 'approval', 'currentRelease', 'message']);
-    if (!result.ok || result.value.session !== status.value.session || result.value.authenticated !== true || !Number.isSafeInteger(result.value.rooms)
-      || Number(result.value.rooms) < 0 || !Number.isSafeInteger(result.value.joinedRooms) || Number(result.value.joinedRooms) < 0
-      || typeof result.value.canReceiveRoomTasks !== 'boolean' || !wakePolicy(result.value.wakeMode) || typeof result.value.busy !== 'boolean' || typeof result.value.deliveryPaused !== 'boolean'
-      || !['none', 'runtime', 'listener'].includes(String(result.value.approval))
-      || typeof result.value.server !== 'string' || !releaseName(result.value.currentRelease) || typeof result.value.message !== 'string') throw new Error('Invalid live listener test result');
-  }
+  const status = await listenerRequest(destination.state, { action });
+  if (!status) return null;
+  if (!status.ok) throw new Error(status.error.message);
   if (action === 'stop') {
     const released = await acquireProcessLock(join(destination.state, 'receiver'), 35);
     await released();

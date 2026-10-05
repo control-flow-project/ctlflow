@@ -60,7 +60,8 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   const instance = { key: 'helper', name: 'helper', definition: 'analyst', workarea: 'agents/analyst/workarea/helper' };
   const view: FleetView = { fleetId, fleetKey: 'research', label: 'Research', directory: fleetDirectory, revision: 0, controller: { name: 'laptop' }, phase: 'running', error: null,
     connection: { connected: true, deliveryEnabled: true, revision: 0, error: null },
-    instances: [{ instance, phase: 'running', listenerActive: true, sessionId, error: null, startedAt: 1 }] };
+    instances: [{ instance, phase: 'running', listenerActive: true, desiredActive: true, lastActivityAt: 1, historyAvailable: true,
+      sessionId, error: null, startedAt: 1 }] };
   const attachment: Attachment = { runtime: 'codex', sessionId, workspace, connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: join(workspace, 'token') } };
   const requests: string[] = [];
   const server = createServer((request, response) => {

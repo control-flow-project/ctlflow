@@ -17,6 +17,7 @@ export function reportRuntime(services: Services, actor: Actor, agentId: string,
     if (!run.ok) return run;
     if (input.observedAt > services.clock.now() + 60000 || new Set(input.settings.map(setting => setting.name)).size !== input.settings.length
       || input.settings.some(setting => !names.has(setting.name))) return failure('invalid', 'Only public runtime settings may be reported');
+    if (input.lastActivityAt !== null && input.lastActivityAt > services.clock.now() + 60000) return failure('invalid', 'Native activity cannot be reported in the future');
     const previous = services.runtime.observation(agentId);
     if (!previous.ok) return previous;
     const original = previous.value.find(value => value.runId === runId && value.sessionId === input.sessionId);

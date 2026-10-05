@@ -21,7 +21,8 @@ test('CLI fleet and individual start resume by default; only --fresh-history sel
   const fleet = { fleetId, fleetKey: 'test', directory: '/private/fixture', label: 'Test', revision: 0, controller: { name: 'test' }, phase: 'stopped',
     connection: { connected: true, deliveryEnabled: false, revision: 0, error: null }, error: null,
     instances: [{ instance: { key: 'one', name: 'one', definition: 'analyst', workarea: 'agents/analyst/workarea/one' }, phase: 'stopped',
-      listenerActive: false, sessionId: null, error: null, startedAt: null }] };
+      listenerActive: false, desiredActive: false, lastActivityAt: null, historyAvailable: null,
+      sessionId: null, error: null, startedAt: null }] };
   const server = createServer(async (request, response) => {
     let data: unknown, meta: object = { requestId: randomUUID() }, status = 200;
     if (request.method === 'GET') { data = [fleet]; meta = { ...meta, page: 1, pageSize: 100, totalItems: 1, totalPages: 1 }; }

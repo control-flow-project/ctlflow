@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { failure, success, type FailureCode, type Result } from '@crossfire/kernel/result';
 import { HTTP_LIMITS } from '@crossfire/contracts/rest/limits';
 import type { Reply } from './bind.js';
-export const COOKIE_NAME = 'crossfire';
+export const COOKIE_NAME = '__Host-crossfire';
 const failureStatus: Record<FailureCode, number> = { invalid: 400, unauthorized: 401, forbidden: 403, missing: 404, conflict: 409, limit: 413, native: 502, unavailable: 503,
   stale_revision: 409, name_collision: 409, capacity: 409, rate_limit: 429, body_too_large: 413, method_not_allowed: 405 };
 export function cookie(request: IncomingMessage): string {
@@ -47,7 +47,6 @@ export function send(response: ServerResponse, requestId: string, result: Result
     'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'", 'X-Request-ID': requestId });
   response.end(serialized);
 }
-export function setCookie(response: ServerResponse, credential: string | null, origin: string): void {
-  response.setHeader('Set-Cookie', COOKIE_NAME + '=' + (credential ?? '') + '; Path=/; HttpOnly; SameSite=Strict'
-    + (origin.startsWith('https:') ? '; Secure' : '') + '; Max-Age=' + (credential === null ? '0' : '28800'));
+export function setCookie(response: ServerResponse, credential: string | null): void {
+  response.setHeader('Set-Cookie', COOKIE_NAME + '=' + (credential ?? '') + '; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=' + (credential === null ? '0' : '28800'));
 }

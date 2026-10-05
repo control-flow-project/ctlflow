@@ -28,7 +28,7 @@ import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import { API, segment } from '@crossfire/contracts/matrix';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { connectCodex } from '@crossfire/adapter-codex/connection';
 import { listen } from '@crossfire/adapter-crossfire/listener';
@@ -38,6 +38,7 @@ import { onboardingUrl } from '@crossfire/contracts/onboarding';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { elementAssets } from './support/element.js';
 import { checkOnboardingPolicy } from './support/onboarding-browser.js';
+import { browserOptions, secureRouter } from './support/tls.js';
 
 test('paper table checks center complete content groups and reject displaced controls', async scope => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
@@ -176,7 +177,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const jwtSecret = secret();
   const matrix = await conduitFixture(scope, { jwtSecret });
   const config = { instance: 'browser', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1',
-    matrixOrigin: matrix.base, administrator: '@admin:architecture.localhost', registrationSecret: matrix.registrationToken, jwtSecret };
+    contentOrigin: 'http://localhost', matrixOrigin: matrix.base, administrator: '@admin:architecture.localhost', registrationSecret: matrix.registrationToken, jwtSecret };
   const password = secret();
   const initialized = await bootstrap(config, { servicePassword: secret(), administratorPassword: password });
   assert(initialized.ok, JSON.stringify(initialized));
@@ -188,15 +189,11 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const address = service.address(); assert(address && typeof address === 'object');
   const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
     web: join(process.cwd(), 'dist/web'), element };
-  const router = publicRouter(routes);
-  router.listen(0, '127.0.0.1'); await once(router, 'listening');
-  const publicAddress = router.address(); assert(publicAddress && typeof publicAddress === 'object');
-  const origin = 'http://127.0.0.1:' + publicAddress.port;
+  cleanup(scope, async () => { await worker.stop(); service.closeAllConnections();
+    await new Promise<void>(resolve => service.close(() => resolve())); application.close(); });
+  const { origin } = await secureRouter(scope, publicRouter(routes));
   routes.publicOrigin = origin; config.publicOrigin = origin; services.instance.publicOrigin = origin;
-  cleanup(scope, async () => { services.matrix.close(); router.closeAllConnections(); service.closeAllConnections();
-    await new Promise<void>(resolve => router.close(() => resolve())); await new Promise<void>(resolve => service.close(() => resolve()));
-    await worker.stop(); application.close(); });
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const errors: string[] = [];
   const identityReads: string[] = [];
@@ -491,10 +488,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(confirmation.getByRole('heading', { name: 'Confirm your invitation', exact: true })).toBeVisible();
   await expect(confirmation.getByText('@alice:architecture.localhost', { exact: true })).toBeVisible();
   await confirmation.screenshot({ path: join(directory, 'element-invitation-confirmation.png'), fullPage: true });
-  const registration = memberPage.waitForResponse(response => response.request().method() === 'POST' && /^\/_matrix\/client\/(?:v3|r0)\/register$/u.test(new URL(response.url()).pathname));
+  const registration = memberPage.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/_matrix/client/v3/register');
   await confirmation.getByRole('button', { name: 'Confirm invitation', exact: true }).click();
   await expect(confirmation.getByRole('heading', { name: 'Account confirmed', exact: true })).toBeVisible();
-  assert.equal((await memberContext.cookies(origin)).filter(cookie => cookie.name === 'crossfire_invitation').length, 0, 'The browser stage clears its bound invitation before credential-omitting SDK requests');
+  assert.equal((await memberContext.cookies(origin)).filter(cookie => cookie.name === '__Host-crossfire-invitation').length, 0, 'The browser stage clears its bound invitation before credential-omitting SDK requests');
   const registered = await registration;
   assert.equal(registered.status(), 200, await registered.text());
   assert.equal((await registered.json() as { user_id: string }).user_id, '@alice:architecture.localhost');

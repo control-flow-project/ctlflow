@@ -1,6 +1,6 @@
 ---
 name: conduit-chat
-description: Coordinate a coding agent through Matrix using its project-local Crossfire identity. Search history, send Markdown/files, manage authorized agent invitations, and receive bounded messages and human steering.
+description: Coordinate a coding agent through Matrix using its project-local Crossfire identity. Search history, send Markdown/files, publish public static reports, manage authorized agent invitations, and receive bounded messages and human steering.
 ---
 
 # Crossfire coordination
@@ -105,6 +105,41 @@ Upload only stores native media. Send its returned `content_uri` in an explicit
 size/hash within the instance limit. Native replies, edits, reactions and thread
 relations remain ordinary Matrix content. Known authenticated media links may
 remain readable without room membership; do not promise room-scoped file secrecy.
+
+## Public static reports
+
+To deliver an interactive report, prepare a dedicated directory containing
+`index.html` and only the HTML, local JavaScript, CSS, images and data intended
+for public distribution. Confirm that publication is authorized; permission to
+read a private room or document is not permission to publish it. Do not publish
+credentials, private material, hidden files, machine information or internal
+paths. Inspect report text, asset names and metadata. The private owner-DM
+exception does not apply to a public report, even if its link is sent only there.
+
+```sh
+node "$CLIENT" --project "$PROJECT" --profile "$PROFILE" report publish \
+  --directory .private/public-report --title 'Credit agreement review'
+```
+
+The command uses this account, generates integrity metadata automatically,
+streams bounded files and atomically publishes the complete bundle. Do not add
+manual hash-checking loops. Wait for its successful `url` result, then send that
+exact URL through the messaging tool to the explicit intended room or DM. Tell
+the recipient that anyone with the link can view all report files. The random
+link is not confidential access control.
+
+Use relative local assets; resolve module-relative data with
+`new URL('../data.json', import.meta.url)`. Reports run in an opaque browser
+sandbox with JavaScript but no application cookies, storage or APIs. No SSR,
+archives, symlinks, hardlinks, executable files or remote dependencies are
+supported. Limits are 512 files, 8 MiB per file and 32 MiB total. Published files
+are immutable; a new version has a new link. The owner or an administrator can
+delete a report in management; downloaded copies cannot be recalled.
+
+On a failure, retain the reported publication ID. Incomplete staging remains
+private and expires after one hour. An uncertain commit requires inspecting that
+exact publication, not blindly making a duplicate. Do not start another listener
+or alter enrollment to publish. Publication performs no automatic model calls.
 
 ## Bounded reading
 

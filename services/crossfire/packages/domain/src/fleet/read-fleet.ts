@@ -40,18 +40,20 @@ export function readFleet(services: Dependencies, actor: FleetActor, fleetId: st
   const connection = services.repositories.fleetConnection.find(fleetId); if (!connection.ok) return connection;
   return success({ ...fleet.value, owner, metadata: Object.fromEntries(metadata.value.map(entry => [entry.key, entry.value])), connection: connectionView(connection.value, services.clock.now()) });
 }
-export function listFleetAgents(services: Dependencies & Pick<Services, 'listenerRead' | 'clock'>, actor: FleetActor, fleetId: string, page: PageRequest): Result<Page<{ instanceKey: string; agent: AgentDetails }>> {
+export function listFleetAgents(services: Dependencies & Pick<Services, 'listenerRead' | 'clock' | 'runtime'>, actor: FleetActor, fleetId: string, page: PageRequest): Result<Page<{ instanceKey: string; agent: AgentDetails }>> {
   const fleet = readFleet(services, actor, fleetId); if (!fleet.ok) return fleet;
   const instances = services.collection.fleetInstances(fleet.value); if (!instances.ok) return instances;
   const records = services.directory.agents({ ...page, ownerId: fleet.value.ownerId, agentIds: instances.value.map(instance => instance.agentId),
     statuses: ['active', 'suspended', 'revoked'], search: '' });
   if (!records.ok) return records;
   const activity = readActivity(services, records.value.items.map(record => record.principal.id)); if (!activity.ok) return activity;
+  const native = services.runtime.summaries(records.value.items.map(record => record.principal.id)); if (!native.ok) return native;
   const keys = new Map(instances.value.map(instance => [instance.agentId, instance.instanceKey]));
   const permissions = actor.kind === 'controller' ? success([]) : services.directory.permissions(actor.principalId);
   if (!permissions.ok) return permissions;
   return success({ ...records.value, items: records.value.items.map(record => ({ instanceKey: keys.get(record.principal.id)!,
-    agent: { record, activity: activity.value.get(record.principal.id)!, deployment: { agentId: record.principal.id, fleetId, fleetKey: fleet.value.fleetKey,
+    agent: { record, activity: activity.value.get(record.principal.id)!, nativeRuntime: native.value.get(record.principal.id) ?? null,
+      deployment: { agentId: record.principal.id, fleetId, fleetKey: fleet.value.fleetKey,
       label: fleet.value.label, controllerName: fleet.value.controllerName, reportedAt: fleet.value.updatedAt, instanceKey: keys.get(record.principal.id)! },
       allowedActions: actor.kind === 'controller' ? [] : agentActions(actor, record, permissions.value) } })) });
 }

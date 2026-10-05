@@ -8,28 +8,47 @@ import { operationView } from '@fleetd/contracts/api';
 import { validateRoster } from '@fleetd/contracts/configuration';
 import type { Registry } from '@fleetd/domain/port';
 import { failure, success, type Result } from '@crossfire/kernel/result';
+import { MAX_JSON_BYTES } from '@crossfire/contracts/limits';
 import { loadConfiguration } from './configuration.js';
 
 const registrations = check.list(check.object({ fleetId: check.identifier, fleetKey: check.name, directory: check.text(4096), label: check.text(100), revision: check.integer(), digest: check.text(64, 64) }), 100);
 const operations = check.list(operationView, 700);
+const desiredRelation = check.list(check.object({ fleetId: check.identifier, instanceKey: check.name }), 10000);
+const DESIRED_INTENT_BYTES = 2 * 1024 * 1024;
+const desiredIntent: typeof desiredRelation = input => {
+  const parsed = desiredRelation(input);
+  if (!parsed.ok) return parsed;
+  if (new Set(parsed.value.map(item => item.fleetId + ':' + item.instanceKey)).size !== parsed.value.length) return failure('invalid', 'Duplicate desired binding');
+  const counts = new Map<string, number>();
+  for (const item of parsed.value) {
+    const count = (counts.get(item.fleetId) ?? 0) + 1;
+    if (count > 100) return failure('invalid', 'A fleet supports at most 100 desired bindings');
+    counts.set(item.fleetId, count);
+  }
+  if (counts.size > 100) return failure('invalid', 'Controller supports at most 100 desired fleets');
+  return success(parsed.value.toSorted((left, right) => left.fleetId.localeCompare(right.fleetId) || left.instanceKey.localeCompare(right.instanceKey)));
+};
 function attempt<Value>(action: () => Result<Value>): Result<Value> {
   try { return action(); } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Private controller storage failed'); }
 }
 export function createRegistry(root: string): Registry {
   privateDir(root);
-  function read<Value>(name: string, parser: check.Parser<Value>, initial: Value): Result<Value> {
-    return attempt(() => existsSync(join(root, name)) ? parser(readJson<unknown>(join(root, name))) : success(initial));
+  function read<Value>(name: string, parser: check.Parser<Value>, initial: Value, maximum = MAX_JSON_BYTES): Result<Value> {
+    return attempt(() => existsSync(join(root, name)) ? parser(readJson<unknown>(join(root, name), maximum)) : success(initial));
   }
-  function save<Value>(name: string, parser: check.Parser<Value>, values: Value): Result<void> {
-    return attempt(() => { const valid = parser(values); if (!valid.ok) return valid; writeJson(join(root, name), valid.value); return success(undefined); });
+  function save<Value>(name: string, parser: check.Parser<Value>, values: Value, maximum = MAX_JSON_BYTES): Result<void> {
+    return attempt(() => { const valid = parser(values); if (!valid.ok) return valid; writeJson(join(root, name), valid.value, maximum); return success(undefined); });
   }
   return {
     registrations: () => read('fleets.json', registrations, []), saveRegistrations: values => save('fleets.json', registrations, values),
+    desiredIntent: () => read('desired-intent.json', desiredIntent, [], DESIRED_INTENT_BYTES), saveDesiredIntent: values => save('desired-intent.json', desiredIntent, values, DESIRED_INTENT_BYTES),
     operations: () => read('operations.json', operations, []), saveOperations: values => save('operations.json', operations, values),
     load: loadConfiguration,
     writeRoster(configuration, roster) {
       return attempt(() => {
-        const valid = validateRoster(roster);
+        const wire = { ...roster, instances: roster.instances.map(({ listenerOptions, ...instance }) => ({ ...instance,
+          ...(listenerOptions ? { listener_options: listenerOptions.historyMode === undefined ? {} : { history_mode: listenerOptions.historyMode } } : {}) })) };
+        const valid = validateRoster(wire);
         if (!valid.ok) return valid;
         const current = loadConfiguration(configuration.directory);
         if (!current.ok) return current;

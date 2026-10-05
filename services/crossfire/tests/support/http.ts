@@ -13,7 +13,7 @@ export async function httpFixture(scope: TestContext, application: Application, 
   const origin = 'http://127.0.0.1:' + address.port;
   application.config.publicOrigin = origin; application.services.instance.publicOrigin = origin;
   cleanup(scope, async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
-  function headers(session: { secret: string; csrfSecret: string }) { return { Cookie: 'crossfire=' + session.secret, Origin: origin, 'X-Crossfire-CSRF': session.csrfSecret }; }
+  function headers(session: { secret: string; csrfSecret: string }) { return { Cookie: '__Host-crossfire=' + session.secret, Origin: origin, 'X-Crossfire-CSRF': session.csrfSecret }; }
   async function request(path: string, method = 'GET', input?: unknown, headers: Record<string, string> = {}) {
     return fetch(origin + path, { method, headers: { 'Content-Type': 'application/json', ...headers },
       ...(input === undefined ? {} : { body: JSON.stringify(input) }), signal: AbortSignal.timeout(15_000) });

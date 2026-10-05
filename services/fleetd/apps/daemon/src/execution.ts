@@ -1,7 +1,10 @@
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { failure, success } from '@crossfire/kernel/result';
-import type { OwnedRuntimeAdapter, OwnedRuntimeConnection } from '@crossfire/agent-core/owned-runtime';
+import type { OwnedRuntimeAdapter } from '@crossfire/agent-core/owned-runtime';
+import { createListenerHost, type ListenerHost } from '@crossfire/adapter-crossfire/listener-host';
+import { nativeClock } from '@crossfire/adapter-runtime/clock';
+import { createNativeLifecycle } from '@fleetd/domain/native-lifecycle';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { prepareProject, paths } from '@crossfire/adapter-filesystem/project';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
@@ -13,7 +16,7 @@ import { createFleetControlConnection, type FleetControlConnection } from '@cros
 import { operations } from '@crossfire/contracts/rest/operations';
 import { errorCode } from '@crossfire/contracts/rest/envelope';
 import { MAX_UPLOAD_BYTES } from '@crossfire/contracts/client';
-import { isListenerStop } from '@crossfire/agent-core/lifecycle';
+import { isListenerStop } from '@crossfire/kernel/lifecycle';
 import { loadBinding, saveBinding, protectFleet } from '@fleetd/storage/binding';
 import type { Execution } from '@fleetd/domain/port';
 import { prepareEnrollment } from './enrollment.js';
@@ -24,6 +27,7 @@ import { canInitializeHistory, initializedHistory } from '@fleetd/storage/histor
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
+  let host: Promise<ListenerHost> | undefined;
   function connect(configuration: Parameters<Execution['connect']>[0], signal: AbortSignal, control: Parameters<Execution['connect']>[2]) {
     try {
       const binding = loadBinding(configuration); if (!binding.ok) return binding;
@@ -61,7 +65,8 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       return connection ? connection.message(input) : failure('conflict', 'Enroll this fleet before sending messages');
     },
     async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear();
-      await Promise.all([...reporters.values()].map(reporter => reporter.close())); reporters.clear(); },
+      await Promise.all([...reporters.values()].map(reporter => reporter.close())); reporters.clear();
+      if (host) await (await host).close(); host = undefined; },
     async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close();
       const reporter = reporters.get(configuration.directory); reporters.delete(configuration.directory); await reporter?.close(); },
     validate(configuration) {
@@ -85,8 +90,15 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       if (!identity) return failure('missing', 'Instance has no enrolled identity');
       return adapter ? resetInstance(configuration, instance, identity.agentId, resetId, adapter, signal) : failure('invalid', 'Unsupported runtime: ' + definition.runtime);
     },
+    async contexts(configuration, instance) {
+      const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
+      if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
+      const contexts = await adapter.savedContexts({ workspace: join(configuration.directory, instance.workarea) });
+      return contexts.ok ? success(contexts.value.map(({ context, runtime, sessionId }) => ({ context, runtime, sessionId }))) : contexts;
+    },
     async start(configuration, instance, signal, reason) {
-      let release: (() => Promise<void>) | undefined, destination: OwnedRuntimeConnection | undefined;
+      let release: (() => Promise<void>) | undefined;
+      let destination: Extract<Awaited<ReturnType<typeof createNativeLifecycle>>, { ok: true }>['value'] | undefined;
       let done: Promise<void> | undefined;
       let bindingControl: ReturnType<FleetControlConnection['listener']> | undefined;
       let enrolledId: string | undefined, reported = false;
@@ -94,7 +106,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       const report = (error: unknown) => {
         if (reported || !enrolledId || signal.aborted || stop.signal.aborted || isListenerStop(error)) return;
         reported = true;
-        reporters.get(configuration.directory)?.record(enrolledId, destination?.sessionId ?? null, error);
+        reporters.get(configuration.directory)?.record(enrolledId, destination?.runtime.sessionId ?? null, error);
       };
       try {
         const loaded = loadBinding(configuration);
@@ -110,6 +122,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         const workspace = privateDir(join(configuration.directory, instance.workarea));
         prepareProject(workspace);
         const local = paths(workspace, instance.name);
+        const listenerHost = await (host ??= createListenerHost());
         release = await acquireProcessLock(join(local.state, 'listener'));
         const software = reason === 'recovery' ? installedSoftware(local.root) : await installSoftware(local.root, binding.server);
         const client = createClient({ origin: binding.server, token: identity.account.access_token, signal: lifetime });
@@ -125,19 +138,37 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         bindingControl = connection.listener(identity.agentId);
         const readiness = new Promise<void>((resolve, reject) => { ready = resolve; rejectReady = reject; });
         done = listen({ settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
-          binding: 'fleet-' + identity.agentId,
+          binding: 'fleet-' + identity.agentId, host: listenerHost,
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
-          historyMode: instance.listener_options?.history_mode ?? 'shared',
+          historyMode: instance.listenerOptions?.historyMode ?? 'shared',
           ready,
           runtime: async (runtimeStop, _poll, hooks) => {
-            const started = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks,
-              allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
-              ...(instance.listener_options ? { listenerOptions: instance.listener_options } : {}) }, runtimeStop);
+            const options = adapter.validate(definition.options);
+            if (!options.ok) throw Object.assign(new Error(options.error.message), { code: options.error.code });
+            const publicSettings = ['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'dangerously_bypass_approvals_and_sandbox'];
+            const started = await createNativeLifecycle({ clock: nativeClock, hooks, runtime: definition.runtime, approval: options.value.approval,
+              primary: instance.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared',
+              initialSettings: publicSettings.filter(name => options.value.options[name] !== undefined)
+                .map(name => ({ name, configured: String(options.value.options[name]), effective: null })),
+              initial: reason === 'operator' ? 'running' : 'sleeping',
+              saved: () => adapter.savedContexts({ workspace }),
+              failed: (sessionId, error) => reporters.get(configuration.directory)?.record(identity.agentId, sessionId, error),
+              recovered: () => reporters.get(configuration.directory)?.recovered(identity.agentId),
+              start: async (scope, observe) => {
+                const unlock = await listenerHost.budget.acquire('native-start', scope);
+                try {
+                  const opened = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks: { ...hooks, observe },
+                    allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
+                    ...(instance.listenerOptions ? { listenerOptions: instance.listenerOptions } : {}) }, scope);
+                  if (opened.ok) initializedHistory(configuration.directory, identity.agentId);
+                  return opened;
+                } finally { unlock(); }
+              },
+            }, runtimeStop);
             if (!started.ok) throw Object.assign(new Error(started.error.message), { code: started.error.code });
             destination = started.value;
-            initializedHistory(configuration.directory, identity.agentId);
-            return destination;
+            return destination.runtime;
           },
         }, lifetime).then(() => { const error = new Error('Listener ended'); rejectReady(error); stop.abort(error); }, error => {
           report(error);
@@ -149,8 +180,9 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         let closing: Promise<void> | undefined;
         const unlock = release;
         const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; bindingControl?.close(); await destination?.close(); await unlock(); })();
-        return success({ sessionId: destination.sessionId, signal: stop.signal, attachment: destination.attachment,
-          attachments: destination.attachments, control: bindingControl.control, close });
+        return success({ sessionId: destination.runtime.sessionId, signal: stop.signal, attachment: destination.attachment,
+          attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, resume: destination.resume,
+          control: bindingControl.control, close });
       } catch (error) {
         report(error); stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.();
         const parsed = errorCode(error && typeof error === 'object' && 'code' in error ? error.code : undefined);

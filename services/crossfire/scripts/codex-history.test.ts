@@ -39,7 +39,7 @@ test('a long active turn needs only its post-submission interval to prove interr
   const delivery = connection.deliver('input', 'interrupted-long');
   await until(() => native.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
   native.update({ mode: 'normal', turnId: 'new-turn' });
-  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'old-turn', status: 'interrupted' } });
+  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'old-turn', status: 'interrupted', error: null } });
   await delivery;
   const starts = native.requests().filter(request => request.method === 'turn/start');
   assert.equal(starts.length, 2);

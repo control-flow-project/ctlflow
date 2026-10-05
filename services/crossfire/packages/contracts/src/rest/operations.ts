@@ -11,7 +11,30 @@ import { fleetMap } from '../schema/fleet-map.js';
 import * as wake from '../wake-up.js';
 import * as runtime from '../runtime.js';
 import { statisticsQuery, fleetStatistics } from '../statistics.js';
+import * as publication from '../publication.js';
+import { binaryInput } from './binary.js';
+import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
 export const operations = {
+  createPublication: operation({ method: 'POST', path: '/api/publications', auth: 'agent',
+    params: check.empty, query: query.none, input: publication.publicationCreation, output: publication.publicationDetails,
+    status: 201, collection: false, permissions: ['publication.publish.self'], description: 'Stage a bounded public static report' }),
+  publications: operation({ method: 'GET', path: '/api/publications', auth: 'human',
+    params: check.empty, query: publication.publicationQuery, input: check.empty, output: check.list(publication.publicationSummary, 100),
+    status: 200, collection: true, permissions: ['publication.read.owned', 'publication.read.any'], description: 'Public reports owned by your agents' }),
+  publication: operation({ method: 'GET', path: '/api/publications/{publicationId}', auth: 'either',
+    params: check.object({ publicationId: check.identifier }), query: query.none, input: check.empty, output: publication.publicationDetails,
+    status: 200, collection: false, permissions: ['publication.publish.self', 'publication.read.owned', 'publication.read.any'], description: 'Report manifest and publication state' }),
+  uploadPublicationFile: operation({ method: 'PUT', path: '/api/publications/{publicationId}/files/{fileId}', auth: 'agent', requestFormat: 'binary',
+    requestBytes: PUBLICATION_LIMITS.fileBytes, params: check.object({ publicationId: check.identifier, fileId: check.identifier }), query: query.none,
+    input: binaryInput, output: check.object({ uploaded: check.boolean }), status: 200, collection: false,
+    permissions: ['publication.publish.self'], description: 'Stream exactly one declared static file' }),
+  commitPublication: operation({ method: 'PUT', path: '/api/publications/{publicationId}/commit', auth: 'agent',
+    params: check.object({ publicationId: check.identifier }), query: query.none, input: publication.publicationMutation,
+    output: publication.publicationDetails, status: 200, collection: false, permissions: ['publication.publish.self'], description: 'Atomically make a complete report public' }),
+  deletePublication: operation({ method: 'DELETE', path: '/api/publications/{publicationId}', auth: 'human',
+    params: check.object({ publicationId: check.identifier }), query: query.none, input: publication.publicationMutation,
+    output: check.object({ deleted: check.boolean }), status: 200, collection: false,
+    permissions: ['publication.delete.owned', 'publication.delete.any'], description: 'Fence public reads and remove report files' }),
   fleetRuntimeOperations: operation({ method: 'GET', path: '/api/fleets/{fleetId}/session-operations', auth: 'either',
     params: check.object({ fleetId: check.identifier }), query: query.page, input: check.empty, output: check.list(fleetRuntime.runtimeOperation, 100),
     status: 200, collection: true, permissions: ['agent.read.owned', 'agent.read.any'], description: 'Native session operation outcomes' }),

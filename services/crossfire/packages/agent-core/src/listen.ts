@@ -20,7 +20,8 @@ import { incrementalEvents } from './receive.js';
 import { deliveryEvents, resolveSenders } from './senders.js';
 import { testListener, type ListenerTest } from './diagnostic.js';
 import { releaseUpdates } from './updates.js';
-import { controlledPublisher, waitForActivation, type ListenerControl } from './listener-control.js';
+import { controlledPublisher, waitForActivation } from './listener-control.js';
+import type { ListenerControl } from './listener-control-port.js';
 import type { ReadBatch } from './receive.js';
 import { scheduledPublisher } from './scheduled.js';
 import { chatPublication } from './chat-publication.js';
@@ -28,9 +29,11 @@ import { chatBatches } from './chat-batches.js';
 import { listenerStatistics } from './statistics.js';
 import { messageArtifacts } from './message-artifacts.js';
 import { historyQueries, type HistoryQueries } from './history-query.js';
+import { createListenerBudget, type ListenerBudget } from './budget.js';
 
 export type ListenerOptions = {
   clock: Clock;
+  budget?: ListenerBudget;
   control?: ListenerControl;
   storage: LocalState;
   transport: Transport;
@@ -59,6 +62,7 @@ function retryable(error: unknown): boolean {
 
 export async function listen(options: ListenerOptions, stop: AbortSignal): Promise<void> {
   const storage = options.storage;
+  const budget = options.budget ?? createListenerBudget();
   if (!Number.isSafeInteger(options.reconcileMs) || options.reconcileMs < 1000 || options.reconcileMs > 600_000) {
     throw new Error('Listener reconciliation interval must be 1000..600000 ms');
   }
@@ -68,11 +72,14 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const lifetime = AbortSignal.any([stop, failed.signal]);
   const statistics = listenerStatistics(options.account.user_id, options.clock.now);
   let maximum = INPUT_BYTES;
+  let pendingInput = () => true;
+  let destination: Awaited<ReturnType<RuntimeAdapter>>;
   let reportingRun: string | undefined;
   let runReady!: () => void;
   const reporting = new Promise<void>(resolve => { runReady = resolve; });
   const observer = ownerObservation({ agentId: options.id, userId: options.account.user_id, file: options.cursorFile + '.observation', storage,
-    clock: options.clock, transport: options.transport, coordination: options.coordination, historyMode: options.historyMode ?? 'shared', get maximum() { return maximum; } }, lifetime);
+    clock: options.clock, transport: options.transport, coordination: options.coordination, historyMode: options.historyMode ?? 'shared', get maximum() { return maximum; },
+    native: () => destination?.lifecycle?.current() }, lifetime);
   const approval = decisions({
     client: options.transport(lifetime, 45_000),
     clock: options.clock,
@@ -80,13 +87,13 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     run: async () => { await reporting; lifetime.throwIfAborted(); if (!reportingRun) throw new Error('Listener reporting is not ready'); return reportingRun; },
     storage, file: options.cursorFile + '.decisions',
   }, lifetime);
-  let destination: Awaited<ReturnType<RuntimeAdapter>>;
   try {
     destination = await options.runtime(lifetime, options.pollMs, {
       observe: observer.observe,
       usage: statistics.usage,
       decisionResponded: approval.responded,
       pendingDecisions: approval.unresolved,
+      pendingInput: () => pendingInput(),
       requestDecision: async (permission, cancelled) => {
         return approval.request(permission, cancelled);
       },
@@ -136,6 +143,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const invitations = new Map<string, number>();
   let lastInvitationCheck = -Infinity;
   const changed = () => { revision++; wake?.(); };
+  pendingInput = () => acquiring || controlling || sending !== undefined || completed !== undefined || chat.pending()
+    || !!controlled?.pending() || scheduled.pending() || queries.pending() || cycle !== undefined
+    || state.controls.some(control => control.status === 'interrupting' || control.status === 'interrupted');
   async function retry<Result>(operation: () => Promise<Result>, scope = signal): Promise<Result> {
     for (let failures = 0; ; failures++) {
       try { return await operation(); }
@@ -147,14 +157,16 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     }
   }
   async function work<Result>(operation: (client: Matrix, scope: AbortSignal) => Promise<Result>): Promise<Result> {
+    const base = AbortSignal.any([signal, ...(options.control ? [options.control.current().signal] : [])]);
+    const release = await budget.acquire('acquisition', base);
     const deadline = options.clock.deadline(options.reconcileMs);
-    const scope = AbortSignal.any([signal, deadline, ...(options.control ? [options.control.current().signal] : [])]);
+    const scope = AbortSignal.any([base, deadline]);
     try {
       return await operation(options.transport(scope, Math.min(45_000, options.reconcileMs)), scope);
     } catch (error) {
       if (deadline.aborted && !signal.aborted) throw Object.assign(new Error('Listener acquisition exceeded its reconciliation deadline'), { code: 'unavailable' });
       throw error;
-    }
+    } finally { release(); }
   }
   async function wait(previous: number, milliseconds = options.reconcileMs, control = false): Promise<void> {
     acquiring = false;
@@ -175,14 +187,16 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const generation = options.control?.current().signal;
     const cancel = new AbortController();
     const done = (async () => {
+      const scope = AbortSignal.any([cancel.signal, signal, ...(options.control ? [options.control.current().signal] : [])]);
+      const release = await budget.acquire('publication', scope);
       try {
-        await operation(AbortSignal.any([cancel.signal, signal, ...(options.control ? [options.control.current().signal] : [])]));
+        await operation(scope);
         return true;
       } catch (error) {
         signal.throwIfAborted();
         if (cancel.signal.aborted || generation?.aborted) return false;
         throw error;
-      }
+      } finally { release(); }
     })();
     sending = { cancel, done };
     try { return await done; }
@@ -228,6 +242,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     if (!parsed.ok) throw Object.assign(new Error(parsed.error.message), { code: parsed.error.code });
     const view = parsed.value;
     maximum = view.maxMessageBytes;
+    destination.lifecycle?.configureIdle(view.fleetIdleTimeoutSeconds);
     if (view.agentId !== options.id || view.matrixUserId !== options.account.user_id || view.ownerMatrixId !== options.settings.owner
       || view.status !== 'active' || view.ownerStatus !== 'active') throw Object.assign(new Error('Agent or owner access is no longer active'), { code: 'forbidden' });
     const next = new Set(view.roomGrants.filter(grant => !grant.muted).map(grant => grant.roomId));
@@ -450,7 +465,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         continue;
       }
       if (controlled?.pending()) { await send(scope => controlled.publish(scope)); continue; }
-      if (updates.pending()) { await send(scope => updates.publish(destination, scope)); continue; }
+      if (updates.pending() && (!destination.lifecycle || destination.lifecycle.current().phase === 'running')) { await send(scope => updates.publish(destination, scope)); continue; }
       let scheduledHandled = false;
       await send(async scope => { scheduledHandled = await scheduled.publish(scope); });
       if (scheduledHandled) continue;

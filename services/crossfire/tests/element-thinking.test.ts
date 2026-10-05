@@ -10,6 +10,7 @@ import { value } from './support/application.js';
 import { elementAssets } from './support/element.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
+import { browserOptions } from './support/tls.js';
 
 test('stock Element uses Crossfire English activity wording', { timeout: 120000 }, async scope => {
   const { origin, native } = await nativeServer(scope, await releaseFixture(), {}, elementAssets());
@@ -26,7 +27,7 @@ test('stock Element uses Crossfire English activity wording', { timeout: 120000 
   assert.equal(typeof created.room_id, 'string');
   const room = created.room_id as string;
   for (const account of participants) value(await nativeOk({ base: origin, token: account.token }, 'POST', API + '/join/' + segment(room), {}));
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const page = await browser.newPage();
   const evidence = join(process.cwd(), '.temp/element-thinking');

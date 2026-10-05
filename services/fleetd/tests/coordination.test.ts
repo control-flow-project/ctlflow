@@ -7,6 +7,8 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import { definition, parseToml } from '@fleetd/contracts/configuration';
 import { loadConfiguration } from '@fleetd/storage/configuration';
 import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { createRegistry } from '@fleetd/storage/registry';
+import { instanceView } from '@fleetd/contracts/api';
 
 test('role coordination options are separate from native options and strictly validate modes, capabilities and selected identities', () => {
   const native = { name: 'Analyst', runtime: 'codex', runtime_options: { model: 'fixture', native_option: true } };
@@ -44,4 +46,29 @@ test('all instances inherit one complete role policy and changing it changes the
   assert.deepEqual(configured.value.roster.instances.map(instance => configured.value.definitions[instance.definition]!.coordinationPolicy),
     [configured.value.definitions.analyst!.coordinationPolicy, configured.value.definitions.analyst!.coordinationPolicy]);
   assert.deepEqual(configured.value.definitions.analyst!.options, { model: 'fixture' });
+});
+
+test('listener history options have one camelCase domain and API representation with an explicit TOML boundary', scope => {
+  const directory = mkdtempSync(join(tmpdir(), 'fleet-listener-options-')), role = join(directory, 'agents/analyst');
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  mkdirSync(role, { recursive: true, mode: 0o700 });
+  writeFileSync(join(role, 'agent.toml'), 'name = "Analyst"\nruntime = "codex"\n[runtime_options]\n', { mode: 0o600 });
+  writeFileSync(join(role, 'AGENTS.md'), 'History option boundary proof.', { mode: 0o600 });
+  const source = 'fleet = "agreements"\n[coordination]\nadapter = "crossfire"\nserver = "https://example.test"\nowner = "@owner:test"\n'
+    + '[[instances]]\nkey = "ada"\nname = "ada"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/ada"\n';
+  const registry = createRegistry(join(directory, '.registry'));
+  for (const historyMode of [undefined, 'shared', 'per-room'] as const) {
+    writeFileSync(join(directory, 'runtime.toml'), source + '[instances.listener_options]\n'
+      + (historyMode ? 'history_mode = "' + historyMode + '"\n' : ''), { mode: 0o600 });
+    const loaded = loadConfiguration(directory); assert(loaded.ok);
+    const instance = loaded.value.roster.instances[0]!;
+    assert.deepEqual(instance.listenerOptions, historyMode ? { historyMode } : {});
+    assert.equal(Object.hasOwn(instance, 'listener_options'), false);
+    const view = { instance, phase: 'stopped', listenerActive: false, desiredActive: false, lastActivityAt: null, historyAvailable: null,
+      sessionId: null, error: null, startedAt: null };
+    assert.equal(instanceView(view).ok, true);
+    assert.equal(instanceView({ ...view, instance: { ...instance, listener_options: {} } }).ok, false);
+    const written = registry.writeRoster(loaded.value, loaded.value.roster); assert(written.ok);
+    assert.deepEqual(written.value.roster, loaded.value.roster);
+  }
 });

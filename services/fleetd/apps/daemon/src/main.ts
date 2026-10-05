@@ -60,6 +60,7 @@ export async function startDaemon(root: string, name: string) {
       }
     })();
     cleanup = close;
+    await controller.ready();
     server.listen(socketPath); await once(server, 'listening'); chmodSync(socketPath, 0o600);
     return { controller, close, socketPath };
   } catch (error) { await cleanup(); throw error; }

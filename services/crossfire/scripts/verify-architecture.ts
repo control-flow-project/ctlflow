@@ -17,6 +17,7 @@ execFileSync(process.execPath, [fileURLToPath(import.meta.resolve("typescript/bi
   cwd: root, stdio: "inherit", timeout: 60_000,
 });
 const directory = join(output, 'scripts/architecture-proof');
+execFileSync(process.execPath, [join(directory, 'conduit-assets.js')], { cwd: root, stdio: 'inherit', timeout: 90000 });
 const tests = readdirSync(directory).filter(name => name.endsWith(".test.js") &&
   (selection.length === 0 || name === "installation.test.js")).sort().map(name => join(directory, name));
 assert(tests.length > 0, "Architecture build produced no tests");

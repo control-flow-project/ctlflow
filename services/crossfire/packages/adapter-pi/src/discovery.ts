@@ -4,6 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
 import { nativeDelivery } from '@crossfire/adapter-runtime/delivery';
+import { deliveryText } from '@crossfire/adapter-runtime/journal';
 import { piDescriptor, piBoundary, piCall, type PiDescriptor } from './protocol.js';
 import { setTimeout as delay } from 'node:timers/promises';
 import { artifactHash } from '@crossfire/adapter-filesystem/release';
@@ -88,12 +89,12 @@ export async function connectPi(descriptor: PiDescriptor, journal: string, pollM
         if (active !== null && typeof active !== 'string') throw new Error('Invalid Pi operation identity');
         return { busy: active !== null };
       },
-      boundary: async () => { const parsed = piBoundary(await piCall(descriptor, { method: 'boundary' }, signal)); if (!parsed.ok) throw new Error('Invalid Pi publication boundary'); return parsed.value; },
+      prepare: async (text, messageId) => { const parsed = piBoundary(await piCall(descriptor, { method: 'boundary' }, signal)); if (!parsed.ok) throw new Error('Invalid Pi publication boundary'); return { text, messageId, boundary: parsed.value }; },
       publish: input => piCall(descriptor, { method: 'publish', ...input }, signal).then(() => {}),
       received: async input => { const result = await piCall(descriptor, { method: 'received', ...input }, signal); if (typeof result !== 'boolean' && result !== 'cancelled' && result !== 'waiting') throw new Error('Invalid Pi native receipt'); return result; },
       cancel: async input => { const result = await piCall(descriptor, { method: 'cancel', messageId: input.messageId, text: input.text }, signal); if (typeof result !== 'boolean') throw new Error('Invalid Pi native cancellation'); return result; },
       close: () => { clear(); stopped.abort(new Error('Pi listener disconnected')); },
-    }, piBoundary, { journal, pollMs });
+    }, check.object({ text: deliveryText, messageId: check.text(200), boundary: piBoundary }), { journal, pollMs });
     return { ...connection, turnControl: {
       activeTurn: async (): Promise<string | null> => { const value = await piCall(descriptor, { method: 'active' }, signal); if (value !== null && typeof value !== 'string') throw new Error('Invalid Pi operation identity'); return value; },
       interrupt: async (turn: string, recovery = false) => {

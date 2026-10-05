@@ -20,6 +20,7 @@ export function deliveryPolicy(services: Pick<Services, 'repositories' | 'direct
     return failure('unavailable', 'The established private owner conversation is not ready');
   }
   return success({ record: target.value, grants: eligible, wake: wake.value, maxMessageBytes: policy.value.maxMessageBytes,
+    fleetIdleTimeoutSeconds: policy.value.fleetIdleTimeoutSeconds,
     ownerConversation: conversation.value && eligible.some(grant => grant.roomId === conversation.value?.roomId)
       ? conversation.value.roomId : null });
 }

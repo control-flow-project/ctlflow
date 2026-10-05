@@ -1,11 +1,6 @@
 import { failure, success } from '@crossfire/kernel/result';
-import type { Agent } from '../identity/types.js';
-
-export type CoordinationPolicy = {
-  wakeMode: Agent['wakeMode'];
-  senderMatrixIds: string[];
-  permissions: 'room.agent.invite'[];
-};
+import type { CoordinationPolicy } from '../coordination/values.js';
+export type { CoordinationPolicy } from '../coordination/values.js';
 
 export function validateCoordinationPolicy(policy: CoordinationPolicy) {
   if (!['nobody', 'owner', 'owner-agents', 'humans', 'everyone', 'selected'].includes(policy.wakeMode)

@@ -90,7 +90,7 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
     } else if (request.method === 'turn/interrupt') {
       if (configuration.rejectInterrupt) { send({ id: request.id, error: { code: -32602, message: 'interruption refused' } }); return; }
       send({ id: request.id, result: {} });
-      if (!configuration.delayInterrupt) notify('turn/completed', { threadId: THREAD, turn: { id: request.params.turnId, status: 'interrupted' } });
+      if (!configuration.delayInterrupt) notify('turn/completed', { threadId: THREAD, turn: { id: request.params.turnId, status: 'interrupted', error: null } });
     } else if (request.method === 'turn/start') {
       if (mode === 'disconnect') { socket.terminate(); return; }
       if (mode === 'timeout') return;
@@ -234,7 +234,8 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       if (!decision) { send(response, { error: { code: 'missing', message: 'Decision not found' }, meta: { requestId: AGENT_ID } }, 404); return; }
       decision.status = (body as { status: string }).status; decision.answers = []; api(response, { accepted: true });
     } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
-      api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, maxMessageBytes: 65536, wakeMode: waking.policy,
+      api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, maxMessageBytes: 65536,
+        fleetIdleTimeoutSeconds: 1800, wakeMode: waking.policy,
         ownerConversation: joined.has(OWNER_DM) ? OWNER_DM : null,
         senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
         roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', powerLevel: null, muted: muted.has(room) })) });
@@ -247,7 +248,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
         status: access.status, revision: 0, createdAt: 1,
         application: { appliedRevision: 0, appliedStatus: 'active', nativeDisplayName: 'Watson (Human)',
           lastAttemptAt: 1, lastSuccessAt: 1, errorCode: null, errorMessage: null },
-        activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, deployment: null, allowedActions: [] });
+        activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, nativeRuntime: null, deployment: null, allowedActions: [] });
     } else if (path === '/api/agents/' + AGENT_ID + '/wake-deliveries' && request.method === 'GET') {
       api(response, { now: Date.now(), nextDueAt: null });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && path.endsWith('/runtime') && request.method === 'PUT') {

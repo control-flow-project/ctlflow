@@ -14,6 +14,7 @@ import { FleetNavigation, type FleetSection } from './fleet-navigation.js';
 import { useFleetDirectory } from './fleet-directory.js';
 import { FleetStatistics } from './fleet-statistics.js';
 import { FleetSessions } from './fleet-sessions.js';
+import { NativeRuntimeStatus } from './runtime-status.js';
 
 export function Fleets() {
   const viewer = useSession(), resource = useFleetDirectory(location.search);
@@ -23,7 +24,8 @@ export function Fleets() {
     <Loaded {...resource} retry={resource.refresh}>{fleets => fleets.length ? <><p className="collection-count">{fleets.length} {fleets.length === 1 ? 'fleet' : 'fleets'}</p><div className="table-wrap"><table aria-label="Fleets"><thead><tr><th scope="col">Fleet</th><th scope="col">Owner</th><th scope="col">Controller</th><th scope="col">Connection</th><th scope="col">Delivery</th></tr></thead><tbody>{fleets.map(fleet =>
       <tr key={fleet.fleetId}><td><a className="record-link" href={'/manage/fleets/' + fleet.fleetId}>{fleet.label}</a><span className="subline">{fleet.fleetKey}</span></td><td>{fleet.owner.displayName}<span className="subline">{fleet.owner.matrixUserId}</span></td><td>{fleet.controller.name}</td><td><Status value={fleet.delivery.connection.status}/></td><td><Status value={fleet.delivery.deliveryEnabled ? 'Enabled' : 'Deactivated'}/></td></tr>)}</tbody></table></div></>
       : <Empty title="No fleets">Connect a fleet with its controller to see its agents here.</Empty>}</Loaded>
-    <Help title="What can I manage here?"><p>Manage delivery, stop or resume sessions, or send a message to the fleet. Session controls also work through the fleet CLI; the controller’s connection status is separate from each agent’s listener status.</p></Help></Page>;
+    <Help title="What can I manage here?"><p>Manage delivery, stop or resume sessions, or send a message to the fleet. Session controls also work through the fleet CLI. The controller can stay connected while native sessions sleep or are stopped.</p>
+      <p>Sleeping agents resume their saved histories for eligible messages. Explicitly stopped agents remain stopped until you resume them. Controller contact, listener readiness and native activity are separate.</p></Help></Page>;
 }
 function RoomPlan({ fleet }: { fleet: FleetView }) {
   const viewer = useSession(), action = useAction(), [source, setSource] = useState(''), [review, setReview] = useState<{ source: string; value: Parsed<typeof preview> }>();
@@ -64,8 +66,8 @@ function FleetSettings({ fleet }: { fleet: FleetView }) {
 function FleetAgents({ id }: { id: string }) {
   const agents = useResource(operations.fleetAgents, { fleetId: id }, pagingQuery(), 5000);
   return <Panel title="Agents" description="Select an agent to manage its room access, wake-up rules or account."><Loaded {...agents} retry={agents.refresh}>{page => <>
-    {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>
-      <tr key={instance.instanceKey}><td><a className="record-link" href={'/manage/agents/' + instance.agent.agentId}>{instance.agent.displayName}</a></td><td>{instance.instanceKey}</td><td><Status value={instance.agent.activity.status}/></td><td><Status value={instance.agent.status}/></td></tr>)}</tbody></table></div>
+    {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Native session</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>
+      <tr key={instance.instanceKey}><td><a className="record-link" href={'/manage/agents/' + instance.agent.agentId}>{instance.agent.displayName}</a></td><td>{instance.instanceKey}</td><td><Status value={instance.agent.activity.status}/></td><td><NativeRuntimeStatus agent={instance.agent}/></td><td><Status value={instance.agent.status}/></td></tr>)}</tbody></table></div>
       : <Empty title="No agents">There are no agents on this page.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel>;
 }
 export function FleetDetail({ id, section }: { id: string; section: Exclude<FleetSection, 'map'> }) {

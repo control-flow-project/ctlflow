@@ -9,7 +9,8 @@ export async function buildClient(root: string, destination = join(root, 'dist/c
     bundle: true, platform: 'node', format: 'esm', target: 'node26',
     banner: { js: "import { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" },
   });
-  await build({ entryPoints: [join(root, 'apps/client/src/pi.ts')], outfile: join(dirname(destination), 'crossfire-pi.mjs'),
+  await build({ stdin: { contents: "export { piExtension as default } from './pi.js';", sourcefile: 'pi-native-entry.js', resolveDir: join(root, 'apps/client/src') },
+    outfile: join(dirname(destination), 'crossfire-pi.mjs'),
     bundle: true, platform: 'node', format: 'esm', target: 'node26' });
 }
 

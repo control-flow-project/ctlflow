@@ -2,21 +2,32 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
 import { createController } from '@fleetd/domain/controller';
-import type { Execution } from '@fleetd/domain/port';
+import type { Execution, Running } from '@fleetd/domain/port';
+import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
 import type { Operation } from '@fleetd/domain/model';
+import type { NativeSessionState } from '@crossfire/agent-core/runtime';
 import { createRegistry } from '@fleetd/storage/registry';
 import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
 import { fleetView, instanceView } from '@fleetd/contracts/api';
 import { success, failure, type Result } from '@crossfire/kernel/result';
 import { createListenerControl } from '@crossfire/agent-core/listener-control';
-import { listenerStop } from '@crossfire/agent-core/lifecycle';
+import { listenerStop } from '@crossfire/kernel/lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
+function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control: Running['control']; pointer: RuntimeAttachment;
+  close: Running['close']; nativeState?: Running['nativeState']; resume?: Running['resume'] }): Running {
+  const nativeState: Running['nativeState'] = input.nativeState ?? (() => ({ phase: 'running', lastActivityAt: 1, historyAvailable: true }));
+  return { sessionId: input.sessionId, signal: input.signal, control: input.control, nativeState, close: input.close,
+    resume: input.resume ?? (async () => success(undefined)),
+    attachment: async () => nativeState().phase === 'running' ? success(input.pointer) : failure('conflict', 'Resume this sleeping session explicitly to attach'),
+    attachments: async () => nativeState().phase === 'running' ? success([{ context: 'shared', attachment: input.pointer }]) : failure('conflict', 'No live native endpoint'),
+    contexts: async () => success([{ context: 'shared', runtime: input.pointer.runtime, sessionId: input.sessionId }]) };
+}
 async function until(predicate: () => boolean): Promise<void> {
   const deadline = Date.now() + 5000;
   while (!predicate()) { assert(Date.now() < deadline, 'Controller observation deadline exceeded'); await yieldLoop(); }
@@ -37,9 +48,10 @@ function fixture(execution?: Partial<Execution>) {
       delivery: async () => failure('unavailable', 'Not connected'), message: async () => failure('unavailable', 'Not connected'), disconnect: async () => {}, close: async () => {},
       validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
       reset: async () => success(undefined),
-      start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success({ sessionId, signal: stop.signal,
-        attachments: async () => [], attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
-        close: async () => { closed.push(instance.key); stop.abort(); } }); }, ...execution } satisfies Execution };
+      contexts: async () => success([]),
+      start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success(runtimeFixture({ sessionId, signal: stop.signal,
+        pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
+        close: async () => { closed.push(instance.key); stop.abort(); } })); }, ...execution } satisfies Execution };
   const controller = value(createController(services)), record = value(controller.add(fleet));
   async function operation(action: 'start' | 'stop' | 'reset', instanceKey?: string) {
     const current = value(controller.view(record.fleetId));
@@ -74,7 +86,7 @@ test('controller owns runtimes, rejects duplicates and operation reuse with diff
   assert.equal((await fixture.finish(await fixture.operation('start'))).status, 'succeeded'); assert.equal(fixture.started.length, 1);
   writeFileSync(join(fixture.definition, 'AGENTS.md'), 'Updated role while running.');
   assert.equal((await fixture.finish(await fixture.operation('stop'))).status, 'succeeded', 'Disk edits cannot prevent stopping the running deployment');
-  assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+  assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 0);
 });
 const fixtureController = fixture;
 
@@ -82,9 +94,9 @@ test('automatic recovery closes the exact failed generation, retains deployed co
   const native: AbortController[] = [], calls: string[] = [], waits: { milliseconds: number; release: () => void }[] = [];
   const fixture = fixtureController({ start: async (_configuration, _instance, _signal, reason) => {
     calls.push(reason); const stop = new AbortController(); native.push(stop);
-    return success({ sessionId: 'retained-native-session', signal: stop.signal, control: createListenerControl(async () => {}).connection,
-      attachment: { runtime: 'fixture', sessionId: 'retained-native-session', workspace: '/fixture', connection: {} }, attachments: async () => [],
-      close: async () => { stop.abort(); } });
+    return success(runtimeFixture({ sessionId: 'retained-native-session', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      pointer: { runtime: 'fixture', sessionId: 'retained-native-session', workspace: '/fixture', connection: {} },
+      close: async () => { stop.abort(); } }));
   } }); cleanup(scope, () => fixture.controller.close());
   fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
     if (signal.aborted) { resolve(); return; }
@@ -105,7 +117,7 @@ test('automatic recovery closes the exact failed generation, retains deployed co
   native[1]!.abort(new Error('Second native disconnect')); await until(() => waits.length >= 2);
   assert.equal((await fixture.finish(await fixture.operation('stop'))).status, 'succeeded');
   waits[1]!.release(); await yieldLoop(); assert.equal(calls.length, 2);
-  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 0);
 });
 
 test('owner disconnect is intentional, stops the owned generation and never automatically restarts it', async scope => {
@@ -113,9 +125,9 @@ test('owner disconnect is intentional, stops the owned generation and never auto
   let starts = 0, closes = 0, waits = 0;
   const fixture = fixtureController({ start: async () => {
     starts++;
-    return success({ sessionId: 'retained', signal: stop.signal, control: createListenerControl(async () => {}).connection,
-      attachment: { runtime: 'fixture', sessionId: 'retained', workspace: '/fixture', connection: {} }, attachments: async () => [],
-      close: async () => { closes++; } });
+    return success(runtimeFixture({ sessionId: 'retained', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      pointer: { runtime: 'fixture', sessionId: 'retained', workspace: '/fixture', connection: {} },
+      close: async () => { closes++; } }));
   } }); cleanup(scope, () => fixture.controller.close());
   fixture.services.delay = async () => { waits++; };
   await fixture.finish(await fixture.operation('start'));
@@ -129,8 +141,8 @@ test('explicit context reset closes the owned process before reset and retains i
   const calls: string[] = [], sessions: string[] = [];
   const fixture = fixtureController({ reset: async (_configuration, instance) => { calls.push('reset-' + instance.key); return success(undefined); },
     start: async (_configuration, instance) => { const stop = new AbortController(); calls.push('start-' + instance.key); const sessionId = randomUUID(); sessions.push(sessionId);
-      return success({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection, attachments: async () => [],
-        attachment: { runtime: 'fixture', workspace: '/fixture', sessionId, connection: {} }, close: async () => { calls.push('close-' + instance.key); stop.abort(); } }); } });
+      return success(runtimeFixture({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection,
+        pointer: { runtime: 'fixture', workspace: '/fixture', sessionId, connection: {} }, close: async () => { calls.push('close-' + instance.key); stop.abort(); } })); } });
   cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start'));
   const reset = await fixture.operation('reset', 'analyst'); assert.equal((await fixture.finish(reset)).status, 'succeeded');
@@ -145,9 +157,9 @@ test('fleet fresh history stops all targets before reset and reports partial fai
     calls.push('reset-' + instance.key); return instance.key === 'analyst' ? failure('missing', 'Missing authorized reset export') : success(undefined);
   }, start: async (_configuration, instance) => {
     calls.push('start-' + instance.key); const stop = new AbortController();
-    return success({ sessionId: randomUUID(), signal: stop.signal, control: createListenerControl(async () => {}).connection,
-      attachments: async () => [], attachment: { runtime: 'fixture', sessionId: randomUUID(), workspace: '/fixture', connection: {} },
-      close: async () => { calls.push('close-' + instance.key); stop.abort(); } });
+    return success(runtimeFixture({ sessionId: randomUUID(), signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      pointer: { runtime: 'fixture', sessionId: randomUUID(), workspace: '/fixture', connection: {} },
+      close: async () => { calls.push('close-' + instance.key); stop.abort(); } }));
   } }); cleanup(scope, () => fixture.controller.close());
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
   await fixture.finish(await fixture.operation('start')); calls.length = 0;
@@ -164,12 +176,12 @@ for (const action of ['stop', 'reset'] as const) test('fleet ' + action + ' isol
   const fixture = fixtureController({ reset: async (_configuration, instance) => { calls.push('reset-' + instance.key); return success(undefined); },
     start: async (_configuration, instance) => {
       calls.push('start-' + instance.key); const stop = new AbortController(), sessionId = randomUUID();
-      return success({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection, attachments: async () => [],
-        attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} }, close: async () => {
+      return success(runtimeFixture({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection,
+        pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} }, close: async () => {
           calls.push('close-' + instance.key);
           if (cleanupFails && instance.key === 'analyst') throw new Error('Exact owned process could not be cleaned up');
           stop.abort();
-        } });
+        } }));
     } });
   cleanup(scope, async () => { cleanupFails = false; await fixture.controller.close(); });
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
@@ -222,8 +234,8 @@ test('delivery deactivation retains owned engines and unregister closes the cont
   const fixture = fixtureController({ connection: () => ({ connected: true, deliveryEnabled: enabled, revision: 4, error: null }),
     delivery: async (_configuration, input) => { enabled = input.enabled; binding.update({ active: enabled, input: null });
       return success({ fleetId: randomUUID(), revision: input.expectedRevision + 1, deliveryEnabled: enabled, connection: { status: 'online', lastSeenAt: 1 } }); },
-    start: async () => { const stop = new AbortController(); return success({ sessionId: 'unchanged', signal: stop.signal,
-      control: binding.connection, attachments: async () => [], attachment: { runtime: 'fixture', sessionId: 'unchanged', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } }); },
+    start: async () => { const stop = new AbortController(); return success(runtimeFixture({ sessionId: 'unchanged', signal: stop.signal,
+      control: binding.connection, pointer: { runtime: 'fixture', sessionId: 'unchanged', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } })); },
     disconnect: async () => { disconnected = true; binding.close(); } });
   cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start'));
@@ -297,7 +309,10 @@ test('per-instance failure retains successful peers; startup history survives co
   await fixture.controller.close(); assert.deepEqual(fixture.closed, ['peer']);
   const reopened = value(createController(fixture.services)); cleanup(scope, () => reopened.close());
   assert.equal(value(reopened.operation(operation.operationId)).status, 'failed');
-  assert(value(reopened.view(fixture.record.fleetId)).instances.every(instance => instance.phase === 'stopped'));
+  await reopened.ready();
+  const recovered = value(reopened.view(fixture.record.fleetId));
+  assert.equal(recovered.instances.find(instance => instance.instance.key === 'analyst')!.phase, 'stopped');
+  assert.equal(recovered.instances.find(instance => instance.instance.key === 'peer')!.phase, 'running');
 });
 
 test('runtime failures retain their cause, become inactive immediately and cannot restart during cleanup', async scope => {
@@ -307,9 +322,9 @@ test('runtime failures retain their cause, become inactive immediately and canno
   const fixture = fixtureController({ start: async (_configuration, instance) => {
     const stop = new AbortController(), control = createListenerControl(async () => {});
     control.update({ active: true, input: null }); stops.set(instance.key, stop);
-    return success({ sessionId: 'native-' + instance.key, signal: stop.signal, control: control.connection,
-      attachments: async () => [], attachment: { runtime: 'fixture', sessionId: 'native-' + instance.key, workspace: '/fixture', connection: {} },
-      close: async () => { if (instance.key === 'analyst') await cleaning; closed.push(instance.key); stop.abort(); } });
+    return success(runtimeFixture({ sessionId: 'native-' + instance.key, signal: stop.signal, control: control.connection,
+      pointer: { runtime: 'fixture', sessionId: 'native-' + instance.key, workspace: '/fixture', connection: {} },
+      close: async () => { if (instance.key === 'analyst') await cleaning; closed.push(instance.key); stop.abort(); } }));
   } });
   cleanup(scope, async () => { release(); await fixture.controller.close(); });
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
@@ -329,13 +344,280 @@ test('runtime failures retain their cause, become inactive immediately and canno
 });
 
 test('runtime cleanup failure is secondary to the original disconnect cause', async scope => {
-  const stop = new AbortController();
-  const fixture = fixtureController({ start: async () => success({ sessionId: 'native', signal: stop.signal,
-    attachments: async () => [], attachment: { runtime: 'fixture', sessionId: 'native', workspace: '/fixture', connection: {} }, control: createListenerControl(async () => {}).connection,
-    close: async () => { throw new Error('Private engine close failed'); } }) });
-  cleanup(scope, () => fixture.controller.close());
+  const stop = new AbortController(); let cleanupFails = true;
+  const fixture = fixtureController({ start: async () => success(runtimeFixture({ sessionId: 'native', signal: stop.signal,
+    pointer: { runtime: 'fixture', sessionId: 'native', workspace: '/fixture', connection: {} }, control: createListenerControl(async () => {}).connection,
+    close: async () => { if (cleanupFails) throw new Error('Private engine close failed'); } })) });
+  cleanup(scope, async () => { cleanupFails = false; await fixture.controller.close(); });
   await fixture.finish(await fixture.operation('start'));
   stop.abort(new Error('Selected thread closed'));
   await yieldLoop();
   assert.equal(value(fixture.controller.view(fixture.record.fleetId)).instances[0]!.error, 'Selected thread closed; cleanup: Private engine close failed');
+  const refused = await fixture.controller.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 });
+  assert(!refused.ok); assert.equal(refused.error.code, 'conflict');
+});
+
+test('inspection never accepts edited configuration; a revision-checked start applies it exactly once', async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.controller.ready();
+  const file = join(fixture.directory, 'controller', 'fleets.json'), before = readFileSync(file);
+  const registered = value(fixture.registry.registrations())[0]!;
+  writeFileSync(join(fixture.definition, 'AGENTS.md'), 'An explicit reviewed configuration change.', { mode: 0o600 });
+  for (let inspection = 0; inspection < 3; inspection++) {
+    assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 0);
+    assert.equal(value(fixture.controller.list())[0]!.revision, 0);
+    assert.deepEqual(value(await fixture.controller.contexts(fixture.record.fleetId, 'analyst')), []);
+  }
+  assert(readFileSync(file).equals(before)); assert.deepEqual(value(fixture.registry.registrations()), [registered]);
+  const stale = await fixture.controller.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 1 });
+  assert(!stale.ok); assert.equal(stale.error.code, 'stale_revision'); assert(readFileSync(file).equals(before));
+  await fixture.finish(await fixture.operation('start'));
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+  assert.notEqual(value(fixture.registry.registrations())[0]!.digest, registered.digest);
+  await fixture.finish(await fixture.operation('stop')); await fixture.finish(await fixture.operation('start'));
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+});
+
+test('sleeping and waking native phases retain the listener and inspection never resumes them', async scope => {
+  const binding = createListenerControl(async () => {}); binding.update({ active: true, input: null });
+  let phase: NativeSessionState['phase'] = 'sleeping', starts = 0, stoppedReads = 0;
+  const fixture = fixtureController({ contexts: async () => { stoppedReads++; return success([{ context: 'shared', runtime: 'fixture', sessionId: 'saved' }]); },
+    start: async () => { starts++; const stop = new AbortController(); return success(runtimeFixture({ sessionId: 'saved', signal: stop.signal,
+      nativeState: () => ({ phase, lastActivityAt: 123, historyAvailable: true }), control: binding.connection,
+      pointer: { runtime: 'fixture', sessionId: 'saved', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } })); } });
+  cleanup(scope, () => fixture.controller.close());
+  assert.deepEqual(value(await fixture.controller.contexts(fixture.record.fleetId, 'analyst')), [{ context: 'shared', runtime: 'fixture', sessionId: 'saved' }]);
+  assert.equal(starts, 0); assert.equal(stoppedReads, 1);
+  await fixture.finish(await fixture.operation('start'));
+  for (const next of ['sleeping', 'waking', 'running'] as const) {
+    phase = next;
+    const state = value(fixture.controller.view(fixture.record.fleetId)); assert(fleetView(state).ok);
+    assert.equal(state.phase, next); assert.equal(state.instances[0]!.phase, next);
+    assert.equal(state.instances[0]!.listenerActive, true); assert.equal(state.instances[0]!.desiredActive, true);
+    assert.equal(state.instances[0]!.lastActivityAt, 123); assert.equal(state.instances[0]!.historyAvailable, true);
+    assert.equal(value(await fixture.controller.contexts(fixture.record.fleetId, 'analyst'))[0]!.sessionId, 'saved');
+    const pointer = await fixture.controller.attachment(fixture.record.fleetId, 'analyst');
+    assert.equal(pointer.ok, next === 'running');
+    if (!pointer.ok) assert.equal(pointer.error.code, 'conflict');
+  }
+  assert.equal(starts, 1); assert.equal(stoppedReads, 1);
+});
+
+test('explicit start wakes a sleeping native generation without replacing its binding or reenrolling', async scope => {
+  const binding = createListenerControl(async () => {}); binding.update({ active: false, input: null });
+  let phase: NativeSessionState['phase'] = 'sleeping', starts = 0, resumes = 0, deny = false;
+  const fixture = fixtureController({ start: async () => {
+    starts++; const stop = new AbortController();
+    return success(runtimeFixture({ sessionId: 'exact-saved', signal: stop.signal, control: binding.connection,
+      pointer: { runtime: 'fixture', sessionId: 'exact-saved', workspace: '/fixture', connection: {} },
+      nativeState: () => ({ phase, lastActivityAt: 123, historyAvailable: true }),
+      resume: async () => { resumes++; if (deny) return failure('conflict', 'Cleanup is unverified'); phase = 'running'; return success(undefined); },
+      close: async () => { stop.abort(); } }));
+  } });
+  cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start'));
+  await fixture.finish(await fixture.operation('start'));
+  const state = value(fixture.controller.view(fixture.record.fleetId));
+  assert.equal(state.instances[0]!.phase, 'running'); assert.equal(state.instances[0]!.sessionId, 'exact-saved');
+  assert.equal(state.instances[0]!.listenerActive, false, 'Native resume cannot change fleet delivery authority');
+  assert.equal(starts, 1); assert.equal(resumes, 1);
+  phase = 'sleeping'; deny = true;
+  const refused = await fixture.finish(await fixture.operation('start'));
+  assert.equal(refused.status, 'failed'); assert.equal(refused.errors[0]!.code, 'conflict');
+  assert.equal(starts, 1); assert.equal(resumes, 2);
+});
+
+test('desired bindings restore exact histories without enrollment and explicit stops remain stopped across restart', async scope => {
+  const calls: string[] = [], sessions = new Map<string, string>(); let preparations = 0;
+  const fixture = fixtureController({ prepare: async () => { preparations++; return success({ failed: [] }); },
+    start: async (_configuration, instance, _signal, reason) => {
+      const sessionId = sessions.get(instance.key) ?? randomUUID(); sessions.set(instance.key, sessionId); calls.push(reason + ':' + instance.key);
+      const stop = new AbortController(); return success(runtimeFixture({ sessionId, signal: stop.signal,
+        control: createListenerControl(async () => {}).connection, pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} },
+        close: async () => { stop.abort(); } }));
+    } }); cleanup(scope, () => fixture.controller.close());
+  value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
+  await fixture.finish(await fixture.operation('start')); await fixture.finish(await fixture.operation('stop', 'analyst'));
+  assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'peer' }]);
+  await fixture.controller.close();
+  assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'peer' }]);
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); await restarted.ready();
+  assert.deepEqual(calls, ['operator:analyst', 'operator:peer', 'recovery:peer']); assert.equal(preparations, 1);
+  const states = value(restarted.view(fixture.record.fleetId)).instances;
+  assert.equal(states[0]!.phase, 'stopped'); assert.equal(states[0]!.desiredActive, false);
+  assert.equal(states[1]!.sessionId, sessions.get('peer')); assert.equal(states[1]!.desiredActive, true);
+});
+
+test('desired intent must reach durable storage before activation and before explicit stop cleanup', async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  const save = fixture.registry.saveDesiredIntent;
+  fixture.registry.saveDesiredIntent = () => failure('unavailable', 'Private intent storage is unavailable');
+  assert.equal((await fixture.finish(await fixture.operation('start'))).status, 'failed'); assert.deepEqual(fixture.started, []);
+  fixture.registry.saveDesiredIntent = save;
+  await fixture.finish(await fixture.operation('start'));
+  fixture.registry.saveDesiredIntent = () => failure('unavailable', 'Private intent storage is unavailable');
+  const refused = await fixture.controller.operate({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 });
+  assert(!refused.ok); assert.equal(refused.error.code, 'unavailable'); assert.deepEqual(fixture.closed, []);
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).instances[0]!.desiredActive, true);
+  fixture.registry.saveDesiredIntent = save;
+  await fixture.finish(await fixture.operation('stop'));
+  assert.deepEqual(value(fixture.registry.desiredIntent()), []); assert.deepEqual(fixture.closed, ['analyst']);
+});
+
+test('a permanent restoration failure preserves desired intent without spinning or accepting unreviewed files', async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  let starts = 0;
+  fixture.services.execution.start = async () => { starts++; return failure('conflict', 'Installed listener needs an explicit update'); };
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); await restarted.ready(); await yieldLoop();
+  assert.equal(starts, 1);
+  const state = value(restarted.view(fixture.record.fleetId)).instances[0]!;
+  assert.equal(state.phase, 'failed'); assert.equal(state.desiredActive, true); assert.equal(state.listenerActive, false);
+  assert.equal(state.error, 'Installed listener needs an explicit update');
+  assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
+  await restarted.close(); writeFileSync(join(fixture.definition, 'AGENTS.md'), 'Unaccepted disk change.', { mode: 0o600 });
+  const edited = value(createController(fixture.services)); cleanup(scope, () => edited.close()); await edited.ready();
+  assert.equal(starts, 1); assert.equal(value(edited.view(fixture.record.fleetId)).revision, 0);
+  assert.equal(value(edited.view(fixture.record.fleetId)).instances[0]!.desiredActive, true);
+});
+
+test('startup restoration deadline is controlled and late native success is closed instead of published', { timeout: 5000 }, async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  let release!: () => void, finish!: (result: Result<Running>) => void, closed = 0, recoveryWaits = 0;
+  fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
+    if (milliseconds === 30000) release = resolve;
+    else recoveryWaits++;
+    if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
+  });
+  fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
+  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  const state = value(restarted.view(fixture.record.fleetId)).instances[0]!;
+  assert.equal(state.phase, 'failed'); assert.equal(state.desiredActive, true); assert(state.error?.includes('deadline'));
+  assert.equal(recoveryWaits, 0, 'A timed-out start must settle before another generation can be scheduled');
+  const stop = new AbortController();
+  finish(success(runtimeFixture({ sessionId: 'too-late', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+    pointer: { runtime: 'fixture', sessionId: 'too-late', workspace: '/fixture', connection: {} }, close: async () => { closed++; stop.abort(); } })));
+  await until(() => closed === 1);
+  await until(() => recoveryWaits === 1);
+  assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.phase, 'failed');
+});
+
+test('late restoration cleanup failure retains its exact generation and blocks replacement', { timeout: 5000 }, async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  let release!: () => void, finish!: (result: Result<Running>) => void, cleanupFails = true, recoveryWaits = 0;
+  fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
+    if (milliseconds === 30000) release = resolve; else recoveryWaits++;
+    if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
+  });
+  fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
+  const restarted = value(createController(fixture.services)); cleanup(scope, async () => { cleanupFails = false; await restarted.close(); });
+  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  const stop = new AbortController();
+  finish(success(runtimeFixture({ sessionId: 'uncleaned', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+    pointer: { runtime: 'fixture', sessionId: 'uncleaned', workspace: '/fixture', connection: {} },
+    close: async () => { if (cleanupFails) throw new Error('Late native generation cleanup failed'); stop.abort(); } })));
+  await until(() => value(restarted.view(fixture.record.fleetId)).instances[0]!.error === 'Late native generation cleanup failed');
+  assert.equal(recoveryWaits, 0);
+  const refused = await restarted.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 });
+  assert(!refused.ok); assert.equal(refused.error.code, 'conflict');
+  assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
+});
+
+test('a permanent start failure remains permanent when reported after the restoration deadline', { timeout: 5000 }, async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  let release!: () => void, finish!: (result: Result<Running>) => void, recoveryWaits = 0;
+  fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
+    if (milliseconds === 30000) release = resolve; else recoveryWaits++;
+    if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
+  });
+  fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
+  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  finish(failure('invalid', 'Saved native identity is invalid'));
+  await until(() => value(restarted.view(fixture.record.fleetId)).instances[0]!.error === 'Saved native identity is invalid');
+  assert.equal(recoveryWaits, 0);
+  assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
+});
+
+test('shutdown drains pending restoration even if roster files become invalid and retains desired intent', { timeout: 5000 }, async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  let release!: () => void, finish!: (result: Result<Running>) => void, executionClosed = false, nativeClosed = false;
+  fixture.services.delay = async (_milliseconds, signal) => new Promise<void>(resolve => {
+    release = resolve; if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
+  });
+  fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
+  fixture.services.execution.close = async () => { executionClosed = true; };
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
+  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  writeFileSync(join(fixture.fleet, 'runtime.toml'), 'invalid TOML');
+  const closing = restarted.close(); await yieldLoop(); assert.equal(executionClosed, false);
+  const stop = new AbortController();
+  finish(success(runtimeFixture({ sessionId: 'late-owned', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+    pointer: { runtime: 'fixture', sessionId: 'late-owned', workspace: '/fixture', connection: {} }, close: async () => { nativeClosed = true; stop.abort(); } })));
+  await closing; assert.equal(nativeClosed, true); assert.equal(executionClosed, true);
+  assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
+});
+
+test('invalid desired state fails closed instead of silently forgetting activation', async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  writeFileSync(join(fixture.directory, 'controller', 'desired-intent.json'), '{bad-json', { mode: 0o600 });
+  const invalid = createController(fixture.services); assert(!invalid.ok);
+  rmSync(join(fixture.directory, 'controller', 'desired-intent.json'));
+  value(fixture.registry.saveDesiredIntent([{ fleetId: randomUUID(), instanceKey: 'analyst' }]));
+  const orphan = createController(fixture.services); assert(!orphan.ok); assert.equal(orphan.error.code, 'invalid');
+});
+
+test('explicit stop does not depend on valid roster files and clears desired keys missing from edited files', async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start'));
+  const roster = join(fixture.fleet, 'runtime.toml'), original = readFileSync(roster);
+  writeFileSync(roster, 'not valid TOML', { mode: 0o600 });
+  const stopped = value(await fixture.controller.operate({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 }));
+  assert.equal((await fixture.finish(stopped)).status, 'succeeded'); assert.deepEqual(fixture.closed, ['analyst']); assert.deepEqual(value(fixture.registry.desiredIntent()), []);
+  writeFileSync(roster, original, { mode: 0o600 }); await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  writeFileSync(roster, 'fleet = "research"\ninstances = []\n[coordination]\nadapter = "crossfire"\nserver = "http://127.0.0.1:8098"\nowner = "@owner:test"\n', { mode: 0o600 });
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); await restarted.ready();
+  assert(value(restarted.view(fixture.record.fleetId)).error?.includes('missing'));
+  const clear = value(await restarted.operate({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 }));
+  await until(() => value(restarted.operation(clear.operationId)).completedAt !== null);
+  assert.equal(value(restarted.operation(clear.operationId)).status, 'succeeded'); assert.deepEqual(value(fixture.registry.desiredIntent()), []);
+});
+
+test('late preparation success after an explicit stop cannot restore activation intent or start a runtime', async scope => {
+  let release!: () => void;
+  const fixture = fixtureController({ prepare: async () => {
+    await new Promise<void>(resolve => { release = resolve; }); return success({ failed: [] });
+  } }); cleanup(scope, () => fixture.controller.close());
+  const starting = await fixture.operation('start'); await until(() => release !== undefined);
+  const stopping = await fixture.operation('stop'); release();
+  assert.equal((await fixture.finish(starting)).status, 'failed'); assert.equal((await fixture.finish(stopping)).status, 'succeeded');
+  assert.deepEqual(fixture.started, []); assert.deepEqual(value(fixture.registry.desiredIntent()), []);
+});
+
+test('startup restoration uses at most four concurrent starts and never reenrolls the persisted roster', { timeout: 5000 }, async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  for (let index = 1; index < 8; index++) {
+    const key = 'peer-' + index, revision = value(fixture.controller.view(fixture.record.fleetId)).revision;
+    value(await fixture.controller.editInstance(fixture.record.fleetId, revision, { kind: 'add', instance: { key, name: key, definition: 'analyst', workarea: 'agents/analyst/workarea/' + key } }));
+  }
+  await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  let active = 0, maximum = 0; const pending: (() => void)[] = [];
+  fixture.services.execution.prepare = async () => assert.fail('Restoration must not reenroll or approve a roster');
+  fixture.services.execution.start = async (_configuration, instance, _signal, reason) => {
+    assert.equal(reason, 'recovery'); active++; maximum = Math.max(maximum, active);
+    await new Promise<void>(resolve => { pending.push(resolve); }); active--;
+    const stop = new AbortController(); return success(runtimeFixture({ sessionId: instance.key, signal: stop.signal,
+      control: createListenerControl(async () => {}).connection, pointer: { runtime: 'fixture', sessionId: instance.key, workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } }));
+  };
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
+  await until(() => pending.length === 4); assert.equal(maximum, 4);
+  for (const complete of pending.slice(0, 4)) complete();
+  await until(() => pending.length === 8); assert.equal(maximum, 4);
+  for (const complete of pending.slice(4)) complete();
+  await restarted.ready(); assert.equal(active, 0); assert.equal(value(restarted.view(fixture.record.fleetId)).instances.filter(item => item.desiredActive).length, 8);
 });

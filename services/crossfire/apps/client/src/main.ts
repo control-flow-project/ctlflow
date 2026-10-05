@@ -19,8 +19,10 @@ import { listenerSettings } from './settings.js';
 import type { Manifest } from '@crossfire/contracts/release';
 import { roomOptions, runRoomCommand } from './room-access.js';
 import { listenerOptions } from './listener-options.js';
+import { publishReport } from './publish.js';
 
 const globals = ["project", "profile", "max-output-bytes"];
+const reportOptions = { publish: ['directory', 'title'] };
 const localOptions: Record<string, readonly string[]> = {
   connect: ['server', 'owner', 'runtime'], disconnect: [], status: [], test: [], read: ["room", "limit"], directory: ['search', 'page', 'page-size'],
   history: ['room', 'limit', 'direction', 'continuation'],
@@ -40,7 +42,7 @@ export async function main(arguments_: string[], installation: () => Manifest, f
     recordClaudeHook(JSON.parse(Buffer.concat(buffers).toString()) as unknown); return;
   }
   const options: Record<string, { type: "string" | "boolean"; multiple?: boolean }> = { help: { type: "boolean" } };
-  for (const name of [...globals, ...Object.values(localOptions).flat(), ...Object.values(roomOptions).flat(), ...operations.flatMap(operation => operationOptions(operation))]) {
+  for (const name of [...globals, ...Object.values(localOptions).flat(), ...Object.values(roomOptions).flat(), ...Object.values(reportOptions).flat(), ...operations.flatMap(operation => operationOptions(operation))]) {
     options[name] = { type: "string", multiple: true };
   }
   const parsed = parseArgs({ args: arguments_, allowPositionals: true, options });
@@ -53,14 +55,15 @@ export async function main(arguments_: string[], installation: () => Manifest, f
     else if (group === "matrix") emit({ namespace: "matrix", schema: "v1.12", operations: operations.map(operation => ({ command: operation.command, access: operation.access })) }, maximum);
     else emit({ usage: "node .crossfire/client.mjs [--project DIRECTORY] [--profile NAME] agent connect|disconnect|status|test|read|history|directory", agent: Object.fromEntries(Object.entries(localOptions).filter(([name]) => name !== 'listen')), room: roomOptions,
       matrix: "Native Matrix operation IDs converted to kebab-case; use matrix COMMAND --help.",
+      report: 'report publish --directory DIRECTORY --title TITLE uploads public static HTML, JavaScript and assets. Anyone with the link can read it.',
       output: "64 KiB default; finite --max-output-bytes 1024..98304",
       identity: "Project-local profiles; private owner DM, explicit additional rooms. The runtime server remains user-owned." }, maximum);
     return;
   }
-  if (group !== "agent" && group !== "matrix" && group !== 'room') throw new Error("Use agent, room or matrix");
+  if (group !== "agent" && group !== "matrix" && group !== 'room' && group !== 'report') throw new Error("Use agent, room, report or matrix");
   if (!command) throw new Error("Supply a command");
   const operation = group === "matrix" ? selectOperation(command) : undefined;
-  const commands: Record<string, readonly string[]> = group === 'room' ? roomOptions : localOptions;
+  const commands: Record<string, readonly string[]> = group === 'room' ? roomOptions : group === 'report' ? reportOptions : localOptions;
   if (!operation && !Object.hasOwn(commands, command)) throw new Error("Unknown command; use --help");
   const allowed = new Set([...globals, ...(operation ? operationOptions(operation) : commands[command]!)]);
   for (const name of Object.keys(values)) if (!allowed.has(name)) throw new Error("Unsupported option --" + name);
@@ -92,6 +95,13 @@ export async function main(arguments_: string[], installation: () => Manifest, f
   }
   const selected = readProfile(destination.profile);
   if (realpathSync(selected.workspace) !== destination.workspace) throw new Error("Profile belongs to another project");
+  if (group === 'report') {
+    const directory = option(values, 'directory'), title = option(values, 'title');
+    if (!directory || !title) throw new Error('Supply report publish --directory DIRECTORY --title TITLE; all report files become public');
+    const result = await publishReport(selected, directory, title);
+    if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message);
+    emit(result.value, maximum); return;
+  }
   if (group === 'agent' && (command === 'read' || command === 'history')) { await readHistory(destination, selected, command, values, maximum); return; }
   if (group === 'room' || group === 'agent' && command === 'directory') {
     const result = await runRoomCommand(selected, command, values);

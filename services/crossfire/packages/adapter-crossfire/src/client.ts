@@ -3,6 +3,8 @@ import { operationPath } from '@crossfire/contracts/rest/operation';
 import { decodeFailure, decodeResponse, type Response } from '@crossfire/contracts/rest/envelope';
 import { HTTP_LIMITS } from '@crossfire/contracts/rest/limits';
 import { failure, type Result } from '@crossfire/kernel/result';
+import { binaryInput } from '@crossfire/contracts/rest/binary';
+import { binaryRequest } from './binary-request.js';
 
 export type ClientOptions = { origin: string; token?: string; csrf?: string; signal?: AbortSignal; timeoutMs?: number; fetch?: typeof fetch };
 export function createClient(options: ClientOptions) {
@@ -15,17 +17,22 @@ export function createClient(options: ClientOptions) {
       params: Params, input: Input, query = new URLSearchParams(), signal?: AbortSignal): Promise<Result<Response<Output>>> {
       const checkedParams = operation.params(params), checkedInput = operation.input(input), checkedQuery = operation.query(query);
       if (!checkedParams.ok) return checkedParams; if (!checkedInput.ok) return checkedInput; if (!checkedQuery.ok) return checkedQuery;
-      const serialized = JSON.stringify(checkedInput.value);
-      if (new TextEncoder().encode(serialized).byteLength > (operation.requestBytes ?? HTTP_LIMITS.requestBytes)) return failure('body_too_large', 'Request exceeds the API input bound');
+      const binary = operation.requestFormat === 'binary' ? binaryInput(checkedInput.value) : undefined;
+      if (binary && !binary.ok) return binary;
+      const serialized = binary ? undefined : JSON.stringify(checkedInput.value);
+      const requestLength = binary?.ok ? binary.value.byteLength : new TextEncoder().encode(serialized).byteLength;
+      if (requestLength > (operation.requestBytes ?? HTTP_LIMITS.requestBytes)) return failure('body_too_large', 'Request exceeds the API input bound');
       const signals = [AbortSignal.timeout(options.timeoutMs ?? HTTP_LIMITS.requestMilliseconds)];
       if (options.signal) signals.push(options.signal); if (signal) signals.push(signal);
       try {
         const url = new URL(operationPath(operation.path, params), origin);
         url.search = query.toString();
-        const response = await (options.fetch ?? fetch)(url, { method: operation.method, redirect: 'error', credentials: options.token ? 'omit' : 'same-origin',
-          signal: AbortSignal.any(signals), headers: { Accept: 'application/json', ...(operation.method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
+        const request: RequestInit & { duplex?: 'half' } = { method: operation.method, redirect: 'error', credentials: options.token ? 'omit' : 'same-origin',
+          signal: AbortSignal.any(signals), headers: { Accept: 'application/json', ...(operation.method === 'GET' ? {} : {
+            'Content-Type': binary ? 'application/octet-stream' : 'application/json', ...(binary ? { 'Content-Length': String(requestLength) } : {}) }),
             ...(options.token && operation.auth !== 'public' ? { Authorization: 'Bearer ' + options.token } : {}), ...(options.csrf ? { 'X-Crossfire-CSRF': options.csrf } : {}) },
-          ...(operation.method === 'GET' ? {} : { body: serialized }) });
+          ...(operation.method === 'GET' ? {} : binary?.ok ? { body: binaryRequest(binary.value), duplex: 'half' } : serialized === undefined ? {} : { body: serialized }) };
+        const response = await (options.fetch ?? fetch)(url, request);
         if (!response.body) return failure('native', 'Missing API response');
         const parts: Uint8Array[] = []; let length = 0;
         const reader = response.body.getReader();

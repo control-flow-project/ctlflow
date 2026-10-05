@@ -181,9 +181,9 @@ test('fleet map REST is human-scoped, strictly validated, read-only and excludes
   const { fixture, fleet, ready, other } = await preparedMap(scope), { request } = await httpFixture(scope, fixture.application);
   const route = '/api/fleets/' + fleet.id + '/map';
   assert.equal((await request(route)).status, 401);
-  assert.equal((await request(route, 'GET', undefined, { Cookie: 'crossfire=' + other.secret })).status, 403);
+  assert.equal((await request(route, 'GET', undefined, { Cookie: '__Host-crossfire=' + other.secret })).status, 403);
   assert.equal((await request(route, 'GET', undefined, { Authorization: 'Bearer ' + ready.fleet!.controllerCredential })).status, 401);
-  const headers = { Cookie: 'crossfire=' + fixture.admin.secret };
+  const headers = { Cookie: '__Host-crossfire=' + fixture.admin.secret };
   const response = await request(route, 'GET', undefined, headers); assert.equal(response.status, 200);
   const raw = await response.json() as { data: unknown }, map = value(mapSchema(raw.data));
   assert.equal(map.agents.length, 24); assert.equal(response.headers.get('cache-control'), 'no-store');

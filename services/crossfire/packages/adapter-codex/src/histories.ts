@@ -1,32 +1,19 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import * as check from '@crossfire/contracts/schema/validation';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
+import { writeJson } from '@crossfire/adapter-filesystem/index';
+import { deliveryJournalExists, readDeliveryJournal } from '@crossfire/adapter-runtime/journal';
 import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
 import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
-import { success } from '@crossfire/kernel/result';
 import { openSession } from './session.js';
 import { codexDelivery, type CodexConnection } from './connection.js';
+import { contextState } from './context-state.js';
+import { codexInput } from './input.js';
 
-const contexts = check.object({ mode: check.choice('shared', 'per-room'), control: check.nullable(check.identifier),
-  rooms: check.list(check.object({ room: check.roomId, sessionId: check.identifier }), 2000) });
 export function codexHistories(options: { home: string; workspace: string; name: string; instructions: string; config: Record<string, unknown>;
   hooks: RuntimeHooks; mode: 'shared' | 'per-room'; endpoint: string; token: string; attachment: Omit<RuntimeAttachment, 'sessionId'>; allowNewHistory?: boolean }, signal: AbortSignal) {
-  const file = join(options.home, 'crossfire-contexts.json');
-  const loaded = contexts(existsSync(file) ? readJson<unknown>(file) : { mode: 'shared', control: null, rooms: [] });
-  if (!loaded.ok) throw new Error(loaded.error.message);
-  const state = loaded.value;
-  const sharedFile = join(options.home, 'crossfire-session.json');
-  const saved = existsSync(sharedFile) ? check.object({ sessionId: check.identifier })(readJson<unknown>(sharedFile)) : success(null);
-  if (!saved.ok) throw new Error(saved.error.message);
-  const sharedSessionId = saved.value?.sessionId;
+  const { file, state, sharedFile, sharedSessionId } = contextState(options.home);
   const primary = options.mode === 'shared' ? sharedSessionId : state.control;
   const changingMode = existsSync(file) && state.mode !== options.mode && (state.mode === 'shared' ? sharedSessionId : state.control);
-  const sessions = [sharedSessionId, state.control, ...state.rooms.map(room => room.sessionId)].filter((id): id is string => id != null);
-  if (new Set(state.rooms.map(room => room.room)).size !== state.rooms.length || new Set(sessions).size !== sessions.length) {
-    throw new Error('Native history bindings require unique rooms and distinct session identities');
-  }
   if (!primary && !changingMode && (!options.allowNewHistory || existsSync(file))) {
     throw Object.assign(new Error('Saved native history is missing. Resume cannot create a new history; use the explicit fresh-history operation if intended.'), { code: 'missing' });
   }
@@ -35,13 +22,21 @@ export function codexHistories(options: { home: string; workspace: string; name:
   const failed = new AbortController();
   const lifetime = AbortSignal.any([signal, failed.signal]);
   function receiptFile(context: string): string { return context === 'shared' ? sharedFile + '.receipt' : file + '.' + createHash('sha256').update(context).digest('hex') + '.receipt'; }
+  function retainedSession(context: string): string | null | undefined {
+    return opened.get(context)?.sessionId ?? (context === 'shared' ? sharedSessionId : context === 'control' ? state.control : state.rooms.find(room => room.room === context)?.sessionId);
+  }
+  function unacknowledged(context: string): boolean {
+    const receipt = receiptFile(context);
+    if (!deliveryJournalExists(receipt)) return false;
+    const sessionId = retainedSession(context);
+    if (!sessionId) throw new Error('Native publication journal has no retained context identity');
+    const journal = readDeliveryJournal(receipt, sessionId, codexInput);
+    return journal.pending !== null || journal.confirmed.length > 0;
+  }
   if (state.mode !== options.mode) {
     if (options.hooks.pendingDecisions?.()) throw new Error('Resolve original native decisions before changing history mode');
     for (const context of ['shared', 'control', ...state.rooms.map(room => room.room)]) {
-      const receipt = receiptFile(context);
-      if (!existsSync(receipt)) continue;
-      const journal = readJson<{ pending: unknown; confirmed: unknown[] }>(receipt, 32 * 1024 * 1024);
-      if (journal.pending !== null || journal.confirmed.length) throw new Error('Resolve and acknowledge native publication before changing history mode');
+      if (unacknowledged(context)) throw new Error('Resolve and acknowledge native publication before changing history mode');
     }
   }
   async function open(context: string): Promise<CodexConnection> {
@@ -70,20 +65,40 @@ export function codexHistories(options: { home: string; workspace: string; name:
         session.signal.addEventListener('abort', ended, { once: true });
         if (session.signal.aborted) ended();
         opened.set(context, connection); return connection;
-      } catch (error) { await session.close(); throw error; }
+      } catch (error) { if (connection) await connection.close(); else await session.close(); throw error; }
     })();
     initializing.set(context, pending);
     try { return await pending; } finally { initializing.delete(context); }
   }
   return { open, signal: lifetime,
-    async close() { failed.abort(new Error('Native history owner stopped')); await Promise.allSettled([...initializing.values()]); await Promise.all([...opened.values()].map(connection => connection.close())); },
+    async inspect() {
+      lifetime.throwIfAborted();
+      if (initializing.size || options.hooks.pendingDecisions?.()) return { busy: true };
+      const count = opened.size;
+      const inspector = opened.values().next().value;
+      if (!inspector) throw new Error('Native activity cannot be inspected without an owned live native connection');
+      for (const context of ['shared', 'control', ...state.rooms.map(room => room.room)]) {
+        const connection = opened.get(context);
+        if (connection) {
+          if (connection.unsettled() || (await connection.inspect()).busy) return { busy: true };
+        } else {
+          if (unacknowledged(context)) return { busy: true };
+          const sessionId = retainedSession(context);
+          if (sessionId && (await inspector.inspectSession(sessionId)).busy) return { busy: true };
+        }
+      }
+      return { busy: initializing.size > 0 || opened.size !== count || options.hooks.pendingDecisions?.() === true
+        || [...opened.values()].some(connection => connection.unsettled()) };
+    },
+    async close() {
+      failed.abort(new Error('Native history owner stopped')); await Promise.allSettled([...initializing.values()]);
+      const results = await Promise.allSettled([...opened.values()].map(connection => connection.close()));
+      const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown);
+      if (errors.length) throw new AggregateError(errors, 'Native history cleanup did not complete');
+    },
     async settle() {
       for (const context of ['shared', 'control', ...state.rooms.map(room => room.room)]) {
-        const receipt = receiptFile(context);
-        if (!opened.has(context) && existsSync(receipt)) {
-          const journal = readJson<{ pending: unknown; confirmed: unknown[] }>(receipt, 32 * 1024 * 1024);
-          if (journal.pending !== null || journal.confirmed.length) await open(context);
-        }
+        if (!opened.has(context) && unacknowledged(context)) await open(context);
       }
       let received = false; for (const connection of opened.values()) received = await connection.settle() || received; return received;
     },

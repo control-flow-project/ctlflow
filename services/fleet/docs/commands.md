@@ -48,7 +48,10 @@ Fleet and individual start and stop commands accept `--operation-id UUID` for an
 exact retry after uncertain submission; the command prints its ID before submission.
 Name collisions, missing credentials and invalid native settings stay errors.
 
-Contexts lists exact retained running histories and their native state. Attach
+Contexts lists exact saved histories even when stopped or sleeping, without
+starting native processes. `fleet show` reports native phase, desired activation,
+last activity and history availability. Explicit `fleet agent start` wakes a
+sleeping native engine without input or binding replacement. Attach
 without a context selects the shared history, or private control history in
 per-room mode. `--context` chooses an existing listed context; it never creates
 a new room conversation or reads credentials into public management output.
@@ -77,7 +80,9 @@ Crossfire UI provides equivalent revision-checked control. Connection loss pause
 delivery; reconnect applies current server intent. Direct listeners are independent.
 
 Message queues explicit input per enrolled agent through the controller. It
-does not join rooms, alter wake rules or start unavailable agents. The CLI prints
+does not join rooms, alter wake rules or revive explicitly stopped agents.
+A sleeping active binding resumes its exact native history for eligible input.
+The CLI prints
 a message UUID before submission. Retry uncertain submission with the same UUID
 and identical text; conflicting reuse fails. The fleet must be enabled and
 controller connected; messages expire after ten minutes.

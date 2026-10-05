@@ -4,6 +4,7 @@ import type { InputOf } from '@crossfire/contracts/rest/operation';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Help, Loaded, Panel, Pagination, Status, timestamp } from './ui.js';
+import { NativeRuntimeDetails } from './runtime-status.js';
 
 export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; agent?: AgentView; refresh(): void }) {
   const viewer = useSession(), action = useAction();
@@ -33,13 +34,16 @@ export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; age
     });
   }
   return <><Panel title={agent ? 'Agent session' : 'Fleet sessions'} description={agent ? 'Stop or resume this fleet-managed agent.' : 'Stop or resume every agent in this fleet. The controller stays connected.'}>
+    {agent && <NativeRuntimeDetails agent={agent}/>}
     <div className="actions"><button disabled={disabled} onClick={() => operate('start')}>{agent ? 'Resume session' : 'Resume sessions'}</button>
       <button disabled={disabled} onClick={() => operate('stop')}>{agent ? 'Stop session' : 'Stop sessions'}</button></div>
     <p className="support">Resume reopens the saved native histories with the same identity and configured parameters. If a saved history cannot be resumed, the operation fails instead of creating another one.</p>
+    {agent && agent.activity.status !== 'online' && <p className="support">Native activity is last reported while the listener is offline. Resume availability depends on the saved history, not a heartbeat.</p>}
     {fleet.delivery.connection.status !== 'online' && <p className="support plan-warning">The fleet controller must reconnect before session controls are available.</p>}
     <Alert>{action.error}</Alert><p role="status">{accepted}</p>
-    <Help title="Sessions and delivery are separate"><p>Stopping sessions terminates agent engines and their listeners, not the controller. Pausing delivery leaves engines running. After resume, delivery follows the fleet’s existing delivery setting.</p>
-      <p>Each running agent has its own listener. Shared or per-room native history follows that agent’s fleet configuration.</p></Help>
+    <Help title="Sessions, sleep and delivery"><p>The fleet controller receives messages for its agent bindings. Stopping sessions ends the native engines and prevents messages from starting them again until you resume. The controller stays connected.</p>
+      <p>Automatic sleep is different: the listener stays ready and an eligible message resumes the saved history. Pausing delivery prevents new input without replacing that history. Resume follows the fleet’s existing delivery setting.</p>
+      <p>Shared or per-room native history follows each agent’s fleet configuration. A reporting listener does not mean its native engine is running.</p></Help>
   </Panel><Panel title="Fresh history" description="Replace model context only when you intend to start over.">
     <p>The controller stops {agent ? 'this agent' : 'all agents'}, archives the old history bindings and starts fresh contexts. Authorized Matrix history and configuration are made available for selective reading. This does not delete chats, identities or permissions.</p>
     <div className="actions"><button className="danger" disabled={disabled} onClick={() => operate('reset')}>Start with fresh history</button><span className="support">Confirmation required</span></div>

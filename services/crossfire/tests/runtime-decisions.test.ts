@@ -66,6 +66,7 @@ test('execution state is per native history, incidents are deduplicated and lazy
   const fixture_ = await fixture(scope), { services, agent, runId, request, native } = fixture_;
   value(await native.matrix.provision(services.instance.serviceMatrixId, 'fixture-secret', 'fixture'));
   const base = { sessionId: request.sessionId, roomId: null, runtime: 'codex', historyMode: 'per-room' as const, maxInputBytes: 100000,
+    lastActivityAt: services.clock.now(), historyAvailable: true,
     observedAt: services.clock.now(), settings: [{ name: 'model', configured: 'fixture-model', effective: 'fixture-model' }], errorMessage: null };
   value(reportRuntime(services, agent.actor, agent.id, runId, { ...base, state: 'idle' }));
   assert.deepEqual(value(services.runtime.activeIncidents()), []);
@@ -82,6 +83,18 @@ test('execution state is per native history, incidents are deduplicated and lazy
   value(await reconcileRuntime(services, () => false));
   assert.equal(native.notices.size, 2);
   assert.equal(value(services.runtime.conversation(fixture_.owner.actor.principalId))!.roomId, conversation.roomId);
+});
+
+test('future native activity is rejected without overwriting the last confirmed history observation', async scope => {
+  const { services, agent, runId, request } = await fixture(scope);
+  const input = { sessionId: request.sessionId, roomId: null, runtime: 'codex', state: 'sleeping' as const,
+    historyMode: 'shared' as const, maxInputBytes: 65536, lastActivityAt: services.clock.now(), historyAvailable: true,
+    observedAt: services.clock.now(), settings: [], errorMessage: null };
+  value(reportRuntime(services, agent.actor, agent.id, runId, input));
+  const rejected = reportRuntime(services, agent.actor, agent.id, runId, { ...input, lastActivityAt: services.clock.now() + 60001 });
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.error.code, 'invalid');
+  assert.equal(value(services.runtime.observation(agent.id))[0]!.lastActivityAt, input.lastActivityAt);
 });
 
 test('idle heartbeat recovery restores contact without declaring a failed native history recovered', async scope => {

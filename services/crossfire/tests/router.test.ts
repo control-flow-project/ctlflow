@@ -1,6 +1,7 @@
 import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
+import { createServer, request as send, type Server } from 'node:http';
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -34,6 +35,38 @@ async function fixture(scope: TestContext) {
   });
   return routes.publicOrigin;
 }
+
+test('only exact current native registration and fallback paths reach Crossfire; removed forms never reach Matrix', async scope => {
+  const management: string[] = [], matrix: string[] = [];
+  async function listen(server: Server) {
+    server.listen(0, '127.0.0.1'); await once(server, 'listening');
+    const address = server.address(); assert(address && typeof address === 'object');
+    cleanup(scope, () => { server.closeAllConnections(); return new Promise<void>(resolve => server.close(() => resolve())); });
+    return 'http://127.0.0.1:' + address.port;
+  }
+  const serviceOrigin = await listen(createServer((request, response) => { management.push(request.url!); response.end('management'); }));
+  const matrixOrigin = await listen(createServer((request, response) => { matrix.push(request.url!); response.end('matrix'); }));
+  const routes = { publicOrigin: 'http://127.0.0.1', serviceOrigin, matrixOrigin, web: '/', element: '/' };
+  const router = publicRouter(routes); routes.publicOrigin = await listen(router);
+  const origin = new URL(routes.publicOrigin);
+  const request = (path: string) => new Promise<{ status: number; cache: string | undefined }>((resolve, reject) => {
+    const operation = send({ hostname: origin.hostname, port: origin.port, path, method: 'POST' }, response => {
+      response.resume(); response.once('end', () => resolve({ status: response.statusCode!, cache: response.headers['cache-control'] }));
+    }); operation.once('error', reject); operation.end('{}');
+  });
+  const register = '/_matrix/client/v3/register', fallback = '/_matrix/client/v3/auth/org.crossfire.login.registration/fallback/web';
+  for (const path of [register + '?kind=user', fallback + '?session=exact']) assert.equal((await request(path)).status, 200);
+  assert.deepEqual(management, [register + '?kind=user', fallback + '?session=exact']); assert.deepEqual(matrix, []);
+  for (const path of [register.replace('/v3/', '/r0/'), register.replace('/v3/', '/v1/'), register.replace('/v3/', '/unknown/'),
+    register.replace('/v3/', '/'), register + '/', register + '//', register.replace('register', 'reg%69ster'),
+    register.replace('/v3/', '/%76%33/'), '/_matrix/client/v3/../v3/register',
+    fallback.replace('/v3/', '/r0/'), fallback.replace('/v3/', '/unknown/'), fallback.replace('/v3/', '/'), fallback + '/',
+    fallback.replace('fallback', 'fall%62ack'), '/_matrix/client/v3/../v3/auth/org.crossfire.login.registration/fallback/web']) {
+    const response = await request(path); assert.equal(response.status, 404, path); assert.equal(response.cache, 'no-store', path);
+  }
+  assert.equal(management.length, 2); assert.deepEqual(matrix, []);
+  assert.equal((await request('/_matrix/client/v3/sync')).status, 200); assert.deepEqual(matrix, ['/_matrix/client/v3/sync']);
+});
 
 test('Element media directory serves its HTML index with same-origin framing, while application pages deny framing', async scope => {
   const origin = await fixture(scope);

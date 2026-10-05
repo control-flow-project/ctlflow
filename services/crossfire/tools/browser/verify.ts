@@ -18,7 +18,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
     const context = await browser.newContext();
     let token: string | undefined, csrf: string | undefined;
     const errors: string[] = [];
-    const routes = ['/manage/agents', '/manage/fleets', '/manage/wake-ups', '/manage/wake-ups/new', '/manage/connect', '/manage/connect/fleet', '/manage/enrollments', '/manage/audit'];
+    const routes = ['/manage/agents', '/manage/fleets', '/manage/reports', '/manage/wake-ups', '/manage/wake-ups/new', '/manage/connect', '/manage/connect/fleet', '/manage/enrollments', '/manage/audit'];
     if (human.viewer.member.roleCode === 'administrator') routes.push('/manage/members', '/manage/invitations', '/manage/policy');
     for (const fleet of fleets.value) for (const suffix of ['', '/map', '/statistics', '/delivery', '/sessions', '/messages', '/rooms', '/settings']) routes.push('/manage/fleets/' + fleet.fleetId + suffix);
     const agent = agents.value[0];

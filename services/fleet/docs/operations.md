@@ -7,7 +7,9 @@ and back up the private controller root, fleet directory and provider state.
 Verify checksums before replacement. Keep credentials out of logs and source.
 
 Update controller/CLI code and the relevant definitions, then start the same
-controller/root and fleet. Each saved instance reuses its identity, session UUID
+controller/root. Desired active bindings restore automatically; explicitly
+stopped agents remain stopped. Use `fleet start` only when activation is intended.
+Each saved instance reuses its identity, session UUID
 and delivery state. Check all per-instance outcomes and effective native settings,
 not just controller connectivity. Native approval requests use the canonical
 owner DM. Do not assign shared-room access merely to make a test respond.
@@ -22,7 +24,9 @@ A stopped fleet directory contains its definitions, private Crossfire binding,
 work areas, sessions and receipts. Preserve private modes, credentials and native
 provider configuration when transferring it. The target requires the same runtime
 and provider prerequisites. Register its new absolute directory explicitly.
-The controller registry is machine-local; the fleet's private state is not a
+Preserve the private controller root, including `desired-intent.json`, when
+restarting on the same machine. Daemon shutdown retains active intent; explicit
+fleet/agent stop clears it. The controller registry is machine-local; the fleet's private state is not a
 public lookup or identity-recovery credential substitute.
 
 Never run two controllers against the same active private fleet state. Exclusive
@@ -36,6 +40,7 @@ not ownership. Do not remove state to bypass a lock or failed resume.
 | Pending approval | Review the roster URL/code; do not enroll again or poll with a model. |
 | Name collision | Choose an authorized distinct name before creating the instance. |
 | Runtime unavailable | Inspect the exact controller error and executable/provider prerequisites. |
+| Native state sleeping | The listener can still be online. Eligible input resumes retained history; metadata GETs never wake it. |
 | Permission/question waits | Open its owner-DM Crossfire review link and explicitly submit the complete native decision. |
 | Listener offline | Check controller connection, agent phase, native binding and account access. |
 | Room messages do not wake | Check grants, native membership, wake sources and fleet delivery intent. |

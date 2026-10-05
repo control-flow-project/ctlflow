@@ -15,7 +15,7 @@ node services/fleetd/dist/apps/daemon/src/main.js --name laptop --root /absolute
 ```
 
 The controller root contains its private descriptor, registry, operation state,
-log and `fleetd.sock`. The API binds only this Unix socket, not a public port.
+desired binding intent, log and `fleetd.sock`. The API binds only this Unix socket, not a public port.
 Private SQLite exclusive transactions own the daemon and each active fleet/receiver;
 OS locks survive suspension and release on process exit. No timeout lease or
 process-name scanning decides ownership. One root has one stable controller name.
@@ -56,7 +56,15 @@ change room/wake permissions, operate another fleet or become a human login.
 The model sees its role and intentional coordination tools, never controller
 credentials or a duty to enroll, poll, update software or emit heartbeats.
 
-Orderly shutdown stops all owned listeners and Codex processes. Whole descendant
+fleetd itself hosts the fleet listeners with one shared control endpoint; it
+does not launch a second listener process. Owned native processes sleep after
+30 idle minutes by default, while their independent receivers remain online.
+Eligible input resumes the exact saved native histories. Crossfire owns the
+instance-wide timeout; directly attached sessions are unaffected.
+
+Orderly shutdown stops all owned listeners and Codex processes, preserving
+desired activation for restart with the same root. Explicit Stop remains stopped.
+Whole descendant
 process supervision after a crash is not promised. No systemd, privileged daemon,
 global skill, host package installer or shell supervisor is installed.
 

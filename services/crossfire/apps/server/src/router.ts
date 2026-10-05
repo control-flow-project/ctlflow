@@ -32,8 +32,17 @@ export function publicRouter(routes: Routes) {
     }
     const path = url.pathname;
     const native = path.startsWith('/_matrix/');
-    const registration = /^\/_matrix\/client\/[^/]+\/register\/?$/u.test(path);
-    const registrationAuthentication = /^\/_matrix\/client\/[^/]+\/auth\/org\.crossfire\.login\.registration\/fallback\/web\/?$/u.test(path);
+    let decodedPath = path;
+    try { if (native) decodedPath = decodeURIComponent(path); }
+    catch { response.writeHead(400); response.end('Invalid request path encoding'); return; }
+    const registration = path === '/_matrix/client/v3/register';
+    const registrationAuthentication = path === '/_matrix/client/v3/auth/org.crossfire.login.registration/fallback/web';
+    const exactPath = (request.url ?? '/').split('?')[0] === path;
+    if (((!registration || !exactPath) && /^\/_matrix\/client\/(?:.*\/)?register\/*$/u.test(decodedPath))
+      || ((!registrationAuthentication || !exactPath) && /^\/_matrix\/client\/(?:.*\/)?auth\/org\.crossfire\.login\.registration\/fallback\/web\/*$/u.test(decodedPath))) {
+      response.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      response.end(JSON.stringify({ errcode: 'M_UNRECOGNIZED', error: 'Unsupported registration path' })); return;
+    }
     const elementConfiguration = path === '/config.json' || path === '/config.' + new URL(routes.publicOrigin).hostname + '.json';
     const management = path === '/_matrix/client/v3/user_directory/search' || registration || registrationAuthentication || elementConfiguration || path.startsWith('/api/') || path.startsWith('/onboarding/');
     if (native || management) {

@@ -49,12 +49,12 @@ test('HTTP heartbeat binds native identity; disconnect requires owner/admin, rev
   const run = randomUUID(), path = '/api/agents/' + agent.id, input = { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 0, controllerBound: false, stopped: false };
   for (const token of ['bad', owner.token, other.token]) assert.notEqual((await request(path + '/listener-runs/' + run, 'PUT', input, { Authorization: 'Bearer ' + token })).status, 200);
   const auth = { Authorization: 'Bearer ' + agent.token };
-  assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, { ...auth, Cookie: 'crossfire=' + owner.secret })).status, 400);
+  assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, { ...auth, Cookie: '__Host-crossfire=' + owner.secret })).status, 400);
   assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, { ...auth, Origin: 'https://wrong.invalid' })).status, 403);
   assert.equal((await request(path + '/listener-runs/' + run, 'PUT', input, auth)).status, 200);
   const stop = { expectedRevision: 0, runIds: [run] };
   assert.equal((await request(path + '/listener-disconnections', 'POST', stop, auth)).status, 401);
-  assert.equal((await request(path + '/listener-disconnections', 'POST', stop, { Cookie: 'crossfire=' + owner.secret, Origin: origin })).status, 403);
+  assert.equal((await request(path + '/listener-disconnections', 'POST', stop, { Cookie: '__Host-crossfire=' + owner.secret, Origin: origin })).status, 403);
   assert.equal((await request(path + '/listener-disconnections', 'POST', stop, headers(other))).status, 404);
   assert.equal((await request(path + '/listener-disconnections', 'POST', stop, headers(owner))).status, 202);
   const result = await request(path + '/listener-runs/' + run, 'PUT', input, auth);

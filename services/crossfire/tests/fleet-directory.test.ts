@@ -17,7 +17,7 @@ test('fleet directory composes bounded canonical pages, retains filters and does
   const client = (cookie: string, failPage?: number) => createClient({ origin, fetch: async (input, options) => {
     const url = new URL(String(input)); requests.push(url);
     if (url.searchParams.get('page') === String(failPage)) return new Response(JSON.stringify({ error: { code: 'unavailable', message: 'Fixture page unavailable' }, meta: { requestId: randomUUID() } }), { status: 503 });
-    return fetch(input, { ...options, headers: { ...options?.headers, Cookie: 'crossfire=' + cookie } });
+    return fetch(input, { ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + cookie } });
   } });
   const all = value(await readFleetDirectory(client(admin.secret), 'ownerId=' + admin.actor.principalId + '&page=4&pageSize=10&search=workstation'));
   assert.equal(all.length, 103); assert.equal(new Set(all.map(fleet => fleet.fleetId)).size, 103);

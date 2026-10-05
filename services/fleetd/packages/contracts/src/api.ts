@@ -3,11 +3,14 @@ import { controller } from '@crossfire/contracts/schema/controller';
 import { operation } from '@crossfire/contracts/rest/operation';
 import { failure, success } from '@crossfire/kernel/result';
 import { page, none } from '@crossfire/contracts/schema/query';
-import { instance } from './configuration.js';
 import { attachment } from './attachment.js';
 import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@crossfire/contracts/fleet-control';
-export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'stopping', 'failed');
-export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, sessionId: check.nullable(check.text(200)), error: check.nullable(check.text(4096)), startedAt: check.nullable(check.integer()) });
+const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
+  listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')) })) });
+export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'sleeping', 'waking', 'stopping', 'failed');
+export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, desiredActive: check.boolean,
+  lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean),
+  sessionId: check.nullable(check.text(200)), error: check.nullable(check.text(4096)), startedAt: check.nullable(check.integer()) });
 export const fleetView = check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), directory: check.text(4096), revision: check.integer(), controller,
   phase, instances: check.list(instanceView, 100), error: check.nullable(check.text(4096)),
   connection: check.object({ connected: check.boolean, deliveryEnabled: check.boolean, revision: check.nullable(check.integer()), error: check.nullable(check.text(4096)) }) });
@@ -39,10 +42,10 @@ export const operations = {
   addAgent: operation({ ...common, method: 'POST', path: '/api/fleets/{fleetId}/agents', params, query: none, input: check.object({ expectedRevision: check.integer(), instance }), output: fleetView, status: 201, description: 'Add defined instance' }),
   agent: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents/{instanceKey}', params: agentParams, query: none, input: check.empty, output: instanceView, description: 'Instance details' }),
   contexts: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents/{instanceKey}/contexts', params: agentParams, query: none, input: check.empty,
-    output: check.list(check.object({ context: check.text(255), runtime: check.name, sessionId: check.text(200) }), 2002), description: 'Retained native history identities' }),
+    output: check.list(check.object({ context: check.text(255), runtime: check.name, sessionId: check.text(200) }), 2002), description: 'Read retained native history identities without starting a session' }),
   attachment: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents/{instanceKey}/attachment', params: agentParams,
     query: input => { if (!(input instanceof URLSearchParams) || [...input.keys()].some(key => key !== 'context') || input.getAll('context').length > 1) return failure('invalid', 'Use one exact context'); return check.object({ context: check.optional(check.text(255)) })(input.has('context') ? { context: input.get('context') } : {}); },
-    input: check.empty, output: attachment, description: 'Private running-session terminal attachment' }),
+    input: check.empty, output: attachment, description: 'Read a private live terminal pointer; sleeping and stopped sessions require explicit resume' }),
   changeAgent: operation({ ...common, method: 'PATCH', path: '/api/fleets/{fleetId}/agents/{instanceKey}', params: agentParams, query: none, input: check.object({ expectedRevision: check.integer(), definition: check.name }), output: fleetView, description: 'Change a stopped instance definition' }),
   removeAgent: operation({ ...common, method: 'DELETE', path: '/api/fleets/{fleetId}/agents/{instanceKey}', params: agentParams, query: none, input: check.object({ expectedRevision: check.integer() }), output: fleetView, description: 'Detach a stopped instance' }),
   operate: operation({ ...common, method: 'POST', path: '/api/operations', params: check.empty, query: none, input: operationInput, output: operationView, status: 202, description: 'Request lifecycle operation' }),

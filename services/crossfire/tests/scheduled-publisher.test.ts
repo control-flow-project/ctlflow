@@ -8,6 +8,7 @@ import { scheduledPublisher } from '@crossfire/agent-core/scheduled';
 import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
 import { nativeClock } from '@crossfire/adapter-runtime/clock';
 import { nativeDelivery } from '@crossfire/adapter-runtime/delivery';
+import { deliveryText } from '@crossfire/adapter-runtime/journal';
 import { localState } from '@crossfire/adapter-filesystem/state';
 import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { createWakeRule, changeWakeRule } from '@crossfire/domain/wake-up/manage';
@@ -16,6 +17,8 @@ import { readWakeRule } from '@crossfire/domain/wake-up/read';
 import * as check from '@crossfire/contracts/schema/validation';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
+const nativeInput = check.object({ text: deliveryText, messageId: check.text(200), boundary: check.integer() });
+const prepare = (text: string, messageId: string) => ({ text, messageId, boundary: 0 });
 
 test('scheduled checkpoints recover only receipts before other input and retain unacknowledged delivery', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, http = await httpFixture(scope, fixture.application);
@@ -27,8 +30,8 @@ test('scheduled checkpoints recover only receipts before other input and retain 
   let publications = 0, receipt = false;
   const inputs: string[] = [];
   const runtime = nativeDelivery({ sessionId: 'same-native-session', approval: 'none', signal: new AbortController().signal, verify: () => {},
-    inspect: async () => ({ busy: false }), boundary: () => 0, received: () => receipt,
-    publish: input => { publications++; inputs.push(input.text); if (!receipt) throw new Error('Lost native publication response'); }, close: () => {} }, check.integer(),
+    inspect: async () => ({ busy: false }), prepare, received: () => receipt,
+    publish: input => { publications++; inputs.push(input.text); if (!receipt) throw new Error('Lost native publication response'); }, close: () => {} }, nativeInput,
   { journal: join(directory, 'native.json'), pollMs: 100, timeoutMs: 100 });
   cleanup(scope, () => runtime.close());
   const coordination = createCoordination({ origin: http.origin, token: agent.token }), file = join(directory, 'scheduled.json');
@@ -67,8 +70,8 @@ test('busy schedules make no claims or model submissions and a disabled queued i
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/scheduled-busy-'));
   let busy = true, published = 0;
   const cancel = new AbortController(), runtime = nativeDelivery({ sessionId: 'native-session', approval: 'none', signal: new AbortController().signal, verify: () => {},
-    inspect: async () => ({ busy }), boundary: () => 0, received: () => false, publish: () => { published++; cancel.abort(new Error('Owner pause')); },
-    cancel: () => true, close: () => {} }, check.integer(), { journal: join(directory, 'native.json'), pollMs: 100 });
+    inspect: async () => ({ busy }), prepare, received: () => false, publish: () => { published++; cancel.abort(new Error('Owner pause')); },
+    cancel: () => true, close: () => {} }, nativeInput, { journal: join(directory, 'native.json'), pollMs: 100 });
   cleanup(scope, () => runtime.close());
   const coordination = createCoordination({ origin: http.origin, token: agent.token });
   const publisher = () => scheduledPublisher({ clock: nativeClock, coordination, storage: localState, file: join(directory, 'scheduled.json'), runtime, artifacts: messageArtifacts(localState, join(directory, 'messages'), Date.now), maximum: 65536,

@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { readJson } from "@crossfire/adapter-filesystem/index";
 import { loadControl } from "@crossfire/agent-core/control";
-import { isListenerStop } from '@crossfire/agent-core/lifecycle';
+import { isListenerStop } from '@crossfire/kernel/lifecycle';
 import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD } from "./test-support/listener.js";
 
 test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", withClock(async (scope, clock) => {

@@ -8,7 +8,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { builtRelease } from '../scripts/test-support/release.js';
 import { readJson } from '@crossfire/adapter-filesystem/index';
@@ -21,13 +21,14 @@ test('published bootstrap connects a real Codex session after native human appro
   const home = join(directory, 'home'), project = join(directory, 'project');
   mkdirSync(home, { mode: 0o700 }); mkdirSync(project, { mode: 0o700 });
   execFileSync('git', ['init', '--quiet', project]);
+  const release = builtRelease().release, fixture = await nativeServer(scope, release);
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, project, ['-c', 'sandbox_mode="danger-full-access"']);
   await materialize(engine, provider);
-  const release = builtRelease().release, fixture = await nativeServer(scope, release);
   const { services, origin, worker, admin } = fixture;
   const human = { id: admin.member.principal.matrixUserId, token: admin.token };
-  const environment = { ...process.env, RUNCODEX_CONNECTION_FILE: join(home, 'connection.json'), CODEX_THREAD_ID: engine.session, CROSSFIRE_AGENT_NAME: 'holmes' };
+  const environment = { ...process.env, CURL_CA_BUNDLE: process.env.NODE_EXTRA_CA_CERTS,
+    RUNCODEX_CONNECTION_FILE: join(home, 'connection.json'), CODEX_THREAD_ID: engine.session, CROSSFIRE_AGENT_NAME: 'holmes' };
   const guide = await fetch(onboardingUrl(origin, human.id));
   assert.equal(guide.status, 200);
   const commands = [...(await guide.text()).matchAll(/```bash\n([\s\S]*?)\n```/gu)];

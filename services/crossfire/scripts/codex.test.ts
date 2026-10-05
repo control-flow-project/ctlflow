@@ -12,8 +12,8 @@ test('native delivery verifies the selected workspace and uses only start-or-ste
   fixture.update({ status: 'active' });
   await connection.deliver('active input', 'second');
   assert.deepEqual(fixture.requests().map(request => request.method),
-    ['initialize', 'initialized', 'thread/read', 'thread/resume', 'thread/read', 'thread/read', 'thread/timeline/list', 'turn/start', 'thread/timeline/list',
-      'thread/read', 'thread/timeline/list', 'turn/start', 'thread/timeline/list']);
+    ['initialize', 'initialized', 'thread/read', 'thread/resume', 'thread/read', 'thread/read', 'thread/timeline/list', 'turn/start', 'thread/read', 'thread/timeline/list',
+      'thread/read', 'thread/timeline/list', 'turn/start', 'thread/read', 'thread/timeline/list']);
   const starts = fixture.requests().filter(request => request.method === 'turn/start');
   assert.deepEqual(starts.map(request => request.params), ['idle input', 'active input'].map((text, index) => ({
     threadId: THREAD, clientUserMessageId: index === 0 ? 'first' : 'second',
@@ -175,7 +175,7 @@ test('interrupted input is retried only after complete bounded history proves it
       { type: 'turnCompleted', turnId: 'existing-turn', position: 3, status: 'interrupted' }], nextCursor: 'next' },
     { data: [{ type: 'turnStarted', turnId: 'existing-turn', position: 1 }], nextCursor: null },
   ] });
-  fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
+  fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted', error: null } });
   await delivery;
   const starts = fixture.requests().filter(request => request.method === 'turn/start');
   assert.equal(starts.length, 2);
@@ -222,7 +222,7 @@ test('uncertain, malformed, foreign, cyclic, or excessive history cannot authori
     const rejection = assert.rejects(connection.deliver('input', 'input'));
     await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
     fixture.update(configuration);
-    fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
+    fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted', error: null } });
     await rejection;
     assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
     connection.close();
@@ -235,7 +235,7 @@ test('successful or failed turns without input evidence stop instead of resubmit
     const connection = await connectCodex(fixture.options, new AbortController().signal);
     const rejection = assert.rejects(connection.deliver('input', 'input'), /without recording the input/);
     await until(() => fixture.requests().some(request => request.method === 'turn/start'));
-    fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status } });
+    fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status, error: null } });
     await rejection;
     assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
     connection.close();

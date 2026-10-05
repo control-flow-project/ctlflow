@@ -1,26 +1,43 @@
 import { cleanup } from '@crossfire/test-support/cleanup';
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { readdir, readFile, readlink } from 'node:fs/promises';
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { promisify } from "node:util";
 import type { TestContext } from "node:test";
 import { request, string } from "./native-http.js";
+import { conduitBinary } from './conduit-assets.js';
+export { conduitImage } from './conduit-assets.js';
 
-export const conduitImage = "matrixconduit/matrix-conduit@sha256:f13263ad11be1f41cc4d89d8ee0f4ccbcc846efacf51abab2d859e073faef642";
-const execute = promisify(execFile);
-
-async function docker(args: string[]): Promise<string> {
-  const result = await execute("docker", args, { encoding: "utf8", timeout: 120_000, maxBuffer: 1024 * 1024 });
-  return result.stdout.trim();
+async function listeningPort(pid: number): Promise<number | undefined> {
+  const descriptors = await readdir('/proc/' + pid + '/fd');
+  const sockets = new Set<string>();
+  for (const descriptor of descriptors) {
+    try {
+      const target = await readlink('/proc/' + pid + '/fd/' + descriptor);
+      const socket = /^socket:\[(\d+)\]$/u.exec(target);
+      if (socket) sockets.add(socket[1]!);
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+    }
+  }
+  const table = await readFile('/proc/' + pid + '/net/tcp', 'utf8');
+  const ports = table.trim().split('\n').slice(1).flatMap(row => {
+    const columns = row.trim().split(/\s+/u);
+    if (columns[3] !== '0A' || !sockets.has(columns[9]!)) return [];
+    const address = /^0100007F:([A-F0-9]{4})$/u.exec(columns[1]!);
+    return address ? [Number.parseInt(address[1]!, 16)] : [];
+  });
+  assert(ports.length <= 1, 'Conduit owns exactly one loopback HTTP listener');
+  return ports[0];
 }
 
 export async function conduitFixture(context: TestContext, options: { jwtSecret?: string } = {}) {
   const started = performance.now();
-  const name = "crossfire-architecture-" + randomUUID();
   const registrationToken = randomUUID();
+  mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-conduit-"));
   const database = join(directory, "database");
   mkdirSync(database, { mode: 0o700 });
@@ -28,9 +45,9 @@ export async function conduitFixture(context: TestContext, options: { jwtSecret?
   writeFileSync(config, `[global]
 server_name = "architecture.localhost"
 database_backend = "rocksdb"
-database_path = "/var/lib/matrix-conduit"
-address = "0.0.0.0"
-port = 6167
+database_path = ${JSON.stringify(database)}
+address = "127.0.0.1"
+port = 0
 allow_federation = false
 allow_registration = true
 registration_token = "${registrationToken}"
@@ -41,33 +58,32 @@ allow_check_for_updates = false
 trusted_servers = []
 log = "warn"
 `, { mode: 0o600 });
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await docker([
-        "run", "--detach", "--rm", "--pull=never", "--name", name, "--label", "crossfire.fixture=architecture",
-        "--publish", "127.0.0.1::6167",
-        "--mount", "type=bind,src=" + config + ",dst=/etc/conduit.toml,readonly",
-        "--mount", "type=bind,src=" + database + ",dst=/var/lib/matrix-conduit",
-        "--env", "CONDUIT_CONFIG=/etc/conduit.toml", conduitImage,
-      ]);
-      break;
-    } catch (error) {
-      if (!(error instanceof Error) || !error.message.includes('bind: address already in use')) throw error;
-      await docker(['rm', '--force', name]);
-      if (attempt >= 2) throw error;
-      context.diagnostic('Docker port acquisition collided with a live host socket; acquiring a fresh native binding');
-    }
-  }
+  const child = spawn(conduitBinary(), [], { env: { ...process.env, CONDUIT_CONFIG: config, TOKIO_WORKER_THREADS: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '', failure: Error | undefined;
+  const append = (bytes: Buffer) => { output = (output + bytes.toString('utf8')).slice(-16000); };
+  child.stdout.on('data', append); child.stderr.on('data', append); child.on('error', error => { failure = error; });
+  const exited = new Promise<number | null>(resolve => { child.once('close', resolve); });
   cleanup(context, async () => {
-    const before = performance.now(); await docker(["stop", "--timeout", "5", name]);
+    const before = performance.now(); child.kill('SIGTERM');
+    const deadline = setTimeout(() => child.kill('SIGKILL'), 5000);
+    try { assert.equal(await exited, 0, output); } finally { clearTimeout(deadline); }
     context.diagnostic('Conduit teardown: ' + Math.round(performance.now() - before) + 'ms');
   });
-  const binding = await docker(["port", name, "6167/tcp"]);
-  assert.match(binding, /^127\.0\.0\.1:\d+$/);
-  const base = "http://" + binding;
+  assert(child.pid !== undefined);
+  let base = '';
   const deadline = Date.now() + 30_000;
   for (;;) {
+    if (failure) throw failure;
+    assert.equal(child.exitCode, null, 'Native Conduit exited before readiness: ' + output);
     try {
+      const port = await listeningPort(child.pid);
+      if (port === undefined) {
+        assert(Date.now() < deadline, 'Conduit must bind its HTTP listener before the deadline');
+        await delay(100);
+        continue;
+      }
+      base = 'http://127.0.0.1:' + port;
       const response = await request(base, "GET", "/_matrix/client/versions");
       assert.equal(response.status, 200);
       console.log("Isolated Conduit native transport ready.");
@@ -75,8 +91,7 @@ log = "warn"
       break;
     } catch (error) {
       if (Date.now() >= deadline) {
-        const logs = await execute("docker", ["logs", "--tail", "15", name], { encoding: "utf8", timeout: 10_000 });
-        console.error(logs.stdout + logs.stderr);
+        console.error(output);
         throw error;
       }
       await delay(100);

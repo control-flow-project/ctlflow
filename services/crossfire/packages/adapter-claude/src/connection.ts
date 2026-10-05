@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { object } from '@crossfire/contracts/validation';
 import { historyBoundary, captureHistory, historySince } from '@crossfire/adapter-runtime/native-file';
 import { nativeDelivery } from '@crossfire/adapter-runtime/delivery';
+import { deliveryText } from '@crossfire/adapter-runtime/journal';
 import * as check from '@crossfire/contracts/schema/validation';
 import { verifyClaude, type ClaudeContext } from './context.js';
 import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
@@ -59,7 +60,8 @@ export async function connectClaude(context: ClaudeContext, options: { journal: 
   }
   try {
     return nativeDelivery({
-      sessionId: context.session, approval: 'runtime', signal, verify, boundary: () => ({ history: captureHistory(context.transcript), publisher: process.pid }),
+      sessionId: context.session, approval: 'runtime', signal, verify,
+      prepare: (text, messageId) => ({ text, messageId, boundary: { history: captureHistory(context.transcript), publisher: process.pid } }),
       inspect: async () => { verify(); return { busy }; },
       publish: input => publish(input.text, input.messageId),
       received: input => historySince(context.transcript, input.boundary.history).some(record => {
@@ -73,6 +75,6 @@ export async function connectClaude(context: ClaudeContext, options: { journal: 
         return true;
       }) ? true : busy ? 'waiting' : false,
       close: () => { clearInterval(timer); signal.removeEventListener('abort', close); close(); },
-    }, check.object({ history: historyBoundary, publisher: check.integer(1) }), options);
+    }, check.object({ text: deliveryText, messageId: check.text(200), boundary: check.object({ history: historyBoundary, publisher: check.integer(1) }) }), options);
   } catch (error) { clearInterval(timer); signal.removeEventListener('abort', close); close(); throw error; }
 }

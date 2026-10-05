@@ -15,6 +15,7 @@ export type Context = { services: Services; requestId: string; actor: Actor | nu
 export type Endpoint = {
   method: string; path: string; auth: 'public' | 'human' | 'agent' | 'either' | 'fleet'; status: number; collection: boolean;
   requestBytes?: number;
+  requestFormat?: 'binary';
   match(pathname: string): Record<string, string> | null;
   invoke(context: Context, params: unknown, query: URLSearchParams, input: unknown): Promise<Result<Reply>>;
 };
@@ -25,6 +26,7 @@ export function bind<Params, Query, Input, Output>(operation: Operation<Params, 
     .replace(/\\\{([A-Za-z]+)\\\}/gu, (_match, key: string) => { keys.push(key); return '([^/]+)'; }) + '$', 'u');
   return { method: operation.method, path: operation.path, auth: operation.auth, status: operation.status, collection: operation.collection,
     ...(operation.requestBytes === undefined ? {} : { requestBytes: operation.requestBytes }),
+    ...(operation.requestFormat === undefined ? {} : { requestFormat: operation.requestFormat }),
     match(pathname) {
       const matched = expression.exec(pathname);
       if (!matched) return null;

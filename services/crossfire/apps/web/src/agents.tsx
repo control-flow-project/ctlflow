@@ -10,21 +10,23 @@ import { AgentWake } from './agent-wake.js';
 import { ListenerVersions } from './listener-versions.js';
 import { AgentNavigation, type AgentSection } from './agent-navigation.js';
 import { AgentSessions } from './fleet-sessions.js';
+import { NativeRuntimeStatus, NativeRuntimeDetails } from './runtime-status.js';
 
 export function Agents() {
   const resource = useResource(operations.agents, {}, location.search, HEARTBEAT_MS);
   return <Page title="Agents" description="Listener status, room access and agent owners."
     action={<><button onClick={resource.refresh}>Refresh</button><a className="button primary" href="/manage/connect">Connect an agent ↗</a></>}>
-      <AgentFilters/><Loaded {...resource} retry={resource.refresh}>{page => <>{page.data.length ? <div className="table-wrap"><table aria-label="Agents"><thead><tr><th scope="col">Agent</th><th scope="col">Owner</th><th scope="col">Deployment</th><th scope="col">Listener</th><th scope="col">Account</th><th scope="col">Last heartbeat</th></tr></thead><tbody>{page.data.map(agent =>
-        <tr key={agent.agentId}><td><a className="record-link" href={'/manage/agents/' + agent.agentId}>{agent.displayName}</a></td><td>{agent.owner.displayName}<span className="subline">{agent.owner.matrixUserId}</span></td><td>{agent.deployment ? <><a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a><span className="subline">{agent.deployment.controllerName}</span></> : <span className="muted">Direct</span>}</td><td><Status value={agent.activity.status}/></td><td><Status value={agent.status}/></td><td>{agent.activity.lastSeenAt === null ? <span className="muted">Not reported</span> : timestamp(agent.activity.lastSeenAt)}</td></tr>)}</tbody></table></div>
+      <AgentFilters/><Loaded {...resource} retry={resource.refresh}>{page => <>{page.data.length ? <div className="table-wrap"><table aria-label="Agents"><thead><tr><th scope="col">Agent</th><th scope="col">Owner</th><th scope="col">Deployment</th><th scope="col">Listener</th><th scope="col">Native session</th><th scope="col">Account</th><th scope="col">Last heartbeat</th></tr></thead><tbody>{page.data.map(agent =>
+        <tr key={agent.agentId}><td><a className="record-link" href={'/manage/agents/' + agent.agentId}>{agent.displayName}</a></td><td>{agent.owner.displayName}<span className="subline">{agent.owner.matrixUserId}</span></td><td>{agent.deployment ? <><a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a><span className="subline">{agent.deployment.controllerName}</span></> : <span className="muted">Direct</span>}</td><td><Status value={agent.activity.status}/></td><td><NativeRuntimeStatus agent={agent}/></td><td><Status value={agent.status}/></td><td>{agent.activity.lastSeenAt === null ? <span className="muted">Not reported</span> : timestamp(agent.activity.lastSeenAt)}</td></tr>)}</tbody></table></div>
         : <Empty title="No matching agents">Connect an agent or adjust the filters.</Empty>}<Pagination meta={page.meta}/></>}</Loaded>
-    <Help title="What does listener status mean?"><p>Listeners ping every 30 seconds without model calls. They show offline after 90 seconds without a ping. Account access is separate.</p></Help>
+    <Help title="What does listener status mean?"><p>Listeners ping every 30 seconds without model calls. They show offline after 90 seconds without a ping. Account access and native activity are separate.</p>
+      <p>A fleet-managed agent can sleep while its listener remains ready. Eligible messages resume its saved history. A manually stopped session requires an explicit resume.</p></Help>
   </Page>;
 }
 function Activity({ agent }: { agent: AgentView }) {
   const viewer = useSession(), action = useAction();
   const activity = agent.activity;
-  return <Panel title="Listener activity"><div className="activity-stats">
+  return <><Panel title="Listener activity"><div className="activity-stats">
     <div><span>Listener status</span><strong><Status value={activity.status}/></strong><small>{activity.activeRuns.length} reporting listeners</small></div>
     <div><span>Active listener time</span><strong>{Math.floor(activity.activeMs / 60000)}m {Math.floor(activity.activeMs / 1000) % 60}s</strong><small>Observed across listener runs</small></div>
     <div><span>Messages delivered</span><strong>{activity.messagesDelivered}</strong><small>Receipt-confirmed chat inputs</small></div>
@@ -33,7 +35,8 @@ function Activity({ agent }: { agent: AgentView }) {
       {agent.allowedActions.includes('listener.disconnect') && <button className="danger" disabled={!activity.activeRuns.length || action.pending} onClick={() => {
         if (confirm('Disconnect these reporting listeners? Agent identity, rooms and saved sessions remain.')) void action.run(() => call(operations.disconnectListeners,
           { agentId: agent.agentId }, { expectedRevision: agent.revision, runIds: activity.activeRuns.map(run => run.runId) }, viewer.csrfSecret));
-      }}>Disconnect listener</button>}</div><Alert>{action.error}</Alert></Panel>;
+      }}>Disconnect listener</button>}</div><Alert>{action.error}</Alert></Panel><Panel title="Native session" description="Reported native activity, separate from listener contact."><NativeRuntimeDetails agent={agent}/>
+      {agent.activity.status !== 'online' && <p className="support">The listener is not reporting. These are the last recorded observations, not proof that a native process is running.</p>}</Panel></>;
 }
 function Lifecycle({ agent }: { agent: AgentView }) {
   const viewer = useSession(), action = useAction();
@@ -57,7 +60,7 @@ export function AgentDetail({ id, section }: { id: string; section: AgentSection
   const resource = useResource(operations.agent, { agentId: id }, '', 5000);
   return <Page title="Agent details" description="Listener activity, room access and account settings." action={<button onClick={resource.refresh}>Refresh status</button>}>
     <a className="back" href="/manage/agents">← Agents</a><Loaded {...resource} retry={resource.refresh}>{({ data: agent }) => <>
-      <SubjectHeading name={agent.displayName} description={<>{agent.owner.displayName} · {agent.owner.matrixUserId}{agent.deployment && <span className="subline">Fleet <a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></span>}</>}><Status value={agent.activity.status}/><Status value={agent.status}/><Status value={applied(agent)}/></SubjectHeading>
+      <SubjectHeading name={agent.displayName} description={<>{agent.owner.displayName} · {agent.owner.matrixUserId}{agent.deployment && <span className="subline">Fleet <a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></span>}</>}><Status value={agent.activity.status}/><NativeRuntimeStatus agent={agent} compact/><Status value={agent.status}/><Status value={applied(agent)}/></SubjectHeading>
       <AgentNavigation id={id} section={section} fleet={agent.deployment !== null}/>{section === 'rooms' && <AgentRooms agent={agent}/>} {section === 'wake' && <AgentWake agent={agent}/>} {section === 'activity' && <Activity agent={agent}/>} {section === 'runtime' && <Runtime agent={agent}/>} {section === 'sessions' && <AgentSessions agent={agent}/>} {section === 'decisions' && <Decisions id={id}/>} {section === 'software' && <ListenerVersions agentId={id}/>} {section === 'settings' && <Lifecycle agent={agent}/>}
     </>}</Loaded>
   </Page>;

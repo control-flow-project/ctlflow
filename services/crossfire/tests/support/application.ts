@@ -18,7 +18,7 @@ export function secret(): string { return randomBytes(32).toString('base64url');
 export async function applicationFixture(scope: TestContext, databasePath = ':memory:') {
   let now = 1_800_000_000_000;
   const native = matrixAuthorityFixture();
-  const config = { instance: 'tests', serverName: 'test.localhost', publicOrigin: 'http://127.0.0.1', matrixOrigin: 'http://127.0.0.1',
+  const config = { instance: 'tests', serverName: 'test.localhost', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost', matrixOrigin: 'http://127.0.0.1',
     administrator: '@admin:test.localhost', jwtSecret: secret(), registrationSecret: secret() };
   const adminNative = value(await native.matrix.provision(config.administrator, secret(), 'test'));
   const application = createApplication(databasePath, config, { now: () => now, matrix: native.matrix });

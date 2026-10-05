@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, rename
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { value } from './support/application.js';
 import type { RuntimeDecision, RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
@@ -31,8 +31,10 @@ test('controller-owned reset creates a fresh native context without changing ide
   let runtime = value(await adapter.start(input, new AbortController().signal)); cleanup(scope, () => runtime.close());
   const previous = runtime.sessionId, authentication = readFileSync(join(workspace, '.codex/auth.json'));
   await runtime.deliver('Prior private context must not appear after reset.', 'before-reset');
-  await until(() => provider.held() !== undefined); provider.finish(); await until(async () => !(await runtime.inspect()).busy);
-  runtime.acknowledge(['before-reset']); await runtime.close();
+  await until(() => provider.held() !== undefined); provider.finish();
+  await until(async () => await runtime.turnControl.activeTurn() === null);
+  assert.equal((await runtime.inspect()).busy, true, 'An idle native model with an unacknowledged receipt cannot sleep');
+  runtime.acknowledge(['before-reset']); assert.equal((await runtime.inspect()).busy, false); await runtime.close();
   assert(usage.length > 0, 'Native app-server token counters reach the optional adapter hook');
   const resetId = randomUUID(); value(await adapter.reset({ workspace, resetId }));
   assert(existsSync(join(workspace, '.codex/crossfire-archive', resetId, 'crossfire-session.json')));
@@ -40,7 +42,7 @@ test('controller-owned reset creates a fresh native context without changing ide
   const current = runtime.sessionId; assert.equal(provider.requests.length, 1, 'Reset and native startup make no model calls');
   assert.deepEqual(readFileSync(join(workspace, '.codex/auth.json')), authentication);
   value(await adapter.reset({ workspace, resetId }));
-  await runtime.deliver('Only the new context.', 'after-reset'); await until(async () => !(await runtime.inspect()).busy);
+  await runtime.deliver('Only the new context.', 'after-reset'); runtime.acknowledge(['after-reset']); await until(async () => !(await runtime.inspect()).busy);
   assert(!JSON.stringify(provider.requests[1]).includes('Prior private context must not appear after reset.'));
   assert.equal(runtime.sessionId, current); assert.equal(provider.requests.length, 2);
 });
@@ -55,14 +57,14 @@ test('default native start resumes complete history and refuses absent or broken
   let runtime = value(await adapter.start({ ...input, allowNewHistory: true }, new AbortController().signal)); cleanup(scope, () => runtime.close());
   const sessionId = runtime.sessionId;
   await runtime.deliver('Retain this exact historical fact: blue orchard 729.', 'retained-fact');
-  await until(() => provider.held() !== undefined); provider.finish(); await until(async () => !(await runtime.inspect()).busy);
-  runtime.acknowledge(['retained-fact']); await runtime.close();
+  await until(() => provider.held() !== undefined); provider.finish(); runtime.acknowledge(['retained-fact']);
+  await until(async () => !(await runtime.inspect()).busy); await runtime.close();
   runtime = value(await adapter.start(input, new AbortController().signal)); assert.equal(runtime.sessionId, sessionId);
   provider.hold();
   await runtime.deliver('Use the earlier historical fact.', 'resumed-followup');
   await until(() => provider.held() !== undefined);
   assert(JSON.stringify(provider.requests.at(-1)).includes('blue orchard 729'), 'Native resume retains full conversation history despite excludeTurns in the RPC response');
-  provider.finish(); await until(async () => !(await runtime.inspect()).busy); runtime.acknowledge(['resumed-followup']); await runtime.close();
+  provider.finish(); runtime.acknowledge(['resumed-followup']); await until(async () => !(await runtime.inspect()).busy); await runtime.close();
   const binding = join(workspace, '.codex/crossfire-session.json'), contexts = join(workspace, '.codex/crossfire-contexts.json');
   renameSync(binding, binding + '.saved'); renameSync(contexts, contexts + '.saved');
   const lost = await adapter.start(input, new AbortController().signal); assert.equal(lost.ok, false);
@@ -77,49 +79,68 @@ test('default native start resumes complete history and refuses absent or broken
 test('stock Codex routes persistent room histories, protects unacknowledged work and retains exact terminal pointers across mode changes', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
   const observed: RuntimeObservationEvent[] = [], stop = new AbortController();
+  let pendingDecision = false;
   const input = { name: 'room-proof', workspace, instructions: 'Inert history proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
-    listenerOptions: { history_mode: 'per-room' as 'per-room' | 'shared' },
-    hooks: { requestDecision: async () => { throw new Error('No permission expected'); }, observe: (event: RuntimeObservationEvent) => observed.push(event) } };
+    listenerOptions: { historyMode: 'per-room' as 'per-room' | 'shared' },
+    hooks: { requestDecision: async () => { throw new Error('No permission expected'); }, pendingDecisions: () => pendingDecision,
+      observe: (event: RuntimeObservationEvent) => observed.push(event) } };
   let runtime = value(await adapter.start(input, stop.signal));
   input.allowNewHistory = false;
   cleanup(scope, () => runtime.close());
   assert.equal(provider.requests.length, 0);
   assert(runtime.conversation);
-  const alpha = await runtime.conversation('!alpha:test'), beta = await runtime.conversation('!beta:test');
+  const opening = runtime.conversation('!alpha:test');
+  assert.equal((await runtime.inspect()).busy, true, 'Initializing a secondary context vetoes sleep');
+  const alpha = await opening, beta = await runtime.conversation('!beta:test');
+  pendingDecision = true; assert.equal((await runtime.inspect()).busy, true); pendingDecision = false;
   assert.notEqual(alpha.sessionId, beta.sessionId); assert.notEqual(alpha.sessionId, runtime.sessionId);
   const retained = (await runtime.attachments()).map(entry => [entry.context, entry.attachment.sessionId]);
   const pointer = (await runtime.attachments()).find(entry => entry.context === '!alpha:test')!;
   assert(value(codexTerminal().command(pointer.attachment)).includes(alpha.sessionId));
   assert.equal(provider.requests.length, 0, 'History selection/attachment performs no inference');
   await alpha.deliver('alpha private evidence', 'alpha-input', stop.signal);
+  alpha.acknowledge(['alpha-input']);
+  assert.equal((await runtime.inspect()).busy, true, 'Work in a room vetoes sleep even when the primary control context is idle');
   await until(() => provider.held() !== undefined); provider.finish();
   await until(async () => (await alpha.inspect()).busy === false);
   await beta.deliver('beta request', 'beta-input', stop.signal);
   await until(async () => (await beta.inspect()).busy === false);
+  assert.equal((await runtime.inspect()).busy, true, 'Unacknowledged receipts in any room veto whole-agent sleep');
   const second = JSON.stringify(provider.requests[1]);
   assert(!second.includes('alpha private evidence'), 'A room does not inherit another room history');
   assert(observed.some(event => event.kind === 'output' && event.text.includes('Fixture complete.')));
   await runtime.close();
-  input.listenerOptions.history_mode = 'shared';
+  input.listenerOptions.historyMode = 'shared';
+  const saved = value(await adapter.savedContexts({ workspace }));
+  assert.deepEqual(saved.map(entry => [entry.context, entry.sessionId]), retained);
+  assert.equal(provider.requests.length, 2, 'Reading sleeping contexts never starts a model');
   const blocked = await adapter.start(input, stop.signal);
   assert.equal(blocked.ok, false, 'Mode changes cannot move unacknowledged publications');
-  input.listenerOptions.history_mode = 'per-room';
+  input.listenerOptions.historyMode = 'per-room';
   runtime = value(await adapter.start(input, stop.signal));
   assert.deepEqual((await runtime.attachments()).map(entry => [entry.context, entry.attachment.sessionId]), retained);
   assert(runtime.conversation);
-  const resumed = await runtime.conversation('!alpha:test');
-  await resumed.deliver('alpha private evidence', 'alpha-input', stop.signal);
+  const resumed = await runtime.conversation('!beta:test');
+  await resumed.deliver('beta request', 'beta-input', stop.signal);
   assert.equal(provider.requests.length, 2, 'Receipt recovery does not replay inference');
   await runtime.settle(); runtime.acknowledge(['alpha-input', 'beta-input']);
   await runtime.close();
-  input.listenerOptions.history_mode = 'shared';
+  input.listenerOptions.historyMode = 'shared';
   runtime = value(await adapter.start(input, stop.signal));
   const sharedId = runtime.sessionId; assert(!runtime.conversation);
   await runtime.close();
-  input.listenerOptions.history_mode = 'per-room'; runtime = value(await adapter.start(input, stop.signal));
+  input.listenerOptions.historyMode = 'per-room'; runtime = value(await adapter.start(input, stop.signal));
   await runtime.close();
-  input.listenerOptions.history_mode = 'shared'; runtime = value(await adapter.start(input, stop.signal));
+  input.listenerOptions.historyMode = 'shared'; runtime = value(await adapter.start(input, stop.signal));
   assert.equal(runtime.sessionId, sharedId); assert.equal(provider.requests.length, 2);
+  assert.equal((await runtime.inspect()).busy, false, 'All positively unloaded retained histories are checked without waking them');
+  await runtime.close();
+  const contexts = join(workspace, '.codex/crossfire-contexts.json');
+  const state = JSON.parse(readFileSync(contexts, 'utf8')) as { mode: string; control: string; rooms: { room: string; sessionId: string }[] };
+  state.rooms[0]!.sessionId = randomUUID(); writeFileSync(contexts, JSON.stringify(state), { mode: 0o600 });
+  runtime = value(await adapter.start(input, stop.signal));
+  await assert.rejects(runtime.inspect(), /thread|history|session/iu, 'A missing secondary native history cannot be guessed idle');
+  assert.equal(provider.requests.length, 2);
 });
 
 test('stock Codex structured questions preserve native attribution and exact responses without a routing model call', { timeout: 60000 }, async scope => {
@@ -127,7 +148,7 @@ test('stock Codex structured questions preserve native attribution and exact res
   const requests: RuntimeDecision[] = [], observed: RuntimeObservationEvent[] = [];
   const runtime = value(await adapter.start({ name: 'question-proof', workspace, instructions: 'Use native structured questions when a human decision is necessary.', allowNewHistory: true,
     options: { features: { default_mode_request_user_input: true } },
-    listenerOptions: { history_mode: 'per-room' },
+    listenerOptions: { historyMode: 'per-room' },
     hooks: { observe: (event: RuntimeObservationEvent) => observed.push(event), requestDecision: async request => {
       requests.push(request);
       const answers = Object.fromEntries(request.questions!.map(question => [question.id, { answers: [question.options[0]!.label] }]));
@@ -164,7 +185,7 @@ test('corrupt native history bindings cannot share a session or ambiguously sele
   ]) {
     writeFileSync(join(workspace, '.codex', 'crossfire-contexts.json'), JSON.stringify({ mode: 'per-room', control: null, rooms }), { mode: 0o600 });
     const started = await adapter.start({ name: 'invalid-history', workspace, instructions: 'No input.', options: {},
-      listenerOptions: { history_mode: 'per-room' }, hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } }, new AbortController().signal);
+      listenerOptions: { historyMode: 'per-room' }, hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } }, new AbortController().signal);
     assert(!started.ok && started.error.message.includes('unique rooms and distinct session identities'));
     assert.equal(provider.requests.length, 0);
   }

@@ -4,6 +4,7 @@ export type Operation<Params, Query, Input, Output> = {
   params: Parser<Params>; query: Parser<Query>; input: Parser<Input>; output: Parser<Output>;
   status: 200 | 201 | 202; collection: boolean; permissions: readonly string[]; description: string;
   requestBytes?: number;
+  requestFormat?: 'binary';
 };
 export function operation<Params, Query, Input, Output>(definition: Operation<Params, Query, Input, Output>): Operation<Params, Query, Input, Output> { return definition; }
 export type ParamsOf<Value extends { params: Parser<unknown> }> = Parsed<Value['params']>;

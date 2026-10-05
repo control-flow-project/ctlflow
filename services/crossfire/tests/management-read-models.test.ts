@@ -62,7 +62,7 @@ test('canonical enrollment and activity HTTP contracts expose identities without
   const alice = await fixture.member('alice');
   const { origin } = await httpFixture(scope, fixture.application);
   const client = (session: { secret: string }) => createClient({ origin, fetch: (input, options) => fetch(input, {
-    ...options, headers: { ...options?.headers, Cookie: 'crossfire=' + session.secret },
+    ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + session.secret },
   }) });
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: alice.member.principal.matrixUserId,
     fleetKey: null, instances: [{ instanceKey: 'pending', name: 'pending' }] };
@@ -88,6 +88,9 @@ test('activity action labels are readable while unknown recorded actions retain 
   assert.equal(auditActionLabel('wake-rule.create'), 'Create Wake-up');
   assert.equal(auditActionLabel('wake-rule.update'), 'Update Wake-up');
   assert.equal(auditActionLabel('wake-rule.delete'), 'Delete Wake-up');
+  assert.equal(auditActionLabel('publication.create'), 'Prepare report');
+  assert.equal(auditActionLabel('publication.publish'), 'Publish report');
+  assert.equal(auditActionLabel('publication.delete'), 'Delete report');
   assert.equal(auditActionLabel('recorded.native.action'), 'recorded.native.action');
   for (const action of ['constructor', 'toString', '__proto__']) assert.equal(auditActionLabel(action), action);
 });

@@ -77,7 +77,7 @@ test('canonical HTTP has scoped REST resources, strict envelopes, CSRF and no cr
   assert(agents.data[0]?.agentId);
   assert.equal((await request('/api/agents/' + agents.data[0]!.agentId, 'PATCH', { revision: 0, status: 'suspended' }, headers)).status, 400);
   const outsider = await fixture.member('outsider');
-  const outsiderCookie = 'crossfire=' + outsider.secret;
+  const outsiderCookie = '__Host-crossfire=' + outsider.secret;
   const hidden = await request('/api/agents/' + agents.data[0]!.agentId, 'GET', undefined, { Cookie: outsiderCookie });
   assert.equal(hidden.status, 404);
   const memberPage = await request('/api/agents', 'GET', undefined, { Cookie: outsiderCookie });
