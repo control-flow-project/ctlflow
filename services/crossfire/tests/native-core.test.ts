@@ -18,6 +18,7 @@ import { readRoom } from '@ctlflow/crossfire-domain/room/read-room';
 import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk, nativeRequest, type Native } from '@ctlflow/crossfire-adapter-matrix/http';
 import { success } from '@ctlflow/crossfire-kernel/result';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 test("management core applies and verifies direct native authority", { timeout: 180_000 }, async scope => {
   const fixture = await nativeApplication(scope), { services, admin } = fixture;
@@ -169,6 +170,8 @@ test("management core applies and verifies direct native authority", { timeout: 
   await scope.test("member revocation is guarded by current management authority", async () => {
     assert.equal(changeMember(services, admin.actor, admin.actor.principalId, { expectedRevision: 0, status: "revoked" }, randomUUID()).ok, false);
     assert.equal(changeMember(services, owner.actor, admin.actor.principalId, { expectedRevision: 0, status: "revoked" }, randomUUID()).ok, false);
-    assert.equal((await introduceEnrollment(services, { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: "@outsider:architecture.localhost", fleetKey: null, instances: [{ instanceKey: "unknown", name: "unknown" }] })).ok, false);
+    assert.equal((await introduceEnrollment(services, { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: "@outsider:architecture.localhost",
+      fleetKey: 'unknown-owner-fleet', controller: { name: 'Unknown owner controller' },
+      instances: [{ instanceKey: "unknown", name: "unknown", coordinationPolicy: defaultCoordinationPolicy() }] })).ok, false);
   });
 });
