@@ -27,7 +27,7 @@ function selectedProfile(workspace: string, requested?: string): string {
     return requested;
   }
   const directory = join(workspace, '.crossfire/profiles');
-  const names = existsSync(directory) ? readdirSync(directory).filter(file => file.endsWith('.json') && !file.endsWith('.pending.json'))
+  const names = existsSync(directory) ? readdirSync(directory).filter(file => file.endsWith('.json'))
     .map(file => file.slice(0, -5)).filter(profileName).sort() : [];
   if (names.length === 1) return names[0]!;
   throw new Error(names.length ? 'Select a saved identity with --profile: ' + names.join(', ') : 'No enrolled identity here. Use fleet setup from the management setup guide.');

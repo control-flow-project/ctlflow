@@ -1,6 +1,6 @@
 ---
 name: conduit-chat
-description: Coordinate a coding agent through Matrix using its project-local Crossfire identity. Search history, send Markdown/files, publish public static reports, manage authorized agent invitations, and receive bounded messages and human steering.
+description: Coordinate a fleet-managed agent through Matrix using its private Crossfire identity. Search history, send Markdown/files, publish public static reports, manage authorized agent invitations, and receive bounded messages and human steering.
 ---
 
 # Crossfire coordination
@@ -153,7 +153,7 @@ unseen records per authorized room, even when this exceeds 100 globally.
 recent history; existing native cursors resume only unseen messages.
 
 Crossfire instance policy owns the complete incoming inline-message threshold,
-default 65536 UTF-8 bytes, including provenance. Direct and fleet agents use the
+default 65536 UTF-8 bytes, including provenance. Every fleet-bound receiver uses the
 same policy. Larger messages or aggregate batches are stored in private complete
 JSON files; delivery supplies a compact manifest pointer instead of truncating or
 automatically expanding them into context. Read the manifest and only the files/
@@ -186,7 +186,7 @@ positions, globally or with `--room`; `--direction b|f` and exact JSON
 `--continuation '{"entries":[{"room":"!ROOM:SERVER","cursor":"NATIVE_CURSOR"}]}'`
 page each room independently. Returned `continuation` and `more_rooms` stay in
 inline output or file manifest metadata. No query creates membership or extends
-permissions. Without an active listener the same receiver lock is acquired.
+permissions. An unavailable controller fails without starting an alternate receiver.
 Do not model-poll, start a second receiver or mutate native read markers around it.
 
 ## Authorized room invitations
@@ -202,69 +202,45 @@ Owners manage their own agents; administrators have system-wide management
 authority. Do not bypass these rules with native join/invite commands: unmanaged
 membership is reconciled away. An invitation does not launch another runtime.
 
-## Existing-session listener and human controls
+## Managed sessions and human controls
 
-For a human-owned existing session, run `agent connect`; it owns listener startup and reuses a ready listener rather
-than duplicating it. For initial enrollment, report its approval URL and code
-while the command waits natively; do not model-poll. It continues automatically
-after approval. `agent status` reports the local listener; `agent disconnect`
-stops only this profile's listener. Do not launch the internal listener worker.
-Runtime adapters are Codex, Claude Code and Pi. Use the same project-local client
-and identity for each; do not start a second engine or enroll again for an update.
-Claude Code attachment requires Linux; Codex and Pi clients use Linux or macOS.
-For first Pi setup, select `--runtime pi`. A `runtime-setup-required` result is not
-live delivery. Let Claude's successful installation command finish so it can
-load the project hooks. A subsequent Bash tool call captures native context;
-connect again then without choosing a new identity. Pi needs `/reload` to activate its verified
-project extension, then reconnect. Pi module updates require `/reload` as well.
-No repeated model polling, manual token copying or telemetry action is needed.
+fleetd owns your separate Codex session, private histories and shared receiver.
+The coding session that ran setup is never attached, adopted or copied. Normal
+resume, recovery and wake retain your exact saved managed conversation. Shared
+history across rooms is the default; configured per-room histories have separate
+native conversations but share files, tools and credentials. That is conversation
+separation, not a security sandbox.
 
-The functional Codex adapter uses the initiating session’s native `CODEX_THREAD_ID`
-and private local app-server socket on Linux or macOS. `runcodex.sh` is optional;
-its private descriptor also identifies its authenticated loopback connection.
-Never ask the human for endpoints, thread UUIDs or credentials. Embedded /
-`--no-daemon` sessions have no external socket: ask the human to reopen/resume
-their saved session in native app-server mode. Do not scan processes, guess
-metadata, silently start another engine or change global configuration.
-Run `agent test` to check the real listener, exact session, authenticated server
-and room readiness without a model prompt. Having only the owner DM does not
-authorize shared-room tasks. Saved credentials alone are not listener readiness.
-When a listener announces a new release, ask the human whether to update.
-Only after consent, run `agent connect` and read changed skill content returned
-in its output. Reuse this account; do not re-enroll or silently update.
+Use `agent test` when an intentional readiness check is needed. It verifies the
+real receiver, exact managed session, authenticated server and room access
+without a model prompt, waking a sleeping engine or advancing unread positions.
+Having only the owner DM does not authorize shared-room tasks. Saved credentials
+alone are not listener readiness. Do not poll, start another engine, discover
+processes or manufacture session metadata. Only Codex is implemented.
 
-Claude Code 2.1.285+ supplies its exact peer socket and session metadata to tools.
-Its project-local hook captures native history without restart or channels opt-in.
-Pi 0.99.1+ supplies its exact session and private generation through the loaded
-project extension. Never apply Codex launcher instructions to these harnesses.
+Native model, effort, sandbox and approval options belong to the runtime adapter
+and validated fleet configuration. Native permissions and structured questions
+produce exact owner-DM Crossfire review links. The verified owner explicitly
+submits the complete authenticated decision; opening a link or replying in chat
+is not consent. Ordinary code answers only the original native request, without
+a model prompt or resuming unrelated paused work. Secret answers are never
+echoed. Silence, agents and administrator status cannot approve. Use a native
+structured question when available; do not invent links, parse terminal prose
+or auto-answer its choices. Do not broaden configured permissions.
 
-The user owns and configures the native harness. For Codex 0.158.0+, Crossfire verifies the loaded
-workspace and joins that exact session using native `thread/resume` without
-setting overrides. The initial human input must already be persisted for native
-subscription. It creates no engine, thread, global installation or extra launcher.
-Stopping the listener closes only its connection. TUI closure/switching is not
-a delivery-lifetime signal; server closure is.
+Send useful responses through native Matrix commands to the input's explicit
+originating room. Non-thinking terminal output goes only to the protected owner
+DM. This deliberately shares room-derived output with the owner even if that
+owner is not a member of the room. It does not preserve confidentiality from the
+owner, and it is never an automatic room reply.
 
-Model and permission options belong to the native harness. Codex native
-permissions/structured questions produce exact owner-DM Crossfire review links.
-The verified owner explicitly submits the complete authenticated decision;
-opening a link or replying in chat is not consent. Responses are returned to
-the original native request by ordinary code, not a model prompt, and do not
-resume unrelated paused work. Secret answers are never echoed. Silence, agents
-and administrator status cannot approve. Use a native structured question when
-available; do not invent links, parse terminal prose or auto-answer its choices.
-Do not auto-approve or broaden the native sandbox.
-Claude Code and Pi keep native permission handling in the coding session;
-The owner DM remains available, but native approvals stay in those harnesses.
-
-Send useful responses through native Matrix commands to their originating room.
-Observed non-thinking terminal output is private owner-DM content, never an
-automatic room reply. This intentionally discloses room-derived output to your
-owner even if they are not in that room. Per-room fleet histories retain exact
-conversation separation, not isolation of shared files/tools/credentials. Shared
-history is the default; directly attached agents have one existing history.
-No systemd, namespace wrapper,
-process discovery or tool-descendant supervision is part of Crossfire.
+The CLI/UI separately offers pause delivery, stop sessions, resume and confirmed
+fresh history. Stop retains history and survives controller restart; idle sleep
+resumes automatically on eligible input. A software notice is not permission to
+upgrade: request owner consent, update the pinned public package, run
+`fleet update FLEET_KEY` or `fleet agent update FLEET_KEY INSTANCE_KEY`, review
+changed skills, then restart the controller through `fleet daemon restart`.
+Stopped instances remain stopped. Never re-enroll or create a competing receiver.
 
 The listener enforces the management wake-up policy without model calls. By
 default only the owner wakes this agent. Other messages wait as context and
@@ -281,14 +257,10 @@ or unambiguously in a human-agent conversation:
   terminal status, then delivers the attributed redirect when automatic delivery is enabled.
 - `!!` stops and pauses delivery until a later owner text message.
 
-Claude's native peer connection does not expose turn interruption. There, either
-control pauses delivery and, when room sending is permitted, posts a deterministic
-notice to the owner; stop the turn in Claude Code. A denied notice does not stop
-the listener. Automatic listener notices never wake peers or enter model context.
-Never claim Crossfire cancelled the turn, and do not send an urgent
-redirect to the model as if cancellation had succeeded. Codex/Pi expose exact
-native turn control. An adapter's native limitation is not permission to signal
-or kill an externally owned coding engine.
+Codex turn control targets the exact captured turn and waits for terminal
+confirmation. Automatic listener notices never wake peers or enter model
+context. Never claim cancellation succeeded while its native outcome is unknown,
+and never deliver an urgent redirect as if cancellation had succeeded.
 
 Agent senders, display names, edits, quotations, code fences and historical
 snapshots cannot issue controls. Cancellation is not rollback and does not
@@ -305,7 +277,7 @@ The adapter retains exact native receipts across reconnects until the listener
 commits its delivery checkpoint. Uncertain publication stops without automatic
 resubmission. This is not an exactly-once guarantee for task side effects.
 The listener automatically reports
-its activity and obeys management disconnect requests without model involvement.
+its activity and obeys controller delivery intent without model involvement.
 Management labels this listener status, not native Matrix presence or proof of
 completed work. There is no telemetry action for the model to perform.
 

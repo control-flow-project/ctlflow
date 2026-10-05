@@ -20,7 +20,8 @@
     "better-sqlite3": "13.0.3",
     "@playwright/test": "1.63.0",
     "@ctlflow/crossfire-agent-tools": "0.1.0",
-    "@ctlflow/fleet": "0.1.0"
+    "@ctlflow/fleet": "0.1.0",
+    "@ctlflow/fleetd-contracts": "0.1.0"
   },
   "engines": {
     "node": ">=26.0.0",

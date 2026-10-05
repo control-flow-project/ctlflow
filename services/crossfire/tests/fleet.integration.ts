@@ -7,11 +7,12 @@ import { once } from 'node:events';
 import { promisify } from 'node:util';
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { nativeServer } from './support/native-server.js';
-import { releaseFixture } from './release-fixture.js';
+import { builtRelease } from '../scripts/test-support/release.js';
 import { value } from './support/application.js';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { openTerminal } from '../scripts/test-support/terminal.js';
@@ -34,9 +35,9 @@ type Fleet = { fleetId: string; phase: string; connection: { connected: boolean;
 type Binding = { fleetId: string; controllerCredential: string; identities: { instanceKey: string; agentId: string; account: { user_id: string; access_token: string } }[] };
 
 test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume without model housekeeping', { timeout: 180000 }, async scope => {
-  const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
+  const fixture = await nativeServer(scope, builtRelease().release), { services, admin, origin, worker } = fixture;
   const directory = mkdtempSync(join(tmpdir(), 'native-fleet-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
-  const cliPath = resolve('../fleet/dist/apps/cli/src/main.js');
+  const cliPath = fileURLToPath(import.meta.resolve('@ctlflow/fleet/executable'));
   const home = join(directory, 'home'); mkdirSync(home, { mode: 0o700 });
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [cliPath, ...args], { env, timeout: 60000 });
