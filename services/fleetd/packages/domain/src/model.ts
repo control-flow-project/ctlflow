@@ -1,7 +1,7 @@
 import type { ControllerState } from '@ctlflow/crossfire-agent-core/listener-control-port';
 import type { ListenerOptions, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { CoordinationPolicy } from '@ctlflow/crossfire-domain/coordination/values';
-import type { SetupDescriptor } from '@ctlflow/crossfire-contracts/onboarding';
+import type { SetupDescriptor } from '@ctlflow/crossfire-domain/onboarding/values';
 export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled: boolean;
   connection: { status: 'online' | 'offline'; lastSeenAt: number | null } };
 export type FleetMessageResult = { messageId: string; body: string; createdAt: number; expiresAt: number;
@@ -25,7 +25,6 @@ export type Approval = { url: string; code: string };
 export type Operation = OperationInput & { status: 'accepted' | 'running' | 'awaiting-approval' | 'succeeded' | 'failed'; createdAt: number; completedAt: number | null;
   receiptPending?: true;
   approval: Approval | null; errors: { instanceKey: string | null; code: string; message: string }[] };
-export type { SetupDescriptor } from '@ctlflow/crossfire-contracts/onboarding';
 export type SetupInput = { descriptor: SetupDescriptor; workspace: string; configuration?: string };
 export type SetupConfiguration = { configuration: Configuration; operationId: string; completed: boolean };
 export type SetupResult = { fleet: FleetState; operation: Operation | null; status: 'starting' | 'ready' | 'stopped' };

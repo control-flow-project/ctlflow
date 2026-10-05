@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { descriptorUrl } from '@ctlflow/fleetd-contracts/setup';
-import { setupDescriptorSchema, type SetupDescriptor } from '@ctlflow/crossfire-contracts/onboarding';
+import { setupDescriptorSchema } from '@ctlflow/crossfire-contracts/onboarding';
+import type { SetupDescriptor } from '@ctlflow/crossfire-domain/onboarding/values';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export function installedVersion(): string {

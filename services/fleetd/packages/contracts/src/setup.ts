@@ -4,7 +4,6 @@ import { setupDescriptorSchema } from '@ctlflow/crossfire-contracts/onboarding';
 import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 
 export const setupInput = check.object({ descriptor: setupDescriptorSchema, workspace: check.text(4096), configuration: check.optional(check.text(4096)) });
-export type { SetupDescriptor } from '@ctlflow/crossfire-contracts/onboarding';
 export type SetupInput = check.Parsed<typeof setupInput>;
 export function descriptorUrl(value: string): Result<URL> {
   try {

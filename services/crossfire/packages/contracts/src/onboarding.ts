@@ -1,4 +1,5 @@
 import type { Manifest } from './release.js';
+import type { SetupDescriptor } from '@ctlflow/crossfire-domain/onboarding/values';
 import * as check from './schema/validation.js';
 import { endpoint } from './origin.js';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
@@ -6,9 +7,8 @@ import { failure, success } from '@ctlflow/crossfire-kernel/result';
 export const setupVersion = check.refine(check.text(100), value => /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/u.test(value), 'Use one exact npm version');
 const setupOrigin = check.refine(check.text(2048), value => { const parsed = endpoint(value); return parsed.ok && parsed.value === value; }, 'Use an exact HTTPS or loopback HTTP origin');
 const schemaVersion: check.Parser<1> = value => value === 1 ? success(1) : failure('invalid', 'Unsupported setup descriptor');
-export const setupDescriptorSchema = check.object({ schemaVersion, server: setupOrigin, ownerMatrixId: check.matrixUserId,
+export const setupDescriptorSchema: check.Parser<SetupDescriptor> = check.object({ schemaVersion, server: setupOrigin, ownerMatrixId: check.matrixUserId,
   package: check.object({ name: check.choice('@ctlflow/fleet'), version: setupVersion }), instructions: check.plainText(128 * 1024) });
-export type SetupDescriptor = check.Parsed<typeof setupDescriptorSchema>;
 
 function quote(value: string): string { return "'" + value.replaceAll("'", "'\\''") + "'"; }
 export function onboardingUrl(origin: string, owner: string): string {
