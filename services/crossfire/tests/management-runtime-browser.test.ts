@@ -1,0 +1,80 @@
+import { cleanup } from '@crossfire/test-support/cleanup';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { chromium, expect } from '@playwright/test';
+import { createClient } from '@crossfire/adapter-crossfire/client';
+import { operations } from '@crossfire/contracts/rest/operations';
+import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
+import { checkPaperLayout } from '../tools/browser/layout.js';
+import { nativeServer } from './support/native-server.js';
+import { mapFleet } from './support/map-fleet.js';
+import { releaseFixture } from './release-fixture.js';
+import { value } from './support/application.js';
+
+test('Management distinguishes native sleep and wake from listener readiness without per-agent runtime requests', { timeout: 120000 }, async scope => {
+  const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
+  const { fleet, instances, ready } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 3);
+  const direct = await fixture.agent(admin.actor, 'direct');
+  const tokens = instances.map(instance => {
+    const token = ready.instances.find(item => item.instanceKey === instance.instanceKey)?.account?.accessToken; assert(token);
+    return createClient({ origin, token });
+  });
+  const runs = instances.map(() => randomUUID()), observedAt = services.clock.now(), lastActivityAt = observedAt - 60000;
+  for (const [index, instance] of instances.entries()) {
+    const client = tokens[index]!, agentId = instance.agentId!;
+    value(await client.call(operations.reportListener, { agentId, runId: runs[index]! }, { release: release.manifest.release,
+      stopped: false, controllerBound: false, messagesDelivered: 0, statistics: null }));
+    value(await client.call(operations.reportRuntime, { agentId, runId: runs[index]! }, { sessionId: 'native-history-' + index,
+      roomId: null, runtime: 'codex', state: index === 0 ? 'sleeping' : index === 1 ? 'waking' : 'idle', observedAt,
+      lastActivityAt: index === 2 ? null : lastActivityAt, historyAvailable: index === 2 ? null : true,
+      historyMode: 'shared', maxInputBytes: 65536, errorMessage: null,
+      settings: [{ name: 'model', configured: 'fixture-model', effective: 'fixture-model' }] }));
+    if (index === 2) value(await client.call(operations.reportListener, { agentId, runId: runs[index]! }, { release: release.manifest.release,
+      stopped: true, controllerBound: false, messagesDelivered: 0, statistics: null }));
+  }
+  mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/native-state-browser-'));
+  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  cleanup(scope, () => browser.close());
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
+  await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
+  const page = await context.newPage(), errors: string[] = [], runtimeRequests: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/runtime-observations')) runtimeRequests.push(request.url()); });
+  await page.goto(origin + '/manage/agents');
+  const agents = page.getByRole('table', { name: 'Agents', exact: true });
+  await expect(agents.getByRole('columnheader', { name: 'Native session', exact: true })).toBeVisible();
+  const sleeping = agents.getByRole('row').filter({ has: page.locator('a[href="/manage/agents/' + instances[0]!.agentId + '"]') });
+  await expect(sleeping.getByText('online', { exact: true })).toBeVisible(); await expect(sleeping.getByText('Sleeping', { exact: true })).toBeVisible();
+  const unknown = agents.getByRole('row').filter({ has: page.locator('a[href="/manage/agents/' + direct.id + '"]') });
+  await expect(unknown.getByText('Unknown', { exact: true })).toBeVisible();
+  assert.deepEqual(runtimeRequests, [], 'The agent list consumes its batched native summary, not N+1 context endpoints');
+  await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'native-agents-desktop.png'), fullPage: true });
+  await page.goto(origin + '/manage/fleets/' + fleet.id);
+  const roster = page.getByRole('table', { name: 'Fleet agents', exact: true }); await expect(roster.locator('tbody tr')).toHaveCount(3);
+  await expect(roster.getByText('Sleeping', { exact: true })).toBeVisible(); await expect(roster.getByText('Waking', { exact: true })).toBeVisible();
+  const offline = roster.getByRole('row').filter({ has: page.getByRole('cell', { name: instances[2]!.instanceKey, exact: true }) });
+  await expect(offline.getByText('offline', { exact: true })).toBeVisible(); await expect(offline.getByText('Idle', { exact: true })).toBeVisible();
+  await expect(offline).toContainText('Last reported'); await expect(offline.getByText('Sleeping', { exact: true })).toHaveCount(0);
+  assert.deepEqual(runtimeRequests, [], 'Fleet roster consumes the same page-batched native summary');
+  await checkPaperLayout(page); await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);
+  await page.screenshot({ path: join(directory, 'native-fleet-mobile.png'), fullPage: true });
+  const agentId = instances[0]!.agentId!, agentPath = '/manage/agents/' + agentId;
+  await page.goto(origin + agentPath + '/sessions');
+  await expect(page.getByRole('region', { name: 'Agent session', exact: true })).toContainText('Available for resume');
+  await expect(page.getByRole('region', { name: 'Agent session', exact: true })).toContainText('Sleeping');
+  await page.goto(origin + agentPath + '/runtime');
+  await expect(page.getByRole('table', { name: 'Runtime settings', exact: true })).toContainText('fixture-model');
+  await expect(page.getByRole('region', { name: 'Runtime', exact: true })).toContainText('Available for resume');
+  await expect(page.getByRole('region', { name: 'Runtime', exact: true })).toContainText('Last activity');
+  await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'native-runtime-mobile.png'), fullPage: true });
+  await page.goto(origin + '/manage/agents/' + instances[2]!.agentId + '/runtime');
+  await expect(page.getByRole('region', { name: 'Runtime', exact: true })).toContainText('not proof that the process is running');
+  await expect(page.getByRole('region', { name: 'Runtime', exact: true }).locator('dt').filter({ hasText: /^Saved history$/u })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Runtime', exact: true }).locator('dd').filter({ hasText: /^Not reported$/u })).toHaveCount(2);
+  await page.goto(origin + '/manage/agents/' + direct.id + '/activity');
+  await expect(page.getByRole('region', { name: 'Native session', exact: true })).toContainText('Not reported');
+  assert.deepEqual(errors, []); scope.diagnostic('Real API browser screenshots: ' + directory);
+});

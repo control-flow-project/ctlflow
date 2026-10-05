@@ -103,6 +103,10 @@ p + p { margin-top: 12px; }
 .status { display: inline-flex; align-items: center; border-radius: 4px; padding: 3px 7px; font-size: 10px; letter-spacing: .1px; background: var(--hover); color: var(--muted); white-space: nowrap; }
 .status-active, .status-applied, .status-approved, .status-online, .status-current, .status-enabled { background: var(--ok-soft); color: var(--ok); }
 .status-pending, .status-suspended, .status-disconnecting, .status-update-available { background: var(--warn-soft); color: var(--warn); }
+.status-published, .status-recorded { background: var(--ok-soft); color: var(--ok); }
+.status-sleeping { background: var(--accent-soft); color: var(--accent); }
+.status-waking, .status-preparing, .status-waiting-for-approval, .status-waiting-for-an-answer { background: var(--warn-soft); color: var(--warn); }
+.status-working { background: var(--ok-soft); color: var(--ok); }
 .status-failed, .status-revoked, .status-rejected { background: var(--danger-soft); color: var(--danger); }
 .quiet-note { margin-top: var(--section-gap); padding-top: 20px; border-top: 1px solid var(--line); font-size: 12px; }
 .quiet-note p { margin-top: 5px; }
@@ -156,6 +160,7 @@ input[type=radio]:disabled { opacity: .55; }
 @media (max-width: 700px) { .setup-step { display: block; } .setup-picture { width: 100px; margin: 0 0 12px; } .pagination-controls { gap: 5px; } }
 .pagination:empty { display: none; }
 .table-wrap { overflow-x: auto; min-width: 0; }
+.report-table td:first-child { min-width: 13rem; max-width: 30rem; overflow-wrap: anywhere; }
 .coordination-roster { min-width: 50rem; }
 .coordination-roster .wake-authority { min-width: 24rem; }
 .fleet-message-body { display: block; min-width: 12rem; max-width: 36rem; overflow-wrap: anywhere; white-space: pre-wrap; }

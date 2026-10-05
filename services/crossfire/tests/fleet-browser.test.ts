@@ -231,7 +231,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       if (route === '/manage/fleets/' + fleet.id) {
         const roster = page.getByRole('region', { name: 'Agents', exact: true });
         const table = roster.getByRole('table', { name: 'Fleet agents', exact: true });
-        await expect(table.getByRole('columnheader')).toHaveText(['Agent', 'Instance', 'Listener', 'Account']);
+        await expect(table.getByRole('columnheader')).toHaveText(['Agent', 'Instance', 'Listener', 'Native session', 'Account']);
         await expect(table.locator('tbody tr')).toHaveCount(instances.length);
         await expect(roster.locator('.agent-card, .agent-grid')).toHaveCount(0);
         for (const instance of instances) {
@@ -239,7 +239,8 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
           await expect(row.getByRole('link')).toHaveAttribute('href', '/manage/agents/' + instance.agentId);
           await expect(row.getByRole('link')).toHaveText(instance.instanceKey + ' (' + admin.member.member.displayName + ')');
           await expect(row.getByRole('cell').nth(2)).toHaveText('offline');
-          await expect(row.getByRole('cell').nth(3)).toHaveText('active');
+          await expect(row.getByRole('cell').nth(3)).toHaveText('UnknownNo native observation');
+          await expect(row.getByRole('cell').nth(4)).toHaveText('active');
         }
       }
       await page.screenshot({ path: join(directory, width + '-' + route.split('/').filter(Boolean).join('-') + '.png'), fullPage: true });

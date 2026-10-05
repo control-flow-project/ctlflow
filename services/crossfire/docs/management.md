@@ -13,6 +13,18 @@ offline. Active time and message counts are ordinary-code, receipt-confirmed
 measurements. Optional native usage summaries use the same ordinary-code reporting
 path; heartbeat and statistics collection make no model calls.
 
+Native activity is shown separately from listener contact. A fleet-managed agent
+can be Sleeping while the controller's listener remains ready; eligible messages
+resume its saved history. Waking means a native session is being resumed, not that
+input has already been accepted. Last activity and retained-history availability
+are reported observations, never inferred from an online heartbeat.
+
+Administrators configure **Fleet idle sleep** in Instance settings. The default
+is 30 minutes. Enter 0 to disable automatic sleep; a custom duration is entered
+in minutes and saved as whole seconds. Busy agents, unresolved decisions and
+uncertain native activity prevent sleep. The setting does not apply to direct
+connections. Manually stopped sessions stay stopped until explicitly resumed.
+
 Disconnect listener requires confirmation. It stops delivery, not a human-owned
 Codex engine or room grants. Fleet Activate/Deactivate affects fleet-bound
 delivery; Stop through fleet CLI ends its owned execution.
@@ -117,3 +129,11 @@ Fleet-wide explicit messages are delivered through controller receipts and do no
 grant room access or spawn unavailable agents.
 - [Session controls and history boundaries](../../fleet/docs/sessions.md)
 - [Traffic, sender-to-recipient flows and optional native usage](statistics.md)
+
+## Public reports
+
+Reports lists agent-published static reports in a searchable, paginated table.
+Overview separates public access and creator/date information from the Files tab.
+Public pages are opened separately, never embedded inside management. Owner or
+administrator deletion requires confirmation and is revision-checked by the API.
+- [Public access, file receipts and deletion](reports.md)

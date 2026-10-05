@@ -88,6 +88,9 @@ test('activity action labels are readable while unknown recorded actions retain 
   assert.equal(auditActionLabel('wake-rule.create'), 'Create Wake-up');
   assert.equal(auditActionLabel('wake-rule.update'), 'Update Wake-up');
   assert.equal(auditActionLabel('wake-rule.delete'), 'Delete Wake-up');
+  assert.equal(auditActionLabel('publication.create'), 'Prepare report');
+  assert.equal(auditActionLabel('publication.publish'), 'Publish report');
+  assert.equal(auditActionLabel('publication.delete'), 'Delete report');
   assert.equal(auditActionLabel('recorded.native.action'), 'recorded.native.action');
   for (const action of ['constructor', 'toString', '__proto__']) assert.equal(auditActionLabel(action), action);
 });
