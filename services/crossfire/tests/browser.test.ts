@@ -554,6 +554,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await checkOnboardingPolicy(page, memberPage, origin, services, adminActor);
   await page.goto(origin + '/manage/agents/' + profile.id + '/settings');
   const retire = page.getByRole('button', { name: 'Retire agent', exact: true });
+  await expect(page.getByRole('region', { name: 'Retire agent', exact: true }).getByText('A session that has never started needs no stop request.', { exact: false })).toBeVisible();
   await expect(retire).toBeEnabled();
   page.removeAllListeners('dialog');
   page.once('dialog', dialog => dialog.dismiss()); await retire.click();
@@ -572,6 +573,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   assert(engine.child.exitCode !== null || engine.child.signalCode !== null, 'Retirement follows an actual stopped native process');
   await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Settings', exact: true }).click();
   const archive = page.getByRole('button', { name: 'Archive fleet', exact: true });
+  await expect(page.getByRole('region', { name: 'Archive fleet', exact: true }).getByText('Sessions that have never started need no stop request.', { exact: false })).toBeVisible();
   await expect(archive).toBeEnabled();
   page.once('dialog', dialog => dialog.dismiss()); await archive.click();
   assert.equal(value(services.repositories.fleet.findById(fleetId))!.archivedAt, null);

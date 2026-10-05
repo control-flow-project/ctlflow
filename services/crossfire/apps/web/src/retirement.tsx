@@ -9,7 +9,7 @@ export function FleetRetirement({ fleet }: { fleet: FleetView }) {
   if (!canManageFleet(fleet)) return null;
   const eligible = fleet.allowedActions.includes('archive');
   return <Panel title="Archive fleet" description="Retire its managed instances and revoke this controller’s authority. Identities, chats and saved histories are preserved.">
-    <p>Archiving does not stop a local process. Stop every native session first and wait for the controller’s successful outcome. Crossfire enables archiving only after that evidence is recorded.</p>
+    <p>Archiving does not stop a local process. Any session that has started needs a successful controller stop outcome first. Sessions that have never started need no stop request.</p>
     {!eligible && <p className="support plan-warning">This fleet is not ready to archive. <a href={'/manage/fleets/' + fleet.fleetId}>Review and stop sessions →</a></p>}
     <div className="actions"><button className="danger" disabled={!eligible || action.pending} onClick={() => {
       if (confirm('Archive ' + fleet.label + '? Its managed instances are retired and controller authority is revoked. Identities, chats and saved histories remain. This cannot be undone from management.')) {
@@ -23,7 +23,7 @@ function RetireAgent({ agent }: { agent: AgentView }) {
   const fleet = useResource(operations.fleet, { fleetId: agent.deployment.fleetId }, '', 5000);
   const eligible = agent.allowedActions.includes('retire');
   return <Panel title="Retire agent" description="Disable this managed instance while preserving its identity, chats and saved history.">
-    <p>Retirement does not stop a local process. Stop the native session first and wait for its successful controller outcome.</p>
+    <p>Retirement does not stop a local process. If this session has started, stop it and wait for its successful controller outcome. A session that has never started needs no stop request.</p>
     {!eligible && <p className="support plan-warning">This agent is not ready to retire. <a href={'/manage/agents/' + agent.agentId + '/session'}>Review and stop its session →</a></p>}
     <Loaded {...fleet} retry={fleet.refresh}>{({ data }) => <div className="actions"><button className="danger" disabled={!eligible || action.pending || !canManageFleet(data)} onClick={() => {
       if (confirm('Retire ' + agent.displayName + ' from ' + data.label + '? Its managed access is disabled. Identity, chats and saved history remain. This cannot be undone from management.')) {
