@@ -3,7 +3,8 @@ import test from 'node:test';
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { promisify } from 'node:util';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
@@ -24,7 +25,9 @@ const execute = promisify(execFile);
 
 test('public fleet setup starts a separate native history, reuses identity and preserves explicit stop intent', { timeout: 180_000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/universal-setup-'));
-  const home = join(directory, 'home'), project = join(directory, 'project'), root = join(directory, 'controller');
+  const home = join(directory, 'home'), project = join(directory, 'project');
+  const root = mkdtempSync(join(tmpdir(), 'crossfire-controller-'));
+  cleanup(scope, () => rmSync(root, { recursive: true, force: true }));
   mkdirSync(home, { mode: 0o700 }); mkdirSync(project, { mode: 0o700 });
   execFileSync('git', ['init', '--quiet', project]);
   const release = builtRelease().release, fixture = await nativeServer(scope, release);

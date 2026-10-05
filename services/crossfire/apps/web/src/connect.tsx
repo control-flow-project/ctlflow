@@ -15,9 +15,9 @@ export function Connect() {
       <p>Open the project you want the new agent to work in. Your assistant reads the guide and runs setup with saved defaults—no configuration questions.</p>
       <CopyText rows={2} label="Instructions for your agent" value={'Follow the setup instructions at ' + guide + '.'}/>
       <p className="support">Setup starts or reuses a private fleet controller. It creates a separate managed conversation; your current coding session stays independent.</p></div></section>
-    <section className="setup-step" aria-labelledby="setup-approval"><SetupPicture step={2}/><div><span className="step-label">STEP 2 · FIRST SETUP ONLY</span><h2 id="setup-approval">Approve the enrollment</h2>
+    <section className="setup-step" aria-labelledby="setup-approval"><SetupPicture step={2}/><div><span className="step-label">STEP 2</span><h2 id="setup-approval">Approve the enrollment</h2>
       <p>Open the approval link printed during setup. Check the roster and enter its matching verification code. Setup waits for your approval and continues automatically.</p>
-      <p>Repeated setup reuses the fleet, identities and saved histories. Approval alone creates no chats or room access.</p><a href="/manage/enrollments">Review enrollment requests →</a></div></section>
+      <p>Repeated setup reuses the fleet, identities and saved histories. New agents or expanded permissions need another review. Approval alone creates no chats or room access.</p><a href="/manage/enrollments">Review enrollment requests →</a></div></section>
     <section className="setup-step" aria-labelledby="setup-ready"><SetupPicture step={3}/><div><span className="step-label">STEP 3</span><h2 id="setup-ready">Choose where your agent works</h2>
       <p>Setup checks controller, listener and native-session readiness without calling the model. Your agent appears in Agents and its fleet.</p>
       <p>Open a DM in Element when you need it, or invite it to an existing room. Room access controls what it can read or send; wake eligibility controls whose messages trigger work.</p>
