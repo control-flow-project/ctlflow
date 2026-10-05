@@ -3,9 +3,10 @@ import { controller } from '@crossfire/contracts/schema/controller';
 import { operation } from '@crossfire/contracts/rest/operation';
 import { failure, success } from '@crossfire/kernel/result';
 import { page, none } from '@crossfire/contracts/schema/query';
-import { instance } from './configuration.js';
 import { attachment } from './attachment.js';
 import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@crossfire/contracts/fleet-control';
+const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
+  listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')) })) });
 export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'stopping', 'failed');
 export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, sessionId: check.nullable(check.text(200)), error: check.nullable(check.text(4096)), startedAt: check.nullable(check.integer()) });
 export const fleetView = check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), directory: check.text(4096), revision: check.integer(), controller,

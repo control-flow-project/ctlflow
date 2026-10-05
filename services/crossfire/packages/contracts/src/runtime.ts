@@ -33,4 +33,3 @@ export const observation = check.object(observationFields) satisfies check.Parse
 export const observationView = check.object({ runId: check.identifier, ...observationFields }) satisfies check.Parser<RuntimeObservationView>;
 export const observations = check.list(observationView, 2002);
 export const failureReport = check.object({ episodeId: check.identifier, agentId: check.identifier, sessionId: check.nullable(check.text(255)), message: check.plainText(4000) });
-export type ListenerOptions = check.Parsed<typeof listenerOptions>;

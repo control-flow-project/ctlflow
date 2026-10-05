@@ -44,6 +44,8 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
         if (existsSync(child) && realpathSync(child) !== child) return failure('invalid', 'Work areas cannot traverse symbolic links');
       }
     }
-    return success({ directory, roster: parsed.value, definitions, digest: hash.digest('hex') });
+    const instances = parsed.value.instances.map(({ listener_options, ...instance }) => ({ ...instance,
+      ...(listener_options ? { listenerOptions: listener_options.history_mode === undefined ? {} : { historyMode: listener_options.history_mode } } : {}) }));
+    return success({ directory, roster: { ...parsed.value, instances }, definitions, digest: hash.digest('hex') });
   } catch (error) { return failure('invalid', error instanceof Error ? error.message : 'Cannot read fleet configuration'); }
 }

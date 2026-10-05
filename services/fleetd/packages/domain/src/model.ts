@@ -1,13 +1,15 @@
 import type { ControllerState } from '@crossfire/agent-core/listener-control';
+import type { ListenerOptions } from '@crossfire/agent-core/owned-runtime';
+import type { CoordinationPolicy } from '@crossfire/domain/coordination/values';
 export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled: boolean;
   connection: { status: 'online' | 'offline'; lastSeenAt: number | null } };
 export type FleetMessageResult = { messageId: string; body: string; createdAt: number; expiresAt: number;
   total: number; pending: number; delivered: number; failed: number; skipped: number; expired: number };
 export type Controller = { name: string; metadata?: Record<string, string> };
-export type Instance = { key: string; name: string; definition: string; workarea: string; listener_options?: import('@crossfire/contracts/runtime').ListenerOptions };
+export type Instance = { key: string; name: string; definition: string; workarea: string; listenerOptions?: ListenerOptions };
 export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string }; instances: Instance[] };
 export type Definition = { name: string; runtime: string; options: Record<string, unknown>; instructions: string;
-  coordinationPolicy: import('@crossfire/contracts/coordination-policy').CoordinationPolicy };
+  coordinationPolicy: CoordinationPolicy };
 export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
 export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'stopping' | 'failed';
