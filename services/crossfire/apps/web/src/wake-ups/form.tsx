@@ -21,7 +21,7 @@ export function WakeForm({ rule }: { rule?: WakeRuleDetails }) {
   }}><fieldset disabled={action.pending}><Panel title="Schedule & message"><div className="wake-form-grid"><div className="bounded-form">
     <Field label="Name">{id => <input id={id} required maxLength={100} value={name} onChange={event => setName(event.target.value)}/>}</Field>
     <ScheduleEditor value={schedule} onChange={setSchedule}/><label className="check"><input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)}/>Enabled</label>
-  </div><div><Field label="Wake-up message">{id => <textarea id={id} required rows={9} value={message} onChange={event => setMessage(event.target.value)}/>}</Field><p className="support">Sent directly to each attached agent’s current coding session. Describe what it should do; this message does not grant extra permissions.</p></div></div></Panel>
+  </div><div><Field label="Wake-up message">{id => <textarea id={id} required rows={9} value={message} onChange={event => setMessage(event.target.value)}/>}</Field><p className="support">Delivered by the fleet controller to each assigned agent’s managed conversation. Describe what it should do; this message does not grant extra permissions or resume a manually stopped session.</p></div></div></Panel>
     <WakeTargets selected={agentIds} onChange={setAgentIds} attached={rule?.agents ?? []}/>
     <Alert>{action.error}</Alert><div className="actions"><button className="primary" disabled={action.pending}>{rule ? 'Save Wake-up' : 'Create Wake-up'}</button><a href="/manage/wake-ups">Cancel</a>
     {rule && <button className="danger" type="button" disabled={action.pending} onClick={() => {
