@@ -13,9 +13,9 @@ test('REST agent filtering and paging preserve owner isolation; policy is admin-
   const agents = [];
   for (const [name, owner] of [['alice', alice], ['bob', bob]] as const) for (const status of ['active', 'suspended', 'revoked'] as const) {
     const agent = await fixture.agent(owner.actor, name + '-' + status); agents.push({ ...agent, status, owner });
-    if (status !== 'active') value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 0, status }, randomUUID()));
+    if (status !== 'active') value(changeAgent(services, owner.actor, agent.id, { expectedRevision: value(services.directory.agent(agent.id))!.principal.revision, status }, randomUUID()));
   }
-  value(reportListener(services, agents[0]!.actor, agents[0]!.id, randomUUID(), { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 1, controllerBound: false, stopped: false }, contractRelease().manifest.release));
+  value(reportListener(services, agents[0]!.actor, agents[0]!.id, randomUUID(), { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 1, controller: agents[0]!.controller, stopped: false }, contractRelease().manifest.release));
   async function list(viewer: typeof alice, query = '') {
     const response = await http.request('/api/agents' + query, 'GET', undefined, http.headers(viewer));
     assert.equal(response.status, 200, await response.clone().text());

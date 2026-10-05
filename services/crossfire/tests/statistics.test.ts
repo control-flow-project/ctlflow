@@ -63,7 +63,7 @@ test('hourly normalized summaries are idempotent, paginated in SQL, token-baseli
   const fixture = await fixtureStore(scope), agent = await fixture.agent(fixture.admin.actor, 'stats'), other = await fixture.agent(fixture.admin.actor, 'other');
   const run = randomUUID(), session = randomUUID(), collected = listenerStatistics(agent.matrixUserId, fixture.now);
   const heartbeat = (statistics: ReturnType<typeof collected.batch>, runId = run) => value(reportListener(fixture.services, agent.actor, agent.id, runId,
-    { release: 'fixture', messagesDelivered: 2, stopped: false, controllerBound: true, statistics }, 'fixture'));
+    { release: 'fixture', messagesDelivered: 2, stopped: false, controller: agent.controller, statistics }, 'fixture'));
   collected.observed([eventView(message('$first', OBSERVER), ROOM)]); collected.usage(sample(session));
   fixture.advance(300000); const first = collected.batch()!; assert(heartbeat(first).statisticsAccepted); assert(heartbeat(first).statisticsAccepted);
   const read = () => value(fixture.services.statistics.read([agent.id], fixture.now() - 3600000, 1, 1));
@@ -92,7 +92,7 @@ test('statistics transaction failure never cancels the independently committed l
   const fixture = await fixtureStore(scope), agent = await fixture.agent(fixture.admin.actor, 'heartbeat');
   const run = randomUUID();
   fixture.database.exec("CREATE TRIGGER reject_statistics BEFORE INSERT ON listener_stat_interval BEGIN SELECT RAISE(ABORT, 'fixture statistics failure'); END");
-  const result = value(reportListener(fixture.services, agent.actor, agent.id, run, { release: 'fixture', messagesDelivered: 1, stopped: false, controllerBound: false,
+  const result = value(reportListener(fixture.services, agent.actor, agent.id, run, { release: 'fixture', messagesDelivered: 1, stopped: false, controller: agent.controller,
     statistics: { sequence: 1, startedAt: fixture.now(), endedAt: fixture.now(), dropped: 0, flows: [], usage: [] } }, 'fixture'));
   assert.equal(result.statisticsAccepted, false); assert.equal(result.disconnect, false);
   assert(value(fixture.services.repositories.listenerRun.find({ id: run })));

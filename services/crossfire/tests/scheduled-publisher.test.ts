@@ -23,7 +23,7 @@ const prepare = (text: string, messageId: string) => ({ text, messageId, boundar
 test('scheduled checkpoints recover only receipts before other input and retain unacknowledged delivery', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, http = await httpFixture(scope, fixture.application);
   const agent = await fixture.agent(admin.actor, 'ada'), runId = randomUUID(), ruleId = randomUUID();
-  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controllerBound: false }, 'test'));
+  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controller: agent.controller }, 'test'));
   const configuration = { name: 'Fetch report', message: 'Exact configured message. '.repeat(250), schedule: { kind: 'interval' as const, seconds: 60 }, enabled: true, agentIds: [agent.id] };
   value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID())); fixture.advance(60000);
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/scheduled-'));
@@ -55,7 +55,7 @@ test('scheduled checkpoints recover only receipts before other input and retain 
   assert.equal(value(readWakeRule(services, admin.actor, ruleId)).lastDeliveredAt, fixture.now());
   await runtime.deliver('Separate urgent owner input.', 'owner-input'); assert.equal(publications, 2);
   runtime.acknowledge(['owner-input']);
-  fixture.advance(60000); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controllerBound: false }, 'test'));
+  fixture.advance(60000); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controller: agent.controller }, 'test'));
   receipt = false; await assert.rejects(publisher().publish(runtime.signal), /Lost native publication response/);
   const saved = localState.read<{ command: { sessionId: string } }>(file); saved.command.sessionId = 'different-native-session'; localState.write(file, saved);
   await assert.rejects(publisher().recover(runtime.signal), /retargeted/); assert.equal(publications, 3);
@@ -66,7 +66,7 @@ test('busy schedules make no claims or model submissions and a disabled queued i
   const agent = await fixture.agent(admin.actor, 'ada'), runId = randomUUID(), ruleId = randomUUID();
   const configuration = { name: 'Report', message: 'Scheduled report.', schedule: { kind: 'interval' as const, seconds: 60 }, enabled: true, agentIds: [agent.id] };
   value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID())); fixture.advance(60000);
-  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controllerBound: false }, 'test'));
+  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controller: agent.controller }, 'test'));
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/scheduled-busy-'));
   let busy = true, published = 0;
   const cancel = new AbortController(), runtime = nativeDelivery({ sessionId: 'native-session', approval: 'none', signal: new AbortController().signal, verify: () => {},

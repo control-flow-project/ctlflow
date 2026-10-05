@@ -13,6 +13,7 @@ import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchang
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
 import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
 import type { ControllerProof } from '@ctlflow/crossfire-domain/listener/controller';
 import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor } from '@ctlflow/crossfire-domain/port/services';
@@ -38,6 +39,15 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
     const previous = value(services.repositories.fleetConnection.find(controller.fleetId));
     if (previous && (previous.closedAt !== null || previous.expiresAt <= now)) controller.connectionId = randomUUID();
     return value(reportFleetConnection(services, actor, controller.fleetId, controller.connectionId, false));
+  }
+  function advanceConnected(milliseconds: number, ...controllers: ControllerProof[]) {
+    let remaining = milliseconds;
+    while (remaining > 0) {
+      for (const controller of controllers) renewController(controller);
+      const step = Math.min(remaining, 20_000);
+      now += step;
+      remaining -= step;
+    }
   }
   async function member(name: string) {
     const account = value(await native.matrix.provision('@' + name + ':' + config.serverName, secret(), 'test'));
@@ -68,5 +78,14 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
     return { id: item.agentId, matrixUserId: account.matrixUserId, token: account.accessToken, controller,
       actor: { principalId: item.agentId, kind: 'agent' as const } };
   }
-  return { application, services, native, admin, member, agent, renewController, advance(milliseconds: number) { now += milliseconds; }, now: () => now, ok: success };
+  function listen(instance: Awaited<ReturnType<typeof agent>>, release = 'test', runId = randomUUID()) {
+    value(reportListener(services, instance.actor, instance.id, runId, { statistics: null, release, messagesDelivered: 0, stopped: false, controller: instance.controller }, release));
+    return { runId, sessionId: 'native-session' };
+  }
+  async function listeningAgent(owner: Actor, name: string, release = 'test') {
+    const instance = await agent(owner, name);
+    listen(instance, release);
+    return instance;
+  }
+  return { application, services, native, admin, member, agent, listeningAgent, listen, renewController, advanceConnected, advance(milliseconds: number) { now += milliseconds; }, now: () => now, ok: success };
 }

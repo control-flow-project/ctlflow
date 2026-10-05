@@ -9,7 +9,7 @@ import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchang
 import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
 import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
 import { readFleet } from '@ctlflow/crossfire-domain/fleet/read-fleet';
-import { removeFleet, bindFleetAgent } from '@ctlflow/crossfire-domain/fleet/change-fleet';
+import { removeFleetAgent, archiveFleet } from '@ctlflow/crossfire-domain/fleet/retire';
 import { reportFleetConnection, changeFleetDelivery } from '@ctlflow/crossfire-domain/fleet/control';
 import { createFleetMessage, readFleetControl, listFleetMessages, acknowledgeFleetMessage } from '@ctlflow/crossfire-domain/fleet/message';
 import { controlQuery, messagePage, fleetControlSnapshot } from '@ctlflow/crossfire-contracts/fleet-control';
@@ -77,10 +77,12 @@ test('fleet messages are durable, roster-snapshotted, bounded, idempotent and re
   value(acknowledgeFleetMessage(...params, input.messageId, agentId, delivered));
   value(acknowledgeFleetMessage(...params, input.messageId, agentId, delivered));
   assert.equal(acknowledgeFleetMessage(...params, input.messageId, agentId, { status: 'skipped', errorMessage: 'different' }).ok, false);
-  value(await bindFleetAgent(...params, otherId, { expectedRevision: snapshot.revision, instanceKey: 'two', remove: true }, randomUUID()));
-  const detached = value(readFleetControl(...params, connectionId));
-  assert.deepEqual(detached.agentIds, [agentId]); assert.deepEqual(detached.messages[0]!.agentIds, [otherId], 'Recipient snapshot survives detachment');
-  value(acknowledgeFleetMessage(...params, input.messageId, otherId, { status: 'skipped', errorMessage: 'No bound listener' }));
+  assert.equal(removeFleetAgent(...params, otherId, { expectedRevision: snapshot.revision, instanceKey: 'two' }, randomUUID()).ok, false, 'Pending delivery must settle before retirement');
+  value(acknowledgeFleetMessage(...params, input.messageId, otherId, { status: 'skipped', errorMessage: 'Owner stopped this recipient' }));
+  value(removeFleetAgent(...params, otherId, { expectedRevision: snapshot.revision, instanceKey: 'two' }, randomUUID()));
+  const retired = value(readFleetControl(...params, connectionId));
+  assert.deepEqual(retired.agentIds, [agentId]); assert.deepEqual(retired.messages, []);
+  assert.equal(value(services.repositories.fleetMessageDelivery.find(input.messageId, otherId))?.status, 'skipped', 'Recipient snapshot survives retirement');
   for (let index = 0; index < 32; index++) {
     fixture.advance(1);
     value(createFleetMessage(...params, { messageId: randomUUID(), body: 'Queued ' + index }, randomUUID()));
@@ -91,7 +93,8 @@ test('fleet messages are durable, roster-snapshotted, bounded, idempotent and re
   fixture.advance(600001);
   assert.equal(value(listFleetMessages(...params, { page: 1, pageSize: 10 })).items[0]!.expired, 1);
   value(reportFleetConnection(...params, randomUUID(), false));
-  assert.equal(value(createFleetMessage(...params, { messageId: randomUUID(), body: 'Fresh task' }, randomUUID())).pending, 1);
+  const freshId = randomUUID();
+  assert.equal(value(createFleetMessage(...params, { messageId: freshId, body: 'Fresh task' }, randomUUID())).pending, 1);
   const previousInsert = services.repositories.fleetMessageDelivery.insert;
   services.repositories.fleetMessageDelivery.insert = () => failure('native', 'Synthetic insert failure');
   const failedId = randomUUID();
@@ -99,9 +102,12 @@ test('fleet messages are durable, roster-snapshotted, bounded, idempotent and re
   services.repositories.fleetMessageDelivery.insert = previousInsert;
   assert.equal(value(services.repositories.fleetMessage.find(failedId)), null);
   const revision = value(readFleet(services, admin.actor, fleet.fleetId)).revision;
-  value(removeFleet(services, admin.actor, fleet.fleetId, revision, randomUUID()));
-  assert.equal(value(services.repositories.fleetMessage.find(input.messageId)), null);
-  assert.equal(value(services.repositories.fleetConnection.find(fleet.fleetId)), null);
+  assert.equal(archiveFleet(services, admin.actor, fleet.fleetId, revision, randomUUID()).ok, false, 'Archive cannot discard unsettled receipts');
+  value(acknowledgeFleetMessage(...params, freshId, agentId, { status: 'skipped', errorMessage: 'Stopped before archive' }));
+  value(archiveFleet(...params, revision, randomUUID()));
+  assert(value(services.repositories.fleetMessage.find(input.messageId)));
+  assert(value(services.repositories.fleetConnection.find(fleet.fleetId))?.closedAt);
+  assert.equal(authenticateController(services, fleet.ready.fleet!.controllerCredential!).ok, false);
 });
 
 test('controller queries refuse coercion, duplicated fields and inconsistent snapshots', () => {

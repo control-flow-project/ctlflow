@@ -1,3 +1,4 @@
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
@@ -17,7 +18,7 @@ test('management read models hydrate recognizable identities in one batch after 
   const alice = await fixture.member('alice'), bob = await fixture.member('bob'), agent = await fixture.agent(alice.actor, 'bea');
   for (const owner of [alice, bob]) value(await introduceEnrollment(services, {
     enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
-    fleetKey: null, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName }],
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName, coordinationPolicy: defaultCoordinationPolicy() }],
   }));
   const calls: string[][] = [];
   const projected = { ...services, discovery: { ...services.discovery, selected(ids: string[]) { calls.push(ids); return services.discovery.selected(ids); } } };
@@ -65,7 +66,7 @@ test('canonical enrollment and activity HTTP contracts expose identities without
     ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + session.secret },
   }) });
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: alice.member.principal.matrixUserId,
-    fleetKey: null, instances: [{ instanceKey: 'pending', name: 'pending' }] };
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending', name: 'pending', coordinationPolicy: defaultCoordinationPolicy() }] };
   const introduced = value(await client(alice).call(operations.introduceEnrollment, {}, input)).data;
   assert.equal(introduced.enrollment.enrollment.owner.displayName, 'alice');
   assert.equal(introduced.enrollment.enrollment.owner.matrixUserId, alice.member.principal.matrixUserId);

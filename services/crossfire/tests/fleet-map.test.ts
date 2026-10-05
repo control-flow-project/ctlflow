@@ -21,7 +21,7 @@ import { httpFixture } from './support/http.js';
 
 async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const { fleet, instances, ready } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
+  const { fleet, instances, ready, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
   const contacted = instances.at(-1)!.agentId!;
   value(await connectOwnerConversation(services, { kind: 'agent', principalId: contacted }, contacted));
   const other = await fixture.member('alice'), specialist = await fixture.agent(other.actor, 'specialist');
@@ -32,7 +32,7 @@ async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
     const mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: agent.principal.revision, mode,
       senderIds: mode === 'selected' ? [specialist.id, other.actor.principalId] : [] }, randomUUID()));
-    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'test', messagesDelivered: 0, controllerBound: false, stopped: false }, 'test'));
+    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'test', messagesDelivered: 0, controller, stopped: false }, 'test'));
     if (index === instances.length - 1) continue;
     const roomId = rooms[index % rooms.length]!.roomId, current = value(services.directory.agent(id))!;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId, expectedRevision: current.principal.revision,
