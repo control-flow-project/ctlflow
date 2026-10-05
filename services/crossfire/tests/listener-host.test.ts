@@ -7,14 +7,15 @@ import { createListenerHost } from '@crossfire/adapter-crossfire/listener-host';
 import { listenerRequest } from '@crossfire/adapter-crossfire/listener-client';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import { createListenerBudget } from '@crossfire/agent-core/budget';
+import { cleanup } from '@crossfire/test-support/cleanup';
 
 test('one listener host serves independent capability-bound agents and rejects superseded control URLs', async scope => {
   const root = mkdtempSync(join(tmpdir(), 'listener-host-')), host = await createListenerHost();
-  scope.after(async () => { await host.close(); rmSync(root, { recursive: true, force: true }); });
+  cleanup(scope, async () => { await host.close(); rmSync(root, { recursive: true, force: true }); });
   const stopped: string[] = [];
   const first = host.bind({ cursorFile: join(root, 'first', 'cursor.json'), binding: 'first', release: '0.1.0-' + 'a'.repeat(24), session: () => 'history-one', stop: () => { stopped.push('first'); } });
   const second = host.bind({ cursorFile: join(root, 'second', 'cursor.json'), binding: 'second', release: '0.1.0-' + 'a'.repeat(24), session: () => 'history-two', stop: () => { stopped.push('second'); } });
-  scope.after(() => { first.close(); second.close(); });
+  cleanup(scope, () => { first.close(); second.close(); });
   const one = readJson<{ port: number; secret: string; binding: string }>(join(root, 'first', 'listener.json'));
   const two = readJson<typeof one>(join(root, 'second', 'listener.json'));
   assert.equal(one.port, two.port); assert.notEqual(one.secret, two.secret); assert.equal(host.size(), 2);
