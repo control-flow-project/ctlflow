@@ -12,7 +12,7 @@ import { httpFixture } from './support/http.js';
 import { contentFixture } from './support/publication.js';
 
 test('the report command streams a local static directory through the canonical authenticated API', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'reporter');
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'reporter');
   const api = await httpFixture(scope, fixture.application); await contentFixture(scope, fixture.application);
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-publication-client-')); cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(join(directory, 'assets')); writeFileSync(join(directory, 'index.html'), '<p>Published by the command</p>');
