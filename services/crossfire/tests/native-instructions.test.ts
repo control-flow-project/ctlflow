@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -79,6 +79,58 @@ test('accepted instructions with a lost native reply recover exact durable evide
   assert.equal(native.published().length, 3, 'The intervening revision is receipt-settled before a distinct new revision is published');
 });
 
+test('lost instruction replies recover across long native histories without materializing or limiting the growing tail', async scope => {
+  const native = fixture(scope), text = 'Durable instruction receipt before subsequent native turns.';
+  native.change({ loseReply: true });
+  await assert.rejects(applyNativeInstructions(native.session, native.options(text)), /Uncertain/u);
+  const event = JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'assistant',
+    content: [{ type: 'output_text', text: 'Long native turn output: ' + '🌿'.repeat(16 * 1024) }] } }) + '\n';
+  appendFileSync(native.path, event.repeat(160));
+  assert(statSync(native.path).size > 8 * 1024 * 1024);
+  const initial = performance.now(); native.change({ loseReply: false });
+  await applyNativeInstructions({ ...native.session }, native.options(text));
+  await applyNativeInstructions({ ...native.session }, native.options(text));
+  assert.equal(native.published().length, 1);
+  assert.equal(readJson<{ pending: unknown; confirmed: unknown[] }>(native.journal).pending, null);
+  scope.diagnostic('Recovered long native instruction tail in ' + Math.round(performance.now() - initial) + 'ms');
+});
+
+test('long native pending tails still reject duplicate and mismatched exact instruction identities', async scope => {
+  for (const altered of [false, true]) {
+    const native = fixture(scope), text = 'One exact developer instruction identity.';
+    native.change({ loseReply: true });
+    await assert.rejects(applyNativeInstructions(native.session, native.options(text)), /Uncertain/u);
+    const receipt: unknown = JSON.parse(readFileSync(native.path, 'utf8').split('\n')[1]!);
+    const duplicate = receipt as { payload: { content: { text: string }[] } };
+    if (altered) duplicate.payload.content[0]!.text = 'Different native instruction bytes';
+    appendFileSync(native.path, (JSON.stringify({ type: 'native_history', text: 'x'.repeat(64 * 1024) }) + '\n').repeat(160));
+    appendFileSync(native.path, JSON.stringify(duplicate) + '\n');
+    native.change({ loseReply: false });
+    await assert.rejects(applyNativeInstructions({ ...native.session }, native.options(text)), altered ? /differs/u : /more than once/u);
+    assert.equal(native.published().length, 1); assert.notEqual(readJson<{ pending: unknown }>(native.journal).pending, null);
+  }
+});
+
+test('native receipt scans read a fixed snapshot once with chunk/record memory independent of total history length', scope => {
+  const native = fixture(scope); native.header();
+  const boundary = captureHistory(native.path); assert(boundary);
+  const event = JSON.stringify({ type: 'native_history', text: '🌿'.repeat(16 * 1024) }) + '\n';
+  for (const count of [16, 160]) {
+    writeFileSync(native.path, readFileSync(native.path).subarray(0, boundary.position));
+    appendFileSync(native.path, event.repeat(count));
+    const snapshot = statSync(native.path).size; let observed = 0;
+    const scan = historySince(native.path, boundary, value => {
+      assert.equal((value as { type: string }).type, 'native_history'); observed++;
+      if (observed === 1) appendFileSync(native.path, '{"type":"after_snapshot"}\n');
+    });
+    assert.equal(observed, count); assert.equal(scan.records, count);
+    assert.equal(scan.bytesRead, snapshot - boundary.position, 'Native evidence reads exactly its captured snapshot, never later appends');
+    assert(scan.maximumBufferedBytes <= 2 * Buffer.byteLength(event) + 2 * 64 * 1024, 'Buffered bytes depend only on one record and fixed chunks');
+    assert(scan.maximumBufferedBytes < 300 * 1024);
+    scope.diagnostic(JSON.stringify({ historyBytes: snapshot, ...scan }));
+  }
+});
+
 test('unaccepted instructions remain pending and are never silently republished', async scope => {
   const native = fixture(scope); native.change({ accepted: false });
   await assert.rejects(applyNativeInstructions(native.session, native.options('Missing durable instruction')), /Uncertain/u);
@@ -106,9 +158,10 @@ test('wrong roles, changed bytes and retargeted private paths cannot certify nat
 test('read-only native evidence preserves byte boundaries and rejects replaced/truncated or symlink histories', async scope => {
   const native = fixture(scope); native.header();
   const boundary = captureHistory(native.path); assert(boundary);
-  appendFileSync(native.path, '{"type":"unfinished"'); assert.deepEqual(historySince(native.path, boundary), []);
-  appendFileSync(native.path, '}\n'); assert.deepEqual(historySince(native.path, boundary), [{ type: 'unfinished' }]);
-  writeFileSync(native.path, '{"type":"replacement"}\n'); assert.throws(() => historySince(native.path, boundary), /boundary/u);
+  const records: unknown[] = [];
+  appendFileSync(native.path, '{"type":"unfinished"'); historySince(native.path, boundary, value => records.push(value)); assert.equal(records.length, 0);
+  appendFileSync(native.path, '}\n'); historySince(native.path, boundary, value => records.push(value)); assert.deepEqual(records, [{ type: 'unfinished' }]);
+  writeFileSync(native.path, '{"type":"replacement"}\n'); assert.throws(() => historySince(native.path, boundary, () => {}), /boundary/u);
   rmSync(native.path); symlinkSync(native.journal, native.path);
   await assert.rejects(applyNativeInstructions(native.session, native.options('Do not follow this path')), /ENOENT|ELOOP/u);
   assert.equal(native.published().length, 0);

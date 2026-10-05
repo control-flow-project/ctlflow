@@ -40,6 +40,9 @@ export const historyBoundary = check.object({ key: check.text(100), position: ch
   prefix: check.refine(check.text(64), value => /^[a-f0-9]{64}$/u.test(value), 'Invalid native history prefix digest') });
 export type HistoryBoundary = check.Parsed<typeof historyBoundary>;
 const MAX_INTERVAL = 8 * 1024 * 1024;
+const READ_CHUNK = 64 * 1024;
+const MAX_RECORD = 32 * 1024 * 1024;
+export type HistoryInspection = { bytesRead: number; records: number; maximumBufferedBytes: number };
 
 function missing(error: unknown): boolean {
   return error !== null && typeof error === 'object' && 'code' in error && error.code === 'ENOENT';
@@ -78,16 +81,36 @@ export function captureHistory(path: string): HistoryBoundary | null {
   } catch (error) { if (missing(error)) return null; throw error; }
 }
 
-export function historySince(path: string, boundary: HistoryBoundary | null): unknown[] {
+export function historySince(path: string, boundary: HistoryBoundary | null, inspect: (record: unknown) => void): HistoryInspection {
   try {
     return ownedFile(path, Number.MAX_SAFE_INTEGER, (descriptor, info) => {
       if (boundary && (String(info.dev) + ':' + String(info.ino) !== boundary.key || info.size < boundary.position
         || prefix(descriptor, boundary.position) !== boundary.prefix)) throw new Error('Native history lost its publication boundary');
-      const position = boundary?.position ?? 0, size = info.size - position;
-      if (size > MAX_INTERVAL) throw new Error('Native publication interval exceeds its verification bound');
-      const bytes = readBytes(descriptor, size, position), end = bytes.lastIndexOf(10);
-      if (end < 0) return [];
-      return bytes.subarray(0, end).toString('utf8').split('\n').filter(Boolean).map(line => JSON.parse(line) as unknown);
+      const result: HistoryInspection = { bytesRead: 0, records: 0, maximumBufferedBytes: 0 };
+      let position = boundary?.position ?? 0, length = 0, fragments: Buffer[] = [];
+      while (position < info.size) {
+        const chunk = readBytes(descriptor, Math.min(READ_CHUNK, info.size - position), position);
+        position += chunk.length; result.bytesRead += chunk.length;
+        for (let start = 0; start < chunk.length;) {
+          const end = chunk.indexOf(10, start), stop = end < 0 ? chunk.length : end;
+          if (stop > start) { fragments.push(chunk.subarray(start, stop)); length += stop - start; }
+          if (length > MAX_RECORD) throw new Error('Native history record exceeds its verification bound');
+          result.maximumBufferedBytes = Math.max(result.maximumBufferedBytes, 2 * length + 2 * READ_CHUNK);
+          if (end < 0) break;
+          if (length) {
+            const line = fragments.length === 1 ? fragments[0]! : Buffer.concat(fragments, length);
+            inspect(JSON.parse(line.toString('utf8')) as unknown); result.records++;
+          }
+          fragments = []; length = 0; start = end + 1;
+        }
+      }
+      if (fstatSync(descriptor).size < info.size || boundary && prefix(descriptor, boundary.position) !== boundary.prefix) {
+        throw new Error('Native history changed during receipt verification');
+      }
+      return result;
     });
-  } catch (error) { if (boundary === null && missing(error)) return []; throw error; }
+  } catch (error) {
+    if (boundary === null && missing(error)) return { bytesRead: 0, records: 0, maximumBufferedBytes: 0 };
+    throw error;
+  }
 }

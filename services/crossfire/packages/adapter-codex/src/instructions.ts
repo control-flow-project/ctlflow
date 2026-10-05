@@ -80,19 +80,19 @@ export async function applyNativeInstructions(session: CodexSession, options: { 
       if ((await current()).path !== input.path) throw new Error('Native instruction recovery changed its retained history path');
       if (!header(input.path)) return false;
       let received = 0;
-      for (const value of historySince(input.path, input.boundary)) {
+      historySince(input.path, input.boundary, value => {
         const record = object(value);
         if (!record.ok) throw new Error('Invalid native history record');
-        if (record.value.type !== 'response_item') continue;
+        if (record.value.type !== 'response_item') return;
         const item = object(record.value.payload);
         if (!item.ok) throw new Error('Invalid native response item');
-        if (item.value.id !== input.messageId) continue;
+        if (item.value.id !== input.messageId) return;
         const content = Array.isArray(item.value.content) && item.value.content.length === 1 ? object(item.value.content[0]) : null;
         if (item.value.type !== 'message' || item.value.role !== 'developer' || !content?.ok
           || content.value.type !== 'input_text' || content.value.text !== input.text) throw new Error('Native developer instruction receipt differs from its submitted identity and content');
         received++;
-      }
-      if (received > 1) throw new Error('Native instruction identity was appended more than once');
+        if (received > 1) throw new Error('Native instruction identity was appended more than once');
+      });
       return received === 1;
     }, close: () => {},
   }, instructionInput, { journal: options.journal, pollMs: 100 });
