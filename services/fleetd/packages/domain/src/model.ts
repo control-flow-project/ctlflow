@@ -1,5 +1,5 @@
 import type { ControllerState } from '@crossfire/agent-core/listener-control';
-import type { ListenerOptions } from '@crossfire/agent-core/owned-runtime';
+import type { ListenerOptions, SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
 import type { CoordinationPolicy } from '@crossfire/domain/coordination/values';
 export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled: boolean;
   connection: { status: 'online' | 'offline'; lastSeenAt: number | null } };
@@ -14,7 +14,7 @@ export type Configuration = { directory: string; roster: Roster; definitions: Re
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
 export type DesiredIntent = { fleetId: string; instanceKey: string };
 export type NativeState = { phase: 'running' | 'sleeping' | 'waking' | 'failed'; lastActivityAt: number | null; historyAvailable: boolean };
-export type RetainedContext = { context: string; runtime: string; sessionId: string };
+export type RetainedContext = Omit<SavedRuntimeContext, 'workspace'>;
 export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'sleeping' | 'waking' | 'stopping' | 'failed';
 export type InstanceState = { instance: Instance; phase: Phase; sessionId: string | null; error: string | null; startedAt: number | null };
 export type FleetState = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; controller: Controller; phase: Phase;

@@ -30,7 +30,14 @@ fleet agent add FLEET INSTANCE --definition DEFINITION
 fleet agent start FLEET INSTANCE [--fresh-history] [--operation-id UUID]
 fleet agent stop FLEET INSTANCE [--operation-id UUID]
 fleet agent remove|contexts FLEET INSTANCE
-fleet agent attach FLEET INSTANCE [--context CONTEXT]`;
+fleet agent attach FLEET INSTANCE [--context CONTEXT]
+
+Start resumes retained history; --fresh-history explicitly replaces it.
+Stop clears the selected bindings' desired activation and retains their histories.
+Daemon shutdown preserves desired activation for the next daemon start.
+Contexts lists saved histories even when sleeping or stopped, without waking them.
+Attach only returns a live terminal pointer; resume a sleeping agent first.
+Status separates native phase, listener delivery, desired activation and saved history.`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, remote: { type: 'string' },
     name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, context: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, 'operation-id': { type: 'string' }, 'fresh-history': { type: 'boolean' }, help: { type: 'boolean' } } });
@@ -79,7 +86,7 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     const agentCommand = positionals[0] === 'agent', command = positionals[agentCommand ? 1 : 0], fleetKey = positionals[agentCommand ? 2 : 1];
     const fleet = listed.find(fleet => fleet.fleetKey === fleetKey || fleet.fleetId === fleetKey);
     if (!fleet) throw new Error('Fleet not found: ' + fleetKey);
-    if (fleet.error) throw new Error(fleet.error);
+    if (fleet.error && command !== 'stop' && command !== 'show') throw new Error(fleet.error);
     const params = { fleetId: fleet.fleetId };
     if (!agentCommand && ['activate', 'deactivate'].includes(command ?? '') && positionals.length === 2) {
       if (!fleet.connection.connected || fleet.connection.revision === null) throw new Error('Fleet controller is not connected to Crossfire');

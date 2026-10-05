@@ -64,7 +64,8 @@ test('listener history options have one camelCase domain and API representation 
     const instance = loaded.value.roster.instances[0]!;
     assert.deepEqual(instance.listenerOptions, historyMode ? { historyMode } : {});
     assert.equal(Object.hasOwn(instance, 'listener_options'), false);
-    const view = { instance, phase: 'stopped', listenerActive: false, sessionId: null, error: null, startedAt: null };
+    const view = { instance, phase: 'stopped', listenerActive: false, desiredActive: false, lastActivityAt: null, historyAvailable: null,
+      sessionId: null, error: null, startedAt: null };
     assert.equal(instanceView(view).ok, true);
     assert.equal(instanceView({ ...view, instance: { ...instance, listener_options: {} } }).ok, false);
     const written = registry.writeRoster(loaded.value, loaded.value.roster); assert(written.ok);
