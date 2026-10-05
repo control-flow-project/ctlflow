@@ -20,8 +20,9 @@ test("project identity requires ignored private storage and cannot overwrite unr
   assert.equal(existsSync(join(project, ".crossfire")), false);
   writeFileSync(join(project, ".gitignore"), ".crossfire/profiles/holmes.json\n");
   assert.throws(() => paths(project, "holmes"), /Ignore .crossfire/);
-  writeFileSync(join(project, ".gitignore"), ".crossfire/\n");
+  writeFileSync(join(project, ".gitignore"), ".crossfire/profiles/holmes.json\n.crossfire/state/holmes\n");
   const profile = paths(project, "holmes");
+  assert.deepEqual(Object.keys(profile).sort(), ['cursors', 'profile', 'root', 'state', 'workspace']);
   assert.equal(profile.root, join(project, ".crossfire"));
   assert.equal(statSync(profile.root).mode & 0o777, 0o700);
   assert.throws(() => paths(project, "../other"), /Profile names/);

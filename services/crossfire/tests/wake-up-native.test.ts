@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
 import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
+import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
 import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
 import { createWakeRule, changeWakeRule } from '@ctlflow/crossfire-domain/wake-up/manage';
 import { readWakeRule } from '@ctlflow/crossfire-domain/wake-up/read';
@@ -20,6 +22,8 @@ import { value } from './support/application.js';
 test('real Conduit and stock Codex deliver idle-only scheduled input without creating chats under Nobody authority', { timeout: 120000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
   const agent = await fixture.agent(admin.actor, 'scheduled'), ruleId = randomUUID();
+  const host = await createListenerHost(), controller = createListenerControl(async () => {}, () => agent.controller);
+  controller.update({ active: true, input: null }); cleanup(scope, () => host.close()); cleanup(scope, controller.close);
   value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: 0, mode: 'nobody', senderIds: [] }, randomUUID()));
   const directory = mkdtempSync(join(process.cwd(), '.temp/wake-native-')), home = join(directory, 'home'), workspace = join(directory, 'project');
   mkdirSync(home, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
@@ -30,7 +34,7 @@ test('real Conduit and stock Codex deliver idle-only scheduled input without cre
   const configuration = { name: 'Fetch fixture data', message: 'Scheduled fixture task; no paid provider.', schedule: { kind: 'interval' as const, seconds: 1 }, enabled: true, agentIds: [agent.id] };
   value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID()));
   const stop = new AbortController(); let ended: unknown, ready = false;
-  const receiver = listen({ binding: 'fixture', clock, coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: admin.member.principal.matrixUserId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' }, id: agent.id,
     release: release.manifest,
