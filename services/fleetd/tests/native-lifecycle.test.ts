@@ -69,6 +69,15 @@ test('30 minute sleep closes native processes, not the listener; input resumes t
   assert.equal(managed.nativeState().phase, 'running');
 });
 
+test('explicit resume wakes saved history for a terminal without model input and remains idempotent', async scope => {
+  const fixture_ = fixture(); fixture_.services.initial = 'sleeping';
+  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  value(await managed.resume()); value(await managed.resume());
+  assert.equal(fixture_.started.length, 1); assert.deepEqual(fixture_.delivered, []);
+  assert.equal(value(await managed.attachment()).sessionId, 'exact-history');
+  assert.equal(managed.nativeState().phase, 'running'); assert.equal(managed.runtime.signal.aborted, false);
+});
+
 test('recovery binds sleeping histories without a process and concurrent inputs share one native generation', async scope => {
   const fixture_ = fixture(); fixture_.services.initial = 'sleeping';
   const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal));

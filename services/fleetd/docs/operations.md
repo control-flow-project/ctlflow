@@ -5,7 +5,7 @@ Start through `fleet daemon start` or directly:
 node services/fleetd/dist/apps/daemon/src/main.js --name laptop --root /absolute/private/controller
 ```
 
-The private root contains descriptor, registry, operation state, log and
+The private root contains descriptor, registry, desired binding intent, operation state, log and
 `fleetd.sock`. It binds a private Unix HTTP socket, not a public network port.
 One root has one stable controller name. Optional metadata is descriptive and
 contains no credentials.
@@ -28,9 +28,39 @@ Attachment returns a current running-session pointer to the shared terminal
 adapter. It carries a private token-file path, never the token. Connection data
 does not belong in public fleet views or durable registry restart authority.
 
-Contexts lists only existing native histories. Attachment can select one exact
-listed context; neither endpoint creates a room/history or starts another
-engine. Room and private-control histories remain runtime-adapter owned.
+Contexts lists saved native histories even while stopped or sleeping. Attachment
+can select one exact listed context; neither endpoint creates a room/history,
+writes state or starts an engine. Sleeping attachment returns an explicit
+conflict. Room and private-control histories remain runtime-adapter owned.
+
+## Idle sleep and restart
+
+fleetd itself hosts the shared listener core. It is not accompanied by a fleet
+listener subprocess. Agent identities, permissions, unread positions and
+receipts remain independent. One shared control server and finite acquisition,
+publication and native-start budgets bound aggregate work.
+
+Crossfire's instance policy defaults to sleeping owned native sessions after
+30 minutes of inactivity. Zero disables sleep. All histories must be confirmed
+idle; pending input, decisions, receipts, initialization, cleanup or unknown
+native activity prevent sleep. Heartbeats and policy checks do not count as work.
+Sleep closes the owned native process, not its listener/controller connection.
+Eligible room, DM, scheduled or broadcast input resumes the exact saved history.
+Directly attached coding sessions cannot be put to sleep by fleetd.
+
+`desired-intent.json` in the private controller root durably owns active binding
+intent. Start persists it before activation; explicit Stop removes it before
+cleanup. Normal daemon shutdown preserves it. Start the same controller/root
+after a restart or power failure to restore desired bindings and exact histories,
+without re-enrollment or model prompts. Restoration may leave native processes
+sleeping until input arrives. Manually stopped agents remain stopped.
+
+Startup restoration is bounded and generation-fenced. Missing histories,
+unreviewed configuration, invalid intent or failed process cleanup remain
+visible errors; they never authorize a new history or overlapping native owner.
+Read-only inspection never accepts changed files or increments revisions.
+Use an explicit revision-checked start/reset to apply configuration changes.
+No automatic host boot service is installed.
 
 Unexpected startup/listener/native failures are recorded in each fleet's private
 `.fleet/failures.json` before reporting through its scoped controller credential.
@@ -38,7 +68,8 @@ Delivery retries independently of listener activation; reporting errors remain
 visible. Crossfire owns normalized episodes and management-DM notifications.
 Deliberate stop/deactivation is not a failure. Transient native/listener failures
 are recovered after exact owned-generation cleanup with exponential one-to-sixty-
-second backoff. Deployed configuration and installed software remain unchanged;
+second backoff. Native recovery replaces only its native generation, not the
+stable receiver. Deployed configuration and installed software remain unchanged;
 successful peers and saved native histories remain intact. Stop cancels pending
 recovery. Failed cleanup or permanent configuration/authorization failures prevent
 unsafe restart and remain visible.
@@ -89,5 +120,6 @@ Crossfire's normal wake and room-access domains, not controller-side permissions
 
 Runtime option interpretation stays in its adapter; controller code consumes
 declared capabilities and validated native options. Orderly shutdown stops owned
-listeners/engines. Crash-proof tool-descendant supervision is not promised.
+listeners/engines and preserves desired intent for restart. Crash-proof
+tool-descendant supervision is not promised.
 No global service, host installer, privileged daemon or alternate listener exists.

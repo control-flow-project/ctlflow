@@ -3,9 +3,17 @@
 ## Activity versus connection
 
 The agent's Runtime tab reports observed native state independently of listener
-heartbeats: idle, working, waiting for approval, waiting for an answer, failed or
+heartbeats: idle, working, waiting for approval, waiting for an answer, sleeping, waking, failed or
 unavailable. Online is not evidence of progress. Offline observations describe
 last reported state, not current native activity.
+
+Fleet-owned native sessions sleep after 30 idle minutes by default while their
+listeners remain connected. Crossfire's Policy page owns the instance-wide
+timeout; zero disables sleep. Eligible chat/scheduled/fleet input resumes the
+exact saved native history. Pending decisions, receipts, input, other busy
+histories or unknown activity prevent sleep. Directly attached sessions never
+receive native shutdown authority. The Runtime view shows last native activity
+and history availability independently of heartbeat freshness.
 
 The page shows native runtime/version, original session, observation time,
 history scope, instance inline-message limit and public runtime settings. Configured and

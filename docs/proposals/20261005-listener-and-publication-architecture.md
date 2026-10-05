@@ -1,13 +1,16 @@
 # Listener architecture audit and feature proposal
 
-Date: 2026-10-05. Status: review complete; implementation proposal, not a release.
+Date: 2026-10-05. Status: approved design; baseline review retained for evidence.
+The canonical specification owns the implemented contracts and verification
+records own certification. Historical findings below describe the reviewed baseline.
 
 ## 1. Scope and conclusion
 
 This review covers the Crossfire monorepo, its three service owners, the relevant
 GAAP deployment and Agreements fleet integration, and the requested publication,
-idle-sleep and consolidated-listener capabilities. It does not authorize product
-implementation, deployment, fleet activation, a commit or a push. Bad Bets belongs
+idle-sleep and consolidated-listener capabilities. The user subsequently approved
+implementation, verification, deployment and feature-branch preparation, while
+requiring the deployed Agreements fleet to remain stopped. Bad Bets belongs
 to another session and is not changed.
 
 **fleetd is the fleet's listening process. There is no need for a second process.**

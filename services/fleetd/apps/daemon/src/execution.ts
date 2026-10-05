@@ -181,7 +181,8 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         const unlock = release;
         const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; bindingControl?.close(); await destination?.close(); await unlock(); })();
         return success({ sessionId: destination.runtime.sessionId, signal: stop.signal, attachment: destination.attachment,
-          attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, control: bindingControl.control, close });
+          attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, resume: destination.resume,
+          control: bindingControl.control, close });
       } catch (error) {
         report(error); stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.();
         const parsed = errorCode(error && typeof error === 'object' && 'code' in error ? error.code : undefined);

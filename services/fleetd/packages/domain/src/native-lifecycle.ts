@@ -256,6 +256,13 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     else emit('sleeping');
     const runtime = logical(services.primary, sessionId);
     return success({ runtime, nativeState: runtime.lifecycle!.current,
+      async resume(): Promise<Result<void>> {
+        try { await call(async () => {}, true); return success(undefined); }
+        catch (error) {
+          return initializationFailure ? { ok: false, error: initializationFailure }
+            : failure('native', error instanceof Error ? error.message : 'Exact native history could not be resumed');
+        }
+      },
       async contexts(): Promise<Result<Context[]>> {
         const saved = await services.saved();
         return saved.ok ? success(saved.value.map(({ context, runtime, sessionId }) => ({ context, runtime, sessionId }))) : saved;

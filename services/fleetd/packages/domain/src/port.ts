@@ -14,6 +14,7 @@ export type Registry = {
   writeRoster(configuration: Configuration, roster: Roster): Result<Configuration>;
 };
 export type Running = { sessionId: string; signal: AbortSignal; nativeState(): NativeSessionState;
+  resume(): Promise<Result<void>>;
   attachment(): Promise<Result<RuntimeAttachment>>;
   attachments(): Promise<Result<{ context: string; attachment: RuntimeAttachment }[]>>;
   contexts(): Promise<Result<RetainedContext[]>>; control: ListenerControl; close(): Promise<void> };

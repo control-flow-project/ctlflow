@@ -20,9 +20,10 @@ import { listenerStop } from '@crossfire/kernel/lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control: Running['control']; pointer: RuntimeAttachment;
-  close: Running['close']; nativeState?: Running['nativeState'] }): Running {
+  close: Running['close']; nativeState?: Running['nativeState']; resume?: Running['resume'] }): Running {
   const nativeState: Running['nativeState'] = input.nativeState ?? (() => ({ phase: 'running', lastActivityAt: 1, historyAvailable: true }));
   return { sessionId: input.sessionId, signal: input.signal, control: input.control, nativeState, close: input.close,
+    resume: input.resume ?? (async () => success(undefined)),
     attachment: async () => nativeState().phase === 'running' ? success(input.pointer) : failure('conflict', 'Resume this sleeping session explicitly to attach'),
     attachments: async () => nativeState().phase === 'running' ? success([{ context: 'shared', attachment: input.pointer }]) : failure('conflict', 'No live native endpoint'),
     contexts: async () => success([{ context: 'shared', runtime: input.pointer.runtime, sessionId: input.sessionId }]) };
@@ -400,6 +401,30 @@ test('sleeping and waking native phases retain the listener and inspection never
     if (!pointer.ok) assert.equal(pointer.error.code, 'conflict');
   }
   assert.equal(starts, 1); assert.equal(stoppedReads, 1);
+});
+
+test('explicit start wakes a sleeping native generation without replacing its binding or reenrolling', async scope => {
+  const binding = createListenerControl(async () => {}); binding.update({ active: false, input: null });
+  let phase: NativeSessionState['phase'] = 'sleeping', starts = 0, resumes = 0, deny = false;
+  const fixture = fixtureController({ start: async () => {
+    starts++; const stop = new AbortController();
+    return success(runtimeFixture({ sessionId: 'exact-saved', signal: stop.signal, control: binding.connection,
+      pointer: { runtime: 'fixture', sessionId: 'exact-saved', workspace: '/fixture', connection: {} },
+      nativeState: () => ({ phase, lastActivityAt: 123, historyAvailable: true }),
+      resume: async () => { resumes++; if (deny) return failure('conflict', 'Cleanup is unverified'); phase = 'running'; return success(undefined); },
+      close: async () => { stop.abort(); } }));
+  } });
+  cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start'));
+  await fixture.finish(await fixture.operation('start'));
+  const state = value(fixture.controller.view(fixture.record.fleetId));
+  assert.equal(state.instances[0]!.phase, 'running'); assert.equal(state.instances[0]!.sessionId, 'exact-saved');
+  assert.equal(state.instances[0]!.listenerActive, false, 'Native resume cannot change fleet delivery authority');
+  assert.equal(starts, 1); assert.equal(resumes, 1);
+  phase = 'sleeping'; deny = true;
+  const refused = await fixture.finish(await fixture.operation('start'));
+  assert.equal(refused.status, 'failed'); assert.equal(refused.errors[0]!.code, 'conflict');
+  assert.equal(starts, 1); assert.equal(resumes, 2);
 });
 
 test('desired bindings restore exact histories without enrollment and explicit stops remain stopped across restart', async scope => {

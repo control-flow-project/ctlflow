@@ -12,8 +12,9 @@ exception. Replacements update every owned consumer and remove the superseded
 implementation. Necessary forward data conversion preserves production state
 without retaining old runtime models.
 
-The following review is non-normative: its proposed features are not yet implemented
-and do not replace the current contracts below.
+The following approved review records the baseline findings and design decisions.
+The current contracts below, not its historical implementation-status statements,
+are normative.
 - [Listener architecture, 30-minute idle sleep and report publication proposal](proposals/20261005-listener-and-publication-architecture.md)
 
 ## 1. Products and source ownership
@@ -511,6 +512,13 @@ only that pure value module and own wire validation/operation declarations;
 domain code does not import contracts or validate HTTP payloads. The architecture
 gate enforces this direction and the narrow declared export.
 
+Fleet coordination policy values belong to the Crossfire domain; native listener
+options and saved-context metadata belong to the shared runtime port. Fleet
+contracts map the TOML/wire forms into those values. Domain modules import only
+pure values or type-only core ports, never executable listener/transport modules.
+The gate checks import declarations, dynamic imports and import-type expressions
+against declared dependencies and semantic directions, including negative fixtures.
+
 The useful reference patterns are Lesser's singular relational names, explicit
 repository interfaces, functional per-operation modules and row/entity mappers;
 and Snapped's transport/domain separation, composition, per-operation permission
@@ -627,6 +635,62 @@ stop or owner-requested listener disconnect cancels recovery; cleanup failure
 prevents an unsafe replacement process. Intentional listener stops are distinct
 from crashes at the shared lifecycle boundary and cannot be silently restarted.
 Failure and recovery remain visible through the existing management incident path.
+
+### Binding lifetime, native sleep and durable intent
+
+fleetd is the fleet's listening process. It embeds the same listener core as
+standalone attachment, with independent authorized agent bindings and one shared
+private loopback control server. There is no second fleet listener subprocess.
+If every native session is sleeping, one fleetd application process remains;
+this is not a promise about unrelated host/container/tool processes.
+
+Agent credentials, Matrix cursors, permissions and receipts remain independent.
+Consolidation never introduces a service-account inbox or shared authorization.
+One host budget fairly limits acquisition to 16 concurrent operations,
+publication to eight and native startup to four; each queue is bounded to 10,000
+waiters and is abortable. An acquisition deadline starts after its permit is
+granted. Capacity or cancellation never acknowledges unread input.
+
+Instance policy `fleetIdleTimeoutSeconds` defaults to 1800 (30 minutes), permits
+integer values 0–604800, and zero disables automatic sleep. Management presents
+minutes. Only fleetd-owned native processes can sleep; an attached standalone
+session has no lifecycle authority. Heartbeats, policy/release checks, filtered
+traffic and statistics do not count as model activity.
+
+Sleep requires confirmed idle across every opened, initializing and retained
+native history. Pending native decisions, listener input, startup/cleanup,
+publication or receipt uncertainty veto sleep. Unknown native activity keeps
+the process alive and reports an owner incident, not invented idle state.
+The lifecycle rechecks activity after inspection and serializes cleanup against
+incoming input. Eligible room/DM, scheduled or fleet input resumes one exact
+saved native generation before using the normal receipt path. History is never
+silently recreated, copied or retargeted; shared/per-room settings remain intact.
+
+Native shutdown does not stop the stable receiver, credential, cursor, heartbeat
+or controller connection. Sleeping/waking are native states, not listener
+offline. Metadata and terminal GETs never wake a process; live attachment while
+sleeping requires explicit Resume sessions. Maintenance notices wait for a live
+native session rather than waking sleeping agents. Failed native generations
+report their original cause and resume independently with bounded transient
+backoff after verified cleanup. Unverified cleanup blocks replacement.
+
+The private controller `desired-intent.json` stores activation separately from
+observed execution. Its key pairs are bounded to 100 fleets and 100 instances
+per fleet, validated and written atomically before activation/stop. Explicit Stop
+removes the selected intent before cleanup and stays stopped after restart.
+Orderly daemon shutdown preserves intent while closing owned resources.
+Starting the same daemon/root restores desired bindings from saved configuration
+and exact native histories, initially without a native process where possible.
+Restoration is bounded to four concurrent attempts with 30-second startup
+observations. A late result is drained/closed, not allowed to overlap a retry.
+Permanent errors retain failed intent and require operator action.
+
+No host boot service is installed: after power failure the operator still starts
+fleetd with its original root. History, credentials, desired intent and unread
+state are durable; unrelated in-flight shell descendants are not frozen for
+continuation. Manually stopped fleets are never automatically started.
+GET inspection never accepts edited configuration or increments revisions;
+an explicit revision-checked start/reset owns configuration application.
 
 An explicit agent or fleet reset stops all selected owned execution before any
 selected history is retired, then exports complete available
@@ -1766,11 +1830,18 @@ as an answer; they alone cannot certify that the selected answer was applied.
 ### Native activity and typing
 
 Observed native activity distinguishes working, idle, waiting for approval,
-waiting for an answer, failure and unavailable observation. A heartbeat means
+waiting for an answer, sleeping, waking, failure and unavailable observation. A heartbeat means
 only a connected reporting listener; it is not proof of model progress.
 Pending questions/permissions remain visible to the owner while the runtime
 waits. A busy runtime without a structured request is not declared to be waiting
 for a decision merely because it has been quiet.
+
+Nullable last native activity and history availability are observations, not
+guessed effective settings. Agent/fleet directory native summaries are hydrated
+in one page-wide query from each agent's latest reporting run. A sleeping agent
+can still have an online listener. Offline/stale summaries are explicitly last
+reported information. One unavailable/failed/waiting context remains visible
+instead of being hidden by another idle context.
 
 Typing is native Matrix ephemeral state, published only to the latest room/DM
 whose chat was actually delivered to the agent. Filtered/unpublished traffic

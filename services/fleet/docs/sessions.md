@@ -7,7 +7,7 @@ Open a fleet and select **Sessions**. An individual fleet-managed agent also has
 
 | Action | Native execution | History and delivery |
 | --- | --- | --- |
-| Resume session(s) | Start stopped agents; retain already running agents. | Resume full saved native histories, identities and current configured parameters. Delivery follows the fleet's existing setting. |
+| Resume session(s) | Start stopped agents or wake sleeping native engines; retain active bindings. | Resume full saved native histories, identities and current configured parameters. Delivery follows the fleet's existing setting. |
 | Stop session(s) | Close the selected listeners and owned engines. | Retain native histories, accounts, permissions and unread positions. The controller remains connected. |
 | Start with fresh history | Stop selected agents, prepare private exports and restart with fresh model contexts. | Archive old bindings; retain identity, credentials, permissions, Matrix messages and configured parameters. Confirmation is required. |
 
@@ -21,10 +21,30 @@ reported by the controller. Acceptance is not completion. A failed fleet operati
 may contain successful peers; inspect the per-agent errors before retrying. An
 offline controller cannot accept a session operation through management.
 
-**Delivery** is separate: pausing delivery leaves native engines running and retains
-their listeners' controller connection. Resuming sessions does not silently enable
-a fleet whose delivery was paused. Each running agent has one listener, and the
-fleet has a separate controller connection.
+**Delivery** is separate: pausing delivery retains active bindings and any live
+native engines. Resuming sessions does not silently enable a fleet whose delivery
+was paused. fleetd itself hosts the listeners: one binding per active agent, not
+one listener process per agent. Each fleet has its scoped controller connection.
+
+## Automatic sleep
+
+Crossfire's Policy page sets fleet idle sleep; the default is 30 minutes and zero
+disables it. An idle native engine can be closed while its receiver remains
+online. Sleeping is not stopped: eligible chat, scheduled or broadcast input
+wakes it and resumes the exact saved history. Busy histories, pending decisions,
+input or receipts and unknown activity prevent sleep. Direct agents are unaffected.
+
+`fleet show` exposes native phase, desired binding intent, last native activity,
+listener activity and history availability separately. `fleet agent contexts`
+reads saved context IDs while sleeping or stopped without waking a process.
+Attachment requires a live native endpoint; GET never launches one. Use Resume
+sessions or `fleet agent start` to wake a sleeping native engine for a terminal
+without changing its binding or sending a model prompt.
+
+Orderly daemon shutdown preserves desired activation. Starting the same daemon
+root after a reboot restores active bindings with retained histories; explicitly
+stopped agents remain stopped. No automatic operating-system boot service is
+installed. Preserve the controller root as well as fleet workareas and credentials.
 
 ## CLI
 
