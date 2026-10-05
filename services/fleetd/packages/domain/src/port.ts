@@ -36,6 +36,7 @@ export type Execution = {
   prepare(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (approval: Approval) => void): Promise<Result<{ failed: { instanceKey: string; code: string; message: string }[] }>>;
   start(configuration: Configuration, instance: Instance, signal: AbortSignal, reason: 'operator' | 'recovery'): Promise<Result<Running>>;
   contexts(configuration: Configuration, instance: Instance): Promise<Result<RetainedContext[]>>;
+  confirmStopped(configuration: Configuration, instance: Instance): Promise<Result<void>>;
   reset(configuration: Configuration, instance: Instance, resetId: string, signal: AbortSignal): Promise<Result<void>>;
   remove(configuration: Configuration, instance: Instance): Promise<Result<void>>;
   archive(configuration: Configuration): Promise<Result<void>>;

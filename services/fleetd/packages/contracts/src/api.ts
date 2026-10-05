@@ -23,11 +23,12 @@ const operationFields = { operationId: check.identifier, target, action: check.c
   releaseDirectory: check.optional(releaseDirectory) };
 export const operationInput = check.refine(check.object(operationFields), value => (value.action === 'update') === (value.releaseDirectory !== undefined),
   'Only an explicit software update supplies its installed release directory');
-export const operationView = check.object({ ...{
+export const operationView = check.refine(check.object({ ...{
   ...operationFields,
 }, receiptPending: check.optional<true>(input => input === true ? success(true) : failure('invalid', 'Only unacknowledged controller requests are pinned')),
   status: check.choice('accepted', 'running', 'awaiting-approval', 'succeeded', 'failed'), createdAt: check.integer(), completedAt: check.nullable(check.integer()),
-  approval: check.nullable(check.object({ url: check.text(2048), code: check.text(12, 12) })), errors: check.list(check.object({ instanceKey: check.nullable(check.name), code: check.text(100), message: check.text(4096) }), 100) });
+  approval: check.nullable(check.object({ url: check.text(2048), code: check.text(12, 12) })), errors: check.list(check.object({ instanceKey: check.nullable(check.name), code: check.text(100), message: check.text(4096) }), 100) }),
+  value => (value.action === 'update') === (value.releaseDirectory !== undefined), 'Only an explicit software update supplies its installed release directory');
 export type FleetView = check.Parsed<typeof fleetView>;
 export type InstanceView = check.Parsed<typeof instanceView>;
 export type OperationInput = check.Parsed<typeof operationInput>;

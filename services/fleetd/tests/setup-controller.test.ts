@@ -29,7 +29,7 @@ function fixture(execution: Partial<Execution> = {}) {
       disconnect: async () => {}, close: async () => {}, delivery: async () => failure('unavailable', 'Unused fixture port'), message: async () => failure('unavailable', 'Unused fixture port'),
       validate: () => success(undefined), inspect: async () => { calls.push('inspect'); return success(undefined); }, test: async () => success(undefined),
       prepare: async () => { calls.push('prepare'); return success({ failed: [] }); },
-      reset: async () => { calls.push('reset'); return success(undefined); }, remove: async () => success(undefined), archive: async () => success(undefined),
+      reset: async () => { calls.push('reset'); return success(undefined); }, confirmStopped: async () => success(undefined), remove: async () => success(undefined), archive: async () => success(undefined),
       update: async (_configuration, instance, releaseDirectory) => { calls.push('update:' + instance.key + ':' + releaseDirectory); return success(undefined); },
       contexts: async (_configuration, instance) => success(histories.has(instance.key) ? [{ context: 'shared', runtime: 'codex', sessionId: histories.get(instance.key)! }] : []),
       start: async (_configuration, instance, _signal, reason) => {
@@ -88,6 +88,53 @@ test('setup waits for exact human approval, concurrent repeats share its operati
   assert.deepEqual(value(current.controller.operation(prepared.operation.operationId)).approval, { url: 'https://example.test/manage/enrollments/exact', code: 'ABCDEF123456' });
   assert.equal(approvals, 1); assert.equal(current.calls.some(call => call.startsWith('start:')), false);
   approve(); assert.equal((await current.finish(prepared.operation)).status, 'succeeded');
+});
+
+test('repeat setup requires actual model-free listener readiness and refuses busy delivery without restarting a session', async scope => {
+  let ready = false, inspections = 0;
+  const current = fixture({ test: async () => { inspections++; return ready ? success(undefined) : failure('conflict', 'Native session is busy'); } });
+  cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation);
+  const blocked = await current.controller.setup(current.input); assert(!blocked.ok); assert.equal(blocked.error.code, 'conflict');
+  assert.equal(blocked.error.message.includes('busy'), true); ready = true;
+  const repeated = value(await current.controller.setup(current.input)); assert.equal(repeated.status, 'ready'); assert.equal(inspections, 2);
+  assert.equal(current.calls.filter(call => call.startsWith('start:')).length, 1); assert.equal(current.calls.includes('reset'), false);
+});
+
+test('readiness checks sleeping bindings without native wake; stopped readiness cannot start a process', async scope => {
+  const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const start = current.services.execution.start;
+  current.services.execution.start = async (...args) => {
+    const running = await start(...args); assert(running.ok);
+    return success({ ...running.value, nativeState: () => ({ phase: 'sleeping' as const, lastActivityAt: 1, historyAvailable: true }),
+      resume: async () => { assert.fail('Read-only readiness cannot wake native execution'); } });
+  };
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation);
+  assert.equal(value(current.controller.view(first.fleet.fleetId)).phase, 'sleeping'); assert((await current.controller.test(first.fleet.fleetId)).ok);
+  await current.operate(first.fleet.fleetId, 'stop'); assert.equal((await current.controller.test(first.fleet.fleetId)).ok, false);
+  assert.equal(current.calls.filter(call => call.startsWith('start:')).length, 1);
+});
+
+test('stop receipt failure is visible while native execution remains stopped and explicit retry does not restart it', async scope => {
+  let acknowledged = false, confirmations = 0;
+  const current = fixture({ confirmStopped: async () => { confirmations++; return acknowledged ? success(undefined) : failure('unavailable', 'Native close receipt is awaiting acknowledgment'); } });
+  cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation);
+  const stopped = await current.operate(first.fleet.fleetId, 'stop'); assert.equal(stopped.status, 'failed');
+  const view = value(current.controller.view(first.fleet.fleetId)); assert.equal(view.instances[0]!.phase, 'stopped'); assert.equal(view.instances[0]!.desiredActive, false);
+  assert.equal(view.instances[0]!.error, 'Native close receipt is awaiting acknowledgment');
+  acknowledged = true; assert.equal((await current.operate(first.fleet.fleetId, 'stop')).status, 'succeeded'); assert.equal(confirmations, 2);
+  assert.equal(current.calls.filter(call => call.startsWith('start:')).length, 1); assert.equal(current.calls.filter(call => call.startsWith('close:')).length, 1);
+});
+
+test('archiving a completed setup does not implicitly recreate its registration or reactivate its preserved native history', async scope => {
+  const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation);
+  const ready = value(await current.controller.setup(current.input)), history = ready.fleet.instances[0]!.sessionId;
+  await current.operate(first.fleet.fleetId, 'stop'); assert((await current.controller.remove(first.fleet.fleetId, ready.fleet.revision)).ok);
+  const repeated = await current.controller.setup(current.input); assert(!repeated.ok); assert.equal(repeated.error.code, 'conflict');
+  assert.deepEqual(value(current.controller.list()), []); assert.equal(current.histories.get(ready.fleet.instances[0]!.instance.key), history);
+  assert.equal(current.calls.filter(call => call.startsWith('start:')).length, 1);
 });
 
 test('missing prerequisite fails before enrollment and retry reuses the private generated configuration', async scope => {

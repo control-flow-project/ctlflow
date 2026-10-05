@@ -168,12 +168,14 @@ export function createController(services: Services) {
       const { configuration, operationId, completed } = prepared.value;
       const inspected = await services.execution.inspect(configuration, lifetime.signal); if (!inspected.ok) return inspected;
       const registered = records.find(record => record.directory === configuration.directory);
+      if (completed && !registered) return failure('conflict', 'Completed setup was unregistered; an archived identity cannot be recreated implicitly');
       const fleet = registered ? view(registered.fleetId) : add(configuration.directory);
       if (!fleet.ok) return fleet;
       if (completed) {
         const active = fleet.value.instances.some(instance => instance.desiredActive);
         const ready = fleet.value.connection.connected && fleet.value.instances.every(instance => !instance.desiredActive
           || !!instance.sessionId && ['running', 'sleeping'].includes(instance.phase));
+        if (active && ready) { const tested = await test(fleet.value.fleetId); if (!tested.ok) return tested; }
         return success({ fleet: fleet.value, operation: null, status: active ? ready ? 'ready' : 'starting' : 'stopped' });
       }
       const existing = operations.find(operation => operation.operationId === operationId);
@@ -188,6 +190,7 @@ export function createController(services: Services) {
       const operation = reusable ? success(structuredClone(existing)) : await operate({ operationId: retryId,
         action: 'start', target: { kind: 'fleet', fleetId: fleet.value.fleetId }, expectedRevision: fleet.value.revision });
       if (!operation.ok) return operation;
+      if (operation.value.status === 'succeeded') { const tested = await test(fleet.value.fleetId); if (!tested.ok) return tested; }
       return success({ fleet: fleet.value, operation: operation.value, status: operation.value.status === 'succeeded' ? 'ready' : 'starting' });
     })().finally(() => { setups.delete(identity); });
     setups.set(identity, pending); return pending;
@@ -410,7 +413,17 @@ export function createController(services: Services) {
     const fleetId = operation.target.fleetId!;
     operation.status = 'running'; saveOperation(operation);
     try {
-      if (operation.action === 'stop') await stopSelected(operation, selected);
+      if (operation.action === 'stop') {
+        await stopSelected(operation, selected);
+        if (configuration) for (const instance of selected) {
+          if (operation.errors.some(error => error.instanceKey === instance.key)) continue;
+          const receipt = await services.execution.confirmStopped(configuration, instance);
+          if (!receipt.ok) {
+            operation.errors.push({ instanceKey: instance.key, ...receipt.error });
+            states.set(key(fleetId, instance.key), { ...states.get(key(fleetId, instance.key))!, error: receipt.error.message });
+          }
+        }
+      }
       else if (operation.action === 'update') {
         if (!configuration) throw new Error('Updating requires a validated fleet configuration');
         const activated = selected.filter(instance => wanted.has(key(fleetId, instance.key)));

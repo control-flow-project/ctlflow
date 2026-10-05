@@ -52,7 +52,7 @@ function fixture(execution?: Partial<Execution>) {
       validate: () => success(undefined), inspect: async () => success(undefined), test: async () => success(undefined), prepare: async () => success({ failed: [] }), remove: async () => success(undefined),
       archive: async () => success(undefined), update: async () => success(undefined),
       reset: async () => success(undefined),
-      contexts: async () => success([]),
+      contexts: async () => success([]), confirmStopped: async () => success(undefined),
       start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success(runtimeFixture({ sessionId, signal: stop.signal,
         pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
         close: async () => { closed.push(instance.key); stop.abort(); } })); }, ...execution } satisfies Execution };

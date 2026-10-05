@@ -52,7 +52,7 @@ CLI does not cancel accepted controller work.
 
 Operation results distinguish pending approval, success and per-instance failure.
 Idempotency keys and expected revisions prevent conflicting replays.
-Fleet and individual start and stop commands accept `--operation-id UUID` for an
+Fleet-wide and per-agent start and stop commands accept `--operation-id UUID` for an
 exact retry after uncertain submission; the command prints its ID before submission.
 Name collisions, missing credentials and invalid native settings stay errors.
 

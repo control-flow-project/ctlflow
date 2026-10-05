@@ -4,7 +4,7 @@ import test from 'node:test';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync, readFileSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync, readFileSync, symlinkSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +20,7 @@ const entry = fileURLToPath(new URL('../apps/cli/src/main.js', import.meta.url))
 
 test('CLI manages a private named daemon through its typed Unix API and survives CLI disconnect', { timeout: 40000 }, async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleet-cli-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const binaryDirectory = join(directory, 'bin'); mkdirSync(binaryDirectory, { mode: 0o700 });
   const installed = join(binaryDirectory, 'fleet'); symlinkSync(entry, installed);
   const home = join(directory, 'home'); mkdirSync(home, { mode: 0o700 });
@@ -55,11 +56,11 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   await assert.rejects(cli('agent', 'attach', 'research', 'analyst'), /Resume this agent before attaching/);
   assert.equal((await client.call(operations.attachment, { fleetId: added.fleetId, instanceKey: 'missing' }, {})).ok, false);
   const starter = spawn(process.execPath, [entry, 'start', 'research'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-  const ended = once(starter, 'close'); let output = '';
-  starter.stdout.on('data', chunk => { output += String(chunk); }); starter.stderr.resume();
+  const ended = once(starter, 'close'); let output = '', errors = '';
+  starter.stdout.on('data', chunk => { output += String(chunk); }); starter.stderr.on('data', chunk => { errors += String(chunk); });
   cleanup(scope, async () => { starter.kill('SIGKILL'); await ended; });
   for (let attempt = 0; !preflight && attempt < 100; attempt++) await delay(30);
-  assert(preflight); assert(output.includes('operationId'));
+  assert(preflight, errors || 'No enrollment preflight was observed'); assert(output.includes('operationId'));
   const operationId = (JSON.parse(output) as { operationId: string }).operationId;
   starter.kill('SIGTERM'); await ended;
   assert.equal(value(await client.call(operations.status, {}, {})).data.stopping, false);

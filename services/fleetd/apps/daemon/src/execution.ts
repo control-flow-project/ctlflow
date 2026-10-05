@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
@@ -24,10 +25,12 @@ import { prepareEnrollment } from './enrollment.js';
 import { failureReporter } from './failures.js';
 import { resetInstance, resetInstructions } from './reset.js';
 import { canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storage/history';
+import { createNativeStopReceipts, type NativeStopActivity } from './native-stops.js';
 
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
+  const stops = new Map<string, ReturnType<typeof createNativeStopReceipts>>();
   let host: Promise<ListenerHost> | undefined;
   const inspect: Execution['inspect'] = async (configuration, signal) => {
     try {
@@ -59,7 +62,14 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
             if (command.agentId !== null && !identity) return failure('missing', 'The requested agent has no identity in this controller binding');
             return control.execute({ operationId: command.operationId, action: command.action, instanceKey: identity?.instanceKey ?? null });
           } });
-        reporters.set(configuration.directory, reporter); connections.set(configuration.directory, connection);
+        const receipts = createNativeStopReceipts({ signal, clock: nativeClock, id: randomUUID, connected: () => connection.status().connected,
+          send: async (receipt, scope) => {
+            const result = await createClient({ origin: binding.value.server, token: receipt.binding.credential, timeoutMs: 5000, signal: scope })
+              .call(operations.recordFleetNativeStop, { fleetId: receipt.binding.fleetId, agentId: receipt.agentId },
+                { connectionId: receipt.binding.connectionId, runId: receipt.runId, receiptId: receipt.receiptId });
+            return result.ok && result.value.data.recorded ? success(undefined) : result.ok ? failure('conflict', 'Crossfire did not accept the native stop receipt') : result;
+          } });
+        stops.set(configuration.directory, receipts); reporters.set(configuration.directory, reporter); connections.set(configuration.directory, connection);
       } catch (error) { void reporter.close(); throw error; }
       return success(undefined);
     } catch (error) { return failure('invalid', error instanceof Error ? error.message : 'Invalid fleet controller binding'); }
@@ -68,7 +78,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
     connect,
     connection(configuration) {
       const status = connections.get(configuration.directory)?.status() ?? { connected: false, deliveryEnabled: false, revision: null, error: 'Fleet has no approved controller binding' };
-      return { ...status, error: reporters.get(configuration.directory)?.error() ?? status.error };
+      return { ...status, error: stops.get(configuration.directory)?.error() ?? reporters.get(configuration.directory)?.error() ?? status.error };
     },
     async delivery(configuration, input) {
       const connection = connections.get(configuration.directory);
@@ -78,10 +88,12 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
       const connection = connections.get(configuration.directory);
       return connection ? connection.message(input) : failure('conflict', 'Enroll this fleet before sending messages');
     },
-    async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear();
+    async close() { await Promise.all([...stops.values()].map(receipts => receipts.close())); stops.clear();
+      await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear();
       await Promise.all([...reporters.values()].map(reporter => reporter.close())); reporters.clear();
       if (host) await (await host).close(); host = undefined; },
-    async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close();
+    async disconnect(configuration) { const receipts = stops.get(configuration.directory); stops.delete(configuration.directory); await receipts?.close();
+      const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close();
       const reporter = reporters.get(configuration.directory); reporters.delete(configuration.directory); await reporter?.close(); },
     validate(configuration) {
       for (const definition of Object.values(configuration.definitions)) {
@@ -131,11 +143,17 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
       const contexts = await adapter.savedContexts({ stateDirectory, workspace: instance.workspace ?? stateDirectory });
       return contexts.ok ? success(contexts.value.map(({ context, runtime, sessionId }) => ({ context, runtime, sessionId }))) : contexts;
     },
+    async confirmStopped(configuration, instance) {
+      const loaded = loadBinding(configuration); if (!loaded.ok) return loaded;
+      const identity = loaded.value.identities.find(item => item.instanceKey === instance.key);
+      return identity ? stops.get(configuration.directory)?.confirm(identity.agentId) ?? success(undefined) : success(undefined);
+    },
     async start(configuration, instance, signal, reason) {
       let release: (() => Promise<void>) | undefined;
       let destination: Extract<Awaited<ReturnType<typeof createNativeLifecycle>>, { ok: true }>['value'] | undefined;
       let done: Promise<void> | undefined;
       let bindingControl: ReturnType<FleetControlConnection['listener']> | undefined;
+      let activity: NativeStopActivity | undefined;
       let enrolledId: string | undefined, reported = false;
       const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
       const report = (error: unknown) => {
@@ -178,6 +196,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
           historyMode: instance.listenerOptions?.historyMode ?? 'shared',
+          activity: (runId, generation) => { activity = stops.get(configuration.directory)!.activity(identity.agentId, runId, generation, () => bindingControl!.control.binding()); },
           ready,
           runtime: async (runtimeStop, _poll, hooks) => {
             const options = adapter.validate(definition.options);
@@ -215,12 +234,16 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         reporters.get(configuration.directory)?.recovered(identity.agentId);
         let closing: Promise<void> | undefined;
         const unlock = release;
-        const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; bindingControl?.close(); await destination?.close(); await unlock(); })();
+        const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; await destination?.close();
+          if (activity) stops.get(configuration.directory)?.closed(activity);
+          bindingControl?.close(); await unlock(); })();
         return success({ sessionId: destination.runtime.sessionId, signal: stop.signal, attachment: destination.attachment,
           attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, resume: destination.resume,
           control: bindingControl.control, close });
       } catch (error) {
-        report(error); stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.();
+        report(error); stop.abort(error); await done; await destination?.close();
+        if (activity) stops.get(configuration.directory)?.closed(activity);
+        bindingControl?.close(); await release?.();
         const parsed = errorCode(error && typeof error === 'object' && 'code' in error ? error.code : undefined);
         return failure(parsed.ok ? parsed.value : 'native', error instanceof Error ? error.message : 'Instance startup failed');
       }
@@ -231,12 +254,14 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         if (!loaded.ok) return loaded;
         const binding = loaded.value, identity = binding.identities.find(item => item.instanceKey === instance.key);
         if (!identity) return success(undefined);
+        const confirmed = await stops.get(configuration.directory)?.confirm(identity.agentId); if (confirmed && !confirmed.ok) return confirmed;
         if (!binding.fleetId || !binding.controllerCredential) return failure('forbidden', 'Fleet controller credential is missing');
         const client = createClient({ origin: binding.server, token: binding.controllerCredential });
         const current = await client.call(operations.fleet, { fleetId: binding.fleetId }, {});
         if (!current.ok) return current;
         const removed = await client.call(operations.removeFleetAgent, { fleetId: binding.fleetId, agentId: identity.agentId }, { expectedRevision: current.value.data.revision, instanceKey: instance.key });
         if (!removed.ok) return removed;
+        stops.get(configuration.directory)?.forget(identity.agentId);
         saveBinding(configuration.directory, { ...binding, request: null });
         return success(undefined);
       } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not retire instance registration'); }
@@ -255,6 +280,11 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
       finally { await receiver?.(); await listener?.(); }
     },
     async archive(configuration) {
+      for (const instance of configuration.roster.instances) {
+        const loaded = loadBinding(configuration); if (!loaded.ok) return loaded;
+        const identity = loaded.value.identities.find(item => item.instanceKey === instance.key);
+        if (identity) { const confirmed = await stops.get(configuration.directory)?.confirm(identity.agentId); if (confirmed && !confirmed.ok) return confirmed; }
+      }
       try {
         const loaded = loadBinding(configuration); if (!loaded.ok) return loaded;
         const binding = loaded.value;

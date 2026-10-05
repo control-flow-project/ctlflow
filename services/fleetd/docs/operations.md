@@ -105,6 +105,17 @@ lifecycle domain, so long native operations do not block lease renewal. Receipt
 uncertainty retains the identical operation ID and pins its native outcome until
 acknowledged. A restart marks unfinished operations failed; it never guesses or
 replays destructive work under a replacement ID.
+
+Local stop reports exact authenticated listener-run and controller-generation
+evidence only after listener settlement and awaited native close. At most one
+pending proof per current fleet member is retained; retries keep its receipt ID.
+Proof-report failures remain visible separately from native-cleanup failures and
+do not block automatic native recovery. New authenticated activity invalidates
+older proof. A lost controller generation requires a current binding's explicit
+resume/stop before retirement; no stale lease or sleeping heartbeat proves stop.
+Instance retirement and fleet archive use the same canonical server operations
+and fail closed until actual native stop and all outstanding decisions/input
+receipts are confirmed. Neither operation detaches an agent or deletes history.
 - [UI/CLI session controls and confirmation](../../fleet/docs/sessions.md)
 
 Role `coordination_options` requests exact Crossfire wake rules and invitation
