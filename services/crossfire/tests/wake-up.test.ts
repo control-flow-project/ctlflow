@@ -5,7 +5,7 @@ import { createWakeRule, changeWakeRule, deleteWakeRule } from '@ctlflow/crossfi
 import { listWakeRules, readWakeRule } from '@ctlflow/crossfire-domain/wake-up/read';
 import { claimWake, wakeMetadata, validateWake, acknowledgeWake } from '@ctlflow/crossfire-domain/wake-up/delivery';
 import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
-import { reportFleetConnection, changeFleetDelivery } from '@ctlflow/crossfire-domain/fleet/control';
+import { changeFleetDelivery } from '@ctlflow/crossfire-domain/fleet/control';
 import type { WakeRuleInput } from '@ctlflow/crossfire-domain/wake-up/types';
 import { failure } from '@ctlflow/crossfire-kernel/result';
 import { applicationFixture, value } from './support/application.js';
@@ -13,8 +13,8 @@ import { httpFixture } from './support/http.js';
 import { contractRelease } from './support/release.js';
 
 const input: WakeRuleInput = { name: 'Fetch data', message: 'Fetch the latest report.', schedule: { kind: 'interval', seconds: 60 }, enabled: true, agentIds: [] };
-function report(fixture: Awaited<ReturnType<typeof applicationFixture>>, agent: Awaited<ReturnType<Awaited<ReturnType<typeof applicationFixture>>['agent']>>, runId = randomUUID(), controllerBound = false) {
-  value(reportListener(fixture.services, agent.actor, agent.id, runId, { statistics: null, release: 'test', messagesDelivered: 0, stopped: false, controllerBound }, 'test'));
+function report(fixture: Awaited<ReturnType<typeof applicationFixture>>, agent: Awaited<ReturnType<Awaited<ReturnType<typeof applicationFixture>>['agent']>>, runId = randomUUID()) {
+  value(reportListener(fixture.services, agent.actor, agent.id, runId, { statistics: null, release: 'test', messagesDelivered: 0, stopped: false, controller: agent.controller }, 'test'));
   return { runId, sessionId: 'native-session' };
 }
 test('normalized Wake-up CRUD is owner-scoped, revision-checked, idempotent, paginated and atomic', async scope => {
@@ -58,7 +58,7 @@ test('due occurrences coalesce per agent, claim once per session and acknowledge
   const ruleId = randomUUID(); value(createWakeRule(services, admin.actor, ruleId, { ...input, agentIds: [first.id, second.id] }, randomUUID()));
   const attachment = report(fixture, first), other = report(fixture, second);
   assert.equal(value(claimWake(services, first.actor, first.id, attachment)), null);
-  fixture.advance(240000); report(fixture, first, attachment.runId); report(fixture, second, other.runId);
+  fixture.advanceConnected(240000, first.controller, second.controller); report(fixture, first, attachment.runId); report(fixture, second, other.runId);
   const due = value(claimWake(services, first.actor, first.id, attachment))!;
   assert.equal(due.ruleId, ruleId); assert.equal(due.message, input.message);
   assert.deepEqual(value(claimWake(services, first.actor, first.id, attachment)), due);
@@ -78,7 +78,7 @@ test('saving, disabling, deleting and authority loss invalidate queued claims wi
   const fixture = await applicationFixture(scope), { services, admin } = fixture, agent = await fixture.agent(admin.actor, 'ada'), ruleId = randomUUID();
   const configured = { ...input, agentIds: [agent.id] };
   value(createWakeRule(services, admin.actor, ruleId, configured, randomUUID()));
-  const attachment = report(fixture, agent); fixture.advance(60000);
+  const attachment = report(fixture, agent); fixture.advanceConnected(60000, agent.controller);
   const due = value(claimWake(services, agent.actor, agent.id, attachment))!;
   value(changeWakeRule(services, admin.actor, ruleId, { ...configured, expectedRevision: 0, enabled: false }, randomUUID()));
   assert.equal(value(validateWake(services, agent.actor, agent.id, due.deliveryId, attachment)).eligible, false);
@@ -94,22 +94,23 @@ test('saving, disabling, deleting and authority loss invalidate queued claims wi
   value(services.repositories.principal.update({ ...principal, status: 'suspended' })); fixture.advance(60000);
   assert.equal(claimWake(services, agent.actor, agent.id, attachment).ok, false, 'Suspending the owner prevents scheduled delivery');
 });
-test('fleet-gated scheduled delivery respects the controller while direct runs stay independent', async scope => {
+test('fleet-gated scheduled delivery cannot continue under paused controller delivery', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, agent = await fixture.agent(admin.actor, 'ada');
-  const fleetId = randomUUID(), credentialId = randomUUID();
-  value(services.repositories.fleet.insert({ id: fleetId, ownerId: admin.actor.principalId, fleetKey: 'test', label: 'Test', controllerName: 'desktop', revision: 0, deliveryEnabled: true, createdAt: fixture.now(), updatedAt: fixture.now() }));
-  value(services.repositories.fleetInstance.insert({ ownerId: admin.actor.principalId, fleetKey: 'test', instanceKey: 'ada', agentId: agent.id }));
-  value(services.repositories.fleetCredential.insert({ id: credentialId, fleetId, secretHash: 'private-test-hash', createdAt: fixture.now(), revokedAt: null }));
-  const controller = { kind: 'controller' as const, fleetId, credentialId }, generation = randomUUID();
-  const bound = report(fixture, agent, randomUUID(), true), direct = report(fixture, agent);
-  const ruleId = randomUUID(); value(createWakeRule(services, admin.actor, ruleId, { ...input, agentIds: [agent.id] }, randomUUID())); fixture.advance(60000);
-  assert.equal(value(claimWake(services, agent.actor, agent.id, bound)), null);
-  value(reportFleetConnection(services, controller, fleetId, generation, false));
-  const pending = value(claimWake(services, agent.actor, agent.id, bound))!;
-  value(changeFleetDelivery(services, admin.actor, fleetId, { expectedRevision: 0, enabled: false }, randomUUID()));
-  assert.equal(value(validateWake(services, agent.actor, agent.id, pending.deliveryId, bound)).eligible, false);
-  value(acknowledgeWake(services, agent.actor, agent.id, pending.deliveryId, bound)); fixture.advance(60000); report(fixture, agent, direct.runId);
-  assert(value(claimWake(services, agent.actor, agent.id, direct)), 'A direct listener is not governed by its account’s deployment controller');
+  const attachment = report(fixture, agent), ruleId = randomUUID();
+  value(createWakeRule(services, admin.actor, ruleId, { ...input, agentIds: [agent.id] }, randomUUID()));
+  fixture.advanceConnected(60000, agent.controller);
+  const pending = value(claimWake(services, agent.actor, agent.id, attachment))!;
+  const fleet = value(services.repositories.fleet.findById(agent.controller.fleetId))!;
+  value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: fleet.revision, enabled: false }, randomUUID()));
+  assert.equal(value(validateWake(services, agent.actor, agent.id, pending.deliveryId, attachment)).eligible, false);
+  value(acknowledgeWake(services, agent.actor, agent.id, pending.deliveryId, attachment));
+  assert.equal(reportListener(services, agent.actor, agent.id, randomUUID(), { statistics: null, release: 'test',
+    messagesDelivered: 0, stopped: false, controller: agent.controller }, 'test').ok, false);
+  const paused = value(services.repositories.fleet.findById(fleet.id))!;
+  value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: paused.revision, enabled: true }, randomUUID()));
+  const resumed = report(fixture, agent);
+  fixture.advanceConnected(60000, agent.controller);
+  assert(value(claimWake(services, agent.actor, agent.id, resumed)), 'A resumed current controller-owned run admits the next occurrence');
 });
 test('Wake-up REST validates strict payloads, human CSRF, owner scope and self-only agent claims', async scope => {
   const fixture = await applicationFixture(scope), http = await httpFixture(scope, fixture.application), { admin, services } = fixture;
@@ -121,7 +122,7 @@ test('Wake-up REST validates strict payloads, human CSRF, owner scope and self-o
   assert.equal((await http.request('/api/wake-rules', 'POST', creation, { Cookie: '__Host-crossfire=' + admin.secret })).status, 403);
   assert.equal((await http.request('/api/wake-rules', 'POST', { ...creation, surprise: true }, http.headers(admin))).status, 400);
   assert.equal((await http.request('/api/wake-rules', 'POST', { ...creation, ruleId: randomUUID(), schedule: { kind: 'cron', expression: 'bad', timeZone: 'UTC' } }, http.headers(admin))).status, 400);
-  const runId = randomUUID(); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 0, stopped: false, controllerBound: false }, contractRelease().manifest.release));
+  const runId = randomUUID(); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: contractRelease().manifest.release, messagesDelivered: 0, stopped: false, controller: agent.controller }, contractRelease().manifest.release));
   const path = '/api/agents/' + agent.id + '/wake-deliveries';
   assert.equal((await http.request(path, 'POST', { runId, sessionId: 'native' }, { Authorization: 'Bearer ' + foreign.token })).status, 404);
   assert.equal((await http.request(path, 'POST', { runId, sessionId: 'native' }, { Authorization: 'Bearer ' + agent.token })).status, 200);
@@ -133,7 +134,7 @@ test('late interval claims preserve cadence, serialize rules and roll back deadl
   const configuration = { ...input, agentIds: [agent.id] }, firstId = randomUUID(), secondId = randomUUID(), started = fixture.now();
   value(createWakeRule(services, admin.actor, firstId, configuration, randomUUID()));
   value(createWakeRule(services, admin.actor, secondId, configuration, randomUUID()));
-  fixture.advance(250000); const attachment = report(fixture, agent);
+  fixture.advance(250000); fixture.renewController(agent.controller); const attachment = report(fixture, agent);
   const originalInsert = services.repositories.wakeDelivery.insert;
   services.repositories.wakeDelivery.insert = () => failure('unavailable', 'delivery fixture');
   assert.equal(claimWake(services, agent.actor, agent.id, attachment).ok, false);
@@ -154,9 +155,9 @@ test('receipt recovery transfers only an expired same-session claim and current 
   const ruleId = randomUUID(), configuration = { ...input, agentIds: [agent.id] };
   value(createWakeRule(services, alice.actor, ruleId, configuration, randomUUID()));
   value(changeWakeRule(services, admin.actor, ruleId, { ...configuration, expectedRevision: 0 }, randomUUID()));
-  const original = report(fixture, agent); fixture.advance(60000);
+  const original = report(fixture, agent); fixture.advanceConnected(60000, agent.controller);
   const due = value(claimWake(services, agent.actor, agent.id, original))!;
-  fixture.advance(90001); const next = report(fixture, agent);
+  fixture.advance(90001); fixture.renewController(agent.controller); const next = report(fixture, agent);
   assert.equal(value(claimWake(services, agent.actor, agent.id, { ...next, sessionId: 'different' })), null);
   assert.equal(value(claimWake(services, agent.actor, agent.id, next))?.deliveryId, due.deliveryId);
   assert.equal(acknowledgeWake(services, agent.actor, agent.id, due.deliveryId, original).ok, false);
@@ -167,7 +168,7 @@ test('receipt recovery transfers only an expired same-session claim and current 
   assert.equal(value(services.repositories.wakeDelivery.find(due.deliveryId))?.status, 'cancelled');
   value(acknowledgeWake(services, agent.actor, agent.id, due.deliveryId, next));
   assert.equal(value(services.repositories.wakeDelivery.find(due.deliveryId))?.status, 'delivered');
-  assert.equal(reportListener(services, agent.actor, agent.id, next.runId, { statistics: null, release: 'test', messagesDelivered: 0, stopped: false, controllerBound: true }, 'test').ok, false);
+  assert.equal(reportListener(services, agent.actor, agent.id, next.runId, { statistics: null, release: 'test', messagesDelivered: 0, stopped: false, controller: { ...agent.controller, connectionId: randomUUID() } }, 'test').ok, false);
   const run = value(services.repositories.listenerRun.find({ id: next.runId }))!;
   value(services.repositories.listenerRun.update({ ...run, disconnectRequestedAt: fixture.now() }));
   assert.equal(value(claimWake(services, agent.actor, agent.id, next)), null);

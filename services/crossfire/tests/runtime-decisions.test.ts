@@ -98,10 +98,10 @@ test('future native activity is rejected without overwriting the last confirmed 
 });
 
 test('idle heartbeat recovery restores contact without declaring a failed native history recovered', async scope => {
-  const { services, agent, runId, owner, advance } = await fixture(scope);
+  const { services, agent, runId, owner, advanceConnected } = await fixture(scope);
   value(openIncident(services, { ownerId: owner.actor.principalId, agentId: agent.id, fleetId: null, runId,
     sessionId: 'failed-history', kind: 'failure', message: 'Original failure' }));
-  advance(90001); value(await reconcileRuntime(services, () => false));
+  advanceConnected(90001, agent.controller); value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()).map(incident => incident.kind).sort(), ['contact', 'failure']);
   value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'fixture', stopped: false, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
   value(await reconcileRuntime(services, () => false));
@@ -110,11 +110,11 @@ test('idle heartbeat recovery restores contact without declaring a failed native
 });
 
 test('a newer intentional stop suppresses false lost-contact notices from an older abandoned run', async scope => {
-  const { services, agent, advance } = await fixture(scope);
+  const { services, agent, advance, advanceConnected } = await fixture(scope);
   advance(1); const next = randomUUID();
   value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: false, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
   value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: true, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
-  advance(90001); value(await reconcileRuntime(services, () => false));
+  advanceConnected(90001, agent.controller); value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()), []);
 });
 

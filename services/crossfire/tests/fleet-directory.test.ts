@@ -10,9 +10,9 @@ test('fleet directory composes bounded canonical pages, retains filters and does
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const other = await fixture.member('alice');
   for (let index = 0; index < 103; index++) value(services.repositories.fleet.insert({ id: randomUUID(), ownerId: admin.actor.principalId,
-    fleetKey: 'fleet-' + String(index).padStart(3, '0'), label: 'Fleet ' + index, controllerName: 'Workstation', deliveryEnabled: true, revision: 0, createdAt: fixture.now(), updatedAt: fixture.now() }));
+    fleetKey: 'fleet-' + String(index).padStart(3, '0'), label: 'Fleet ' + index, controllerName: 'Workstation', deliveryEnabled: true, archivedAt: null, revision: 0, createdAt: fixture.now(), updatedAt: fixture.now() }));
   value(services.repositories.fleet.insert({ id: randomUUID(), ownerId: other.actor.principalId, fleetKey: 'private', label: 'Private fleet',
-    controllerName: 'Other computer', deliveryEnabled: true, revision: 0, createdAt: fixture.now(), updatedAt: fixture.now() }));
+    controllerName: 'Other computer', deliveryEnabled: true, archivedAt: null, revision: 0, createdAt: fixture.now(), updatedAt: fixture.now() }));
   const { origin } = await httpFixture(scope, fixture.application), requests: URL[] = [];
   const client = (cookie: string, failPage?: number) => createClient({ origin, fetch: async (input, options) => {
     const url = new URL(String(input)); requests.push(url);

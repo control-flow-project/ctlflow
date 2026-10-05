@@ -65,12 +65,12 @@ test('hourly normalized summaries are idempotent, paginated in SQL, token-baseli
   const heartbeat = (statistics: ReturnType<typeof collected.batch>, runId = run) => value(reportListener(fixture.services, agent.actor, agent.id, runId,
     { release: 'fixture', messagesDelivered: 2, stopped: false, controller: agent.controller, statistics }, 'fixture'));
   collected.observed([eventView(message('$first', OBSERVER), ROOM)]); collected.usage(sample(session));
-  fixture.advance(300000); const first = collected.batch()!; assert(heartbeat(first).statisticsAccepted); assert(heartbeat(first).statisticsAccepted);
+  fixture.advanceConnected(300000, agent.controller); const first = collected.batch()!; assert(heartbeat(first).statisticsAccepted); assert(heartbeat(first).statisticsAccepted);
   const read = () => value(fixture.services.statistics.read([agent.id], fixture.now() - 3600000, 1, 1));
   assert.equal(read().totals.observed, 1); assert.equal(read().tokens!.input, 0);
   collected.acknowledge(first);
   collected.observed([eventView(message('$second', OBSERVER), '!second:test.localhost')]); collected.usage(sample(session, 160, 40));
-  fixture.advance(300000); const second = collected.batch()!; assert(heartbeat(second).statisticsAccepted);
+  fixture.advanceConnected(300000, agent.controller); const second = collected.batch()!; assert(heartbeat(second).statisticsAccepted);
   assert.equal(read().totals.observed, 2); assert.equal(read().totalFlows, 2); assert.equal(read().flows.length, 1);
   assert.equal(read().tokens!.input, 60); assert.equal(read().tokens!.cachedInput, 30); assert.equal(read().tokens!.output, 20); assert.equal(read().tokens!.cacheWriteInput, null);
   assert.equal(value(fixture.services.statistics.read([agent.id], 0, 2, 1)).flows.length, 1);
@@ -83,8 +83,8 @@ test('hourly normalized summaries are idempotent, paginated in SQL, token-baseli
   assert.deepEqual(database.pragma('foreign_key_check'), []);
   const plan = database.prepare('EXPLAIN QUERY PLAN SELECT * FROM listener_stat_interval WHERE agent_id = ? AND captured_at >= ?').all(agent.id, 0) as { detail: string }[];
   assert(plan.some(row => row.detail.includes('ix_listener_stat_interval_agent_captured')));
-  fixture.advance(31 * 86400000);
-  assert(heartbeat({ ...second, sequence: 2, flows: [], usage: [sample(session, 200, 50)] }, restarted).statisticsAccepted);
+  fixture.advance(31 * 86400000); fixture.renewController(agent.controller);
+  assert(heartbeat({ ...second, sequence: 2, flows: [], usage: [sample(session, 200, 50)] }, randomUUID()).statisticsAccepted);
   assert.equal(value(fixture.services.statistics.read([agent.id], 0, 1, 20)).totals.observed, 0);
 });
 
