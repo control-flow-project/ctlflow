@@ -84,7 +84,7 @@ test('room discovery and canonical agent grants retain native authority without 
     assert.equal((await assign(inviter.id, adminHeaders)).status, 202);
     value(await reconcileRoomGrant(services, inviter.id, roomId));
     assert.deepEqual((await joined(inviter.token) as string[]).sort(), [inviterRoom, roomId].sort());
-    assert.equal((await http.request(grantPath(target.id), 'PUT', { expectedRevision: 1, expectedGeneration: null,
+    assert.equal((await http.request(grantPath(target.id), 'PUT', { expectedRevision: value(services.directory.agent(target.id))!.principal.revision, expectedGeneration: null,
       accessMode: 'reply', powerLevel: null, muted: false }, inviterHeaders)).status, 403);
     const current = await grant(inviter.id, adminHeaders);
     assert(current.grant);
