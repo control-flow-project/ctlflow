@@ -1,6 +1,25 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  enrollment_archive: {
+    controller_name: string | null; controller_credential_hash: string | null; fleet_key: string | null;
+    id: string; owner_id: string; verification_code: string; claim_hash: string; roster_digest: string;
+    status: 'pending' | 'approved' | 'rejected' | 'expired'; revision: number; created_at: number; expires_at: number;
+    decided_by_member_id: string | null; decided_at: number | null;
+  };
+  enrollment_archive_item: {
+    request_id: string; instance_key: string; requested_name: string; outcome: 'existing' | 'claimed' | 'failed';
+    agent_id: string | null; failure_code: string | null;
+  };
+  enrollment_archive_policy: {
+    request_id: string; instance_key: string; wake_mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected';
+    expected_agent_revision: number | null;
+  };
+  enrollment_archive_permission: {
+    request_id: string; instance_key: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room';
+  };
+  enrollment_archive_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string };
+  enrollment_archive_metadata: { enrollment_id: string; key: string; value: string };
   fleet_native_stop: { agent_id: string; receipt_id: string; sequence: number; fleet_id: string; run_id: string; connection_id: string;
     credential_id: string; native_stopped_at: number; invalidated_at: number | null };
   publication: { id: string; agent_id: string; public_key: string; title: string; state: 'staging' | 'published' | 'deleted';

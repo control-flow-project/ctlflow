@@ -9,6 +9,13 @@ import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 function counts(database: Database.Database) {
   return {
+    enrollment_archive: () => executeSelect(database, schema, query => query.from('enrollment_archive').count()),
+    enrollment_archive_item: () => executeSelect(database, schema, query => query.from('enrollment_archive_item').count()),
+    enrollment_archive_policy: () => executeSelect(database, schema, query => query.from('enrollment_archive_policy').count()),
+    enrollment_archive_permission: () => executeSelect(database, schema, query => query.from('enrollment_archive_permission').count()),
+    enrollment_archive_wake_sender: () => executeSelect(database, schema, query => query.from('enrollment_archive_wake_sender').count()),
+    enrollment_archive_metadata: () => executeSelect(database, schema, query => query.from('enrollment_archive_metadata').count()),
+    fleet_native_stop: () => executeSelect(database, schema, query => query.from('fleet_native_stop').count()),
     publication: () => executeSelect(database, schema, query => query.from('publication').count()),
     publication_file: () => executeSelect(database, schema, query => query.from('publication_file').count()),
     listener_stat_checkpoint: () => executeSelect(database, schema, query => query.from('listener_stat_checkpoint').count()),
@@ -142,6 +149,13 @@ export function verifyPreservation(before: string, after: string) {
 
 function protectedRecords(database: Database.Database) {
   return {
+    enrollment_archive: () => executeSelect(database, schema, query => query.from('enrollment_archive').take(100001)),
+    enrollment_archive_item: () => executeSelect(database, schema, query => query.from('enrollment_archive_item').take(100001)),
+    enrollment_archive_policy: () => executeSelect(database, schema, query => query.from('enrollment_archive_policy').take(100001)),
+    enrollment_archive_permission: () => executeSelect(database, schema, query => query.from('enrollment_archive_permission').take(100001)),
+    enrollment_archive_wake_sender: () => executeSelect(database, schema, query => query.from('enrollment_archive_wake_sender').take(100001)),
+    enrollment_archive_metadata: () => executeSelect(database, schema, query => query.from('enrollment_archive_metadata').take(100001)),
+    fleet_native_stop: () => executeSelect(database, schema, query => query.from('fleet_native_stop').take(100001)),
     publication: () => executeSelect(database, schema, query => query.from('publication').take(100001)),
     publication_file: () => executeSelect(database, schema, query => query.from('publication_file').take(100001)),
     principal: () => executeSelect(database, schema, query => query.from('principal').take(100001)),
