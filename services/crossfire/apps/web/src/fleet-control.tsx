@@ -14,7 +14,7 @@ export function FleetDelivery({ fleet }: { fleet: FleetView }) {
   const viewer = useSession(), action = useAction(), enabled = fleet.delivery.deliveryEnabled;
   return <Panel title="Fleet delivery" description="Pause new input without stopping sessions or the controller.">
     <div className="delivery-summary"><Status value={enabled ? 'Enabled' : 'Paused'}/><p>{enabled ? 'Delivery is enabled while the controller is connected and sessions are eligible.' : 'New delivery is paused. Unread messages and saved histories are retained.'}</p></div>
-    <div className="actions"><button disabled={action.pending || !canManageFleet(viewer, fleet)} onClick={() => {
+    <div className="actions"><button disabled={action.pending || !canManageFleet(fleet)} onClick={() => {
       if (confirm(enabled ? 'Pause this fleet’s delivery? Sessions keep running. Unread messages are retained.' : 'Resume this fleet’s delivery? Input resumes for eligible agents when the controller is connected. Stopped sessions remain stopped.')) {
         void action.run(() => call(operations.changeFleetDelivery, { fleetId: fleet.fleetId }, { expectedRevision: fleet.revision, enabled: !enabled }, viewer.csrfSecret));
       }
@@ -42,7 +42,7 @@ export function FleetMessages({ fleet }: { fleet: FleetView }) {
         setAccepted('Queued for ' + result.total + ' agents. Receipt outcomes appear below.'); setBody(''); setRequest(undefined); messages.refresh();
       });
     }}><Field label="Message the fleet">{id => <textarea id={id} required maxLength={4096} rows={3} value={body} onChange={event => { setBody(event.target.value); setAccepted(''); }}/>}</Field>
-      <div className="actions"><button disabled={action.pending || !canManageFleet(viewer, fleet) || !enabled || !online || !body.trim()}>Send to fleet</button><span role="status">{accepted}</span></div></form>
+      <div className="actions"><button disabled={action.pending || !canManageFleet(fleet) || !enabled || !online || !body.trim()}>Send to fleet</button><span role="status">{accepted}</span></div></form>
     <Alert>{action.error}</Alert></Panel>
     <Panel title="Fleet messages" description="Native input receipts, not completed model work. Delivery expires after ten minutes.">
       <Loaded {...messages} retry={messages.refresh}>{page => <>{page.data.length ? <div className="table-wrap"><table aria-label="Fleet messages"><thead><tr><th>Message</th><th>Sent</th><th>Delivered</th><th>Pending</th><th>Skipped</th><th>Failed</th><th>Expired</th></tr></thead><tbody>

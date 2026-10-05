@@ -13,7 +13,7 @@ export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; age
   const query = new URLSearchParams({ page: new URLSearchParams(location.search).get('sessionsPage') ?? '1', pageSize: '10' });
   const history = useResource(operations.fleetRuntimeOperations, { fleetId: fleet.fleetId }, query.toString(), 3000);
   const busy = history.result?.ok === true && history.result.value.data.some(operation => operation.status === 'pending' || operation.status === 'running');
-  const allowed = canManageFleet(viewer, fleet) && (!agent || agent.allowedActions.includes('configure'));
+  const allowed = canManageFleet(fleet) && (!agent || agent.allowedActions.includes('configure'));
   const disabled = action.pending || history.result?.ok !== true || busy || !allowed || fleet.delivery.connection.status !== 'online';
   const subject = agent ? agent.displayName : 'all agents in ' + fleet.label;
   function operate(kind: 'start' | 'stop' | 'reset'): void {

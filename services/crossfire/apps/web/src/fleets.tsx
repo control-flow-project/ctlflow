@@ -16,6 +16,7 @@ import { FleetStatistics } from './fleet-statistics.js';
 import { FleetSessions } from './fleet-sessions.js';
 import { NativeRuntimeStatus } from './runtime-status.js';
 import { canManageFleet } from './fleet-authority.js';
+import { FleetRetirement } from './retirement.js';
 
 export function Fleets() {
   const viewer = useSession(), resource = useFleetDirectory(location.search);
@@ -30,7 +31,7 @@ export function Fleets() {
 }
 function RoomPlan({ fleet }: { fleet: FleetView }) {
   const viewer = useSession(), action = useAction(), [source, setSource] = useState(''), [review, setReview] = useState<{ source: string; value: Parsed<typeof preview> }>();
-  const editable = canManageFleet(viewer, fleet);
+  const editable = canManageFleet(fleet);
   async function inspect() {
     const parsed = parseRoomPlan(source, fleet);
     if (!parsed.ok) return parsed;
@@ -58,10 +59,10 @@ function FleetSettings({ fleet }: { fleet: FleetView }) {
   const viewer = useSession(), action = useAction(), [label, setLabel] = useState(fleet.label);
   return <><Panel title="Display name" description="Change the name shown in management. The fleet key stays the same.">
     <form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.changeFleet, { fleetId: fleet.fleetId }, { expectedRevision: fleet.revision, label, controller: fleet.controller }, viewer.csrfSecret)); }}>
-      <fieldset disabled={action.pending || !canManageFleet(viewer, fleet)}><label className="bounded-form">Fleet label<input required maxLength={100} value={label} onChange={event => setLabel(event.target.value)}/></label><div className="actions"><button>Save label</button></div></fieldset><Alert>{action.error}</Alert></form></Panel>
+      <fieldset disabled={action.pending || !canManageFleet(fleet)}><label className="bounded-form">Fleet label<input required maxLength={100} value={label} onChange={event => setLabel(event.target.value)}/></label><div className="actions"><button>Save label</button></div></fieldset><Alert>{action.error}</Alert></form></Panel>
     <Panel title="Controller and identity" description="The controller reports where this fleet runs; its label does not grant authority."><dl><dt>Controller</dt><dd>{fleet.controller.name}</dd><dt>Owner</dt><dd>{fleet.owner.displayName}<span className="subline">{fleet.owner.matrixUserId}</span></dd><dt>Last updated</dt><dd>{timestamp(fleet.updatedAt)}</dd></dl>
       <Help title="Technical identifiers and controller metadata"><dl><dt>Fleet key</dt><dd>{fleet.fleetKey}</dd><dt>Fleet ID</dt><dd className="mono">{fleet.fleetId}</dd>{Object.entries(fleet.controller.metadata ?? {}).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{value}</dd></Fragment>)}</dl></Help></Panel>
-    <Help title="Bulk room access (advanced)"><RoomPlan fleet={fleet}/></Help></>;
+    <Help title="Bulk room access (advanced)"><RoomPlan fleet={fleet}/></Help><FleetRetirement fleet={fleet}/></>;
 }
 function FleetAgents({ id }: { id: string }) {
   const agents = useResource(operations.fleetAgents, { fleetId: id }, pagingQuery(), 5000);

@@ -13,6 +13,7 @@ import { AgentSessions } from './fleet-sessions.js';
 import { NativeRuntimeStatus } from './runtime-status.js';
 import { Runtime } from './runtime.js';
 import { Decisions } from './decisions.js';
+import { AgentRetirement } from './retirement.js';
 
 export function Agents() {
   const resource = useResource(operations.agents, {}, location.search, HEARTBEAT_MS);
@@ -51,7 +52,7 @@ function Lifecycle({ agent }: { agent: AgentView }) {
       if (confirm('Permanently revoke this agent? This cannot be undone.')) void action.run(() => change({ status: 'revoked' }));
     }}>Revoke account</button></>}</div><Alert>{action.error}</Alert><p className="support">Pending or failed changes are not yet fully enforced by Matrix.</p>
   </Panel><Panel title="Identity"><dl><dt>Verified owner</dt><dd>{agent.owner.displayName}<span className="subline">{agent.owner.matrixUserId}</span></dd><dt>Matrix identity</dt><dd className="mono">{agent.matrixUserId}</dd></dl>
-    <Help title="Fleet deployment details"><dl><dt>Fleet</dt><dd><a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></dd><dt>Instance</dt><dd>{agent.deployment.instanceKey}</dd><dt>Controller</dt><dd>{agent.deployment.controllerName}</dd><dt>Last reported</dt><dd>{timestamp(agent.deployment.reportedAt)}</dd></dl><p>Controller details identify the deployment. Listener heartbeats determine whether this agent is online.</p></Help></Panel></>;
+    <Help title="Fleet deployment details"><dl><dt>Fleet</dt><dd><a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></dd><dt>Instance</dt><dd>{agent.deployment.instanceKey}</dd><dt>Controller</dt><dd>{agent.deployment.controllerName}</dd><dt>Last reported</dt><dd>{timestamp(agent.deployment.reportedAt)}</dd></dl><p>Controller details identify the deployment. Listener heartbeats determine whether this agent is online.</p></Help></Panel><AgentRetirement agent={agent}/></>;
 }
 export function AgentDetail({ id, section }: { id: string; section: AgentSection }) {
   const resource = useResource(operations.agent, { agentId: id }, '', 5000);
