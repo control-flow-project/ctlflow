@@ -5,7 +5,8 @@ import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
 import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
 import { listEnrollments, readEnrollment } from '@ctlflow/crossfire-domain/enrollment/read-enrollment';
 import { listFleets, readFleet, listFleetAgents } from '@ctlflow/crossfire-domain/fleet/read-fleet';
-import { changeFleet, removeFleet, bindFleetAgent } from '@ctlflow/crossfire-domain/fleet/change-fleet';
+import { changeFleet } from '@ctlflow/crossfire-domain/fleet/change-fleet';
+import { archiveFleet, removeFleetAgent } from '@ctlflow/crossfire-domain/fleet/retire';
 import { bind, reply, paged, actor, fleetActor, acknowledged } from '../bind.js';
 import * as view from '../representation/enrollment.js';
 import { agent } from '../representation/identity.js';
@@ -21,10 +22,9 @@ export function enrollmentRoutes() {
     bind(operations.fleets, (context, _params, query) => paged(listFleets(context.services, actor(context), query), view.fleet)),
     bind(operations.fleet, (context, params) => reply(readFleet(context.services, fleetActor(context), params.fleetId), view.fleet)),
     bind(operations.changeFleet, (context, params, _query, input) => reply(changeFleet(context.services, fleetActor(context), params.fleetId, input, context.requestId), view.fleet)),
-    bind(operations.removeFleet, (context, params, _query, input) => acknowledged(removeFleet(context.services, actor(context), params.fleetId, input.expectedRevision, context.requestId))),
+    bind(operations.archiveFleet, (context, params, _query, input) => acknowledged(archiveFleet(context.services, actor(context), params.fleetId, input.expectedRevision, context.requestId))),
     bind(operations.fleetAgents, (context, params, query) => paged(listFleetAgents(context.services, fleetActor(context), params.fleetId, query),
       value => ({ instanceKey: value.instanceKey, agent: agent(value.agent) }))),
-    bind(operations.bindFleetAgent, async (context, params, _query, input) => acknowledged(await bindFleetAgent(context.services, fleetActor(context), params.fleetId, params.agentId, { ...input, remove: false }, context.requestId))),
-    bind(operations.unbindFleetAgent, async (context, params, _query, input) => acknowledged(await bindFleetAgent(context.services, fleetActor(context), params.fleetId, params.agentId, { ...input, remove: true }, context.requestId))),
+    bind(operations.removeFleetAgent, async (context, params, _query, input) => acknowledged(await removeFleetAgent(context.services, fleetActor(context), params.fleetId, params.agentId, input, context.requestId))),
   ];
 }
