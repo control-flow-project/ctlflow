@@ -112,7 +112,9 @@ canonical schema as the selected snapshots.
 principals, members, agents/credentials/names, policy, permission/role relations,
 selected wake senders, room grants/permissions, invitations, owner/management
 conversations, wake rules/assignments, fleets/instances/controller metadata/
-credentials, requested/approved fleet coordination policies, publications/files and existing audit events. Credential refresh timestamps and wake
+credentials, requested/approved fleet coordination policies, immutable archived
+enrollment relations, native-close receipt state, publications/files and existing
+audit events. Credential refresh timestamps and wake
 assignment deadlines are intentionally not immutable fields. Existing protected
 rows must still exist unchanged; additions are allowed. Volatile listener,
 session, reconciliation, delivery, observation, decision and incident rows are
@@ -121,7 +123,8 @@ exceeding that bound fails explicitly. Hashes are used internally for comparison
 reports contain counts, not private row data or credential hashes.
 
 This comparison is strict: configuration writes between snapshots, including a
-revision-only controller update or a fleet pause/resume, cause a conflict. Review
+revision-only controller update, a fleet pause/resume or renewed native
+observations invalidating a close receipt, cause a conflict. Review
 intentional changes against their audit records separately; do not modify a
 snapshot or suppress fields to make preservation pass.
 
