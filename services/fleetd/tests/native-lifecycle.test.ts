@@ -22,7 +22,7 @@ function fixture() {
   const saved: SavedRuntimeContext[] = [{ context: 'shared', runtime: 'fixture', sessionId: 'exact-history', workspace: '/fixture' }];
   const started: AbortController[] = [], closed: string[] = [], delivered: string[] = [], failures: unknown[] = [], observed: RuntimeObservationEvent[] = [];
   let recovered = 0, inspect: (() => Promise<{ busy: boolean }>) | undefined;
-  const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'fixture', initialSettings: [], initial: 'running',
+  const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'fixture', approval: 'none', initialSettings: [], initial: 'running',
     hooks: { requestDecision: async () => failure('forbidden', 'Unexpected decision'), pendingInput: () => pending,
       pendingDecisions: () => decisions, observe: event => observed.push(event) },
     saved: async () => success(saved), failed: (_session, error) => failures.push(error), recovered: () => { recovered++; },
@@ -74,6 +74,7 @@ test('recovery binds sleeping histories without a process and concurrent inputs 
   const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal));
   scope.after(() => managed.close());
   assert.equal(fixture_.started.length, 0); assert.equal(managed.nativeState().historyAvailable, true);
+  assert.equal(managed.runtime.approval, 'none');
   await Promise.all([managed.runtime.deliver('One', 'one'), managed.runtime.deliver('Two', 'two')]);
   managed.runtime.acknowledge(['one', 'two']);
   assert.equal(fixture_.started.length, 1); assert.deepEqual(fixture_.delivered.toSorted(), ['one', 'two']);
@@ -130,4 +131,58 @@ test('missing history and a resume with a different identity fail closed without
   changed.services.start = async (...input) => { const result = await start(...input); return result.ok ? success({ ...result.value, sessionId: 'different-history' }) : result; };
   const result = await createNativeLifecycle(changed.services, new AbortController().signal);
   assert.equal(result.ok, false); assert.equal(result.ok ? null : result.error.code, 'conflict'); assert.equal(changed.closed.length, 1);
+});
+
+test('a crashed generation remains retryable even when recovery has already detached it', async scope => {
+  const fixture_ = fixture(), start = fixture_.services.start;
+  fixture_.services.start = async (...input) => {
+    const result = await start(...input);
+    if (!result.ok || fixture_.started.length > 1) return result;
+    return success({ ...result.value, deliver: async () => {
+      fixture_.started[0]!.abort(new Error('Native transport lost'));
+      await yieldLoop();
+      throw new Error('Original native request failed');
+    } });
+  };
+  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  await assert.rejects(managed.runtime.deliver('One', 'one'), error => error instanceof Error && 'code' in error && error.code === 'unavailable');
+  await until(() => managed.nativeState().phase === 'running' && fixture_.started.length === 2);
+  assert.equal(await managed.runtime.recover('One', 'one'), false);
+  await managed.runtime.deliver('One', 'one'); managed.runtime.acknowledge(['one']);
+  assert.deepEqual(fixture_.delivered, ['one']); assert.equal(managed.runtime.signal.aborted, false);
+});
+
+test('input racing with native cleanup observes sleeping before waking and resumes only after cleanup', async scope => {
+  const fixture_ = fixture(), start = fixture_.services.start;
+  let finish!: () => void, closing = false;
+  fixture_.services.start = async (...input) => {
+    const result = await start(...input);
+    if (!result.ok || fixture_.started.length > 1) return result;
+    return success({ ...result.value, close: async () => {
+      closing = true;
+      await new Promise<void>(resolve => { finish = resolve; });
+      await result.value.close();
+    } });
+  };
+  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  await fixture_.advance(1800000); await until(() => closing);
+  const delivered = managed.runtime.deliver('Raced input', 'race');
+  await yieldLoop(); assert.equal(fixture_.started.length, 1);
+  finish(); await delivered; managed.runtime.acknowledge(['race']);
+  assert.equal(managed.nativeState().phase, 'running');
+  const states = fixture_.observed.flatMap(event => event.kind === 'state' ? [event.observation.state] : []);
+  assert.deepEqual(states.slice(-3), ['sleeping', 'waking', 'idle']);
+});
+
+test('unverified process cleanup blocks replacement rather than risking duplicate native owners', async () => {
+  const fixture_ = fixture(), start = fixture_.services.start;
+  fixture_.services.start = async (...input) => {
+    const result = await start(...input);
+    return result.ok ? success({ ...result.value, close: async () => { throw new Error('Could not terminate native process'); } }) : result;
+  };
+  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal));
+  await fixture_.advance(1800000); await until(() => managed.nativeState().phase === 'failed');
+  await assert.rejects(managed.runtime.deliver('One', 'one'), error => error instanceof Error && 'code' in error && error.code === 'conflict');
+  assert.equal(fixture_.started.length, 1); assert.equal(fixture_.failures.length, 1);
+  await assert.rejects(managed.close(), /cleanup failed/);
 });

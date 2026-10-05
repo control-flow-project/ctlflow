@@ -147,7 +147,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
             const options = adapter.validate(definition.options);
             if (!options.ok) throw Object.assign(new Error(options.error.message), { code: options.error.code });
             const publicSettings = ['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'dangerously_bypass_approvals_and_sandbox'];
-            const started = await createNativeLifecycle({ clock: nativeClock, hooks, runtime: definition.runtime,
+            const started = await createNativeLifecycle({ clock: nativeClock, hooks, runtime: definition.runtime, approval: options.value.approval,
               primary: instance.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared',
               initialSettings: publicSettings.filter(name => options.value.options[name] !== undefined)
                 .map(name => ({ name, configured: String(options.value.options[name]), effective: null })),

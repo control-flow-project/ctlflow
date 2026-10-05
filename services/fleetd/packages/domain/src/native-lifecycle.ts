@@ -1,6 +1,6 @@
 import { failure, success, type Result, type Failure } from '@crossfire/kernel/result';
 import type { Clock } from '@crossfire/agent-core/port';
-import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState } from '@crossfire/agent-core/runtime';
+import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval } from '@crossfire/agent-core/runtime';
 import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
 import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
 
@@ -11,6 +11,7 @@ export type NativeLifecycleServices = {
   hooks: RuntimeHooks;
   primary: 'shared' | 'control';
   runtime: string;
+  approval: RuntimeApproval;
   initialSettings: Observation['settings'];
   initial: 'running' | 'sleeping';
   saved(): Promise<Result<SavedRuntimeContext[]>>;
@@ -83,11 +84,16 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     }
     contexts = saved.value;
   }
-  async function discard(connection: OwnedRuntimeConnection): Promise<void> {
+  async function discard(connection: OwnedRuntimeConnection, completed?: () => void): Promise<void> {
     if (native === connection) native = undefined;
-    const cleanup = Promise.resolve(connection.close());
+    const cleanup = (async () => {
+      try { await connection.close(); }
+      catch { throw nativeError('conflict', 'Native process cleanup failed; replacement is blocked until cleanup is verified'); }
+      completed?.();
+    })();
     closingNative = cleanup;
-    try { await cleanup; } finally { if (closingNative === cleanup) closingNative = undefined; }
+    await cleanup;
+    if (closingNative === cleanup) closingNative = undefined;
   }
   async function ensure(): Promise<OwnedRuntimeConnection> {
     lifetime.throwIfAborted();
@@ -144,9 +150,10 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   async function call<Value>(operation: (connection: OwnedRuntimeConnection) => Promise<Value>, activity = false): Promise<Value> {
     activeCalls++;
     if (activity) touch();
-    try { return await operation(await ensure()); }
+    let connection: OwnedRuntimeConnection | undefined;
+    try { connection = await ensure(); return await operation(connection); }
     catch (error) {
-      if (!lifetime.aborted && native?.signal.aborted) throw nativeError('unavailable', 'Native input is waiting for exact-history recovery');
+      if (!lifetime.aborted && connection?.signal.aborted) throw nativeError('unavailable', 'Native input is waiting for exact-history recovery');
       throw error;
     }
     finally { activeCalls--; schedule(); }
@@ -162,10 +169,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       || services.clock.now() < lastActivityAt + idleSeconds * 1000) { touch(); return; }
     cancelIdle?.(); cancelIdle = undefined;
     await refreshContexts();
-    native = undefined;
-    phase = 'sleeping';
-    await discard(connection);
-    emit('sleeping');
+    await discard(connection, () => { phase = 'sleeping'; emit('sleeping'); });
   }
   function logical(context: string, expectedSession: string): RuntimeConnection {
     async function selected(connection: OwnedRuntimeConnection): Promise<RuntimeConnection> {
@@ -174,7 +178,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       return target;
     }
     return {
-      sessionId: expectedSession, signal: lifetime, approval: native?.approval ?? 'runtime',
+      sessionId: expectedSession, signal: lifetime, approval: services.approval,
       lifecycle: { current: () => ({ phase, lastActivityAt, historyAvailable: !!sessionId }), configureIdle: seconds => {
         if (!Number.isSafeInteger(seconds) || seconds < 0 || seconds > 604800) throw new Error('Invalid native idle timeout');
         idleSeconds = seconds; schedule();
