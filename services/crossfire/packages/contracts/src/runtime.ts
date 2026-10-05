@@ -15,7 +15,7 @@ const decisionFields = { id: check.identifier, runId: check.identifier, runtime:
   kind: check.choice('permission', 'question'), action: check.text(255), review: check.refine(check.plainText(MAX_REVIEW_BYTES),
     value => new TextEncoder().encode(value).byteLength <= MAX_REVIEW_BYTES, 'Native review exceeds the separate UTF-8 resource bound'),
   blocking: check.boolean, expiresAt: check.nullable(check.integer()), questions: check.list(decisionQuestion, 100, 1) };
-export const decisionCreation = check.object(decisionFields) satisfies check.Parser<DecisionCreation>;
+export const decisionCreation = check.object({ ...decisionFields, runtime: check.choice('codex') }) satisfies check.Parser<DecisionCreation>;
 export const decisionAnswer = check.object({ questionId: check.text(255), optionId: check.nullable(check.text(255)), text: check.nullable(check.plainText(16000)) }) satisfies check.Parser<DecisionAnswer>;
 export const decisionSubmission = check.object({ answers: check.list(decisionAnswer, 100, 1) });
 export const decisionStatus = check.choice('pending', 'answered', 'responded', 'cancelled', 'expired');
@@ -29,7 +29,7 @@ const observationFields = { sessionId: check.text(255), roomId: check.nullable(c
   observedAt: check.integer(), lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean),
   historyMode: check.choice('shared', 'per-room'), maxInputBytes: check.integer(1024, MAX_INPUT_BYTES),
   settings: check.list(setting, 100), errorMessage: check.nullable(check.plainText(4000)) };
-export const observation = check.object(observationFields) satisfies check.Parser<RuntimeObservation>;
+export const observation = check.object({ ...observationFields, runtime: check.choice('codex') }) satisfies check.Parser<RuntimeObservation>;
 export const observationView = check.object({ runId: check.identifier, ...observationFields }) satisfies check.Parser<RuntimeObservationView>;
 export const observations = check.list(observationView, 2002);
 export const failureReport = check.object({ episodeId: check.identifier, agentId: check.identifier, sessionId: check.nullable(check.text(255)), message: check.plainText(4000) });

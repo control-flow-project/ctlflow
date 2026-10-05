@@ -7,13 +7,14 @@ export type IncidentNotification = { incidentId: string; phase: 'initial' | 'rec
 export type ManagementConversation = { ownerId: string; roomId: string; createdAt: number };
 export type RuntimeRepository = {
   decision(id: string): Result<DecisionView | null>;
-  decisions(agentId: string, page: number, pageSize: number): Result<{ items: DecisionSummary[]; totalItems: number }>;
+  decisions(agentId: string, page: number, pageSize: number, status: 'pending' | 'answered' | null): Result<{ items: DecisionSummary[]; totalItems: number }>;
   pendingDecisions(): Result<DecisionSummary[]>;
   insertDecision(value: DecisionView): Result<void>;
   decisionStatus(id: string, status: DecisionView['status']): Result<void>;
   answers(id: string): Result<DecisionAnswer[]>;
   answer(id: string, values: DecisionAnswer[]): Result<void>;
   observation(agentId: string): Result<RuntimeObservationView[]>;
+  hasObservedRuntime(agentId: string): Result<boolean>;
   summaries(agentIds: string[]): Result<Map<string, NativeRuntimeSummary>>;
   saveObservation(agentId: string, value: RuntimeObservationView): Result<void>;
   incident(id: string): Result<Incident | null>;

@@ -8,12 +8,19 @@ export function bindRoster(services: Pick<Services, 'repositories' | 'collection
   let size = existing.value.length, changed = false;
   for (const entry of entries) {
     if (entry.outcome === 'failed' || entry.agentId === null) continue;
+    const authoritative = services.repositories.fleetInstance.findByAgent(entry.agentId); if (!authoritative.ok) return authoritative;
+    if (authoritative.value && (authoritative.value.ownerId !== ownerId || authoritative.value.fleetKey !== fleetKey || authoritative.value.instanceKey !== entry.instanceKey))
+      return failure('conflict', 'Agent already belongs to another fleet instance');
     const key = { ownerId, fleetKey, instanceKey: entry.instanceKey };
     const previous = services.repositories.fleetInstance.find(key); if (!previous.ok) return previous;
     if (previous.value && previous.value.agentId !== entry.agentId) return failure('conflict', 'Fleet instance identity changed: ' + entry.instanceKey);
     if (!previous.value) {
       if (++size > 100) return failure('capacity', 'A fleet supports at most 100 instances');
-      const saved = services.repositories.fleetInstance.insert({ ...key, agentId: entry.agentId }); if (!saved.ok) return saved;
+      const saved = services.repositories.fleetInstance.insert({ ...key, agentId: entry.agentId, retiredAt: null }); if (!saved.ok) return saved;
+      changed = true;
+    } else if (previous.value.retiredAt !== null) {
+      if (++size > 100) return failure('capacity', 'A fleet supports at most 100 current instances');
+      const saved = services.repositories.fleetInstance.update({ ...previous.value, retiredAt: null }); if (!saved.ok) return saved;
       changed = true;
     }
   }

@@ -7,6 +7,8 @@ import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { FleetCredentialRepository } from '@ctlflow/crossfire-domain/port/repositories';
 export function createFleetCredentialRepository(database: Database.Database): FleetCredentialRepository {
   return {
+    forFleet(fleetId) { return stored(() => success(executeSelect(database, schema, (query, params) => query.from('fleet_credential')
+      .where(row => row.fleet_id === params.fleetId).orderBy(row => row.id), { fleetId }).map(mapFleetCredential))); },
     find(key) { return stored(() => {
       const row = executeSelect(database, schema, (query, params) => query.from('fleet_credential').where(row => row.id === params.id).firstOrDefault(), key);
       return success(row ? mapFleetCredential(row) : null);

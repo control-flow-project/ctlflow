@@ -2,6 +2,7 @@ import type { Fleet } from '@ctlflow/crossfire-domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapFleet(row: Tables['fleet']): Fleet {
   return {
+    archivedAt: row.archived_at,
     id: row.id,
     deliveryEnabled: row.delivery_enabled === 1,
     label: row.label,

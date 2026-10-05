@@ -13,6 +13,11 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
   if (!owner.value || owner.value.status !== 'active') return failure('forbidden', 'Owner access is no longer active');
   if (request.value.expiresAt <= services.clock.now()) return success({ status: 'expired', ownerMatrixId: owner.value.matrixUserId, fleet: null, instances: [] });
   if (request.value.status !== 'approved') return success({ status: request.value.status, ownerMatrixId: owner.value.matrixUserId, fleet: null, instances: [] });
+  const currentFleet = services.repositories.fleet.find({ ownerId: request.value.ownerId, fleetKey: request.value.fleetKey });
+  if (!currentFleet.ok) return currentFleet;
+  if (!currentFleet.value || currentFleet.value.archivedAt !== null) return failure('forbidden', 'Fleet enrollment is no longer current');
+  const issued = services.repositories.fleetCredential.find({ id: enrollmentId }); if (!issued.ok) return issued;
+  if (issued.value && issued.value.revokedAt !== null) return failure('forbidden', 'This controller enrollment has been revoked');
   const items = services.collection.enrollmentItems({ requestId: enrollmentId });
   if (!items.ok) return items;
   const instances: ExchangedInstance[] = [];
@@ -20,6 +25,9 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
     const base = { instanceKey: item.instanceKey, name: item.requestedName, agentId: item.agentId };
     if (item.outcome === 'failed') { instances.push({ ...base, status: 'failed', errorCode: item.failureCode, account: null }); continue; }
     if (item.agentId === null) return failure('unavailable', 'Approved identity is not assigned');
+    const binding = services.repositories.fleetInstance.findByAgent(item.agentId); if (!binding.ok) return binding;
+    if (!binding.value || binding.value.retiredAt !== null || binding.value.ownerId !== currentFleet.value.ownerId || binding.value.fleetKey !== currentFleet.value.fleetKey
+      || binding.value.instanceKey !== item.instanceKey) return failure('forbidden', 'Agent registration is no longer current');
     const agent = services.directory.agent(item.agentId);
     const credentials = services.repositories.agentCredential.find({ agentId: item.agentId });
     if (!agent.ok) return agent; if (!credentials.ok) return credentials;
@@ -29,7 +37,7 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
       account: ready ? { matrixUserId: agent.value.principal.matrixUserId, accessToken: credentials.value.accessToken!, deviceId: 'CROSSFIRE_AGENT' } : null });
   }
   let fleet: { fleetId: string; controllerCredential: string | null } | null = null;
-  if (request.value.fleetKey !== null) {
+  {
     const found = services.repositories.fleet.find({ ownerId: request.value.ownerId, fleetKey: request.value.fleetKey });
     if (!found.ok) return found;
     if (!found.value) return failure('missing', 'Fleet no longer exists');

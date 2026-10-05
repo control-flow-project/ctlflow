@@ -10,6 +10,10 @@ function mapDelivery(row: Tables['fleet_message_delivery']): FleetMessageDeliver
 }
 export function createFleetMessageDeliveryRepository(database: Database.Database): FleetMessageDeliveryRepository {
   return {
+    pendingForAgent(agentId, now) { return stored(() => success(executeSelect(database, schema, (query, params) => query.from('fleet_message_delivery')
+      .where(row => row.agent_id === params.agentId && row.status === 'pending')
+      .join(query.from('fleet_message'), delivery => delivery.message_id, message => message.id, (delivery, message) => ({ delivery, message }))
+      .where(row => row.message.expires_at > params.now).count(), { agentId, now }) > 0)); },
     find(messageId, agentId) { return stored(() => {
       const row = executeSelect(database, schema, (query, params) => query.from('fleet_message_delivery')
         .where(row => row.message_id === params.messageId && row.agent_id === params.agentId).firstOrDefault(), { messageId, agentId });

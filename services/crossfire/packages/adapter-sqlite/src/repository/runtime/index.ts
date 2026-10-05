@@ -51,13 +51,13 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
       const row = executeSelect(database, schema, (query, params) => query.from('runtime_decision').where(row => row.id === params.id).firstOrDefault(), { id });
       return success(row ? decision(row) : null);
     }); },
-    decisions(agentId, page, pageSize) { return stored(() => {
-      const totalItems = executeSelect(database, schema, (query, params) => query.from('runtime_decision').where(row => row.agent_id === params.agentId).count(), { agentId });
-      const rows = executeSelect(database, schema, (query, params) => query.from('runtime_decision').where(row => row.agent_id === params.agentId)
+    decisions(agentId, page, pageSize, status) { return stored(() => {
+      const totalItems = executeSelect(database, schema, (query, params) => query.from('runtime_decision').where(row => row.agent_id === params.agentId && (params.status === null || row.status === params.status)).count(), { agentId, status });
+      const rows = executeSelect(database, schema, (query, params) => query.from('runtime_decision').where(row => row.agent_id === params.agentId && (params.status === null || row.status === params.status))
         .orderByDescending(row => row.created_at).thenBy(row => row.id).skip(params.offset).take(params.limit)
         .select(row => ({ id: row.id, agentId: row.agent_id, runId: row.run_id, runtime: row.runtime, sessionId: row.session_id,
           requestId: row.request_id, turnId: row.turn_id, itemId: row.item_id, kind: row.kind, action: row.action,
-          blocking: row.blocking, expiresAt: row.expires_at, createdAt: row.created_at, status: row.status })), { agentId, offset: (page - 1) * pageSize, limit: pageSize });
+          blocking: row.blocking, expiresAt: row.expires_at, createdAt: row.created_at, status: row.status })), { agentId, status, offset: (page - 1) * pageSize, limit: pageSize });
       return success({ items: rows.map(row => ({ ...row, blocking: row.blocking === 1 })), totalItems });
     }); },
     pendingDecisions() { return stored(() => success(executeSelect(database, schema, query => query.from('runtime_decision')
@@ -89,6 +89,8 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
       executeUpdate(database, schema, (query, params) => query.update('runtime_decision').set({ status: 'answered' }).where(row => row.id === params.id), { id });
       return success(undefined);
     }); },
+    hasObservedRuntime(agentId) { return stored(() => success(executeSelect(database, schema, (query, params) => query.from('runtime_observation')
+      .where(row => row.agent_id === params.agentId).count(), { agentId }) > 0)); },
     observation(agentId) { return stored(() => {
       const latest = executeSelect(database, schema, (query, params) => query.from('listener_run').where(row => row.agent_id === params.agentId).orderByDescending(row => row.started_at).thenByDescending(row => row.id).firstOrDefault(), { agentId });
       if (!latest) return success([]);

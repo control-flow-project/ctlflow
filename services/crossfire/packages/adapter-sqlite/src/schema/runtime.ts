@@ -15,20 +15,6 @@ CREATE TABLE runtime_setting (
  PRIMARY KEY(run_id,session_id,name), FOREIGN KEY(run_id,session_id) REFERENCES runtime_observation(run_id,session_id)
 ) STRICT;
 `;
-export const runtimeObservationMigration = runtimeObservationSchema.replaceAll('runtime_observation', 'runtime_observation_next')
-  + runtimeSettingSchema.replaceAll('runtime_setting', 'runtime_setting_next').replaceAll('runtime_observation', 'runtime_observation_next') + `
-INSERT INTO runtime_observation_next(run_id,agent_id,session_id,room_id,runtime,state,observed_at,history_mode,max_input_bytes,error_message,last_activity_at,history_available)
- SELECT run_id,agent_id,session_id,room_id,runtime,state,observed_at,history_mode,max_input_bytes,error_message,NULL,NULL FROM runtime_observation;
-INSERT INTO runtime_setting_next SELECT * FROM runtime_setting;
-DROP TABLE runtime_setting;
-DROP TABLE runtime_observation;
-ALTER TABLE runtime_observation_next RENAME TO runtime_observation;
-ALTER TABLE runtime_setting_next RENAME TO runtime_setting;
-DROP INDEX ix_runtime_observation_next_agent_time;
-DROP INDEX ix_runtime_observation_next_run_state;
-CREATE INDEX ix_runtime_observation_agent_time ON runtime_observation(agent_id,observed_at DESC,run_id);
-CREATE INDEX ix_runtime_observation_run_state ON runtime_observation(run_id,state);
-`;
 export const runtimeSchema = `
 CREATE UNIQUE INDEX ux_listener_run_agent_binding ON listener_run(id,agent_id);
 CREATE INDEX ix_listener_run_agent_started ON listener_run(agent_id,started_at DESC,id DESC);

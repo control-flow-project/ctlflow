@@ -23,7 +23,7 @@ export type MemberSession = {
 };
 
 export type ListenerRun = {
-  controllerBound: boolean;
+  controller: { fleetId: string; connectionId: string; credentialId: string } | null;
   id: string;
   agentId: string;
   release: string | null;

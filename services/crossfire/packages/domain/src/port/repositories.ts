@@ -93,7 +93,6 @@ export type AgentNameRepository = {
 export type FleetKey = { ownerId: string; fleetKey: string };
 export type FleetRepository = {
   findById(id: string): Result<Fleet | null>;
-  remove(key: FleetKey): Result<void>;
   find(key: FleetKey): Result<Fleet | null>;
   insert(value: Fleet): Result<void>;
   update(value: Fleet): Result<void>;
@@ -101,7 +100,7 @@ export type FleetRepository = {
 
 export type FleetInstanceKey = { ownerId: string; fleetKey: string; instanceKey: string };
 export type FleetInstanceRepository = {
-  remove(key: FleetInstanceKey): Result<void>;
+  findByAgent(agentId: string): Result<FleetInstance | null>;
   find(key: FleetInstanceKey): Result<FleetInstance | null>;
   insert(value: FleetInstance): Result<void>;
   update(value: FleetInstance): Result<void>;
@@ -180,6 +179,7 @@ export type AuditEventRepository = {
 };
 
 export type FleetCredentialRepository = {
+  forFleet(fleetId: string): Result<FleetCredential[]>;
   find(key: { id: string }): Result<FleetCredential | null>;
   insert(value: FleetCredential): Result<void>;
   update(value: FleetCredential): Result<void>;
@@ -201,6 +201,7 @@ export type EnrollmentControllerMetadataRepository = {
 };
 
 export type Repositories = {
+  nativeStop: import('../fleet/native-stop.js').NativeStopRepository;
   fleetRuntimeOperation: import('../fleet/runtime-types.js').RuntimeOperationRepository;
   fleetPolicy: FleetPolicyRepository;
   ownerConversation: OwnerConversationRepository;

@@ -2,6 +2,7 @@ import { createEnrollmentControllerMetadataRepository } from './repository/enrol
 import { createFleetControllerMetadataRepository } from './repository/fleet-controller-metadata/index.js';
 import { createFleetCredentialRepository } from './repository/fleet-credential/index.js';
 import type Database from 'better-sqlite3';
+import { createNativeStopRepository } from './repository/native-stop/index.js';
 import { createFleetRuntimeOperationRepository } from './repository/fleet-runtime-operation/index.js';
 import type { Repositories } from '@ctlflow/crossfire-domain/port/repositories';
 import { createPrincipalRepository } from './repository/principal/index.js';
@@ -36,6 +37,7 @@ import { createFleetPolicyRepository } from './repository/fleet-policy/index.js'
 
 export function createRepositories(database: Database.Database): Repositories {
   return {
+    nativeStop: createNativeStopRepository(database),
     fleetPolicy: createFleetPolicyRepository(database),
     ownerConversation: createOwnerConversationRepository(database),
     wakeRule: createWakeRuleRepository(database),

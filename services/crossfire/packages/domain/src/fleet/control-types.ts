@@ -24,6 +24,7 @@ export type FleetMessageRepository = {
   page(fleetId: string, page: PageRequest): Result<Page<FleetMessage>>;
 };
 export type FleetMessageDeliveryRepository = {
+  pendingForAgent(agentId: string, now: number): Result<boolean>;
   find(messageId: string, agentId: string): Result<FleetMessageDelivery | null>;
   forMessages(messageIds: string[]): Result<FleetMessageDelivery[]>;
   insert(delivery: FleetMessageDelivery): Result<void>;

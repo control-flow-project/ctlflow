@@ -1,6 +1,8 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
+  fleet_native_stop: { agent_id: string; receipt_id: string; sequence: number; fleet_id: string; run_id: string; connection_id: string;
+    credential_id: string; native_stopped_at: number; invalidated_at: number | null };
   publication: { id: string; agent_id: string; public_key: string; title: string; state: 'staging' | 'published' | 'deleted';
     revision: number; created_at: number; expires_at: number; published_at: number | null; deleted_at: number | null;
     cleaned_at: number | null; total_bytes: number; file_count: number };
@@ -112,11 +114,11 @@ export type Tables = {
     assigned_at: number;
   };
   enrollment_request: {
-    controller_name: string | null;
-    controller_credential_hash: string | null;
+    controller_name: string;
+    controller_credential_hash: string;
     id: string;
     owner_id: string;
-    fleet_key: string | null;
+    fleet_key: string;
     verification_code: string;
     claim_hash: string;
     roster_digest: string;
@@ -142,6 +144,7 @@ export type Tables = {
     agent_id: string | null;
   };
   fleet: {
+    archived_at: number | null;
     id: string;
     delivery_enabled: number;
     label: string;
@@ -153,6 +156,7 @@ export type Tables = {
     created_at: number;
   };
   fleet_instance: {
+    retired_at: number | null;
     owner_id: string;
     fleet_key: string;
     instance_key: string;
@@ -224,7 +228,9 @@ export type Tables = {
     expires_at: number;
   };
   listener_run: {
-    controller_bound: number;
+    controller_fleet_id: string | null;
+    controller_connection_id: string | null;
+    controller_credential_id: string | null;
     id: string;
     agent_id: string;
     release: string | null;

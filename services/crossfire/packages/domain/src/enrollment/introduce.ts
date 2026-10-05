@@ -26,10 +26,10 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
   const valid = validateRoster(input);
   if (!valid.ok) return valid;
   const rosterDigest = services.identity.hash(JSON.stringify({ owner: input.ownerMatrixId, fleet: input.fleetKey,
-    controller: input.controller ? { name: input.controller.name, metadata: Object.entries(input.controller.metadata ?? {}).sort(([left], [right]) => left.localeCompare(right)) } : null,
+    controller: { name: input.controller.name, metadata: Object.entries(input.controller.metadata ?? {}).sort(([left], [right]) => left.localeCompare(right)) },
     items: input.instances.map(item => [item.instanceKey, item.name, item.identity?.agentId ?? null,
-      item.coordinationPolicy ? { wakeMode: item.coordinationPolicy.wakeMode, senderMatrixIds: [...item.coordinationPolicy.senderMatrixIds].sort(),
-        permissions: [...item.coordinationPolicy.permissions].sort() } : null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))) }));
+      { wakeMode: item.coordinationPolicy.wakeMode, senderMatrixIds: [...item.coordinationPolicy.senderMatrixIds].sort(),
+        permissions: [...item.coordinationPolicy.permissions].sort() }]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))) }));
   const prior = services.repositories.enrollmentRequest.find({ id: input.enrollmentId }); if (!prior.ok) return prior;
   if (prior.value) {
     if (prior.value.expiresAt <= services.clock.now() || prior.value.rosterDigest !== rosterDigest || !services.identity.matches(input.claimSecret, prior.value.claimHash)) return failure('conflict', 'Enrollment request belongs to different credentials or roster, or has expired');
@@ -54,7 +54,7 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
     for (const item of verified.value.existing) {
       const principal = services.repositories.principal.find({ id: item.agentId });
       if (!principal.ok) return principal;
-      if (!principal.value || principal.value.status !== 'active' || principal.value.revision !== item.revision) return failure('conflict', 'Existing agent authority changed');
+      if (!principal.value || principal.value.status !== 'active' && !(item.retired && principal.value.status === 'suspended') || principal.value.revision !== item.revision) return failure('conflict', 'Existing agent authority changed');
     }
     const capacity = enrollmentCapacity(services, owner.value.id);
     if (!capacity.ok) return capacity;
@@ -64,13 +64,13 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
     if (pendingRequests.value >= policy.maxPending) return failure('limit', 'Pending enrollment capacity reached');
     let remaining = capacity.value.remaining;
     const now = services.clock.now();
-    const request: EnrollmentRequest = { controllerName: input.controller?.name ?? null,
-      controllerCredentialHash: input.controller ? services.identity.hash(controllerToken(services, input.enrollmentId, input.claimSecret)) : null, id: input.enrollmentId, ownerId: owner.value.id, fleetKey: input.fleetKey,
+    const request: EnrollmentRequest = { controllerName: input.controller.name,
+      controllerCredentialHash: services.identity.hash(controllerToken(services, input.enrollmentId, input.claimSecret)), id: input.enrollmentId, ownerId: owner.value.id, fleetKey: input.fleetKey,
       verificationCode: services.identity.verificationCode(), claimHash: services.identity.hash(input.claimSecret), rosterDigest,
       status: 'pending', revision: 0, createdAt: now, expiresAt: now + policy.enrollmentSeconds * 1000, decidedByMemberId: null, decidedAt: null };
     const saved = services.repositories.enrollmentRequest.insert(request);
     if (!saved.ok) return saved;
-    for (const [key, value] of Object.entries(input.controller?.metadata ?? {})) {
+    for (const [key, value] of Object.entries(input.controller.metadata ?? {})) {
       const saved = services.repositories.enrollmentControllerMetadata.insert({ enrollmentId: request.id, key, value }); if (!saved.ok) return saved;
     }
     const instances: EnrollmentItem[] = [];
@@ -97,18 +97,18 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       }
       instances.push(record);
     }
-    const existingFleet = input.fleetKey === null ? success(null) : services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey: input.fleetKey });
+    const existingFleet = services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey: input.fleetKey });
     if (!existingFleet.ok) return existingFleet;
-    let unchanged = true;
+    let unchanged = existingFleet.value?.archivedAt === null && !verified.value.existing.some(item => item.retired);
     for (const item of instances) {
-      if (input.fleetKey === null || item.outcome !== 'existing' || !item.agentId) continue;
+      if (item.outcome !== 'existing' || !item.agentId) continue;
       const requestedPolicy = verified.value.policies.find(entry => entry.instanceKey === item.instanceKey)?.policy;
       if (!requestedPolicy) return failure('invalid', 'Fleet instance coordination policy is missing');
       const matches = coordinationPolicyMatches(services, item.agentId, requestedPolicy);
       if (!matches.ok) return matches;
       unchanged = unchanged && matches.value;
     }
-    if ((input.fleetKey === null || existingFleet.value && unchanged) && !instances.some(item => item.outcome === 'claimed')) {
+    if (existingFleet.value && unchanged && !instances.some(item => item.outcome === 'claimed')) {
       if (existingFleet.value) {
         const bound = bindRoster(services, owner.value.id, existingFleet.value.fleetKey, instances);
         if (!bound.ok) return bound;

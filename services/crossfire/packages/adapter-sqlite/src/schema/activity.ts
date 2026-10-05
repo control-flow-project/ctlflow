@@ -38,7 +38,9 @@ CREATE INDEX ix_member_session_member ON member_session(member_id, expires_at);
 CREATE INDEX ix_member_session_expiry ON member_session(expires_at);
 
 CREATE TABLE listener_run (
-  controller_bound INTEGER NOT NULL CHECK(controller_bound IN (0,1)),
+  controller_fleet_id TEXT,
+  controller_connection_id TEXT,
+  controller_credential_id TEXT,
   id TEXT NOT NULL,
   agent_id TEXT NOT NULL,
   release TEXT,
@@ -50,11 +52,16 @@ CREATE TABLE listener_run (
   disconnect_requested_at INTEGER,
   PRIMARY KEY (id),
   FOREIGN KEY(agent_id) REFERENCES agent(principal_id),
+  FOREIGN KEY(controller_fleet_id) REFERENCES fleet(id),
+  FOREIGN KEY(controller_credential_id, controller_fleet_id) REFERENCES fleet_credential(id, fleet_id),
+  CHECK((controller_fleet_id IS NOT NULL AND controller_connection_id IS NOT NULL AND controller_credential_id IS NOT NULL)
+    OR (controller_fleet_id IS NULL AND controller_connection_id IS NULL AND controller_credential_id IS NULL AND stopped_at IS NOT NULL)),
   CHECK(active_ms >= 0 AND messages_delivered >= 0),
   CHECK(last_seen_at >= started_at)
 ) STRICT;
 CREATE INDEX ix_listener_run_agent ON listener_run(agent_id, last_seen_at DESC, id);
 CREATE INDEX ix_listener_run_active ON listener_run(last_seen_at, agent_id, id) WHERE stopped_at IS NULL;
+CREATE INDEX ix_listener_run_controller ON listener_run(controller_fleet_id,controller_connection_id,agent_id) WHERE stopped_at IS NULL;
 
 CREATE TABLE wake_notice (
   receiver_agent_id TEXT NOT NULL,

@@ -5,8 +5,6 @@ import type { JsonObject } from "./json.js";
 export type Account = { user_id: string; access_token: string; device_id: string };
 export type Settings = { instance: string; homeserver: string; server_name: string; owner: string; max_upload_bytes: number };
 export type Profile = { settings: Settings; workspace: string; id: string; account: Account };
-export type PendingEnrollment = { server: string; owner: string; name: string; workspace: string;
-  request: string; secret: string; code: string; expires: number };
 export type Event = { event_id: string; sender: string; type: string; state_key?: string;
   content: JsonObject; origin_server_ts?: number; unsigned?: JsonObject };
 export const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;

@@ -7,6 +7,13 @@ export function page(input: unknown) {
   const parsed = checked(input, []);
   return parsed.ok ? pagination(parsed.value) : parsed;
 }
+export function runtimeDecisions(input: unknown): Result<PageQuery & { status: 'pending' | null }> {
+  const parsed = checked(input, ['status']); if (!parsed.ok) return parsed;
+  const bounds = pagination(parsed.value); if (!bounds.ok) return bounds;
+  const status = parsed.value.get('status');
+  if (status === null) return success({ ...bounds.value, status: null });
+  return status === 'pending' ? success({ ...bounds.value, status: 'pending' as const }) : failure('invalid', 'Invalid native decision status filter');
+}
 export function roomGrants(input: unknown): Result<PageQuery & { roomIds?: string[] }> {
   const parsed = checked(input, ['roomIds']);
   if (!parsed.ok) return parsed;

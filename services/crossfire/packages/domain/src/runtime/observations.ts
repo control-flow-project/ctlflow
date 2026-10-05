@@ -7,8 +7,9 @@ import { openIncident, recoverIncidents } from './incidents.js';
 import { agentDisplayName } from '../identity/display-name.js';
 
 const names = new Set(['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'native_version',
-  'dangerously_bypass_approvals_and_sandbox', 'features.default_mode_request_user_input', 'provider', 'thinking', 'permission_mode']);
+  'dangerously_bypass_approvals_and_sandbox', 'features.default_mode_request_user_input', 'provider']);
 export function reportRuntime(services: Services, actor: Actor, agentId: string, runId: string, input: RuntimeObservation) {
+  if (input.runtime !== 'codex') return failure('invalid', 'Codex is the only implemented runtime');
   return services.unitOfWork.run(() => {
     const authority = authorize(services, actor, 'runtime.report.self');
     if (!authority.ok) return authority;
@@ -27,6 +28,9 @@ export function reportRuntime(services: Services, actor: Actor, agentId: string,
     if (previous.value.some(value => value.runId === runId && value.sessionId === input.sessionId && value.observedAt > input.observedAt)) return failure('conflict', 'Runtime observation is older than the recorded state');
     const saved = services.runtime.saveObservation(agentId, { runId, ...input });
     if (!saved.ok) return saved;
+    if (input.state !== 'unavailable' && input.state !== 'sleeping') {
+      const invalidated = services.repositories.nativeStop.invalidate(agentId, services.clock.now()); if (!invalidated.ok) return invalidated;
+    }
     if (input.state === 'failed') {
       const agent = services.directory.agent(agentId);
       if (!agent.ok) return agent;
