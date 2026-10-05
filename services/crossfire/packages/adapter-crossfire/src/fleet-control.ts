@@ -100,7 +100,7 @@ export function createFleetControlConnection(options: { origin: string; credenti
         const messageId = inputId.slice(6, 42);
         if (inputId !== 'fleet-' + messageId + '-' + agentId) throw new Error('Controller receipt identity mismatch');
         await receipt(messageId, agentId, status, errorMessage);
-      }, disconnect);
+      }, () => ({ fleetId: options.fleetId, connectionId, credential: options.credential }), disconnect);
       listeners.set(agentId, listener); refresh();
       return { control: listener.connection, close: () => { listener.close(); listeners.delete(agentId); } };
     },
