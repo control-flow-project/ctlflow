@@ -5,7 +5,7 @@ import { authorizeFleet, type FleetActor } from './authority.js';
 import { recordEvent } from '../audit/record-event.js';
 import { readFleet } from './read-fleet.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'discovery'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'discovery' | 'runtime' | 'listenerRead'>;
 export function changeFleet(services: Dependencies, actor: FleetActor, fleetId: string,
   input: { expectedRevision: number; label: string; controller: ControllerDescriptor }, requestId: string) {
   const valid = validateController(input.controller);
