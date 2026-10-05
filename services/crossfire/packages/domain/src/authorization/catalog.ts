@@ -1,4 +1,9 @@
 export const permissionCatalog = [
+  { code: 'publication.publish.self', grantScope: 'role', description: 'Publish static reports as oneself', roles: ['agent'] },
+  { code: 'publication.read.owned', grantScope: 'role', description: 'Read reports created by owned agents', roles: ['member', 'administrator'] },
+  { code: 'publication.read.any', grantScope: 'role', description: 'Read every report', roles: ['administrator'] },
+  { code: 'publication.delete.owned', grantScope: 'role', description: 'Delete reports created by owned agents', roles: ['member', 'administrator'] },
+  { code: 'publication.delete.any', grantScope: 'role', description: 'Delete every report', roles: ['administrator'] },
   { code: 'runtime.report.self', grantScope: 'role', description: 'Report own native runtime observations and decisions', roles: ['agent'] },
   { code: 'runtime.decision.answer.owned', grantScope: 'role', description: 'Answer native decisions of owned agents', roles: ['member', 'administrator'] },
   { code: 'wake-rule.read.owned', grantScope: 'role', description: 'Read owned scheduled wake-up rules', roles: ['member', 'administrator'] },
