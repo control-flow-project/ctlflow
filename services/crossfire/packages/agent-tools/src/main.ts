@@ -45,7 +45,7 @@ export async function main(arguments_: string[]): Promise<void> {
   if (values.help) {
     if (group === 'matrix' && command) emit(selectOperation(command), maximum);
     else if (group === 'matrix') emit({ namespace: 'matrix', schema: 'v1.12', operations: operations.map(operation => ({ command: operation.command, access: operation.access })) }, maximum);
-    else emit({ usage: 'node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent status|test|read|history|directory', agent: agentOptions, room: roomOptions,
+    else emit({ usage: 'node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" [--project DIRECTORY] [--profile NAME] agent status|test|read|history|directory', agent: agentOptions, room: roomOptions,
       matrix: 'Native Matrix operation IDs converted to kebab-case; use matrix COMMAND --help.',
       report: 'report publish --directory DIRECTORY --title TITLE uploads public static reports. Anyone with the link can read them.',
       output: '64 KiB default; finite --max-output-bytes 1024..98304',

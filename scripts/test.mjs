@@ -4,7 +4,7 @@ import { availableParallelism } from 'node:os';
 import { join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildProducts, repository, products, command } from './build.mjs';
-import { testOptions, runtimeTestEnabled } from './test-options.mjs';
+import { testOptions } from './test-options.mjs';
 import { testEvidence } from './test-evidence.mjs';
 import { verifyTestResources } from './test-resources.mjs';
 
@@ -17,7 +17,7 @@ export function selectedTest(directory, file, selection) {
     : (selection !== 'non-browser' || !browser) && (file.endsWith('.test.js') || integration);
 }
 
-export async function runTests(selected, selection, options = { allRuntimes: false }) {
+export async function runTests(selected, selection) {
   const resourceScope = verifyTestResources();
   if (!['all', 'non-browser', 'browser', 'integration'].includes(selection)) throw new Error('Select an existing test suite');
   const discovered = selected.flatMap(service => {
@@ -30,7 +30,7 @@ export async function runTests(selected, selection, options = { allRuntimes: fal
     discovered.push(...readdirSync(join(repository, 'scripts')).filter(file => file.endsWith('.test.mjs'))
       .map(file => ({ service: 'workspace', root: repository, file: join(repository, 'scripts', file), label: 'workspace/scripts/' + file })));
   }
-  const jobs = discovered.filter(job => runtimeTestEnabled(job.file, options));
+  const jobs = discovered;
   if (!jobs.length) throw new Error('No tests matched the selected products and suite');
   const concurrency = Math.min(availableParallelism(), jobs.length), started = performance.now();
   const evidence = join(repository, '.temp/test-runs', new Date().toISOString().replaceAll(':', '-') + '-' + process.pid);
@@ -46,8 +46,8 @@ export async function runTests(selected, selection, options = { allRuntimes: fal
   const preparationMs = Math.round(performance.now() - started);
   let next = 0;
   const results = [];
-  const runtimes = options.allRuntimes ? ['codex', 'claude', 'pi'] : ['codex'];
-  console.log('Runtime test suites: ' + runtimes.join(', ') + '; ' + (discovered.length - jobs.length) + ' optional runtime files excluded. Use --all-runtimes to include Claude and Pi.');
+  const runtimes = ['codex'];
+  console.log('Runtime test suite: Codex. Every current test file in the selected suite is included.');
   console.log('Running ' + jobs.length + ' isolated test files on ' + concurrency + ' parallel workers. Logs: ' + evidence);
   await Promise.all(Array.from({ length: concurrency }, async () => {
     for (;;) {
@@ -90,6 +90,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   verifyTestResources();
   const service = process.argv[2], selection = process.argv[3] ?? 'all';
   if (!products.includes(service)) throw new Error('Select an existing product');
-  const options = testOptions(process.argv.slice(4));
-  await buildProducts([service]); await runTests([service], selection, options);
+  testOptions(process.argv.slice(4));
+  await buildProducts([service]); await runTests([service], selection);
 }

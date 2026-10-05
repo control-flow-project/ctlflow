@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { readPublications } from '@ctlflow/crossfire-domain/publication/read';
 import type { Profile } from '@ctlflow/crossfire-contracts/client';
-import { publishReport } from '../apps/client/src/publish.js';
+import { publishReport } from '@ctlflow/crossfire-agent-tools/publish';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contentFixture } from './support/publication.js';

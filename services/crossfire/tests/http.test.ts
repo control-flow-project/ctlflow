@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { applicationFixture } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contractRelease } from './support/release.js';
-import { onboardingCommand, onboardingUrl } from '@ctlflow/crossfire-contracts/onboarding';
+import { onboardingCommand, onboardingUrl, setupDescriptor, setupDescriptorUrl } from '@ctlflow/crossfire-contracts/onboarding';
 
 test("HTTP management enforces cookie, origin, CSRF, strict requests and removed routes", async scope => {
   const fixture = await applicationFixture(scope), { request, origin } = await httpFixture(scope, fixture.application);
@@ -39,10 +39,26 @@ test("HTTP management enforces cookie, origin, CSRF, strict requests and removed
     '?ownerMatrixId=%40admin%3Atests.localhost&ownerMatrixId=%40other%3Atests.localhost', '?ownerMatrixId=%40admin%3Atests.localhost&unknown=true']) {
     assert.equal((await request('/onboarding/setup' + query)).status, 400, query);
   }
-  const quotedOwner = "@o'connor:tests.localhost";
+  await fixture.member("o'connor");
+  const quotedOwner = "@o'connor:" + ctx.config.serverName;
   const quoted = await fetch(onboardingUrl(origin, quotedOwner));
-  assert.equal(quoted.status, 200, 'The public guide does not look up accounts or authorize enrollment');
+  assert.equal(quoted.status, 200, 'The guide verifies a real active human owner without granting enrollment authority');
   assert((await quoted.text()).includes(onboardingCommand(origin, quotedOwner, release.manifest)));
+  const descriptor = await fetch(setupDescriptorUrl(origin, ctx.config.administrator));
+  assert.equal(descriptor.status, 200);
+  assert.equal(descriptor.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.equal(descriptor.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await descriptor.json(), setupDescriptor(origin, ctx.config.administrator, release.manifest));
+  const otherDescriptor = await fetch(setupDescriptorUrl(origin, quotedOwner));
+  assert.equal(otherDescriptor.status, 200);
+  const other = await otherDescriptor.text();
+  assert(other.includes(quotedOwner));
+  assert(!other.includes(ctx.config.administrator));
+  for (const path of ['/onboarding/setup', '/onboarding/setup.json']) {
+    assert.equal((await request(path + '?ownerMatrixId=' + encodeURIComponent('@unknown:' + ctx.config.serverName))).status, 403);
+    assert.equal((await request(path + '?ownerMatrixId=' + encodeURIComponent(ctx.config.administrator) + '&extra=true')).status, 400);
+    assert.equal((await request(path + '?ownerMatrixId=' + encodeURIComponent(ctx.config.administrator), 'PUT', {})).status, 405);
+  }
   const invalidHost = await new Promise<number>((resolve, reject) => {
     const outgoing = httpRequest(setupUrl, { headers: { Host: 'attacker.invalid' } }, response => {
       response.resume(); resolve(response.statusCode!);

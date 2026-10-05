@@ -13,7 +13,7 @@ export function member(value: MemberRecord) {
     application: application(value.application) };
 }
 export function listenerRun(value: ListenerRun) {
-  return { runId: value.id, agentId: value.agentId, release: value.release, controllerBound: value.controllerBound, startedAt: value.startedAt, lastSeenAt: value.lastSeenAt,
+  return { runId: value.id, agentId: value.agentId, release: value.release, controller: value.controller, startedAt: value.startedAt, lastSeenAt: value.lastSeenAt,
     activeMs: value.activeMs, messagesDelivered: value.messagesDelivered, stoppedAt: value.stoppedAt, disconnectRequestedAt: value.disconnectRequestedAt };
 }
 export function agent(value: AgentDetails) {
@@ -25,7 +25,7 @@ export function agent(value: AgentDetails) {
     application: application(record.application), activity: { status: activity.status, activeMs: activity.activeMs,
       messagesDelivered: activity.messagesDelivered, lastSeenAt: activity.lastSeenAt, activeRuns: activity.activeRuns.map(listenerRun) },
     nativeRuntime: value.nativeRuntime,
-    deployment: value.deployment ? { fleetId: value.deployment.fleetId, fleetKey: value.deployment.fleetKey, label: value.deployment.label,
-      controllerName: value.deployment.controllerName, reportedAt: value.deployment.reportedAt, instanceKey: value.deployment.instanceKey } : null,
+    deployment: { fleetId: value.deployment.fleetId, fleetKey: value.deployment.fleetKey, label: value.deployment.label,
+      controllerName: value.deployment.controllerName, reportedAt: value.deployment.reportedAt, instanceKey: value.deployment.instanceKey },
     allowedActions: value.allowedActions };
 }

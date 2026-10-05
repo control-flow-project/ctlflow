@@ -31,7 +31,7 @@ test('all services have one strict implementation and declared package-export bo
   assert.deepEqual(dependencies('crossfire', 'contracts').sort(), ['@ctlflow/crossfire-domain', '@ctlflow/crossfire-kernel', 'smol-toml']);
   for (const name of ['files', 'matrix']) assert.equal(files(join(root, 'services/crossfire/packages', name, 'src')).length, 0);
   for (const manifest of manifests.values()) if (manifest.name.startsWith('@ctlflow/crossfire-')) {
-    assert(!Object.keys(manifest.dependencies ?? {}).some(name => name.startsWith('@fleet')));
+    assert(!Object.keys(manifest.dependencies ?? {}).some(name => /^@ctlflow\/(?:fleet|fleetd)(?:-|$)/u.test(name)));
   }
 });
 

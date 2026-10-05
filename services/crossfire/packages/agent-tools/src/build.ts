@@ -7,7 +7,8 @@ import { artifactHash, releaseHash, loadRelease, type Release } from '@ctlflow/c
 
 export async function buildAgentClient(destination: string): Promise<void> {
   if (Number(process.versions.node.split('.')[0]) < 26) throw new Error('Crossfire requires Node.js 26+');
-  await build({ entryPoints: [fileURLToPath(import.meta.resolve('@ctlflow/crossfire-agent-tools/entry'))], outfile: destination,
+  await build({ absWorkingDir: join(dirname(fileURLToPath(import.meta.url)), '..'),
+    entryPoints: [fileURLToPath(import.meta.resolve('@ctlflow/crossfire-agent-tools/entry'))], outfile: destination,
     bundle: true, platform: 'node', format: 'esm', target: 'node26',
     banner: { js: "import { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" } });
 }
