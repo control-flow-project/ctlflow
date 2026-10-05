@@ -26,6 +26,7 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
   const provider = await nativeProvider(scope, home); trustWorkspace(home, workspace);
   const adapter = codexRuntime(), stop = new AbortController(), observations: RuntimeObservationEvent[] = [];
+  const failures: string[] = [];
   let now = Date.now(), sequence = 0, starts = 0, allowNewHistory = true;
   const timers = new Map<number, { at: number; callback: () => void }>();
   const clock: Clock = { now: () => now, deadline: milliseconds => AbortSignal.timeout(milliseconds),
@@ -42,7 +43,7 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
     initial: 'running', initialSettings: [], saved: () => adapter.savedContexts({ workspace }),
     hooks: { observe: event => observations.push(event), pendingInput: () => false, pendingDecisions: () => false,
       requestDecision: async () => success(null) },
-    failed: (_session, error) => { assert.fail(error instanceof Error ? error.message : 'Unexpected native failure'); }, recovered: () => {},
+    failed: (_session, error) => { failures.push(error instanceof Error ? error.message : 'Unexpected native failure'); }, recovered: () => {},
     start: async (signal, observe) => {
       starts++;
       const started = await adapter.start({ name: 'native-sleep-proof', workspace, instructions: 'Inert provider proof; do not access external services.',
@@ -62,6 +63,8 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   assert.equal(managed.runtime.signal.aborted, false); assert.equal(existsSync(firstPointer.connection.tokenFile!), false);
   assert.equal((await managed.attachment()).ok, false); assert.equal(value(await managed.contexts())[0]!.sessionId, history);
   assert.equal(starts, 1); assert.equal(provider.requests.length, 1, 'Sleep and metadata reads call no model');
+  value(await managed.resume()); assert.equal(starts, 2); assert.equal(provider.requests.length, 1, 'Explicit resume creates no model input');
+  assert.equal(value(await managed.attachment()).sessionId, history);
   await managed.runtime.deliver('Second retained native sleep proof', 'sleep-proof-two'); managed.runtime.acknowledge(['sleep-proof-two']);
   await until(() => provider.requests.length === 2); await until(async () => !(await managed.runtime.inspect()).busy);
   assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 2);
@@ -75,4 +78,5 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   assert(JSON.stringify(provider.requests[2]).includes('Second retained native sleep proof'), 'Controller binding restart preserves full native context');
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'sleeping'));
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'waking'));
+  assert.equal(failures.length, 0, failures.join('; '));
 });

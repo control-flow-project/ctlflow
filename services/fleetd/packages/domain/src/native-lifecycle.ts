@@ -38,6 +38,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   let native: OwnedRuntimeConnection | undefined, opening: Promise<OwnedRuntimeConnection> | undefined, closingNative: Promise<void> | undefined;
   let recovery: Promise<void> | undefined, closing: Promise<void> | undefined;
   let activeCalls = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
+  let observationGeneration = 0;
   let cancelIdle: (() => void) | undefined;
   let failedEpisode = false;
   let inspectionUncertain = false;
@@ -86,7 +87,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     contexts = saved.value;
   }
   async function discard(connection: OwnedRuntimeConnection, completed?: () => void): Promise<void> {
-    if (native === connection) native = undefined;
+    if (native === connection) { native = undefined; observationGeneration++; }
     const cleanup = (async () => {
       try { await connection.close(); }
       catch { throw nativeError('conflict', 'Native process cleanup failed; replacement is blocked until cleanup is verified'); }
@@ -103,9 +104,12 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     if (native && !native.signal.aborted) return native;
     if (opening) return opening;
     const pending = (async () => {
+      const generation = ++observationGeneration;
       phase = 'waking';
       emit('waking', contexts.filter(context => context.context === services.primary));
-      const started = await services.start(lifetime, observe);
+      const started = await services.start(lifetime, event => {
+        if (generation === observationGeneration && !lifetime.aborted) observe(event);
+      });
       if (!started.ok) { initializationFailure = started.error; throw nativeError(started.error.code, started.error.message); }
       const connection = started.value;
       if (lifetime.aborted) { await connection.close(); lifetime.throwIfAborted(); }
@@ -145,6 +149,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     try { return await pending; }
     catch (error) {
       if (native) await discard(native);
+      observationGeneration++;
       report(error); throw error;
     } finally { if (opening === pending) opening = undefined; }
   }
@@ -165,8 +170,9 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     const connection = native;
     if (activeCalls || opening || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()) { touch(); return; }
     let status: { busy: boolean };
-    try { status = await connection.inspect(); }
+    try { status = await connection.inspect(); await refreshContexts(); }
     catch (error) {
+      if (lifetime.aborted || native !== connection || connection.signal.aborted) return;
       if (!inspectionUncertain) {
         inspectionUncertain = true;
         services.failed(sessionId, error);
@@ -180,14 +186,14 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       }
       touch(); return;
     }
+    if (lifetime.aborted || native !== connection || connection.signal.aborted || phase !== 'running') return;
     if (inspectionUncertain) {
       inspectionUncertain = false; services.recovered();
       for (const observation of observations.values()) services.hooks.observe?.({ kind: 'state', observation: { ...observation, observedAt: services.clock.now() } });
     }
-    if (status.busy || native !== connection || activeCalls || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()
+    if (!idleSeconds || status.busy || activeCalls || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()
       || services.clock.now() < lastActivityAt + idleSeconds * 1000) { touch(); return; }
     cancelIdle?.(); cancelIdle = undefined;
-    await refreshContexts();
     await discard(connection, () => { phase = 'sleeping'; emit('sleeping'); });
   }
   function logical(context: string, expectedSession: string): RuntimeConnection {

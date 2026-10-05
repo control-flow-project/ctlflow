@@ -21,12 +21,14 @@ function fixture() {
   };
   const saved: SavedRuntimeContext[] = [{ context: 'shared', runtime: 'fixture', sessionId: 'exact-history', workspace: '/fixture' }];
   const started: AbortController[] = [], closed: string[] = [], delivered: string[] = [], failures: unknown[] = [], observed: RuntimeObservationEvent[] = [];
+  const nativeObservers: NonNullable<NativeLifecycleServices['hooks']['observe']>[] = [];
   let recovered = 0, inspect: (() => Promise<{ busy: boolean }>) | undefined;
   const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'fixture', approval: 'none', initialSettings: [], initial: 'running',
     hooks: { requestDecision: async () => failure('forbidden', 'Unexpected decision'), pendingInput: () => pending,
       pendingDecisions: () => decisions, observe: event => observed.push(event) },
     saved: async () => success(saved), failed: (_session, error) => failures.push(error), recovered: () => { recovered++; },
     start: async (_signal, observe) => {
+      nativeObservers.push(observe);
       const stop = new AbortController(); started.push(stop);
       const context = saved.find(context => context.context === 'shared')!;
       observe({ kind: 'state', observation: { runtime: 'fixture', sessionId: context.sessionId, roomId: null, state: 'idle', observedAt: now, settings: [], errorMessage: null } });
@@ -46,7 +48,7 @@ function fixture() {
     for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.callback(); }
     await yieldLoop();
   }
-  return { services, advance, started, saved, closed, delivered, failures, observed,
+  return { services, advance, started, saved, closed, delivered, failures, observed, nativeObservers,
     setBusy: (value: boolean) => { busy = value; }, setUnknown: (value: boolean) => { unknown = value; },
     setPending: (value: boolean) => { pending = value; }, setDecisions: (value: boolean) => { decisions = value; },
     setInspect: (value: typeof inspect) => { inspect = value; }, recovered: () => recovered, timers: () => timers.size };
@@ -67,6 +69,21 @@ test('30 minute sleep closes native processes, not the listener; input resumes t
   assert.equal(fixture_.started.length, 2); assert.equal(managed.runtime.sessionId, 'exact-history');
   assert.equal(value(await managed.attachment()).sessionId, 'exact-history');
   assert.equal(managed.nativeState().phase, 'running');
+});
+
+test('retired native generations cannot overwrite current activity or mirror late output', async scope => {
+  const fixture_ = fixture();
+  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  await fixture_.advance(1800000); await until(() => managed.nativeState().phase === 'sleeping');
+  const sleepingEvents = fixture_.observed.length;
+  fixture_.nativeObservers[0]!({ kind: 'output', sessionId: 'exact-history', id: 'late-output', streamId: null, text: 'Old generation' });
+  assert.equal(fixture_.observed.length, sleepingEvents);
+  value(await managed.resume()); const liveEvents = fixture_.observed.length;
+  fixture_.nativeObservers[0]!({ kind: 'state', observation: { sessionId: 'exact-history', roomId: null,
+    runtime: 'fixture', state: 'failed', observedAt: 1801001, settings: [], errorMessage: 'Retired generation' } });
+  assert.equal(fixture_.observed.length, liveEvents); assert.equal(managed.nativeState().phase, 'running');
+  fixture_.nativeObservers[1]!({ kind: 'output', sessionId: 'exact-history', id: 'current-output', streamId: null, text: 'Current generation' });
+  assert.equal(fixture_.observed.length, liveEvents + 1);
 });
 
 test('explicit resume wakes saved history for a terminal without model input and remains idempotent', async scope => {
@@ -134,6 +151,32 @@ test('idle inspection cannot close a generation after new input arrives; zero di
   release({ busy: false }); await yieldLoop(); assert.equal(fixture_.closed.length, 0);
   managed.runtime.lifecycle!.configureIdle(0); fixture_.setInspect(undefined);
   await fixture_.advance(180000000); assert.equal(fixture_.closed.length, 0); assert.equal(fixture_.timers(), 0);
+});
+
+test('input and timeout changes during saved-context inspection veto native shutdown', async scope => {
+  for (const action of ['input', 'disable'] as const) {
+    const fixture_ = fixture();
+    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    let finish!: () => void, inspecting = false;
+    fixture_.services.saved = async () => {
+      inspecting = true; await new Promise<void>(resolve => { finish = resolve; }); return success(fixture_.saved);
+    };
+    await fixture_.advance(1800000); await until(() => inspecting);
+    if (action === 'input') { await managed.runtime.deliver('New work', 'race-saved'); managed.runtime.acknowledge(['race-saved']); }
+    else managed.runtime.lifecycle!.configureIdle(0);
+    finish(); await yieldLoop(); await yieldLoop();
+    assert.equal(fixture_.closed.length, 0, action); assert.equal(managed.nativeState().phase, 'running', action);
+  }
+});
+
+test('an idle inspection canceled by intentional shutdown produces no owner failure incident', async () => {
+  const fixture_ = fixture();
+  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal));
+  let reject!: (error: Error) => void, inspecting = false;
+  fixture_.setInspect(async () => { inspecting = true; return new Promise((_, fail) => { reject = fail; }); });
+  await fixture_.advance(1800000); await until(() => inspecting);
+  await managed.close(); reject(new Error('Native history owner stopped'));
+  await yieldLoop(); assert.equal(fixture_.failures.length, 0); assert.equal(fixture_.closed.length, 1);
 });
 
 test('missing history and a resume with a different identity fail closed without implicit fresh context', async () => {
