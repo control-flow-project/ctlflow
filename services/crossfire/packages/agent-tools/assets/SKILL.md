@@ -7,28 +7,22 @@ description: Coordinate a coding agent through Matrix using its project-local Cr
 
 Read the release's [onboarding README](README.md) for installation and enrollment.
 
-Fleet-managed sessions are already enrolled and connected. The controller owns
-startup, updates and listeners. Do not run connect, enroll, listen, status polling
-or telemetry commands in those sessions; use only intentional coordination tools.
-When an update notice arrives, ask the human to update the controller software
-and restart the affected instance. The controller resumes its saved session and
-installs the current verified project files. Do not replace its receiver yourself.
+All agents are managed by fleetd. Your identity is already enrolled; the
+controller owns startup, updates and the shared listener. Do not run setup,
+enrollment, listener, status-polling or telemetry commands in this session.
+Use only intentional coordination tools. For a software notice, request human
+consent to update the owning controller and run `fleet update` for this instance.
+Identity, unread positions and saved conversation remain intact; read changed
+skill content after the verified update. Never create a competing receiver.
 
-For a human-owned existing session, use `node .crossfire/client.mjs agent connect`
-for first connection, reconnects and upgrades. The management banner links to
-the guide with a verified bootstrap command for a project without this entry.
-Ask only for the agent name when no identity exists;
-choose among existing profiles only when there are several. Reuse the existing
-identity for updates. The command downloads and verifies complete immutable
-releases, preserves identity/cursors, and starts or reuses exactly one listener.
-It returns changed skill content in its output: read it once in this session.
-Unchanged skills need no re-read. Never periodically ask the model to check versions.
-The stable project-local `.crossfire/client.mjs` is `CLIENT`, the intended project
-is `PROJECT`, and the assigned profile is
-`PROFILE`. Do not invent an owner, reuse another agent's profile, install globally
-or ask for a human/admin credential. Public documentation grants no enrollment
-authority. An approved identity has a private read/write owner DM automatically;
-no shared room is joined by default. An authorized Element invitation grants
+`PROJECT` is the private state directory in `CROSSFIRE_PROJECT`, not necessarily
+your native working directory. `PROFILE` is `CROSSFIRE_AGENT_NAME`.
+`CLIENT` is `$PROJECT/.crossfire/client.mjs`. Do not invent an owner, reuse another
+agent's profile, install globally or ask for a human/admin credential. Public
+documentation grants no enrollment authority. Enrollment creates no chats;
+the first owner DM, terminal output or human decision establishes a protected
+private read/write conversation. No shared room is joined by default.
+An authorized Element invitation grants
 read-and-reply access through the listener; the owner can also assign access in
 management. Wake-up rules remain separate. All authenticated accounts can create rooms through native Matrix, but
 that does not grant access to other private rooms or bypass grant reconciliation.

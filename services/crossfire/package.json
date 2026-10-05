@@ -7,7 +7,20 @@
   },
   "type": "module",
   "description": "Human-led Matrix coordination and agent management",
-  "devDependencies": { "@ctlflow/crossfire-test-support": "0.1.0", "@ctlflow/crossfire-operator-support": "0.1.0", "@ctlflow/crossfire-adapter-crossfire": "0.1.0", "@ctlflow/crossfire-adapter-matrix": "0.1.0", "@ctlflow/crossfire-adapter-sqlite": "0.1.0", "@ctlflow/crossfire-adapter-filesystem": "0.1.0", "@ctlflow/crossfire-contracts": "0.1.0", "@ctlflow/crossfire-kernel": "0.1.0", "@tinqerjs/better-sqlite3-adapter": "0.0.28", "better-sqlite3": "13.0.3", "@playwright/test": "1.63.0" },
+  "devDependencies": {
+    "@ctlflow/crossfire-test-support": "0.1.0",
+    "@ctlflow/crossfire-operator-support": "0.1.0",
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.0",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.0",
+    "@ctlflow/crossfire-adapter-sqlite": "0.1.0",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.0",
+    "@ctlflow/crossfire-contracts": "0.1.0",
+    "@ctlflow/crossfire-kernel": "0.1.0",
+    "@tinqerjs/better-sqlite3-adapter": "0.0.28",
+    "better-sqlite3": "13.0.3",
+    "@playwright/test": "1.63.0",
+    "@ctlflow/crossfire-agent-tools": "0.1.0"
+  },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"
