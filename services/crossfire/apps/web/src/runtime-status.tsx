@@ -13,8 +13,10 @@ export function savedHistoryLabel(available: boolean | null): string {
 }
 export function NativeRuntimeStatus({ agent, compact = false }: { agent: AgentView; compact?: boolean }) {
   const summary = agent.nativeRuntime;
-  return summary ? <span title={'Observed ' + timestamp(summary.observedAt)}><NativeStatus state={summary.state}/>
-    {!compact && <span className="subline">{agent.activity.status !== 'online' ? 'Last reported · ' : ''}{summary.lastActivityAt === null ? 'Activity not reported' : 'Last active ' + timestamp(summary.lastActivityAt)}</span>}</span>
+  return summary ? <span title={'Observed ' + timestamp(summary.observedAt)}>
+    {summary.state === 'failed' || summary.state === 'unavailable' ? <a href={'/manage/agents/' + agent.agentId + '/runtime'} aria-label={'Inspect native runtime for ' + agent.displayName}><NativeStatus state={summary.state}/></a> : <NativeStatus state={summary.state}/>}
+    {!compact && <span className="subline">{agent.activity.status !== 'online' ? 'Last reported · ' : ''}{summary.lastActivityAt === null ? 'Activity not reported' : 'Last active ' + timestamp(summary.lastActivityAt)}
+      <br/>{summary.historyAvailable === null ? 'History not reported' : savedHistoryLabel(summary.historyAvailable)}</span>}</span>
     : <><Status value="Unknown"/>{!compact && <span className="subline">No native observation</span>}</>;
 }
 export function NativeRuntimeDetails({ agent }: { agent: AgentView }) {

@@ -48,6 +48,7 @@ test('Management distinguishes native sleep and wake from listener readiness wit
   await expect(agents.getByRole('columnheader', { name: 'Native session', exact: true })).toBeVisible();
   const sleeping = agents.getByRole('row').filter({ has: page.locator('a[href="/manage/agents/' + instances[0]!.agentId + '"]') });
   await expect(sleeping.getByText('online', { exact: true })).toBeVisible(); await expect(sleeping.getByText('Sleeping', { exact: true })).toBeVisible();
+  await expect(sleeping).toContainText('Available for resume');
   const unknown = agents.getByRole('row').filter({ has: page.locator('a[href="/manage/agents/' + direct.id + '"]') });
   await expect(unknown.getByText('Unknown', { exact: true })).toBeVisible();
   assert.deepEqual(runtimeRequests, [], 'The agent list consumes its batched native summary, not N+1 context endpoints');
@@ -58,6 +59,7 @@ test('Management distinguishes native sleep and wake from listener readiness wit
   const offline = roster.getByRole('row').filter({ has: page.getByRole('cell', { name: instances[2]!.instanceKey, exact: true }) });
   await expect(offline.getByText('offline', { exact: true })).toBeVisible(); await expect(offline.getByText('Idle', { exact: true })).toBeVisible();
   await expect(offline).toContainText('Last reported'); await expect(offline.getByText('Sleeping', { exact: true })).toHaveCount(0);
+  await expect(offline).toContainText('History not reported');
   assert.deepEqual(runtimeRequests, [], 'Fleet roster consumes the same page-batched native summary');
   await checkPaperLayout(page); await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);
   await page.screenshot({ path: join(directory, 'native-fleet-mobile.png'), fullPage: true });
