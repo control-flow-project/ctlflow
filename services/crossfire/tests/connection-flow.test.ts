@@ -46,7 +46,7 @@ test('public fleet setup starts a separate native history, reuses identity and p
   });
   const guide = await fetch(onboardingUrl(origin, admin.member.principal.matrixUserId));
   assert.equal(guide.status, 200);
-  const commands = [...(await guide.text()).matchAll(/\`\`\`bash\n([\s\S]*?)\n\`\`\`/gu)];
+  const commands = [...(await guide.text()).matchAll(/```bash\n([\s\S]*?)\n```/gu)];
   assert.equal(commands.length, 1, 'There is one public npm setup command, not HTTP and native attachment alternatives');
   assert.equal(commands[0]![1], onboardingCommand(origin, admin.member.principal.matrixUserId, release.manifest));
   const starter = spawn(process.execPath, [executable, 'setup', '--root', root,
