@@ -1,6 +1,6 @@
 import { chromium, expect } from '@playwright/test';
 import { join } from 'node:path';
-import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { privateDir, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
@@ -19,6 +19,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
     const browser = await chromium.launch({ executablePath: executable, headless: true });
     const context = await browser.newContext();
     let token: string | undefined, csrf: string | undefined;
+    let phase = 'sign-in';
     const errors: string[] = [];
     const views = managementViews(human.viewer, policy.value.data, agents.value, fleets.value);
     const abort = () => { void context.close().catch(() => {}); };
@@ -45,6 +46,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
       for (const viewport of managementViewports) {
         await page.setViewportSize(viewport);
         for (const view of views) {
+          phase = viewport.width + ' ' + view.route;
           signal.throwIfAborted();
           await page.goto(origin + view.route);
           await expect(page.locator('.page-heading h1')).toHaveText(view.title);
@@ -82,12 +84,18 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
         }
       }
       await page.goto(origin + '/manage/connect');
+      phase = 'personalized setup guide';
       await page.getByText('Requirements & advanced configuration', { exact: true }).click();
       const link = await page.getByRole('link', { name: 'Read the full guide for your account →', exact: true }).getAttribute('href');
       if (!link || new URL(link, origin).searchParams.get('ownerMatrixId') !== account.matrixUserId) return failure('native', 'Onboarding link does not identify the signed-in user');
       if (errors.length) return failure('native', 'Management browser reported a page error');
       return success({ origin, human: account.matrixUserId, managementRoutes: views.length * managementViewports.length, screenshots: directory, modelCalls: 0 });
-    } catch { return failure('native', 'Browser management verification failed; inspect the private evidence directory'); }
+    } catch (error) {
+      let message = error instanceof Error ? error.message.slice(0, 8192) : 'Unknown browser verification failure';
+      for (const secret of [account.password, human.nativeAccessToken, token, csrf]) if (secret) message = message.replaceAll(secret, '[redacted]');
+      writeJson(join(directory, 'failure.json'), { phase, message });
+      return failure('native', 'Browser management verification failed at ' + phase + '; inspect the private evidence directory');
+    }
     finally {
       signal.removeEventListener('abort', abort);
       try {

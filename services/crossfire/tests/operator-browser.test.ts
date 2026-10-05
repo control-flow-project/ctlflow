@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -45,7 +45,9 @@ test('operator browser waits for authenticated management, checks real views and
   assert.deepEqual(memberRoutes, ['/manage/agents', '/manage/fleets', '/manage/wake-ups', '/manage/wake-ups/new', '/manage/connect', '/manage/enrollments', '/manage/audit', '/manage/reports']);
   assert(managementViews(member, { ...policy, invitationIssuers: 'members' }, [], []).some(view => view.route === '/manage/invitations'));
   assert(!managementViews({ ...member, permissions: [] }, policy, [], []).some(view => view.route === '/manage/reports'));
-  const report = value(await verifyBrowser(origin, fixture.account, browserExecutable(scope), directory, new AbortController().signal));
+  const observed = await verifyBrowser(origin, fixture.account, browserExecutable(scope), directory, new AbortController().signal);
+  if (!observed.ok && existsSync(join(directory, 'failure.json'))) scope.diagnostic(readFileSync(join(directory, 'failure.json'), 'utf8'));
+  const report = value(observed);
   assert.equal(report.human, fixture.account.matrixUserId);
   assert.equal(report.managementRoutes, views.length * managementViewports.length);
   assert.equal(report.modelCalls, 0);
