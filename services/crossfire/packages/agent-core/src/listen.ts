@@ -38,6 +38,7 @@ export type ListenerOptions = {
   storage: LocalState;
   transport: Transport;
   invitationRooms: (signal: AbortSignal) => Promise<readonly string[]>;
+  activity?: (runId: string) => void;
   ready?: (test: () => Promise<ListenerTest>, queries: HistoryQueries) => void;
   release: Manifest;
   coordination: Coordination;
@@ -64,6 +65,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const storage = options.storage;
   const budget = options.budget ?? createListenerBudget();
   if (!options.control || typeof options.control.binding !== 'function') throw new Error('Listeners require an authenticated fleet controller binding');
+  if (!Number.isSafeInteger(options.pollMs) || options.pollMs < 100 || options.pollMs > 30_000) throw new Error('Listener polling interval must be 100..30000 ms');
+  if (!Number.isSafeInteger(options.debounceMs) || options.debounceMs < 0 || options.debounceMs > 60_000) throw new Error('Listener collection interval must be 0..60000 ms');
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 100) throw new Error('Listener message page must contain 1..100 records');
   if (!Number.isSafeInteger(options.reconcileMs) || options.reconcileMs < 1000 || options.reconcileMs > 600_000) {
     throw new Error('Listener reconciliation interval must be 1000..600000 ms');
   }
@@ -275,6 +279,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
     reportingRun = activity.runId; runReady(); approval.start(); observer.start(activity.runId);
+    options.activity?.(activity.runId);
   }
   try {
     if (approval) {
