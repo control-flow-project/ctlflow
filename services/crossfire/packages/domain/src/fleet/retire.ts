@@ -4,6 +4,7 @@ import type { FleetInstance } from '../enrollment/types.js';
 import { authorizeFleet, type FleetActor } from './authority.js';
 import { recordEvent } from '../audit/record-event.js';
 import { retirementEligible } from './native-stop.js';
+import { liveFleetConnection } from './control.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'listenerRead' | 'runtime' | 'unitOfWork' | 'clock' | 'identity'>;
 
@@ -46,11 +47,15 @@ export function removeFleetAgent(services: Dependencies, actor: FleetActor, flee
 }
 
 export function archiveFleet(services: Dependencies, actor: FleetActor, fleetId: string, expectedRevision: number, requestId: string) {
-  if (actor.kind !== 'human') return failure('forbidden', 'Only a human may archive a fleet');
   return services.unitOfWork.run(() => {
     const fleet = services.repositories.fleet.findById(fleetId); if (!fleet.ok) return fleet;
     if (!fleet.value) return failure('missing', 'Fleet not found');
     const authority = authorizeFleet(services, actor, fleet.value, true); if (!authority.ok) return authority;
+    if (actor.kind === 'controller') {
+      const connection = services.repositories.fleetConnection.find(fleetId); if (!connection.ok) return connection;
+      if (!connection.value) return failure('conflict', 'An authenticated current controller lease is required to archive');
+      const live = liveFleetConnection(services, actor, fleetId, connection.value.connectionId); if (!live.ok) return live;
+    }
     if (fleet.value.revision !== expectedRevision) return failure('stale_revision', 'Refresh the fleet before archiving');
     const instances = services.collection.fleetInstances(fleet.value); if (!instances.ok) return instances;
     const pending = services.repositories.fleetRuntimeOperation.pending(fleetId); if (!pending.ok) return pending;

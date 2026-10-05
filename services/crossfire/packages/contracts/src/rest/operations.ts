@@ -184,7 +184,7 @@ export const operations = {
   changeFleet: operation({ method: 'PATCH', path: '/api/fleets/{fleetId}', auth: 'fleet',
     params: check.object({ fleetId: check.identifier }), query: query.none, input: req.fleetChange, output: res.fleet,
     status: 200, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Update fleet reporting metadata' }),
-  archiveFleet: operation({ method: 'POST', path: '/api/fleets/{fleetId}/archive', auth: 'human',
+  archiveFleet: operation({ method: 'POST', path: '/api/fleets/{fleetId}/archive', auth: 'fleet',
     params: check.object({ fleetId: check.identifier }), query: query.none, input: req.fleetArchive, output: res.acknowledged,
     status: 200, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Decommission a fleet, preserving identity and history' }),
   fleetMap: operation({ method: 'GET', path: '/api/fleets/{fleetId}/map', auth: 'human',

@@ -49,12 +49,12 @@ export function recordNativeStop(services: Pick<Services, 'repositories' | 'runt
       || run.value.controller.connectionId !== input.connectionId || run.value.controller.credentialId !== current.value.connection.credentialId)
       return failure('conflict', 'Native stop proof requires the current authenticated listener generation');
     if (run.value.stoppedAt === null) return failure('conflict', 'Stop delivery for this listener generation before recording native close');
+    const runs = services.listenerRead.history(agentId, { page: 1, pageSize: 1 }); if (!runs.ok) return runs;
+    if (runs.value.items[0]?.id !== input.runId) return failure('conflict', 'Native stop proof must cover the latest listener run');
     const existing = services.repositories.nativeStop.receipt(agentId, input.receiptId); if (!existing.ok) return existing;
     if (existing.value) return existing.value.runId === input.runId && existing.value.connectionId === input.connectionId
       && existing.value.credentialId === current.value.connection.credentialId && existing.value.invalidatedAt === null
       ? success({ recorded: true }) : failure('conflict', 'This native stop receipt is obsolete or belongs to another generation');
-    const runs = services.listenerRead.history(agentId, { page: 1, pageSize: 1 }); if (!runs.ok) return runs;
-    if (runs.value.items[0]?.id !== input.runId) return failure('conflict', 'Native stop proof must cover the latest listener run');
     const settled = settledAgentReceipts(services, agentId); if (!settled.ok) return settled;
     if (!settled.value) return failure('conflict', 'Settle native decisions and wake receipts before reporting a native stop');
     const previous = services.repositories.nativeStop.find(agentId); if (!previous.ok) return previous;

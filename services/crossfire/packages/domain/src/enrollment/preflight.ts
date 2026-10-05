@@ -7,7 +7,7 @@ import { enrollmentCapacity } from './capacity.js';
 import { resolveCoordinationPolicy } from '../fleet/policy.js';
 import type { RequestedFleetPolicy } from '../port/fleet-policy.js';
 
-export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; revision: number; retired: boolean }[];
+export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; revision: number; retired: boolean; operational: boolean }[];
   policies: { instanceKey: string; policy: RequestedFleetPolicy }[] };
 export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
   const valid = validateRoster(input);
@@ -46,7 +46,8 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
     }
     if (current.value && (current.value.fleetKey !== input.fleetKey || current.value.ownerId !== owner.value.id || current.value.instanceKey !== item.instanceKey))
       return failure('conflict', 'Agent already belongs to another fleet instance');
-    existing.push({ instanceKey: item.instanceKey, agentId: item.identity.agentId, revision: record.value.principal.revision, retired });
+    existing.push({ instanceKey: item.instanceKey, agentId: item.identity.agentId, revision: record.value.principal.revision, retired,
+      operational: current.value !== null && current.value.retiredAt === null && fleet.value?.archivedAt === null });
   }
   const policies: VerifiedRoster['policies'] = [];
   for (const item of input.instances) {
@@ -73,7 +74,7 @@ export async function preflightEnrollment(services: Pick<Services, 'repositories
   if (collisions.length) return failure('name_collision', 'Name collision: ' + collisions.join(', '));
   const capacity = enrollmentCapacity(services, verified.value.ownerId);
   if (!capacity.ok) return capacity;
-  const additional = input.instances.length - verified.value.existing.length;
+  const additional = input.instances.length - verified.value.existing.filter(item => item.operational).length;
   if (additional > capacity.value.remaining) return failure('capacity', 'Enrollment needs ' + additional + ' new agents; owner capacity is '
     + capacity.value.ownerCount + '/' + capacity.value.ownerLimit + ' and instance capacity is '
     + capacity.value.instanceCount + '/' + capacity.value.policy.maxAgents + '. Ask an administrator to adjust the applicable limits.');

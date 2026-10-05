@@ -33,6 +33,13 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
       const capacity = enrollmentCapacity(services, request.ownerId);
       if (!capacity.ok) return capacity;
       if (capacity.value.remaining < 0) return failure('limit', 'Agent capacity changed; adjust the instance limits');
+      let restorations = 0;
+      for (const item of items.value) {
+        if (item.outcome !== 'existing' || !item.agentId) continue;
+        const binding = services.repositories.fleetInstance.findByAgent(item.agentId); if (!binding.ok) return binding;
+        if (!binding.value || binding.value.retiredAt !== null) restorations++;
+      }
+      if (restorations > capacity.value.remaining) return failure('capacity', 'Agent restoration exceeds the current owner or instance capacity');
       const fleet = approveFleet(services, request); if (!fleet.ok) return fleet;
       const restoringIds = new Set<string>();
       for (const item of items.value) {

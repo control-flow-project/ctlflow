@@ -17,11 +17,8 @@ export function createListenerReadRepository(database: Database.Database): Liste
     },
     reportingAgentIds(since, disconnecting, now) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('listener_run')
-        .where(row => row.stopped_at === null && row.last_seen_at > params.since && (params.disconnecting === true || row.disconnect_requested_at === null))
         .join(query.from('fleet_connection'), run => run.controller_fleet_id, connection => connection.fleet_id, (run, connection) => ({ run, connection }))
-        .where(row => row.run.controller_connection_id === row.connection.connection_id && row.run.controller_credential_id === row.connection.credential_id
-          && row.connection.closed_at === null && row.connection.expires_at > params.now)
-        .join(query.from('fleet').where(row => row.archived_at === null && row.delivery_enabled === 1), row => row.run.controller_fleet_id, fleet => fleet.id, (row, fleet) => ({ ...row, fleet }))
+        .join(query.from('fleet'), row => row.run.controller_fleet_id, fleet => fleet.id, (row, fleet) => ({ ...row, fleet })).where(row => row.run.stopped_at === null && row.run.last_seen_at > params.since && (params.disconnecting === true || row.run.disconnect_requested_at === null) && row.run.controller_connection_id === row.connection.connection_id && row.run.controller_credential_id === row.connection.credential_id && row.connection.closed_at === null && row.connection.expires_at > params.now && row.fleet.archived_at === null && row.fleet.delivery_enabled === 1)
         .select(row => ({ agentId: row.run.agent_id })).distinct(), { since, disconnecting, now }).map(row => row.agentId)));
     },
     totals(agentIds) {
