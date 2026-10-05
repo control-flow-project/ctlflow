@@ -12,10 +12,13 @@ export type Definition = { name: string; runtime: string; options: Record<string
   coordinationPolicy: CoordinationPolicy };
 export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
-export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'stopping' | 'failed';
+export type DesiredIntent = { fleetId: string; instanceKey: string };
+export type NativeState = { phase: 'running' | 'sleeping' | 'waking' | 'failed'; lastActivityAt: number | null; historyAvailable: boolean };
+export type RetainedContext = { context: string; runtime: string; sessionId: string };
+export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'sleeping' | 'waking' | 'stopping' | 'failed';
 export type InstanceState = { instance: Instance; phase: Phase; sessionId: string | null; error: string | null; startedAt: number | null };
 export type FleetState = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; controller: Controller; phase: Phase;
-  connection: ControllerState; instances: (InstanceState & { listenerActive: boolean })[]; error: string | null };
+  connection: ControllerState; instances: (InstanceState & { listenerActive: boolean; desiredActive: boolean; lastActivityAt: number | null; historyAvailable: boolean | null })[]; error: string | null };
 export type Target = { kind: 'fleet' | 'agent' | 'daemon'; fleetId?: string; instanceKey?: string };
 export type OperationInput = { operationId: string; target: Target; action: 'start' | 'stop' | 'reset'; expectedRevision: number };
 export type Approval = { url: string; code: string };

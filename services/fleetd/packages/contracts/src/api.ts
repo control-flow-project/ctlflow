@@ -7,8 +7,10 @@ import { attachment } from './attachment.js';
 import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@crossfire/contracts/fleet-control';
 const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
   listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')) })) });
-export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'stopping', 'failed');
-export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, sessionId: check.nullable(check.text(200)), error: check.nullable(check.text(4096)), startedAt: check.nullable(check.integer()) });
+export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'sleeping', 'waking', 'stopping', 'failed');
+export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, desiredActive: check.boolean,
+  lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean),
+  sessionId: check.nullable(check.text(200)), error: check.nullable(check.text(4096)), startedAt: check.nullable(check.integer()) });
 export const fleetView = check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), directory: check.text(4096), revision: check.integer(), controller,
   phase, instances: check.list(instanceView, 100), error: check.nullable(check.text(4096)),
   connection: check.object({ connected: check.boolean, deliveryEnabled: check.boolean, revision: check.nullable(check.integer()), error: check.nullable(check.text(4096)) }) });

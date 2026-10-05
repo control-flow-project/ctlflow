@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
 import { createController } from '@fleetd/domain/controller';
-import type { Execution } from '@fleetd/domain/port';
+import type { Execution, Running } from '@fleetd/domain/port';
+import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
 import type { Operation } from '@fleetd/domain/model';
 import { createRegistry } from '@fleetd/storage/registry';
 import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
@@ -17,6 +18,14 @@ import { createListenerControl } from '@crossfire/agent-core/listener-control';
 import { listenerStop } from '@crossfire/agent-core/lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
+function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control: Running['control']; pointer: RuntimeAttachment;
+  close: Running['close']; nativeState?: Running['nativeState'] }): Running {
+  const nativeState = input.nativeState ?? (() => ({ phase: 'running', lastActivityAt: 1, historyAvailable: true }));
+  return { sessionId: input.sessionId, signal: input.signal, control: input.control, nativeState, close: input.close,
+    attachment: async () => nativeState().phase === 'running' ? success(input.pointer) : failure('conflict', 'Resume this sleeping session explicitly to attach'),
+    attachments: async () => nativeState().phase === 'running' ? success([{ context: 'shared', attachment: input.pointer }]) : failure('conflict', 'No live native endpoint'),
+    contexts: async () => success([{ context: 'shared', runtime: input.pointer.runtime, sessionId: input.sessionId }]) };
+}
 async function until(predicate: () => boolean): Promise<void> {
   const deadline = Date.now() + 5000;
   while (!predicate()) { assert(Date.now() < deadline, 'Controller observation deadline exceeded'); await yieldLoop(); }
@@ -37,9 +46,10 @@ function fixture(execution?: Partial<Execution>) {
       delivery: async () => failure('unavailable', 'Not connected'), message: async () => failure('unavailable', 'Not connected'), disconnect: async () => {}, close: async () => {},
       validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
       reset: async () => success(undefined),
-      start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success({ sessionId, signal: stop.signal,
-        attachments: async () => [], attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
-        close: async () => { closed.push(instance.key); stop.abort(); } }); }, ...execution } satisfies Execution };
+      contexts: async () => success([]),
+      start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success(runtimeFixture({ sessionId, signal: stop.signal,
+        pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
+        close: async () => { closed.push(instance.key); stop.abort(); } })); }, ...execution } satisfies Execution };
   const controller = value(createController(services)), record = value(controller.add(fleet));
   async function operation(action: 'start' | 'stop' | 'reset', instanceKey?: string) {
     const current = value(controller.view(record.fleetId));
@@ -74,7 +84,7 @@ test('controller owns runtimes, rejects duplicates and operation reuse with diff
   assert.equal((await fixture.finish(await fixture.operation('start'))).status, 'succeeded'); assert.equal(fixture.started.length, 1);
   writeFileSync(join(fixture.definition, 'AGENTS.md'), 'Updated role while running.');
   assert.equal((await fixture.finish(await fixture.operation('stop'))).status, 'succeeded', 'Disk edits cannot prevent stopping the running deployment');
-  assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+  assert.equal(fixture.closed.length, 1); assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 0);
 });
 const fixtureController = fixture;
 
@@ -82,9 +92,9 @@ test('automatic recovery closes the exact failed generation, retains deployed co
   const native: AbortController[] = [], calls: string[] = [], waits: { milliseconds: number; release: () => void }[] = [];
   const fixture = fixtureController({ start: async (_configuration, _instance, _signal, reason) => {
     calls.push(reason); const stop = new AbortController(); native.push(stop);
-    return success({ sessionId: 'retained-native-session', signal: stop.signal, control: createListenerControl(async () => {}).connection,
-      attachment: { runtime: 'fixture', sessionId: 'retained-native-session', workspace: '/fixture', connection: {} }, attachments: async () => [],
-      close: async () => { stop.abort(); } });
+    return success(runtimeFixture({ sessionId: 'retained-native-session', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      pointer: { runtime: 'fixture', sessionId: 'retained-native-session', workspace: '/fixture', connection: {} },
+      close: async () => { stop.abort(); } }));
   } }); cleanup(scope, () => fixture.controller.close());
   fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
     if (signal.aborted) { resolve(); return; }
@@ -105,7 +115,7 @@ test('automatic recovery closes the exact failed generation, retains deployed co
   native[1]!.abort(new Error('Second native disconnect')); await until(() => waits.length >= 2);
   assert.equal((await fixture.finish(await fixture.operation('stop'))).status, 'succeeded');
   waits[1]!.release(); await yieldLoop(); assert.equal(calls.length, 2);
-  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 1);
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).revision, 0);
 });
 
 test('owner disconnect is intentional, stops the owned generation and never automatically restarts it', async scope => {
@@ -113,9 +123,9 @@ test('owner disconnect is intentional, stops the owned generation and never auto
   let starts = 0, closes = 0, waits = 0;
   const fixture = fixtureController({ start: async () => {
     starts++;
-    return success({ sessionId: 'retained', signal: stop.signal, control: createListenerControl(async () => {}).connection,
-      attachment: { runtime: 'fixture', sessionId: 'retained', workspace: '/fixture', connection: {} }, attachments: async () => [],
-      close: async () => { closes++; } });
+    return success(runtimeFixture({ sessionId: 'retained', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      pointer: { runtime: 'fixture', sessionId: 'retained', workspace: '/fixture', connection: {} },
+      close: async () => { closes++; } }));
   } }); cleanup(scope, () => fixture.controller.close());
   fixture.services.delay = async () => { waits++; };
   await fixture.finish(await fixture.operation('start'));
@@ -129,8 +139,8 @@ test('explicit context reset closes the owned process before reset and retains i
   const calls: string[] = [], sessions: string[] = [];
   const fixture = fixtureController({ reset: async (_configuration, instance) => { calls.push('reset-' + instance.key); return success(undefined); },
     start: async (_configuration, instance) => { const stop = new AbortController(); calls.push('start-' + instance.key); const sessionId = randomUUID(); sessions.push(sessionId);
-      return success({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection, attachments: async () => [],
-        attachment: { runtime: 'fixture', workspace: '/fixture', sessionId, connection: {} }, close: async () => { calls.push('close-' + instance.key); stop.abort(); } }); } });
+      return success(runtimeFixture({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection,
+        pointer: { runtime: 'fixture', workspace: '/fixture', sessionId, connection: {} }, close: async () => { calls.push('close-' + instance.key); stop.abort(); } })); } });
   cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start'));
   const reset = await fixture.operation('reset', 'analyst'); assert.equal((await fixture.finish(reset)).status, 'succeeded');
@@ -145,9 +155,9 @@ test('fleet fresh history stops all targets before reset and reports partial fai
     calls.push('reset-' + instance.key); return instance.key === 'analyst' ? failure('missing', 'Missing authorized reset export') : success(undefined);
   }, start: async (_configuration, instance) => {
     calls.push('start-' + instance.key); const stop = new AbortController();
-    return success({ sessionId: randomUUID(), signal: stop.signal, control: createListenerControl(async () => {}).connection,
-      attachments: async () => [], attachment: { runtime: 'fixture', sessionId: randomUUID(), workspace: '/fixture', connection: {} },
-      close: async () => { calls.push('close-' + instance.key); stop.abort(); } });
+    return success(runtimeFixture({ sessionId: randomUUID(), signal: stop.signal, control: createListenerControl(async () => {}).connection,
+      pointer: { runtime: 'fixture', sessionId: randomUUID(), workspace: '/fixture', connection: {} },
+      close: async () => { calls.push('close-' + instance.key); stop.abort(); } }));
   } }); cleanup(scope, () => fixture.controller.close());
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
   await fixture.finish(await fixture.operation('start')); calls.length = 0;
@@ -164,12 +174,12 @@ for (const action of ['stop', 'reset'] as const) test('fleet ' + action + ' isol
   const fixture = fixtureController({ reset: async (_configuration, instance) => { calls.push('reset-' + instance.key); return success(undefined); },
     start: async (_configuration, instance) => {
       calls.push('start-' + instance.key); const stop = new AbortController(), sessionId = randomUUID();
-      return success({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection, attachments: async () => [],
-        attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} }, close: async () => {
+      return success(runtimeFixture({ sessionId, signal: stop.signal, control: createListenerControl(async () => {}).connection,
+        pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} }, close: async () => {
           calls.push('close-' + instance.key);
           if (cleanupFails && instance.key === 'analyst') throw new Error('Exact owned process could not be cleaned up');
           stop.abort();
-        } });
+        } }));
     } });
   cleanup(scope, async () => { cleanupFails = false; await fixture.controller.close(); });
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
@@ -222,8 +232,8 @@ test('delivery deactivation retains owned engines and unregister closes the cont
   const fixture = fixtureController({ connection: () => ({ connected: true, deliveryEnabled: enabled, revision: 4, error: null }),
     delivery: async (_configuration, input) => { enabled = input.enabled; binding.update({ active: enabled, input: null });
       return success({ fleetId: randomUUID(), revision: input.expectedRevision + 1, deliveryEnabled: enabled, connection: { status: 'online', lastSeenAt: 1 } }); },
-    start: async () => { const stop = new AbortController(); return success({ sessionId: 'unchanged', signal: stop.signal,
-      control: binding.connection, attachments: async () => [], attachment: { runtime: 'fixture', sessionId: 'unchanged', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } }); },
+    start: async () => { const stop = new AbortController(); return success(runtimeFixture({ sessionId: 'unchanged', signal: stop.signal,
+      control: binding.connection, pointer: { runtime: 'fixture', sessionId: 'unchanged', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } })); },
     disconnect: async () => { disconnected = true; binding.close(); } });
   cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start'));
@@ -297,7 +307,10 @@ test('per-instance failure retains successful peers; startup history survives co
   await fixture.controller.close(); assert.deepEqual(fixture.closed, ['peer']);
   const reopened = value(createController(fixture.services)); cleanup(scope, () => reopened.close());
   assert.equal(value(reopened.operation(operation.operationId)).status, 'failed');
-  assert(value(reopened.view(fixture.record.fleetId)).instances.every(instance => instance.phase === 'stopped'));
+  await reopened.ready();
+  const recovered = value(reopened.view(fixture.record.fleetId));
+  assert.equal(recovered.instances.find(instance => instance.instance.key === 'analyst')!.phase, 'stopped');
+  assert.equal(recovered.instances.find(instance => instance.instance.key === 'peer')!.phase, 'running');
 });
 
 test('runtime failures retain their cause, become inactive immediately and cannot restart during cleanup', async scope => {
@@ -307,9 +320,9 @@ test('runtime failures retain their cause, become inactive immediately and canno
   const fixture = fixtureController({ start: async (_configuration, instance) => {
     const stop = new AbortController(), control = createListenerControl(async () => {});
     control.update({ active: true, input: null }); stops.set(instance.key, stop);
-    return success({ sessionId: 'native-' + instance.key, signal: stop.signal, control: control.connection,
-      attachments: async () => [], attachment: { runtime: 'fixture', sessionId: 'native-' + instance.key, workspace: '/fixture', connection: {} },
-      close: async () => { if (instance.key === 'analyst') await cleaning; closed.push(instance.key); stop.abort(); } });
+    return success(runtimeFixture({ sessionId: 'native-' + instance.key, signal: stop.signal, control: control.connection,
+      pointer: { runtime: 'fixture', sessionId: 'native-' + instance.key, workspace: '/fixture', connection: {} },
+      close: async () => { if (instance.key === 'analyst') await cleaning; closed.push(instance.key); stop.abort(); } }));
   } });
   cleanup(scope, async () => { release(); await fixture.controller.close(); });
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
@@ -330,9 +343,9 @@ test('runtime failures retain their cause, become inactive immediately and canno
 
 test('runtime cleanup failure is secondary to the original disconnect cause', async scope => {
   const stop = new AbortController();
-  const fixture = fixtureController({ start: async () => success({ sessionId: 'native', signal: stop.signal,
-    attachments: async () => [], attachment: { runtime: 'fixture', sessionId: 'native', workspace: '/fixture', connection: {} }, control: createListenerControl(async () => {}).connection,
-    close: async () => { throw new Error('Private engine close failed'); } }) });
+  const fixture = fixtureController({ start: async () => success(runtimeFixture({ sessionId: 'native', signal: stop.signal,
+    pointer: { runtime: 'fixture', sessionId: 'native', workspace: '/fixture', connection: {} }, control: createListenerControl(async () => {}).connection,
+    close: async () => { throw new Error('Private engine close failed'); } })) });
   cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start'));
   stop.abort(new Error('Selected thread closed'));
