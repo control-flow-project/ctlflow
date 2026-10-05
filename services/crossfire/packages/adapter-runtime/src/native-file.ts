@@ -1,6 +1,6 @@
 import { openSync, closeSync, fstatSync, constants, readSync, type Stats } from 'node:fs';
 import { createHash } from 'node:crypto';
-import * as check from '@crossfire/contracts/schema/validation';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 export function ownedFile<Value>(path: string, maximum: number, operation: (descriptor: number, information: Stats) => Value): Value {
   const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);

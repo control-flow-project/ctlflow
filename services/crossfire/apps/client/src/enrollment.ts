@@ -1,16 +1,16 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
-import { fields, text, userId } from '@crossfire/contracts/validation';
-import { profileName, UUID, MAX_UPLOAD_BYTES, type PendingEnrollment } from '@crossfire/contracts/client';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { endpoint } from '@crossfire/contracts/origin';
-import { readProfile, type paths } from '@crossfire/adapter-filesystem/project';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import type { Manifest } from '@crossfire/contracts/release';
-import { requireCurrentRelease } from '@crossfire/agent-core/release';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { operations } from '@crossfire/contracts/rest/operations';
+import { fields, text, userId } from '@ctlflow/crossfire-contracts/validation';
+import { profileName, UUID, MAX_UPLOAD_BYTES, type PendingEnrollment } from '@ctlflow/crossfire-contracts/client';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { endpoint } from '@ctlflow/crossfire-contracts/origin';
+import { readProfile, type paths } from '@ctlflow/crossfire-adapter-filesystem/project';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import type { Manifest } from '@ctlflow/crossfire-contracts/release';
+import { requireCurrentRelease } from '@ctlflow/crossfire-agent-core/release';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 
 async function introduce(destination: ReturnType<typeof paths>, pending: PendingEnrollment): Promise<Result<PendingEnrollment>> {
   const client = createClient({ origin: pending.server });

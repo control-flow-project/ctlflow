@@ -1,9 +1,9 @@
-import type { DeliveryPolicy, PrincipalIdentity } from '@crossfire/contracts/schema/response';
-import type { Manifest } from '@crossfire/contracts/release';
-import type { Result } from '@crossfire/kernel/result';
-import type { WakeAttachment, ScheduledWake } from '@crossfire/contracts/wake-up';
-import type { DecisionCreation, DecisionView, DecisionAnswer, RuntimeObservation } from '@crossfire/contracts/runtime';
-import type { StatisticsBatch } from '@crossfire/contracts/statistics';
+import type { DeliveryPolicy, PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
+import type { Manifest } from '@ctlflow/crossfire-contracts/release';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
+import type { WakeAttachment, ScheduledWake } from '@ctlflow/crossfire-contracts/wake-up';
+import type { DecisionCreation, DecisionView, DecisionAnswer, RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
+import type { StatisticsBatch } from '@ctlflow/crossfire-contracts/statistics';
 
 export type Coordination = {
   origin: string;

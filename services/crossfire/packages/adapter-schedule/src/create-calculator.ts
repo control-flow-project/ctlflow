@@ -1,6 +1,6 @@
 import { CronExpressionParser } from 'cron-parser';
-import { failure, success } from '@crossfire/kernel/result';
-import type { ScheduleCalculator } from '@crossfire/domain/port/schedule';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { ScheduleCalculator } from '@ctlflow/crossfire-domain/port/schedule';
 
 export function createScheduleCalculator(): ScheduleCalculator {
   return { next(schedule, after) {

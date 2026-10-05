@@ -7,10 +7,10 @@ import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, expect } from '@playwright/test';
 import { main, imageName, runArguments } from '../apps/server/src/operator.js';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { ARTIFACTS } from '@crossfire/contracts/release';
-import { messageContent } from '@crossfire/adapter-matrix/message';
-import { onboardingUrl } from '@crossfire/contracts/onboarding';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { ARTIFACTS } from '@ctlflow/crossfire-contracts/release';
+import { messageContent } from '@ctlflow/crossfire-adapter-matrix/message';
+import { onboardingUrl } from '@ctlflow/crossfire-contracts/onboarding';
 import { browserOptions, secureProxy } from '../tests/support/tls.js';
 
 const root = process.cwd();

@@ -1,11 +1,11 @@
 import { existsSync, writeFileSync, constants, openSync, fstatSync, closeSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import * as check from '@crossfire/contracts/schema/validation';
-import { account } from '@crossfire/contracts/client';
-import { success } from '@crossfire/kernel/result';
-import type { Configuration } from '@fleetd/domain/model';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { account } from '@ctlflow/crossfire-contracts/client';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import type { Configuration } from '@ctlflow/fleetd-domain/model';
 
 export const identity = check.object({ instanceKey: check.name, name: check.name, agentId: check.identifier, account });
 const parser = check.object({ server: check.text(2048), owner: check.matrixUserId, fleetKey: check.name, fleetId: check.nullable(check.identifier),

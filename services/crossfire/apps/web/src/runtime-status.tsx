@@ -1,5 +1,5 @@
-import type { RuntimeObservationView } from '@crossfire/contracts/runtime';
-import type { AgentView } from '@crossfire/contracts/schema/response';
+import type { RuntimeObservationView } from '@ctlflow/crossfire-contracts/runtime';
+import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
 import { Status, timestamp } from './ui.js';
 
 const labels = { idle: 'Idle', working: 'Working', 'waiting-approval': 'Waiting for approval', 'waiting-answer': 'Waiting for an answer',

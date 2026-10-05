@@ -1,9 +1,9 @@
-import type { Operation } from '@crossfire/contracts/rest/operation';
-import { operationPath } from '@crossfire/contracts/rest/operation';
-import { decodeFailure, decodeResponse, type Response } from '@crossfire/contracts/rest/envelope';
-import { HTTP_LIMITS } from '@crossfire/contracts/rest/limits';
-import { failure, type Result } from '@crossfire/kernel/result';
-import { binaryInput } from '@crossfire/contracts/rest/binary';
+import type { Operation } from '@ctlflow/crossfire-contracts/rest/operation';
+import { operationPath } from '@ctlflow/crossfire-contracts/rest/operation';
+import { decodeFailure, decodeResponse, type Response } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { HTTP_LIMITS } from '@ctlflow/crossfire-contracts/rest/limits';
+import { failure, type Result } from '@ctlflow/crossfire-kernel/result';
+import { binaryInput } from '@ctlflow/crossfire-contracts/rest/binary';
 import { binaryRequest } from './binary-request.js';
 
 export type ClientOptions = { origin: string; token?: string; csrf?: string; signal?: AbortSignal; timeoutMs?: number; fetch?: typeof fetch };

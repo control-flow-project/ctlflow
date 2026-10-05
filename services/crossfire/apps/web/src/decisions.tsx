@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { call, operations, useAction, useResource } from './api.js';
 import { Alert, Empty, Loaded, Page, Panel, Pagination, Status, timestamp, pagingQuery } from './ui.js';
 import { useSession } from './session.js';
-import type { DecisionView, DecisionAnswer } from '@crossfire/contracts/runtime';
+import type { DecisionView, DecisionAnswer } from '@ctlflow/crossfire-contracts/runtime';
 
 export function Decisions({ id }: { id: string }) {
   const rows = useResource(operations.runtimeDecisions, { agentId: id }, pagingQuery('decisionsPage'), 10000);

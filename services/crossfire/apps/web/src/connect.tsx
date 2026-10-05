@@ -1,4 +1,4 @@
-import { onboardingUrl } from '@crossfire/contracts/onboarding';
+import { onboardingUrl } from '@ctlflow/crossfire-contracts/onboarding';
 import { useSession } from './session.js';
 import { operations, useResource } from './api.js';
 import { CopyText, Loaded, Page, ViewNavigation } from './ui.js';

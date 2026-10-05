@@ -1,9 +1,9 @@
 import { chromium } from '@playwright/test';
 import { join } from 'node:path';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
-import { endpoint } from '@crossfire/contracts/origin';
-import { publicationPath } from '@crossfire/domain/publication/validation';
-import { failure, success } from '@crossfire/kernel/result';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { endpoint } from '@ctlflow/crossfire-contracts/origin';
+import { publicationPath } from '@ctlflow/crossfire-domain/publication/validation';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 
 export async function verifyContent(url: string, mainOrigin: string, executable: string, evidence: string, signal: AbortSignal) {
   const main = endpoint(mainOrigin); if (!main.ok) return main;

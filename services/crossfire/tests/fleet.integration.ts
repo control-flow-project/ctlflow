@@ -1,5 +1,5 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile, spawn } from 'node:child_process';
@@ -13,17 +13,17 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { openTerminal } from '../scripts/test-support/terminal.js';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { roomAccess } from '@crossfire/adapter-crossfire/room-access';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { runtimeOperation, type FleetRuntimeOperation } from '@crossfire/contracts/fleet-runtime';
-import { API, segment } from '@crossfire/contracts/matrix';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { readJson } from '@crossfire/adapter-filesystem/index';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { roomAccess } from '@ctlflow/crossfire-adapter-crossfire/room-access';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { runtimeOperation, type FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 const execute = promisify(execFile);
 async function until(predicate: () => boolean): Promise<void> {

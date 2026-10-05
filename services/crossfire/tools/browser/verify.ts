@@ -1,11 +1,11 @@
 import { chromium, expect } from '@playwright/test';
 import { join } from 'node:path';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
-import { nativeJson } from '@crossfire/adapter-matrix/http';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { decodeResponse } from '@crossfire/contracts/rest/envelope';
-import { failure, success } from '@crossfire/kernel/result';
-import { collectPages } from '@crossfire/operator-support/collections';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
 import { withHuman, type Credentials } from '../auth.js';
 import { checkPaperLayout } from './layout.js';
 

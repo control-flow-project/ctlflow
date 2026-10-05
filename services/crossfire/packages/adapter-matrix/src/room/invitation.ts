@@ -1,8 +1,8 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { RoomInvitation } from '@crossfire/domain/port/matrix-authority';
-import { API, segment } from '@crossfire/contracts/matrix';
-import { object, roomId as validRoomId, userId } from '@crossfire/contracts/validation';
-import { eventId } from '@crossfire/contracts/schema/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { RoomInvitation } from '@ctlflow/crossfire-domain/port/matrix-authority';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { object, roomId as validRoomId, userId } from '@ctlflow/crossfire-contracts/validation';
+import { eventId } from '@ctlflow/crossfire-contracts/schema/validation';
 import { nativeOk, nativeJson, type Native } from '../http.js';
 
 type InvitationState = { since: string; senders: Map<string, string> };

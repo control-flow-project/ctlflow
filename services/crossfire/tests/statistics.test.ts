@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { join } from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import type { TestContext } from 'node:test';
-import { listenerStatistics } from '@crossfire/agent-core/statistics';
-import { eventView } from '@crossfire/agent-core/receive';
-import { codexUsage } from '@crossfire/adapter-codex/usage';
-import { nativeClock } from '@crossfire/adapter-runtime/clock';
-import { statisticsBatch, statisticsQuery, STATISTICS_LIMITS, type UsageSample } from '@crossfire/contracts/statistics';
-import { reportListener } from '@crossfire/domain/listener/report';
+import { listenerStatistics } from '@ctlflow/crossfire-agent-core/statistics';
+import { eventView } from '@ctlflow/crossfire-agent-core/receive';
+import { codexUsage } from '@ctlflow/crossfire-adapter-codex/usage';
+import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
+import { statisticsBatch, statisticsQuery, STATISTICS_LIMITS, type UsageSample } from '@ctlflow/crossfire-contracts/statistics';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
 import { applicationFixture, value } from './support/application.js';
 import { message, OBSERVER, ROOM } from '../scripts/test-support/listener.js';
 

@@ -1,4 +1,4 @@
-import type { AgentRoomGrant } from '@crossfire/domain/room-access/types';
+import type { AgentRoomGrant } from '@ctlflow/crossfire-domain/room-access/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapAgentRoomGrant(row: Tables['agent_room_grant']): AgentRoomGrant {
   return {

@@ -1,14 +1,14 @@
 import { lstatSync, realpathSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
-import { loadConfiguration } from '@fleetd/storage/configuration';
-import { loadBinding } from '@fleetd/storage/binding';
-import { nativeJson } from '@crossfire/adapter-matrix/http';
-import { command } from '@crossfire/operator-support/process';
-import { collectPages } from '@crossfire/operator-support/collections';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import * as check from '@crossfire/contracts/schema/validation';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
+import { loadConfiguration } from '@ctlflow/fleetd-storage/configuration';
+import { loadBinding } from '@ctlflow/fleetd-storage/binding';
+import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
+import { command } from '@ctlflow/crossfire-operator-support/process';
+import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { inspectNative, preserveNative } from './runtime/inspect.js';
 import type { NativeInspector } from './runtime/types.js';
 

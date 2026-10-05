@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { failure, success } from '@crossfire/kernel/result';
-import { operations } from '@crossfire/contracts/rest/operations';
-import type { FleetControlSnapshot } from '@crossfire/contracts/fleet-control';
-import { createListenerControl } from '@crossfire/agent-core/listener-control';
-import type { ControllerState } from '@crossfire/agent-core/listener-control-port';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import type { FleetControlSnapshot } from '@ctlflow/crossfire-contracts/fleet-control';
+import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import type { ControllerState } from '@ctlflow/crossfire-agent-core/listener-control-port';
 import { createClient } from './client.js';
 import { createFleetRuntimeWorker, type FleetRuntimeExecutor } from './fleet-runtime.js';
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 export function createFleetControlConnection(options: { origin: string; credential: string; fleetId: string; owner: string; signal: AbortSignal; execute: FleetRuntimeExecutor;
   acknowledged(operationId: string): Result<void> }) {

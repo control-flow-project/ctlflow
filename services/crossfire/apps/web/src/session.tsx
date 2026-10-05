@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type FormEvent, type ReactNode } from 'react';
-import type { SessionView } from '@crossfire/contracts/schema/response';
-import { login } from '@crossfire/adapter-matrix/browser-session';
+import type { SessionView } from '@ctlflow/crossfire-contracts/schema/response';
+import { login } from '@ctlflow/crossfire-adapter-matrix/browser-session';
 import { call, operations, useAction, useResource } from './api.js';
 import { AccountPage, Alert } from './ui.js';
 

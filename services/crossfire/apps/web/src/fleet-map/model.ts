@@ -1,5 +1,5 @@
-import type { FleetMapView, MapConnection, MapSource } from '@crossfire/contracts/schema/fleet-map';
-import { WAKE_LABELS } from '@crossfire/contracts/wake';
+import type { FleetMapView, MapConnection, MapSource } from '@ctlflow/crossfire-contracts/schema/fleet-map';
+import { WAKE_LABELS } from '@ctlflow/crossfire-contracts/wake';
 
 export type MapSelection = { kind: 'agent' | 'room' | 'source'; id: string };
 export type MapFilters = { search: string; listener: 'all' | 'online' | 'offline' | 'disconnecting' };

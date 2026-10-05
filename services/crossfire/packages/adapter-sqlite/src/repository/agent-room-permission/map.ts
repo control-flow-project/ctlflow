@@ -1,4 +1,4 @@
-import type { AgentRoomPermission } from '@crossfire/domain/room-access/types';
+import type { AgentRoomPermission } from '@ctlflow/crossfire-domain/room-access/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapAgentRoomPermission(row: Tables['agent_room_permission']): AgentRoomPermission {
   return {

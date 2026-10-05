@@ -1,9 +1,9 @@
 import { join, isAbsolute } from 'node:path';
 import { realpathSync, existsSync } from 'node:fs';
-import { object } from '@crossfire/contracts/validation';
-import { writeJson } from '@crossfire/adapter-filesystem/index';
-import { ignoreProjectPaths } from '@crossfire/adapter-filesystem/project';
-import { projectConfiguration, saveProjectConfiguration, shellQuote } from '@crossfire/adapter-runtime/project-config';
+import { object } from '@ctlflow/crossfire-contracts/validation';
+import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { ignoreProjectPaths } from '@ctlflow/crossfire-adapter-filesystem/project';
+import { projectConfiguration, saveProjectConfiguration, shellQuote } from '@ctlflow/crossfire-adapter-runtime/project-config';
 import { nativeClaude } from './context.js';
 
 export function claudeContextFile(workspace: string, session: string): string { return join(workspace, '.crossfire/runtime/claude', session + '.json'); }

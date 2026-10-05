@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createExecution } from '../apps/daemon/src/execution.js';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import type { OwnedRuntimeAdapter } from '@crossfire/agent-core/owned-runtime';
-import type { Configuration } from '@fleetd/domain/model';
-import { failure, success } from '@crossfire/kernel/result';
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { Configuration } from '@ctlflow/fleetd-domain/model';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 const configuration: Configuration = { directory: '/fixture', digest: 'fixture',
   roster: { fleet: 'fixture', instances: [], coordination: { adapter: 'crossfire', server: 'https://example.test', owner: '@human:example.test' } },

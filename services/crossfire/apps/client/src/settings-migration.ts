@@ -1,5 +1,5 @@
-import { fields, roomId } from '@crossfire/contracts/validation';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
+import { fields, roomId } from '@ctlflow/crossfire-contracts/validation';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 export function migrateListenerSettings(file: string): void {
   const source = readJson<unknown>(file);

@@ -1,6 +1,6 @@
 import { createClient, type ClientOptions } from './client.js';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { failure } from '@crossfire/kernel/result';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 export function roomAccess(options: ClientOptions) {
   const client = createClient(options);

@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export function sleepDurationSeconds(minutes: string, maximumSeconds: number): Result<number> {
   const text = minutes.trim();

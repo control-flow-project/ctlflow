@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export function createFleetChanges() {
   const versions = new Map<string, number>(), waiting = new Map<string, () => void>();

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { publicRouter } from '../apps/server/src/router.js';
 import { verifyBrowser } from '../tools/browser/verify.js';
 import { operatorFixture } from './support/operator.js';

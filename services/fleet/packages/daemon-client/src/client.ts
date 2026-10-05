@@ -1,9 +1,9 @@
 import { request as httpRequest } from 'node:http';
-import type { Operation } from '@crossfire/contracts/rest/operation';
-import { operationPath } from '@crossfire/contracts/rest/operation';
-import { decodeResponse, decodeFailure, type Response } from '@crossfire/contracts/rest/envelope';
-import { failure, type Result } from '@crossfire/kernel/result';
-export { operations } from '@fleetd/contracts/api';
+import type { Operation } from '@ctlflow/crossfire-contracts/rest/operation';
+import { operationPath } from '@ctlflow/crossfire-contracts/rest/operation';
+import { decodeResponse, decodeFailure, type Response } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { failure, type Result } from '@ctlflow/crossfire-kernel/result';
+export { operations } from '@ctlflow/fleetd-contracts/api';
 
 export function createDaemonClient(socketPath: string, signal?: AbortSignal) {
   async function call<Params extends Record<string, string>, Query, Input, Output>(operation: Operation<Params, Query, Input, Output>, params: Params, input: Input, query = new URLSearchParams()): Promise<Result<Response<Output>>> {

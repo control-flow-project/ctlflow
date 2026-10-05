@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { realpathSync, openSync, closeSync, fstatSync, readFileSync, constants } from 'node:fs';
-import { fields } from '@crossfire/contracts/validation';
-import { UUID } from '@crossfire/contracts/client';
-import { readJson } from '@crossfire/adapter-filesystem/index';
+import { fields } from '@ctlflow/crossfire-contracts/validation';
+import { UUID } from '@ctlflow/crossfire-contracts/client';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { connectCodex } from './connection.js';
 import { localEndpoint } from './protocol.js';
-import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
+import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
 
 export function discoverCodex(workspace: string, environment: NodeJS.ProcessEnv = process.env) {
   const file = environment.RUNCODEX_CONNECTION_FILE;

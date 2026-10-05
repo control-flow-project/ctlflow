@@ -1,5 +1,5 @@
 import type { DecisionCreation, DecisionAnswer, DecisionView, DecisionSummary } from './values.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor, Services } from '../port/services.js';
 import { authorize, authorizeAgent } from '../authorization/authorize.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';

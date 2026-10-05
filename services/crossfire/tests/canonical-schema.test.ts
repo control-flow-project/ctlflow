@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
-import { createDirectoryRepository } from '@crossfire/adapter-sqlite/repository/directory/index';
-import { createUnitOfWork } from '@crossfire/adapter-sqlite/unit-of-work';
-import { createDiscoveryRepository } from '@crossfire/adapter-sqlite/repository/discovery/index';
-import { createListenerReadRepository } from '@crossfire/adapter-sqlite/repository/listener-read/index';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
+import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
+import { createUnitOfWork } from '@ctlflow/crossfire-adapter-sqlite/unit-of-work';
+import { createDiscoveryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/discovery/index';
+import { createListenerReadRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/listener-read/index';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 function value<T>(result: Result<T>): T { if (!result.ok) assert.fail(result.error.message); return result.value; }
 

@@ -1,4 +1,4 @@
-import type { Publication, PublicationFile } from '@crossfire/domain/publication/values';
+import type { Publication, PublicationFile } from '@ctlflow/crossfire-domain/publication/values';
 import type { Tables } from '../../schema/tables.js';
 export function mapPublication(row: Tables['publication']): Publication {
   return { id: row.id, agentId: row.agent_id, publicKey: row.public_key, title: row.title, state: row.state, revision: row.revision,

@@ -1,18 +1,18 @@
 import Database from 'better-sqlite3';
-import { identitySchema } from '@crossfire/adapter-sqlite/schema/identity';
-import { authorizationSchema } from '@crossfire/adapter-sqlite/schema/authorization';
-import { enrollmentSchema } from '@crossfire/adapter-sqlite/schema/enrollment';
-import { roomAccessSchema } from '@crossfire/adapter-sqlite/schema/room-access';
-import { activitySchema } from '@crossfire/adapter-sqlite/schema/activity';
-import { auditSchema } from '@crossfire/adapter-sqlite/schema/audit';
-import { fleetControlSchema } from '@crossfire/adapter-sqlite/schema/fleet-control';
-import { wakeUpSchema } from '@crossfire/adapter-sqlite/schema/wake-up';
-import { ownerConversationSchema } from '@crossfire/adapter-sqlite/schema/owner-conversation';
-import { runtimeSchema, runtimeObservationSchema } from '@crossfire/adapter-sqlite/schema/runtime';
-import { statisticsSchema } from '@crossfire/adapter-sqlite/schema/statistics';
-import { fleetPolicySchema } from '@crossfire/adapter-sqlite/schema/fleet-policy';
-import { fleetRuntimeSchema } from '@crossfire/adapter-sqlite/schema/fleet-runtime';
-import { seedReferenceData } from '@crossfire/adapter-sqlite/schema/reference-data';
+import { identitySchema } from '@ctlflow/crossfire-adapter-sqlite/schema/identity';
+import { authorizationSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/authorization';
+import { enrollmentSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/enrollment';
+import { roomAccessSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/room-access';
+import { activitySchema } from '@ctlflow/crossfire-adapter-sqlite/schema/activity';
+import { auditSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/audit';
+import { fleetControlSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/fleet-control';
+import { wakeUpSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/wake-up';
+import { ownerConversationSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/owner-conversation';
+import { runtimeSchema, runtimeObservationSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/runtime';
+import { statisticsSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/statistics';
+import { fleetPolicySchema } from '@ctlflow/crossfire-adapter-sqlite/schema/fleet-policy';
+import { fleetRuntimeSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/fleet-runtime';
+import { seedReferenceData } from '@ctlflow/crossfire-adapter-sqlite/schema/reference-data';
 
 const observation = `
 CREATE TABLE runtime_observation (

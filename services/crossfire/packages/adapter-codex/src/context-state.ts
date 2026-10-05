@@ -1,9 +1,9 @@
 import { lstatSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
-import * as check from '@crossfire/contracts/schema/validation';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
 
 const contexts = check.object({ mode: check.choice('shared', 'per-room'), control: check.nullable(check.identifier),
   rooms: check.list(check.object({ room: check.roomId, sessionId: check.identifier }), 2000) });

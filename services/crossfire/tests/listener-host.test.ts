@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createListenerHost } from '@crossfire/adapter-crossfire/listener-host';
-import { listenerRequest } from '@crossfire/adapter-crossfire/listener-client';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { createListenerBudget } from '@crossfire/agent-core/budget';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
+import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { createListenerBudget } from '@ctlflow/crossfire-agent-core/budget';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 
 test('one listener host serves independent capability-bound agents and rejects superseded control URLs', async scope => {
   const root = mkdtempSync(join(tmpdir(), 'listener-host-')), host = await createListenerHost();

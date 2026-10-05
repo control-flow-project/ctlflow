@@ -1,9 +1,9 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
 import { setTimeout as poll } from 'node:timers/promises';
-import type { Clock } from '@crossfire/agent-core/port';
+import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 
 export function testClock(scope: TestContext) {
   const epoch = Date.now();

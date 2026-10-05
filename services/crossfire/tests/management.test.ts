@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value } from './support/application.js';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { changeMember } from '@crossfire/domain/member/change-member';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
-import { createMemberInvitation } from '@crossfire/domain/member/invitation';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { success } from '@crossfire/kernel/result';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
+import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
+import { createMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { success } from '@ctlflow/crossfire-kernel/result';
 
 test('wake modes resolve active verified identities and never modify room authority', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
 import { chromium } from '@playwright/test';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { setCookie } from '../apps/server/src/http/transport.js';
 import { setInvitationCookie } from '../apps/server/src/http/registration.js';
 

@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Agent } from '../identity/types.js';
 
 export type RequestedFleetPolicy = {

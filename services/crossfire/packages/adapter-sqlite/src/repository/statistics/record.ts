@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { executeSelect, executeInsert, executeUpdate, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
 import { schema, type Tables } from '../../schema/tables.js';
-import type { StatisticsBatch, Tokens } from '@crossfire/domain/statistics/types';
-import { failure, success } from '@crossfire/kernel/result';
+import type { StatisticsBatch, Tokens } from '@ctlflow/crossfire-domain/statistics/types';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { stored } from '../stored.js';
 
 function counters(value: Tokens) {

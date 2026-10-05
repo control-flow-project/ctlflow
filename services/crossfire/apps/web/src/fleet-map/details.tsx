@@ -1,4 +1,4 @@
-import type { FleetMapView, MapAgent, MapConnection, MapSource } from '@crossfire/contracts/schema/fleet-map';
+import type { FleetMapView, MapAgent, MapConnection, MapSource } from '@ctlflow/crossfire-contracts/schema/fleet-map';
 import { Empty, PageItems, Status, timestamp } from '../ui.js';
 import { accessLabel, connectionState, sourceLabel, type MapSelection } from './model.js';
 

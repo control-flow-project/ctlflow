@@ -1,10 +1,10 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { controller } from '@crossfire/contracts/schema/controller';
-import { operation } from '@crossfire/contracts/rest/operation';
-import { failure, success } from '@crossfire/kernel/result';
-import { page, none } from '@crossfire/contracts/schema/query';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { controller } from '@ctlflow/crossfire-contracts/schema/controller';
+import { operation } from '@ctlflow/crossfire-contracts/rest/operation';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { page, none } from '@ctlflow/crossfire-contracts/schema/query';
 import { attachment } from './attachment.js';
-import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@crossfire/contracts/fleet-control';
+import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@ctlflow/crossfire-contracts/fleet-control';
 const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
   listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')) })) });
 export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'sleeping', 'waking', 'stopping', 'failed');

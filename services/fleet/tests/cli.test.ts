@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile, spawn } from 'node:child_process';
@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { request, createServer } from 'node:http';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
-import type { Result } from '@crossfire/kernel/result';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 const execute = promisify(execFile);
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 const entry = fileURLToPath(new URL('../apps/cli/src/main.js', import.meta.url));

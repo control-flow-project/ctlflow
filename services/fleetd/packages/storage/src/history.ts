@@ -1,7 +1,7 @@
 import { existsSync, unlinkSync, openSync, closeSync, fsyncSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import * as check from '@crossfire/contracts/schema/validation';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 const initialization = check.object({ agentId: check.identifier, resetId: check.nullable(check.identifier) });
 function file(directory: string, agentId: string): string {

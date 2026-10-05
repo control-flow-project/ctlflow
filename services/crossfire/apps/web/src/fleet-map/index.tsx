@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FleetMapView } from '@crossfire/contracts/schema/fleet-map';
+import type { FleetMapView } from '@ctlflow/crossfire-contracts/schema/fleet-map';
 import { operations, useResource } from '../api.js';
 import { Empty, Field, Loaded, Page, Status, timestamp } from '../ui.js';
 import { FleetNavigation } from '../fleet-navigation.js';

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AGENT_INSTRUCTIONS_MAX_BYTES, DEFAULT_AGENT_INSTRUCTIONS } from "@crossfire/contracts/policy";
-import { roomId } from "@crossfire/contracts/validation";
-import { deliveryGrant, policy, deliveryPolicy, roomAuthority, grantApplication } from "@crossfire/contracts/schema/response";
-import { agents as agentFilters } from "@crossfire/contracts/schema/query";
-import { page } from "@crossfire/contracts/schema/query";
-import { memberChange } from '@crossfire/contracts/schema/request';
-import { owner } from '@crossfire/contracts/schema/response';
+import { AGENT_INSTRUCTIONS_MAX_BYTES, DEFAULT_AGENT_INSTRUCTIONS } from "@ctlflow/crossfire-contracts/policy";
+import { roomId } from "@ctlflow/crossfire-contracts/validation";
+import { deliveryGrant, policy, deliveryPolicy, roomAuthority, grantApplication } from "@ctlflow/crossfire-contracts/schema/response";
+import { agents as agentFilters } from "@ctlflow/crossfire-contracts/schema/query";
+import { page } from "@ctlflow/crossfire-contracts/schema/query";
+import { memberChange } from '@ctlflow/crossfire-contracts/schema/request';
+import { owner } from '@ctlflow/crossfire-contracts/schema/response';
 
 
 test("native room identities remain opaque, including version 12 IDs", () => {

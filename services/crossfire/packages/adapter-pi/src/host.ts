@@ -3,11 +3,11 @@ import { once } from 'node:events';
 import { realpathSync, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { object } from '@crossfire/contracts/validation';
-import { writeJson, readJson } from '@crossfire/adapter-filesystem/index';
+import { object } from '@ctlflow/crossfire-contracts/validation';
+import { writeJson, readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { piRequest, piDescriptor } from './protocol.js';
 import type { PiApi, PiContext } from './native.js';
-import { visibleOutput } from '@crossfire/adapter-runtime/visible-output';
+import { visibleOutput } from '@ctlflow/crossfire-adapter-runtime/visible-output';
 
 async function body(request: IncomingMessage): Promise<unknown> {
   let size = 0;

@@ -6,7 +6,7 @@ Run from the repository root after the normal build:
 node services/crossfire/dist/tools/main.js --help
 ```
 
-`npm run tools --workspace=@crossfire/service -- <command> <options>` invokes the
+`npm run tools --workspace=@ctlflow/crossfire -- <command> <options>` invokes the
 same implementation. Use absolute filesystem paths. Examples use an example
 server and operator paths, not deployment defaults. JSON inputs must be existing
 owned, private, bounded, nonsymlink files. Write them with `umask 077` and keep

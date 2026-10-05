@@ -1,8 +1,8 @@
 import { writeSync, realpathSync, openSync, closeSync, fstatSync, constants } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
-import { profile, profileName } from "@crossfire/contracts/client";
-import { endpoint } from "@crossfire/contracts/origin";
+import { profile, profileName } from "@ctlflow/crossfire-contracts/client";
+import { endpoint } from "@ctlflow/crossfire-contracts/origin";
 import { privateDir, readJson } from "./index.js";
 
 function gitExit(error: unknown, status: number): boolean {

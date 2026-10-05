@@ -1,10 +1,10 @@
-import { discoverCodex } from '@crossfire/adapter-codex/discovery';
-import { discoverClaude } from '@crossfire/adapter-claude/discovery';
-import { installClaudeHook } from '@crossfire/adapter-claude/hook';
-import { nativeClaude } from '@crossfire/adapter-claude/context';
-import { claudeContextFile } from '@crossfire/adapter-claude/hook';
+import { discoverCodex } from '@ctlflow/crossfire-adapter-codex/discovery';
+import { discoverClaude } from '@ctlflow/crossfire-adapter-claude/discovery';
+import { installClaudeHook } from '@ctlflow/crossfire-adapter-claude/hook';
+import { nativeClaude } from '@ctlflow/crossfire-adapter-claude/context';
+import { claudeContextFile } from '@ctlflow/crossfire-adapter-claude/hook';
 import { existsSync } from 'node:fs';
-import { discoverPi, installPiExtension } from '@crossfire/adapter-pi/discovery';
+import { discoverPi, installPiExtension } from '@ctlflow/crossfire-adapter-pi/discovery';
 
 const adapters = { codex: discoverCodex, claude: discoverClaude, pi: discoverPi };
 export function runtimeName(requested?: string, environment: NodeJS.ProcessEnv = process.env): string | undefined {

@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor, Services } from '../port/services.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
 import { liveReceiver, scheduledReceiver, ruleCanWake } from './authority.js';

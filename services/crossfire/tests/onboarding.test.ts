@@ -4,10 +4,10 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
+import { paths, readProfile } from '@ctlflow/crossfire-adapter-filesystem/project';
 import { enroll, connect } from "../apps/client/src/enrollment.js";
-import { API } from '@crossfire/contracts/matrix';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { releaseFixture } from "./release-fixture.js";
 
 

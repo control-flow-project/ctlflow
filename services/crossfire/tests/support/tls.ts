@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:https';
 import { createServer as createHttpServer, request as forward, type Server } from 'node:http';
 import { getCACertificates, setDefaultCACertificates } from 'node:tls';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 
 type Scope = Parameters<typeof cleanup>[0];
 

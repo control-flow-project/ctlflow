@@ -1,5 +1,5 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { failure, success } from '@crossfire/kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { approvalRouting } from './permission-policy.js';
 
 const options = check.object({

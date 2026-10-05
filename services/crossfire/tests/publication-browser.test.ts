@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { verifyContent } from '../tools/browser/content.js';

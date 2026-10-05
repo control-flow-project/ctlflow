@@ -7,7 +7,7 @@ COPY .npmrc package.json package-lock.json tsconfig.base.json ./
 COPY scripts ./scripts
 COPY services ./services
 RUN npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source
-RUN npm run build --workspace=@crossfire/service
+RUN npm run build --workspace=@ctlflow/crossfire
 
 FROM build AS production-dependencies
 RUN npm ci --omit=dev --ignore-scripts && npm rebuild better-sqlite3 --build-from-source

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { markdownMessage, messageContent, MAX_MESSAGE_BYTES } from '@crossfire/adapter-matrix/message';
+import { markdownMessage, messageContent, MAX_MESSAGE_BYTES } from '@ctlflow/crossfire-adapter-matrix/message';
 
 test('native file attachments retain their filename, MIME type, size and MXC URL without text formatting', () => {
   const content = { body: 'nifty-october-2026-top-options.csv', info: { mimetype: 'text/csv', size: 7798 },

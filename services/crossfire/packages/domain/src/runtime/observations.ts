@@ -1,7 +1,7 @@
 import type { RuntimeObservation } from './values.js';
 import type { Services, Actor } from '../port/services.js';
 import { authorize, authorizeAgent } from '../authorization/authorize.js';
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { liveRun } from './decisions.js';
 import { openIncident, recoverIncidents } from './incidents.js';
 import { agentDisplayName } from '../identity/display-name.js';

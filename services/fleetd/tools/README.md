@@ -12,7 +12,7 @@ node services/fleetd/dist/tools/main.js verify --root /home/operator/controller 
 ```
 
 The same entry is available as
-`npm run tools --workspace=@fleetd/service -- verify ...`. All paths are absolute.
+`npm run tools --workspace=@ctlflow/fleetd -- verify ...`. All paths are absolute.
 The root and Unix socket must be owned, private and canonical; the command uses
 Fleet's exported daemon client with the current private API. Run through SSH on
 remote hosts rather than copying private controller state or exposing the socket

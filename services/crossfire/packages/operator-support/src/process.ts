@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 const execute = promisify(execFile);
 export async function command(binary: string, arguments_: string[], signal: AbortSignal): Promise<Result<string>> {

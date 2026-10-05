@@ -1,7 +1,7 @@
 import { controller } from './controller.js';
 import * as check from './validation.js';
 import type { Parser } from './validation.js';
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { HUMAN_SIGNUP } from '../policy.js';
 import { statisticsBatch } from '../statistics.js';
 import { coordinationPolicy } from '../coordination-policy.js';

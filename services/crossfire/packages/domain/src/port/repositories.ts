@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Principal, Member, Agent, AgentCredential, PrincipalApplication } from '../identity/types.js';
 import type { Permission, Role, RolePermission, PrincipalRole } from '../authorization/types.js';
 import type { FleetControllerMetadata, EnrollmentControllerMetadata, FleetCredential, EnrollmentRequest, EnrollmentItem, AgentName, Fleet, FleetInstance } from '../enrollment/types.js';

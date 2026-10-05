@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FleetView } from '@crossfire/contracts/schema/response';
+import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Field, Help, Loaded, Panel, Pagination, Status, timestamp } from './ui.js';

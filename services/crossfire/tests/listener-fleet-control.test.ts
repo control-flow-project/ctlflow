@@ -1,13 +1,13 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createListenerControl, controlledPublisher } from '@crossfire/agent-core/listener-control';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
-import type { LocalState } from '@crossfire/agent-core/port';
-import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
-import { listen } from '@crossfire/adapter-crossfire/listener';
+import { createListenerControl, controlledPublisher } from '@ctlflow/crossfire-agent-core/listener-control';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
+import type { LocalState } from '@ctlflow/crossfire-agent-core/port';
+import type { RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, matrixFixture, message, ROOM, until } from '../scripts/test-support/listener.js';
 import { withClock } from '../scripts/test-support/clock.js';
 

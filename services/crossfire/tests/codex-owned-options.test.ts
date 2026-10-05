@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { success } from '@crossfire/kernel/result';
-import { ownedVersion, ownedQuestionCapability } from '@crossfire/adapter-codex/owned-options';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import { ownedVersion, ownedQuestionCapability } from '@ctlflow/crossfire-adapter-codex/owned-options';
 
 test('owned Codex defaults to full access with owner-routed on-request approval', () => {
   const adapter = codexRuntime();

@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeApproval, RuntimeConnection } from '@crossfire/agent-core/runtime';
-import type { Parser } from '@crossfire/contracts/schema/validation';
+import type { RuntimeApproval, RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
+import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
 import { deliveryJournal } from './journal.js';
 
 export type NativeMessage = { text: string; messageId: string };

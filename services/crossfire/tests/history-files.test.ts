@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { matrix } from '@crossfire/adapter-matrix/http';
-import { localState } from '@crossfire/adapter-filesystem/state';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
-import { historyQueries } from '@crossfire/agent-core/history-query';
-import { exportResetHistory } from '@crossfire/agent-core/reset-history';
-import { historyPage } from '@crossfire/agent-core/history-page';
-import { readUnread, acknowledge, loadCursors, eventView, validReadBatch } from '@crossfire/agent-core/receive';
+import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
+import { historyQueries } from '@ctlflow/crossfire-agent-core/history-query';
+import { exportResetHistory } from '@ctlflow/crossfire-agent-core/reset-history';
+import { historyPage } from '@ctlflow/crossfire-agent-core/history-page';
+import { readUnread, acknowledge, loadCursors, eventView, validReadBatch } from '@ctlflow/crossfire-agent-core/receive';
 import { matrixFixture, message, OBSERVER, ROOM, temporary } from '../scripts/test-support/listener.js';
 
 test('valid oversized native pages repage from the identical cursor and retain all events until acknowledgment', async scope => {

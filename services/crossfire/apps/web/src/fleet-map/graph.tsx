@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { FleetMapView } from '@crossfire/contracts/schema/fleet-map';
+import type { FleetMapView } from '@ctlflow/crossfire-contracts/schema/fleet-map';
 import { adjacentNode, layoutFleetMap, type MapNode } from './layout.js';
 import { connectionState, highlightedMap, selectionKey, sourceLabel, sourceTitle, type MapSelection } from './model.js';
 

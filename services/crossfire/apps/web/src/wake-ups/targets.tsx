@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { WakeRuleDetails } from '@crossfire/contracts/wake-up';
-import type { AgentView } from '@crossfire/contracts/schema/response';
+import type { WakeRuleDetails } from '@ctlflow/crossfire-contracts/wake-up';
+import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
 import { operations, useResource } from '../api.js';
 import { Loaded, Panel, Pagination, PageItems, Empty, timestamp } from '../ui.js';
 

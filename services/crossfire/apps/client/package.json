@@ -1,5 +1,5 @@
 {
-  "name": "@crossfire/client",
+  "name": "@ctlflow/crossfire-client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,14 +8,14 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
-    "@crossfire/adapter-codex": "0.1.0",
-    "@crossfire/adapter-claude": "0.1.0",
-    "@crossfire/adapter-pi": "0.1.0",
-    "@crossfire/contracts": "0.1.0",
-    "@crossfire/agent-core": "0.1.0",
-    "@crossfire/adapter-matrix": "0.1.0",
-    "@crossfire/adapter-filesystem": "0.1.0",
-    "@crossfire/kernel": "0.1.0",
-    "@crossfire/adapter-crossfire": "0.1.0"
+    "@ctlflow/crossfire-adapter-codex": "0.1.0",
+    "@ctlflow/crossfire-adapter-claude": "0.1.0",
+    "@ctlflow/crossfire-adapter-pi": "0.1.0",
+    "@ctlflow/crossfire-contracts": "0.1.0",
+    "@ctlflow/crossfire-agent-core": "0.1.0",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.0",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.0",
+    "@ctlflow/crossfire-kernel": "0.1.0",
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.0"
   }
 }

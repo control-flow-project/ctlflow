@@ -1,13 +1,13 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
-import type { DiscoveryRepository, PrincipalSummary } from '@crossfire/domain/port/discovery';
+import type { DiscoveryRepository, PrincipalSummary } from '@ctlflow/crossfire-domain/port/discovery';
 import { schema } from '../../schema/tables.js';
-import { success } from '@crossfire/kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapRole } from '../role/map.js';
 import { mapPermission } from '../permission/map.js';
-import { agentDisplayName } from '@crossfire/domain/identity/display-name';
+import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
 function namedAgent(row: Omit<PrincipalSummary, 'displayName'> & { name: string; ownerName: string; override: string | null }): PrincipalSummary {
   const { name, ownerName, override, ...principal } = row;
   return { ...principal, displayName: agentDisplayName(name, ownerName, override) };

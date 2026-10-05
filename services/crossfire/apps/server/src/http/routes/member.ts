@@ -1,9 +1,9 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { readMember, listMembers, readInvitation, listInvitations } from '@crossfire/domain/member/read-member';
-import { changeMember } from '@crossfire/domain/member/change-member';
-import { createMemberInvitation, revokeMemberInvitation } from '@crossfire/domain/member/invitation';
-import { verifyInvitation } from '@crossfire/domain/member/registration';
-import { success, failure } from '@crossfire/kernel/result';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { readMember, listMembers, readInvitation, listInvitations } from '@ctlflow/crossfire-domain/member/read-member';
+import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
+import { createMemberInvitation, revokeMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
+import { verifyInvitation } from '@ctlflow/crossfire-domain/member/registration';
+import { success, failure } from '@ctlflow/crossfire-kernel/result';
 import { bind, reply, paged, actor, acknowledged } from '../bind.js';
 import { member } from '../representation/identity.js';
 import { invitation } from '../representation/enrollment.js';

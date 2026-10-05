@@ -1,4 +1,4 @@
-import { FLEET_MAP_LIMITS } from '@crossfire/kernel/fleet-map';
+import { FLEET_MAP_LIMITS } from '@ctlflow/crossfire-kernel/fleet-map';
 import * as check from './validation.js';
 import { fleet, grant, grantApplication, principal, owner } from './response.js';
 import type { Parsed } from './validation.js';

@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 import { lstatSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
-import { schema } from '@crossfire/adapter-sqlite/schema/tables';
-import { failure, success } from '@crossfire/kernel/result';
-import * as check from '@crossfire/contracts/schema/validation';
+import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 function counts(database: Database.Database) {
   return {

@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { nativeServer } from './support/native-server.js';
 import { value } from './support/application.js';
 import assert from 'node:assert/strict';
@@ -8,11 +8,11 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { builtRelease } from '../scripts/test-support/release.js';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { onboardingCommand, onboardingUrl } from '@crossfire/contracts/onboarding';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { onboardingCommand, onboardingUrl } from '@ctlflow/crossfire-contracts/onboarding';
 
 const execute = promisify(execFile);
 

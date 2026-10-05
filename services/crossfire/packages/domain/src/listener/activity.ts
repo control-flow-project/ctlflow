@@ -1,4 +1,4 @@
-import { success, type Result } from '@crossfire/kernel/result';
+import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 import type { ListenerRun } from '../activity/types.js';
 import { HEARTBEAT_EXPIRY_MS } from './report.js';

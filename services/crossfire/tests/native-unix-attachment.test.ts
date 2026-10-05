@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -7,11 +7,11 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { codexProtocol } from '@crossfire/adapter-codex/protocol';
-import { discoverCodex } from '@crossfire/adapter-codex/discovery';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { codexProtocol } from '@ctlflow/crossfire-adapter-codex/protocol';
+import { discoverCodex } from '@ctlflow/crossfire-adapter-codex/discovery';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { materialize } from '../scripts/test-support/native-engine.js';
-import type { NativeEvent } from '@crossfire/adapter-codex/protocol';
+import type { NativeEvent } from '@ctlflow/crossfire-adapter-codex/protocol';
 test('stock Codex native Unix socket attaches the exact existing session without launcher metadata or model input', { timeout: 30000 }, async scope => {
   const home = mkdtempSync(join(tmpdir(), 'crossfire-unix-'));
   chmodSync(home, 0o700);

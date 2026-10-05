@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createServer } from 'node:http';
@@ -8,8 +8,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { terminalPointer } from '../apps/cli/src/attachment.js';
-import { createDaemonClient } from '@fleet/daemon-client/client';
-import { success } from '@crossfire/kernel/result';
+import { createDaemonClient } from '@ctlflow/fleet-daemon-client/client';
+import { success } from '@ctlflow/crossfire-kernel/result';
 
 test('fleet terminal pointers dispatch only through the runtime adapter and the private API', async scope => {
   const socket = join(mkdtempSync(join(tmpdir(), 'fleet-pointer-')), 'daemon.sock'), fleetId = randomUUID();

@@ -6,11 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { executeUpdate, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
-import { schema } from '@crossfire/adapter-sqlite/schema/tables';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import type { EnrollmentIntroduction } from '@crossfire/domain/enrollment/input';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
+import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import type { EnrollmentIntroduction } from '@ctlflow/crossfire-domain/enrollment/input';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
 import { applicationFixture, value, secret } from './support/application.js';
 import { inspectDatabase, verifyPreservation, databaseExpectations } from '../tools/database.js';
 

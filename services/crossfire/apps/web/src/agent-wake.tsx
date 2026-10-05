@@ -1,7 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import { WAKE_POLICIES, WAKE_LABELS, wakePolicy } from '@crossfire/contracts/wake';
-import type { AgentView } from '@crossfire/contracts/schema/response';
-import type { OutputOf } from '@crossfire/contracts/rest/operation';
+import { WAKE_POLICIES, WAKE_LABELS, wakePolicy } from '@ctlflow/crossfire-contracts/wake';
+import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
+import type { OutputOf } from '@ctlflow/crossfire-contracts/rest/operation';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Field, Help, Loaded, Panel, Pagination, PageItems } from './ui.js';

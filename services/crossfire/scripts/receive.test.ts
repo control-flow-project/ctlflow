@@ -1,14 +1,14 @@
-import { localState as storage } from '@crossfire/adapter-filesystem/state';
+import { localState as storage } from '@ctlflow/crossfire-adapter-filesystem/state';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { matrix } from '@crossfire/adapter-matrix/http';
-import { writeJson } from '@crossfire/adapter-filesystem/index';
-import type { Event } from '@crossfire/contracts/client';
-import { eventView, readUnread, synchronize, loadSyncCursor, checkpointSync, incrementalEvents, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, acquisitionBytes, type Sync } from '@crossfire/agent-core/receive';
-import { chatBatches } from '@crossfire/agent-core/chat-batches';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
-import { deliveryEvents } from '@crossfire/agent-core/senders';
+import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import type { Event } from '@ctlflow/crossfire-contracts/client';
+import { eventView, readUnread, synchronize, loadSyncCursor, checkpointSync, incrementalEvents, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, acquisitionBytes, type Sync } from '@ctlflow/crossfire-agent-core/receive';
+import { chatBatches } from '@ctlflow/crossfire-agent-core/chat-batches';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
+import { deliveryEvents } from '@ctlflow/crossfire-agent-core/senders';
 import { matrixFixture, message, OBSERVER, ROOM, SELF, temporary } from './test-support/listener.js';
 
 async function collected(source: AsyncIterable<Event>): Promise<Event[]> {

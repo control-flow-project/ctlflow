@@ -1,8 +1,8 @@
 import { existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { fields, userId } from '@crossfire/contracts/validation';
-import { endpoint } from '@crossfire/contracts/origin';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
+import { fields, userId } from '@ctlflow/crossfire-contracts/validation';
+import { endpoint } from '@ctlflow/crossfire-contracts/origin';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 export function connectionSetup(state: string) {
   const file = join(state, 'setup.json');

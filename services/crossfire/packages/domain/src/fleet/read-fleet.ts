@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { PageRequest, Page } from '../port/directory.js';
 import type { Fleet } from '../enrollment/types.js';

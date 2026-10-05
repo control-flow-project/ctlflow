@@ -1,5 +1,5 @@
-import { option, type Arguments } from '@crossfire/adapter-matrix/commands';
-import { integerOption } from '@crossfire/contracts/limits';
+import { option, type Arguments } from '@ctlflow/crossfire-adapter-matrix/commands';
+import { integerOption } from '@ctlflow/crossfire-contracts/limits';
 
 export function listenerOptions(values: Arguments) {
   return {

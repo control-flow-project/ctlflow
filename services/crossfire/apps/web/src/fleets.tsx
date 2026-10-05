@@ -1,9 +1,9 @@
 import { Fragment, useState } from 'react';
-import type { FleetView } from '@crossfire/contracts/schema/response';
-import type { Parsed } from '@crossfire/contracts/schema/validation';
-import { preview } from '@crossfire/contracts/schema/plan';
-import { parseRoomPlan } from '@crossfire/contracts/room-plan';
-import { failure, success } from '@crossfire/kernel/result';
+import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
+import type { Parsed } from '@ctlflow/crossfire-contracts/schema/validation';
+import { preview } from '@ctlflow/crossfire-contracts/schema/plan';
+import { parseRoomPlan } from '@ctlflow/crossfire-contracts/room-plan';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Field, Help, Loaded, Page, Panel, Pagination, PageItems, Status, SubjectHeading, timestamp, pagingQuery } from './ui.js';

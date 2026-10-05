@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile, execFileSync } from 'node:child_process';
@@ -7,14 +7,14 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { discoverPi } from '@crossfire/adapter-pi/discovery';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { piCall, piDescriptor } from '@crossfire/adapter-pi/protocol';
+import { discoverPi } from '@ctlflow/crossfire-adapter-pi/discovery';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { piCall, piDescriptor } from '@ctlflow/crossfire-adapter-pi/protocol';
 import { builtClient, builtRelease } from '../scripts/test-support/release.js';
 import { nativeServer } from './support/native-server.js';
 import { updatedRelease } from './release-fixture.js';
 import { until } from '../scripts/test-support/listener.js';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
 import { value } from './support/application.js';
 
 const execute = promisify(execFile);

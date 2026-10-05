@@ -1,8 +1,8 @@
 import { parse } from 'smol-toml';
-import * as check from '@crossfire/contracts/schema/validation';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { listenerOptions } from '@crossfire/contracts/runtime';
-import { coordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { listenerOptions } from '@ctlflow/crossfire-contracts/runtime';
+import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 export const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024), listener_options: check.optional(listenerOptions) });
 export const coordination = check.object({ adapter: check.choice('crossfire'), server: check.text(2048), owner: check.matrixUserId });

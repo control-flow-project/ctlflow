@@ -1,10 +1,10 @@
 import { openSync, closeSync, fstatSync, readFileSync, realpathSync, constants, lstatSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { parseToml, validateRoster, definition } from '@fleetd/contracts/configuration';
-import type { Configuration, Definition } from '@fleetd/domain/model';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { parseToml, validateRoster, definition } from '@ctlflow/fleetd-contracts/configuration';
+import type { Configuration, Definition } from '@ctlflow/fleetd-domain/model';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 export function readText(file: string, maximum = 1024 * 1024): string {
   const path = resolve(file);

@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { API, segment } from '@crossfire/contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import { ownerNotice, ownerNoticeChunks, ownerNoticeFits } from './owner-notices.js';
 import type { RuntimeObservationEvent } from './runtime.js';
 import type { NativeSessionState } from './runtime.js';
-import { observation, type RuntimeObservation } from '@crossfire/contracts/runtime';
+import { observation, type RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
 import type { Clock, LocalState, Transport } from './port.js';
 import type { Coordination } from './coordination.js';
 

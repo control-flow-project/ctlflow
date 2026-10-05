@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { executeSelect, executeInsert, executeUpdate, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
-import { failure, success } from '@crossfire/kernel/result';
-import type { WakeRuleAgent, WakeRuleAgentRepository } from '@crossfire/domain/wake-up/types';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { WakeRuleAgent, WakeRuleAgentRepository } from '@ctlflow/crossfire-domain/wake-up/types';
 import { schema, type Tables } from '../../schema/tables.js';
 import { stored } from '../stored.js';
 import { mapWakeRule } from '../wake-rule/map.js';

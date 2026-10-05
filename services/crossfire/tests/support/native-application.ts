@@ -1,17 +1,17 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { randomUUID } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import { conduitFixture } from '../../scripts/architecture-proof/conduit-fixture.js';
 import { createApplication } from '../../apps/server/src/composition.js';
-import { createSession } from '@crossfire/domain/session/create-session';
-import { authenticateMember } from '@crossfire/domain/session/authenticate';
-import { createMemberInvitation } from '@crossfire/domain/member/invitation';
-import { acceptMemberInvitation } from '@crossfire/domain/member/accept-invitation';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
-import type { Actor } from '@crossfire/domain/port/services';
+import { createSession } from '@ctlflow/crossfire-domain/session/create-session';
+import { authenticateMember } from '@ctlflow/crossfire-domain/session/authenticate';
+import { createMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
+import { acceptMemberInvitation } from '@ctlflow/crossfire-domain/member/accept-invitation';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import type { Actor } from '@ctlflow/crossfire-domain/port/services';
 import { value, secret } from './application.js';
 export async function nativeApplication(scope: TestContext) {
   const started = performance.now();

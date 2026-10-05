@@ -1,6 +1,6 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { deliveryText } from '@crossfire/adapter-runtime/journal';
-import { success, failure } from '@crossfire/kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { deliveryText } from '@ctlflow/crossfire-adapter-runtime/journal';
+import { success, failure } from '@ctlflow/crossfire-kernel/result';
 
 const softwareHash: check.Parser<string> = value => typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value)
   ? success(value) : failure('invalid', 'Invalid Pi native software hash');

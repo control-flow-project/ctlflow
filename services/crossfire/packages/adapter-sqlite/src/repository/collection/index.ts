@@ -1,8 +1,8 @@
 import { executeSelect, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
-import { success } from '@crossfire/kernel/result';
-import type { CollectionRepository } from '@crossfire/domain/port/collection';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import type { CollectionRepository } from '@ctlflow/crossfire-domain/port/collection';
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapEnrollmentItem } from '../enrollment-item/map.js';

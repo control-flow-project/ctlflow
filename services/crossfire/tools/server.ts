@@ -1,9 +1,9 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { nativeJson } from '@crossfire/adapter-matrix/http';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { withHuman, operatorClient, type Credentials } from './auth.js';
-import { collectPages } from '@crossfire/operator-support/collections';
+import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
 
 export const serverExpectations = check.object({ release: check.optional(check.text(200)), agents: check.optional(check.integer(0, 1000)),
   names: check.optional(check.list(check.name, 1000)), online: check.optional(check.boolean), emptyRooms: check.optional(check.boolean),

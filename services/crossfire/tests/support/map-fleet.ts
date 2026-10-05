@@ -1,10 +1,10 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import { randomUUID } from 'node:crypto';
-import type { Actor, Services } from '@crossfire/domain/port/services';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
+import type { Actor, Services } from '@ctlflow/crossfire-domain/port/services';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
 import { value, secret } from './application.js';
 
 export async function mapFleet(services: Services, owner: Actor, ownerMatrixId: string, count = 24) {

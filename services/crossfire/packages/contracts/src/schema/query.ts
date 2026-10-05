@@ -1,5 +1,5 @@
 import * as check from './validation.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { pagination, listQuery } from './request.js';
 export type PageQuery = { page: number; pageSize: number };
 function checked(input: unknown, allowed: readonly string[]): Result<URLSearchParams> { return listQuery(['page', 'pageSize', ...allowed])(input); }

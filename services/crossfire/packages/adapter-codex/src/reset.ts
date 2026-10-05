@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { failure, success } from '@crossfire/kernel/result';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import { archiveState } from '@crossfire/adapter-filesystem/archive';
-import { identifier } from '@crossfire/contracts/schema/validation';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { archiveState } from '@ctlflow/crossfire-adapter-filesystem/archive';
+import { identifier } from '@ctlflow/crossfire-contracts/schema/validation';
 import { prepareHome } from './home.js';
 
 export async function resetCodex(input: { workspace: string; resetId: string }) {

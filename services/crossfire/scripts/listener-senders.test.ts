@@ -1,15 +1,15 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, existsSync } from 'node:fs';
-import { chatBatches } from '@crossfire/agent-core/chat-batches';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
-import { localState } from '@crossfire/adapter-filesystem/state';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { eventView } from '@crossfire/agent-core/receive';
-import { deliveryEvents, resolveSenders } from '@crossfire/agent-core/senders';
-import { success } from '@crossfire/kernel/result';
-import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
+import { chatBatches } from '@ctlflow/crossfire-agent-core/chat-batches';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
+import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { eventView } from '@ctlflow/crossfire-agent-core/receive';
+import { deliveryEvents, resolveSenders } from '@ctlflow/crossfire-agent-core/senders';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import type { PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
 import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, SELF, temporary, until } from './test-support/listener.js';
 
 test('delivery batches carry one verified entry per emitted sender, with exact byte accounting and no self-chat metadata', async scope => {

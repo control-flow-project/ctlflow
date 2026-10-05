@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { API, segment } from '@crossfire/contracts/matrix';
-import { grantView, room as roomView } from '@crossfire/contracts/schema/response';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
-import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { grantView, room as roomView } from '@ctlflow/crossfire-contracts/schema/response';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
+import { reconcileRoomGrant } from '@ctlflow/crossfire-domain/room-access/reconcile-grant';
+import { connectOwnerConversation } from '@ctlflow/crossfire-domain/owner-conversation/connect';
 import { nativeApplication } from './support/native-application.js';
 import { httpFixture } from './support/http.js';
 import { value } from './support/application.js';

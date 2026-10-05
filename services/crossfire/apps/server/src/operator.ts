@@ -5,7 +5,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { config } from './config.js';
-import { privateDir, readJson, writeJson } from '@crossfire/adapter-filesystem/index';
+import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const repository = resolve(root, '../..');

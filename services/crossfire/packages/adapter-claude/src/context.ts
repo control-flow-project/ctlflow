@@ -1,9 +1,9 @@
 import { join, isAbsolute } from 'node:path';
 import { homedir } from 'node:os';
 import { realpathSync, readSync } from 'node:fs';
-import { UUID } from '@crossfire/contracts/client';
-import { object } from '@crossfire/contracts/validation';
-import { nativeJson, ownedFile } from '@crossfire/adapter-runtime/native-file';
+import { UUID } from '@ctlflow/crossfire-contracts/client';
+import { object } from '@ctlflow/crossfire-contracts/validation';
+import { nativeJson, ownedFile } from '@ctlflow/crossfire-adapter-runtime/native-file';
 
 export const CLAUDE_VERSION = '2.1.285';
 export type ClaudeContext = { session: string; workspace: string; registry: string; pid: number; birth: string; socket: string; token: string; transcript: string };

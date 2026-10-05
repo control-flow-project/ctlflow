@@ -1,8 +1,8 @@
-import { publicationSource } from '@crossfire/adapter-filesystem/publication/source';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { operations } from '@crossfire/contracts/rest/operations';
-import type { Profile } from '@crossfire/contracts/client';
-import { failure, success } from '@crossfire/kernel/result';
+import { publicationSource } from '@ctlflow/crossfire-adapter-filesystem/publication/source';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import type { Profile } from '@ctlflow/crossfire-contracts/client';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 
 export async function publishReport(profile: Profile, directory: string, title: string) {
   const source = await publicationSource(directory); if (!source.ok) return source;

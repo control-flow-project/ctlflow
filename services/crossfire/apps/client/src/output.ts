@@ -1,5 +1,5 @@
 import { writeSync } from 'node:fs';
-import { encodeOutput } from '@crossfire/contracts/limits';
+import { encodeOutput } from '@ctlflow/crossfire-contracts/limits';
 export function emit(value: unknown, maximum?: number): void {
   const bytes = encodeOutput(value, maximum);
   let offset = 0;

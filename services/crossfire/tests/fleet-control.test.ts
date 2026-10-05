@@ -1,22 +1,22 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value, secret } from './support/application.js';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
-import { authenticateController } from '@crossfire/domain/fleet/authority';
-import { readFleet } from '@crossfire/domain/fleet/read-fleet';
-import { removeFleet, bindFleetAgent } from '@crossfire/domain/fleet/change-fleet';
-import { reportFleetConnection, changeFleetDelivery } from '@crossfire/domain/fleet/control';
-import { createFleetMessage, readFleetControl, listFleetMessages, acknowledgeFleetMessage } from '@crossfire/domain/fleet/message';
-import { controlQuery, messagePage, fleetControlSnapshot } from '@crossfire/contracts/fleet-control';
-import { failure } from '@crossfire/kernel/result';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { readFleet } from '@ctlflow/crossfire-domain/fleet/read-fleet';
+import { removeFleet, bindFleetAgent } from '@ctlflow/crossfire-domain/fleet/change-fleet';
+import { reportFleetConnection, changeFleetDelivery } from '@ctlflow/crossfire-domain/fleet/control';
+import { createFleetMessage, readFleetControl, listFleetMessages, acknowledgeFleetMessage } from '@ctlflow/crossfire-domain/fleet/message';
+import { controlQuery, messagePage, fleetControlSnapshot } from '@ctlflow/crossfire-contracts/fleet-control';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 import { createFleetChanges } from '../apps/server/src/http/fleet-changes.js';
-import { requestFleetRuntime, listFleetRuntime, claimFleetRuntime, receiptFleetRuntime } from '@crossfire/domain/fleet/runtime';
-import { runtimeRequest, runtimeOperation, runtimeReceipt } from '@crossfire/contracts/fleet-runtime';
+import { requestFleetRuntime, listFleetRuntime, claimFleetRuntime, receiptFleetRuntime } from '@ctlflow/crossfire-domain/fleet/runtime';
+import { runtimeRequest, runtimeOperation, runtimeReceipt } from '@ctlflow/crossfire-contracts/fleet-runtime';
 
 async function enroll(fixture: Awaited<ReturnType<typeof applicationFixture>>, owner = fixture.admin, name = 'team') {
   const { services } = fixture;

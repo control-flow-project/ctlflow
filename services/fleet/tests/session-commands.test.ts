@@ -9,8 +9,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { operations } from '@fleetd/contracts/api';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { operations } from '@ctlflow/fleetd-contracts/api';
 
 test('CLI fleet and individual start resume by default; only --fresh-history selects reset', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleet-session-cli-')), root = join(directory, 'controller'), home = join(directory, 'home');

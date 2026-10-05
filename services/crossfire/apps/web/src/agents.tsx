@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { AgentView } from '@crossfire/contracts/schema/response';
-import { HEARTBEAT_MS } from '@crossfire/contracts/activity';
+import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
+import { HEARTBEAT_MS } from '@ctlflow/crossfire-contracts/activity';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Help, Loaded, Page, Panel, Pagination, Status, SubjectHeading, applied, timestamp } from './ui.js';

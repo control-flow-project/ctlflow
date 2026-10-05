@@ -1,9 +1,9 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { testListener } from '@crossfire/agent-core/diagnostic';
-import { matrix } from '@crossfire/adapter-matrix/http';
-import { success, failure } from '@crossfire/kernel/result';
+import { testListener } from '@ctlflow/crossfire-agent-core/diagnostic';
+import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { success, failure } from '@ctlflow/crossfire-kernel/result';
 import { fakeCodex, matrixFixture, THREAD } from '../scripts/test-support/listener.js';
 test('listener diagnostics distinguish live readiness, no rooms, nobody policy, pause and inactive authority without prompts or read markers', async scope => {
   const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory), stop = new AbortController();

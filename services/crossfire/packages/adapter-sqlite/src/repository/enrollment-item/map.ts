@@ -1,4 +1,4 @@
-import type { EnrollmentItem } from '@crossfire/domain/enrollment/types';
+import type { EnrollmentItem } from '@ctlflow/crossfire-domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapEnrollmentItem(row: Tables['enrollment_item']): EnrollmentItem {
   return {

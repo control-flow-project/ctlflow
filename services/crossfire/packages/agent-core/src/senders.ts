@@ -1,6 +1,6 @@
-import { principalIdentities, type PrincipalIdentity } from '@crossfire/contracts/schema/response';
+import { principalIdentities, type PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
 import type { Coordination } from './coordination.js';
-import { isListenerNotice } from '@crossfire/contracts/notices';
+import { isListenerNotice } from '@ctlflow/crossfire-contracts/notices';
 import type { ReceivedEvent } from './receive.js';
 
 export function deliveryEvents(events: readonly ReceivedEvent[], self: string): ReceivedEvent[] {

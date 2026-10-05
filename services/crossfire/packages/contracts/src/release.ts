@@ -1,5 +1,5 @@
 import { fields, text } from "./validation.js";
-import { failure, success, type Result } from "@crossfire/kernel/result";
+import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
 
 export const ARTIFACTS = ["README.md", "SKILL.md", "crossfire-client.mjs", "crossfire-pi.mjs", "matrix-spec-LICENSE.txt", "runcodex.sh"] as const;
 export type ArtifactName = typeof ARTIFACTS[number];

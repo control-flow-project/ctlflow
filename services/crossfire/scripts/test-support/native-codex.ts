@@ -1,13 +1,13 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import type { TestContext } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
-import { codexDelivery, type CodexConnection } from '@crossfire/adapter-codex/connection';
-import { connectSession } from '@crossfire/adapter-codex/session';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
+import { codexDelivery, type CodexConnection } from '@ctlflow/crossfire-adapter-codex/connection';
+import { connectSession } from '@ctlflow/crossfire-adapter-codex/session';
 import { nativeEngine, materialize } from './native-engine.js';
-import type { NativeEvent } from '@crossfire/adapter-codex/protocol';
+import type { NativeEvent } from '@ctlflow/crossfire-adapter-codex/protocol';
 
 type Rpc = { method: string; params: Record<string, unknown> };
 

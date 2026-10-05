@@ -2,11 +2,11 @@ import { readFileSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import catalog from './operations.json' with { type: 'json' };
 import { kebab, type MatrixSchema, type Operation, type Parameter } from './schema.js';
-import { API, segment, json } from '@crossfire/contracts/matrix';
+import { API, segment, json } from '@ctlflow/crossfire-contracts/matrix';
 import { collect, type Matrix } from './http.js';
-import type { JsonObject } from '@crossfire/contracts/json';
-import type { Account, Settings } from '@crossfire/contracts/client';
-import { DEFAULT_EVENTS, MAX_EVENTS, MAX_JSON_BYTES } from '@crossfire/contracts/limits';
+import type { JsonObject } from '@ctlflow/crossfire-contracts/json';
+import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
+import { DEFAULT_EVENTS, MAX_EVENTS, MAX_JSON_BYTES } from '@ctlflow/crossfire-contracts/limits';
 import { messageContent, MAX_MESSAGE_BYTES } from './message.js';
 import { uploadStream, saveStream } from './files.js';
 

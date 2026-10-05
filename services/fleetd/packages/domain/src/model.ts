@@ -1,6 +1,6 @@
-import type { ControllerState } from '@crossfire/agent-core/listener-control-port';
-import type { ListenerOptions, SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
-import type { CoordinationPolicy } from '@crossfire/domain/coordination/values';
+import type { ControllerState } from '@ctlflow/crossfire-agent-core/listener-control-port';
+import type { ListenerOptions, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { CoordinationPolicy } from '@ctlflow/crossfire-domain/coordination/values';
 export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled: boolean;
   connection: { status: 'online' | 'offline'; lastSeenAt: number | null } };
 export type FleetMessageResult = { messageId: string; body: string; createdAt: number; expiresAt: number;

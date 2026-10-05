@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
-import { ARTIFACTS, manifest, MAX_ARTIFACT_BYTES, type ArtifactName, type Manifest } from "@crossfire/contracts/release";
+import { ARTIFACTS, manifest, MAX_ARTIFACT_BYTES, type ArtifactName, type Manifest } from "@ctlflow/crossfire-contracts/release";
 
 export function artifactHash(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");

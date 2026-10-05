@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -8,12 +8,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 
 test('installed fleetd symlink starts the exact private daemon and stops normally', { timeout: 15000 }, async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleetd-installed-'));
   const installed = join(directory, 'fleetd'), root = join(directory, 'controller');
-  symlinkSync(fileURLToPath(import.meta.resolve('@fleetd/service/executable')), installed);
+  symlinkSync(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/executable')), installed);
   const child = spawn(process.execPath, [installed, '--root', root, '--name', 'installed-controller'], { stdio: ['ignore', 'pipe', 'pipe'] });
   const ended = once(child, 'close'); let output = '', errors = '';
   child.stdout.on('data', chunk => { output += String(chunk); });

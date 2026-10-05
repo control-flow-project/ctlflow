@@ -1,9 +1,9 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
-import { agentDisplayName } from '@crossfire/domain/identity/display-name';
+import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
 import type Database from 'better-sqlite3';
 import { schema, type Tables } from '../../schema/tables.js';
-import type { DirectoryRepository, Page, PageRequest, MemberRecord, AgentRecord, DirectoryFilter } from '@crossfire/domain/port/directory';
-import { success } from '@crossfire/kernel/result';
+import type { DirectoryRepository, Page, PageRequest, MemberRecord, AgentRecord, DirectoryFilter } from '@ctlflow/crossfire-domain/port/directory';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { stored } from '../stored.js';
 import { mapPrincipal } from '../principal/map.js';
 

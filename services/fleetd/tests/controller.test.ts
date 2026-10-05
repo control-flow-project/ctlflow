@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -6,17 +6,17 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
-import { createController } from '@fleetd/domain/controller';
-import type { Execution, Running } from '@fleetd/domain/port';
-import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
-import type { Operation } from '@fleetd/domain/model';
-import type { NativeSessionState } from '@crossfire/agent-core/runtime';
-import { createRegistry } from '@fleetd/storage/registry';
-import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
-import { fleetView, instanceView } from '@fleetd/contracts/api';
-import { success, failure, type Result } from '@crossfire/kernel/result';
-import { createListenerControl } from '@crossfire/agent-core/listener-control';
-import { listenerStop } from '@crossfire/kernel/lifecycle';
+import { createController } from '@ctlflow/fleetd-domain/controller';
+import type { Execution, Running } from '@ctlflow/fleetd-domain/port';
+import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
+import type { Operation } from '@ctlflow/fleetd-domain/model';
+import type { NativeSessionState } from '@ctlflow/crossfire-agent-core/runtime';
+import { createRegistry } from '@ctlflow/fleetd-storage/registry';
+import { validateRoster, parseToml } from '@ctlflow/fleetd-contracts/configuration';
+import { fleetView, instanceView } from '@ctlflow/fleetd-contracts/api';
+import { success, failure, type Result } from '@ctlflow/crossfire-kernel/result';
+import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import { listenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control: Running['control']; pointer: RuntimeAttachment;

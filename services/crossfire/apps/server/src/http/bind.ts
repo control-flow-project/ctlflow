@@ -1,10 +1,10 @@
-import type { FleetActor } from '@crossfire/domain/fleet/authority';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { Operation } from '@crossfire/contracts/rest/operation';
-import type { Page } from '@crossfire/domain/port/directory';
-import type { Actor, Services } from '@crossfire/domain/port/services';
-import type { Manifest } from '@crossfire/contracts/release';
-import type { MemberRecord } from '@crossfire/domain/port/directory';
+import type { FleetActor } from '@ctlflow/crossfire-domain/fleet/authority';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { Operation } from '@ctlflow/crossfire-contracts/rest/operation';
+import type { Page } from '@ctlflow/crossfire-domain/port/directory';
+import type { Actor, Services } from '@ctlflow/crossfire-domain/port/services';
+import type { Manifest } from '@ctlflow/crossfire-contracts/release';
+import type { MemberRecord } from '@ctlflow/crossfire-domain/port/directory';
 import type { createFleetChanges } from './fleet-changes.js';
 export type Metadata = { page: number; pageSize: number; totalItems: number; totalPages: number };
 export type Reply = { data: unknown; pagination?: Metadata; cookie?: string | null; invitationCookie?: string };

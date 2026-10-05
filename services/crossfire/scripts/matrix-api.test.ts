@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -8,11 +8,11 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { matrix } from '@crossfire/adapter-matrix/http';
-import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '@crossfire/adapter-matrix/commands';
-import { kebab } from '@crossfire/adapter-matrix/schema';
-import { encodeOutput, outputBytes } from '@crossfire/contracts/limits';
-import { uploadStream, saveStream } from '@crossfire/adapter-matrix/files';
+import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '@ctlflow/crossfire-adapter-matrix/commands';
+import { kebab } from '@ctlflow/crossfire-adapter-matrix/schema';
+import { encodeOutput, outputBytes } from '@ctlflow/crossfire-contracts/limits';
+import { uploadStream, saveStream } from '@ctlflow/crossfire-adapter-matrix/files';
 import { matrixFixture, temporary, ROOM } from './test-support/listener.js';
 import { buildClient } from './build-client.js';
 

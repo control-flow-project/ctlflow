@@ -4,11 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contractRelease } from './support/release.js';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { readActivity } from '@crossfire/domain/listener/activity';
-import { disconnectListeners } from '@crossfire/domain/listener/disconnect';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { heartbeat } from '@crossfire/contracts/schema/request';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { readActivity } from '@ctlflow/crossfire-domain/listener/activity';
+import { disconnectListeners } from '@ctlflow/crossfire-domain/listener/disconnect';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { heartbeat } from '@ctlflow/crossfire-contracts/schema/request';
 
 test('listener activity counts cumulative receipts once and excludes offline gaps and stopped runs', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;

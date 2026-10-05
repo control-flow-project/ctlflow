@@ -1,4 +1,4 @@
-import { object } from '@crossfire/contracts/validation';
+import { object } from '@ctlflow/crossfire-contracts/validation';
 
 export function visibleOutput(value: unknown, runtime: 'claude' | 'pi'): { id: string; text: string }[] {
   const record = object(value);

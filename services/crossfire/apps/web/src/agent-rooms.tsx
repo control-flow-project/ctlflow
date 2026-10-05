@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AgentView, RoomView, RoomGrantView } from '@crossfire/contracts/schema/response';
+import type { AgentView, RoomView, RoomGrantView } from '@ctlflow/crossfire-contracts/schema/response';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Help, Loaded, Page, Panel, Pagination, PageItems, Status, SubjectHeading, timestamp } from './ui.js';

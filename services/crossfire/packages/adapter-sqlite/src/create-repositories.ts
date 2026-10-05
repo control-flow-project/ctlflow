@@ -3,7 +3,7 @@ import { createFleetControllerMetadataRepository } from './repository/fleet-cont
 import { createFleetCredentialRepository } from './repository/fleet-credential/index.js';
 import type Database from 'better-sqlite3';
 import { createFleetRuntimeOperationRepository } from './repository/fleet-runtime-operation/index.js';
-import type { Repositories } from '@crossfire/domain/port/repositories';
+import type { Repositories } from '@ctlflow/crossfire-domain/port/repositories';
 import { createPrincipalRepository } from './repository/principal/index.js';
 import { createMemberRepository } from './repository/member/index.js';
 import { createAgentRepository } from './repository/agent/index.js';

@@ -1,9 +1,9 @@
-import { roomAccess } from '@crossfire/adapter-crossfire/room-access';
-import type { Profile } from '@crossfire/contracts/client';
-import { identifier, roomId, choice, integer } from '@crossfire/contracts/schema/validation';
-import { integerOption } from '@crossfire/contracts/limits';
-import { option, type Arguments } from '@crossfire/adapter-matrix/commands';
-import { failure } from '@crossfire/kernel/result';
+import { roomAccess } from '@ctlflow/crossfire-adapter-crossfire/room-access';
+import type { Profile } from '@ctlflow/crossfire-contracts/client';
+import { identifier, roomId, choice, integer } from '@ctlflow/crossfire-contracts/schema/validation';
+import { integerOption } from '@ctlflow/crossfire-contracts/limits';
+import { option, type Arguments } from '@ctlflow/crossfire-adapter-matrix/commands';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 export const roomOptions = {
   'invite-agent': ['room', 'agent', 'access', 'power-level'],

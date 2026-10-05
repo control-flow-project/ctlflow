@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { activeActor, authorize } from '../authorization/authorize.js';
 import type { Actor, Services } from '../port/services.js';
 import type { WakeRule } from './types.js';

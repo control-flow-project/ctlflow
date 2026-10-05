@@ -7,8 +7,8 @@ import { createApplication } from './composition.js';
 import { createHttpServer } from './http/create-server.js';
 import { createWorker } from './worker.js';
 import { createContentServer } from './content-server.js';
-import { readJson } from "@crossfire/adapter-filesystem/index";
-import { loadRelease } from "@crossfire/adapter-filesystem/release";
+import { readJson } from "@ctlflow/crossfire-adapter-filesystem/index";
+import { loadRelease } from "@ctlflow/crossfire-adapter-filesystem/release";
 import type { ElementPresentation } from './element-configuration.js';
 
 async function closeHttp(server: Server): Promise<void> {

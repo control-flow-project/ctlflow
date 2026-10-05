@@ -1,11 +1,11 @@
 import { realpathSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { readPrivateBytes } from '@crossfire/adapter-filesystem/index';
-import { codexProtocol } from '@crossfire/adapter-codex/protocol';
-import { ownedOptions } from '@crossfire/adapter-codex/owned-options';
-import { object } from '@crossfire/contracts/validation';
-import { failure, success } from '@crossfire/kernel/result';
-import { fingerprint } from '@crossfire/operator-support/files';
+import { readPrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { codexProtocol } from '@ctlflow/crossfire-adapter-codex/protocol';
+import { ownedOptions } from '@ctlflow/crossfire-adapter-codex/owned-options';
+import { object } from '@ctlflow/crossfire-contracts/validation';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { fingerprint } from '@ctlflow/crossfire-operator-support/files';
 import type { NativeInspector, NativePreserver } from './types.js';
 
 export const preserveCodex: NativePreserver = workspace => {

@@ -1,7 +1,7 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
-import type { RoomGrantReadRepository } from '@crossfire/domain/port/room-grant-read';
-import { success } from '@crossfire/kernel/result';
+import type { RoomGrantReadRepository } from '@ctlflow/crossfire-domain/port/room-grant-read';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { schema } from '../../schema/tables.js';
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';

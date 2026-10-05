@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { object } from '@crossfire/contracts/validation';
-import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { object } from '@ctlflow/crossfire-contracts/validation';
+import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
 import { claudeContextFile } from './hook.js';
 import { nativeClaude, type ClaudeContext } from './context.js';
 import { connectClaude } from './connection.js';

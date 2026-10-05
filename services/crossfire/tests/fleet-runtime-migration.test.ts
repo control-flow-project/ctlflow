@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 
 test('current fleet session commands retain normalized indexed lifecycle state', () => {
   const database = openStore(':memory:');

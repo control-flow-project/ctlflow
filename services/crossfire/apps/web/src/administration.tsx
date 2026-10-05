@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { MemberView, PolicyView } from '@crossfire/contracts/schema/response';
-import { POLICY_LIMITS, DEFAULT_AGENT_INSTRUCTIONS, AGENT_INSTRUCTIONS_MAX_BYTES } from '@crossfire/contracts/policy';
+import type { MemberView, PolicyView } from '@ctlflow/crossfire-contracts/schema/response';
+import { POLICY_LIMITS, DEFAULT_AGENT_INSTRUCTIONS, AGENT_INSTRUCTIONS_MAX_BYTES } from '@ctlflow/crossfire-contracts/policy';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Field, Help, Loaded, Page, Panel, Pagination, Status, applied, timestamp } from './ui.js';

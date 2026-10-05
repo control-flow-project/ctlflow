@@ -1,18 +1,18 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { value } from './support/application.js';
-import type { RuntimeDecision, RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
-import { success } from '@crossfire/kernel/result';
-import { codexTerminal } from '@crossfire/adapter-codex/terminal';
-import type { UsageSample } from '@crossfire/contracts/statistics';
+import type { RuntimeDecision, RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
+import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 
 async function environment(scope: Parameters<typeof nativeProvider>[0]) {
   const directory = mkdtempSync(join(process.cwd(), '.temp/native-histories-'));

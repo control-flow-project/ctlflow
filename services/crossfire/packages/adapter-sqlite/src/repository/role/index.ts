@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapRole } from './map.js';
 import { stored } from '../stored.js';
-import { success } from '@crossfire/kernel/result';
-import type { RoleRepository } from '@crossfire/domain/port/repositories';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import type { RoleRepository } from '@ctlflow/crossfire-domain/port/repositories';
 
 export function createRoleRepository(database: Database.Database): RoleRepository {
   return {

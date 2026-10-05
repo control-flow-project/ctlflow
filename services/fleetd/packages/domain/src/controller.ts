@@ -1,7 +1,7 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Running } from './port.js';
-import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
-import { isListenerStop } from '@crossfire/kernel/lifecycle';
+import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
+import { isListenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 import type { Configuration, Registration, FleetState, InstanceState, Operation, OperationInput, Instance, RetainedContext } from './model.js';
 
 export function createController(services: Services) {

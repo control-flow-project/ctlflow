@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { EnrollmentView } from '@crossfire/contracts/schema/response';
-import { WAKE_LABELS } from '@crossfire/contracts/wake';
+import type { EnrollmentView } from '@ctlflow/crossfire-contracts/schema/response';
+import { WAKE_LABELS } from '@ctlflow/crossfire-contracts/wake';
 import { call, operations, useResource, useAction } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Help, Loaded, Page, Panel, Pagination, PageItems, Status, timestamp } from './ui.js';

@@ -1,15 +1,15 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
-import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import assert from 'node:assert/strict';
 import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { API } from '@crossfire/contracts/matrix';
-import { writeJson } from '@crossfire/adapter-filesystem/index';
-import { listen, type ListenerOptions } from '@crossfire/adapter-crossfire/listener';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { listen, type ListenerOptions } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, SELF, THREAD, until } from './test-support/listener.js';
 import { builtClient, installTestRelease } from './test-support/release.js';
 

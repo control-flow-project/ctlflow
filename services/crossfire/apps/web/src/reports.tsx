@@ -1,4 +1,4 @@
-import type { PublicationDetails, PublicationSummary } from '@crossfire/contracts/publication';
+import type { PublicationDetails, PublicationSummary } from '@ctlflow/crossfire-contracts/publication';
 import { call, operations, useAction, useResource } from './api.js';
 import { OwnerFilter } from './agent-filters.js';
 import { filterQuery } from './form.js';

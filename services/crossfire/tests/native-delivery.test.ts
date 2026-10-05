@@ -1,15 +1,15 @@
-import { localState as storage } from '@crossfire/adapter-filesystem/state';
+import { localState as storage } from '@ctlflow/crossfire-adapter-filesystem/state';
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
-import { API, segment } from '@crossfire/contracts/matrix';
-import { matrix } from '@crossfire/adapter-matrix/http';
-import { acknowledge, loadCursors, readUnread, synchronize } from "@crossfire/agent-core/receive";
-import type { Settings } from "@crossfire/contracts/client";
-import { captureWake, collectBatch, pendingBatch, wakeEvent } from '@crossfire/agent-core/delivery';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { acknowledge, loadCursors, readUnread, synchronize } from "@ctlflow/crossfire-agent-core/receive";
+import type { Settings } from "@ctlflow/crossfire-contracts/client";
+import { captureWake, collectBatch, pendingBatch, wakeEvent } from '@ctlflow/crossfire-agent-core/delivery';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
 
 test("native unread recovery delivers selected state notices once and keeps receipts private", { timeout: 120_000 }, async scope => {
   mkdirSync(join(process.cwd(), ".temp"), { recursive: true });

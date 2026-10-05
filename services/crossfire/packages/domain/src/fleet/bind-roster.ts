@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 export function bindRoster(services: Pick<Services, 'repositories' | 'collection' | 'clock'>, ownerId: string, fleetKey: string,
   entries: { instanceKey: string; agentId: string | null; outcome: string }[]) {

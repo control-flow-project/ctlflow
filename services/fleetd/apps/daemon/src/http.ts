@@ -1,9 +1,9 @@
 import { createServer, type IncomingMessage } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import type { Operation } from '@crossfire/contracts/rest/operation';
-import { failure, success, type Result, type FailureCode } from '@crossfire/kernel/result';
-import type { FleetController } from '@fleetd/domain/controller';
-import { operations } from '@fleetd/contracts/api';
+import type { Operation } from '@ctlflow/crossfire-contracts/rest/operation';
+import { failure, success, type Result, type FailureCode } from '@ctlflow/crossfire-kernel/result';
+import type { FleetController } from '@ctlflow/fleetd-domain/controller';
+import { operations } from '@ctlflow/fleetd-contracts/api';
 
 type Reply = { data: unknown; pagination?: { page: number; pageSize: number; totalItems: number; totalPages: number } };
 type Endpoint = { method: string; status: number; match(path: string): Record<string, string> | null; invoke(params: unknown, query: URLSearchParams, input: unknown): Promise<Result<Reply>> };

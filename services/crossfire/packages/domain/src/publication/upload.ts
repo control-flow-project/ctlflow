@@ -1,5 +1,5 @@
-import { failure, success } from '@crossfire/kernel/result';
-import type { BinaryInput } from '@crossfire/kernel/bytes';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { BinaryInput } from '@ctlflow/crossfire-kernel/bytes';
 import type { Actor } from '../port/services.js';
 import { publicationAuthority, type PublicationDependencies } from './authority.js';
 export function uploadPublicationFile(services: PublicationDependencies, actor: Actor, id: string, fileId: string, input: BinaryInput, signal: AbortSignal) {

@@ -1,5 +1,5 @@
 {
-  "name": "@crossfire/adapter-codex",
+  "name": "@ctlflow/crossfire-adapter-codex",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,11 +9,11 @@
   },
   "dependencies": {
     "ws": "8.21.3",
-    "@crossfire/contracts": "0.1.0",
-    "@crossfire/kernel": "0.1.0",
-    "@crossfire/agent-core": "0.1.0",
-    "@crossfire/adapter-filesystem": "0.1.0",
-    "@crossfire/adapter-runtime": "0.1.0"
+    "@ctlflow/crossfire-contracts": "0.1.0",
+    "@ctlflow/crossfire-kernel": "0.1.0",
+    "@ctlflow/crossfire-agent-core": "0.1.0",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.0",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.0"
   },
   "exports": {
     "./*": {

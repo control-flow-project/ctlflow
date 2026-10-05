@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 export type RuntimeAttachment = {
   runtime: string;

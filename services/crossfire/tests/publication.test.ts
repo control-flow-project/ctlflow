@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID, createHash } from 'node:crypto';
-import { binaryBytes } from '@crossfire/kernel/bytes';
-import { createPublication } from '@crossfire/domain/publication/create';
-import { uploadPublicationFile } from '@crossfire/domain/publication/upload';
-import { commitPublication } from '@crossfire/domain/publication/commit';
-import { deletePublication } from '@crossfire/domain/publication/delete';
-import { readPublication, readPublications } from '@crossfire/domain/publication/read';
-import { maintainPublications } from '@crossfire/domain/publication/maintenance';
-import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
-import { validatePublication } from '@crossfire/domain/publication/validation';
-import { publicationCreation, publicationQuery } from '@crossfire/contracts/publication';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
-import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
+import { binaryBytes } from '@ctlflow/crossfire-kernel/bytes';
+import { createPublication } from '@ctlflow/crossfire-domain/publication/create';
+import { uploadPublicationFile } from '@ctlflow/crossfire-domain/publication/upload';
+import { commitPublication } from '@ctlflow/crossfire-domain/publication/commit';
+import { deletePublication } from '@ctlflow/crossfire-domain/publication/delete';
+import { readPublication, readPublications } from '@ctlflow/crossfire-domain/publication/read';
+import { maintainPublications } from '@ctlflow/crossfire-domain/publication/maintenance';
+import { PUBLICATION_LIMITS } from '@ctlflow/crossfire-domain/publication/values';
+import { validatePublication } from '@ctlflow/crossfire-domain/publication/validation';
+import { publicationCreation, publicationQuery } from '@ctlflow/crossfire-contracts/publication';
+import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
+import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
 import { applicationFixture, value } from './support/application.js';
 
 function manifest(body = '<!doctype html><p>Report</p>') {

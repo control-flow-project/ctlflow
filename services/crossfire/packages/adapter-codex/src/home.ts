@@ -1,7 +1,7 @@
 import { existsSync, writeFileSync, constants, openSync, fstatSync, closeSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 export function prepareHome(workspace: string): string {
   const home = privateDir(join(workspace, '.codex'));

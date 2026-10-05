@@ -1,5 +1,5 @@
-import type { FleetMap } from '@crossfire/domain/fleet/read-map';
-import { agentDisplayName } from '@crossfire/domain/identity/display-name';
+import type { FleetMap } from '@ctlflow/crossfire-domain/fleet/read-map';
+import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
 import { fleet } from './enrollment.js';
 import { grant, application } from './room.js';
 export function fleetMap(value: FleetMap) {

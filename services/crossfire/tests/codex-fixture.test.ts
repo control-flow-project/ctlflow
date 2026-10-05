@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 
 test('private Codex fixture trust preserves provider configuration and targets only its exact workspace', () => {
   mkdirSync('.temp', { recursive: true });

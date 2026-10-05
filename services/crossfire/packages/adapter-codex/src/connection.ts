@@ -1,10 +1,10 @@
 import { realpathSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeConnection, RuntimeHooks, TurnControl } from '@crossfire/agent-core/runtime';
+import type { RuntimeConnection, RuntimeHooks, TurnControl } from '@ctlflow/crossfire-agent-core/runtime';
 import { connectSession, type CodexOptions, type CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
 import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
-import { nativeDelivery } from '@crossfire/adapter-runtime/delivery';
+import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
 
 export type { CodexOptions } from './session.js';
 export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>;

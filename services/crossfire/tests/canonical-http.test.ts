@@ -1,5 +1,5 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -7,9 +7,9 @@ import { once } from 'node:events';
 import { createHttpServer } from '../apps/server/src/http/create-server.js';
 import { applicationFixture, secret } from './support/application.js';
 import { contractRelease } from './support/release.js';
-import { operations } from '@crossfire/contracts/rest/operations';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { bind } from '../apps/server/src/http/bind.js';
-import { success } from '@crossfire/kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 
 test('operation declarations match exactly one current path and validate parameters', async () => {
   for (const operation of Object.values(operations)) {

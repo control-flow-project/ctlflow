@@ -1,12 +1,12 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { once } from 'node:events';
 import { createHttpServer } from '../apps/server/src/http/create-server.js';
-import { resolvePrincipals } from '@crossfire/domain/identity/resolve-principals';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { principalResolution } from '@crossfire/contracts/schema/request';
-import { principalIdentities } from '@crossfire/contracts/schema/response';
+import { resolvePrincipals } from '@ctlflow/crossfire-domain/identity/resolve-principals';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { principalResolution } from '@ctlflow/crossfire-contracts/schema/request';
+import { principalIdentities } from '@ctlflow/crossfire-contracts/schema/response';
 import { applicationFixture, value } from './support/application.js';
 import { contractRelease } from './support/release.js';
 

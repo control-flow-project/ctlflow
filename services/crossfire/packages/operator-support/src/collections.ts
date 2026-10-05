@@ -1,5 +1,5 @@
-import type { Response } from '@crossfire/contracts/rest/envelope';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import type { Response } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export async function collectPages<Value>(read: (query: URLSearchParams) => Promise<Result<Response<Value[]>>>, identity: (value: Value) => string | number): Promise<Result<Value[]>> {
   const values: Value[] = [];

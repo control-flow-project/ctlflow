@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { validateCoordinationPolicy, type CoordinationPolicy } from '../fleet/coordination-policy.js';
 export type EnrollmentIdentityProof = { agentId: string; accessToken: string };
 export type EnrollmentEntry = { instanceKey: string; name: string; identity?: EnrollmentIdentityProof; coordinationPolicy?: CoordinationPolicy };

@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 export type Tokens = { input: number; cachedInput: number; cacheWriteInput: number | null; output: number; reasoningOutput: number; total: number };
 export type Usage = { runtime: string; sessionId: string; tokens: Tokens };

@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { matrixDirectorySearch, type MatrixDirectoryResult } from '@crossfire/contracts/matrix-directory';
-import type { Failure } from '@crossfire/kernel/result';
-import type { Services } from '@crossfire/domain/port/services';
-import { authenticateNativePrincipal } from '@crossfire/domain/session/authenticate';
-import { discoverPrincipals } from '@crossfire/domain/authorization/discover';
+import { matrixDirectorySearch, type MatrixDirectoryResult } from '@ctlflow/crossfire-contracts/matrix-directory';
+import type { Failure } from '@ctlflow/crossfire-kernel/result';
+import type { Services } from '@ctlflow/crossfire-domain/port/services';
+import { authenticateNativePrincipal } from '@ctlflow/crossfire-domain/session/authenticate';
+import { discoverPrincipals } from '@ctlflow/crossfire-domain/authorization/discover';
 import { readBody } from './transport.js';
 
 export async function searchMatrixDirectory(services: Services, request: IncomingMessage, response: ServerResponse, url: URL, requestId: string) {

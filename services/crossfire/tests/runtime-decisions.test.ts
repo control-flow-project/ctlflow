@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value } from './support/application.js';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { createDecision, readDecision, answerDecision, pollDecision, receiptDecision, expireDecisions, listDecisions } from '@crossfire/domain/runtime/decisions';
-import { reportRuntime } from '@crossfire/domain/runtime/observations';
-import { reconcileRuntime, openIncident } from '@crossfire/domain/runtime/incidents';
-import type { DecisionCreation } from '@crossfire/contracts/runtime';
-import { listRooms, readRoom } from '@crossfire/domain/room/read-room';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { acceptRoomInvitation } from '@crossfire/domain/room-access/accept-invitation';
-import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { createDecision, readDecision, answerDecision, pollDecision, receiptDecision, expireDecisions, listDecisions } from '@ctlflow/crossfire-domain/runtime/decisions';
+import { reportRuntime } from '@ctlflow/crossfire-domain/runtime/observations';
+import { reconcileRuntime, openIncident } from '@ctlflow/crossfire-domain/runtime/incidents';
+import type { DecisionCreation } from '@ctlflow/crossfire-contracts/runtime';
+import { listRooms, readRoom } from '@ctlflow/crossfire-domain/room/read-room';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { acceptRoomInvitation } from '@ctlflow/crossfire-domain/room-access/accept-invitation';
+import { setRoomPermission } from '@ctlflow/crossfire-domain/room-access/set-permission';
 
 async function fixture(scope: Parameters<typeof applicationFixture>[0]) {
   const fixture = await applicationFixture(scope), owner = await fixture.member('owner'), stranger = await fixture.member('stranger');

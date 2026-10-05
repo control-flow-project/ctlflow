@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type Database from 'better-sqlite3';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
-import { createSchema, SCHEMA_VERSION } from '@crossfire/adapter-sqlite/schema/create-schema';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { schema11Store } from './support/schema11.js';
 import { value } from './support/application.js';
 

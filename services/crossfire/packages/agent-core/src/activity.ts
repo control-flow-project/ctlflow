@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Clock } from './port.js';
-import { HEARTBEAT_MS } from '@crossfire/contracts/activity';
-import type { Manifest } from '@crossfire/contracts/release';
+import { HEARTBEAT_MS } from '@ctlflow/crossfire-contracts/activity';
+import type { Manifest } from '@ctlflow/crossfire-contracts/release';
 import type { Coordination } from './coordination.js';
 import type { listenerStatistics } from './statistics.js';
-import { listenerStop } from '@crossfire/kernel/lifecycle';
+import { listenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 
 export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controllerBound: boolean, clock: Clock, statistics: ReturnType<typeof listenerStatistics>, onUpdate?: (release: string) => void) {
   const run = randomUUID();

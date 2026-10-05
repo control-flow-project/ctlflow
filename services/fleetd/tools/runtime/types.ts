@@ -1,6 +1,6 @@
-import type { Parsed } from '@crossfire/contracts/schema/validation';
-import type { attachment } from '@fleetd/contracts/attachment';
-import type { Result } from '@crossfire/kernel/result';
+import type { Parsed } from '@ctlflow/crossfire-contracts/schema/validation';
+import type { attachment } from '@ctlflow/fleetd-contracts/attachment';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 export type Attachment = Parsed<typeof attachment>;
 export type NativeInfo = { sessionId: string; status: string; authenticated: boolean; configuredModel: string | null;

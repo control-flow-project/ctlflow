@@ -1,8 +1,8 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { listWakeRules, readWakeRule } from '@crossfire/domain/wake-up/read';
-import { createWakeRule, changeWakeRule, deleteWakeRule } from '@crossfire/domain/wake-up/manage';
-import { wakeMetadata, claimWake, validateWake, acknowledgeWake } from '@crossfire/domain/wake-up/delivery';
-import type { WakeRuleSummary, WakeRuleDetails } from '@crossfire/domain/wake-up/types';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { listWakeRules, readWakeRule } from '@ctlflow/crossfire-domain/wake-up/read';
+import { createWakeRule, changeWakeRule, deleteWakeRule } from '@ctlflow/crossfire-domain/wake-up/manage';
+import { wakeMetadata, claimWake, validateWake, acknowledgeWake } from '@ctlflow/crossfire-domain/wake-up/delivery';
+import type { WakeRuleSummary, WakeRuleDetails } from '@ctlflow/crossfire-domain/wake-up/types';
 import { bind, actor, paged, reply } from '../bind.js';
 
 function summary(rule: WakeRuleSummary) {

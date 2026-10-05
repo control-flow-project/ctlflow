@@ -1,11 +1,11 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect, type Page } from '@playwright/test';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { decodeResponse } from '@crossfire/contracts/rest/envelope';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';

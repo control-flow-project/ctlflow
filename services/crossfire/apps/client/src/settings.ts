@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { fields } from '@crossfire/contracts/validation';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
+import { fields } from '@ctlflow/crossfire-contracts/validation';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { migrateListenerSettings } from './settings-migration.js';
 
 export function listenerSettings(state: string, runtime?: string) {

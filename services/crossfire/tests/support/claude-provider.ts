@@ -1,7 +1,7 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { collect } from '@crossfire/adapter-matrix/http';
+import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
 import type { TestContext } from 'node:test';
 
 export async function claudeProvider(scope: TestContext, command?: string, holdRequest?: number) {

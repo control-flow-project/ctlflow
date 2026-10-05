@@ -1,11 +1,11 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { piHost } from '@crossfire/adapter-pi/host';
-import { piCall } from '@crossfire/adapter-pi/protocol';
-import type { PiApi, PiContext } from '@crossfire/adapter-pi/native';
+import { piHost } from '@ctlflow/crossfire-adapter-pi/host';
+import { piCall } from '@ctlflow/crossfire-adapter-pi/protocol';
+import type { PiApi, PiContext } from '@ctlflow/crossfire-adapter-pi/native';
 
 test('Pi native host enforces credentials, exact generation, bounded input and pre-publication cancellation', async scope => {
   mkdirSync('.temp', { recursive: true });

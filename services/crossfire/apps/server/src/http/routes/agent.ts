@@ -1,13 +1,13 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { readAgent, listAgents } from '@crossfire/domain/agent/read-agent';
-import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
-import { readWakePolicy } from '@crossfire/domain/wake/read-policy';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { readListenerRuns } from '@crossfire/domain/listener/read-runs';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { disconnectListeners } from '@crossfire/domain/listener/disconnect';
-import { requestWakeNotice } from '@crossfire/domain/notice/request-notice';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { readAgent, listAgents } from '@ctlflow/crossfire-domain/agent/read-agent';
+import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
+import { readWakePolicy } from '@ctlflow/crossfire-domain/wake/read-policy';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { readListenerRuns } from '@ctlflow/crossfire-domain/listener/read-runs';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { disconnectListeners } from '@ctlflow/crossfire-domain/listener/disconnect';
+import { requestWakeNotice } from '@ctlflow/crossfire-domain/notice/request-notice';
 import { bind, reply, paged, actor } from '../bind.js';
 import * as view from '../representation/identity.js';
 export function agentRoutes() {

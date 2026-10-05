@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -6,11 +6,11 @@ import { once } from 'node:events';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { discoverClaude } from '@crossfire/adapter-claude/discovery';
-import { connectClaude } from '@crossfire/adapter-claude/connection';
-import { claudeContextFile } from '@crossfire/adapter-claude/hook';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import type { ClaudeContext } from '@crossfire/adapter-claude/context';
+import { discoverClaude } from '@ctlflow/crossfire-adapter-claude/discovery';
+import { connectClaude } from '@ctlflow/crossfire-adapter-claude/connection';
+import { claudeContextFile } from '@ctlflow/crossfire-adapter-claude/hook';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import type { ClaudeContext } from '@ctlflow/crossfire-adapter-claude/context';
 import { claudeProvider } from './support/claude-provider.js';
 import { until } from '../scripts/test-support/listener.js';
 

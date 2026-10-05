@@ -2,13 +2,13 @@ import { existsSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync,
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { stringify } from 'smol-toml';
-import { privateDir, readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import * as check from '@crossfire/contracts/schema/validation';
-import { operationView } from '@fleetd/contracts/api';
-import { validateRoster } from '@fleetd/contracts/configuration';
-import type { Registry } from '@fleetd/domain/port';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { MAX_JSON_BYTES } from '@crossfire/contracts/limits';
+import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { operationView } from '@ctlflow/fleetd-contracts/api';
+import { validateRoster } from '@ctlflow/fleetd-contracts/configuration';
+import type { Registry } from '@ctlflow/fleetd-domain/port';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { MAX_JSON_BYTES } from '@ctlflow/crossfire-contracts/limits';
 import { loadConfiguration } from './configuration.js';
 
 const registrations = check.list(check.object({ fleetId: check.identifier, fleetKey: check.name, directory: check.text(4096), label: check.text(100), revision: check.integer(), digest: check.text(64, 64) }), 100);

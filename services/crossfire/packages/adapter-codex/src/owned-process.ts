@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { writeFileSync, unlinkSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { ownedVersion, ownedQuestionCapability } from './owned-options.js';
 
 export async function startProcess(home: string, workspace: string, stop: AbortSignal, binary = 'codex', questions = false) {

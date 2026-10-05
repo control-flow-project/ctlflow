@@ -1,7 +1,7 @@
 import type { Services } from '../port/services.js';
 import type { FleetActor } from '../fleet/authority.js';
 import { authorizeFleet } from '../fleet/authority.js';
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { openIncident } from './incidents.js';
 import { agentDisplayName } from '../identity/display-name.js';
 

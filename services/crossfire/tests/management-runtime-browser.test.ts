@@ -1,12 +1,12 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { operations } from '@crossfire/contracts/rest/operations';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 import { browserOptions } from './support/tls.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';

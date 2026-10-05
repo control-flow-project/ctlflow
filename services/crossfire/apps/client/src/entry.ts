@@ -2,7 +2,7 @@ import { main } from "./main.js";
 import { reportStartup } from './listener-process.js';
 import { dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadRelease } from '@crossfire/adapter-filesystem/release';
+import { loadRelease } from '@ctlflow/crossfire-adapter-filesystem/release';
 
 main(process.argv.slice(2), () => {
   const file = fileURLToPath(import.meta.url);

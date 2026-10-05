@@ -1,17 +1,17 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import { createApplication } from '../../apps/server/src/composition.js';
-import { createSession } from '@crossfire/domain/session/create-session';
-import { authenticateMember } from '@crossfire/domain/session/authenticate';
-import { registerPrincipal } from '@crossfire/domain/principal/register';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { success, type Result } from '@crossfire/kernel/result';
-import type { Actor } from '@crossfire/domain/port/services';
+import { createSession } from '@ctlflow/crossfire-domain/session/create-session';
+import { authenticateMember } from '@ctlflow/crossfire-domain/session/authenticate';
+import { registerPrincipal } from '@ctlflow/crossfire-domain/principal/register';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { Actor } from '@ctlflow/crossfire-domain/port/services';
 import { matrixAuthorityFixture } from './matrix-authority.js';
 export function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.code + ': ' + result.error.message); return result.value; }
 export function secret(): string { return randomBytes(32).toString('base64url'); }

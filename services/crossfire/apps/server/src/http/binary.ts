@@ -1,6 +1,6 @@
 import type { IncomingMessage } from 'node:http';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { BinaryInput } from '@crossfire/kernel/bytes';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { BinaryInput } from '@ctlflow/crossfire-kernel/bytes';
 export function readBinary(request: IncomingMessage, maximum: number): Result<BinaryInput> {
   if (request.headers['content-type'] !== 'application/octet-stream') return failure('invalid', 'Expected application/octet-stream');
   const declared = request.headers['content-length'];

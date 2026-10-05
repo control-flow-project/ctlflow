@@ -13,7 +13,7 @@ import * as runtime from '../runtime.js';
 import { statisticsQuery, fleetStatistics } from '../statistics.js';
 import * as publication from '../publication.js';
 import { binaryInput } from './binary.js';
-import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
+import { PUBLICATION_LIMITS } from '@ctlflow/crossfire-domain/publication/values';
 export const operations = {
   createPublication: operation({ method: 'POST', path: '/api/publications', auth: 'agent',
     params: check.empty, query: query.none, input: publication.publicationCreation, output: publication.publicationDetails,

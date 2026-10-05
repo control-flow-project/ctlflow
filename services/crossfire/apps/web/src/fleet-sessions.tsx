@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { AgentView, FleetView } from '@crossfire/contracts/schema/response';
-import type { InputOf } from '@crossfire/contracts/rest/operation';
+import type { AgentView, FleetView } from '@ctlflow/crossfire-contracts/schema/response';
+import type { InputOf } from '@ctlflow/crossfire-contracts/rest/operation';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Help, Loaded, Panel, Pagination, Status, timestamp } from './ui.js';

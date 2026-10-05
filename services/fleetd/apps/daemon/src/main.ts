@@ -6,15 +6,15 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createConnection } from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { controller as parseController } from '@crossfire/contracts/schema/controller';
-import { privateDir, readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
-import { createRegistry } from '@fleetd/storage/registry';
-import { createController } from '@fleetd/domain/controller';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
+import { controller as parseController } from '@ctlflow/crossfire-contracts/schema/controller';
+import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
+import { createRegistry } from '@ctlflow/fleetd-storage/registry';
+import { createController } from '@ctlflow/fleetd-domain/controller';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
-import { nativeClock } from '@crossfire/adapter-runtime/clock';
+import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
 
 export async function startDaemon(root: string, name: string) {
   if (process.platform !== 'linux') throw new Error('Fleet controller requires Linux');

@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 import { authorizeGrantChange } from '../room-access/authorize-change.js';
 import { commitGrantChange, recheckGrantAuthorization } from '../room-access/commit-change.js';

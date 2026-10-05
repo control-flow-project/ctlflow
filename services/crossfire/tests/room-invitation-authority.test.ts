@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { setImmediate as yieldToOperations } from 'node:timers/promises';
-import { success, failure } from '@crossfire/kernel/result';
-import { acceptRoomInvitation } from '@crossfire/domain/room-access/accept-invitation';
-import { changeMember } from '@crossfire/domain/member/change-member';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
-import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
+import { success, failure } from '@ctlflow/crossfire-kernel/result';
+import { acceptRoomInvitation } from '@ctlflow/crossfire-domain/room-access/accept-invitation';
+import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { setRoomPermission } from '@ctlflow/crossfire-domain/room-access/set-permission';
+import { reconcileRoomGrant } from '@ctlflow/crossfire-domain/room-access/reconcile-grant';
 import { applicationFixture, value } from './support/application.js';
 
 async function invitedFixture(scope: TestContext) {

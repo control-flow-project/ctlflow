@@ -1,6 +1,6 @@
-import type { AgentRoomGrant, RoomGrantApplication } from '@crossfire/domain/room-access/types';
-import type { RoomDetails } from '@crossfire/domain/room/read-room';
-import type { GrantPlanPreview } from '@crossfire/domain/room-access/grant-plan';
+import type { AgentRoomGrant, RoomGrantApplication } from '@ctlflow/crossfire-domain/room-access/types';
+import type { RoomDetails } from '@ctlflow/crossfire-domain/room/read-room';
+import type { GrantPlanPreview } from '@ctlflow/crossfire-domain/room-access/grant-plan';
 export function grant(value: AgentRoomGrant) {
   return { agentId: value.agentId, roomId: value.roomId, generation: value.generation, authorizerId: value.authorizerId, addedById: value.addedById,
     accessMode: value.accessMode, powerLevel: value.powerLevel, muted: value.muted, revision: value.revision, accessRevision: value.accessRevision, updatedAt: value.updatedAt };

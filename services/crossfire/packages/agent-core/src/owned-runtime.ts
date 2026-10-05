@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { RuntimeApproval, RuntimeConnection, RuntimeHooks, TurnControl } from './runtime.js';
 import type { RuntimeAttachment } from './terminal.js';
 export type ListenerOptions = { historyMode?: 'shared' | 'per-room' };

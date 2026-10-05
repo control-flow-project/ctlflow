@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { authorize } from '../authorization/authorize.js';
 import { changeRoomGrant } from './change-grant.js';

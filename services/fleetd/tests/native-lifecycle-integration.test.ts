@@ -4,14 +4,14 @@ import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { success, type Result } from '@crossfire/kernel/result';
-import type { Clock } from '@crossfire/agent-core/port';
-import type { RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
-import { createNativeLifecycle, type NativeLifecycleServices } from '@fleetd/domain/native-lifecycle';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { Clock } from '@ctlflow/crossfire-agent-core/port';
+import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
+import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.code + ': ' + result.error.message); return result.value; }
 async function until(predicate: () => boolean | Promise<boolean>): Promise<void> {

@@ -5,11 +5,11 @@ import { applicationFixture, value, secret } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
-import { authenticateNativePrincipal, authenticateMember } from '@crossfire/domain/session/authenticate';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { changeMember } from '@crossfire/domain/member/change-member';
-import { API } from '@crossfire/contracts/matrix';
-import type { MatrixDirectoryResult } from '@crossfire/contracts/matrix-directory';
+import { authenticateNativePrincipal, authenticateMember } from '@ctlflow/crossfire-domain/session/authenticate';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import type { MatrixDirectoryResult } from '@ctlflow/crossfire-contracts/matrix-directory';
 
 const path = '/_matrix/client/v3/user_directory/search';
 test('Matrix directory authenticates native principals, bounds searches and retains REST session authority', async scope => {

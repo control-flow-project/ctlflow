@@ -1,7 +1,7 @@
 import { operations, useResource } from './api.js';
 import { Empty, Help, Loaded, Panel, PageItems, timestamp } from './ui.js';
 import { NativeStatus, savedHistoryLabel } from './runtime-status.js';
-import type { AgentView } from '@crossfire/contracts/schema/response';
+import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
 
 export function Runtime({ agent }: { agent: AgentView }) {
   const observed = useResource(operations.runtimeObservations, { agentId: agent.agentId }, '', 10000);

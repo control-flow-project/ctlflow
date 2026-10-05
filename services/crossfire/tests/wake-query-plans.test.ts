@@ -1,9 +1,9 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
-import { createSchema } from '@crossfire/adapter-sqlite/schema/create-schema';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
+import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
 
 test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized indexes', scope => {

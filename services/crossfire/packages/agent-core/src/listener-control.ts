@@ -1,4 +1,4 @@
-import * as check from '@crossfire/contracts/schema/validation';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import type { LocalState } from './port.js';
 import type { RuntimeConnection } from './runtime.js';
 import type { MessageArtifacts } from './message-artifacts.js';

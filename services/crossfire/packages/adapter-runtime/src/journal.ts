@@ -1,11 +1,11 @@
 import { lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import * as check from '@crossfire/contracts/schema/validation';
-import { success, failure } from '@crossfire/kernel/result';
-import { fields } from '@crossfire/contracts/validation';
-import { acquireFileLock } from '@crossfire/adapter-filesystem/lock';
-import { MAX_INPUT_BYTES } from '@crossfire/contracts/runtime';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { success, failure } from '@ctlflow/crossfire-kernel/result';
+import { fields } from '@ctlflow/crossfire-contracts/validation';
+import { acquireFileLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
+import { MAX_INPUT_BYTES } from '@ctlflow/crossfire-contracts/runtime';
 
 export const deliveryText: check.Parser<string> = value => typeof value === 'string' && Buffer.byteLength(value) <= MAX_INPUT_BYTES
   ? success(value) : failure('invalid', 'Native delivery text exceeds its byte bound');

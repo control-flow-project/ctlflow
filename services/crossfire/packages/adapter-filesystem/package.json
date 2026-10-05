@@ -1,5 +1,5 @@
 {
-  "name": "@crossfire/adapter-filesystem",
+  "name": "@ctlflow/crossfire-adapter-filesystem",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,10 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
-    "@crossfire/domain": "0.1.0",
-    "@crossfire/kernel": "0.1.0",
-    "@crossfire/agent-core": "0.1.0",
-    "@crossfire/contracts": "0.1.0"
+    "@ctlflow/crossfire-domain": "0.1.0",
+    "@ctlflow/crossfire-kernel": "0.1.0",
+    "@ctlflow/crossfire-agent-core": "0.1.0",
+    "@ctlflow/crossfire-contracts": "0.1.0"
   },
   "exports": {
     "./*": {

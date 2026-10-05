@@ -1,4 +1,4 @@
-import type { Fleet } from '@crossfire/domain/enrollment/types';
+import type { Fleet } from '@ctlflow/crossfire-domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapFleet(row: Tables['fleet']): Fleet {
   return {

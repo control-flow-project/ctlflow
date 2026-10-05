@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, mkdirSync, realpathSync, renameSync, writeFileSync, unlinkSync, openSync, closeSync, fsyncSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { object } from '@crossfire/contracts/validation';
+import { object } from '@ctlflow/crossfire-contracts/validation';
 import { nativeJson } from './native-file.js';
 
 export function projectConfiguration(path: string): Record<string, unknown> {

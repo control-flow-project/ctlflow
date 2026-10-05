@@ -1,15 +1,15 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { value } from './support/application.js';
-import { codexTerminal } from '@crossfire/adapter-codex/terminal';
+import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
 import { openTerminal } from '../scripts/test-support/terminal.js';
 import { builtRelease } from '../scripts/test-support/release.js';
 

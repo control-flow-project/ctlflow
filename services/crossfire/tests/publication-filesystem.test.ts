@@ -4,10 +4,10 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, symlinkSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { binaryBytes } from '@crossfire/kernel/bytes';
-import { createPublicationStore } from '@crossfire/adapter-filesystem/publication/store';
-import { publicationSource } from '@crossfire/adapter-filesystem/publication/source';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { binaryBytes } from '@ctlflow/crossfire-kernel/bytes';
+import { createPublicationStore } from '@ctlflow/crossfire-adapter-filesystem/publication/store';
+import { publicationSource } from '@ctlflow/crossfire-adapter-filesystem/publication/source';
 import { value } from './support/application.js';
 
 test('private staging resists symlinks, hash drift, partial writes and competing store ownership', async scope => {

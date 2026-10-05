@@ -4,8 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contractRelease } from './support/release.js';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { reportListener } from '@crossfire/domain/listener/report';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
 
 test('REST agent filtering and paging preserve owner isolation; policy is admin-only', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, http = await httpFixture(scope, fixture.application);

@@ -1,16 +1,16 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value, secret } from './support/application.js';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
-import { authenticateController } from '@crossfire/domain/fleet/authority';
-import { changeFleet, bindFleetAgent, removeFleet } from '@crossfire/domain/fleet/change-fleet';
-import { listFleetAgents, listFleets, readFleet } from '@crossfire/domain/fleet/read-fleet';
-import { previewGrantPlan, applyGrantPlan } from '@crossfire/domain/room-access/grant-plan';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { changeFleet, bindFleetAgent, removeFleet } from '@ctlflow/crossfire-domain/fleet/change-fleet';
+import { listFleetAgents, listFleets, readFleet } from '@ctlflow/crossfire-domain/fleet/read-fleet';
+import { previewGrantPlan, applyGrantPlan } from '@ctlflow/crossfire-domain/room-access/grant-plan';
 
 test('twenty-instance approval, scoped controller, and same-key fleets retain exact authority', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;

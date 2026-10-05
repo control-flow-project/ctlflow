@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync, chmodSync, realpathSync } from 'node:fs';
@@ -8,10 +8,10 @@ import test from 'node:test';
 import { fakeCodex, matrixFixture, THREAD, ROOM, until } from '../scripts/test-support/listener.js';
 import { builtRelease, installTestRelease } from '../scripts/test-support/release.js';
 import { updatedRelease } from './release-fixture.js';
-import { updateNotice } from '@crossfire/contracts/release';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { discoverCodex } from '@crossfire/adapter-codex/discovery';
-import { writeJson, readJson } from '@crossfire/adapter-filesystem/index';
+import { updateNotice } from '@ctlflow/crossfire-contracts/release';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { discoverCodex } from '@ctlflow/crossfire-adapter-codex/discovery';
+import { writeJson, readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 const execute = promisify(execFile);
 

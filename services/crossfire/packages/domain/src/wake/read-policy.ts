@@ -1,4 +1,4 @@
-import { success } from '@crossfire/kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { authorizeAgent } from '../authorization/authorize.js';
 export function readWakePolicy(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'clock'>, actor: Actor, agentId: string) {

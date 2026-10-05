@@ -1,8 +1,8 @@
-import type { EnrollmentItemView } from '@crossfire/domain/enrollment/item-view';
-import type { EnrollmentOverview } from '@crossfire/domain/enrollment/overview';
-import type { EnrollmentReceipt } from '@crossfire/domain/enrollment/introduce';
-import type { FleetDetails } from '@crossfire/domain/fleet/read-fleet';
-import type { MemberInvitation } from '@crossfire/domain/activity/types';
+import type { EnrollmentItemView } from '@ctlflow/crossfire-domain/enrollment/item-view';
+import type { EnrollmentOverview } from '@ctlflow/crossfire-domain/enrollment/overview';
+import type { EnrollmentReceipt } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import type { FleetDetails } from '@ctlflow/crossfire-domain/fleet/read-fleet';
+import type { MemberInvitation } from '@ctlflow/crossfire-domain/activity/types';
 export function enrollment({ request: value, owner }: EnrollmentOverview) {
   return { owner, controllerName: value.controllerName, enrollmentId: value.id, ownerId: value.ownerId, fleetKey: value.fleetKey, verificationCode: value.verificationCode, status: value.status,
     revision: value.revision, createdAt: value.createdAt, expiresAt: value.expiresAt, decidedByMemberId: value.decidedByMemberId, decidedAt: value.decidedAt };

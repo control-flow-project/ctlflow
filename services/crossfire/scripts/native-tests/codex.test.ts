@@ -1,8 +1,8 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { listen } from '@crossfire/adapter-crossfire/listener';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { matrixFixture, message, ROOM, OBSERVER, until } from '../test-support/listener.js';
 import { nativeCodex } from '../test-support/native-codex.js';
 

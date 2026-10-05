@@ -1,11 +1,11 @@
 import { existsSync, lstatSync, mkdtempSync, realpathSync, readlinkSync, renameSync, symlinkSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { ARTIFACTS, MAX_ARTIFACT_BYTES } from '@crossfire/contracts/release';
-import { loadRelease, artifactHash } from '@crossfire/adapter-filesystem/release';
-import { privateDir, writeJson, readPrivateBytes } from '@crossfire/adapter-filesystem/index';
+import { ARTIFACTS, MAX_ARTIFACT_BYTES } from '@ctlflow/crossfire-contracts/release';
+import { loadRelease, artifactHash } from '@ctlflow/crossfire-adapter-filesystem/release';
+import { privateDir, writeJson, readPrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { createCoordination } from './coordination.js';
-import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 
 function installedClient(root: string): string | null {
   const entry = join(root, 'client.mjs');

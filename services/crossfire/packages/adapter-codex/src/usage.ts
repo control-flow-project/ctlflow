@@ -1,4 +1,4 @@
-import { tokenCounts, type UsageSample } from '@crossfire/contracts/statistics';
+import { tokenCounts, type UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 import type { NativeEvent } from './protocol.js';
 
 export function codexUsage(event: NativeEvent, sessionId: string): UsageSample | null {

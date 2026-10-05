@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { mkdirSync, mkdtempSync } from "node:fs";
@@ -8,11 +8,11 @@ import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
 import { buildRelease } from "../scripts/build-release.js";
-import { authority } from "@crossfire/adapter-matrix/account/authority";
+import { authority } from "@ctlflow/crossfire-adapter-matrix/account/authority";
 import { serve } from "../apps/server/src/main.js";
 import { secret } from "./support/application.js";
 import type { Config } from "../apps/server/src/config.js";
-import { writeJson } from "@crossfire/adapter-filesystem/index";
+import { writeJson } from "@ctlflow/crossfire-adapter-filesystem/index";
 
 test("native authority shutdown aborts reads and serialized provisioning without replay", { timeout: 10_000 }, async scope => {
   const paths: string[] = [];

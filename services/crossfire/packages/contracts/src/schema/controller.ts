@@ -1,5 +1,5 @@
 import * as check from './validation.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 function metadata(input: unknown): Result<Record<string, string>> {
   if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length > 16) return failure('invalid', 'Controller metadata supports at most 16 text fields');

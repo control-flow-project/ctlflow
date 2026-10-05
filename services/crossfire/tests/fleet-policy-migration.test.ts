@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
 
 function policyStore() {

@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapAuditEvent } from './map.js';
 import { stored } from '../stored.js';
-import { success } from '@crossfire/kernel/result';
-import type { AuditEventRepository } from '@crossfire/domain/port/repositories';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import type { AuditEventRepository } from '@ctlflow/crossfire-domain/port/repositories';
 
 export function createAuditEventRepository(database: Database.Database): AuditEventRepository {
   return {

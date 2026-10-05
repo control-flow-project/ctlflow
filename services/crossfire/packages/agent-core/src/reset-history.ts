@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto';
-import { API, segment } from '@crossfire/contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import type { LocalState, Matrix } from './port.js';
-import type { Account, Settings } from '@crossfire/contracts/client';
+import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
 import type { Coordination } from './coordination.js';
 import { historyPage, HISTORY_RESOURCE_BYTES } from './history-page.js';
 import { eventView, joinedRooms, validatePage, synchronize } from './receive.js';
 import { eventOrigins } from './origins.js';
 import { resolveSenders } from './senders.js';
 import { deliveryEnvelope } from './receive.js';
-import * as check from '@crossfire/contracts/schema/validation';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 type Artifact = { file: string; bytes: number; sha256: string };
 type RoomExport = { room: string; end: string; cursor: string; complete: boolean; state: Artifact; pages: (Artifact & { count: number })[] };

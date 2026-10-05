@@ -1,16 +1,16 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
-import { createSchema } from '@crossfire/adapter-sqlite/schema/create-schema';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
-import { createDirectoryRepository } from '@crossfire/adapter-sqlite/repository/directory/index';
-import { createDiscoveryRepository } from '@crossfire/adapter-sqlite/repository/discovery/index';
-import { createListenerReadRepository } from '@crossfire/adapter-sqlite/repository/listener-read/index';
-import { createRoomGrantReadRepository } from '@crossfire/adapter-sqlite/repository/room-grant-read/index';
-import { createRuntimeRepository } from '@crossfire/adapter-sqlite/repository/runtime/index';
-import { roomGrants } from '@crossfire/contracts/schema/query';
-import type { Result } from '@crossfire/kernel/result';
+import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
+import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
+import { createDiscoveryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/discovery/index';
+import { createListenerReadRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/listener-read/index';
+import { createRoomGrantReadRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/room-grant-read/index';
+import { createRuntimeRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/runtime/index';
+import { roomGrants } from '@ctlflow/crossfire-contracts/schema/query';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 function value<T>(result: Result<T>): T {
   if (!result.ok) assert.fail(result.error.message);

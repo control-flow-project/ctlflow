@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Page, PageRequest } from './directory.js';
 import type { Permission, Role } from '../authorization/types.js';
 export type PrincipalSummary = { principalId: string; matrixUserId: string; kind: 'human' | 'agent'; displayName: string; ownerId: string; ownerMatrixId: string };

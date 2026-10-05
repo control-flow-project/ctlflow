@@ -1,4 +1,4 @@
-import { failure } from '@crossfire/kernel/result';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 import type { NativeInspector, NativePreserver } from './types.js';
 import { inspectCodex, preserveCodex } from './codex.js';
 

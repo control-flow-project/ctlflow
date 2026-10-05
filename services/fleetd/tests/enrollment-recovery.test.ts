@@ -6,9 +6,9 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { loadConfiguration } from '@fleetd/storage/configuration';
-import { loadBinding, saveBinding } from '@fleetd/storage/binding';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { loadConfiguration } from '@ctlflow/fleetd-storage/configuration';
+import { loadBinding, saveBinding } from '@ctlflow/fleetd-storage/binding';
 import { prepareEnrollment } from '../apps/daemon/src/enrollment.js';
 
 for (const status of ['expired', 'rejected', 'pending', 'unauthorized'] as const) {

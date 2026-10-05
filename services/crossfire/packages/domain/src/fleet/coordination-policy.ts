@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { CoordinationPolicy } from '../coordination/values.js';
 export type { CoordinationPolicy } from '../coordination/values.js';
 

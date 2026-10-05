@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { PUBLICATION_LIMITS, PUBLICATION_MEDIA, type PublicationCreation } from './values.js';
 
 export function publicationPath(value: string): Result<string> {

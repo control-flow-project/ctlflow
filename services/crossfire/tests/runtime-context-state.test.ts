@@ -4,8 +4,8 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmdirSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 
 function workspace(scope: TestContext) {
   const directory = mkdtempSync(join(tmpdir(), 'native-context-metadata-'));

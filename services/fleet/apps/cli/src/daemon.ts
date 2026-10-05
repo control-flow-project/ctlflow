@@ -3,8 +3,8 @@ import { openSync, closeSync, constants, fstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 
 export async function launchDaemon(root: string, name: string, signal: AbortSignal) {
   privateDir(root);
@@ -14,7 +14,7 @@ export async function launchDaemon(root: string, name: string, signal: AbortSign
   const output = openSync(join(root, 'daemon.log'), constants.O_CREAT | constants.O_APPEND | constants.O_WRONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
   const info = fstatSync(output);
   if (!info.isFile() || info.uid !== process.getuid!() || info.mode & 0o077) { closeSync(output); throw new Error('Daemon log is not a private owned file'); }
-  const child = spawn(process.execPath, [fileURLToPath(import.meta.resolve('@fleetd/service/executable')), '--root', root, '--name', name], { detached: true, stdio: ['ignore', output, output] });
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.resolve('@ctlflow/fleetd/executable')), '--root', root, '--name', name], { detached: true, stdio: ['ignore', output, output] });
   closeSync(output); child.unref();
   const ended = new Promise<void>(resolve => { child.once('close', () => resolve()); });
   let failed = false;

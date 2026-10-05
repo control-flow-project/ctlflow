@@ -1,6 +1,6 @@
 import * as check from './schema/validation.js';
 import { listQuery } from './schema/request.js';
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Parsed } from './schema/validation.js';
 import { runtimeOperation } from './fleet-runtime.js';
 

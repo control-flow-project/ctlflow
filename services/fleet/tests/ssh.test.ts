@@ -1,5 +1,5 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn, execFile } from 'node:child_process';
@@ -12,12 +12,12 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
 import { createServer as createProvider } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
-import { openTunnel } from '@fleet/ssh-transport/tunnel';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
-import { sshTerminalCommand } from '@fleet/ssh-transport/terminal';
-import { codexTerminal } from '@crossfire/adapter-codex/terminal';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import type { OwnedRuntimeConnection } from '@crossfire/agent-core/owned-runtime';
+import { openTunnel } from '@ctlflow/fleet-ssh-transport/tunnel';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
+import { sshTerminalCommand } from '@ctlflow/fleet-ssh-transport/terminal';
+import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { randomUUID } from 'node:crypto';
 
 const execute = promisify(execFile);

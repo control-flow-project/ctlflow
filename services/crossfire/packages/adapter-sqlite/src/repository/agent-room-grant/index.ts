@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapAgentRoomGrant } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '@crossfire/kernel/result';
-import type { AgentRoomGrantRepository } from '@crossfire/domain/port/repositories';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { AgentRoomGrantRepository } from '@ctlflow/crossfire-domain/port/repositories';
 
 export function createAgentRoomGrantRepository(database: Database.Database): AgentRoomGrantRepository {
   return {

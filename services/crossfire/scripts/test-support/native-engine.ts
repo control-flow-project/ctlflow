@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -6,8 +6,8 @@ import { once } from 'node:events';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
-import { codexProtocol, type NativeEvent } from '@crossfire/adapter-codex/protocol';
-import type { nativeProvider } from '@crossfire/test-support/native-provider';
+import { codexProtocol, type NativeEvent } from '@ctlflow/crossfire-adapter-codex/protocol';
+import type { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export async function materialize(engine: Pick<Awaited<ReturnType<typeof nativeEngine>>, 'session' | 'call' | 'notifications'>, provider: Awaited<ReturnType<typeof nativeProvider>>) {

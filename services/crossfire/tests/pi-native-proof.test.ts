@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
@@ -8,18 +8,18 @@ import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { claudeProvider } from './support/claude-provider.js';
 import { until, matrixFixture, message, ROOM } from '../scripts/test-support/listener.js';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { piDescriptor } from '@crossfire/adapter-pi/protocol';
-import { connectPi } from '@crossfire/adapter-pi/discovery';
-import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { piDescriptor } from '@ctlflow/crossfire-adapter-pi/protocol';
+import { connectPi } from '@ctlflow/crossfire-adapter-pi/discovery';
+import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
 import { builtClient, builtRelease } from '../scripts/test-support/release.js';
 import { nativeServer } from './support/native-server.js';
 import { value } from './support/application.js';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { createWakeRule, changeWakeRule } from '@crossfire/domain/wake-up/manage';
-import { readWakeRule } from '@crossfire/domain/wake-up/read';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { createWakeRule, changeWakeRule } from '@ctlflow/crossfire-domain/wake-up/manage';
+import { readWakeRule } from '@ctlflow/crossfire-domain/wake-up/read';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
 
 test('installed Pi native extension confirms idle/busy inputs, exact interruption, Matrix batching and replacement', { timeout: 180000 }, async scope => {
   const release = builtRelease().release, fixture = await nativeServer(scope, release);

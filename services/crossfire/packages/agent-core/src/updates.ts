@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { releaseName } from '@crossfire/contracts/release';
+import { releaseName } from '@ctlflow/crossfire-contracts/release';
 import type { LocalState } from './port.js';
 import type { RuntimeConnection } from './runtime.js';
 export function releaseUpdates(storage: LocalState, file: string, installed: string, owner: string, session: string) {

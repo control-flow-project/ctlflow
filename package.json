@@ -1,5 +1,5 @@
 {
-  "name": "@crossfire/workspace",
+  "name": "@ctlflow/workspace",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -18,9 +18,9 @@
     "test": "node scripts/workspaces.mjs test",
     "test:browser": "node scripts/test.mjs crossfire browser",
     "verify:structure": "node scripts/verify-structure.mjs",
-    "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@crossfire/service",
-    "verify:installation": "npm run verify:installation --workspace=@crossfire/service",
-    "verify:container": "npm run verify:container --workspace=@crossfire/service"
+    "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@ctlflow/crossfire",
+    "verify:installation": "npm run verify:installation --workspace=@ctlflow/crossfire",
+    "verify:container": "npm run verify:container --workspace=@ctlflow/crossfire"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

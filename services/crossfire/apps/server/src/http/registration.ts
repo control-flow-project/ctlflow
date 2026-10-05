@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Services } from '@crossfire/domain/port/services';
-import { registerMember, verifyInvitation } from '@crossfire/domain/member/registration';
+import type { Services } from '@ctlflow/crossfire-domain/port/services';
+import { registerMember, verifyInvitation } from '@ctlflow/crossfire-domain/member/registration';
 import { readBody, readForm } from './transport.js';
 import { registrationPage } from './registration-page.js';
 export const registrationStage = 'org.crossfire.login.registration';

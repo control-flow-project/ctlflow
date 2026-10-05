@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { WakeRuleDetails, WakeSchedule } from '@crossfire/contracts/wake-up';
+import type { WakeRuleDetails, WakeSchedule } from '@ctlflow/crossfire-contracts/wake-up';
 import { useSession } from '../session.js';
 import { call, operations, useAction } from '../api.js';
 import { Alert, Field, Panel, Help } from '../ui.js';

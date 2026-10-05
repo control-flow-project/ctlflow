@@ -1,8 +1,8 @@
 import { realpathSync } from 'node:fs';
-import type { Json } from '@crossfire/contracts/json';
-import type { RuntimeApproval, RuntimeHooks, RuntimeDecision } from '@crossfire/agent-core/runtime';
+import type { Json } from '@ctlflow/crossfire-contracts/json';
+import type { RuntimeApproval, RuntimeHooks, RuntimeDecision } from '@ctlflow/crossfire-agent-core/runtime';
 import { codexPermission, permissionDenial } from './approval.js';
-import { object } from '@crossfire/contracts/validation';
+import { object } from '@ctlflow/crossfire-contracts/validation';
 import { codexProtocol, type NativeEvent } from './protocol.js';
 import { approvalRouting } from './permission-policy.js';
 import { codexQuestion, validQuestionAnswer } from './questions.js';

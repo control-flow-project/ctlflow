@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { applicationFixture } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contractRelease } from './support/release.js';
-import { onboardingCommand, onboardingUrl } from '@crossfire/contracts/onboarding';
+import { onboardingCommand, onboardingUrl } from '@ctlflow/crossfire-contracts/onboarding';
 
 test("HTTP management enforces cookie, origin, CSRF, strict requests and removed routes", async scope => {
   const fixture = await applicationFixture(scope), { request, origin } = await httpFixture(scope, fixture.application);

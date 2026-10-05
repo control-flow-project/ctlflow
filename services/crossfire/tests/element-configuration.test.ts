@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,8 +8,8 @@ import { readElementPresentation } from '../apps/server/src/element-configuratio
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
-import { createMemberInvitation } from '@crossfire/domain/member/invitation';
+import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
+import { createMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
 
 test('Element presentation owns branding, not instance origin or access policy', scope => {
   const directory = mkdtempSync(join(tmpdir(), 'element-presentation-'));

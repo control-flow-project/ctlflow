@@ -1,8 +1,8 @@
-import type { MemberRecord } from '@crossfire/domain/port/directory';
-import type { PrincipalApplication } from '@crossfire/domain/identity/types';
-import type { AgentDetails } from '@crossfire/domain/agent/read-agent';
-import type { ListenerRun } from '@crossfire/domain/activity/types';
-import { agentDisplayName } from '@crossfire/domain/identity/display-name';
+import type { MemberRecord } from '@ctlflow/crossfire-domain/port/directory';
+import type { PrincipalApplication } from '@ctlflow/crossfire-domain/identity/types';
+import type { AgentDetails } from '@ctlflow/crossfire-domain/agent/read-agent';
+import type { ListenerRun } from '@ctlflow/crossfire-domain/activity/types';
+import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
 export function application(value: PrincipalApplication) {
   return { appliedRevision: value.appliedRevision, appliedStatus: value.appliedStatus, nativeDisplayName: value.nativeDisplayName,
     lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt, errorCode: value.errorCode, errorMessage: value.errorMessage };

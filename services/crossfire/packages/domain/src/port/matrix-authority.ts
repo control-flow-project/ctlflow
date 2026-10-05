@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 export type MatrixAccount = { userId: string; accessToken: string; deviceId: string };
 export type RoomPower = { creator: true; powerLevel: null } | { creator: false; powerLevel: number };
 export type RoomFacts = {

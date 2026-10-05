@@ -1,7 +1,7 @@
 import { copyFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { ARTIFACTS } from '@crossfire/contracts/release';
-import { loadRelease, type Release } from '@crossfire/adapter-filesystem/release';
+import { ARTIFACTS } from '@ctlflow/crossfire-contracts/release';
+import { loadRelease, type Release } from '@ctlflow/crossfire-adapter-filesystem/release';
 
 let cached: { directory: string; release: Release } | undefined;
 export function builtRelease() {

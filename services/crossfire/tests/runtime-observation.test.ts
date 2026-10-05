@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { nativeObservation } from '@crossfire/adapter-codex/observation';
-import { observedEvent } from '@crossfire/adapter-codex/observed-event';
-import { ownerObservation } from '@crossfire/agent-core/owner-observation';
-import type { RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { nativeObservation } from '@ctlflow/crossfire-adapter-codex/observation';
+import { observedEvent } from '@ctlflow/crossfire-adapter-codex/observed-event';
+import { ownerObservation } from '@ctlflow/crossfire-agent-core/owner-observation';
+import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
 import { fakeCodex, matrixFixture, OWNER_DM, ROOM, SELF, until } from '../scripts/test-support/listener.js';
 import { testClock } from '../scripts/test-support/clock.js';
-import { localState } from '@crossfire/adapter-filesystem/state';
-import { matrix as matrixClient } from '@crossfire/adapter-matrix/http';
-import type { Transport } from '@crossfire/agent-core/port';
+import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
+import { matrix as matrixClient } from '@ctlflow/crossfire-adapter-matrix/http';
+import type { Transport } from '@ctlflow/crossfire-agent-core/port';
 
 test('current native observations use exact discriminants and never guess alternative output fields', () => {
   const events: RuntimeObservationEvent[] = [], observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => events.push(event) }, () => 'original');

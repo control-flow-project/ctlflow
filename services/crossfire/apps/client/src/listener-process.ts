@@ -1,17 +1,17 @@
 import { openSync, closeSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
-import { listenerRequest, type LocalListener } from '@crossfire/adapter-crossfire/listener-client';
-import type { paths } from '@crossfire/adapter-filesystem/project';
-import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { listenerRequest, type LocalListener } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
+import type { paths } from '@ctlflow/crossfire-adapter-filesystem/project';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { emit } from './output.js';
-import type { ListenerOptions } from '@crossfire/adapter-crossfire/listener';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { isListenerStop } from '@crossfire/kernel/lifecycle';
+import type { ListenerOptions } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { isListenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 
 type Destination = ReturnType<typeof paths>;
-export type { LocalListener } from '@crossfire/adapter-crossfire/listener-client';
+export type { LocalListener } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
 
 export function reportStartup(message: { ready: true } | { error: string }): void {
   if (process.connected) process.send?.(message, () => {});

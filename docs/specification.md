@@ -53,10 +53,20 @@ documentation and shared verification tooling; it contains no application source
 or repository-wide package pool. Cross-project reuse is through declared package
 exports and dependencies. Applications never import another application's source.
 There is one listener and one native integration per supported runtime, not per-product copies.
-Only concrete, supported capabilities have packages. Individual agent attachment
-supports Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+. Fleet execution supports
-Codex; Claude Code/Pi fleet execution is a separate capability, not implicit in
-their individual-agent adapters.
+Only concrete, supported capabilities have packages. Every agent belongs to a
+fleet managed by fleetd, including a one-agent fleet. There is no standalone
+deployment, existing-session attachment, optional controller or detach-to-direct
+operation. Runtime behavior remains behind pure adapter interfaces. Codex
+0.158.0+ is the only implemented runtime; Claude Code and Pi are unimplemented,
+not selectable alternatives, placeholders or retained legacy integrations.
+
+All npm names use @ctlflow. Product names are @ctlflow/crossfire,
+@ctlflow/fleetd and @ctlflow/fleet; internal modules consistently use
+@ctlflow/<service>-<module>. Only fleet and fleetd are public distributables.
+Every other workspace, including Crossfire and the repository workspace, remains
+private. Public packages ship verified standalone builds with exact dependencies
+and never require publishing internal modules. The reviewed implementation plan
+is [Universal fleet controller](plans/20261005-universal-fleet-controller.md).
 
 - Crossfire owns identity, enrollment, human authorization, room access, native
   reconciliation, wake policies, listener activity, fleet grouping and React UI.
@@ -172,7 +182,36 @@ publication, not after model work completes. Accepted work is never rolled back.
 Client metadata checks are bounded to 30-second refreshes, server-clock due
 deadlines and a one-second busy recheck; they cause no model turn.
 
-### Individual agent connection
+### Noninteractive agent setup
+
+The user pastes one sentence directing the existing coding assistant to a
+personalized setup URL. That assistant runs the noninteractive `fleet setup`
+command; it is not connected, adopted or imported into Crossfire. fleetd starts
+a new managed agent with its own conversation. Existing coding sessions remain
+untouched. Later managed starts resume exact saved histories by default.
+
+The guide dynamically supplies the verified owner/server and pins the public npm
+release. Setup uses private persisted defaults without configuration questions:
+current project workspace, project-derived stable fleet/agent identifiers,
+existing configured local controller or a new local controller, native model
+defaults, danger-full-access/on-request with bypass disabled, shared history and
+the instance-wide 30-minute idle policy. Explicit optional configuration uses the
+same validated owners. Repeated setup reuses registrations/identities/history;
+invalid or ambiguous authority fails with an actionable error rather than asking
+a question, guessing identity or silently creating a replacement.
+
+Setup checks prerequisites and reports official installation/native login steps
+when needed. It installs the pinned CLI/controller privately, creates or reuses
+the controller, submits enrollment, prints its exact approval link/code, waits
+in ordinary code for owner authorization, and verifies actual listener/native
+readiness. No install lifecycle script starts a process. Human approval remains
+required and is not a configuration prompt. Setup creates no room or conversation
+in Matrix and sends no dummy model prompt. Owner DMs remain lazy and protected.
+
+The obsolete direct-connection contract below is removed during the owning
+implementation replacement; it is not an authorized alternative or fallback.
+
+### Superseded direct-connection baseline for implementation removal
 
 The user opens an existing Codex, Claude Code or Pi session in a project and
 pastes one sentence directing it to the personalized setup URL. That guide owns

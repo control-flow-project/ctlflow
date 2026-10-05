@@ -1,5 +1,5 @@
-import type { InstancePolicy } from '@crossfire/domain/audit/types';
-import type { AuditEventDetails } from '@crossfire/domain/audit/read-events';
+import type { InstancePolicy } from '@ctlflow/crossfire-domain/audit/types';
+import type { AuditEventDetails } from '@ctlflow/crossfire-domain/audit/read-events';
 export function policy(value: InstancePolicy) {
   return { revision: value.revision, maxOwnerAgents: value.maxOwnerAgents, maxAgents: value.maxAgents, maxPending: value.maxPending,
     maxMessageBytes: value.maxMessageBytes,

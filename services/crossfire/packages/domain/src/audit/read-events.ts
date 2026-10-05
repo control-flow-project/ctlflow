@@ -1,7 +1,7 @@
 import type { Services, Actor } from '../port/services.js';
 import type { PageRequest } from '../port/directory.js';
 import { ownerScope } from '../authorization/read-scope.js';
-import { success } from '@crossfire/kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import type { AuditEvent } from './types.js';
 import type { PrincipalSummary } from '../port/discovery.js';
 export type AuditEventDetails = AuditEvent & { actor: PrincipalSummary | null; target: PrincipalSummary | null };

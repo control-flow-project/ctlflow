@@ -1,6 +1,6 @@
-import type { Services } from '@crossfire/domain/port/services';
-import { reconcile } from '@crossfire/domain/maintenance/reconcile';
-import { maintainPublications } from '@crossfire/domain/publication/maintenance';
+import type { Services } from '@ctlflow/crossfire-domain/port/services';
+import { reconcile } from '@ctlflow/crossfire-domain/maintenance/reconcile';
+import { maintainPublications } from '@ctlflow/crossfire-domain/publication/maintenance';
 export function createWorker(services: Services) {
   let running: Promise<void> | undefined, timer: ReturnType<typeof setTimeout> | undefined;
   let pending = false, stopped = false;

@@ -1,6 +1,6 @@
 import type { Matrix } from './port.js';
-import type { Event } from '@crossfire/contracts/client';
-import { API, segment } from '@crossfire/contracts/matrix';
+import type { Event } from '@ctlflow/crossfire-contracts/client';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 
 export const HISTORY_RESOURCE_BYTES = 64 * 1024 * 1024;
 export type HistoryPage = { chunk: Event[]; start?: string; end?: string };

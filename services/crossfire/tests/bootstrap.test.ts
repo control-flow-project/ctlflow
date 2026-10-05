@@ -1,15 +1,15 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
 import { bootstrap } from "../apps/server/src/bootstrap.js";
-import { authority } from "@crossfire/adapter-matrix/account/authority";
+import { authority } from "@ctlflow/crossfire-adapter-matrix/account/authority";
 import { secret } from "./support/application.js";
 import { serviceUser } from '../apps/server/src/config.js';
-import { API } from '@crossfire/contracts/matrix';
-import { nativeOk, nativeRequest } from '@crossfire/adapter-matrix/http';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk, nativeRequest } from '@ctlflow/crossfire-adapter-matrix/http';
 import type { Config } from "../apps/server/src/config.js";
-import type { Result } from "@crossfire/kernel/result";
+import type { Result } from "@ctlflow/crossfire-kernel/result";
 
 function value<T>(result: Result<T>): T {
   assert(result.ok, result.ok ? "" : result.error.message);
