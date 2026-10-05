@@ -10,7 +10,7 @@ import { listen } from '@crossfire/adapter-crossfire/listener';
 import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
 import { createWakeRule, changeWakeRule } from '@crossfire/domain/wake-up/manage';
 import { readWakeRule } from '@crossfire/domain/wake-up/read';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { testClock } from '../scripts/test-support/clock.js';
 import { nativeServer } from './support/native-server.js';

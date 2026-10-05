@@ -8,7 +8,7 @@ import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import { emit } from './output.js';
 import type { ListenerOptions } from '@crossfire/adapter-crossfire/listener';
 import { listen } from '@crossfire/adapter-crossfire/listener';
-import { isListenerStop } from '@crossfire/agent-core/lifecycle';
+import { isListenerStop } from '@crossfire/kernel/lifecycle';
 
 type Destination = ReturnType<typeof paths>;
 export type { LocalListener } from '@crossfire/adapter-crossfire/listener-client';

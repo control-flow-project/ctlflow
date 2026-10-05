@@ -28,7 +28,7 @@ import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
 import { readJson } from '@crossfire/adapter-filesystem/index';
 import { API, segment } from '@crossfire/contracts/matrix';
 import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { connectCodex } from '@crossfire/adapter-codex/connection';
 import { listen } from '@crossfire/adapter-crossfire/listener';

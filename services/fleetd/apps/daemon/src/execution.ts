@@ -16,7 +16,7 @@ import { createFleetControlConnection, type FleetControlConnection } from '@cros
 import { operations } from '@crossfire/contracts/rest/operations';
 import { errorCode } from '@crossfire/contracts/rest/envelope';
 import { MAX_UPLOAD_BYTES } from '@crossfire/contracts/client';
-import { isListenerStop } from '@crossfire/agent-core/lifecycle';
+import { isListenerStop } from '@crossfire/kernel/lifecycle';
 import { loadBinding, saveBinding, protectFleet } from '@fleetd/storage/binding';
 import type { Execution } from '@fleetd/domain/port';
 import { prepareEnrollment } from './enrollment.js';

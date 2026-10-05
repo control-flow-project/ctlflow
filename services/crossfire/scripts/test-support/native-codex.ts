@@ -3,7 +3,7 @@ import type { TestContext } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { nativeProvider } from './native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { codexDelivery, type CodexConnection } from '@crossfire/adapter-codex/connection';
 import { connectSession } from '@crossfire/adapter-codex/session';
 import { nativeEngine, materialize } from './native-engine.js';

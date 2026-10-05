@@ -6,7 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { value } from './support/application.js';
 import { codexTerminal } from '@crossfire/adapter-codex/terminal';

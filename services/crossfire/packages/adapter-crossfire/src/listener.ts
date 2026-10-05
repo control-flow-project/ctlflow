@@ -7,7 +7,7 @@ import type { Clock } from '@crossfire/agent-core/port';
 import { dirname, join } from 'node:path';
 import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
 import { createListenerHost, type ListenerHost } from './listener-host.js';
-import { listenerStop } from '@crossfire/agent-core/lifecycle';
+import { listenerStop } from '@crossfire/kernel/lifecycle';
 export type ListenerOptions = Omit<CoreOptions, 'storage' | 'transport' | 'invitationRooms' | 'clock' | 'budget'> & { clock?: Clock; binding: string; host?: ListenerHost };
 export async function listen(options: ListenerOptions, signal: AbortSignal): Promise<void> {
   const release = await acquireProcessLock(join(dirname(options.cursorFile), 'receiver'));

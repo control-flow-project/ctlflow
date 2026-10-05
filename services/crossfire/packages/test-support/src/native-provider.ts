@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from './cleanup.js';
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
 import { createServer, type ServerResponse } from "node:http";

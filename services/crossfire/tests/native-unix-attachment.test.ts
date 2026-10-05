@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { codexProtocol } from '@crossfire/adapter-codex/protocol';
 import { discoverCodex } from '@crossfire/adapter-codex/discovery';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { materialize } from '../scripts/test-support/native-engine.js';
 import type { NativeEvent } from '@crossfire/adapter-codex/protocol';
 test('stock Codex native Unix socket attaches the exact existing session without launcher metadata or model input', { timeout: 30000 }, async scope => {

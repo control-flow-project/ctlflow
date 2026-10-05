@@ -4,7 +4,7 @@ import { HEARTBEAT_MS } from '@crossfire/contracts/activity';
 import type { Manifest } from '@crossfire/contracts/release';
 import type { Coordination } from './coordination.js';
 import type { listenerStatistics } from './statistics.js';
-import { listenerStop } from './lifecycle.js';
+import { listenerStop } from '@crossfire/kernel/lifecycle';
 
 export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controllerBound: boolean, clock: Clock, statistics: ReturnType<typeof listenerStatistics>, onUpdate?: (release: string) => void) {
   const run = randomUUID();

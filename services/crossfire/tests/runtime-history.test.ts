@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, rename
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { value } from './support/application.js';
 import type { RuntimeDecision, RuntimeObservationEvent } from '@crossfire/agent-core/runtime';

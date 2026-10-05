@@ -13,7 +13,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { openTerminal } from '../scripts/test-support/terminal.js';
 import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
 import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';

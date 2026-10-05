@@ -8,7 +8,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { nativeProvider } from '../scripts/test-support/native-provider.js';
+import { nativeProvider } from '@crossfire/test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
 import { builtRelease } from '../scripts/test-support/release.js';
 import { readJson } from '@crossfire/adapter-filesystem/index';
