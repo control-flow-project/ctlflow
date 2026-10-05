@@ -1,17 +1,13 @@
-import { lstatSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { lstatSync } from 'node:fs';
+import { join } from 'node:path';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import { metadataExists, nativeDirectories } from './home.js';
 
 const contexts = check.object({ mode: check.choice('shared', 'per-room'), control: check.nullable(check.identifier),
   rooms: check.list(check.object({ room: check.roomId, sessionId: check.identifier }), 2000) });
-
-function metadataExists(file: string): boolean {
-  try { lstatSync(file); return true; }
-  catch (error) { if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return false; throw error; }
-}
 
 export function contextState(home: string) {
   const file = join(home, 'crossfire-contexts.json');
@@ -28,10 +24,10 @@ export function contextState(home: string) {
   return { file, sharedFile, state, sharedSessionId };
 }
 
-export async function codexSavedContexts(input: { workspace: string }): Promise<Result<SavedRuntimeContext[]>> {
+export async function codexSavedContexts(input: { workspace: string; stateDirectory: string }): Promise<Result<SavedRuntimeContext[]>> {
   try {
-    if (!isAbsolute(input.workspace) || resolve(input.workspace) !== realpathSync(input.workspace)) return failure('invalid', 'Use the exact native workspace, without symbolic links');
-    const home = join(input.workspace, '.codex');
+    nativeDirectories(input);
+    const home = join(input.stateDirectory, '.codex');
     if (!metadataExists(home)) return success([]);
     const info = lstatSync(home);
     if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid!() || info.mode & 0o077) return failure('invalid', 'Native history metadata must be an owned private directory');

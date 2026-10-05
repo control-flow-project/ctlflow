@@ -8,6 +8,7 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
+    "smol-toml": "1.8.0",
     "ws": "8.21.3",
     "@ctlflow/crossfire-contracts": "0.1.0",
     "@ctlflow/crossfire-kernel": "0.1.0",

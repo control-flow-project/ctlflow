@@ -3,11 +3,11 @@ import type { LocalState } from './port.js';
 import type { RuntimeConnection } from './runtime.js';
 import type { MessageArtifacts } from './message-artifacts.js';
 import type { DirectedInput, ListenerControl } from './listener-control-port.js';
-export function createListenerControl(acknowledge: ListenerControl['acknowledge'], unavailable?: (reason: string) => void) {
+export function createListenerControl(acknowledge: ListenerControl['acknowledge'], binding: ListenerControl['binding'], unavailable?: (reason: string) => void) {
   let active = false, input: DirectedInput | null = null, generation = new AbortController();
   generation.abort(new Error('Controller delivery is inactive'));
   const observers = new Set<() => void>();
-  const connection: ListenerControl = { current: () => ({ active, signal: generation.signal, input }), acknowledge,
+  const connection: ListenerControl = { current: () => ({ active, signal: generation.signal, input }), binding, acknowledge,
     unavailable(reason) { update({ active: false, input }); unavailable?.(reason); },
     subscribe(changed) { observers.add(changed); return () => { observers.delete(changed); }; } };
   function update(next: { active: boolean; input: DirectedInput | null }): void {

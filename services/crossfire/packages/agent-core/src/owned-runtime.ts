@@ -6,14 +6,15 @@ export type SavedRuntimeContext = { context: string; runtime: string; sessionId:
 export type OwnedRuntimeConnection = RuntimeConnection & { attachment: RuntimeAttachment; turnControl: TurnControl;
   attachments: () => Promise<{ context: string; attachment: RuntimeAttachment }[]> };
 export type OwnedRuntimeInput = {
-  name: string; workspace: string; instructions: string;
+  name: string; workspace: string; stateDirectory: string; instructions: string;
   options: Record<string, unknown>; hooks: RuntimeHooks;
   listenerOptions?: ListenerOptions;
   allowNewHistory?: boolean;
 };
 export type OwnedRuntimeAdapter = {
   validate(options: unknown): Result<{ options: Record<string, unknown>; approval: RuntimeApproval }>;
-  savedContexts(input: { workspace: string }): Promise<Result<SavedRuntimeContext[]>>;
-  reset(input: { workspace: string; resetId: string }): Promise<Result<void>>;
+  inspect(input: { workspace: string; stateDirectory: string; options: Record<string, unknown> }, stop: AbortSignal): Promise<Result<void>>;
+  savedContexts(input: { workspace: string; stateDirectory: string }): Promise<Result<SavedRuntimeContext[]>>;
+  reset(input: { workspace: string; stateDirectory: string; resetId: string }): Promise<Result<void>>;
   start(input: OwnedRuntimeInput, stop: AbortSignal): Promise<Result<OwnedRuntimeConnection>>;
 };

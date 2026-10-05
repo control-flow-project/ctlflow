@@ -1,10 +1,9 @@
 import { existsSync, lstatSync, mkdtempSync, realpathSync, readlinkSync, renameSync, symlinkSync, writeFileSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ARTIFACTS, MAX_ARTIFACT_BYTES } from '@ctlflow/crossfire-contracts/release';
 import { loadRelease, artifactHash } from '@ctlflow/crossfire-adapter-filesystem/release';
 import { privateDir, writeJson, readPrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
-import { createCoordination } from './coordination.js';
 import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 
 function installedClient(root: string): string | null {
@@ -22,23 +21,24 @@ function installedClient(root: string): string | null {
 
 export function installedSoftware(root: string) {
   const client = installedClient(root);
-  if (!client) throw new Error('Automatic recovery requires the previously approved project software');
+  if (!client) throw new Error('Automatic recovery requires the previously approved controller-installed software');
   const directory = dirname(client), release = loadRelease(directory);
   return { manifest: release.manifest, file: client, activate: () => {},
     skill: { path: join(directory, 'SKILL.md'), changed: false } };
 }
 
-export async function installSoftware(root: string, origin: string) {
+export async function installSoftware(root: string, releaseDirectory: string) {
   const release = await acquireProcessLock(join(root, 'software-install'), 35);
-  try { return await prepareSoftware(root, origin); }
+  try { return prepareSoftware(root, releaseDirectory); }
   finally { await release(); }
 }
 
-async function prepareSoftware(root: string, origin: string) {
-  const response = await createCoordination({ origin }).release();
-  if (!response.ok) throw new Error(response.error.message);
-  const current = response.value;
+function prepareSoftware(root: string, releaseDirectory: string) {
+  if (!isAbsolute(releaseDirectory) || resolve(releaseDirectory) !== realpathSync(releaseDirectory)
+    || !lstatSync(releaseDirectory).isDirectory()) throw new Error('Controller software must come from the exact installed package release directory');
+  const local = loadRelease(releaseDirectory), current = local.manifest;
   const previous = installedClient(root);
+  if (previous) loadRelease(dirname(previous));
   const previousSkillHash = previous ? artifactHash(readPrivateBytes(join(dirname(previous), 'SKILL.md'), MAX_ARTIFACT_BYTES)) : null;
   const software = privateDir(join(root, 'software'));
   const directory = join(software, current.release);
@@ -46,19 +46,7 @@ async function prepareSoftware(root: string, origin: string) {
     const staging = mkdtempSync(join(software, '.install-'));
     try {
       for (const name of ARTIFACTS) {
-        const expected = current.artifacts[name];
-        const result = await fetch(origin + '/onboarding/' + current.release + '/' + name, { redirect: 'error', signal: AbortSignal.timeout(30_000) });
-        if (!result.ok || !result.body) throw new Error('Cannot download current ' + name + ': HTTP ' + result.status);
-        const buffers: Uint8Array[] = [];
-        let size = 0;
-        for await (const bytes of result.body) {
-          size += bytes.byteLength;
-          if (size > expected.bytes) throw new Error('Downloaded artifact exceeds its published size');
-          buffers.push(bytes);
-        }
-        const content = Buffer.concat(buffers);
-        if (size !== expected.bytes || artifactHash(content) !== expected.sha256) throw new Error('Downloaded artifact failed verification: ' + name);
-        writeFileSync(join(staging, name), content, { flag: 'wx', mode: 0o600 });
+        writeFileSync(join(staging, name), local.files[name], { flag: 'wx', mode: 0o600 });
       }
       writeJson(join(staging, 'manifest.json'), current);
       loadRelease(staging);

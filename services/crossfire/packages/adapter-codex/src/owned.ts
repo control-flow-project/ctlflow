@@ -1,7 +1,8 @@
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { startProcess } from './owned-process.js';
-import { prepareHome } from './home.js';
+import { nativeDirectories, prepareHome } from './home.js';
+import { inspectCodex } from './prerequisites.js';
 import { ownedOptions } from './owned-options.js';
 import { codexHistories } from './histories.js';
 import { resetCodex } from './reset.js';
@@ -9,14 +10,15 @@ import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { codexSavedContexts } from './context-state.js';
 
 export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
-  return { validate: ownedOptions, reset: resetCodex, savedContexts: codexSavedContexts, async start(input, stop) {
+  return { validate: ownedOptions, inspect: (input, stop) => inspectCodex(binary, input, stop), reset: resetCodex, savedContexts: codexSavedContexts, async start(input, stop) {
     const parsed = ownedOptions(input.options);
     if (!parsed.ok) return parsed;
     let process: Awaited<ReturnType<typeof startProcess>> | undefined;
     let histories: ReturnType<typeof codexHistories> | undefined;
     try {
-      const home = prepareHome(input.workspace);
-      process = await startProcess(home, input.workspace, stop, binary, parsed.value.options.features?.default_mode_request_user_input === true);
+      nativeDirectories(input);
+      const home = prepareHome(input.stateDirectory);
+      process = await startProcess(home, input.workspace, input.stateDirectory, input.name, stop, binary, parsed.value.options.features?.default_mode_request_user_input === true);
       const owner = process;
       const attachment = { runtime: 'codex', workspace: input.workspace,
         connection: { endpoint: owner.endpoint, tokenFile: owner.tokenFile, home, binary: owner.binary, path: owner.path } };
