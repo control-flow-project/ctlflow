@@ -31,7 +31,8 @@ test('Policy browser edits idle sleep in minutes, validates durations and keeps 
   await page.goto(origin + '/manage/policy');
   const minutes = page.getByLabel('Sleep after idle minutes', { exact: true }), save = page.getByRole('button', { name: 'Save settings', exact: true });
   await expect(minutes).toHaveValue('30'); assert.equal(await idleSeconds(page, origin), 1800);
-  await expect(page.getByRole('region', { name: 'Fleet idle sleep', exact: true })).toContainText('Directly connected agents are never stopped');
+  await expect(page.getByRole('region', { name: 'Fleet idle sleep', exact: true })).toContainText('applies to every agent');
+  await expect(page.getByRole('region', { name: 'Fleet idle sleep', exact: true })).toContainText('manually stopped session stays stopped');
   for (const invalid of ['', '-1', '0.001', '10081']) {
     await minutes.fill(invalid); await expect(minutes).toHaveAttribute('aria-invalid', 'true'); await expect(save).toBeDisabled();
     assert.equal(await idleSeconds(page, origin), 1800, 'Invalid local input never changes the persisted policy');
