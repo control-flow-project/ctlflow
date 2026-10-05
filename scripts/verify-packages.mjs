@@ -32,6 +32,10 @@ export function verifyPackageOwnership(root) {
     const product = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
     const isPublic = PUBLIC_PACKAGES.includes(product.name);
     verifyPackageManifest(product, '@ctlflow/' + service, isPublic);
+    assert.equal(product.version, workspace.version, 'Server setup descriptors and public controller products share one release version');
+    for (const [name, version] of Object.entries(product.dependencies ?? {})) {
+      if (PUBLIC_PACKAGES.includes(name)) assert.equal(version, workspace.version, 'Public controller dependencies match the exact coordinated release');
+    }
     if (isPublic) published.push(product.name);
     for (const kind of ['apps', 'packages']) {
       const parent = join(directory, kind);
