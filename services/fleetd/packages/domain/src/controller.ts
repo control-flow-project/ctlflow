@@ -496,6 +496,7 @@ export function createController(services: Services) {
     await Promise.all(mutations.values());
     for (const operation of active.values()) operation.stop.abort(new Error('Controller stopping'));
     await Promise.all([...active.values()].map(operation => operation.done));
+    await Promise.all([...recovering.values()].map(recovery => recovery.done));
     for (const record of records) {
       const configuration = services.registry.load(record.directory);
       if (configuration.ok) for (const instance of configuration.value.roster.instances) await stopInstance(record.fleetId, instance);

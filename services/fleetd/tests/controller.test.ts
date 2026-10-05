@@ -517,6 +517,26 @@ test('a permanent start failure remains permanent when reported after the restor
   assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
 });
 
+test('shutdown drains pending restoration even if roster files become invalid and retains desired intent', { timeout: 5000 }, async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+  let release!: () => void, finish!: (result: Result<Running>) => void, executionClosed = false, nativeClosed = false;
+  fixture.services.delay = async (_milliseconds, signal) => new Promise<void>(resolve => {
+    release = resolve; if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
+  });
+  fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
+  fixture.services.execution.close = async () => { executionClosed = true; };
+  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
+  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  writeFileSync(join(fixture.fleet, 'runtime.toml'), 'invalid TOML');
+  const closing = restarted.close(); await yieldLoop(); assert.equal(executionClosed, false);
+  const stop = new AbortController();
+  finish(success(runtimeFixture({ sessionId: 'late-owned', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+    pointer: { runtime: 'fixture', sessionId: 'late-owned', workspace: '/fixture', connection: {} }, close: async () => { nativeClosed = true; stop.abort(); } })));
+  await closing; assert.equal(nativeClosed, true); assert.equal(executionClosed, true);
+  assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
+});
+
 test('invalid desired state fails closed instead of silently forgetting activation', async scope => {
   const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
   writeFileSync(join(fixture.directory, 'controller', 'desired-intent.json'), '{bad-json', { mode: 0o600 });
