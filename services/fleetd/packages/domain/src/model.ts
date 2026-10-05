@@ -13,7 +13,6 @@ export type Definition = { name: string; runtime: string; options: Record<string
 export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
 export type DesiredIntent = { fleetId: string; instanceKey: string };
-export type NativeState = { phase: 'running' | 'sleeping' | 'waking' | 'failed'; lastActivityAt: number | null; historyAvailable: boolean };
 export type RetainedContext = Omit<SavedRuntimeContext, 'workspace'>;
 export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'sleeping' | 'waking' | 'stopping' | 'failed';
 export type InstanceState = { instance: Instance; phase: Phase; sessionId: string | null; error: string | null; startedAt: number | null };

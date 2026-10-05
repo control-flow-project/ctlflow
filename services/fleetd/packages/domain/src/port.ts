@@ -1,7 +1,8 @@
 import type { Result } from '@crossfire/kernel/result';
 import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
 import type { ControllerState, ListenerControl } from '@crossfire/agent-core/listener-control';
-import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, NativeState, RetainedContext } from './model.js';
+import type { NativeSessionState } from '@crossfire/agent-core/runtime';
+import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, RetainedContext } from './model.js';
 export type Registry = {
   registrations(): Result<Registration[]>;
   saveRegistrations(values: Registration[]): Result<void>;
@@ -12,7 +13,7 @@ export type Registry = {
   load(directory: string): Result<Configuration>;
   writeRoster(configuration: Configuration, roster: Roster): Result<Configuration>;
 };
-export type Running = { sessionId: string; signal: AbortSignal; nativeState(): NativeState;
+export type Running = { sessionId: string; signal: AbortSignal; nativeState(): NativeSessionState;
   attachment(): Promise<Result<RuntimeAttachment>>;
   attachments(): Promise<Result<{ context: string; attachment: RuntimeAttachment }[]>>;
   contexts(): Promise<Result<RetainedContext[]>>; control: ListenerControl; close(): Promise<void> };
