@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import type { TestContext } from 'node:test';
 import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,11 +10,12 @@ import { promisify } from 'node:util';
 
 const execute = promisify(execFile);
 
-export async function installedFleet(): Promise<string> {
+export async function installedFleet(scope: TestContext): Promise<string> {
   const installer = process.env.npm_execpath;
   assert(installer, 'Run installed product verification through npm');
   const repository = fileURLToPath(new URL('../../../../../', import.meta.url));
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-public-fleet-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const packages = join(directory, 'packages'), prefix = join(directory, 'installation');
   mkdirSync(packages); mkdirSync(prefix);
   const tarballs: string[] = [];

@@ -9,9 +9,9 @@ test('all packages use their service-owned ctlflow namespace and only the two pr
 });
 
 test('publication rejects internal exposure, source files, private dependencies, ranged public dependencies and install hooks', () => {
-  const valid = { name: '@ctlflow/fleet', private: false, type: 'module', publishConfig: { access: 'public' }, files: ['dist/bin', 'README.md'], bin: { fleet: './dist/bin/fleet.mjs' }, dependencies: { '@ctlflow/fleetd': '0.1.0' } };
+  const valid = { name: '@ctlflow/fleet', private: false, type: 'module', publishConfig: { access: 'public' }, files: ['dist/bin', 'docs', 'README.md'], bin: { fleet: './dist/bin/fleet.mjs' }, dependencies: { '@ctlflow/fleetd': '0.1.0' } };
   verifyPackageManifest(valid, valid.name, true);
-  for (const changed of [ { private: true }, { files: ['src'] }, { files: ['dist/*'] }, { dependencies: { '@ctlflow/fleetd-app': '0.1.0' } },
+  for (const changed of [ { private: true }, { files: ['src'] }, { files: ['dist/*'] }, { files: ['dist/src'] }, { files: ['dist/tests'] }, { files: ['dist/assets'] }, { files: ['docs/*'] }, { dependencies: { '@ctlflow/fleetd-app': '0.1.0' } },
     { dependencies: { '@ctlflow/fleetd': '^0.1.0' } }, { scripts: { postinstall: 'fleet start' } }, { publishConfig: { access: 'restricted' } } ]) {
     assert.throws(() => verifyPackageManifest({ ...valid, ...changed }, valid.name, true));
   }

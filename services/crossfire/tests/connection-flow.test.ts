@@ -36,7 +36,7 @@ test('public fleet setup starts a separate native history, reuses identity and p
   const { services, origin, worker, admin } = fixture;
   const environment = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'configuration'),
     CODEX_THREAD_ID: existing.session, RUNCODEX_CONNECTION_FILE: join(home, 'connection.json') };
-  const executable = await installedFleet();
+  const executable = await installedFleet(scope);
   const cli = (...args: string[]) => execute(process.execPath, [executable, '--root', root, ...args], {
     cwd: project, env: environment, timeout: 70_000, maxBuffer: 256 * 1024,
   });

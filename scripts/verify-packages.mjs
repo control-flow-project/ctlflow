@@ -11,8 +11,8 @@ export function verifyPackageManifest(manifest, expectedName, isPublic) {
   if (!isPublic) return;
   assert.deepEqual(manifest.publishConfig, { access: 'public' }, 'Public scope requires explicit public access');
   assert(Array.isArray(manifest.files) && manifest.files.length > 0, 'Public packages need a finite file allowlist');
-  for (const file of manifest.files) assert(typeof file === 'string' && !file.includes('*') && !file.includes('..')
-    && !file.startsWith('/') && /^(?:dist\/|README\.md$|LICENSE$)/u.test(file), 'Public package files must be explicit build artifacts/docs');
+  for (const file of manifest.files) assert(typeof file === 'string' && ['dist/bin', 'dist/assets', 'docs', 'README.md'].includes(file), 'Public package files must be explicit executable, release assets or product documentation directories');
+  assert(!manifest.files.includes('dist/assets') || expectedName === '@ctlflow/fleetd', 'Only fleetd owns bundled listener release assets');
   assert(manifest.bin && Object.keys(manifest.bin).length === 1 && manifest.bin[expectedName.slice('@ctlflow/'.length)], 'Public product needs its named executable');
   for (const [name, version] of Object.entries(manifest.dependencies ?? {})) {
     if (name.startsWith('@ctlflow/')) {
