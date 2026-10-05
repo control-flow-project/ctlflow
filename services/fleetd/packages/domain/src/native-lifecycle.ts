@@ -40,6 +40,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   let activeCalls = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
   let cancelIdle: (() => void) | undefined;
   let failedEpisode = false;
+  let inspectionUncertain = false;
   let configured = false;
   let initializationFailure: Failure | undefined;
 
@@ -48,11 +49,11 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     phase = 'failed';
     if (!failedEpisode) { failedEpisode = true; services.failed(sessionId || null, error); }
   }
-  function emit(state: Observation['state'], selected = contexts): void {
+  function emit(state: Observation['state'], selected = contexts, errorMessage: string | null = null): void {
     for (const context of selected) {
       const previous = observations.get(context.sessionId);
       const observation: Observation = { sessionId: context.sessionId, roomId: context.context === 'shared' || context.context === 'control' ? null : context.context,
-        runtime: services.runtime, state, observedAt: services.clock.now(), settings: previous?.settings ?? services.initialSettings, errorMessage: null };
+        runtime: services.runtime, state, observedAt: services.clock.now(), settings: previous?.settings ?? services.initialSettings, errorMessage };
       observations.set(context.sessionId, observation);
       services.hooks.observe?.({ kind: 'state', observation });
     }
@@ -122,7 +123,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         if (native !== connection || lifetime.aborted) return;
         const error: unknown = connection.signal.reason ?? nativeError('native', 'Native session disconnected');
         report(error);
-        emit('failed');
+        emit('failed', contexts, (error instanceof Error ? error.message : 'Native execution failed').slice(0, 4096));
         recovery ??= (async () => {
           await discard(connection);
           emit('sleeping', contexts.filter(context => context.context !== services.primary));
@@ -164,7 +165,25 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     const connection = native;
     if (activeCalls || opening || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()) { touch(); return; }
     let status: { busy: boolean };
-    try { status = await connection.inspect(); } catch { touch(); return; }
+    try { status = await connection.inspect(); }
+    catch (error) {
+      if (!inspectionUncertain) {
+        inspectionUncertain = true;
+        services.failed(sessionId, error);
+        for (const context of contexts) {
+          const previous = observations.get(context.sessionId);
+          services.hooks.observe?.({ kind: 'state', observation: { sessionId: context.sessionId,
+            roomId: context.context === 'shared' || context.context === 'control' ? null : context.context,
+            runtime: services.runtime, state: 'unavailable', observedAt: services.clock.now(), settings: previous?.settings ?? services.initialSettings,
+            errorMessage: (error instanceof Error ? error.message : 'Native idle state could not be verified').slice(0, 4096) } });
+        }
+      }
+      touch(); return;
+    }
+    if (inspectionUncertain) {
+      inspectionUncertain = false; services.recovered();
+      for (const observation of observations.values()) services.hooks.observe?.({ kind: 'state', observation: { ...observation, observedAt: services.clock.now() } });
+    }
     if (status.busy || native !== connection || activeCalls || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()
       || services.clock.now() < lastActivityAt + idleSeconds * 1000) { touch(); return; }
     cancelIdle?.(); cancelIdle = undefined;
@@ -253,6 +272,6 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       }, close });
   } catch (error) {
     await close();
-    return initializationFailure ? { ok: false, error: initializationFailure } : failure('native', error instanceof Error ? error.message : 'Native listener binding could not initialize');
+    return initializationFailure ? { ok: false as const, error: initializationFailure } : failure('native', error instanceof Error ? error.message : 'Native listener binding could not initialize');
   }
 }

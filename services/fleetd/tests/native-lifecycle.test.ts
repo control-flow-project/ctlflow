@@ -87,6 +87,11 @@ test('all native activity, unresolved decisions, pending listener work and unkno
     fixture_.setBusy(condition === 'busy'); fixture_.setDecisions(condition === 'decisions'); fixture_.setPending(condition === 'pending'); fixture_.setUnknown(condition === 'unknown');
     await fixture_.advance(1800000);
     assert.equal(fixture_.closed.length, 0, condition); assert.equal(managed.nativeState().phase, 'running', condition);
+    if (condition === 'unknown') {
+      assert.equal(fixture_.failures.length, 1);
+      assert(fixture_.observed.some(event => event.kind === 'state' && event.observation.state === 'unavailable'));
+      await fixture_.advance(1800000); assert.equal(fixture_.failures.length, 1, 'Unknown inspection is one owner incident, not a notice flood');
+    }
     fixture_.setBusy(false); fixture_.setDecisions(false); fixture_.setPending(false); fixture_.setUnknown(false);
     await fixture_.advance(1800000); await until(() => managed.nativeState().phase === 'sleeping');
   }

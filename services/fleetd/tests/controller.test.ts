@@ -9,7 +9,8 @@ import { setImmediate as yieldLoop } from 'node:timers/promises';
 import { createController } from '@fleetd/domain/controller';
 import type { Execution, Running } from '@fleetd/domain/port';
 import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
-import type { Operation, NativeState } from '@fleetd/domain/model';
+import type { Operation } from '@fleetd/domain/model';
+import type { NativeSessionState } from '@crossfire/agent-core/runtime';
 import { createRegistry } from '@fleetd/storage/registry';
 import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
 import { fleetView, instanceView } from '@fleetd/contracts/api';
@@ -378,7 +379,7 @@ test('inspection never accepts edited configuration; a revision-checked start ap
 
 test('sleeping and waking native phases retain the listener and inspection never resumes them', async scope => {
   const binding = createListenerControl(async () => {}); binding.update({ active: true, input: null });
-  let phase: NativeState['phase'] = 'sleeping', starts = 0, stoppedReads = 0;
+  let phase: NativeSessionState['phase'] = 'sleeping', starts = 0, stoppedReads = 0;
   const fixture = fixtureController({ contexts: async () => { stoppedReads++; return success([{ context: 'shared', runtime: 'fixture', sessionId: 'saved' }]); },
     start: async () => { starts++; const stop = new AbortController(); return success(runtimeFixture({ sessionId: 'saved', signal: stop.signal,
       nativeState: () => ({ phase, lastActivityAt: 123, historyAvailable: true }), control: binding.connection,
