@@ -8,6 +8,7 @@ import { chromium, expect } from '@playwright/test';
 import { createClient } from '@crossfire/adapter-crossfire/client';
 import { operations } from '@crossfire/contracts/rest/operations';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
+import { browserOptions } from './support/tls.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
 import { mapFleet } from './support/map-fleet.js';
@@ -36,7 +37,7 @@ test('Management distinguishes native sleep and wake from listener readiness wit
       stopped: true, controllerBound: false, messagesDelivered: 0, statistics: null }));
   }
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/native-state-browser-'));
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
   await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);

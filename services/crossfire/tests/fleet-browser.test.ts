@@ -26,6 +26,8 @@ import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
 import { listen } from '@crossfire/adapter-crossfire/listener';
 import { fakeCodex, until } from '../scripts/test-support/listener.js';
 import { success } from '@crossfire/kernel/result';
+import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
+import { browserOptions } from './support/tls.js';
 
 test('browser fleet review, room-plan confirmation, invitation delegation and selected wake identities share canonical APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
@@ -37,9 +39,9 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       { instanceKey: 'beta', name: 'beta', coordinationPolicy: { ...defaultCoordinationPolicy(), wakeMode: 'selected' as const,
         senderMatrixIds: [admin.member.principal.matrixUserId, guest.matrixUserId] } }] };
   const introduced = value(await introduceEnrollment(services, input));
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
-  const context = await browser.newContext(); await context.addCookies([{ name: 'crossfire', value: admin.secret, url: origin }]);
+  const context = await browser.newContext(); await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const page = await context.newPage(), errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin + '/manage/enrollments/' + input.enrollmentId);
   await expect(page.getByText('Research workstation', { exact: true })).toBeVisible();
@@ -251,7 +253,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       }
     }
   }
-  const otherContext = await browser.newContext(); await otherContext.addCookies([{ name: 'crossfire', value: other.secret, url: origin }]);
+  const otherContext = await browser.newContext(); await otherContext.addCookies([{ name: COOKIE_NAME, value: other.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const otherPage = await otherContext.newPage(); await otherPage.goto(origin + '/manage/fleets');
   await expect(otherPage.getByRole('heading', { name: 'No fleets' })).toBeVisible();
   await checkPaperLayout(otherPage);
@@ -272,7 +274,7 @@ test('stock Element room invite search finds an agent with no shared rooms witho
   const fixture = await nativeServer(scope, await releaseFixture(), {}, elementAssets());
   const owner = await fixture.member('alice'), other = await fixture.member('bob'), agent = await fixture.agent(other.actor, 'bea');
   const room = value(await nativeOk({ base: fixture.origin, token: owner.token }, 'POST', API + '/createRoom', { name: 'Matter review', preset: 'private_chat' }));
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on('dialog', dialog => dialog.dismiss());
@@ -319,7 +321,7 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000, runtime: runtime.runtime,
   }, stop.signal).catch(error => { ended = error; });
   cleanup(scope, async () => { stop.abort(); await receiver; });
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } }), page = await context.newPage();
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
@@ -374,7 +376,7 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId, conversation.roomId);
   assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 1);
   await page.screenshot({ path: join(directory, 'element-owner-dm-admitted.png'), fullPage: true });
-  await context.addCookies([{ name: 'crossfire', value: owner.secret, url: origin }]);
+  await context.addCookies([{ name: COOKIE_NAME, value: owner.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   await page.goto(origin + '/manage/agents/' + agent.id);
   await expect(page.getByRole('row').filter({ has: page.getByRole('link', { name: 'Samosas', exact: true }) }).getByRole('cell').nth(2)).toHaveText('Read & reply');
   const directRow = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'ada (alice)', exact: true }) });
@@ -407,10 +409,10 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
       expectedGeneration: null, accessMode: modeIndex === 0 ? 'read' : modeIndex === 1 ? 'reply' : 'custom', powerLevel: modeIndex === 2 ? 25 : null, muted: index % 5 === 0 }, randomUUID()));
   }
   await worker.drain();
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1920, height: 1200 } });
-  await context.addCookies([{ name: 'crossfire', value: admin.secret, url: origin }]);
+  await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const page = await context.newPage(), errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   const base = '/manage/fleets/' + fleet.id, route = base + '/map';
@@ -470,7 +472,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
     await page.screenshot({ path: join(directory, 'fleet-map-' + width + '.png'), fullPage: true });
   }
   const unauthorized = await browser.newContext(); cleanup(scope, () => unauthorized.close());
-  await unauthorized.addCookies([{ name: 'crossfire', value: other.secret, url: origin }]);
+  await unauthorized.addCookies([{ name: COOKIE_NAME, value: other.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const denied = await unauthorized.newPage(); await denied.goto(origin + route);
   await expect(denied.getByRole('alert')).toBeVisible(); await expect(denied.locator('.map-node')).toHaveCount(0);
   assert.deepEqual(errors, []);

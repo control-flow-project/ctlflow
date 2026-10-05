@@ -11,6 +11,7 @@ import { readJson } from '@crossfire/adapter-filesystem/index';
 import { ARTIFACTS } from '@crossfire/contracts/release';
 import { messageContent } from '@crossfire/adapter-matrix/message';
 import { onboardingUrl } from '@crossfire/contracts/onboarding';
+import { browserOptions, secureProxy } from '../tests/support/tls.js';
 
 const root = process.cwd();
 const repository = resolve(root, '../..');
@@ -19,7 +20,8 @@ portProbe.listen(0, '127.0.0.1'); await once(portProbe, 'listening');
 const address = portProbe.address(); assert(address && typeof address === 'object');
 const port = address.port;
 await new Promise<void>(resolve => portProbe.close(() => resolve()));
-const origin = 'http://127.0.0.1:' + port;
+const disposal: (() => Promise<void>)[] = [];
+const { origin } = await secureProxy({ after: operation => { disposal.push(operation); } }, 'http://127.0.0.1:' + port);
 const contentPort = port + 1;
 mkdirSync(join(root, '.temp'), { recursive: true });
 const directory = mkdtempSync(join(root, '.temp/container-verification-'));
@@ -37,7 +39,7 @@ if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status
 }
 
 async function start() {
-  const child = spawn(process.execPath, [join(root, 'crossfire'), 'start', '--directory', directory, '--content-port', String(contentPort)], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(root, 'crossfire'), 'start', '--directory', directory, '--port', String(port), '--content-port', String(contentPort)], { stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '';
   child.stdout.on('data', (data: Buffer) => { output = (output + data.toString()).slice(-24_000); });
   child.stderr.on('data', (data: Buffer) => { output = (output + data.toString()).slice(-24_000); });
@@ -69,7 +71,7 @@ async function start() {
   return { close };
 }
 
-const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+const browser = await chromium.launch(browserOptions);
 const additionalInstructions = 'Use project tickets.\nKeep replies concise. 東京';
 let publicRoom: string | undefined;
 try {
@@ -210,5 +212,8 @@ try {
       } finally { await context.close(); }
     } finally { await stack.close(); }
   }
-} finally { await browser.close(); }
+} finally {
+  try { await browser.close(); }
+  finally { while (disposal.length) await disposal.pop()!(); }
+}
 console.log('Container startup, Element public-room creation and attachment download, React/native routes, artifacts, shutdown and persisted rooms passed: ' + directory);

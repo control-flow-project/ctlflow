@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 test('one schema refuses unrelated storage without modifying it', () => {
   mkdirSync('.temp', { recursive: true }); const path = join(mkdtempSync(join(process.cwd(), '.temp/schema-')), 'foreign.sqlite');
   const original = new Database(path); original.exec('CREATE TABLE unrelated (id TEXT PRIMARY KEY); INSERT INTO unrelated VALUES (\'retained\')'); original.close(); chmodSync(path, 0o600);
-  assert.throws(() => openStore(path), /current Crossfire schema/);
+  assert.throws(() => openStore(path), /Unsupported Crossfire schema.*No data was changed/u);
   const inspection = new Database(path);
   assert.deepEqual(inspection.prepare('SELECT id FROM unrelated').all(), [{ id: 'retained' }]);
   assert.equal(inspection.pragma('user_version', { simple: true }), 0); inspection.close();

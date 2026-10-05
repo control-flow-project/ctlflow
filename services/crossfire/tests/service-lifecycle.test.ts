@@ -61,7 +61,7 @@ test("private service starts with real native bootstrap and shuts down idempoten
   writeJson(join(directory, "bootstrap.json"), { servicePassword: secret(), administratorPassword: secret() });
   const output = join(directory, "release");
   const release = await buildRelease(process.cwd(), output);
-  const service = await serve(directory, join(output, "onboarding", release.release), port);
+  const service = await serve(directory, join(output, "onboarding", release.release), port, {}, port + 1);
   cleanup(scope, service.close);
   const health = await fetch(config.publicOrigin + "/api/health", { signal: AbortSignal.timeout(5000) });
   assert.equal(health.status, 200);

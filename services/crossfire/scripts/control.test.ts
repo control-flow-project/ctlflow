@@ -192,7 +192,7 @@ test('a receipt published during human interruption is acknowledged without repl
   await clock.until(() => native.requests().some(request => request.method === 'turn/interrupt'));
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(original.clientUserMessageId), original.input) });
   native.update({ mode: 'normal' });
-  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted' } });
+  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted', error: null } });
   await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '2');
   assert.equal(starts().length, 2);
   assert(JSON.stringify(starts()[1]!.params!.input).includes('$redirect'));

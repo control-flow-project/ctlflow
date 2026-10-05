@@ -29,6 +29,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   const directory = createDirectoryRepository(database);
   const discovery = createDiscoveryRepository(database);
   const activity = createListenerReadRepository(database);
+  const runtime = createRuntimeRepository(database);
   const application = (principalId: string) => value(repositories.principalApplication.insert({
     principalId, appliedRevision: 0, appliedIntentHash: 'applied', appliedStatus: 'active',
     nativeDisplayName: principalId, lastAttemptAt: 1, lastSuccessAt: 1, nextCheckAt: 100,
@@ -46,11 +47,15 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
         value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
         value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
         application(agentId);
-        for (let runIndex = 0; runIndex < 3; runIndex++) value(repositories.listenerRun.insert({
-          id: agentId + '-run-' + runIndex, agentId, release: 'proof', controllerBound: false, startedAt: 1,
-          lastSeenAt: 100 + runIndex, activeMs: 100, messagesDelivered: 2,
-          stoppedAt: runIndex === 2 ? null : 101, disconnectRequestedAt: null,
-        }));
+        for (let runIndex = 0; runIndex < 3; runIndex++) {
+          const runId = agentId + '-run-' + runIndex;
+          value(repositories.listenerRun.insert({ id: runId, agentId, release: 'proof', controllerBound: false, startedAt: 1,
+            lastSeenAt: 100 + runIndex, activeMs: 100, messagesDelivered: 2,
+            stoppedAt: runIndex === 2 ? null : 101, disconnectRequestedAt: null }));
+          value(runtime.saveObservation(agentId, { runId, sessionId: 'shared', roomId: null, runtime: 'codex',
+            state: runIndex === 2 ? 'sleeping' : 'failed', observedAt: 100 + runIndex, historyMode: 'shared',
+            maxInputBytes: 100000, errorMessage: null, lastActivityAt: 90, historyAvailable: true, settings: [] }));
+        }
       }
     }
   })();
@@ -81,6 +86,12 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
     const identities = value(discovery.selected([...agentIds, 'owner-2']));
     assert.equal(identities.length, pageSize + 1);
     assert.equal(statements.length, 6, 'Selected identities hydrate through two batched queries');
+    const summaries = value(runtime.summaries(agentIds));
+    assert.equal(summaries.size, pageSize);
+    assert([...summaries.values()].every(summary => summary.state === 'sleeping' && summary.historyAvailable === true));
+    assert.equal(statements.length, 8, 'Native summaries use two page-wide queries, including tied run start times');
+    assert.match(plan(statements[6]!), /SEARCH .*ix_listener_run_agent.*agent_id=/u);
+    assert.match(plan(statements[7]!), /SEARCH .*runtime_observation.*run_id=/u);
     scope.diagnostic(JSON.stringify({ agents: 1000, listenerRuns: 3000, page: 2, pageSize,
       statements: statements.length, elapsedMs: Math.ceil(performance.now() - started) }));
   }
@@ -110,16 +121,25 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
     assert.equal(roomGrants(new URLSearchParams({ roomIds: source })).ok, false);
   }
   assert.equal(roomGrants(new URLSearchParams('roomIds=[]&roomIds=[]')).ok, false);
-  const runtime = createRuntimeRepository(database);
+  value(repositories.listenerRun.insert({ id: agentId + '-new-run', agentId, release: 'proof', controllerBound: false,
+    startedAt: 2, lastSeenAt: 103, activeMs: 0, messagesDelivered: 0, stoppedAt: null, disconnectRequestedAt: null }));
+  value(runtime.saveObservation(agentId, { runId: agentId + '-new-run', sessionId: 'shared', roomId: null,
+    runtime: 'codex', state: 'waking', observedAt: 103, historyMode: 'shared', maxInputBytes: 100000,
+    errorMessage: null, lastActivityAt: 103, historyAvailable: true, settings: [] }));
+  assert.equal(value(runtime.summaries([agentId])).get(agentId)?.state, 'waking', 'Start time takes priority over lexical run ID');
+  assert.equal(value(runtime.summaries(['missing-agent'])).size, 0);
+  statements = [];
+  assert.equal(value(runtime.summaries([])).size, 0); assert.equal(statements.length, 0);
   for (const contexts of [1, 100]) {
     for (let position = 0; position < contexts; position++) value(runtime.saveObservation(agentId, {
-      runId: agentId + '-run-2', sessionId: 'context-' + position, roomId: '!context-' + position + ':test', runtime: 'codex',
+      runId: agentId + '-new-run', sessionId: 'context-' + position, roomId: '!context-' + position + ':test', runtime: 'codex',
       state: 'idle', observedAt: position, historyMode: 'per-room', maxInputBytes: 100000, errorMessage: null,
+      lastActivityAt: position, historyAvailable: true,
       settings: [{ name: 'model', configured: 'configured', effective: 'effective' }] }));
     statements = [];
     const observed = value(runtime.observation(agentId));
-    assert.equal(observed.length, contexts);
-    assert(observed.every(context => context.settings.length === 1));
+    assert.equal(observed.length, contexts + 1);
+    assert(observed.filter(context => context.roomId !== null).every(context => context.settings.length === 1));
     assert.equal(statements.length, 3, 'Runtime contexts and settings hydrate in three indexed queries, not one per history');
     const runPlan = database.prepare('EXPLAIN QUERY PLAN ' + statements[0]).all() as { detail: string }[];
     assert(runPlan.some(step => step.detail.includes('ix_listener_run_agent_started')), JSON.stringify(runPlan));

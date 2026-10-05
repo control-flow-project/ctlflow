@@ -26,18 +26,17 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
   return {
     summaries(agentIds) { return stored(() => {
       if (!agentIds.length) return success(new Map<string, NativeRuntimeSummary>());
-      const runs = executeSelect(database, schema, (query, params) => query.from('listener_run')
-        .join(query.from('listener_run').where(row => params.agentIds.includes(row.agent_id)).groupBy(row => row.agent_id)
-          .select(group => ({ agentId: group.key, startedAt: group.max(row => row.started_at) })),
-          row => row.agent_id, latest => latest.agentId, (run, latest) => ({ run, latest }))
-        .where(row => row.run.started_at === row.latest.startedAt).orderByDescending(row => row.run.id)
-        .select(row => ({ id: row.run.id, agentId: row.run.agent_id })), { agentIds });
-      const selected = new Map<string, string>();
-      for (const run of runs) if (!selected.has(run.agentId)) selected.set(run.agentId, run.id);
+      const runs = executeSelect(database, schema, (query, params, helpers) => query.from('listener_run')
+        .where(row => params.agentIds.includes(row.agent_id))
+        .select(row => ({ id: row.id, agentId: row.agent_id,
+          position: helpers.window(row).partitionBy(item => item.agent_id).orderByDescending(item => item.started_at)
+            .thenByDescending(item => item.id).rowNumber() }))
+        .where(row => row.position === 1), { agentIds });
+      if (!runs.length) return success(new Map<string, NativeRuntimeSummary>());
       const rows = executeSelect(database, schema, (query, params) => query.from('runtime_observation')
         .where(row => params.runIds.includes(row.run_id))
         .select(row => ({ agentId: row.agent_id, state: row.state, observedAt: row.observed_at, lastActivityAt: row.last_activity_at,
-          historyAvailable: row.history_available })), { runIds: [...selected.values()] });
+          historyAvailable: row.history_available })), { runIds: runs.map(run => run.id) });
       const groups = new Map<string, Parameters<typeof summarizeNative>[0]>();
       for (const row of rows) {
         const group = groups.get(row.agentId) ?? [];

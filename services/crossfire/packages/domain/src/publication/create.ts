@@ -3,7 +3,8 @@ import type { Actor } from '../port/services.js';
 import { recordEvent } from '../audit/record-event.js';
 import { publicationPublisher, type PublicationDependencies } from './authority.js';
 import { readPublication } from './read.js';
-import { PUBLICATION_LIMITS, validatePublication, type PublicationCreation } from './values.js';
+import { PUBLICATION_LIMITS, type PublicationCreation } from './values.js';
+import { validatePublication } from './validation.js';
 export function createPublication(services: PublicationDependencies, actor: Actor, input: PublicationCreation, requestId: string) {
   const valid = validatePublication(input); if (!valid.ok) return valid;
   return services.unitOfWork.run(() => {

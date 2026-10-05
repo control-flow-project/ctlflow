@@ -9,6 +9,8 @@ import * as check from '@crossfire/contracts/schema/validation';
 
 function counts(database: Database.Database) {
   return {
+    publication: () => executeSelect(database, schema, query => query.from('publication').count()),
+    publication_file: () => executeSelect(database, schema, query => query.from('publication_file').count()),
     listener_stat_checkpoint: () => executeSelect(database, schema, query => query.from('listener_stat_checkpoint').count()),
     listener_stat_interval: () => executeSelect(database, schema, query => query.from('listener_stat_interval').count()),
     listener_stat_flow: () => executeSelect(database, schema, query => query.from('listener_stat_flow').count()),
@@ -140,6 +142,8 @@ export function verifyPreservation(before: string, after: string) {
 
 function protectedRecords(database: Database.Database) {
   return {
+    publication: () => executeSelect(database, schema, query => query.from('publication').take(100001)),
+    publication_file: () => executeSelect(database, schema, query => query.from('publication_file').take(100001)),
     principal: () => executeSelect(database, schema, query => query.from('principal').take(100001)),
     member: () => executeSelect(database, schema, query => query.from('member').take(100001)),
     agent: () => executeSelect(database, schema, query => query.from('agent').take(100001)),

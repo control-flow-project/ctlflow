@@ -2,11 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 import { cleanup } from '@crossfire/test-support/cleanup';
+import { mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { verifyContent } from '../tools/browser/content.js';
+import { value } from './support/application.js';
 import { nativeApplication } from './support/native-application.js';
 import { httpFixture } from './support/http.js';
 import { contentFixture, publishFixture, publicationHeaders } from './support/publication.js';
 
-test('real published HTML runs modules, CSS, images and data with an opaque origin and no application credentials', { timeout: 60_000 }, async scope => {
+test('real published HTML runs modules, CSS, images and data with an opaque origin and no application credentials', { timeout: 180_000 }, async scope => {
   const fixture = await nativeApplication(scope), agent = await fixture.agent(fixture.admin.actor, 'public-reporter');
   const api = await httpFixture(scope, fixture.application), content = await contentFixture(scope, fixture.application);
   const report = await publishFixture(api.origin, agent.token, {
@@ -36,8 +40,13 @@ document.querySelector('#proof').textContent=JSON.stringify(result);`,
   await expect(page.locator('#illustration')).toHaveJSProperty('complete', true);
   await expect(page.locator('#illustration')).toHaveJSProperty('naturalWidth', 1);
   assert.equal((await page.request.get(content.origin + '/api/health')).status(), 404);
+  const evidence = mkdtempSync(join(process.cwd(), '.temp/content-operator-'));
+  const verified = value(await verifyContent(report.url!, api.origin, '/usr/bin/google-chrome', evidence, new AbortController().signal));
+  assert.equal(verified.origin, 'null'); assert.equal(verified.modelCalls, 0);
+  assert.equal((await verifyContent(api.origin + '/index.html', api.origin, '/usr/bin/google-chrome', evidence, new AbortController().signal)).ok, false);
   const svg = report.url!.replace('index.html', 'diagram.svg'); await page.goto(svg);
   await expect(page.locator('svg')).toHaveAttribute('data-cookie', 'SecurityError');
   const deleted = await api.request('/api/publications/' + report.id, 'DELETE', { expectedRevision: report.revision }, publicationHeaders(api.origin, fixture.admin)); assert.equal(deleted.status, 200);
   assert.equal((await page.request.get(report.url!)).status(), 404);
+  assert.equal((await verifyContent(report.url!, api.origin, '/usr/bin/google-chrome', evidence, new AbortController().signal)).ok, false);
 });

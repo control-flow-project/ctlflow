@@ -35,6 +35,10 @@ export async function runTests(selected, selection, options = { allRuntimes: fal
   const concurrency = Math.min(availableParallelism(), jobs.length), started = performance.now();
   const evidence = join(repository, '.temp/test-runs', new Date().toISOString().replaceAll(':', '-') + '-' + process.pid);
   mkdirSync(evidence, { recursive: true });
+  if (jobs.some(job => job.service === 'crossfire')) {
+    const root = join(repository, 'services/crossfire');
+    await command(process.execPath, [join(root, 'dist/scripts/architecture-proof/conduit-assets.js')], root);
+  }
   if (jobs.some(job => job.service === 'crossfire' && elementFiles.has(basename(job.file)))) {
     const root = join(repository, 'services/crossfire');
     await command(process.execPath, [join(root, 'dist/tests/support/element.js')], root);

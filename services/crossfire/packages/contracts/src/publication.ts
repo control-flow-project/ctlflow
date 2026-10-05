@@ -1,14 +1,13 @@
 import { failure, success, type Result } from '@crossfire/kernel/result';
-import { PUBLICATION_LIMITS, validatePublication } from '@crossfire/domain/publication/values';
-import type { PublicationCreation, PublicationQuery } from '@crossfire/domain/publication/values';
+import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
+import type { PublicationQuery } from '@crossfire/domain/publication/values';
 import * as check from './schema/validation.js';
 import { pagination, listQuery } from './schema/request.js';
 export type { PublicationCreation, PublicationQuery, PublicationSummary, PublicationDetails } from '@crossfire/domain/publication/values';
 export const publicationState = check.choice('staging', 'published', 'deleted');
 const file = { path: check.text(240), mediaType: check.text(100), bytes: check.integer(0, PUBLICATION_LIMITS.fileBytes),
   sha256: check.refine(check.text(64, 64), value => /^[a-f0-9]{64}$/u.test(value), 'Expected SHA-256 hex') };
-export const publicationCreation = check.refine(check.object({ title: check.text(200), files: check.list(check.object(file), PUBLICATION_LIMITS.files, 1) }),
-  (value: PublicationCreation) => validatePublication(value).ok, 'Invalid bounded static report manifest');
+export const publicationCreation = check.object({ title: check.text(200), files: check.list(check.object(file), PUBLICATION_LIMITS.files, 1) });
 const summary = { id: check.identifier, agentId: check.identifier, agentName: check.text(255), ownerId: check.identifier,
   ownerName: check.text(255), title: check.text(200), state: publicationState, revision: check.integer(), createdAt: check.integer(),
   expiresAt: check.integer(), publishedAt: check.nullable(check.integer()), deletedAt: check.nullable(check.integer()),

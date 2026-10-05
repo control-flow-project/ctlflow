@@ -11,6 +11,7 @@ import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
+import { browserOptions } from './support/tls.js';
 
 async function idleSeconds(page: Page, origin: string): Promise<number> {
   const response = await page.request.get(origin + operations.policy.path); assert.equal(response.status(), 200);
@@ -22,7 +23,7 @@ test('Policy browser edits idle sleep in minutes, validates durations and keeps 
   const fixture = await nativeServer(scope, await releaseFixture()), { admin, origin } = fixture;
   const member = await fixture.member('alice');
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/idle-policy-browser-'));
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
   await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);

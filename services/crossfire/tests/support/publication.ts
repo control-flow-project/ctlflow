@@ -6,7 +6,7 @@ import { cleanup } from '@crossfire/test-support/cleanup';
 import { createClient } from '@crossfire/adapter-crossfire/client';
 import { binaryBytes } from '@crossfire/kernel/bytes';
 import { operations } from '@crossfire/contracts/rest/operations';
-import { publicationMedia } from '@crossfire/domain/publication/values';
+import { publicationMedia } from '@crossfire/domain/publication/validation';
 import { createContentServer } from '../../apps/server/src/content-server.js';
 import { COOKIE_NAME } from '../../apps/server/src/http/transport.js';
 import type { Application } from '../../apps/server/src/composition.js';

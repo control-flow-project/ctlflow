@@ -16,7 +16,7 @@ async function closeHttp(server: Server): Promise<void> {
   if (server.listening) await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }
 
-export async function serve(directory: string, releaseDirectory: string, port = 8080, presentation: ElementPresentation = {}, contentPort = port + 1, contentAddress = '127.0.0.1') {
+export async function serve(directory: string, releaseDirectory: string, port = 8080, presentation: ElementPresentation = {}, contentPort = 8082, contentAddress = '127.0.0.1') {
   if (process.platform !== "linux" || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire requires Linux and Node.js 26+");
   if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) throw new Error("Invalid private service port");
   if (!Number.isSafeInteger(contentPort) || contentPort < 1024 || contentPort > 65535 || contentPort === port) throw new Error('Invalid separate content port');

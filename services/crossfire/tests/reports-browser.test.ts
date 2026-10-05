@@ -13,6 +13,7 @@ import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
+import { browserOptions } from './support/tls.js';
 
 async function stage(client: Client, title: string, assets = false) {
   const files = [{ path: 'index.html', mediaType: 'text/html', content: '<!doctype html><title>Report</title><script>globalThis.reportSideEffect = true</script><h1>Credit review</h1>' },
@@ -42,7 +43,7 @@ test('Reports browser inventory, durable files view and confirmed deletion use t
   const report = await publish(client, title, true), otherReport = await publish(otherClient, 'Alice credit review');
   for (let index = 0; index < 21; index++) await stage(client, 'Draft review ' + String(index).padStart(2, '0'));
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/reports-browser-'));
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } });
   await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);

@@ -8,7 +8,8 @@ import { commitPublication } from '@crossfire/domain/publication/commit';
 import { deletePublication } from '@crossfire/domain/publication/delete';
 import { readPublication, readPublications } from '@crossfire/domain/publication/read';
 import { maintainPublications } from '@crossfire/domain/publication/maintenance';
-import { validatePublication, PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
+import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
+import { validatePublication } from '@crossfire/domain/publication/validation';
 import { publicationCreation, publicationQuery } from '@crossfire/contracts/publication';
 import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
 import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
@@ -23,13 +24,13 @@ function manifest(body = '<!doctype html><p>Report</p>') {
 test('static manifests reject traversal, MIME confusion, archives, aliases, duplicates and unbounded sizes', () => {
   const valid = manifest().input; assert(publicationCreation(valid).ok); assert(validatePublication(valid).ok);
   for (const path of ['/index.html', '../index.html', 'a/../index.html', 'a//index.html', 'a\\index.html', '%2e%2e/index.html', '.hidden/index.html', 'a/.hidden/index.html', 'index.HTML', 'bundle.zip', 'script.php', 'a./index.html'])
-    assert.equal(publicationCreation({ ...valid, files: [{ ...valid.files[0]!, path }] }).ok, false, path);
+    assert.equal(validatePublication({ ...valid, files: [{ ...valid.files[0]!, path }] }).ok, false, path);
   for (const extra of [{ mediaType: 'application/javascript' }, { bytes: PUBLICATION_LIMITS.fileBytes + 1 }, { bytes: -1 }, { sha256: 'invalid' }])
-    assert.equal(publicationCreation({ ...valid, files: [{ ...valid.files[0]!, ...extra }] }).ok, false);
-  assert.equal(publicationCreation({ ...valid, files: [...valid.files, { ...valid.files[0]!, path: 'INDEX.html' }] }).ok, false);
-  assert.equal(publicationCreation({ ...valid, files: [...valid.files, { ...valid.files[0]!, path: 'index.html/page.html' }] }).ok, false);
+    assert.equal(validatePublication({ ...valid, files: [{ ...valid.files[0]!, ...extra }] }).ok, false);
+  assert.equal(validatePublication({ ...valid, files: [...valid.files, { ...valid.files[0]!, path: 'INDEX.html' }] }).ok, false);
+  assert.equal(validatePublication({ ...valid, files: [...valid.files, { ...valid.files[0]!, path: 'index.html/page.html' }] }).ok, false);
   assert.equal(publicationCreation({ ...valid, files: Array.from({ length: 513 }, (_, index) => ({ ...valid.files[0]!, path: index + '.html' })) }).ok, false);
-  assert.equal(publicationCreation({ ...valid, files: [{ ...valid.files[0]!, path: 'other.html' }] }).ok, false);
+  assert.equal(validatePublication({ ...valid, files: [{ ...valid.files[0]!, path: 'other.html' }] }).ok, false);
   assert.equal(publicationCreation({ ...valid, unexpected: true }).ok, false);
   for (const query of ['pageSize=101', 'page=1&page=2', 'state=unknown', 'ownerId=admin', 'after=old']) assert.equal(publicationQuery(new URLSearchParams(query)).ok, false);
 });
@@ -69,6 +70,25 @@ test('publication access uses verified agent identity and current human ownershi
   assert.equal(readPublications(fixture.services, other.actor, { page: 1, pageSize: 1, search: '', ownerId: owner.actor.principalId }).ok, false);
   assert.equal(value(readPublications(fixture.services, fixture.admin.actor, { page: 1, pageSize: 1, search: '', ownerId: owner.actor.principalId })).totalItems, 1);
   value(await deletePublication(fixture.services, owner.actor, report.id, 0, randomUUID()));
+});
+
+test('owner-scoped report pages filter before counting, ordering and hydration without widening the scope', async scope => {
+  const fixture = await applicationFixture(scope), owner = await fixture.member('owner'), other = await fixture.member('other');
+  const agent = await fixture.agent(owner.actor, 'publisher'), foreign = await fixture.agent(other.actor, 'foreign-publisher');
+  const reports: string[] = [];
+  for (let index = 0; index < 3; index++) {
+    fixture.advance(1);
+    reports.push(value(createPublication(fixture.services, agent.actor, { ...manifest().input, title: 'Review ' + index }, randomUUID())).id);
+    value(createPublication(fixture.services, foreign.actor, manifest().input, randomUUID()));
+  }
+  const query = { page: 1, pageSize: 1, search: 'Review', state: 'staging' as const };
+  const first = value(readPublications(fixture.services, owner.actor, query));
+  const second = value(readPublications(fixture.services, owner.actor, { ...query, page: 2, agentId: agent.id }));
+  assert.equal(first.totalItems, 3); assert.equal(second.totalItems, 3);
+  assert.equal(first.items[0]!.id, reports[2]); assert.equal(second.items[0]!.id, reports[1]);
+  assert.equal(first.items[0]!.ownerId, owner.actor.principalId);
+  assert.equal(value(readPublications(fixture.services, owner.actor, { ...query, agentId: foreign.id })).totalItems, 0);
+  assert.equal(value(readPublications(fixture.services, fixture.admin.actor, { ...query, ownerId: owner.actor.principalId })).totalItems, 3);
 });
 
 test('quota reservations include incomplete and pending-deletion bytes; expired staging is reclaimed without publication', async scope => {

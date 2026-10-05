@@ -19,6 +19,7 @@ them out of Git. Every command accepts `--output /absolute/private/report.json`.
 | `release` | `--origin`, `--release-directory` | `--web-directory` | Local manifest/artifact contract; live release; exact published bytes and hashes; optional management entry/assets |
 | `server` | `--origin`, `--credentials` | `--expect` | Anonymous access refusal, normal human login, complete visible roster, native invite discovery, runtime observations and fleet maps |
 | `browser` | `--origin`, `--credentials`, `--browser`, `--evidence` | None | Real login, authorized management sections, desktop/mobile geometry, tables, software history, map selection/URL/keyboard and personalized onboarding link |
+| `content` | `--url`, `--main-origin`, `--browser`, `--evidence` | None | An existing public HTML report's headers, opaque browser origin, blocked cookies/storage/main-site reads and absent application routes; no upload or deletion |
 | `database` | `--file` | `--expect`, `--schema` | Current Crossfire application/schema, integrity, foreign keys and every table count; optional columns/keys/index metadata |
 | `preservation` | `--before`, `--after` | None | Protected existing domain records unchanged, allowing appended records |
 | `files` | `--plan` | None | Owned regular-file fingerprints and optional exact expected hashes |
@@ -87,6 +88,11 @@ checks; this command makes no claim to cover them.
 
 ## Database and preservation
 
+`content` visits only the explicitly selected public report. Use it after publishing
+nonsecret deployment-proof content; it does not authenticate, publish a directory,
+invoke a model or change a report. It verifies isolation, not report correctness
+or confidentiality. Its browser runs the selected report's JavaScript.
+
 Inspect an owned private SQLite snapshot made by SQLite backup or a quiescent
 deployment procedure. Do not copy only a live database file while ignoring its
 WAL. The database is opened readonly with `fileMustExist`; no migrations, tables
@@ -94,7 +100,7 @@ or missing files are created. Current normalized tables are queried through
 Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
 
 ```json
-{"schemaVersion":11,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0}}
+{"schemaVersion":12,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
 ```
 
 The schema version and table counts are optional exact expectations. `--schema`
@@ -106,7 +112,7 @@ canonical schema as the selected snapshots.
 principals, members, agents/credentials/names, policy, permission/role relations,
 selected wake senders, room grants/permissions, invitations, owner/management
 conversations, wake rules/assignments, fleets/instances/controller metadata/
-credentials, requested/approved fleet coordination policies and existing audit events. Credential refresh timestamps and wake
+credentials, requested/approved fleet coordination policies, publications/files and existing audit events. Credential refresh timestamps and wake
 assignment deadlines are intentionally not immutable fields. Existing protected
 rows must still exist unchanged; additions are allowed. Volatile listener,
 session, reconciliation, delivery, observation, decision and incident rows are

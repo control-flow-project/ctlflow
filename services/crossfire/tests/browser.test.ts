@@ -38,6 +38,7 @@ import { onboardingUrl } from '@crossfire/contracts/onboarding';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { elementAssets } from './support/element.js';
 import { checkOnboardingPolicy } from './support/onboarding-browser.js';
+import { browserOptions, secureRouter } from './support/tls.js';
 
 test('paper table checks center complete content groups and reject displaced controls', async scope => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
@@ -188,15 +189,11 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const address = service.address(); assert(address && typeof address === 'object');
   const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
     web: join(process.cwd(), 'dist/web'), element };
-  const router = publicRouter(routes);
-  router.listen(0, '127.0.0.1'); await once(router, 'listening');
-  const publicAddress = router.address(); assert(publicAddress && typeof publicAddress === 'object');
-  const origin = 'http://127.0.0.1:' + publicAddress.port;
+  cleanup(scope, async () => { await worker.stop(); service.closeAllConnections();
+    await new Promise<void>(resolve => service.close(() => resolve())); application.close(); });
+  const { origin } = await secureRouter(scope, publicRouter(routes));
   routes.publicOrigin = origin; config.publicOrigin = origin; services.instance.publicOrigin = origin;
-  cleanup(scope, async () => { services.matrix.close(); router.closeAllConnections(); service.closeAllConnections();
-    await new Promise<void>(resolve => router.close(() => resolve())); await new Promise<void>(resolve => service.close(() => resolve()));
-    await worker.stop(); application.close(); });
-  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const errors: string[] = [];
   const identityReads: string[] = [];

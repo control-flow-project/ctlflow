@@ -1925,20 +1925,79 @@ bodies. Management's Stats tab supports period selection, explicit refresh,
 paginated flows and clear unknown/approximate measurement labels. No realtime
 analytics subscription, periodic model use or provider-billing polling exists.
 
+### Public static reports
+
+An enrolled active agent can publish a dedicated static directory through the
+same typed client in individual or fleet mode:
+`report publish --directory DIRECTORY --title TITLE`. It stages a manifest,
+streams bounded regular files through typed binary operations and explicitly
+commits only the complete, verified bundle. There is no archive extraction,
+server-side execution, extra daemon or model-based integrity workflow.
+
+The server supplies a 256-bit, 43-character base64url public key. Committed files
+are served at the explicitly configured separate content origin under
+`/<publicKey>/index.html` and relative asset paths. Anyone holding the link can
+read them: public distribution requires explicit human authorization, not merely
+permission to work in a private room. Updates create a new immutable publication.
+The tool returns a public URL only after confirmed commit. Uncertain outcomes
+retain the exact publication identity for inspection, not a guessed URL or blind
+duplicate creation.
+
+One report contains 1–512 files, at most 32 MiB total and 8 MiB per file, with a
+root `index.html`. Relative ASCII paths are at most 240 characters and 100 per
+component. Traversal, aliases, symlinks, hardlinks, special files, case-insensitive
+duplicate paths and a file serving as a directory are rejected. Exact extension,
+MIME, length and automatically computed SHA-256 integrity are verified. The
+domain owns semantic manifest validation; wire contracts own strict structural
+validation and import only pure domain values. The filesystem adapter owns
+bounded enumeration, no-follow handles, streaming and durable file/directory
+synchronization.
+
+Staging expires after one hour. Aggregate reservations default to 1 GiB and
+4096 reports instance-wide, 128 MiB and 128 reports per agent; at most eight
+concurrent uploads, serialized per report. Explicit private configuration can
+change these finite budgets. Declared bytes/counts remain reserved through
+expiry or deletion until disk cleanup succeeds. Replacement/interrupted pending
+copies have a verified payload bound of twice reserved bytes, not a claimed
+literal disk ceiling; filesystem/database/WAL/backup overhead is additional.
+
+Every content response carries `sandbox allow-scripts` without
+`allow-same-origin`. HTML and directly opened SVG execute at an opaque origin;
+local scripts/modules, CSS, images, fonts and data remain usable. No cookies,
+authentication, Matrix proxy, management routes, credentialed CORS, directory
+listing or service workers are available. Static GET/HEAD/OPTIONS uses public
+asset CORS only. Main APIs reject content-host and null Origin requests. Main
+and invitation cookies use canonical Secure, HttpOnly, host-only `__Host-`
+names with Path=/; no old-name fallback exists. DNS, TLS and nginx remain site
+owned. This protects application credentials, not confidential report content.
+
+Humans list and inspect their agents' reports; administrators can inspect any.
+Only the publishing agent can upload/commit its own staging. Owners/admins
+delete with an expected revision. The database public-read fence commits before
+file cleanup; in-progress reads recheck it before headers and each chunk. Failed
+cleanup is bounded, retried and still charged. Already downloaded bytes cannot
+be recalled. Reports management uses paginated tables and durable Overview/Files
+URLs, with no embedded or executed report content. Creation, publication and
+deletion are audited. Detailed configuration, REST payloads and browser guarantees
+are in [Public static reports](../services/crossfire/docs/publications.md).
+
 ## 11. Normalized persistence and authorization
 
 One canonical schema and permission catalog own current state. Fresh development
 stores initialize that schema directly. Deployed stores advance transactionally
-to schema version 11 after a verified backup; existing identities, native access,
+from the inventoried deployed schema 11 to schema 12 after a verified backup;
+existing identities, native access,
 credentials, controller authority, policy and audit remain intact. Runtime code
 has no historical-schema reader, importer, compatibility handler or dual
 read/write path. Production resets and automatic reset-on-startup-error are
 prohibited. Source work, operator configuration, external credentials and other
 projects remain intact.
 
-The canonical schema has 54 singular tables. Transactional forward migrations
+The canonical schema has 56 singular tables. The transactional forward migration
 preserve existing principal, access, listener, credential and audit rows while
-adding required runtime/statistics, fleet-policy and session-operation relations. Requested policies
+adds publication/file relations, idle policy and sleeping/waking observation
+fields. Versions 1–10, foreign stores and future versions are refused without
+changes; there is no historical migration ladder. Requested policies
 and approved invitation defaults use normalized tables, not serialized settings.
 Existing fleets acquire no invented policy approval during migration; their next
 configured start requests owner review when approval is absent.
@@ -2013,6 +2072,11 @@ boundary, not a human role or a controller-label permission.
 The implemented operation catalog and permission catalog must cover each other
 in an architecture test. A role permission does not erase ownership checks or
 pretend an administrator approved enrollment as another owner.
+
+Static reports add `publication.publish.self` to agents; owners have
+`publication.read.owned` and `publication.delete.owned`. Administrators also have
+`publication.read.any` and `publication.delete.any`. No agent publication-delete
+permission or other-owner publishing authority exists.
 
 There is no role column in `member` or `agent` alongside `principal_role`.
 General identity views cannot read `agent_credential`. Narrow credential
@@ -2135,7 +2199,7 @@ batched current assignments and their last recorded delivery, not model completi
 | `member_session` | `secret_hash PK`, `member_id FK member`, `csrf_secret`, `native_access_token`, `created_at`, `expires_at`. |
 | `listener_run` | `id PK`, `agent_id FK agent`, `release?`, `controller_bound`, `started_at`, `last_seen_at`, `active_ms`, `messages_delivered`, `stopped_at?`, `disconnect_requested_at?`. Controller binding is immutable per run and does not follow fleet membership alone. |
 | `wake_notice` | `receiver_agent_id FK agent`, `event_id`, `sender_matrix_id`, `room_id`, `reserved_at`, `message_body`, `status`, `sent_at?`, `native_event_id?`, `next_attempt_at?`, `last_error?`; `PK(receiver_agent_id, event_id)`. |
-| `instance_policy` | `id PK = instance`, `revision`, `max_owner_agents`, `max_agents`, `max_pending`, `enrollment_seconds`, `reconcile_seconds`, `agent_instructions`, `signup_mode` (`invitation` or `open`), `invitation_issuers` (`administrators` or `members`), `max_message_bytes` (4096–4194304, default 65536). |
+| `instance_policy` | `id PK = instance`, `revision`, `max_owner_agents`, `max_agents`, `max_pending`, `enrollment_seconds`, `reconcile_seconds`, `agent_instructions`, `signup_mode` (`invitation` or `open`), `invitation_issuers` (`administrators` or `members`), `max_message_bytes` (4096–4194304, default 65536), `fleet_idle_timeout_seconds` (0–604800, default 1800; zero disables). |
 | `audit_event` | `id PK`, `request_id`, `actor_kind`, `actor_principal_id? FK principal`, `actor_credential_id?`, `owner_id? FK member`, `target_kind`, `target_id`, `room_id?`, `membership_generation?`, `authorizer_id? FK principal`, `added_by_id? FK principal`, `permission_code? FK permission`, `action`, `outcome`, `message`, `created_at`. |
 
 Known signup-claim components are all present or all absent. The human-role
@@ -2194,7 +2258,7 @@ Matrix event store. External room/sender/session IDs retain their native identit
 | `runtime_decision_question` | `decision_id FK runtime_decision`, `question_id`, `position`, `title`, `prompt`, `secret`, `allow_text`; PK `(decision_id,question_id)`, UQ `(decision_id,position)`. |
 | `runtime_decision_option` | `decision_id`, `question_id`, `option_id`, `position`, `label`, `description`; PK `(decision_id,question_id,option_id)`, UQ `(decision_id,question_id,position)`, composite FK to runtime_decision_question. |
 | `runtime_decision_answer` | `decision_id`, `question_id`, `option_id?`, `answer_text?`; PK/FK `(decision_id,question_id)` to question, optional composite FK to offered option; exactly one option or text. |
-| `runtime_observation` | `run_id`, `agent_id FK agent`, `session_id`, `room_id?`, `runtime`, `state`, `observed_at`, `history_mode`, `max_input_bytes`, `error_message?`; PK `(run_id,session_id)`, composite FK `(run_id,agent_id)` to listener_run. |
+| `runtime_observation` | `run_id`, `agent_id FK agent`, `session_id`, `room_id?`, `runtime`, `state` (idle/working/waiting-approval/waiting-answer/failed/unavailable/sleeping/waking), `observed_at`, `last_activity_at?`, `history_available?`, `history_mode`, `max_input_bytes`, `error_message?`; PK `(run_id,session_id)`, composite FK `(run_id,agent_id)` to listener_run. |
 | `runtime_setting` | `run_id`, `session_id`, `name`, `configured_value?`, `effective_value?`; PK `(run_id,session_id,name)`, composite FK to runtime_observation. |
 | `runtime_incident` | `id PK`, `owner_id FK member`, `agent_id? FK agent`, `fleet_id? FK fleet`, `run_id? FK listener_run`, `session_id?`, `kind` (failure/contact), `message`, `created_at`, `recovered_at?`; exactly one agent or fleet target. |
 | `incident_notification` | `incident_id FK runtime_incident`, `phase` (initial/recovery), `body`, `next_attempt_at`, `event_id?`; PK `(incident_id,phase)`. |
@@ -2210,6 +2274,18 @@ without writing; maintenance performs cleanup. Episode IDs are immutable even
 when an active target/session episode already exists. Notification bodies and
 native transaction identities are stable across retries. Recovery notices
 cannot overtake undelivered initial notices.
+
+### Publication tables
+
+| Table | Complete logical columns and keys |
+| --- | --- |
+| `publication` | `id PK`, `agent_id FK agent`, `public_key UQ` (43-character base64url), `title`, `state` (staging/published/deleted), `revision`, `created_at`, `expires_at`, `published_at?`, `deleted_at?`, `cleaned_at?`, `total_bytes`, `file_count`. Visibility, immutable identity/manifest and complete-commit guards; cleaned implies deleted. |
+| `publication_file` | `id PK`, `publication_id FK publication ON DELETE CASCADE`, `path`, `media_type`, `bytes`, `sha256`, `uploaded`; UQ `(publication_id,path COLLATE NOCASE)`. Indexed normalized manifest, immutable after commit. |
+
+SQLite stores no report bodies. The private filesystem stores only opaque file
+IDs beneath the publication ID; declared relative paths are metadata, never
+server filesystem destinations. A deleted management record retains attribution
+without retaining public access.
 
 ### Index and query contract
 
@@ -2247,11 +2323,13 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `member_session` | `(member_id, expires_at)`, `(expires_at)` | Session limits/revocation/expiry. |
 | `listener_run` | `(agent_id, last_seen_at DESC, id)`, `(agent_id, started_at DESC, id DESC)`; partial `(last_seen_at, agent_id, id)` for unstopped runs; UQ `(id,agent_id)` | History, latest-run observation/contact selection and exact runtime FK binding. |
 | `runtime_decision` | `(agent_id,created_at DESC,id)`, `(status,expires_at,run_id)` | Paginated summaries without full review hydration, expiry maintenance. |
-| `runtime_observation` | `(agent_id,observed_at DESC,run_id)` | Latest run and all native contexts. |
+| `runtime_observation` | `(agent_id,observed_at DESC,run_id)`, `(run_id,state)` | Latest run/all native contexts and batched directory summaries. |
 | `runtime_incident` | `(recovered_at,owner_id,created_at,id)`; partial UQ active `(agent_id,COALESCE(session_id,''),kind)` and `(fleet_id,kind)` | Episode selection/deduplication and recovery. |
 | `incident_notification` | `(event_id,next_attempt_at,incident_id)` | Pending durable delivery. |
 | `wake_notice` | `(receiver_agent_id, sender_matrix_id, reserved_at DESC)`; partial UQ on receiver/sender for unresolved status; `(status, next_attempt_at)` | Ten-minute cooldown and retry ownership. |
 | `audit_event` | `(created_at DESC, id DESC)`, `(actor_principal_id, created_at DESC, id DESC)`, `(owner_id, created_at DESC, id DESC)`, `(target_kind, target_id, created_at DESC, id DESC)`, `(request_id, id)` | Global/scoped history and one operation's records. |
+| `publication` | `(agent_id,created_at DESC,id DESC)`, `(created_at DESC,id DESC)`, `(state,cleaned_at,expires_at,id)`, `(cleaned_at,agent_id,total_bytes)` | Agent/global sorted pages, bounded expiry/cleanup and reserved storage. Owner scope seeks the existing agent owner index, not a parameterized administrator-OR-owner predicate. |
+| `publication_file` | `(publication_id,uploaded,id)` | Bounded commit manifest; unique public path lookup uses its UQ index. |
 
 Keys already cover the remaining table lookups. Permission/key prefixes are not
 indexed twice merely for appearance. Role/permission reference data is small;
@@ -2311,7 +2389,8 @@ public responses redact credential/claim material.
 
 ## 12. REST conventions and resource inventory
 
-Crossfire exposes REST/JSON only. It does not add GraphQL. The canonical product
+Crossfire exposes REST with JSON resource representations and explicitly typed
+binary file-upload bodies. It does not add GraphQL. The canonical product
 API prefix is `/api`; Matrix's native `/_matrix` endpoints and immutable release
 artifacts under `/onboarding/<releaseId>/` retain their separate protocol/asset
 ownership. The management website remains under `/manage`.
@@ -2415,6 +2494,10 @@ ownership. The management website remains under `/manage`.
 | `GET /api/audit-events` | Scoped, filtered and paginated immutable audit history. |
 | `GET /api/releases/current` | Public current manifest/protocol requirements for deterministic installation/update checks. |
 | `GET /api/health` | Bounded public readiness metadata without secrets. |
+| `POST, GET /api/publications` | An active enrolled agent creates its own bounded staging; humans list authorized scoped/global report summaries. |
+| `GET, DELETE /api/publications/{publicationId}` | Authorized read; expected-revision owner/admin deletion fences public access before cleanup. |
+| `PUT /api/publications/{publicationId}/files/{fileId}` | Publishing agent's exact declared file, bounded binary application/octet-stream with exact Content-Length; no JSON/base64/multipart. |
+| `PUT /api/publications/{publicationId}/commit` | Publishing agent commits a complete verified immutable bundle with expectedRevision; exact retry is idempotent. |
 
 Single-agent, bulk and delegated-agent routes are transport representations of
 the same grant domain, not competing implementations. Agent additions/removals

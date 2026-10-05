@@ -115,7 +115,7 @@ test('CLI exposes the native manifest and rejects every superseded top-level com
   const result = await execute(process.execPath, [script, 'matrix', 'get-room-events', '--help']);
   assert.equal(JSON.parse(result.stdout).id, 'getRoomEvents');
   for (const command of ['init', 'read', 'listen', 'send', 'history', 'rooms', 'who', 'upload', 'download']) {
-    await assert.rejects(execute(process.execPath, [script, command]), /Use agent, room or matrix/);
+    await assert.rejects(execute(process.execPath, [script, command]), /Use agent, room, report or matrix/);
   }
 });
 
