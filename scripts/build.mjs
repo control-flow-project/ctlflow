@@ -1,11 +1,26 @@
 import { spawn } from 'node:child_process';
-import { readdirSync, rmSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build as bundle } from 'esbuild';
 
 export const products = ['crossfire', 'fleetd', 'fleet'];
 export const repository = fileURLToPath(new URL('../', import.meta.url));
+
+export function productBuildClosure(selected) {
+  if (!selected.length || selected.some(service => !products.includes(service))) throw new Error('Select an existing product');
+  const manifests = new Map(products.map(service => [service, JSON.parse(readFileSync(join(repository, 'services', service, 'package.json'), 'utf8'))]));
+  const names = new Map([...manifests].map(([service, manifest]) => [manifest.name, service]));
+  const included = new Set(selected);
+  for (const service of included) {
+    const manifest = manifests.get(service);
+    for (const dependency of Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })) {
+      const owner = names.get(dependency);
+      if (owner !== undefined) included.add(owner);
+    }
+  }
+  return products.filter(service => included.has(service));
+}
 
 export function command(binary, arguments_, cwd) {
   return new Promise((resolve, reject) => {
@@ -62,8 +77,8 @@ async function buildProduct(service) {
 }
 
 export async function buildProducts(selected) {
-  if (!selected.length || selected.some(service => !products.includes(service))) throw new Error('Select an existing product');
-  await typecheckProducts(selected);
+  const owners = productBuildClosure(selected);
+  await typecheckProducts(owners);
   await buildPackages();
-  await Promise.all(selected.map(buildProduct));
+  await Promise.all(owners.map(buildProduct));
 }
