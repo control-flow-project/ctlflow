@@ -8,11 +8,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { codexProtocol } from '@ctlflow/crossfire-adapter-codex/protocol';
-import { discoverCodex } from '@ctlflow/crossfire-adapter-codex/discovery';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { materialize } from '../scripts/test-support/native-engine.js';
 import type { NativeEvent } from '@ctlflow/crossfire-adapter-codex/protocol';
-test('stock Codex native Unix socket attaches the exact existing session without launcher metadata or model input', { timeout: 30000 }, async scope => {
+test('stock Codex native Unix transport connects the exact fixture-owned session without discovery or model input', { timeout: 30000 }, async scope => {
   const home = mkdtempSync(join(tmpdir(), 'crossfire-unix-'));
   chmodSync(home, 0o700);
   const workspace = join(home, 'project'), control = join(home, 'app-server-control');
@@ -31,11 +31,10 @@ test('stock Codex native Unix socket attaches the exact existing session without
   await owner.request('initialize', { clientInfo: { name: 'crossfire-unix-proof', version: '0.1.0' }, capabilities: { experimentalApi: true } }); owner.notify('initialized');
   const started = await owner.request('thread/start', { cwd: workspace }) as { thread: { id: string } };
   await materialize({ session: started.thread.id, call: async (method, params) => await owner.request(method, params) as Record<string, unknown>, notifications: notices }, provider);
-  const adapter = discoverCodex(workspace, { CODEX_HOME: home, CODEX_THREAD_ID: started.thread.id });
-  const connection = await adapter.runtime(stop.signal, 100, { requestDecision: async () => { throw Error('Unexpected permission'); } });
+  const connection = await connectCodex({ workspace, session: started.thread.id, endpoint: 'unix://' + socket, token: '', receiptFile: join(home, 'receipt.json'),
+    pollMs: 100, hooks: { requestDecision: async () => { throw Error('Unexpected permission'); } } }, stop.signal);
   assert.equal((await connection.inspect()).busy, false);
   assert.equal(connection.sessionId, started.thread.id);
   assert.equal(provider.requests.length, 0);
   await connection.close();
-  assert.throws(() => discoverCodex(workspace, { CODEX_HOME: workspace, CODEX_THREAD_ID: started.thread.id }), /no native app-server socket/);
 });

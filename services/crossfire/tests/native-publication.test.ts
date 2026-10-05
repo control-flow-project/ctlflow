@@ -1,11 +1,10 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, renameSync, symlinkSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
 import { deliveryText, readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
-import { captureHistory, historySince, nativeJson } from '@ctlflow/crossfire-adapter-runtime/native-file';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
@@ -147,27 +146,6 @@ test('native cancellation receipts never claim successful delivery on send or re
   uncertain = false;
   await assert.rejects(connection.deliver('Exact input.', 'second'), /cancelled before publication/);
   assert.equal(readJson<{ confirmed: unknown[] }>(file).confirmed.length, 0);
-});
-
-test('native history verification excludes old inputs, partial records and replaced/truncated files', () => {
-  const directory = temporary(), file = join(directory, 'native.jsonl');
-  writeFileSync(file, '{"id":"old"}\n');
-  const boundary = captureHistory(file);
-  appendFileSync(file, '{"id":"new"}\n{"id":');
-  assert.deepEqual(historySince(file, boundary), [{ id: 'new' }]);
-  appendFileSync(file, '"pending"}\n');
-  assert.deepEqual(historySince(file, boundary), [{ id: 'new' }, { id: 'pending' }]);
-  appendFileSync(file, '{"id":"incomplete');
-  const partial = captureHistory(file);
-  assert.deepEqual(historySince(file, partial), []);
-  appendFileSync(file, '"}\n{"id":"complete"}\n');
-  assert.deepEqual(historySince(file, partial), [{ id: 'incomplete' }, { id: 'complete' }]);
-  renameSync(file, file + '.old'); writeFileSync(file, '{"id":"old"}\n');
-  assert.throws(() => historySince(file, boundary), /lost its publication boundary/);
-  const replaced = captureHistory(file);
-  writeFileSync(file, ''); assert.throws(() => historySince(file, replaced), /lost its publication boundary/);
-  symlinkSync(file, join(directory, 'link'));
-  assert.throws(() => nativeJson(join(directory, 'link')));
 });
 
 test('invalid journal identity, text and limits are refused before publication', async scope => {

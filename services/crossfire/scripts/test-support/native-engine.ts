@@ -24,11 +24,10 @@ export async function materialize(engine: Pick<Awaited<ReturnType<typeof nativeE
 export async function nativeEngine(scope: TestContext, home: string, workspace: string, arguments_: string[] = []) {
   const token = randomBytes(32).toString('hex');
   const tokenFile = join(home, 'token');
-  const connectionFile = join(home, 'connection.json');
   writeFileSync(tokenFile, token, { mode: 0o600 });
   const child = spawn(process.env.CROSSFIRE_TEST_CODEX ?? 'codex', ['app-server', '--listen', 'ws://127.0.0.1:0',
     '--ws-auth', 'capability-token', '--ws-token-file', tokenFile, ...arguments_], {
-    cwd: workspace, env: { ...process.env, HOME: home, CODEX_HOME: home, RUNCODEX_CONNECTION_FILE: connectionFile }, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+    cwd: workspace, env: { ...process.env, HOME: home, CODEX_HOME: home, CROSSFIRE_PROJECT: workspace }, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   const ended = once(child, 'close');
   const terminate = (signal: NodeJS.Signals) => { try { process.kill(-child.pid!, signal); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; } };
@@ -46,7 +45,6 @@ export async function nativeEngine(scope: TestContext, home: string, workspace: 
     child.once('close', () => { clearTimeout(timer); reject(new Error('Native fixture closed: ' + output)); });
   });
   const notifications: NativeEvent[] = [];
-  writeFileSync(connectionFile, JSON.stringify({ version: 1, endpoint, tokenFile: 'token' }), { mode: 0o600 });
   const controller = new AbortController();
   const protocol = codexProtocol({ endpoint, token, timeoutMs: 10_000, event: notice => notifications.push(notice),
     approval: async () => { throw new Error('Unexpected approval on fixture owner connection'); },

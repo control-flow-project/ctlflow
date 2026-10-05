@@ -2,9 +2,13 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { testListener } from '@ctlflow/crossfire-agent-core/diagnostic';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
 import { success, failure } from '@ctlflow/crossfire-kernel/result';
-import { fakeCodex, matrixFixture, THREAD } from '../scripts/test-support/listener.js';
+import { fakeCodex, matrixFixture, THREAD, until } from '../scripts/test-support/listener.js';
 test('listener diagnostics distinguish live readiness, no rooms, nobody policy, pause and inactive authority without prompts or read markers', async scope => {
   const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory), stop = new AbortController();
   const runtime = await native.runtime(stop.signal, 100);
@@ -33,6 +37,31 @@ test('listener diagnostics distinguish live readiness, no rooms, nobody policy, 
   assert(!fixture.requests.some(request => request.path.endsWith('/read_markers')));
   await runtime.close();
   await assert.rejects(testListener(options), /stopped|closed|disconnect/i);
+});
+
+test('real shared-host readiness verifies on-request approval without creating owner chats, publishing input or waking another history', async scope => {
+  const native = await fakeCodex(scope, { approvalPolicy: 'on-request' }), fixture = await matrixFixture(scope, native.directory);
+  fixture.joined.clear();
+  const stop = new AbortController(); let ready = false, failure: unknown;
+  const receiving = listen({ ...fixture, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 100,
+    ready: () => { ready = true; } }, stop.signal).catch(error => { failure = error; return error; });
+  cleanup(scope, async () => { stop.abort(); await receiving; });
+  await until(() => { if (failure) throw failure; return ready && fixture.waiting() === 1; });
+  const cursor = () => [fixture.cursorFile, fixture.cursorFile + '.sync'].map(file => existsSync(file) ? readFileSync(file, 'utf8') : null);
+  const before = cursor(), resumes = native.requests().filter(request => request.method === 'thread/resume').length;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const tested = await listenerRequest(dirname(fixture.cursorFile), { action: 'test' });
+    assert(tested?.ok); assert(tested.value.ready); assert.equal(tested.value.test?.approval, 'listener');
+    assert.equal(tested.value.test?.rooms, 0); assert.equal(tested.value.test?.authenticated, true);
+    assert.equal(tested.value.test?.session, THREAD);
+  }
+  assert.deepEqual(cursor(), before, 'Readiness diagnostics never acknowledge or rewrite unread positions');
+  assert.equal(fixture.joined.size, 0);
+  assert.equal(fixture.requests.some(request => request.path.endsWith('/owner-conversation')), false);
+  assert.equal(fixture.requests.some(request => request.path.endsWith('/read_markers')), false);
+  assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, resumes);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+  assert.equal(failure, undefined);
 });
 
 test('diagnostics verify native approval readiness without executing a model turn', async scope => {

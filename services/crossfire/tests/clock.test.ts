@@ -2,7 +2,6 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { testClock, withClock } from '../scripts/test-support/clock.js';
-import { listenerOptions } from '../apps/client/src/listener-options.js';
 
 test('controlled clocks preserve deadline boundaries, cancellation and recurring cadence without changing native time', withClock(async (_scope, clock) => {
   const wall = Date.now(), monotonic = performance.now(), order: number[] = [];
@@ -19,11 +18,9 @@ test('controlled clocks preserve deadline boundaries, cancellation and recurring
   assert(Date.now() >= wall); assert(performance.now() >= monotonic);
 }));
 
-test('clock disposal is isolated and default CLI options share strict native bounds', async scope => {
+test('clock disposal is isolated between listener schedules', async scope => {
   const first = testClock(scope), second = testClock(scope);
   cleanup(scope, first.close); cleanup(scope, second.close);
   first.schedule(() => assert.fail('Disposed timer ran'), 1); first.close();
   await first.advance(10); assert.equal(second.now(), 0);
-  assert.deepEqual(listenerOptions({}), { pollMs: 10000, debounceMs: 10000, reconcileMs: 120000 });
-  for (const invalid of ['-1', '60001', 'NaN', '0.5']) assert.throws(() => listenerOptions({ 'debounce-ms': invalid }));
 });

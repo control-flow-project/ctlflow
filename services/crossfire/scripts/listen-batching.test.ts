@@ -2,17 +2,13 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { testClock, withClock } from './test-support/clock.js';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { once } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
 import { API } from '@ctlflow/crossfire-contracts/matrix';
 import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { listen, type ListenerOptions } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import type { ReceivedEvent } from '@ctlflow/crossfire-agent-core/receive';
 import type { WakePolicy } from '@ctlflow/crossfire-contracts/wake';
-import { builtClient } from './test-support/release.js';
-import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD, until } from './test-support/listener.js';
-import { listenerOptions } from '../apps/client/src/listener-options.js';
+import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD } from './test-support/listener.js';
 
 const PLANNING = '!planning:test.localhost';
 const PEER = '@agent-holmes:test.localhost';
@@ -351,37 +347,17 @@ test('stopping during a window keeps the complete unread context for reconnectio
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$peer', '$owner']]);
 }));
 
-test('validated CLI options select one ten-second collection window or an explicitly shorter window', async context => {
-  for (const debounceMs of [undefined, 100]) await context.test(debounceMs === undefined ? 'default 10000ms' : 'configured 100ms', withClock(async (childContext, clock) => {
-    const settings = listenerOptions(debounceMs === undefined ? {} : { 'debounce-ms': String(debounceMs) });
-    assert.equal(settings.debounceMs, debounceMs ?? 10000);
-    assert.equal(settings.pollMs, 10000); assert.equal(settings.reconcileMs, 120000);
+test('controller-owned listener options select one bounded collection window without premature delivery', async context => {
+  for (const debounceMs of [10000, 100]) await context.test('configured ' + debounceMs + 'ms', withClock(async (childContext, clock) => {
+    const settings: Pick<ListenerOptions, 'debounceMs' | 'pollMs'> = { debounceMs, pollMs: 10000 };
     const { native, matrix, cursors } = await fixture(childContext, clock, settings);
     const started = clock.now();
     matrix.add(ROOM, message('$owner', OBSERVER), message('$peer-one'), message('$peer-two'));
-    await clock.advance(debounceMs === undefined ? 9000 : 40);
+    await clock.advance(debounceMs === 10000 ? 9000 : 40);
     assert.equal(submissions(native).length, 0);
-    await clock.advance(debounceMs ?? 10000);
+    await clock.advance(debounceMs);
     await clock.until(() => cursors()[ROOM] === '3');
-    assert(clock.now() - started >= (debounceMs ?? 10000));
+    assert(clock.now() - started >= debounceMs);
     assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$owner', '$peer-one', '$peer-two']]);
   }));
-});
-
-test('the installed CLI passes its collection settings to a live native listener', async context => {
-  const native = await fakeCodex(context), matrix = await matrixFixture(context, native.directory);
-  const child = spawn(process.execPath, [builtClient(), '--project', matrix.workspace, '--profile', 'watson', 'agent', 'listen', '--runtime', 'codex', '--poll-ms', '100', '--debounce-ms', '100'],
-    { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' }, stdio: ['ignore', 'pipe', 'pipe'] });
-  const stopped = once(child, 'close'); let output = '', errors = '';
-  assert(child.stdout && child.stderr);
-  child.stdout.on('data', chunk => { output += String(chunk); }); child.stderr.on('data', chunk => { errors += String(chunk); });
-  cleanup(context, async () => { child.kill('SIGTERM'); await stopped; });
-  await until(() => { assert.equal(child.exitCode, null, errors); return matrix.waiting() === 1 && existsSync(matrix.cursorFile); });
-  const started = performance.now();
-  matrix.add(ROOM, message('$owner', OBSERVER), message('$peer-one'), message('$peer-two'));
-  await until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '3');
-  assert(performance.now() - started >= 100);
-  assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$owner', '$peer-one', '$peer-two']]);
-  child.kill('SIGTERM'); assert.deepEqual(await stopped, [0, null]);
-  assert.deepEqual(JSON.parse(output), { runtime: 'codex', session: THREAD, workspace: matrix.workspace }); assert.equal(errors, '');
 });
