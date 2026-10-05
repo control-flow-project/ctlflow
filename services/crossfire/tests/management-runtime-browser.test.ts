@@ -6,10 +6,7 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
 import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
-import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
-import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
-import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
-import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 import { browserOptions } from './support/tls.js';
@@ -18,18 +15,14 @@ import { nativeServer } from './support/native-server.js';
 import { mapFleet } from './support/map-fleet.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { until } from '../scripts/test-support/listener.js';
+import { browserController } from './support/browser-controller.js';
 
 test('Management distinguishes native sleep and wake from listener readiness without per-agent runtime requests', { timeout: 120000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
   const { fleet, instances, ready, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 3);
   const unreported = await fixture.agent(admin.actor, 'unreported');
-  value(reportFleetConnection(services, value(authenticateController(services, controller.credential)), fleet.id, controller.connectionId, true));
-  const liveController = createFleetControlConnection({ origin, credential: controller.credential, fleetId: fleet.id,
-    owner: admin.member.principal.matrixUserId, signal: new AbortController().signal, acknowledged: () => success(undefined),
+  const liveController = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId,
     execute: async () => failure('unavailable', 'This observation fixture has no native lifecycle executor') });
-  cleanup(scope, () => liveController.close());
-  await until(() => liveController.status().connected);
   const tokens = instances.map(instance => {
     const token = ready.instances.find(item => item.instanceKey === instance.instanceKey)?.account?.accessToken; assert(token);
     return createClient({ origin, token });

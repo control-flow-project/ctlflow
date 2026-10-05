@@ -11,7 +11,6 @@ import { releaseFixture } from './release-fixture.js';
 import { value, secret } from './support/application.js';
 import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
 import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
-import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
 import { API } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { checkPaperLayout } from '../tools/browser/layout.js';
@@ -31,6 +30,7 @@ import { fakeCodex, until } from '../scripts/test-support/listener.js';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 import { browserOptions } from './support/tls.js';
+import { browserController } from './support/browser-controller.js';
 
 test('browser fleet review, room-plan confirmation, invitation delegation and selected wake identities share canonical APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
@@ -85,11 +85,9 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
         messageType: 'type-' + index, observed: 1, delivered: 1, contentBytes: 1024, deliveredBytes: 1024, attachmentBytes: 0, largestBytes: 1024 })),
       usage: [] } }, 'browser'));
   assert(reporting.statisticsAccepted);
-  value(reportFleetConnection(services, controllerActor, fleet.id, controller.connectionId, true));
   const runtimeCommands: { action: string; agentId: string | null }[] = [];
   const runtimeRuns = new Map<string, string>();
-  const control = createFleetControlConnection({ origin, credential: controller.credential, fleetId: fleet.id,
-    owner: admin.member.principal.matrixUserId, signal: new AbortController().signal, acknowledged: () => success(undefined), execute: async command => {
+  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId, execute: async command => {
       runtimeCommands.push({ action: command.action, agentId: command.agentId });
       for (const instance of instances) {
         if (command.agentId !== null && command.agentId !== instance.agentId) continue;
@@ -101,7 +99,6 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       }
       return success({ status: 'succeeded', errorMessage: null });
     } });
-  cleanup(scope, () => control.close());
   await page.goto(origin + '/manage/fleets');
   await page.getByLabel('Search fleets or controllers').fill('workstation');
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Apply filters', exact: true }).click()]);
@@ -338,14 +335,10 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   const created = value(await nativeOk({ base: origin, token: owner.token }, 'POST', API + '/createRoom', { name: 'Samosas', preset: 'private_chat' }));
   assert(typeof created.room_id === 'string');
   const roomId = created.room_id, runtime = await fakeCodex(scope), stop = new AbortController();
-  value(reportFleetConnection(services, value(authenticateController(services, agent.controller.credential)), agent.controller.fleetId, agent.controller.connectionId, true));
   const host = await createListenerHost(); cleanup(scope, () => host.close());
-  const controller = createFleetControlConnection({ origin, credential: agent.controller.credential, fleetId: agent.controller.fleetId,
-    owner: owner.accepted.account.userId, signal: stop.signal, acknowledged: () => success(undefined),
+  const controller = await browserController(scope, { origin, controller: agent.controller, owner: owner.accepted.account.userId,
     execute: async () => failure('invalid', 'This invitation fixture does not execute native lifecycle operations') });
-  cleanup(scope, () => controller.close());
   const binding = controller.listener(agent.id);
-  await until(() => controller.status().connected);
   let ended: unknown;
   const receiver = listen({ binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
@@ -426,12 +419,8 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
 test('browser fleet connection map uses management theme, full roster, adaptive geometry and durable accessible selection', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
   const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
-  value(reportFleetConnection(services, value(authenticateController(services, controller.credential)), fleet.id, controller.connectionId, true));
-  const control = createFleetControlConnection({ origin, credential: controller.credential, fleetId: fleet.id,
-    owner: admin.member.principal.matrixUserId, signal: new AbortController().signal, acknowledged: () => success(undefined),
+  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId,
     execute: async () => failure('unavailable', 'This map fixture has no native lifecycle executor') });
-  cleanup(scope, () => control.close());
-  await until(() => control.status().connected);
   for (const instance of [instances[0]!, instances.at(-1)!]) value(await connectOwnerConversation(services,
     { kind: 'agent', principalId: instance.agentId! }, instance.agentId!));
   const other = await fixture.member('map-visitor');

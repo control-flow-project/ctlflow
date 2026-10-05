@@ -1,7 +1,7 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
@@ -14,6 +14,8 @@ import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
 import { browserOptions } from './support/tls.js';
+import { browserController } from './support/browser-controller.js';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 async function stage(client: Client, title: string, assets = false) {
   const files = [{ path: 'index.html', mediaType: 'text/html', content: '<!doctype html><title>Report</title><script>globalThis.reportSideEffect = true</script><h1>Credit review</h1>' },
@@ -36,9 +38,17 @@ async function publish(client: Client, title: string, assets = false) {
 }
 
 test('Reports browser inventory, durable files view and confirmed deletion use the canonical publication APIs', { timeout: 120000 }, async scope => {
-  const fixture = await nativeServer(scope, await releaseFixture()), { admin, origin } = fixture;
+  const release = await releaseFixture(), fixture = await nativeServer(scope, release), { admin, origin } = fixture;
   const alice = await fixture.member('alice'), owned = await fixture.agent(admin.actor, 'ada'), foreign = await fixture.agent(alice.actor, 'visitor');
   const client = createClient({ origin, token: owned.token }), otherClient = createClient({ origin, token: foreign.token });
+  for (const [agent, owner, publisher] of [[owned, admin, client], [foreign, alice, otherClient]] as const) {
+    const controller = await browserController(scope, { origin, controller: agent.controller, owner: owner.member.principal.matrixUserId,
+      execute: async () => failure('unavailable', 'This publication fixture has no native lifecycle executor') });
+    const binding = controller.listener(agent.id), proof = binding.control.binding(); binding.close();
+    const runId = randomUUID(), report = { controller: proof, release: release.manifest.release, messagesDelivered: 0, statistics: null };
+    value(await publisher.call(operations.reportListener, { agentId: agent.id, runId }, { ...report, stopped: false }));
+    cleanup(scope, async () => { value(await publisher.call(operations.reportListener, { agentId: agent.id, runId }, { ...report, stopped: true })); });
+  }
   const title = 'Credit review <img src=x onerror="globalThis.reportSideEffect=true">';
   const report = await publish(client, title, true), otherReport = await publish(otherClient, 'Alice credit review');
   for (let index = 0; index < 21; index++) await stage(client, 'Draft review ' + String(index).padStart(2, '0'));
