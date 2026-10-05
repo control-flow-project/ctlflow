@@ -85,7 +85,8 @@ test('canonical enrollment and activity HTTP contracts expose identities without
 test('activity action labels are readable while unknown recorded actions retain their identity', () => {
   assert.equal(auditActionLabel('instance-policy.configure'), 'Change instance settings');
   assert.equal(auditActionLabel('room-permission.set'), 'Change invitation permission');
-  assert.equal(auditActionLabel('fleet.delivery.deactivate'), 'Deactivate fleet delivery');
+  assert.equal(auditActionLabel('fleet.delivery.deactivate'), 'Pause fleet delivery');
+  assert.equal(auditActionLabel('fleet.delivery.activate'), 'Resume fleet delivery');
   assert.equal(auditActionLabel('wake-rule.create'), 'Create Wake-up');
   assert.equal(auditActionLabel('wake-rule.update'), 'Update Wake-up');
   assert.equal(auditActionLabel('wake-rule.delete'), 'Delete Wake-up');
