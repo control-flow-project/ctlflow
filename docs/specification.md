@@ -2502,6 +2502,12 @@ condition that prevents an owner seek. Distinct authorized scopes select
 explicit query shapes inside one repository implementation. Activity summaries
 are page-wide aggregate projections, never several queries per agent.
 
+Activity reads use two indexed batch queries: historical totals and current
+listener/controller admission facts. The domain evaluates the same pure predicate
+used for single-run admission, including owner status, current instance/fleet,
+delivery intent, exact connection/credential generation and unexpired open lease.
+Missing joined facts fail closed. No authority lookup runs per listener.
+
 Runtime observation hydration uses three constant queries for latest run,
 contexts and settings, never one query per room. Contact detection selects
 latest-started runs by indexed aggregate joins so an older abandoned run cannot
@@ -2782,6 +2788,18 @@ Identity/status context stays compact above navigation; permission ceilings,
 pending/failed enforcement and destructive consequences remain immediately
 visible. Mutations retain scoped authority, expected revisions, CSRF and
 idempotency even when controls are hidden.
+
+Same-key resource refresh retains mounted views without discarding edits. Editable
+forms bind their field values and concurrency fences to one versioned snapshot.
+Pristine forms adopt refreshed values/revisions; dirty forms retain their inputs
+and original revision/generation, display an explicit conflict and block saving
+until the human discards edits and loads the latest settings. Returning a draft
+to its unchanged baseline also permits pristine refresh. Entity changes never
+reuse another entity's draft. Grant access/delegation, chat wake policy, agent and
+fleet naming, scheduled Wake-ups and instance policy use this shared treatment.
+Instant account/lifecycle actions use the currently displayed entity revision;
+they never borrow a retained naming draft's revision. Server concurrency checks
+remain authoritative for changes racing an otherwise current submission.
 
 Policy differentiates signup, capacity, enrollment/reconciliation and onboarding
 sections with one atomic save. Enrollment review shows the exact owner,

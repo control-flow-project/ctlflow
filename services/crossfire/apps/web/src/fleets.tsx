@@ -6,6 +6,7 @@ import { parseRoomPlan } from '@ctlflow/crossfire-contracts/room-plan';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
+import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Empty, Field, Help, Loaded, Page, Panel, Pagination, PageItems, Status, SubjectHeading, ViewNavigation, timestamp, pagingQuery } from './ui.js';
 import { OwnerFilter } from './agent-filters.js';
 import { filterQuery } from './form.js';
@@ -56,10 +57,10 @@ function RoomPlan({ fleet }: { fleet: FleetView }) {
   </Panel>;
 }
 function FleetSettings({ fleet }: { fleet: FleetView }) {
-  const viewer = useSession(), action = useAction(), [label, setLabel] = useState(fleet.label);
+  const viewer = useSession(), action = useAction(), edit = useEditable(fleet.fleetId, fleet.revision, { label: fleet.label, controller: fleet.controller });
   return <><Panel title="Display name" description="Change the name shown in management. The fleet key stays the same.">
-    <form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.changeFleet, { fleetId: fleet.fleetId }, { expectedRevision: fleet.revision, label, controller: fleet.controller }, viewer.csrfSecret)); }}>
-      <fieldset disabled={action.pending || !canManageFleet(fleet)}><label className="bounded-form">Fleet label<input required maxLength={100} value={label} onChange={event => setLabel(event.target.value)}/></label><div className="actions"><button>Save label</button></div></fieldset><Alert>{action.error}</Alert></form></Panel>
+    <form onSubmit={event => { event.preventDefault(); if (!edit.conflict) void action.run(() => call(operations.changeFleet, { fleetId: fleet.fleetId }, { expectedRevision: edit.version, ...edit.value }, viewer.csrfSecret)); }}>
+      <fieldset disabled={action.pending || !canManageFleet(fleet)}><label className="bounded-form">Fleet label<input required maxLength={100} value={edit.value.label} onChange={event => edit.setValue(previous => ({ ...previous, label: event.target.value }))}/></label><div className="actions"><button disabled={edit.conflict}>Save label</button></div><EditConflict {...edit}/></fieldset><Alert>{action.error}</Alert></form></Panel>
     <Panel title="Controller and identity" description="The controller reports where this fleet runs; its label does not grant authority."><dl><dt>Controller</dt><dd>{fleet.controller.name}</dd><dt>Owner</dt><dd>{fleet.owner.displayName}<span className="subline">{fleet.owner.matrixUserId}</span></dd><dt>Last updated</dt><dd>{timestamp(fleet.updatedAt)}</dd></dl>
       <Help title="Technical identifiers and controller metadata"><dl><dt>Fleet key</dt><dd>{fleet.fleetKey}</dd><dt>Fleet ID</dt><dd className="mono">{fleet.fleetId}</dd>{Object.entries(fleet.controller.metadata ?? {}).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{value}</dd></Fragment>)}</dl></Help></Panel>
     <Help title="Bulk room access (advanced)"><RoomPlan fleet={fleet}/></Help><FleetRetirement fleet={fleet}/></>;

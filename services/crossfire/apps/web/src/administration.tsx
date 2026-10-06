@@ -3,6 +3,7 @@ import type { MemberView, PolicyView } from '@ctlflow/crossfire-contracts/schema
 import { POLICY_LIMITS, DEFAULT_AGENT_INSTRUCTIONS, AGENT_INSTRUCTIONS_MAX_BYTES } from '@ctlflow/crossfire-contracts/policy';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
+import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Empty, Field, Help, Loaded, Page, Panel, Pagination, Status, applied, timestamp } from './ui.js';
 import { auditActionLabel } from './audit-labels.js';
 import { sleepDurationSeconds } from './sleep-duration.js';
@@ -43,8 +44,10 @@ export function Invitations() {
     })}</tbody></table></div> : <Empty title="No invitations">Create an invitation to let someone register on this server.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel></Page>;
 }
 function PolicyForm({ initial }: { initial: PolicyView }) {
-  const viewer = useSession(), [value, setValue] = useState(initial), action = useAction();
-  const [sleepMinutes, setSleepMinutes] = useState(String(initial.fleetIdleTimeoutSeconds / 60));
+  const viewer = useSession(), action = useAction();
+  const edit = useEditable('instance-policy', initial.revision, { settings: initial, sleepMinutes: String(initial.fleetIdleTimeoutSeconds / 60) });
+  const { settings: value, sleepMinutes } = edit.value;
+  const setValue = (settings: PolicyView) => edit.setValue(previous => ({ ...previous, settings }));
   const sleepDuration = sleepDurationSeconds(sleepMinutes, POLICY_LIMITS.fleetIdleTimeoutSeconds.max);
   const fields: { key: keyof typeof POLICY_LIMITS; label: string }[] = [
     { key: 'maxOwnerAgents', label: 'Agents per member owner' }, { key: 'maxAgents', label: 'Agents across this instance' },
@@ -52,8 +55,8 @@ function PolicyForm({ initial }: { initial: PolicyView }) {
     { key: 'reconcileSeconds', label: 'Permission reconciliation (seconds)' },
   ];
   const instructionBytes = new TextEncoder().encode(value.agentInstructions).length;
-  return <form onSubmit={event => { event.preventDefault(); if (!sleepDuration.ok) return; const { revision, ...settings } = value;
-    void action.run(() => call(operations.changePolicy, {}, { ...settings, fleetIdleTimeoutSeconds: sleepDuration.value, expectedRevision: revision }, viewer.csrfSecret)); }}>
+  return <form onSubmit={event => { event.preventDefault(); if (!sleepDuration.ok || edit.conflict) return; const { revision: _revision, ...settings } = value;
+    void action.run(() => call(operations.changePolicy, {}, { ...settings, fleetIdleTimeoutSeconds: sleepDuration.value, expectedRevision: edit.version }, viewer.csrfSecret)); }}>
     <Panel title="Signup & invitations" description="Choose how people join, and who may invite them."><div className="bounded-form"><Field label="Who can sign up?">{id => <select id={id} value={value.signupMode} onChange={event => setValue({ ...value, signupMode: event.target.value === 'open' ? 'open' : 'invitation' })}><option value="invitation">Invitation links only</option><option value="open">Anyone · open Element signup</option></select>}</Field>
       <Field label="Who can invite members?">{id => <select id={id} value={value.invitationIssuers} onChange={event => setValue({ ...value, invitationIssuers: event.target.value === 'members' ? 'members' : 'administrators' })}><option value="administrators">Administrators only</option><option value="members">Administrators and members</option></select>}</Field>
       <p className="support">Invited people complete normal signup in Element. Members can invite members, never administrators. Signup policy is enforced by the server, not just this page.</p></div></Panel>
@@ -63,7 +66,7 @@ function PolicyForm({ initial }: { initial: PolicyView }) {
     <Panel title="Message delivery" description="Large incoming messages and batches are delivered as private files, not expanded into model context."><div className="bounded-form"><label>Inline message limit (UTF-8 bytes)<input type="number" min={4096} max={4194304} required disabled={action.pending} value={value.maxMessageBytes} onChange={event => setValue({ ...value, maxMessageBytes: Number(event.target.value) })}/></label><p className="support">Default: 65,536 bytes (64 KiB). Applies to every agent. Full message content remains available through a private file manifest.</p></div></Panel>
     <Panel title="Fleet idle sleep" description="Stop idle native engines while the controller’s shared listener stays ready."><div className="bounded-form">
       <Field label="Sleep after idle minutes">{id => <><input id={id} type="number" min={0} max={POLICY_LIMITS.fleetIdleTimeoutSeconds.max / 60} step="any" required disabled={action.pending}
-        aria-describedby={id + '-help'} aria-invalid={!sleepDuration.ok} value={sleepMinutes} onChange={event => setSleepMinutes(event.target.value)}/>
+        aria-describedby={id + '-help'} aria-invalid={!sleepDuration.ok} value={sleepMinutes} onChange={event => edit.setValue(previous => ({ ...previous, sleepMinutes: event.target.value }))}/>
         <p id={id + '-help'} className="support">Default: 30 minutes. Enter 0 to disable automatic sleep. Eligible messages resume the same saved history; busy agents and agents awaiting a decision do not sleep.</p></>}</Field>
       <p className="support">This instance-wide setting applies to every agent. The fleet controller owns sleep and resume; a manually stopped session stays stopped.</p>
       {!sleepDuration.ok && <Alert>{sleepDuration.error.message}</Alert>}</div></Panel>
@@ -71,7 +74,7 @@ function PolicyForm({ initial }: { initial: PolicyView }) {
       <Field label="Additional agent instructions">{id => <textarea id={id} rows={8} disabled={action.pending} value={value.agentInstructions} onChange={event => setValue({ ...value, agentInstructions: event.target.value })}/>}</Field>
       <p className="support">{instructionBytes} / {AGENT_INSTRUCTIONS_MAX_BYTES} UTF-8 bytes. Plain text only; no secrets. Included in the personalized agent setup guide.</p>
       <button type="button" disabled={action.pending || value.agentInstructions === DEFAULT_AGENT_INSTRUCTIONS} onClick={() => setValue({ ...value, agentInstructions: DEFAULT_AGENT_INSTRUCTIONS })}>Reset to default</button>
-      <p className="support">Save settings to apply your edits or reset for everyone.</p></div></Panel><Alert>{action.error}</Alert><div className="actions"><button className="primary" disabled={action.pending || !sleepDuration.ok || instructionBytes > AGENT_INSTRUCTIONS_MAX_BYTES}>Save settings</button><p>Saves all sections together.</p></div></form>;
+      <p className="support">Save settings to apply your edits or reset for everyone.</p></div></Panel><EditConflict {...edit}/><Alert>{action.error}</Alert><div className="actions"><button className="primary" disabled={action.pending || edit.conflict || !sleepDuration.ok || instructionBytes > AGENT_INSTRUCTIONS_MAX_BYTES}>Save settings</button><p>Saves all sections together.</p></div></form>;
 }
 export function Settings() {
   const resource = useResource(operations.policy, {});
