@@ -75,6 +75,9 @@ alongside the existing named Tinqer exclusions. No organization wildcard, privat
 package exemption, hook enablement or global age-policy disabling is allowed.
 Controlled-registry gates verify those named positives and nonexempt negatives;
 public installation cannot require publishing a private internal module.
+The lock contains exactly the current owned workspace manifests and one link per
+owner, with coordinated versions and matching dependency/engine maps. Removed
+modules cannot remain as extraneous entries or alternate workspace owners.
 
 - Crossfire owns identity, enrollment, human authorization, room access, native
   reconciliation, wake policies, listener activity, fleet identity and React UI.
@@ -2901,6 +2904,12 @@ the fleet or selected instance from its bundled verified local assets, then
 restart fleetd with that installed executable while preserving desired stop/resume
 intent and exact histories. Remote updates may specify the already installed
 absolute release directory; they never download an HTTP fallback.
+Explicit replacement validates only the selected immutable package release and
+its installed destination against the current artifact contract. The previous
+managed entry is checked for ownership/path safety; its skill bytes are bounded
+and hashed only to report whether instructions changed. Its manifest is not
+interpreted as a current release or used as update authority. Recovery still
+strictly verifies the activated current release and never substitutes software.
 Update notices bind an exact opaque runtime session and release. Native identifier
 formats remain adapter-owned; durable notice filenames use a hash of the session.
 

@@ -23,13 +23,35 @@ export function verifyPackageManifest(manifest, expectedName, isPublic) {
   for (const script of ['preinstall', 'install', 'postinstall']) assert(!manifest.scripts?.[script], 'Installation must not run controller/agent lifecycle scripts');
 }
 
+export function verifyWorkspaceLock(lock, manifests) {
+  assert.equal(lock.lockfileVersion, 3, 'Workspace lock format');
+  const entries = lock.packages;
+  assert.deepEqual(Object.keys(entries).filter(path => path === '' || path.startsWith('services/')).sort(),
+    Object.keys(manifests).sort(), 'The lock contains exactly the current owned workspaces');
+  const expectedLinks = Object.entries(manifests).filter(([path]) => path !== '')
+    .map(([path, manifest]) => ['node_modules/' + manifest.name, path]).sort();
+  const actualLinks = Object.entries(entries).filter(([, entry]) => entry.link)
+    .map(([path, entry]) => [path, entry.resolved]).sort();
+  assert.deepEqual(actualLinks, expectedLinks, 'Workspace links have exactly one current owner');
+  for (const [path, manifest] of Object.entries(manifests)) {
+    const entry = entries[path];
+    assert.equal(entry.name, manifest.name, 'Locked workspace name: ' + path);
+    assert.equal(entry.version, manifests[''].version, 'Locked coordinated version: ' + path);
+    for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'engines']) {
+      assert.deepEqual(entry[field] ?? {}, manifest[field] ?? {}, 'Locked workspace ' + field + ': ' + path);
+    }
+  }
+}
+
 export function verifyPackageOwnership(root) {
   const workspace = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   verifyPackageManifest(workspace, '@ctlflow/workspace', false);
+  const manifests = { '': workspace };
   const published = [];
   for (const service of ['crossfire', 'fleetd', 'fleet']) {
     const directory = join(root, 'services', service);
     const product = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
+    manifests['services/' + service] = product;
     const isPublic = PUBLIC_PACKAGES.includes(product.name);
     verifyPackageManifest(product, '@ctlflow/' + service, isPublic);
     assert.equal(product.version, workspace.version, 'Server setup descriptors and public controller products share one release version');
@@ -46,8 +68,11 @@ export function verifyPackageOwnership(root) {
         assert(existsSync(file), 'Every owned module must declare its package: ' + file);
         const manifest = JSON.parse(readFileSync(file, 'utf8'));
         verifyPackageManifest(manifest, '@ctlflow/' + service + '-' + entry.name, false);
+        assert.equal(manifest.version, workspace.version, 'Every owned module shares the coordinated release');
+        manifests['services/' + service + '/' + kind + '/' + entry.name] = manifest;
       }
     }
   }
   assert.deepEqual(published.sort(), [...PUBLIC_PACKAGES].sort(), 'Both and only fleet products are public');
+  verifyWorkspaceLock(JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')), manifests);
 }

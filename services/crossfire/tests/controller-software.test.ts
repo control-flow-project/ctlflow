@@ -55,3 +55,22 @@ test('corrupt or symlinked local artifacts never replace approved software or fe
   assert.throws(() => installedSoftware(root), /manifest/u);
   await assert.rejects(installSoftware(root, first.releaseDirectory), /manifest/u);
 });
+
+test('explicit replacement validates the selected release without interpreting previous release metadata', async scope => {
+  const { root, release } = fixture(scope), first = release('first');
+  const software = await installSoftware(root, first.releaseDirectory); software.activate();
+  const previousDirectory = join(root, 'software', first.manifest.release);
+  writeFileSync(join(previousDirectory, 'manifest.json'), JSON.stringify({ ...first.manifest,
+    artifacts: { ...first.manifest.artifacts, 'retired.txt': { bytes: 1, sha256: artifactHash(Buffer.from('x')) } } }), { mode: 0o600 });
+  const retained = join(root, 'retained-state.json'), bytes = Buffer.from('{"identity":"original","history":"original","cursor":"original"}\n');
+  writeFileSync(retained, bytes, { mode: 0o600 });
+  assert.throws(() => installedSoftware(root), /Missing or unknown fields/u);
+  const next = release('next');
+  const updated = await installSoftware(root, next.releaseDirectory);
+  assert.equal(updated.skill.changed, true);
+  assert.equal(realpathSync(join(root, 'client.mjs')), software.file, 'Preparation retains the previous entry');
+  assert.throws(() => installedSoftware(root), /Missing or unknown fields/u, 'Recovery cannot run unsupported installed software');
+  updated.activate();
+  assert.equal(installedSoftware(root).manifest.release, next.manifest.release);
+  assert.deepEqual(readFileSync(retained), bytes, 'Explicit replacement preserves unrelated private state');
+});
