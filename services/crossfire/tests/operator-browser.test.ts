@@ -20,7 +20,7 @@ test('browser diagnostics redact complete credentials before bounding output, in
   assert.equal(browserFailureMessage('untrusted message', []), 'Unknown browser verification failure');
 });
 
-test('operator browser waits for authenticated management, checks real views and logs out both sessions', { timeout: 120000 }, async scope => {
+test('operator browser captures native login before navigation, checks real views and logs out both sessions', { timeout: 120000 }, async scope => {
   const fixture = await operatorFixture(scope);
   const agent = await fixture.agent(fixture.admin.actor, 'helper');
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-operator-browser-'));

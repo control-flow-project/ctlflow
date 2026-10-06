@@ -12,6 +12,7 @@ import { createRuntimeRepository } from '@ctlflow/crossfire-adapter-sqlite/repos
 import { roomGrants } from '@ctlflow/crossfire-contracts/schema/query';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 import { canRetireAgent } from '@ctlflow/crossfire-domain/fleet/native-stop';
+import { readActivity } from '@ctlflow/crossfire-domain/listener/activity';
 
 function value<T>(result: Result<T>): T {
   if (!result.ok) assert.fail(result.error.message);
@@ -82,13 +83,11 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
     assert.equal(Number(pagination[1]), pageSize);
     assert.equal(Number(pagination[2]), pageSize);
     const agentIds = page.items.map(row => row.agent.principalId);
-    const totals = value(activity.totals(agentIds));
-    assert.equal(totals.length, pageSize);
-    assert(totals.every(row => row.messagesDelivered === 6 && row.activeMs === 300));
-    const active = value(activity.active(agentIds, 50));
-    assert.equal(active.length, pageSize);
-    assert(active.every(row => row.stoppedAt === null));
-    assert.equal(statements.length, 4, 'Activity aggregates are page-wide, not per-agent');
+    const observed = value(readActivity({ listenerRead: activity, clock: { now: () => 500 } }, agentIds));
+    assert.equal(observed.size, pageSize);
+    assert([...observed.values()].every(row => row.messagesDelivered === 6 && row.activeMs === 300
+      && row.status === 'online' && row.activeRuns.length === 1 && row.activeRuns[0]?.stoppedAt === null));
+    assert.equal(statements.length, 4, 'Complete domain activity, including controller authority, uses two page-wide queries');
     for (const statement of statements.slice(2)) assert.match(plan(statement), /SEARCH .*ix_listener_run_agent.*agent_id=/u);
     const identities = value(discovery.selected([...agentIds, 'owner-2']));
     assert.equal(identities.length, pageSize + 1);

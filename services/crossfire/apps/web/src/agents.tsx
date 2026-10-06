@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
 import { HEARTBEAT_MS } from '@ctlflow/crossfire-contracts/activity';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
+import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Empty, Help, Loaded, Page, Panel, Pagination, Status, SubjectHeading, applied, timestamp } from './ui.js';
 import { AgentFilters } from './agent-filters.js';
 import { AgentRooms } from './agent-rooms.js';
@@ -38,18 +38,18 @@ function Activity({ agent }: { agent: AgentView }) {
 }
 function Lifecycle({ agent }: { agent: AgentView }) {
   const viewer = useSession(), action = useAction();
-  const [name, setName] = useState(agent.displayName), [revision] = useState(agent.revision);
-  const change = (input: { displayName?: string | null; status?: 'active' | 'suspended' | 'revoked' }) =>
-    call(operations.changeAgent, { agentId: agent.agentId }, { expectedRevision: revision, ...input }, viewer.csrfSecret);
+  const edit = useEditable(agent.agentId + '/name', agent.revision, agent.displayName);
+  const changeName = (displayName: string | null) => call(operations.changeAgent, { agentId: agent.agentId }, { expectedRevision: edit.version, displayName }, viewer.csrfSecret);
+  const changeStatus = (status: 'active' | 'suspended' | 'revoked') => call(operations.changeAgent, { agentId: agent.agentId }, { expectedRevision: agent.revision, status }, viewer.csrfSecret);
   const mutable = agent.allowedActions.includes('configure') && agent.status !== 'revoked';
-  return <><Panel title="Display name" description="The name shown in management and Matrix."><form className="bounded-form" onSubmit={event => { event.preventDefault(); void action.run(() => change({ displayName: name })); }}>
-      <fieldset disabled={!mutable || action.pending}><label>Configured display name<input maxLength={200} required value={name} onChange={event => setName(event.target.value)}/></label>
-        <div className="actions"><button>Save name</button><button type="button" onClick={() => { void action.run(() => change({ displayName: null })); }}>Use owner-qualified name</button></div></fieldset></form>
+  return <><Panel title="Display name" description="The name shown in management and Matrix."><form className="bounded-form" onSubmit={event => { event.preventDefault(); if (!edit.conflict) void action.run(() => changeName(edit.value)); }}>
+      <fieldset disabled={!mutable || action.pending}><label>Configured display name<input maxLength={200} required value={edit.value} onChange={event => edit.setValue(event.target.value)}/></label>
+        <div className="actions"><button disabled={edit.conflict}>Save name</button><button type="button" disabled={edit.conflict} onClick={() => { void action.run(() => changeName(null)); }}>Use owner-qualified name</button></div><EditConflict {...edit}/></fieldset></form>
     <Alert>{action.error}</Alert></Panel><Panel title="Account access" description="Suspension is reversible. Revocation permanently disables this identity."><dl><dt>Account</dt><dd><Status value={agent.status}/></dd><dt>Native application</dt><dd><Status value={applied(agent)}/></dd><dt>Last applied</dt><dd>{timestamp(agent.application.lastSuccessAt)}</dd></dl><Alert>{agent.application.errorMessage}</Alert>
     <div className="actions">{mutable && <><button disabled={action.pending} onClick={() => {
-      if (confirm(agent.status === 'active' ? 'Suspend this agent’s account access?' : 'Reactivate this agent?')) void action.run(() => change({ status: agent.status === 'active' ? 'suspended' : 'active' }));
+      if (confirm(agent.status === 'active' ? 'Suspend this agent’s account access?' : 'Reactivate this agent?')) void action.run(() => changeStatus(agent.status === 'active' ? 'suspended' : 'active'));
     }}>{agent.status === 'active' ? 'Suspend agent' : 'Activate agent'}</button><button className="danger" disabled={action.pending} onClick={() => {
-      if (confirm('Permanently revoke this agent? This cannot be undone.')) void action.run(() => change({ status: 'revoked' }));
+      if (confirm('Permanently revoke this agent? This cannot be undone.')) void action.run(() => changeStatus('revoked'));
     }}>Revoke account</button></>}</div><Alert>{action.error}</Alert><p className="support">Pending or failed changes are not yet fully enforced by Matrix.</p>
   </Panel><Panel title="Identity"><dl><dt>Verified owner</dt><dd>{agent.owner.displayName}<span className="subline">{agent.owner.matrixUserId}</span></dd><dt>Matrix identity</dt><dd className="mono">{agent.matrixUserId}</dd></dl>
     <Help title="Fleet deployment details"><dl><dt>Fleet</dt><dd><a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></dd><dt>Instance</dt><dd>{agent.deployment.instanceKey}</dd><dt>Controller</dt><dd>{agent.deployment.controllerName}</dd><dt>Last reported</dt><dd>{timestamp(agent.deployment.reportedAt)}</dd></dl><p>Controller details identify the deployment. Listener heartbeats determine whether this agent is online.</p></Help></Panel><AgentRetirement agent={agent}/></>;

@@ -1,5 +1,5 @@
 {
-  "name": "@ctlflow/fleet-daemon-client", "version": "0.1.0", "private": true, "type": "module",
+  "name": "@ctlflow/fleet-daemon-client", "version": "0.1.1", "private": true, "type": "module",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.0", "@ctlflow/crossfire-contracts": "0.1.0", "@ctlflow/crossfire-kernel": "0.1.0" }
+  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.1", "@ctlflow/crossfire-contracts": "0.1.1", "@ctlflow/crossfire-kernel": "0.1.1" }
 }

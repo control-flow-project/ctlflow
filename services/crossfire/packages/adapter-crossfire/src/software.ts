@@ -38,7 +38,6 @@ function prepareSoftware(root: string, releaseDirectory: string) {
     || !lstatSync(releaseDirectory).isDirectory()) throw new Error('Controller software must come from the exact installed package release directory');
   const local = loadRelease(releaseDirectory), current = local.manifest;
   const previous = installedClient(root);
-  if (previous) loadRelease(dirname(previous));
   const previousSkillHash = previous ? artifactHash(readPrivateBytes(join(dirname(previous), 'SKILL.md'), MAX_ARTIFACT_BYTES)) : null;
   const software = privateDir(join(root, 'software'));
   const directory = join(software, current.release);

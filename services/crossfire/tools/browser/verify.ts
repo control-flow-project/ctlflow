@@ -37,13 +37,21 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
       await page.goto(origin + '/manage/');
       await page.getByLabel('Matrix username', { exact: true }).fill(account.matrixUserId);
       await page.getByLabel('Password', { exact: true }).fill(account.password);
+      let native: unknown;
+      const loginUrl = origin + '/_matrix/client/v3/login';
+      await page.route(loginUrl, async route => {
+        const response = await route.fetch({ maxRedirects: 0 });
+        native = await response.json();
+        if (response.status() === 200 && native && typeof native === 'object' && 'access_token' in native && typeof native.access_token === 'string'
+          && 'user_id' in native && native.user_id === account.matrixUserId) token = native.access_token;
+        await route.fulfill({ response });
+      });
       const login = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/_matrix/client/v3/login');
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
       const signedIn = await login;
-      const native: unknown = await signedIn.json();
+      await page.unroute(loginUrl);
       if (signedIn.status() !== 200 || !native || typeof native !== 'object' || !('access_token' in native) || typeof native.access_token !== 'string'
         || !('user_id' in native) || native.user_id !== account.matrixUserId) return failure('unauthorized', 'Browser native login failed');
-      token = native.access_token;
       await expect(page.locator('.shell .page-heading h1')).toBeVisible();
       const current = await context.request.get(origin + '/api/sessions/current');
       const viewer = decodeResponse(await current.json(), operations.currentSession.output, false);

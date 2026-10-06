@@ -7,8 +7,10 @@ import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapListenerRun } from '../listener-run/map.js';
 import { readRetirement } from './retirement.js';
+import { readAdmissionCandidates } from './admission.js';
 export function createListenerReadRepository(database: Database.Database): ListenerReadRepository {
   return {
+    admissionCandidates(agentIds, since) { return stored(() => success(readAdmissionCandidates(database, agentIds, since))); },
     retirement(selection, now) { return stored(() => success(readRetirement(database, selection, now))); },
     activeCount(agentId, since, now) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('listener_run')

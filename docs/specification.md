@@ -75,6 +75,9 @@ alongside the existing named Tinqer exclusions. No organization wildcard, privat
 package exemption, hook enablement or global age-policy disabling is allowed.
 Controlled-registry gates verify those named positives and nonexempt negatives;
 public installation cannot require publishing a private internal module.
+The lock contains exactly the current owned workspace manifests and one link per
+owner, with coordinated versions and matching dependency/engine maps. Removed
+modules cannot remain as extraneous entries or alternate workspace owners.
 
 - Crossfire owns identity, enrollment, human authorization, room access, native
   reconciliation, wake policies, listener activity, fleet identity and React UI.
@@ -2502,6 +2505,12 @@ condition that prevents an owner seek. Distinct authorized scopes select
 explicit query shapes inside one repository implementation. Activity summaries
 are page-wide aggregate projections, never several queries per agent.
 
+Activity reads use two indexed batch queries: historical totals and current
+listener/controller admission facts. The domain evaluates the same pure predicate
+used for single-run admission, including owner status, current instance/fleet,
+delivery intent, exact connection/credential generation and unexpired open lease.
+Missing joined facts fail closed. No authority lookup runs per listener.
+
 Runtime observation hydration uses three constant queries for latest run,
 contexts and settings, never one query per room. Contact detection selects
 latest-started runs by indexed aggregate joins so an older abandoned run cannot
@@ -2783,6 +2792,18 @@ pending/failed enforcement and destructive consequences remain immediately
 visible. Mutations retain scoped authority, expected revisions, CSRF and
 idempotency even when controls are hidden.
 
+Same-key resource refresh retains mounted views without discarding edits. Editable
+forms bind their field values and concurrency fences to one versioned snapshot.
+Pristine forms adopt refreshed values/revisions; dirty forms retain their inputs
+and original revision/generation, display an explicit conflict and block saving
+until the human discards edits and loads the latest settings. Returning a draft
+to its unchanged baseline also permits pristine refresh. Entity changes never
+reuse another entity's draft. Grant access/delegation, chat wake policy, agent and
+fleet naming, scheduled Wake-ups and instance policy use this shared treatment.
+Instant account/lifecycle actions use the currently displayed entity revision;
+they never borrow a retained naming draft's revision. Server concurrency checks
+remain authoritative for changes racing an otherwise current submission.
+
 Policy differentiates signup, capacity, enrollment/reconciliation and onboarding
 sections with one atomic save. Enrollment review shows the exact owner,
 controller, roster and each wake/invitation policy, including selected Matrix IDs.
@@ -2883,6 +2904,12 @@ the fleet or selected instance from its bundled verified local assets, then
 restart fleetd with that installed executable while preserving desired stop/resume
 intent and exact histories. Remote updates may specify the already installed
 absolute release directory; they never download an HTTP fallback.
+Explicit replacement validates only the selected immutable package release and
+its installed destination against the current artifact contract. The previous
+managed entry is checked for ownership/path safety; its skill bytes are bounded
+and hashed only to report whether instructions changed. Its manifest is not
+interpreted as a current release or used as update authority. Recovery still
+strictly verifies the activated current release and never substitutes software.
 Update notices bind an exact opaque runtime session and release. Native identifier
 formats remain adapter-owned; durable notice filenames use a hash of the session.
 

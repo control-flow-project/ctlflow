@@ -4,6 +4,7 @@ import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
 import type { OutputOf } from '@ctlflow/crossfire-contracts/rest/operation';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
+import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Empty, Field, Help, Loaded, Panel, Pagination, PageItems } from './ui.js';
 
 type WakeSenders = OutputOf<typeof operations.wakePolicy>['senders'];
@@ -27,18 +28,20 @@ function IdentityPicker({ agentId, senders, setSenders }: { agentId: string; sen
 }
 function WakeForm({ agent, initial }: { agent: AgentView; initial: OutputOf<typeof operations.wakePolicy> }) {
   const viewer = useSession(), action = useAction();
-  const [mode, setMode] = useState(initial.mode), [senders, setSenders] = useState(initial.senders);
+  const edit = useEditable(agent.agentId + '/wake', initial.revision, { mode: initial.mode, senders: initial.senders });
+  const { mode, senders } = edit.value;
+  const setSenders: Dispatch<SetStateAction<WakeSenders>> = change => edit.setValue(previous => ({ ...previous,
+    senders: typeof change === 'function' ? change(previous.senders) : change }));
   const senderIds = senders.map(sender => sender.principalId);
-  const changed = mode !== initial.mode || mode === 'selected' && JSON.stringify([...senderIds].sort()) !== JSON.stringify(initial.senders.map(sender => sender.principalId).sort());
-  return <form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.changeWakePolicy,
-    { agentId: agent.agentId }, { expectedRevision: initial.revision, mode, senderIds: mode === 'selected' ? senderIds : [] }, viewer.csrfSecret)); }}>
+  return <form onSubmit={event => { event.preventDefault(); if (edit.conflict) return; void action.run(() => call(operations.changeWakePolicy,
+    { agentId: agent.agentId }, { expectedRevision: edit.version, mode, senderIds: mode === 'selected' ? senderIds : [] }, viewer.csrfSecret)); }}>
     <fieldset disabled={!agent.allowedActions.includes('configure') || agent.status === 'revoked' || action.pending}>
-      <label htmlFor="wake-policy">Wake-up authority</label><select id="wake-policy" value={mode} onChange={event => { if (wakePolicy(event.target.value)) setMode(event.target.value); }}>
+      <label htmlFor="wake-policy">Wake-up authority</label><select id="wake-policy" value={mode} onChange={event => { const next = event.target.value; if (wakePolicy(next)) edit.setValue(previous => ({ ...previous, mode: next })); }}>
         {WAKE_POLICIES.map(mode => <option key={mode} value={mode}>{WAKE_LABELS[mode]}</option>)}</select>
       {mode === 'selected' && <IdentityPicker agentId={agent.agentId} senders={senders} setSenders={setSenders}/>}
       <Help title="Context and blocked messages"><p>An allowed message delivers all pending context together. Nobody disables chat-triggered input. Scheduled Wake-ups and explicit terminal input are separate. Unread context remains available.</p>
         <p>Explicitly addressed, blocked messages receive a short owner-named notice at most once per sender every ten minutes. Filtering and notices never call the model.</p></Help>
-      <Alert>{action.error}</Alert><div className="actions"><button disabled={!changed}>Save wake-up policy</button></div>
+      <EditConflict {...edit}/><Alert>{action.error}</Alert><div className="actions"><button disabled={!edit.changed || edit.conflict}>Save wake-up policy</button></div>
     </fieldset></form>;
 }
 export function AgentWake({ agent }: { agent: AgentView }) {

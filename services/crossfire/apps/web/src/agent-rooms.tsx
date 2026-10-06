@@ -2,29 +2,31 @@ import { useState } from 'react';
 import type { AgentView, RoomView, RoomGrantView } from '@ctlflow/crossfire-contracts/schema/response';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
+import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Help, Loaded, Page, Panel, Pagination, PageItems, Status, SubjectHeading, timestamp } from './ui.js';
 
 const labels = { none: 'No access', read: 'Read only', reply: 'Read & reply', custom: 'Custom power level' } as const;
 function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; view?: RoomGrantView }) {
   const viewer = useSession(), action = useAction();
-  const [mode, setMode] = useState<keyof typeof labels>(view?.grant?.accessMode ?? 'none'), [muted, setMuted] = useState(view?.grant?.muted ?? false);
-  const [level, setLevel] = useState(view?.grant?.powerLevel ?? 0), [revision] = useState(view?.revision ?? agent.revision);
+  const edit = useEditable(agent.agentId + '/' + room.roomId, { revision: view?.revision ?? agent.revision, generation: view?.grant?.generation ?? null },
+    { mode: view?.grant?.accessMode ?? 'none', muted: view?.grant?.muted ?? false, level: view?.grant?.powerLevel ?? 0 });
+  const { mode, muted, level } = edit.value;
   const editable = agent.allowedActions.includes('room-grant.manage') && agent.status !== 'revoked';
   const canReply = room.authority && (room.authority.creator || room.authority.powerLevel !== null && room.authority.replyLevel <= room.authority.powerLevel);
   const nativeCreator = room.authority?.creatorIds.includes(agent.matrixUserId) ?? false;
   if (view?.ownerConversation) return <div><Status value="Read & reply"/><span className="subline">Owner DM · always available</span><span className="support">Private messages and native approvals. Access cannot be disabled.</span></div>;
   return <form onSubmit={event => { event.preventDefault();
-    if (mode === 'none' && view?.grant && !confirm('Remove this agent’s access to ' + room.name + '?')) return;
-    const params = { agentId: agent.agentId, roomId: room.roomId }, base = { expectedRevision: revision, expectedGeneration: view?.grant?.generation ?? null };
+    if (edit.conflict || mode === 'none' && edit.version.generation && !confirm('Remove this agent’s access to ' + room.name + '?')) return;
+    const params = { agentId: agent.agentId, roomId: room.roomId }, base = { expectedRevision: edit.version.revision, expectedGeneration: edit.version.generation };
     void action.run(() => mode === 'none' ? call(operations.removeGrant, params, base, viewer.csrfSecret)
       : call(operations.setGrant, params, { ...base, accessMode: mode, powerLevel: mode === 'custom' ? level : null, muted }, viewer.csrfSecret));
   }}><fieldset disabled={!editable || action.pending}><label className="sr-only" htmlFor={'access-' + room.roomId}>Access for {room.name}</label>
-    <select id={'access-' + room.roomId} value={mode} onChange={event => { const value = event.target.value; if (value === 'none' || value === 'read' || value === 'reply' || value === 'custom') setMode(value); }}>
+    <select id={'access-' + room.roomId} value={mode} onChange={event => { const value = event.target.value; if (value === 'none' || value === 'read' || value === 'reply' || value === 'custom') edit.setValue(previous => ({ ...previous, mode: value })); }}>
       <option value="none">No access</option><option value="read" disabled={!room.authority || nativeCreator}>Read only</option>
       <option value="reply" disabled={!canReply}>Read &amp; reply</option><option value="custom" disabled={!room.authority || nativeCreator}>Custom power level</option></select>
-    {mode === 'custom' && <label>Power level<input type="number" required value={level} max={room.authority?.creator ? undefined : room.authority?.powerLevel ?? undefined} onChange={event => setLevel(Number(event.target.value))}/></label>}
-    <div className="room-actions"><label className="check"><input type="checkbox" disabled={mode === 'none'} checked={muted} onChange={event => setMuted(event.target.checked)}/>Mute delivery</label><button className="room-save">Save access</button></div>
-  </fieldset>{nativeCreator && <p className="support">Matrix made this agent a room creator. Its native authority cannot be reduced; you can mute delivery or remove its membership.</p>}<Alert>{action.error}</Alert></form>;
+    {mode === 'custom' && <label>Power level<input type="number" required value={level} max={room.authority?.creator ? undefined : room.authority?.powerLevel ?? undefined} onChange={event => edit.setValue(previous => ({ ...previous, level: Number(event.target.value) }))}/></label>}
+    <div className="room-actions"><label className="check"><input type="checkbox" disabled={mode === 'none'} checked={muted} onChange={event => edit.setValue(previous => ({ ...previous, muted: event.target.checked }))}/>Mute delivery</label><button className="room-save" disabled={edit.conflict}>Save access</button></div>
+    <EditConflict {...edit}/></fieldset>{nativeCreator && <p className="support">Matrix made this agent a room creator. Its native authority cannot be reduced; you can mute delivery or remove its membership.</p>}<Alert>{action.error}</Alert></form>;
 }
 function AppliedGrant({ view }: { view?: RoomGrantView }) {
   const grant = view?.grant, application = view?.application;
@@ -59,14 +61,14 @@ function RoomAssignments({ agent, rooms }: { agent: AgentView; rooms: RoomView[]
 }
 function Delegation({ view, roomId }: { view: RoomGrantView; roomId: string }) {
   const viewer = useSession(), action = useAction();
-  const [enabled, setEnabled] = useState(view.permissions.includes('room.agent.invite'));
+  const edit = useEditable(view.agentId + '/' + roomId + '/permissions', { revision: view.revision, generation: view.grant?.generation ?? null }, view.permissions.includes('room.agent.invite'));
   const grant = view.grant;
   if (view.ownerConversation) return <p>Owner DMs stay private between this agent and its owner. Invitation delegation is not available.</p>;
   if (!grant || grant.accessMode === 'none') return <p>Grant room access before delegating invitations.</p>;
-  return <form onSubmit={event => { event.preventDefault(); void action.run(() => call(operations.setGrantPermissions, { agentId: view.agentId, roomId },
-    { expectedRevision: view.revision, expectedGeneration: grant.generation, permissions: enabled ? ['room.agent.invite'] : [] }, viewer.csrfSecret)); }}>
-    <fieldset disabled={!view.allowedActions.includes('permissions.set') || action.pending}><label className="check"><input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)}/>Allow this agent to invite other registered agents</label>
-      <p className="support">May cross owners, within the inviter’s native Matrix authority. The agent may remove only additions it made. It cannot pass this permission onward.</p><button>Save invitation permission</button></fieldset><Alert>{action.error}</Alert>
+  return <form onSubmit={event => { event.preventDefault(); if (edit.conflict || !edit.version.generation) return; void action.run(() => call(operations.setGrantPermissions, { agentId: view.agentId, roomId },
+    { expectedRevision: edit.version.revision, expectedGeneration: edit.version.generation, permissions: edit.value ? ['room.agent.invite'] : [] }, viewer.csrfSecret)); }}>
+    <fieldset disabled={!view.allowedActions.includes('permissions.set') || action.pending}><label className="check"><input type="checkbox" checked={edit.value} onChange={event => edit.setValue(event.target.checked)}/>Allow this agent to invite other registered agents</label>
+      <p className="support">May cross owners, within the inviter’s native Matrix authority. The agent may remove only additions it made. It cannot pass this permission onward.</p><button disabled={edit.conflict}>Save invitation permission</button><EditConflict {...edit}/></fieldset><Alert>{action.error}</Alert>
     <Help title="Grant provenance"><dl><dt>Added by principal</dt><dd className="mono">{grant.addedById}</dd><dt>Authorizing principal</dt><dd className="mono">{grant.authorizerId}</dd><dt>Membership generation</dt><dd className="mono">{grant.generation}</dd></dl></Help></form>;
 }
 export function AgentRoomDetail({ id, room }: { id: string; room: string }) {

@@ -2,15 +2,15 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { authorize, activeActor } from '../authorization/authorize.js';
 import type { Actor, Services } from '../port/services.js';
 import type { PublicationRecord } from './port.js';
-import { controllerAdmission } from '../listener/controller.js';
+import { admitsController } from '../listener/admission.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
 export type PublicationDependencies = Pick<Services, 'publication' | 'repositories' | 'directory' | 'listenerRead' | 'clock' | 'unitOfWork' | 'identity'>;
 function publisherLease(services: PublicationDependencies, agentId: string) {
-  const runs = services.listenerRead.active([agentId], services.clock.now() - HEARTBEAT_EXPIRY_MS); if (!runs.ok) return runs;
-  for (const run of runs.value) {
+  const now = services.clock.now();
+  const runs = services.listenerRead.admissionCandidates([agentId], now - HEARTBEAT_EXPIRY_MS); if (!runs.ok) return runs;
+  for (const { run, facts } of runs.value) {
     if (run.disconnectRequestedAt !== null) continue;
-    const admitted = controllerAdmission(services, run); if (!admitted.ok) return admitted;
-    if (admitted.value) return success(undefined);
+    if (admitsController(run, facts, now)) return success(undefined);
   }
   return failure('forbidden', 'Publication requires the current authenticated fleet controller listener');
 }

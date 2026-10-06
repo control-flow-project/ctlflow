@@ -85,6 +85,10 @@ for an administrator. Screenshots are private. It does not create users, rules,
 rooms or messages, pause fleets, select native answers or call a model. Element
 theme/signup/messaging checks remain application regression or deployment-owner
 checks; this command makes no claim to cover them.
+The browser's native login request is fetched from the selected real server,
+without redirects, and its unchanged response is delivered to the UI only after
+capturing the credential for cleanup. This avoids reading a discarded response
+body after the UI navigates. It neither stubs authentication nor substitutes data.
 
 ## Database and preservation
 

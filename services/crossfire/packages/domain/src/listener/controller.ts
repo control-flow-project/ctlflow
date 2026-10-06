@@ -2,6 +2,7 @@ import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 import type { ListenerRun } from '../activity/types.js';
 import { authenticateController } from '../fleet/authority.js';
+import { admitsController } from './admission.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'identity' | 'clock'>;
 export type ControllerProof = { fleetId: string; connectionId: string; credential: string };
@@ -25,9 +26,7 @@ export function controllerAdmission(services: Pick<Services, 'repositories' | 'c
   const connection = services.repositories.fleetConnection.find(run.controller.fleetId); if (!connection.ok) return connection;
   const credential = services.repositories.fleetCredential.find({ id: run.controller.credentialId }); if (!credential.ok) return credential;
   const owner = fleet.value ? services.repositories.principal.find({ id: fleet.value.ownerId }) : success(null); if (!owner.ok) return owner;
-  return success(Boolean(binding.value && fleet.value && owner.value?.status === 'active'
-    && binding.value.retiredAt === null && fleet.value.archivedAt === null && binding.value.ownerId === fleet.value.ownerId && binding.value.fleetKey === fleet.value.fleetKey
-    && fleet.value.deliveryEnabled && connection.value?.connectionId === run.controller.connectionId
-    && connection.value.credentialId === run.controller.credentialId && connection.value.closedAt === null
-    && connection.value.expiresAt > services.clock.now() && credential.value?.fleetId === fleet.value.id && credential.value.revokedAt === null));
+  const facts = binding.value && fleet.value && connection.value && credential.value && owner.value
+    ? { binding: binding.value, fleet: fleet.value, connection: connection.value, credential: credential.value, ownerStatus: owner.value.status } : null;
+  return success(admitsController(run, facts, services.clock.now()));
 }
