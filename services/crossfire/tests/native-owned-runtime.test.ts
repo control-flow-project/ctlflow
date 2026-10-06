@@ -42,7 +42,7 @@ test('stock Codex default and native bypass execute synchronous subprocess IPC a
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
   const provider = await nativeProvider(scope, home), adapter = codexRuntime(), stop = new AbortController();
   trustWorkspace(home, workspace);
-  const input = { name: 'native-options', workspace, stateDirectory: workspace, instructions: 'Inert native option proof.', allowNewHistory: true,
+  const input = { profile: 'native-options', name: 'native-options', workspace, stateDirectory: workspace, instructions: 'Inert native option proof.', allowNewHistory: true,
     options: {} as Record<string, unknown>, hooks: { requestDecision: async () => { throw new Error('Unexpected fixture approval'); } } };
   let runtime = value(await adapter.start(input, stop.signal));
   input.allowNewHistory = false;
@@ -86,7 +86,7 @@ test('external native workspaces retain private managed state, explicit role ski
   const provider = await nativeProvider(scope, home), adapter = codexRuntime(process.env.CROSSFIRE_TEST_CODEX ?? 'codex');
   trustWorkspace(home, workspace);
   const skill = readFileSync(join(builtRelease().directory, 'SKILL.md'), 'utf8');
-  const input = { name: 'private-managed-agent', workspace, stateDirectory, allowNewHistory: true,
+  const input = { profile: 'private-managed-agent', name: 'private-managed-agent-max', workspace, stateDirectory, allowNewHistory: true,
     instructions: 'Role instructions: external-workspace-proof.\n\n' + skill,
     options: { sandbox_mode: 'danger-full-access', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No fixture approval is expected'); } } };
@@ -101,7 +101,7 @@ test('external native workspaces retain private managed state, explicit role ski
   provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 1000, max_output_tokens: 1024 });
   await runtime.deliver('Retain external native history: silver orchard 913.', 'external-environment-proof');
   await until(() => existsSync(marker), 'Native tools did not retain the explicit private state binding');
-  assert.deepEqual(JSON.parse(readFileSync(marker, 'utf8')), { cwd: workspace, home, state: stateDirectory, name: input.name });
+  assert.deepEqual(JSON.parse(readFileSync(marker, 'utf8')), { cwd: workspace, home, state: stateDirectory, name: input.profile });
   runtime.acknowledge(['external-environment-proof']); await until(async () => !(await runtime.inspect()).busy);
   assert.equal(provider.requests.length, 2);
   assert(JSON.stringify(provider.requests[0]).includes('external-workspace-proof'));
@@ -113,20 +113,39 @@ test('external native workspaces retain private managed state, explicit role ski
   assert(existsSync(join(home, 'crossfire-session.json')));
   assert.deepEqual(value(await adapter.savedContexts({ workspace, stateDirectory })), [{ context: 'shared', runtime: 'codex', sessionId, workspace }]);
   input.instructions = 'Updated role instructions: resumed-external-workspace-proof.\n\n' + skill;
+  input.name = 'private-managed-agent-high';
   runtime = value(await adapter.start(input, new AbortController().signal)); assert.equal(runtime.sessionId, sessionId);
   assert.equal((await instructionItems(runtime)).length, 2, 'One changed role creates one native developer revision');
-  provider.hold(); await runtime.deliver('Use the original historical fact.', 'external-resume-proof');
-  await until(() => provider.held() !== undefined);
-  const resumedRequest = provider.requests.at(-1);
-  provider.finish(); runtime.acknowledge(['external-resume-proof']); await until(async () => !(await runtime.inspect()).busy);
+  const resumedMarker = join(stateDirectory, 'resumed-environment.json');
+  provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source.replace(JSON.stringify(marker), JSON.stringify(resumedMarker))), yield_time_ms: 1000, max_output_tokens: 1024 });
+  await runtime.deliver('Use the original historical fact.', 'external-resume-proof');
+  await until(() => existsSync(resumedMarker));
+  const resumedRequest = provider.requests[2];
+  assert.deepEqual(JSON.parse(readFileSync(resumedMarker, 'utf8')), { cwd: workspace, home, state: stateDirectory, name: input.profile });
+  runtime.acknowledge(['external-resume-proof']); await until(async () => !(await runtime.inspect()).busy);
   assert(JSON.stringify(resumedRequest).includes('silver orchard 913'));
   assert(JSON.stringify(resumedRequest).includes('resumed-external-workspace-proof'));
   await runtime.close();
   value(await adapter.reset({ workspace, stateDirectory, resetId: '5a2435b3-f3bb-482c-8b99-51e5afcae258' }));
   runtime = value(await adapter.start({ ...input, allowNewHistory: true }, new AbortController().signal));
-  assert.notEqual(runtime.sessionId, sessionId); assert.equal(provider.requests.length, 3);
+  assert.notEqual(runtime.sessionId, sessionId); assert.equal(provider.requests.length, 4);
   assert.equal((await instructionItems(runtime)).length, 1, 'Explicit fresh history owns its own first instruction receipt');
   assert.deepEqual(readdirSync(existing), ['existing-history']);
+});
+
+test('missing or invalid immutable profiles fail before touching private native state', async scope => {
+  const directory = mkdtempSync(join(process.cwd(), '.temp/invalid-owned-profile-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  const stateDirectory = join(directory, 'uncreated');
+  const input = { profile: 'immutable-key', name: 'display-name', workspace: directory, stateDirectory, instructions: '', options: {},
+    hooks: { requestDecision: async () => { throw new Error('Invalid identity must not request approval'); } } };
+  for (const profile of [undefined, null, '', 'Display Name', 'another/profile', 'x'.repeat(41)]) {
+    Reflect.set(input, 'profile', profile);
+    const result = await codexRuntime('/unavailable-native-codex').start(input, new AbortController().signal);
+    assert.equal(result.ok, false);
+    if (!result.ok) { assert.equal(result.error.code, 'invalid'); assert.match(result.error.message, /immutable controller-assigned profile/u); }
+    assert.equal(existsSync(stateDirectory), false);
+  }
 });
 
 test('owned stock Codex has zero-model startup and resumes the same private native session', { timeout: 60000 }, async scope => {
@@ -139,7 +158,7 @@ test('owned stock Codex has zero-model startup and resumes the same private nati
   const instructions = readFileSync(join(builtRelease().directory, 'SKILL.md'), 'utf8');
   assert(instructions.includes('Machine-specific diagnostics belong only in your verified private owner DM.'));
   assert(instructions.includes('Credentials and secret answers remain protected everywhere.'));
-  const input = { name: 'native-proof', workspace, stateDirectory: workspace, instructions: instructions + '\nInert native verification. Never contact external services.', allowNewHistory: true,
+  const input = { profile: 'native-proof', name: 'native-proof', workspace, stateDirectory: workspace, instructions: instructions + '\nInert native verification. Never contact external services.', allowNewHistory: true,
     options: { model: 'gpt-6.1-sol', model_reasoning_effort: 'max', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No approvals are expected'); } } };
   let runtime = value(await adapter.start(input, stop.signal));

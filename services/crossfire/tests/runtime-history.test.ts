@@ -26,7 +26,7 @@ async function environment(scope: Parameters<typeof nativeProvider>[0]) {
 
 test('controller-owned reset creates a fresh native context without changing identity, parameters or provider authentication', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope), usage: UsageSample[] = [];
-  const input = { name: 'reset-proof', workspace, stateDirectory: workspace, instructions: 'Native reset proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'danger-full-access', approval_policy: 'never' },
+  const input = { profile: 'reset-proof', name: 'reset-proof', workspace, stateDirectory: workspace, instructions: 'Native reset proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'danger-full-access', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No decision expected'); }, usage: (sample: UsageSample) => usage.push(sample) } };
   let runtime = value(await adapter.start(input, new AbortController().signal)); cleanup(scope, () => runtime.close());
   const previous = runtime.sessionId, authentication = readFileSync(join(workspace, '.codex/auth.json'));
@@ -49,7 +49,7 @@ test('controller-owned reset creates a fresh native context without changing ide
 
 test('default native start resumes complete history and refuses absent or broken bindings without a fresh fallback', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
-  const input = { name: 'resume-proof', workspace, stateDirectory: workspace, instructions: 'Inert retained history proof.', options: { sandbox_mode: 'read-only', approval_policy: 'never' },
+  const input = { profile: 'resume-proof', name: 'resume-proof', workspace, stateDirectory: workspace, instructions: 'Inert retained history proof.', options: { sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } };
   const missing = await adapter.start(input, new AbortController().signal);
   assert.equal(missing.ok, false); if (!missing.ok) assert.equal(missing.error.code, 'missing');
@@ -80,7 +80,7 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
   const { workspace, provider, adapter } = await environment(scope);
   const observed: RuntimeObservationEvent[] = [], stop = new AbortController();
   let pendingDecision = false;
-  const input = { name: 'room-proof', workspace, stateDirectory: workspace, instructions: 'Inert history proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
+  const input = { profile: 'room-proof', name: 'room-proof', workspace, stateDirectory: workspace, instructions: 'Inert history proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
     listenerOptions: { historyMode: 'per-room' as 'per-room' | 'shared' },
     hooks: { requestDecision: async () => { throw new Error('No permission expected'); }, pendingDecisions: () => pendingDecision,
       observe: (event: RuntimeObservationEvent) => observed.push(event) } };
@@ -146,7 +146,7 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
 test('stock Codex structured questions preserve native attribution and exact responses without a routing model call', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
   const requests: RuntimeDecision[] = [], observed: RuntimeObservationEvent[] = [];
-  const runtime = value(await adapter.start({ name: 'question-proof', workspace, stateDirectory: workspace, instructions: 'Use native structured questions when a human decision is necessary.', allowNewHistory: true,
+  const runtime = value(await adapter.start({ profile: 'question-proof', name: 'question-proof', workspace, stateDirectory: workspace, instructions: 'Use native structured questions when a human decision is necessary.', allowNewHistory: true,
     options: { features: { default_mode_request_user_input: true } },
     listenerOptions: { historyMode: 'per-room' },
     hooks: { observe: (event: RuntimeObservationEvent) => observed.push(event), requestDecision: async request => {
@@ -184,7 +184,7 @@ test('corrupt native history bindings cannot share a session or ambiguously sele
     [{ room: '!alpha:test', sessionId: other }, { room: '!alpha:test', sessionId: randomUUID() }],
   ]) {
     writeFileSync(join(workspace, '.codex', 'crossfire-contexts.json'), JSON.stringify({ mode: 'per-room', control: null, rooms }), { mode: 0o600 });
-    const started = await adapter.start({ name: 'invalid-history', workspace, stateDirectory: workspace, instructions: 'No input.', options: {},
+    const started = await adapter.start({ profile: 'invalid-history', name: 'invalid-history', workspace, stateDirectory: workspace, instructions: 'No input.', options: {},
       listenerOptions: { historyMode: 'per-room' }, hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } }, new AbortController().signal);
     assert(!started.ok && started.error.message.includes('unique rooms and distinct session identities'));
     assert.equal(provider.requests.length, 0);

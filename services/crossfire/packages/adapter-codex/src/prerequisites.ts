@@ -4,11 +4,11 @@ import { effectiveProvider, nativeConfiguration, nativeDirectories, prepareHome 
 import { ownedOptions, ownedQuestionCapability, ownedVersion } from './owned-options.js';
 import { inspectInstructionCapability } from './capability.js';
 
-export function nativeEnvironment(home: string, stateDirectory: string, name?: string): NodeJS.ProcessEnv {
+export function nativeEnvironment(home: string, stateDirectory: string, profile?: string): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home, CROSSFIRE_PROJECT: stateDirectory };
   delete environment.CODEX_THREAD_ID;
   delete environment.CROSSFIRE_AGENT_NAME;
-  if (name !== undefined) environment.CROSSFIRE_AGENT_NAME = name;
+  if (profile !== undefined) environment.CROSSFIRE_AGENT_NAME = profile;
   return environment;
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-adapter-sqlite",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,9 +11,9 @@
     "@tinqerjs/better-sqlite3-adapter": "0.0.28",
     "@tinqerjs/tinqer": "0.0.28",
     "better-sqlite3": "13.0.3",
-    "@ctlflow/crossfire-domain": "0.1.2",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.2",
-    "@ctlflow/crossfire-kernel": "0.1.2"
+    "@ctlflow/crossfire-domain": "0.1.3",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.3",
+    "@ctlflow/crossfire-kernel": "0.1.3"
   },
   "exports": {
     "./*": {

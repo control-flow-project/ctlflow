@@ -2076,6 +2076,13 @@ streams bounded regular files through typed binary operations and explicitly
 commits only the complete, verified bundle. There is no archive extraction,
 server-side execution, extra daemon or model-based integrity workflow.
 
+The owned runtime receives its immutable local profile separately from its
+mutable display name. fleetd supplies the instance key as that required profile;
+native tools receive it in CROSSFIRE_AGENT_NAME and private state in
+CROSSFIRE_PROJECT. Display-name changes cannot select a different credential,
+cursor, workspace or native history. Invalid/missing profiles fail before native
+startup; there is no display-name alias or profile-discovery fallback.
+
 The server supplies a 256-bit, 43-character base64url public key. Committed files
 are served at the explicitly configured separate content origin under
 `/<publicKey>/index.html` and relative asset paths. Anyone holding the link can

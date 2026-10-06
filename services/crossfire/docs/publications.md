@@ -28,7 +28,9 @@ node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" report publish \
 
 `CROSSFIRE_PROJECT` identifies private state even when native cwd is a separate
 existing workspace. Operator invocations may explicitly select that state and
-its enrolled profile with `--project` and `--profile`. The directory may
+its enrolled profile with `--project` and `--profile`. The profile is the immutable
+controller-assigned key in `CROSSFIRE_AGENT_NAME`, not the agent's display name.
+The directory may
 be relative or absolute for private command execution. Do not include the
 machine's absolute paths in the report or the message sharing its link.
 

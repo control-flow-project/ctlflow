@@ -46,7 +46,7 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
     failed: (_session, error) => { failures.push(error instanceof Error ? error.message : 'Unexpected native failure'); }, recovered: () => {},
     start: async (signal, observe) => {
       starts++;
-      const started = await adapter.start({ name: 'native-sleep-proof', workspace, stateDirectory: workspace, instructions: 'Inert provider proof; do not access external services.',
+      const started = await adapter.start({ profile: 'native-sleep-proof', name: 'native-sleep-proof', workspace, stateDirectory: workspace, instructions: 'Inert provider proof; do not access external services.',
         options, allowNewHistory, hooks: { ...services.hooks, observe } }, signal);
       if (started.ok) allowNewHistory = false;
       return started;
