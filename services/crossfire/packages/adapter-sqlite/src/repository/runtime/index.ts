@@ -3,8 +3,7 @@ import { executeSelect, executeInsert, executeUpdate, executeDelete } from '@tin
 import type { RuntimeRepository, Incident } from '@ctlflow/crossfire-domain/runtime/types';
 import type { DecisionView } from '@ctlflow/crossfire-domain/runtime/values';
 import { success } from '@ctlflow/crossfire-kernel/result';
-import { summarizeNative } from '@ctlflow/crossfire-domain/runtime/summary';
-import type { NativeRuntimeSummary } from '@ctlflow/crossfire-domain/runtime/values';
+import { nativeSummaries } from './summaries.js';
 import { schema, type Tables } from '../../schema/tables.js';
 import { stored } from '../stored.js';
 
@@ -24,29 +23,7 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
       kind: row.kind, message: row.message, createdAt: row.created_at, recoveredAt: row.recovered_at };
   }
   return {
-    summaries(agentIds) { return stored(() => {
-      if (!agentIds.length) return success(new Map<string, NativeRuntimeSummary>());
-      const runs = executeSelect(database, schema, (query, params, helpers) => query.from('listener_run')
-        .where(row => params.agentIds.includes(row.agent_id))
-        .select(row => ({ id: row.id, agentId: row.agent_id,
-          position: helpers.window(row).partitionBy(item => item.agent_id).orderByDescending(item => item.started_at)
-            .thenByDescending(item => item.id).rowNumber() }))
-        .where(row => row.position === 1), { agentIds });
-      if (!runs.length) return success(new Map<string, NativeRuntimeSummary>());
-      const rows = executeSelect(database, schema, (query, params) => query.from('runtime_observation')
-        .where(row => params.runIds.includes(row.run_id))
-        .select(row => ({ agentId: row.agent_id, state: row.state, observedAt: row.observed_at, lastActivityAt: row.last_activity_at,
-          historyAvailable: row.history_available })), { runIds: runs.map(run => run.id) });
-      const groups = new Map<string, Parameters<typeof summarizeNative>[0]>();
-      for (const row of rows) {
-        const group = groups.get(row.agentId) ?? [];
-        group.push({ ...row, historyAvailable: row.historyAvailable === null ? null : row.historyAvailable === 1 });
-        groups.set(row.agentId, group);
-      }
-      const summaries = new Map<string, NativeRuntimeSummary>();
-      for (const [agentId, values] of groups) { const summary = summarizeNative(values); if (summary) summaries.set(agentId, summary); }
-      return success(summaries);
-    }); },
+    summaries(agentIds) { return stored(() => success(nativeSummaries(database, agentIds))); },
     decision(id) { return stored(() => {
       const row = executeSelect(database, schema, (query, params) => query.from('runtime_decision').where(row => row.id === params.id).firstOrDefault(), { id });
       return success(row ? decision(row) : null);

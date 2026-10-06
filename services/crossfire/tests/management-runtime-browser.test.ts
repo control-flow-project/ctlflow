@@ -63,7 +63,8 @@ test('Management distinguishes native sleep and wake from listener readiness wit
   const roster = page.getByRole('table', { name: 'Fleet agents', exact: true }); await expect(roster.locator('tbody tr')).toHaveCount(3);
   await expect(roster.getByText('Sleeping', { exact: true })).toBeVisible(); await expect(roster.getByText('Waking', { exact: true })).toBeVisible();
   const offline = roster.getByRole('row').filter({ has: page.getByRole('cell', { name: instances[2]!.instanceKey, exact: true }) });
-  await expect(offline.getByText('offline', { exact: true })).toBeVisible(); await expect(offline.getByText('Idle', { exact: true })).toBeVisible();
+  await expect(offline.getByText('offline', { exact: true })).toBeVisible(); await expect(offline.getByText('Unknown', { exact: true })).toBeVisible();
+  await expect(offline.getByText('Idle', { exact: true })).toHaveCount(0); await expect(offline).toContainText('Last reported: Idle');
   await expect(offline).toContainText('Last reported'); await expect(offline.getByText('Sleeping', { exact: true })).toHaveCount(0);
   await expect(offline).toContainText('History not reported');
   assert.deepEqual(runtimeRequests, [], 'Fleet roster consumes the same page-batched native summary');

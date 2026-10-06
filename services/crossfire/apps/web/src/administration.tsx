@@ -7,20 +7,24 @@ import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Empty, Field, Help, Loaded, Page, Panel, Pagination, Status, applied, timestamp } from './ui.js';
 import { auditActionLabel } from './audit-labels.js';
 import { sleepDurationSeconds } from './sleep-duration.js';
+import { useConfirmation } from './confirmation.js';
 
 function MemberRow({ item }: { item: MemberView }) {
-  const viewer = useSession(), action = useAction(), params = { memberId: item.memberId };
+  const viewer = useSession(), action = useAction(), confirmation = useConfirmation(), params = { memberId: item.memberId };
   return <tr><td><strong>{item.displayName}</strong><span className="subline mono">{item.matrixUserId}</span></td><td>
     <select aria-label={'Role for ' + item.matrixUserId} value={item.roleCode} disabled={action.pending || item.status === 'revoked'} onChange={event => {
       const roleCode = event.target.value === 'administrator' ? 'administrator' : 'member';
-      if (confirm('Change this member’s role to ' + roleCode + '?')) void action.run(() => call(operations.memberRole, params, { expectedRevision: item.revision, roleCode }, viewer.csrfSecret));
+      confirmation.request({ title: 'Change member role?', description: 'Change ' + item.displayName + '’s role to ' + roleCode + '.', label: 'Change role',
+        execute: () => action.run(() => call(operations.memberRole, params, { expectedRevision: item.revision, roleCode }, viewer.csrfSecret)) });
     }}><option value="member">Member</option><option value="administrator">Administrator</option></select></td>
     <td><Status value={item.status}/></td><td><Status value={applied(item)}/><Alert>{item.application.errorMessage}</Alert></td><td>
       {item.status !== 'revoked' && <div className="actions"><button disabled={action.pending} onClick={() => {
-        if (confirm('Change access for this member and their agents?')) void action.run(() => call(operations.changeMember, params, { expectedRevision: item.revision, status: item.status === 'active' ? 'suspended' : 'active' }, viewer.csrfSecret));
+        confirmation.request({ title: item.status === 'active' ? 'Suspend member?' : 'Reactivate member?', description: 'Change access for ' + item.displayName + ' and their agents.', label: item.status === 'active' ? 'Suspend' : 'Reactivate', danger: item.status === 'active',
+          execute: () => action.run(() => call(operations.changeMember, params, { expectedRevision: item.revision, status: item.status === 'active' ? 'suspended' : 'active' }, viewer.csrfSecret)) });
       }}>{item.status === 'active' ? 'Suspend' : 'Reactivate'}</button><button className="danger" disabled={action.pending} onClick={() => {
-        if (confirm('Permanently revoke this member and their agents?')) void action.run(() => call(operations.changeMember, params, { expectedRevision: item.revision, status: 'revoked' }, viewer.csrfSecret));
-      }}>Revoke</button></div>}<Alert>{action.error}</Alert></td></tr>;
+        confirmation.request({ title: 'Revoke member?', description: 'Permanently revoke ' + item.displayName + ' and their agents. This cannot be undone.', label: 'Revoke member', danger: true,
+          execute: () => action.run(() => call(operations.changeMember, params, { expectedRevision: item.revision, status: 'revoked' }, viewer.csrfSecret)) });
+      }}>Revoke</button></div>}<Alert>{action.error}</Alert>{confirmation.dialog}</td></tr>;
 }
 export function Members() {
   const resource = useResource(operations.members, {}, location.search);
@@ -29,7 +33,7 @@ export function Members() {
       <tbody>{page.data.map(item => <MemberRow key={item.memberId} item={item}/>)}</tbody></table></div><Pagination meta={page.meta}/></>}</Loaded></Page>;
 }
 export function Invitations() {
-  const viewer = useSession(), resource = useResource(operations.invitations, {}, location.search), action = useAction();
+  const viewer = useSession(), resource = useResource(operations.invitations, {}, location.search), action = useAction(), confirmation = useConfirmation();
   const [roleCode, setRole] = useState<'member' | 'administrator'>('member'), [lifetime, setLifetime] = useState(86400), [link, setLink] = useState('');
   return <Page title="Invitations" description="Give someone a private, one-use link to join this server."><Panel title="Create an invitation" description="The invitee chooses their username and password in Element."><form onSubmit={event => {
     event.preventDefault(); void action.run(() => call(operations.createInvitation, {}, { roleCode, expiresSeconds: lifetime }, viewer.csrfSecret), value => { setLink(value.signupUrl); resource.refresh(); });
@@ -39,9 +43,10 @@ export function Invitations() {
     <Panel title="Issued invitations" description="Used, expired and revoked links cannot register another account."><Loaded {...resource} retry={resource.refresh}>{page => <>{page.data.length ? <div className="table-wrap"><table aria-label="Invitations"><thead><tr><th>Created</th><th>Role</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead><tbody>{page.data.map(item => {
       const state = item.revokedAt !== null ? 'Revoked' : item.consumedByMemberId ? 'Used' : item.expiresAt <= Date.now() ? 'Expired' : 'Active';
       return <tr key={item.invitationId}><td>{timestamp(item.createdAt)}<span className="subline mono" title={item.invitationId}>{item.invitationId.slice(0, 8)}</span></td><td>{item.roleCode === 'administrator' ? 'Administrator' : 'Member'}</td><td>{timestamp(item.expiresAt)}</td><td><Status value={state}/></td><td>{state === 'Active' && <button disabled={action.pending} onClick={() => {
-        if (confirm('Revoke this signup invitation?')) void action.run(() => call(operations.revokeInvitation, { invitationId: item.invitationId }, {}, viewer.csrfSecret));
+        confirmation.request({ title: 'Revoke invitation?', description: 'This private signup link will no longer permit registration.', label: 'Revoke invitation', danger: true,
+          execute: () => action.run(() => call(operations.revokeInvitation, { invitationId: item.invitationId }, {}, viewer.csrfSecret)) });
       }}>Revoke</button>}</td></tr>;
-    })}</tbody></table></div> : <Empty title="No invitations">Create an invitation to let someone register on this server.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel></Page>;
+    })}</tbody></table></div> : <Empty title="No invitations">Create an invitation to let someone register on this server.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel>{confirmation.dialog}</Page>;
 }
 function PolicyForm({ initial }: { initial: PolicyView }) {
   const viewer = useSession(), action = useAction();

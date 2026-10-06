@@ -17,6 +17,7 @@
 - [Listener, sleep and report-publication review](proposals/20261005-listener-and-publication-architecture.md)
 - [Universal fleet controller verification](verification/20261005-universal-fleet-controller.md)
 - [Preserving GAAP rollout verification](verification/20261006-gaap-preserving-rollout.md)
+- [Fleet stop and management navigation](verification/20261007-fleet-stop-management.md)
 - [High-first Agreements rollout verification](verification/20261006-high-first-agreements.md)
 
 The review records the inspected baseline and the current managed design. It is

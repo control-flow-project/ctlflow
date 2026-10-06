@@ -3,10 +3,11 @@ import type { EnrollmentView } from '@ctlflow/crossfire-contracts/schema/respons
 import { WAKE_LABELS } from '@ctlflow/crossfire-contracts/wake';
 import { call, operations, useResource, useAction } from './api.js';
 import { useSession } from './session.js';
+import { useConfirmation } from './confirmation.js';
 import { Alert, Empty, Help, Loaded, Page, Panel, Pagination, PageItems, Status, timestamp } from './ui.js';
 
 function Approval({ item }: { item: EnrollmentView }) {
-  const viewer = useSession(), action = useAction(), [code, setCode] = useState('');
+  const viewer = useSession(), action = useAction(), confirmation = useConfirmation(), [code, setCode] = useState('');
   const request = item.enrollment, pending = request.status === 'pending' && request.expiresAt > Date.now();
   const decide = (decision: 'approve' | 'reject') => call(operations.decideEnrollment, { enrollmentId: request.enrollmentId },
     { expectedRevision: request.revision, decision, verificationCode: code }, viewer.csrfSecret);
@@ -23,8 +24,8 @@ function Approval({ item }: { item: EnrollmentView }) {
       <p>Approval applies these wake settings and invitation defaults to existing room access and future admissions. It does not grant room membership or bypass Matrix permissions. Owner and management DMs never allow third-agent invitations.</p>
       <label className="bounded-form">Verification code<input value={code} onChange={event => setCode(event.target.value.toUpperCase())} required minLength={12} maxLength={12} autoComplete="off" className="mono"/></label>
       <Alert>{action.error}</Alert><div className="actions"><button disabled={action.pending || request.ownerId !== viewer.member.memberId}>Approve roster</button>
-        <button type="button" disabled={action.pending || code.length !== 12 || request.ownerId !== viewer.member.memberId} onClick={() => { if (confirm('Reject this exact request?')) void action.run(() => decide('reject')); }}>Reject</button></div>
-    </form>}<Help title="Request ownership and identifiers"><dl><dt>Owner</dt><dd>{request.owner.displayName}<span className="subline">{request.owner.matrixUserId}</span></dd><dt>Approval deadline</dt><dd>{timestamp(request.expiresAt)}</dd><dt>Request</dt><dd className="mono">{request.enrollmentId}</dd></dl></Help>
+        <button type="button" disabled={action.pending || code.length !== 12 || request.ownerId !== viewer.member.memberId} onClick={() => confirmation.request({ title: 'Reject enrollment?', description: 'Reject this exact fleet enrollment request. These identities will not be approved.', label: 'Reject request', danger: true, execute: () => action.run(() => decide('reject')) })}>Reject</button></div>
+    </form>}{confirmation.dialog}<Help title="Request ownership and identifiers"><dl><dt>Owner</dt><dd>{request.owner.displayName}<span className="subline">{request.owner.matrixUserId}</span></dd><dt>Approval deadline</dt><dd>{timestamp(request.expiresAt)}</dd><dt>Request</dt><dd className="mono">{request.enrollmentId}</dd></dl></Help>
   </Panel>;
 }
 export function Enrollments({ id }: { id?: string }) { return id ? <EnrollmentDetail id={id}/> : <EnrollmentList/>; }

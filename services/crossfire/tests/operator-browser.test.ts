@@ -43,9 +43,9 @@ test('operator browser captures native login before navigation, checks real view
   assert.deepEqual(views.map(view => view.route), [
     '/manage/agents', '/manage/fleets', '/manage/wake-ups', '/manage/wake-ups/new', '/manage/connect', '/manage/enrollments', '/manage/audit', '/manage/reports',
     '/manage/members', '/manage/policy', '/manage/invitations',
-    '/manage/fleets/' + fleetView.fleetId, '/manage/fleets/' + fleetView.fleetId + '/map', '/manage/fleets/' + fleetView.fleetId + '/activity',
+    '/manage/fleets/' + fleetView.fleetId, '/manage/fleets/' + fleetView.fleetId + '/map', '/manage/fleets/' + fleetView.fleetId + '/sessions', '/manage/fleets/' + fleetView.fleetId + '/activity',
     '/manage/fleets/' + fleetView.fleetId + '/activity?view=traffic', '/manage/fleets/' + fleetView.fleetId + '/settings',
-    '/manage/agents/' + agent.id, '/manage/agents/' + agent.id + '/session', '/manage/agents/' + agent.id + '/activity', '/manage/agents/' + agent.id + '/settings',
+    '/manage/agents/' + agent.id, '/manage/agents/' + agent.id + '/session', '/manage/agents/' + agent.id + '/activity', '/manage/agents/' + agent.id + '/settings', '/manage/agents/' + agent.id + '/wake',
   ]);
   const member = { ...viewer, member: { ...viewer.member, roleCode: 'member' as const } };
   const memberRoutes = managementViews(member, { ...policy, invitationIssuers: 'administrators' }, [], []).map(view => view.route);

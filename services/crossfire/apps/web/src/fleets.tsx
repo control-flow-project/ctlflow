@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useState } from 'react';
+import { Fragment, useState } from 'react';
+import { useConfirmation } from './confirmation.js';
 import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
 import type { Parsed } from '@ctlflow/crossfire-contracts/schema/validation';
 import { preview } from '@ctlflow/crossfire-contracts/schema/plan';
@@ -31,7 +32,7 @@ export function Fleets() {
       <p>Sleeping agents resume their saved histories for eligible messages. Explicitly stopped agents remain stopped until you resume them. Controller contact, listener readiness and native activity are separate.</p></Help></Page>;
 }
 function RoomPlan({ fleet }: { fleet: FleetView }) {
-  const viewer = useSession(), action = useAction(), [source, setSource] = useState(''), [review, setReview] = useState<{ source: string; value: Parsed<typeof preview> }>();
+  const viewer = useSession(), action = useAction(), confirmation = useConfirmation(), [source, setSource] = useState(''), [review, setReview] = useState<{ source: string; value: Parsed<typeof preview> }>();
   const editable = canManageFleet(fleet);
   async function inspect() {
     const parsed = parseRoomPlan(source, fleet);
@@ -48,7 +49,7 @@ function RoomPlan({ fleet }: { fleet: FleetView }) {
     <p className="support plan-warning">The plan replaces grants for its listed instances. Omitted grants for those instances are removed. Create rooms in Element first.</p>
     <Field label="Room plan TOML">{id => <textarea id={id} rows={10} value={source} onChange={event => { setSource(event.target.value); setReview(undefined); }} spellCheck={false}/>}</Field>
     <div className="actions"><button disabled={action.pending || !editable || !source} onClick={() => { void action.run(inspect, setReview); }}>Preview room access</button>
-      <button disabled={action.pending || !editable || !review} onClick={() => { if (confirm('Apply this exact room-access diff? Removed grants will lose access.')) void action.run(apply); }}>Apply reviewed plan</button></div><Alert>{action.error}</Alert>
+      <button disabled={action.pending || !editable || !review} onClick={() => confirmation.request({ title: 'Apply room-access changes?', description: 'Apply this exact reviewed room-access diff. Removed grants will lose access.', label: 'Apply reviewed plan', danger: true, execute: () => action.run(apply) })}>Apply reviewed plan</button></div><Alert>{action.error}</Alert>{confirmation.dialog}
     {review && <PageItems items={review.value.changes} parameter="planPage">{changes => <div className="table-wrap"><table aria-label="Room plan changes"><thead><tr><th>Agent</th><th>Room</th><th>Current</th><th>Desired</th><th>Native authority</th><th>Change</th></tr></thead><tbody>{changes.map(change =>
       <tr key={change.agentId + change.roomId}><td><a href={'/manage/agents/' + change.agentId}>{change.agentName}</a><span className="subline">{change.instanceKey}</span></td><td><a href={'/manage/agents/' + change.agentId + '/rooms/' + encodeURIComponent(change.roomId)}>{change.roomName}</a><span className="subline">{change.roomAlias ?? change.roomId}</span></td>
         <td>{change.before?.accessMode ?? 'none'}{change.before?.powerLevel !== null && change.before?.powerLevel !== undefined ? ' · ' + change.before.powerLevel : ''}{change.before?.muted ? ' · muted' : ''}</td>
@@ -65,14 +66,12 @@ function FleetSettings({ fleet }: { fleet: FleetView }) {
       <Help title="Technical identifiers and controller metadata"><dl><dt>Fleet key</dt><dd>{fleet.fleetKey}</dd><dt>Fleet ID</dt><dd className="mono">{fleet.fleetId}</dd>{Object.entries(fleet.controller.metadata ?? {}).map(([key, value]) => <Fragment key={key}><dt>{key}</dt><dd>{value}</dd></Fragment>)}</dl></Help></Panel>
     <Help title="Bulk room access (advanced)"><RoomPlan fleet={fleet}/></Help><FleetRetirement fleet={fleet}/></>;
 }
-function FleetAgents({ fleet, refresh }: { fleet: FleetView; refresh(): void }) {
+function FleetAgents({ fleet }: { fleet: FleetView }) {
   const agents = useResource(operations.fleetAgents, { fleetId: fleet.fleetId }, pagingQuery(), 5000);
-  const refreshStatus = useCallback(() => { agents.refresh(); refresh(); }, [agents.refresh, refresh]);
-  return <><Panel title="Agents" description="Select an agent to manage its room access, wake-up rules or account."><Loaded {...agents} retry={agents.refresh}>{page => <>
+  return <Panel title="Agents" description="Select an agent to manage its room access, wake-up rules or account."><Loaded {...agents} retry={agents.refresh}>{page => <>
     {page.data.length ? <div className="table-wrap"><table aria-label="Fleet agents"><thead><tr><th scope="col">Agent</th><th scope="col">Instance</th><th scope="col">Listener</th><th scope="col">Native session</th><th scope="col">Account</th></tr></thead><tbody>{page.data.map(instance =>
       <tr key={instance.instanceKey}><td><a className="record-link" href={'/manage/agents/' + instance.agent.agentId}>{instance.agent.displayName}</a></td><td>{instance.instanceKey}</td><td><Status value={instance.agent.activity.status}/></td><td><NativeRuntimeStatus agent={instance.agent}/></td><td><Status value={instance.agent.status}/></td></tr>)}</tbody></table></div>
-      : <Empty title="No agents">There are no agents on this page.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel>
-    <FleetSessions fleet={fleet} refresh={refreshStatus}/></>;
+      : <Empty title="No agents">There are no agents on this page.</Empty>}<Pagination meta={page.meta}/></>}</Loaded></Panel>;
 }
 function FleetActivity({ fleet }: { fleet: FleetView }) {
   const traffic = new URLSearchParams(location.search).get('view') === 'traffic', base = '/manage/fleets/' + fleet.fleetId + '/activity';
@@ -84,8 +83,9 @@ function FleetActivity({ fleet }: { fleet: FleetView }) {
 export function FleetDetail({ id, section }: { id: string; section: Exclude<FleetSection, 'map'> }) {
   const resource = useResource(operations.fleet, { fleetId: id }, '', 5000);
   return <Page title="Fleet details" description="Agents, delivery and room access." action={<button onClick={resource.refresh}>Refresh status</button>}><a className="back" href="/manage/fleets">← Fleets</a>
-    <Loaded {...resource} retry={resource.refresh}>{({ data: fleet }) => <><SubjectHeading name={fleet.label} description={<>{fleet.owner.displayName} · Controller {fleet.controller.name}</>}><Status value={fleet.delivery.connection.status}/><Status value={fleet.delivery.deliveryEnabled ? 'Delivery enabled' : 'Delivery paused'}/></SubjectHeading>
-      <FleetNavigation id={id} section={section}/>{section === 'agents' && <FleetAgents fleet={fleet} refresh={resource.refresh}/>}
+    <Loaded {...resource} retry={resource.refresh}>{({ data: fleet }) => <><SubjectHeading name={fleet.label} description={<>{fleet.owner.displayName} · Controller {fleet.controller.name}</>}><span>Controller <Status value={fleet.delivery.connection.status}/></span><Status value={fleet.delivery.deliveryEnabled ? 'Delivery enabled' : 'Delivery paused'}/></SubjectHeading>
+      <FleetNavigation id={id} section={section}/>{section === 'agents' && <FleetAgents fleet={fleet}/>}
+      {section === 'sessions' && <FleetSessions fleet={fleet} refresh={resource.refresh}/>}
       {section === 'activity' && <FleetActivity fleet={fleet}/>} {section === 'settings' && <FleetSettings fleet={fleet}/>}
     </>}</Loaded></Page>;
 }

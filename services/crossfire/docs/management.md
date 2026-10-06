@@ -9,7 +9,7 @@ collections. Administrator status neither grants private Matrix-room access
 nor allows answering another owner's native decisions.
 
 Agent details have **Rooms**, **Session**, **Activity** and **Settings**.
-Fleet details have **Agents**, **Map**, **Activity** and **Settings**.
+Fleet details have **Agents**, **Map**, **Sessions**, **Activity** and **Settings**.
 The first tab at each scope is the base URL. Other views have durable URLs;
 obsolete section URLs are unavailable, not aliases. Long technical identifiers
 and original evidence are disclosures, not the main information hierarchy.
@@ -19,6 +19,22 @@ Heartbeats occur every thirty seconds; ninety seconds without contact means
 offline. Controller contact, fleet delivery intent, native phase, account access
 and room enforcement are distinct. Sleeping native sessions can have an online
 receiver because fleetd continues listening.
+Confirmed stopped sessions show **Stopped** and the confirmation time. Offline
+sessions without native-close evidence show **Unknown**, with any historical
+state labelled last reported. Saved-history availability is a separate observation.
+
+## Fleet Sessions
+
+Open `/manage/fleets/{fleetId}/sessions` or the **Sessions** tab to stop or resume
+the fleet. The controller remains connected after Stop. **Resume sessions**
+restores existing saved histories, identities and parameters; it does not reset
+context. **Start with fresh history** is a separate confirmed destructive action.
+An operation's pending/running/completed outcome is separate from model progress.
+Controls track the current operation even while viewing older history pages.
+Agent-specific controls remain on the agent's **Session** tab.
+
+Stop completion is not retirement authority. Retirement and archive additionally
+require exact current-generation native-close evidence and settled receipts.
 
 ## Agent Rooms
 
@@ -42,17 +58,20 @@ invitation delegation nor wake authority.
 
 The Rooms view separately shows **Who can wake this agent**. The default is
 one explicit person-only entry for the owner. **Choose who can wake** opens a
-popup with searchable, paginated people and individual agents. Select several
+page at `/manage/agents/{agentId}/wake`, with searchable, paginated people and individual agents. Select several
 people; each can allow just that person or that person plus their currently owned
 agents. Ownership groups include agents enrolled later. All entries combine.
 The owner is not an implicit exception; self is always excluded. Broader audiences
 are all active people plus selected entries, or everyone. Everyone requires no
 individual entries. Empty selected-only authority disables chat wake.
 
-The popup fills small screens while retaining focus trapping, Escape/Cancel and
-focus return. Draft selections survive search/page changes. Cancel discards them;
+The responsive page supports direct reload and has Back/Cancel links. Draft
+selections survive search/page changes. Back or Cancel discards them;
 Save atomically replaces the complete set with revision checks. A concurrent edit
 keeps your draft and offers explicit discard/load latest, never an overwrite.
+Confirmations elsewhere use small themed modals, not browser popups. Cancel/Escape
+makes no change; pending requests cannot be dismissed or sent twice. Failed
+requests remain visible for deliberate retry.
 Non-waking chat remains
 context for the next eligible message, within the instance inline/file policy.
 

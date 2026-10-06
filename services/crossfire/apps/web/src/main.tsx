@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Session, useSession } from './session.js';
 import { Agents, AgentDetail } from './agents.js';
 import { AgentRoomDetail } from './agent-rooms.js';
+import { AgentWakeEdit } from './agent-wake.js';
 import { DecisionDetail } from './decisions.js';
 import { Enrollments } from './enrollments.js';
 import { Connect } from './connect.js';
@@ -46,6 +47,8 @@ function Route({ canInvite }: { canInvite: boolean }) {
   if (wakeUp) return <WakeUpDetail id={wakeUp[1]!}/>;
   const decision = /^\/manage\/agents\/([a-f0-9-]{36})\/decisions\/([a-f0-9-]{36})$/u.exec(path);
   if (decision) return <DecisionDetail agentId={decision[1]!} decisionId={decision[2]!}/>;
+  const wakeAudience = /^\/manage\/agents\/([a-f0-9-]{36})\/wake$/u.exec(path);
+  if (wakeAudience) return <AgentWakeEdit id={wakeAudience[1]!}/>;
   const agent = /^\/manage\/agents\/([a-f0-9-]{36})(?:\/(session|activity|settings))?$/u.exec(path);
   if (agent) { const section = agent[2]; if (section === undefined || section === 'session' || section === 'activity' || section === 'settings') return <AgentDetail id={agent[1]!} section={section ?? 'rooms'}/>; }
   const agentRoom = /^\/manage\/agents\/([a-f0-9-]{36})\/rooms\/([^/]+)$/u.exec(path);
@@ -59,8 +62,8 @@ function Route({ canInvite }: { canInvite: boolean }) {
   if (path === '/manage/fleets') return <Fleets/>;
   const fleetMap = /^\/manage\/fleets\/([a-f0-9-]{36})\/map$/u.exec(path);
   if (fleetMap) return <FleetMap id={fleetMap[1]!}/>;
-  const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})(?:\/(activity|settings))?$/u.exec(path);
-  if (fleet) { const section = fleet[2]; if (section === undefined || section === 'activity' || section === 'settings') return <FleetDetail id={fleet[1]!} section={section ?? 'agents'}/>; }
+  const fleet = /^\/manage\/fleets\/([a-f0-9-]{36})(?:\/(sessions|activity|settings))?$/u.exec(path);
+  if (fleet) { const section = fleet[2]; if (section === undefined || section === 'sessions' || section === 'activity' || section === 'settings') return <FleetDetail id={fleet[1]!} section={section ?? 'agents'}/>; }
   if (viewer.member.roleCode === 'administrator') {
     if (path === '/manage/members') return <Members/>;
     if (path === '/manage/policy') return <Settings/>;

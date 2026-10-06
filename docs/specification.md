@@ -1623,10 +1623,10 @@ person entry includes that person; true also includes currently owned active
 agents, including agents enrolled later. Individual-agent entries require false.
 Two person groups admit both people and both ownership groups, not everyone.
 The Rooms view shows a compact policy summary and selected-entry table. Its
-picker is a native modal dialog with search, paginated people/individual-agent
-discovery and a per-person scope selector. On small screens it fills the screen
-but retains modal focus, Escape/Cancel, background isolation and focus return.
-Draft entries remain visible across searches/pages. Cancel discards them. Save
+picker is the durable `/manage/agents/{agentId}/wake` page with a back link,
+search, paginated people/individual-agent discovery and a per-person scope
+selector. Desktop and mobile use the same responsive page, not an overlay.
+Draft entries remain visible across searches/pages. Cancel or Back discards them. Save
 atomically replaces mode and all entries with an exact revision check. Conflicts
 retain the draft, load the current policy and require explicit discard before
 replacement. Empty selection wakes nobody. Owner is not implicit; self is excluded.
@@ -2833,12 +2833,30 @@ page controls, reading bounded 100-row REST pages. Counts and filters share API
 scope; failures never masquerade as an empty or complete partial result. Refresh
 does not imply an atomic multi-page snapshot.
 
-Fleet detail has exactly four durable sections: Agents at the base path,
-`/map`, `/activity` and `/settings`. Agents opens on the roster table with
-scope-labelled Stop sessions, Resume sessions and confirmed Start with fresh
-history controls. Ordinary resume uses exact saved histories. Requested,
+Fleet detail has exactly five durable sections: Agents at the base path,
+`/map`, `/sessions`, `/activity` and `/settings`. Agents opens on the roster
+table. Sessions opens on scope-labelled Stop sessions, Resume sessions and
+confirmed Start with fresh history controls. Ordinary resume uses exact saved histories. Requested,
 running, succeeded and failed controller operation outcomes remain distinct;
 no human HTTP acknowledgment is presented as native completion.
+Controls track the latest operation independently of the selected history page.
+The fleet controller's lease and delivery intent are labelled separately from
+agent listener readiness and native execution.
+
+A current, claimed controller lifecycle receipt records the final operation
+outcome independently of listener generations. Historical stopped runs cannot
+reject that outcome, keep Resume locked or force repeated native execution.
+Reclaimed final outcomes release the local operation pin without execution.
+Native-close retirement proofs retain their separate, exact current-run,
+current-connection and credential checks; lifecycle completion cannot fabricate
+those proofs or authorize retirement.
+
+Latest-run summaries project Stopped from a successful scoped stop completion
+after that run closed, or from a noninvalidated exact native-stop receipt. A
+later reporting generation supersedes that projection. Agents cannot report
+Stopped themselves. Offline observations without native-close evidence show
+Unknown with muted last-reported state/time, never a current Working or Sleeping
+badge. Saved-history availability remains separately reported, not inferred.
 
 Fleet Activity groups delivery intent and broadcasts at `/activity`, and traffic/
 usage at `/activity?view=traffic`. Pause delivery retains native processes and
@@ -2854,7 +2872,8 @@ Agent detail has exactly four durable sections: Rooms at the base path,
 `/session`, `/activity` and `/settings`. Rooms groups current room access,
 native enforcement and clearly separate wake eligibility; selected-author
 controls read the authorized directory only when needed and preserve choices
-across searches. `/rooms/{roomId}` preserves native permission details,
+across searches. The audience editor lives at `/wake`, with direct reload and
+explicit Back/Cancel navigation. `/rooms/{roomId}` preserves native permission details,
 generation-bound delegation and provenance-limited removal.
 
 Session owns native lifecycle controls, pending decisions, runtime observations,
@@ -2951,6 +2970,13 @@ TOML has a full diff/confirmation and revision validation. Native session stop,
 fresh-history reset, retirement and archive each state their different effects
 and require the appropriate explicit confirmation. Retirement/archive cannot
 bypass receipt-confirmed native stop or the server's current eligibility checks.
+Every management confirmation uses one themed accessible modal, never browser
+confirm/alert/prompt. Cancel initially owns focus; Escape/cancel restores the
+trigger without a write. Background content is inert. A pending request cannot
+be dismissed or duplicated; failures stay visible in the modal and retain the
+same request identity/concurrency fences for a deliberate retry. Modals fit
+desktop/mobile viewports with scrollable content. Complex pickers are durable
+pages, not confirmation overlays. Element's native dialogs are unchanged.
 
 The Connect page presents one universal setup flow: paste the minimal personalized
 guide URL into an existing coding assistant, approve the exact roster once, then

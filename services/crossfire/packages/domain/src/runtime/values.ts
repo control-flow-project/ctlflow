@@ -14,5 +14,5 @@ export type RuntimeSetting = { name: string; configured: string | null; effectiv
 export type RuntimeObservation = { sessionId: string; roomId: string | null; runtime: string; state: RuntimeState; observedAt: number;
   lastActivityAt: number | null; historyAvailable: boolean | null;
   historyMode: 'shared' | 'per-room'; maxInputBytes: number; settings: RuntimeSetting[]; errorMessage: string | null };
-export type NativeRuntimeSummary = Pick<RuntimeObservation, 'state' | 'observedAt' | 'lastActivityAt' | 'historyAvailable'>;
+export type NativeRuntimeSummary = Pick<RuntimeObservation, 'observedAt' | 'lastActivityAt' | 'historyAvailable'> & { state: RuntimeState | 'stopped' };
 export type RuntimeObservationView = RuntimeObservation & { runId: string };

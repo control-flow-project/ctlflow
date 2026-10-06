@@ -29,10 +29,11 @@ export function managementViews(viewer: SessionView, policy: PolicyView, agents:
     views.push({ route: '/manage/invitations', title: 'Invitations', sections: ['Create an invitation', 'Issued invitations'] });
   }
   for (const fleet of fleets) {
-    const base = '/manage/fleets/' + fleet.fleetId, items = ['Agents', 'Map', 'Activity', 'Settings'];
+    const base = '/manage/fleets/' + fleet.fleetId, items = ['Agents', 'Map', 'Sessions', 'Activity', 'Settings'];
     for (const view of [
-      { suffix: '', title: 'Fleet details', current: 'Agents', sections: ['Agents', 'Fleet sessions'] },
+      { suffix: '', title: 'Fleet details', current: 'Agents', sections: ['Agents'] },
       { suffix: '/map', title: 'Fleet map', current: 'Map', sections: [] },
+      { suffix: '/sessions', title: 'Fleet details', current: 'Sessions', sections: ['Fleet sessions'] },
       { suffix: '/activity', title: 'Fleet details', current: 'Activity', sections: ['Fleet delivery', 'Send a message', 'Fleet messages'] },
       { suffix: '/activity?view=traffic', title: 'Fleet details', current: 'Activity', sections: ['Traffic', 'Agents', 'Sender → recipient', 'Native usage'] },
       { suffix: '/settings', title: 'Fleet details', current: 'Settings', sections: ['Display name', 'Controller and identity'] },
@@ -47,6 +48,9 @@ export function managementViews(viewer: SessionView, policy: PolicyView, agents:
       { suffix: '/activity', current: 'Activity', sections: ['Listener activity'] },
       { suffix: '/settings', current: 'Settings', sections: ['Listener software', 'Display name', 'Account access', 'Identity'] },
     ]) views.push({ route: base + view.suffix, title: 'Agent details', sections: view.sections, navigation: { label: 'Agent sections', current: view.current, items } });
+    if (agent.allowedActions.includes('configure') && agent.status !== 'revoked') {
+      views.push({ route: base + '/wake', title: 'Who can wake this agent?', sections: ['Wake audience'] });
+    }
   }
   return views;
 }

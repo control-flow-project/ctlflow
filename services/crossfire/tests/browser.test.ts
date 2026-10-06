@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { chromium, expect, type Page } from '@playwright/test';
+import { decideConfirmation } from './support/confirmation.js';
 import { conduitFixture } from '../scripts/architecture-proof/conduit-fixture.js';
 import { bootstrap } from '../apps/server/src/bootstrap.js';
 import { secret, value } from './support/application.js';
@@ -27,6 +28,8 @@ import { publicRouter } from '../apps/server/src/router.js';
 import { releaseFixture, updatedRelease } from './release-fixture.js';
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
@@ -124,7 +127,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on('request', request => { if (new URL(request.url()).pathname === '/api/principals') identityReads.push(request.url()); });
   page.on('pageerror', error => errors.push(error.message));
-  page.on('dialog', dialog => dialog.accept());
+  page.on('dialog', dialog => { errors.push('Unexpected browser confirmation: ' + dialog.type()); void dialog.dismiss(); });
   await page.goto(origin + '/manage/');
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   await checkPaperLayout(page);
@@ -193,6 +196,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await expect(page.getByText(/Renamed agents keep their accounts, conversations, permissions and saved histories/u)).toBeVisible();
   await page.getByLabel('Verification code').fill(review.request.verificationCode);
   await page.getByRole('button', { name: 'Reject', exact: true }).click();
+  await decideConfirmation(page, 'Reject request');
   await expect(page.getByText('rejected', { exact: true })).toBeVisible();
   assert.equal(value(services.directory.agent(profile.id))!.name, 'holmes');
   await page.goto(request.approvalUrl);
@@ -212,13 +216,13 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await page.getByText('How wake authority works', { exact: true }).click();
   await expect(page.getByText('Room membership, reply permissions and muted delivery remain separate.', { exact: false })).toBeVisible();
   for (const policy of ['humans', 'everyone', 'selected'] as const) {
-    await page.getByRole('button', { name: 'Choose who can wake' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByLabel('Audience').locator('option')).toHaveCount(3);
-    await page.getByLabel('Audience').selectOption(policy);
+    await page.getByRole('link', { name: 'Choose who can wake' }).click();
+    await expect(page).toHaveURL(origin + '/manage/agents/' + profile.id + '/wake');
+    await expect(page.getByLabel('Audience', { exact: true }).locator('option')).toHaveCount(3);
+    await page.getByLabel('Audience', { exact: true }).selectOption(policy);
     if (policy === 'selected') await page.getByLabel('Allow ' + config.administrator, { exact: true }).check();
     await page.getByRole('button', { name: 'Save wake-up policy', exact: true }).click();
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page).toHaveURL(origin + '/manage/agents/' + profile.id);
     await page.reload();
     assert.equal(value(services.directory.agent(profile.id))!.agent.wakeMode, policy);
     assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);
@@ -270,10 +274,10 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const engine = await nativeEngine(scope, home, workspace);
   await materialize(engine, provider);
   await page.goto(origin + '/manage/agents/' + profile.id);
-  await page.getByRole('button', { name: 'Choose who can wake' }).click();
+  await page.getByRole('link', { name: 'Choose who can wake' }).click();
   await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
   await page.getByRole('button', { name: 'Save wake-up policy', exact: true }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(origin + '/manage/agents/' + profile.id);
   const stop = new AbortController();
   let listenerFailure: unknown;
   let listenerReady = false;
@@ -282,7 +286,11 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const control = createFleetControlConnection({ origin, credential: enrolled.fleet.controllerCredential, fleetId,
     owner: config.administrator, signal: new AbortController().signal, acknowledged: () => success(undefined), execute: async command => {
       if (command.action !== 'stop') return failure('invalid', 'This native browser fixture only executes its owned stop operation');
+      const controllerBinding = binding.control.binding();
+      const run = value(services.listenerRead.history(profile.id, { page: 1, pageSize: 1 })).items[0]!;
       stop.abort(); await receiving; process.kill(-engine.child.pid!, 'SIGTERM'); await engine.ended;
+      value(await createClient({ origin, token: controllerBinding.credential }).call(operations.recordFleetNativeStop,
+        { fleetId, agentId: profile.id }, { connectionId: controllerBinding.connectionId, runId: run.id, receiptId: randomUUID() }));
       return success({ status: 'succeeded', errorMessage: null });
     } });
   cleanup(scope, () => control.close());
@@ -310,10 +318,11 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   provider.finish();
   await until(() => engine.notifications.some(notice => notice.method === 'turn/completed'));
   provider.hold();
-  await page.getByRole('button', { name: 'Choose who can wake' }).click();
+  await page.getByRole('link', { name: 'Choose who can wake' }).click();
+  await page.getByLabel('Search people or Matrix IDs').fill(config.administrator);
   await page.getByLabel('Allow ' + config.administrator, { exact: true }).check();
   await page.getByRole('button', { name: 'Save wake-up policy', exact: true }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(origin + '/manage/agents/' + profile.id);
   await until(() => provider.requests.some(value => JSON.stringify(value).includes('Crossfire integrated native delivery')) || listenerFailure !== undefined);
   assert.equal(listenerFailure, undefined, String(listenerFailure));
   provider.finish();
@@ -400,6 +409,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Session', exact: true }).click();
   await page.getByRole('button', { name: 'Stop session', exact: true }).click();
+  await decideConfirmation(page, 'Stop session');
   await expect(page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({ hasText: 'Stop' })).toContainText('succeeded');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Activity', exact: true }).click();
   await expect(activity.getByText('offline', { exact: true })).toBeVisible({ timeout: 45_000 });
@@ -513,7 +523,8 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await expect(page.getByText('alice', { exact: true })).toBeVisible();
   await page.goto(origin + '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room));
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('none');
-  await submit(page, 'Save access');
+  await page.getByRole('button', { name: 'Save access', exact: true }).click();
+  await decideConfirmation(page, 'Remove access');
   await worker.drain();
   await page.reload();
   await expect(page.locator('.status').filter({ hasText: /^No access$/u })).toBeVisible();
@@ -556,7 +567,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await expect(memberPage.getByRole('table', { name: 'Agents', exact: true })).toContainText('alice-agent');
   await reviewLayouts(page, origin, directory, 'administrator', ['/manage/agents', '/manage/agents/' + profile.id,
     ...['session', 'activity', 'settings'].map(section => '/manage/agents/' + profile.id + '/' + section),
-    '/manage/fleets/' + fleetId, '/manage/fleets/' + fleetId + '/activity', '/manage/fleets/' + fleetId + '/activity?view=traffic', '/manage/fleets/' + fleetId + '/settings',
+    '/manage/fleets/' + fleetId, '/manage/fleets/' + fleetId + '/sessions', '/manage/fleets/' + fleetId + '/activity', '/manage/fleets/' + fleetId + '/activity?view=traffic', '/manage/fleets/' + fleetId + '/settings',
     '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room), '/manage/connect', '/manage/enrollments',
     new URL(request.approvalUrl).pathname, '/manage/members', '/manage/invitations', '/manage/policy', '/manage/audit', '/manage/not-a-page']);
   await reviewLayouts(memberPage, origin, directory, 'member', ['/manage/agents', '/manage/fleets', '/manage/enrollments', '/manage/connect', '/manage/policy']);
@@ -579,14 +590,13 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const retire = page.getByRole('button', { name: 'Retire agent', exact: true });
   await expect(page.getByRole('region', { name: 'Retire agent', exact: true }).getByText('A session that has never started needs no stop request.', { exact: false })).toBeVisible();
   await expect(retire).toBeEnabled();
-  page.removeAllListeners('dialog');
-  page.once('dialog', dialog => dialog.dismiss()); await retire.click();
+  await retire.click(); await decideConfirmation(page);
   assert.equal(value(services.repositories.fleetInstance.find({ ownerId: adminActor.principalId, fleetKey: 'project', instanceKey: 'holmes' }))!.retiredAt, null);
   const memberRetirement = await memberPage.request.delete(origin + '/api/fleets/' + fleetId + '/agents/' + profile.id,
     { data: { expectedRevision: value(services.repositories.fleet.findById(fleetId))!.revision, instanceKey: 'holmes' },
       headers: { 'X-Crossfire-CSRF': value(await authenticateMember(services, (await memberContext.cookies(origin)).find(cookie => cookie.name === COOKIE_NAME)!.value)).csrfSecret } });
   assert.equal(memberRetirement.status(), 403, 'Another owner cannot retire this managed identity');
-  page.once('dialog', dialog => dialog.accept()); await retire.click();
+  await retire.click(); await decideConfirmation(page, 'Retire agent');
   await expect(page).toHaveURL(origin + '/manage/fleets/' + fleetId);
   await expect(page.getByRole('heading', { name: 'No agents', exact: true })).toBeVisible();
   const retired = value(services.repositories.fleetInstance.find({ ownerId: adminActor.principalId, fleetKey: 'project', instanceKey: 'holmes' }))!;
@@ -598,9 +608,9 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const archive = page.getByRole('button', { name: 'Archive fleet', exact: true });
   await expect(page.getByRole('region', { name: 'Archive fleet', exact: true }).getByText('Sessions that have never started need no stop request.', { exact: false })).toBeVisible();
   await expect(archive).toBeEnabled();
-  page.once('dialog', dialog => dialog.dismiss()); await archive.click();
+  await archive.click(); await decideConfirmation(page);
   assert.equal(value(services.repositories.fleet.findById(fleetId))!.archivedAt, null);
-  page.once('dialog', dialog => dialog.accept()); await archive.click();
+  await archive.click(); await decideConfirmation(page, 'Archive fleet');
   await expect(page).toHaveURL(origin + '/manage/fleets');
   await expect(page.getByRole('table', { name: 'Fleets', exact: true }).locator('a[href="/manage/fleets/' + fleetId + '"]')).toHaveCount(0);
   assert(value(services.repositories.fleet.findById(fleetId))!.archivedAt !== null);
