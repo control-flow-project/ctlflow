@@ -7,8 +7,8 @@ import { existsSync } from "node:fs";
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { readJson } from "@ctlflow/crossfire-adapter-filesystem/index";
 import { loadControl } from "@ctlflow/crossfire-agent-core/control";
-import { isListenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
-import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD } from "./test-support/listener.js";
+import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD, CONTROLLER } from "./test-support/listener.js";
 
 test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", withClock(async (scope, clock) => {
 
@@ -63,13 +63,24 @@ test("reconciliation respects human pause, mute and suspension without empty mod
   assert.equal(native.requests().filter(request => request.method === "turn/start").length, 0);
 }));
 
-test('owner disconnection propagates an intentional lifecycle outcome, not a runtime failure', withClock(async (scope, clock) => {
+test('server admission loss pauses delivery and rebinds the same desired receiver rather than treating it as an owner stop', withClock(async (scope, clock) => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
+  const notices: string[] = [], binding = createListenerControl(async () => {}, () => matrix.reporting.controller, reason => notices.push(reason));
+  binding.update({ active: true, input: null });
   matrix.reporting.disconnect = true;
-  const result = listen({ ...matrix, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
+  let finished = false;
+  const result = listen({ ...matrix, control: binding.connection, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal)
+    .catch(error => error).finally(() => { finished = true; });
   cleanup(scope, async () => { stop.abort(); await clock.complete(result); });
-  assert(isListenerStop(await clock.complete(result)));
+  await clock.until(() => notices.length === 1);
+  assert.equal(binding.connection.current().active, false); assert.equal(finished, false);
+  matrix.add(ROOM, message('$unread-after-admission-loss')); await clock.advance(20);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+  matrix.reporting.disconnect = false; matrix.reporting.controller = { ...CONTROLLER, connectionId: 'dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee' };
+  binding.update({ active: true, input: null });
+  await clock.until(() => existsSync(matrix.cursorFile) && readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '1');
+  assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1); assert.equal(finished, false);
 }));
 
 test("a hung acquisition is cancelled within its deadline and retried without dropping the listener or advancing unread cursors", withClock(async (scope, clock) => {

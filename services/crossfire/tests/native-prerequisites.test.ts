@@ -66,7 +66,9 @@ model = "unselected"
 `, { mode: 0o600 });
   const configuration = nativeConfiguration(prepareHome(stateDirectory));
   assert.equal(configuration.profile, 'selected');
-  assert.deepEqual(configuration.profiles, { selected: { model: 'profile-model', model_reasoning_effort: 'high' } });
+  assert.deepEqual(configuration.profiles, Object.assign(Object.create(null), {
+    selected: Object.assign(Object.create(null), { model: 'profile-model', model_reasoning_effort: 'high' }),
+  }));
 });
 
 test('unsafe configuration/login files cannot seed private managed runtime state', scope => {

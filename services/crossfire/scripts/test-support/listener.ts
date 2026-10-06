@@ -198,7 +198,8 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   const waking: { policy: WakePolicy; senders: string[] } = { policy: 'owner-agents', senders: [OBSERVER, '@agent-holmes:test.localhost'] };
   const release = builtRelease().release.manifest;
   const publication = { release: builtRelease().release };
-  const reporting = { disconnect: false, current: release };
+  const reporting = { disconnect: false, current: release, controller: { ...CONTROLLER } };
+  const listenerRuns = new Map<string, ControllerBinding>();
   const syncUpdates = { enabled: true, hung: false };
   const waiters = new Set<() => void>();
   let maximumWaiters = 0;
@@ -265,10 +266,12 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && path.endsWith('/runtime') && request.method === 'PUT') {
       api(response, { accepted: true });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && request.method === 'PUT') {
-      if (JSON.stringify((body as { controller?: ControllerBinding }).controller) !== JSON.stringify(CONTROLLER)) {
+      const submitted = body as { controller: ControllerBinding; stopped: boolean }, recorded = listenerRuns.get(path);
+      if (JSON.stringify(submitted.controller) !== JSON.stringify(recorded ?? reporting.controller)) {
         send(response, { error: { code: 'forbidden', message: 'Fixture listener requires its exact controller capability' }, meta: { requestId: AGENT_ID } }, 403); return;
       }
-      api(response, { statisticsAccepted: true, disconnect: reporting.disconnect, currentRelease: reporting.current.release });
+      listenerRuns.set(path, { ...submitted.controller });
+      api(response, { statisticsAccepted: true, disconnect: reporting.disconnect || JSON.stringify(submitted.controller) !== JSON.stringify(reporting.controller), currentRelease: reporting.current.release });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
       send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
     } else if (path === API + '/account/whoami') {

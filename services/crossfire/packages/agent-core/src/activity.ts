@@ -4,7 +4,6 @@ import { HEARTBEAT_MS } from '@ctlflow/crossfire-contracts/activity';
 import type { Manifest } from '@ctlflow/crossfire-contracts/release';
 import type { Coordination } from './coordination.js';
 import type { listenerStatistics } from './statistics.js';
-import { listenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 import type { ControllerBinding } from './listener-control-port.js';
 
 export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controller: ControllerBinding, clock: Clock, statistics: ReturnType<typeof listenerStatistics>, onUpdate?: (release: string) => void) {
@@ -30,7 +29,7 @@ export async function reportActivity(client: Coordination, agent: string, instal
       process.stderr.write('Crossfire release ' + current + ' is available. Ask the owner to update the fleet controller and review changed skills; this listener remains running.\n');
     }
     unavailable = false;
-    if (response.value.disconnect && !stopped) failed.abort(listenerStop('The owner requested this listener to disconnect'));
+    if (response.value.disconnect && !stopped) failed.abort(Object.assign(new Error('Listener admission expired; reconnect its controller lease'), { code: 'unavailable' }));
   }
   await report(false, true);
   const running = (async () => {

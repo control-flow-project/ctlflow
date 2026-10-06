@@ -109,6 +109,23 @@ successful peers and saved native histories remain intact. Stop cancels pending
 recovery. Failed cleanup or permanent configuration/authorization failures prevent
 unsafe restart and remain visible.
 
+Transport cancellation is not an owner stop. Controller lease replacement pauses
+delivery and creates a new immutable reporting run on reactivation, retaining the
+same logical receiver, account, native histories and unread checkpoints. This
+also applies when pause and resume arrive before the receiver observes the pause.
+Queued publication is canceled without dropping messages. Empty reconciliation
+checkpoints settle while sleeping without starting a native process.
+
+DOM AbortError/TimeoutError and Node transport cancellation/network failures retry
+while desired intent remains active. Explicit Stop cancels recovery; authorization,
+invalid saved state, missing histories and unknown coded failures remain visible
+and require correction. No failed cleanup permits an overlapping process.
+
+Native-stop proofs belong to their original controller generation. A historical
+proof cannot authorize retirement after reconnect, but also cannot mark a healthy
+new connection as failed or cause an endless stale-proof reporting loop. Resume
+and stop the current binding explicitly if retirement needs current native evidence.
+
 An explicit `reset` operation targets one enrolled instance or all fleet instances.
 It stops selected owned processes before resetting any history, then exports and
 verifies all available authorized Matrix room history and

@@ -79,6 +79,17 @@ The lock contains exactly the current owned workspace manifests and one link per
 owner, with coordinated versions and matching dependency/engine maps. Removed
 modules cannot remain as extraneous entries or alternate workspace owners.
 
+All four TOML dependency owners pin the same patched `smol-toml` 1.9.0 parser.
+Dot-free key parsing must not repeatedly scan the remaining document. Existing
+document-size bounds, strict schemas and native installation admission remain
+unchanged; security updates do not authorize an age-policy bypass.
+The single transitive `source-map-js` lock entry uses patched 1.2.2. Dependency
+verification checks actual installed bytes against both parser locks and rejects
+unsafe indexed-map offsets in a bounded subprocess. On 6 October 2026 the owner
+explicitly approved a one-time release-age exception for resolving exactly this
+security patch. Persistent npm policy and all other dependency admission remain
+unchanged; no permanent exemption or direct dependency is added.
+
 - Crossfire owns identity, enrollment, human authorization, room access, native
   reconciliation, wake policies, listener activity, fleet identity and React UI.
   Fleet membership alone confers no room permission, wake authority or new agent
@@ -741,6 +752,11 @@ session stop or retirement cancels recovery; cleanup failure
 prevents an unsafe replacement process. Intentional listener stops are distinct
 from crashes at the shared lifecycle boundary and cannot be silently restarted.
 Failure and recovery remain visible through the existing management incident path.
+Transport AbortError/TimeoutError and Node cancellation/network codes are transient
+only while desired intent remains active. They do not imply an owner stop. Unknown
+coded authorization, configuration, filesystem or protocol failures remain permanent;
+cleanup must still finish before any replacement. The controller and native
+lifecycle share this classification rather than independently guessing from messages.
 
 ### Binding lifetime, native sleep and durable intent
 
@@ -756,6 +772,9 @@ One host budget fairly limits acquisition to 16 concurrent operations,
 publication to eight and native startup to four; each queue is bounded to 10,000
 waiters and is abortable. An acquisition deadline starts after its permit is
 granted. Capacity or cancellation never acknowledges unread input.
+Controller-generation cancellation also covers queued publication permits. Cancelled
+work releases its permit, preserves its checkpoint and leaves the logical receiver
+available for the next authorized generation.
 
 Instance policy `fleetIdleTimeoutSeconds` defaults to 1800 (30 minutes), permits
 integer values 0–604800, and zero disables automatic sleep. Management presents
@@ -778,6 +797,19 @@ sleeping requires explicit Resume sessions. Maintenance notices wait for a live
 native session rather than waking sleeping agents. Failed native generations
 report their original cause and resume independently with bounded transient
 backoff after verified cleanup. Unverified cleanup blocks replacement.
+Empty receipt sets are checkpoint-only no-ops at the native lifecycle boundary:
+an empty Matrix reconciliation can settle while sleeping without starting a process.
+Nonempty receipt sets still require their exact available native generation.
+
+Each reporting run captures one immutable controller tuple and delivery-generation
+signal. Lease loss or a disabled gate ends that reporting lifetime, not desired
+activation. Reactivation creates a new reporting run even if pause/resume coalesce
+before the receiver loop observes them. Server admission loss requests controller
+reconnection; it is never classified as an explicit owner stop. Old reporting
+failures cannot cancel a replacement generation. Native stop receipts retain their
+original tuple and cannot authorize retirement after lease replacement. Expired
+proofs are not retried by the current-generation worker or presented as current
+connection errors; explicit retirement still rejects that stale evidence.
 
 The private controller `desired-intent.json` stores activation separately from
 observed execution. Its key pairs are bounded to 100 fleets and 100 instances
@@ -3024,6 +3056,9 @@ Required banks:
 - Exclusive controller leases, loss/deadline deactivation, retained listener/runtime
   bindings, UI/CLI reactivation, queued-send cancellation, durable fleet-message
   receipts/fan-out and exact current-generation authorization for every agent.
+  Rapid lease turnover, initial admission loss, canceled publication queues,
+  empty sleeping checkpoints and coded transport cancellation retain exact native
+  histories/unread cursors; explicit stops and expired retirement proofs stay fenced.
 - Native TUI pointers to the exact session locally and through SSH, no extra
   model call/receiver/engine, TUI exit leaves the fleet running, stopped-run
   refusal, shell quoting and exclusion of authentication tokens from output.

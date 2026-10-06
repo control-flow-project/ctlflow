@@ -45,7 +45,7 @@ test('all instances inherit one complete role policy and changing it changes the
   assert.deepEqual(configured.value.definitions.analyst!.coordinationPolicy, { wakeMode: 'owner-agents', senderMatrixIds: [], permissions: ['room.agent.invite'] });
   assert.deepEqual(configured.value.roster.instances.map(instance => configured.value.definitions[instance.definition]!.coordinationPolicy),
     [configured.value.definitions.analyst!.coordinationPolicy, configured.value.definitions.analyst!.coordinationPolicy]);
-  assert.deepEqual(configured.value.definitions.analyst!.options, { model: 'fixture' });
+  assert.deepEqual(configured.value.definitions.analyst!.options, Object.assign(Object.create(null), { model: 'fixture' }));
 });
 
 test('listener history options have one camelCase domain and API representation with an explicit TOML boundary', scope => {

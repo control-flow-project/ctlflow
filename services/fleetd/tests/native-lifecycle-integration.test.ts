@@ -55,6 +55,8 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   let managed = value(await createNativeLifecycle(services, stop.signal)); cleanup(scope, () => managed.close());
   const history = managed.runtime.sessionId, firstPointer = value(await managed.attachment());
   assert.equal(provider.requests.length, 0, 'Startup does not call a model');
+  managed.runtime.acknowledge([]);
+  assert.equal(existsSync(join(home, 'crossfire-session.json.receipt')), false, 'Checkpoint-only acknowledgment creates no native receipt');
   await managed.runtime.deliver('First retained native sleep proof', 'sleep-proof-one'); managed.runtime.acknowledge(['sleep-proof-one']);
   await until(() => provider.held() !== undefined);
   await advance(1800000); assert.equal(managed.nativeState().phase, 'running', 'A native working turn vetoes idle sleep');
@@ -63,6 +65,9 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   assert.equal(managed.runtime.signal.aborted, false); assert.equal(existsSync(firstPointer.connection.tokenFile!), false);
   assert.equal((await managed.attachment()).ok, false); assert.equal(value(await managed.contexts())[0]!.sessionId, history);
   assert.equal(starts, 1); assert.equal(provider.requests.length, 1, 'Sleep and metadata reads call no model');
+  managed.runtime.acknowledge([]);
+  assert.equal(managed.nativeState().phase, 'sleeping'); assert.equal(starts, 1);
+  assert.equal(provider.requests.length, 1, 'Checkpoint-only reconciliation does not wake a sleeping engine');
   value(await managed.resume()); assert.equal(starts, 2); assert.equal(provider.requests.length, 1, 'Explicit resume creates no model input');
   assert.equal(value(await managed.attachment()).sessionId, history);
   await managed.runtime.deliver('Second retained native sleep proof', 'sleep-proof-two'); managed.runtime.acknowledge(['sleep-proof-two']);
@@ -72,6 +77,8 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   await managed.close(); services.initial = 'sleeping';
   managed = value(await createNativeLifecycle(services, new AbortController().signal));
   assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 2); assert.equal(managed.nativeState().phase, 'sleeping');
+  managed.runtime.acknowledge([]);
+  assert.equal(starts, 2); assert.equal(provider.requests.length, 2, 'Sleeping restoration acknowledges checkpoints without starting native execution');
   await managed.runtime.deliver('Third retained native sleep proof', 'sleep-proof-three'); managed.runtime.acknowledge(['sleep-proof-three']);
   await until(() => provider.requests.length === 3); await until(async () => !(await managed.runtime.inspect()).busy);
   assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 3);
