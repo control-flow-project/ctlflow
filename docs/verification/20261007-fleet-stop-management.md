@@ -67,3 +67,32 @@ These are integrated source and native-fixture results, not a claim that every
 real model task or production failure mode has been certified. The production
 rollout separately verifies backups, release identity, operation settlement,
 preserved accounts/rooms/native histories and real management browser flows.
+
+## Production results and remaining dependency
+
+- The website runs image `gaap-runtime:3c071fd92bd76ffa1515`, with runtime source
+  `00852e08b9c5cc3c1d8eb80c61c26679d5add018` and the exact listener release above.
+  Both public `0.1.9` archives match their registry integrity and the installed
+  Turbine packages. No internal package was published.
+- Verified quiescent website/controller/provider backups precede activation.
+  Consistent SQLite before/after inspection preserves all 37 protected relations.
+  All 28 Matrix identities, native history scopes and private provider-file
+  fingerprints are unchanged. No database, room or history was reset.
+- The original stop completes through the normal authenticated receipt path.
+  No operation remains pending/running. Exactly 15 previously enabled receivers
+  are restored; 13 deliberately stopped instances remain stopped. Read-only
+  native thread queries confirm the 15 resumed saved histories and workspaces.
+  Nell retains both owner-selected wake senders; all 19 visible rooms remain.
+- Postdeployment Chrome checks pass for 44 management route/viewport combinations
+  and both wake-picker viewports. Additional desktop/mobile checks confirm enabled
+  Resume, settled stop history, themed confirmation focus/Tab/Escape/Cancel,
+  viewport fit and zero mutation on cancellation. No native browser popup or
+  page error occurs. Actual screenshots were inspected. No model task was sent.
+
+Production model readiness is **not verified**. The retained fleet Codex login
+fails native provider workspace authentication with HTTP 401. Turbine's current
+login has a different subject, email and provider account. It must not silently
+replace the fleet's credentials or billing authority. The owner must reauthenticate
+the retained account or explicitly authorize a provider-account change before
+model responses can be certified. History restoration, controller connectivity
+and an available model catalog do not establish provider authentication.
