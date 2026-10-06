@@ -26,14 +26,14 @@ Crossfire installs no systemd, global skills, certificates or host permissions.
 
 ## Schema and report storage
 
-Schema 13 accepts a fresh store or the inventoried deployed schema 12 only.
-Versions 1–11 and foreign/future stores fail without mutation. Conversion retains
+Schema 14 accepts a fresh store or the inventoried deployed schema 13 only.
+Versions 1–12 and foreign/future stores fail without mutation. Conversion retains
 identities, native credentials, histories, grants, publications, receipts and audit.
-Historical requests missing mandatory controller fields or successful-item policy
-become immutable history-only archive relations. All fourteen original request
-fields and normalized item/policy/permission/selected-sender/metadata rows retain
-their exact values. Complete managed requests remain current; no fleet or policy
-is invented during conversion. The current inventory has 63 singular tables.
+It converts old wake presets to exact explicit person/group selections in agent,
+enrollment and archive relations. Pending review digests advance to the current
+representation; revisions and effective permissions stay unchanged. Historical
+requests remain immutable archive data. No fleet or authority is invented during
+conversion. The current inventory has 63 singular tables.
 Unbound historical identities are excluded from operational authentication and
 directories until a new owner-reviewed fleet enrollment proves private identity.
 Every new reporting run requires its exact active fleet/current controller lease.

@@ -38,9 +38,9 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   const other = await fixture.member('alice'), guest = await fixture.agent(other.actor, 'visitor');
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId, fleetKey: 'research',
     controller: { name: 'Research workstation', metadata: { site: 'local' } }, instances: [
-      { instanceKey: 'alpha', name: 'alpha', coordinationPolicy: { ...defaultCoordinationPolicy(), wakeMode: 'owner-agents' as const, permissions: ['room.agent.invite' as const] } },
-      { instanceKey: 'beta', name: 'beta', coordinationPolicy: { ...defaultCoordinationPolicy(), wakeMode: 'selected' as const,
-        senderMatrixIds: [admin.member.principal.matrixUserId, guest.matrixUserId] } }] };
+      { instanceKey: 'alpha', name: 'alpha', coordinationPolicy: { wakeMode: 'selected' as const, senders: [{ matrixUserId: admin.member.principal.matrixUserId, includeAgents: true }], permissions: ['room.agent.invite' as const] } },
+      { instanceKey: 'beta', name: 'beta', coordinationPolicy: { ...defaultCoordinationPolicy(admin.member.principal.matrixUserId), wakeMode: 'selected' as const,
+        senders: [admin.member.principal.matrixUserId, guest.matrixUserId].map(matrixUserId => ({ matrixUserId, includeAgents: false })) } }] };
   const introduced = value(await introduceEnrollment(services, input));
   const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
@@ -50,9 +50,10 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByText('Research workstation', { exact: true })).toBeVisible();
   await expect(page.getByText('alpha', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('table', { name: 'Enrollment roster' }).getByRole('columnheader')).toHaveText(['Instance', 'Agent name', 'Outcome', 'Who can wake', 'Room coordination', 'Details']);
-  await expect(page.getByText(WAKE_LABELS['owner-agents'], { exact: true })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Enrollment roster' }).locator('tbody tr').first().getByRole('cell').nth(3)).toContainText(WAKE_LABELS.selected);
   await expect(page.getByText('Remove only its own additions', { exact: true })).toBeVisible();
-  await page.getByText('2 selected identities', { exact: true }).click();
+  await page.getByText('2 selected entries', { exact: true }).click();
+  await page.getByText('1 selected entry', { exact: true }).click();
   await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(guest.matrixUserId);
   await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(admin.member.principal.matrixUserId);
   for (const width of [1440, 390]) {
@@ -238,15 +239,16 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByLabel('Allow this agent to invite other registered agents')).toBeChecked();
   assert.deepEqual(value(services.collection.roomPermissions({ agentId: alpha.agentId, roomId })).map(permission => permission.permissionCode), ['room.agent.invite']);
   await page.goto(origin + agentUrl);
-  await page.getByLabel('Wake-up authority').selectOption('selected');
-  await page.getByLabel('Search identities').fill('visitor');
+  await page.getByRole('button', { name: 'Choose who can wake' }).click();
+  await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+  await page.getByLabel('Show', { exact: true }).selectOption('agent');
+  await page.getByLabel('Search people or Matrix IDs').fill('visitor');
   await page.getByLabel('Allow ' + guest.matrixUserId, { exact: true }).check();
-  await page.getByLabel('Search identities').fill('no-match');
-  await expect(page.getByRole('list', { name: 'Selected wake-up identities' })).toContainText(guest.matrixUserId);
+  await page.getByLabel('Search people or Matrix IDs').fill('no-match');
+  await expect(page.getByRole('dialog').getByRole('table', { name: 'Selected wake-up people and agents' })).toContainText(guest.matrixUserId);
   await page.getByRole('button', { name: 'Save wake-up policy' }).click();
-  await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled(); await page.reload();
-  await expect(page.getByLabel('Wake-up authority')).toHaveValue('selected');
-  await expect(page.getByRole('list', { name: 'Selected wake-up identities' })).toContainText(guest.matrixUserId);
+  await expect(page.getByRole('dialog')).toHaveCount(0); await page.reload();
+  await expect(page.getByRole('table', { name: 'Selected wake-up people and agents' })).toContainText(guest.matrixUserId);
   assert.deepEqual(value(services.collection.wakeSenders({ agentId: alpha.agentId })).map(sender => sender.senderPrincipalId), [guest.id]);
   await page.goto(origin + '/manage/fleets/' + fleet.id + '/activity');
   await page.getByRole('navigation', { name: 'Fleet activity' }).getByRole('link', { name: 'Traffic & usage', exact: true }).click();
@@ -446,7 +448,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
     { base: fixture.native.base, token: admin.token }, 'POST', API + '/createRoom', { name, preset: 'private_chat' })).room_id as string);
   for (let index = 0; index < instances.length; index++) {
     const id = instances[index]!.agentId!, principal = value(services.directory.agent(id))!.principal, mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
-    value(changeWakePolicy(services, admin.actor, id, { expectedRevision: principal.revision, mode, senderIds: mode === 'selected' ? [other.actor.principalId] : [] }, randomUUID()));
+    value(changeWakePolicy(services, admin.actor, id, { expectedRevision: principal.revision, mode, senders: mode === 'selected' ? [other.actor.principalId].map(principalId => ({ principalId, includeAgents: false })) : [] }, randomUUID()));
     if (index < 12) {
       const binding = control.listener(id), proof = binding.control.binding(); binding.close();
       value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(),
@@ -470,7 +472,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   await expect(page.getByRole('heading', { name: 'Fleet map', exact: true })).toBeVisible();
   await expect(page.locator('.map-node-agent')).toHaveCount(24);
   await expect(page.locator('.map-node-room')).toHaveCount(6);
-  await expect(page.locator('.map-node-source')).toHaveCount(6);
+  await expect(page.locator('.map-node-source')).toHaveCount(3);
   await expect(page.locator('.map-edge')).toHaveCount(46);
   await expect(page.locator('.map-toolbar')).toContainText('24 of 24 agents shown');
   await checkPaperLayout(page);
@@ -497,7 +499,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
   await page.getByLabel('Search map').fill('map-worker-23'); await page.getByRole('button', { name: 'Apply search', exact: true }).click();
   await expect(page.locator('.map-node-agent')).toHaveCount(1); await expect(page.locator('.map-node-room')).toHaveCount(1);
-  await expect(page.locator('.map-node-source small')).toHaveText('1 agent · 1 chosen');
+  await expect(page.locator('.map-node-source small')).toHaveText('1 agent');
   await page.locator('.map-node-agent').click(); await expect(details.getByRole('table', { name: 'Selected room connections' }).locator('tbody tr')).toHaveCount(1);
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click(); await expect(page.locator('.map-node-agent')).toHaveCount(24);
   await page.getByLabel('Listener status').selectOption('online'); await expect(page.locator('.map-node-agent')).toHaveCount(12);

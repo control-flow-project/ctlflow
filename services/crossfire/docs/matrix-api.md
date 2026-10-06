@@ -117,10 +117,20 @@ leave and rejoin both occur between polls. Profile changes do not reset it.
 - `packages/agent-tools/src/main.ts`: intentional tool namespace/dispatch through
   fleetd's existing receiver; no standalone lifecycle or receiver fallback.
 
-The human's `!!` control cannot come from historical search, edited messages,
-quotes, another agent or an unmentioned shared-room broadcast. A bare stop
-holds unread messages until later human input; a redirect is delivered before
-the old backlog. Urgent skip-ahead does not advance contiguous read markers.
+An eligible human's fresh native `m.mentions.user_ids` mention steers the
+selected agent like Esc followed by a new terminal instruction. Wake policy,
+verified human identity, current native membership, room access/mute and active
+controller delivery are checked before exact-turn interruption and replacement
+input. Shared histories retain all room context; per-room histories interrupt
+only that room's turn. An idle/sleeping agent receives the instruction normally
+in the same saved history. No new session or receiver is created.
+
+Display-name text, agents, notices, edited or historical mentions cannot steer.
+An explicitly mentioned fresh reply can steer. A mention is not an approval or
+answer to a native question. There is no `!!`-prefixed redirect alias.
+The distinct bare owner `!!` stop holds unread messages until later owner input;
+shared-room stops require a native mention. An authorized redirect is delivered
+before the old backlog. Urgent skip-ahead does not advance contiguous read markers.
 Cancellation is not rollback. Interrupted native input is not blindly replayed,
 and uncertain cancellation is never retargeted to a later turn.
 A cancelled receipt wait retains its exact native verification boundary. The

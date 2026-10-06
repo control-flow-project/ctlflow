@@ -62,6 +62,18 @@ test('disconnected and superseded controller generations cannot publish native s
   assert((await current.receipts.confirm(current.agentId)).ok); assert.equal(reports.length, 1);
 });
 
+test('expired stop proofs remain fenced for retirement but cannot poison a healthy current connection or retry forever', async scope => {
+  let reports = 0;
+  const current = fixture(async () => { reports++; return success(undefined); }); cleanup(scope, current.close);
+  current.receipts.closed(current.activity()); current.turnover();
+  const stale = await current.receipts.confirm(current.agentId);
+  assert(!stale.ok); assert.equal(stale.error.code, 'conflict');
+  assert.equal(current.receipts.error(), null, 'Historical proofs are not current connection failures');
+  await current.advance(); await current.advance();
+  assert.equal(reports, 0, 'Only the original authenticated generation can submit its stop proof');
+  assert.equal(current.receipts.error(), null);
+});
+
 test('new authenticated native activity invalidates in-flight stop evidence and keeps retirement fenced', async scope => {
   let delivered!: () => void;
   const current = fixture(async () => new Promise<Result<void>>(resolve => { delivered = () => resolve(success(undefined)); })); cleanup(scope, current.close);

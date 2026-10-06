@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
@@ -33,6 +34,50 @@ test('all services have one strict implementation and declared package-export bo
   for (const manifest of manifests.values()) if (manifest.name.startsWith('@ctlflow/crossfire-')) {
     assert(!Object.keys(manifest.dependencies ?? {}).some(name => /^@ctlflow\/(?:fleet|fleetd)(?:-|$)/u.test(name)));
   }
+});
+
+test('all TOML dependency owners lock one patched parser', () => {
+  const root = resolve(process.cwd(), '../..');
+  const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')) as {
+    packages: Record<string, { version?: string; dependencies?: Record<string, string> }>;
+  };
+  for (const owner of ['crossfire/packages/contracts', 'crossfire/packages/adapter-codex',
+    'fleetd/packages/contracts', 'fleetd/packages/storage']) {
+    const path = 'services/' + owner;
+    const manifest = JSON.parse(readFileSync(join(root, path, 'package.json'), 'utf8')) as PackageManifest;
+    assert.equal(manifest.dependencies?.['smol-toml'], '1.9.0', path);
+    assert.equal(lock.packages[path]?.dependencies?.['smol-toml'], '1.9.0', path + ' lock');
+  }
+  assert.deepEqual(Object.keys(lock.packages).filter(path => path.endsWith('node_modules/smol-toml')),
+    ['node_modules/smol-toml']);
+  assert.equal(lock.packages['node_modules/smol-toml']?.version, '1.9.0');
+  const installed = JSON.parse(readFileSync(join(root, 'node_modules/smol-toml/package.json'), 'utf8')) as { version: string };
+  assert.equal(installed.version, lock.packages['node_modules/smol-toml']?.version, 'Installed parser matches the lock');
+});
+
+test('the locked source-map dependency rejects unsafe indexed offsets without blocking its caller', () => {
+  const root = resolve(process.cwd(), '../..');
+  const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')) as {
+    packages: Record<string, { version?: string }>;
+  };
+  assert.deepEqual(Object.keys(lock.packages).filter(path => path.endsWith('node_modules/source-map-js')),
+    ['node_modules/source-map-js']);
+  assert.equal(lock.packages['node_modules/source-map-js']?.version, '1.2.2');
+  const installed = JSON.parse(readFileSync(join(root, 'node_modules/source-map-js/package.json'), 'utf8')) as { version: string };
+  assert.equal(installed.version, lock.packages['node_modules/source-map-js']?.version, 'Installed source-map parser matches the lock');
+  const probe = spawnSync(process.execPath, ['--input-type=commonjs', '--eval', `
+    const assert = require('node:assert/strict');
+    const { SourceMapConsumer } = require('node:module').createRequire(require.resolve('postcss'))('source-map-js');
+    const basic = { version: 3, sources: ['input.js'], names: [], mappings: 'AAAA' };
+    const indexed = (line, map = basic) => ({ version: 3, sections: [{ offset: { line, column: 0 }, map }] });
+    for (const line of [Infinity, -1, 0.5, '1', 10000001])
+      assert.throws(() => new SourceMapConsumer(indexed(line)), /Section offset/);
+    assert.throws(() => new SourceMapConsumer(indexed(6000000, indexed(6000000))), /including offsets of nested sections/);
+    const consumer = new SourceMapConsumer(indexed(2));
+    assert.deepEqual(consumer.generatedPositionFor({ source: 'input.js', line: 1, column: 0 }),
+      { line: 3, column: 0 });
+  `], { cwd: root, encoding: 'utf8', timeout: 5000, maxBuffer: 16384 });
+  assert.equal(probe.status, 0, probe.error?.message ?? probe.stderr);
 });
 
 test('every import form is inspected, including erased types, exports and current ESM literals', () => {

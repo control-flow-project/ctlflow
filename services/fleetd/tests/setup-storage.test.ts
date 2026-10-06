@@ -29,7 +29,9 @@ test('project setup persists one ordinary fleet and private instance state witho
   const instance = first.configuration.roster.instances[0]!;
   assert.equal(instance.workspace, project); assert(name(instance.name).ok); assert.equal(instance.key, instance.name);
   assert.equal(instance.workarea, 'agents/project/workarea/' + instance.name);
-  assert.deepEqual(first.configuration.definitions.project!.options, { sandbox_mode: 'danger-full-access', approval_policy: 'on-request', dangerously_bypass_approvals_and_sandbox: false });
+  assert.deepEqual(first.configuration.definitions.project!.options, Object.assign(Object.create(null), {
+    sandbox_mode: 'danger-full-access', approval_policy: 'on-request', dangerously_bypass_approvals_and_sandbox: false,
+  }));
   assert(first.configuration.definitions.project!.instructions.includes(descriptor.instructions));
   const repeated = value(registry.setup({ descriptor, workspace: project }));
   assert.equal(repeated.operationId, first.operationId); assert.equal(repeated.configuration.directory, first.configuration.directory);

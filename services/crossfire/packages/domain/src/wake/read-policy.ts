@@ -7,5 +7,7 @@ export function readWakePolicy(services: Pick<Services, 'repositories' | 'direct
   const senders = services.collection.wakeSenders({ agentId });
   if (!senders.ok) return senders;
   const identities = services.discovery.selected(senders.value.map(sender => sender.senderPrincipalId));
-  return identities.ok ? success({ agentId, revision: target.value.principal.revision, mode: target.value.agent.wakeMode, senders: identities.value }) : identities;
+  const selection = new Map(senders.value.map(sender => [sender.senderPrincipalId, sender.includeAgents]));
+  return identities.ok ? success({ agentId, revision: target.value.principal.revision, mode: target.value.agent.wakeMode,
+    senders: identities.value.map(identity => ({ identity, includeAgents: selection.get(identity.principalId)! })) }) : identities;
 }

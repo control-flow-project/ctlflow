@@ -188,12 +188,13 @@ application state.
 
 ## Migration and verification
 
-The current database is schema 13. Fresh stores initialize it directly. Only the
-inventoried deployed schema 12 has a transactional forward conversion; versions
-1–11, foreign stores and future versions are refused without changes. Conversion
+The current database is schema 14. Fresh stores initialize it directly. Only the
+inventoried deployed schema 13 has a transactional forward conversion; versions
+1–12, foreign stores and future versions are refused without changes. Conversion
 retains publications/files, identities, credentials, room grants, native histories,
-runtime/usage/receipt records and audit. Historical non-controller enrollment
-becomes archive data; current operational agents require exact active fleet and
+runtime/usage/receipt records and audit. Wake selections gain explicit ownership
+group flags without broadening permissions. Archived enrollment stays historical;
+current operational agents require exact active fleet and
 controller-lease binding. The 1800-second idle policy remains unchanged. Verify
 an addressed production backup before running the new application. Never reset
 data or rewrite a version number to bypass validation.

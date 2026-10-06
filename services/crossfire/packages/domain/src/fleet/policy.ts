@@ -12,15 +12,15 @@ type Dependencies = ReadDependencies & Pick<Services, 'clock' | 'identity' | 'ru
 
 export function resolveCoordinationPolicy(services: ReadDependencies, policy: CoordinationPolicy,
   agentId: string | null, expectedAgentRevision: number | null): Result<RequestedFleetPolicy> {
-  const senderIds: string[] = [];
-  for (const matrixId of policy.senderMatrixIds) {
-    const sender = services.directory.principalByMatrixId(matrixId);
+  const senders: RequestedFleetPolicy['senders'] = [];
+  for (const selection of policy.senders) {
+    const sender = services.directory.principalByMatrixId(selection.matrixUserId);
     if (!sender.ok) return sender;
-    if (!sender.value) return failure('invalid', 'Selected identity is not registered: ' + matrixId);
-    senderIds.push(sender.value.id);
+    if (!sender.value) return failure('invalid', 'Selected identity is not registered: ' + selection.matrixUserId);
+    senders.push({ principalId: sender.value.id, includeAgents: selection.includeAgents });
   }
-  const valid = validateWakeSenders(services, agentId, policy.wakeMode, senderIds);
-  return valid.ok ? success({ wakeMode: policy.wakeMode, senderIds: senderIds.sort(),
+  const valid = validateWakeSenders(services, agentId, policy.wakeMode, senders);
+  return valid.ok ? success({ wakeMode: policy.wakeMode, senders: senders.sort((left, right) => left.principalId.localeCompare(right.principalId)),
     permissions: [...policy.permissions].sort(), expectedAgentRevision }) : valid;
 }
 
@@ -33,8 +33,8 @@ export function coordinationPolicyMatches(services: ReadDependencies, agentId: s
     && agent.value.wakeMode === requested.wakeMode
     && policy.value.permissions.length === requested.permissions.length
     && policy.value.permissions.every(code => requested.permissions.includes(code))
-    && senders.value.length === requested.senderIds.length
-    && senders.value.every(sender => requested.senderIds.includes(sender.senderPrincipalId)));
+    && senders.value.length === requested.senders.length
+    && senders.value.every(sender => requested.senders.some(selection => selection.principalId === sender.senderPrincipalId && selection.includeAgents === sender.includeAgents)));
 }
 
 export function applyFleetRoomPermissions(services: Dependencies, grant: import('../room-access/types.js').AgentRoomGrant) {
@@ -60,7 +60,7 @@ export function applyCoordinationPolicy(services: Dependencies, actor: Actor, ag
   const matches = coordinationPolicyMatches(services, agentId, requested);
   if (!matches.ok) return matches;
   if (matches.value) return success(undefined);
-  const wake = replaceWakePolicy(services, current.value.agent, requested.wakeMode, requested.senderIds);
+  const wake = replaceWakePolicy(services, current.value.agent, requested.wakeMode, requested.senders);
   if (!wake.ok) return wake;
   const saved = services.repositories.fleetPolicy.approve({ agentId, approvedByMemberId: actor.principalId,
     approvedAt: services.clock.now(), permissions: requested.permissions });

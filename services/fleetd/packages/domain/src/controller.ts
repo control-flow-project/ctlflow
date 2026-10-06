@@ -1,7 +1,7 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Running } from './port.js';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
-import { isListenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
+import { canRecoverFailure, isListenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 import type { Configuration, Registration, FleetState, InstanceState, Operation, OperationInput, Instance, RetainedContext } from './model.js';
 import { createSetup } from './setup.js';
 
@@ -279,16 +279,23 @@ export function createController(services: Services) {
         return;
       } finally { if (cleaned && runtime && running.get(identity) === runtime) running.delete(identity); }
       if (intentional) { states.set(identity, { ...states.get(identity)!, phase: intentSaved.ok ? 'stopped' : 'failed', startedAt: null, error: intentSaved.ok ? null : intentSaved.error.message }); return; }
-      if (reason && typeof reason === 'object' && 'code' in reason && !['native', 'unavailable'].includes(String(reason.code))) return;
+      if (!canRecoverFailure(reason)) return;
       for (let attempt = 0; wanted.has(identity) && !signal.aborted && !stopping; attempt++) {
         await services.delay(Math.min(60000, 1000 * 2 ** Math.min(attempt, 6)), signal);
         if (signal.aborted || !wanted.has(identity) || stopping) return;
         if (active.has(fleetId) || mutations.has(fleetId)) continue;
-        const result = await services.execution.start(configuration, instance, signal, 'recovery');
+        let result: Result<Running>;
+        try { result = await services.execution.start(configuration, instance, signal, 'recovery'); }
+        catch (error) {
+          if (signal.aborted || !wanted.has(identity)) return;
+          states.set(identity, { ...states.get(identity)!, error: (error instanceof Error ? error.message : 'Binding recovery failed').slice(0, 4096) });
+          if (!canRecoverFailure(error)) return;
+          continue;
+        }
         if (signal.aborted || !wanted.has(identity)) { if (result.ok) await discardRuntime(fleetId, instance, result.value); return; }
         if (!result.ok) {
           states.set(identity, { ...states.get(identity)!, error: result.error.message });
-          if (!['native', 'unavailable'].includes(result.error.code)) return;
+          if (!canRecoverFailure(result.error)) return;
           continue;
         }
         recovering.delete(identity);
@@ -323,7 +330,7 @@ export function createController(services: Services) {
           return failure('unavailable', 'Binding restoration cancelled');
         }
         return result;
-      }).catch(error => failure('unavailable', error instanceof Error ? error.message : 'Binding restoration failed'));
+      });
       const timeout = services.delay(30000, AbortSignal.any([timer.signal, signal])).then(() => {
         if (!timer.signal.aborted && !signal.aborted) stop.abort(new Error('Binding restoration exceeded its 30-second deadline'));
         return failure('unavailable', signal.reason instanceof Error ? signal.reason.message : 'Binding restoration cancelled');
@@ -333,7 +340,7 @@ export function createController(services: Services) {
         if (!stopping && wanted.has(identity)) states.set(identity, { ...states.get(identity)!, phase: 'failed', error: result.error.message });
         observed();
         const settled = await started;
-        if (!settled.ok && !['native', 'unavailable'].includes(settled.error.code)) {
+        if (!settled.ok && !canRecoverFailure(settled.error)) {
           states.set(identity, { ...states.get(identity)!, phase: 'failed', error: settled.error.message }); return;
         }
       }
@@ -342,7 +349,7 @@ export function createController(services: Services) {
       if (result.ok) launched(record.fleetId, configuration, instance, result.value);
       else recover(record.fleetId, configuration, instance, result.error);
     }).catch(error => {
-      states.set(identity, { ...states.get(identity)!, phase: 'failed', error: error instanceof Error ? error.message : 'Binding restoration failed' });
+      if (!stopping && wanted.has(identity)) recover(record.fleetId, configuration, instance, error);
     }).finally(() => { timer.abort(); observed(); if (recovering.get(identity)?.stop === stop) recovering.delete(identity); });
     recovering.set(identity, { stop, done });
     await attempted;
@@ -360,7 +367,7 @@ export function createController(services: Services) {
         const valid = services.execution.validate(configuration.value);
         const error = selected.length !== desired.length ? 'Desired binding is missing from the saved roster; stop this fleet and review its files'
           : configuration.value.roster.fleet !== record.fleetKey || configuration.value.digest !== record.digest
-            ? 'Fleet files changed after their last accepted revision; stop this fleet and review before applying them' : !valid.ok ? valid.error.message : null;
+            ? 'Fleet files changed after their last accepted revision; review them and run an explicit update' : !valid.ok ? valid.error.message : null;
         if (error) {
           connectionErrors.set(record.directory, error);
           for (const instance of selected) states.set(key(record.fleetId, instance.key), { instance, phase: 'failed', sessionId: null, startedAt: null, error });
@@ -424,6 +431,8 @@ export function createController(services: Services) {
             states.set(key(fleetId, instance.key), { instance, phase: 'failed', error: updated.error.message, sessionId: states.get(key(fleetId, instance.key))?.sessionId ?? null, startedAt: null });
           }
         }
+        connect(configuration);
+        if (connectionErrors.has(configuration.directory)) throw new Error(connectionErrors.get(configuration.directory)!);
         for (const instance of activated) {
           if (!wanted.has(key(fleetId, instance.key)) || operation.errors.some(error => error.instanceKey === instance.key)) continue;
           const resumed = await services.execution.start(configuration, instance, AbortSignal.any([signal, lifetime.signal]), 'operator');

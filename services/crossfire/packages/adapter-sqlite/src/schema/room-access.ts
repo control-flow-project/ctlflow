@@ -67,6 +67,7 @@ CREATE INDEX ix_room_grant_application_due ON room_grant_application(next_check_
 CREATE TABLE agent_wake_sender (
   agent_id TEXT NOT NULL,
   sender_principal_id TEXT NOT NULL,
+  include_agents INTEGER NOT NULL CHECK(include_agents IN (0,1)),
   PRIMARY KEY (agent_id, sender_principal_id),
   FOREIGN KEY(agent_id) REFERENCES agent(principal_id),
   FOREIGN KEY(sender_principal_id) REFERENCES principal(id),

@@ -57,6 +57,7 @@ test('operator browser captures native login before navigation, checks real view
   const report = value(observed);
   assert.equal(report.human, fixture.account.matrixUserId);
   assert.equal(report.managementRoutes, views.length * managementViewports.length);
+  assert.equal(report.wakePickerViewports, 2);
   assert.equal(report.modelCalls, 0);
   assert.equal(fixture.requests.filter(request => request.method === 'DELETE' && request.path === '/api/sessions/current').length, 2);
   assert.equal(fixture.requests.filter(request => request.path.endsWith('/logout')).length, 2);

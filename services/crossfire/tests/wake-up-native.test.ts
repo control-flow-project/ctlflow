@@ -19,13 +19,13 @@ import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
 
-test('real Conduit and stock Codex deliver idle-only scheduled input without creating chats under Nobody authority', { timeout: 120000 }, async scope => {
+test('real Conduit and stock Codex deliver idle-only scheduled input without creating chats under an empty selected audience', { timeout: 120000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
   const agent = await fixture.agent(admin.actor, 'scheduled'), ruleId = randomUUID();
   const host = await createListenerHost(), controller = createListenerControl(async () => {}, () => agent.controller);
   controller.update({ active: true, input: null }); cleanup(scope, () => host.close()); cleanup(scope, controller.close);
   const principal = value(services.repositories.principal.find({ id: agent.id })); assert(principal);
-  value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: principal.revision, mode: 'nobody', senderIds: [] }, randomUUID()));
+  value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: principal.revision, mode: 'selected', senders: [] }, randomUUID()));
   const directory = mkdtempSync(join(process.cwd(), '.temp/wake-native-')), home = join(directory, 'home'), workspace = join(directory, 'project');
   mkdirSync(home, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
   const provider = await nativeProvider(scope, home), engine = await nativeEngine(scope, home, workspace);

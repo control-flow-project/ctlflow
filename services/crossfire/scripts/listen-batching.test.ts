@@ -36,11 +36,11 @@ function content(native: Awaited<ReturnType<typeof fakeCodex>>) {
 }
 
 async function fixture(context: TestContext, clock: ReturnType<typeof testClock>,
-  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}, initialAuthority: 'owner' | 'nobody' = 'owner',
+  controls: Partial<Pick<ListenerOptions, 'debounceMs' | 'pollMs' | 'limit' | 'room'>> = {}, inputEnabled = true,
   prepare?: (matrix: Awaited<ReturnType<typeof matrixFixture>>) => void) {
   const native = await fakeCodex(context);
   const matrix = await matrixFixture(context, native.directory, clock);
-  matrix.waking.policy = initialAuthority; matrix.waking.senders = initialAuthority === 'nobody' ? [] : [OBSERVER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = inputEnabled ? [OBSERVER] : [];
   prepare?.(matrix);
   const stop = new AbortController();
   const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 120,
@@ -52,7 +52,7 @@ async function fixture(context: TestContext, clock: ReturnType<typeof testClock>
   cleanup(context, async () => { stop.abort(new Error('test complete')); await clock.complete(result); });
   await clock.until(() => matrix.waiting() === 1 && (existsSync(matrix.cursorFile) || existsSync(matrix.cursorFile + '.snapshot')));
   const cursors = () => existsSync(matrix.cursorFile) ? readJson<Record<string, string>>(matrix.cursorFile) : {};
-  if (!prepare && initialAuthority === 'owner') await clock.until(() => cursors()[ROOM] === 'sync-0');
+  if (!prepare && inputEnabled) await clock.until(() => cursors()[ROOM] === 'sync-0');
   return { native, matrix, stop, options, result, cursors };
 }
 
@@ -76,7 +76,7 @@ test('five waiting messages and an owner burst reach the model together without 
 
 test('all automatic wake policies use exact allowed identities, never self or names inside content', async context => {
   const policies: [WakePolicy, string[], string][] = [
-    ['owner', [OBSERVER], OBSERVER], ['owner-agents', [OBSERVER, PEER], PEER],
+    ['selected', [OBSERVER], OBSERVER], ['selected', [OBSERVER, PEER], PEER],
     ['humans', [OBSERVER, PEER, HUMAN], HUMAN], ['everyone', [OBSERVER, PEER, HUMAN, OTHER_AGENT], OTHER_AGENT],
   ];
   for (const [policy, senders, trigger] of policies) await context.test(policy, withClock(async (child, clock) => {
@@ -95,7 +95,7 @@ test('all automatic wake policies use exact allowed identities, never self or na
 
 test('nobody retains every author’s context across restart and delivers it only after authority is enabled', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors, stop, options, result } = await fixture(context, clock, { debounceMs: 0 }, 'nobody');
+  const { native, matrix, cursors, stop, options, result } = await fixture(context, clock, { debounceMs: 0 }, false);
   const before = cursors();
   const senders = [OBSERVER, PEER, HUMAN, OTHER_AGENT, '@unknown:elsewhere.localhost'];
   matrix.add(ROOM, ...senders.map((sender, index) => message('$waiting-' + index, sender)));
@@ -110,7 +110,7 @@ test('nobody retains every author’s context across restart and delivers it onl
   await clock.until(() => matrix.waiting() === 1);
   await clock.advance(1200);
   assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
-  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER];
   await clock.until(() => cursors()[ROOM] === '5');
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)),
     [senders.map((_, index) => '$waiting-' + index)]);
@@ -118,11 +118,12 @@ test('nobody retains every author’s context across restart and delivers it onl
 
 test('nobody blocks urgent owner prompts without disabling owner stop or starting a second receiver', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, 'nobody');
+  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, false);
   const before = cursors();
-  matrix.add(ROOM, message('$urgent', OBSERVER, '!! do this now'));
+  matrix.add(ROOM, { ...message('$urgent', OBSERVER, 'do this now'), content: { msgtype: 'm.text', body: 'do this now', 'm.mentions': { user_ids: [matrix.account.user_id] } } });
   const controls = () => readJson<{ paused: boolean; controls: { event: string; status: string }[] }>(matrix.cursorFile + '.control');
-  await clock.until(() => controls().controls.some(control => control.event === '$urgent' && control.status === 'interrupted'));
+  await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-1');
+  assert.equal(controls().controls.some(control => control.event === '$urgent'), false);
   await clock.advance(300);
   assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
   matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
@@ -141,10 +142,10 @@ test('selecting nobody during collection cancels an owner wake and preserves the
   const before = cursors();
   matrix.add(ROOM, message('$peer'), message('$owner', OBSERVER));
   await clock.advance(150);
-  matrix.waking.policy = 'nobody'; matrix.waking.senders = [];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [];
   await clock.advance(1700);
   assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
-  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER];
   await clock.until(() => cursors()[ROOM] === '2');
   assert.deepEqual(content(native).map(events => events.map(event => event.event_id)), [['$peer', '$owner']]);
 }));
@@ -185,7 +186,7 @@ test('continuous traffic does not extend the fixed collection window or wake a s
 test('pending context is chronological across rooms while explicit selection excludes other rooms', async context => {
   for (const room of [undefined, ROOM]) await context.test(room ?? 'all rooms', withClock(async (child, clock) => {
 
-    const { native, matrix, cursors } = await fixture(child, clock, { ...(room ? { room } : {}), debounceMs: 100 }, 'owner', matrix => {
+    const { native, matrix, cursors } = await fixture(child, clock, { ...(room ? { room } : {}), debounceMs: 100 }, true, matrix => {
       matrix.subscribe(PLANNING);
       writeJson(matrix.cursorFile, { [ROOM]: '0', [PLANNING]: '0' });
     });
@@ -202,7 +203,7 @@ test('pending context is chronological across rooms while explicit selection exc
 test('an initial recent snapshot stays pinned while waiting and across listener restart', withClock(async (context, clock) => {
 
   const native = await fakeCodex(context), matrix = await matrixFixture(context, native.directory, clock);
-  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER];
   matrix.add(ROOM, ...Array.from({ length: 5 }, (_, index) => message('$initial-' + index)));
   const options: ListenerOptions = { ...matrix, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 0, runtime: native.runtime };
   const first = new AbortController();
@@ -222,7 +223,7 @@ test('an initial recent snapshot stays pinned while waiting and across listener 
 
 test('membership reset retires an initial snapshot and resumes delivery from the current membership', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, 'owner', matrix => {
+  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, true, matrix => {
     matrix.add(ROOM, message('$old-context'));
   });
   assert(existsSync(matrix.cursorFile + '.snapshot'));
@@ -238,7 +239,7 @@ test('membership reset retires an initial snapshot and resumes delivery from the
 
 test('a newly granted room can wake the listener without replacing another room’s pinned context', withClock(async (context, clock) => {
 
-  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, 'owner', matrix => {
+  const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, true, matrix => {
     matrix.add(ROOM, message('$pinned-first'), message('$pinned-second'));
   });
   assert(existsSync(matrix.cursorFile + '.snapshot'));
@@ -294,12 +295,12 @@ test('large aggregate context reaches the model once through private files witho
 test('restricting authority during collection cancels the peer wake without losing its context', withClock(async (context, clock) => {
 
   const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 1500 });
-  matrix.waking.policy = 'owner-agents'; matrix.waking.senders = [OBSERVER, PEER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER, PEER];
   await clock.advance(1100);
   const before = cursors();
   matrix.add(ROOM, message('$peer'));
   await clock.advance(150);
-  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER];
   await clock.advance(1600); assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
   matrix.add(ROOM, message('$owner', OBSERVER));
   await clock.until(() => cursors()[ROOM] === '2');

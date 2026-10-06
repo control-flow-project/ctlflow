@@ -14,6 +14,12 @@ the superseded path; do not leave it available behind a flag. Record any explici
 exception and its exact scope in these instructions, local memory and the ledger.
 There are currently no project-wide compatibility exceptions.
 
+On 2026-10-06 the owner approved a one-time npm release-age exception only for
+the reviewed `source-map-js` 1.2.2 security patch. Native npm resolution changes
+only that transitive lock entry. The persistent seven-day policy and existing
+named exemptions remain unchanged. This does not authorize future exemptions,
+compatibility paths or broader dependency updates.
+
 Necessary forward data migrations convert a verified deployed schema into the
 single current schema; they do not authorize concurrent old/new runtime paths.
 Preserve production data, credentials and native histories. Inventory actual

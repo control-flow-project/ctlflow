@@ -43,7 +43,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.equal(value(directory.activeAdministratorCount()), 1);
     assert.equal(value(directory.agents({ page: 1, pageSize: 20, statuses: ['active'], search: '' })).totalItems, 0);
     value(repositories.principal.insert({ id: 'agent', matrixUserId: '@agent:test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
-    value(repositories.agent.insert({ principalId: 'agent', principalKind: 'agent', ownerId: 'human', displayNameOverride: null, wakeMode: 'owner' }));
+    value(repositories.agent.insert({ principalId: 'agent', principalKind: 'agent', ownerId: 'human', displayNameOverride: null, wakeMode: 'selected' }));
     assert.equal(repositories.principalRole.insert({ principalId: 'agent', principalKind: 'agent', roleCode: 'administrator', assignedByMemberId: 'human', assignedAt: 1 }).ok, false);
     value(repositories.principalRole.insert({ principalId: 'agent', principalKind: 'agent', roleCode: 'agent', assignedByMemberId: 'human', assignedAt: 1 }));
     value(repositories.agentName.insert({ name: 'alpha', requestId: null, instanceKey: null, agentId: 'agent' }));

@@ -20,7 +20,8 @@ export function createAgentWakeSenderRepository(database: Database.Database): Ag
         executeInsert(database, schema, (query, params) => query.insertInto('agent_wake_sender').values({
       agent_id: params.agentId,
       sender_principal_id: params.senderPrincipalId,
-        }), value);
+      include_agents: params.includeAgents,
+        }), { ...value, includeAgents: value.includeAgents ? 1 : 0 });
         return success(undefined);
       });
     },
@@ -28,7 +29,8 @@ export function createAgentWakeSenderRepository(database: Database.Database): Ag
       return stored(() => {
         const changed = executeUpdate(database, schema, (query, params) => query.update('agent_wake_sender').set({
       agent_id: params.agentId,
-        }).where(row => row.agent_id === params.agentId && row.sender_principal_id === params.senderPrincipalId), value);
+      include_agents: params.includeAgents,
+        }).where(row => row.agent_id === params.agentId && row.sender_principal_id === params.senderPrincipalId), { ...value, includeAgents: value.includeAgents ? 1 : 0 });
         return changed === 1 ? success(undefined) : failure('missing', 'AgentWakeSender not found');
       });
     },

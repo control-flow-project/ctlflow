@@ -9,10 +9,13 @@ type Entry = { activity: NativeStopActivity; receipt?: NativeStopReceipt; confir
 export function createNativeStopReceipts(options: { clock: Clock; signal: AbortSignal; id(): string; connected(): boolean;
   send(receipt: NativeStopReceipt, signal: AbortSignal): Promise<Result<void>> }) {
   const entries = new Map<string, Entry>(), stop = new AbortController(), lifetime = AbortSignal.any([stop.signal, options.signal]);
+  function current(entry: Entry): boolean {
+    const selected = entry.activity.current(), captured = entry.activity.binding;
+    return selected.fleetId === captured.fleetId && selected.connectionId === captured.connectionId && selected.credential === captured.credential;
+  }
   function valid(entry: Entry): Result<void> {
     if (!entry.receipt) return failure('conflict', 'Native close is not confirmed for this authenticated listener run');
-    const current = entry.activity.current(), captured = entry.receipt.binding;
-    if (current.fleetId !== captured.fleetId || current.connectionId !== captured.connectionId || current.credential !== captured.credential) {
+    if (!current(entry)) {
       return failure('conflict', 'Native stop proof belongs to an expired controller generation; resume and stop the current binding before retirement');
     }
     if (lifetime.aborted || !options.connected()) return failure('unavailable', 'Native process closed; its stop receipt is waiting for the original controller connection');
@@ -29,7 +32,7 @@ export function createNativeStopReceipts(options: { clock: Clock; signal: AbortS
         const result = await options.send(entry.receipt!, lifetime);
         if (entries.get(agentId) !== entry) return failure('conflict', 'New authenticated activity invalidated this native stop receipt');
         if (!result.ok) { entry.error = result.error.message; return result; }
-        const current = valid(entry); if (!current.ok) { entry.error = current.error.message; return current; }
+        const checked = valid(entry); if (!checked.ok) { entry.error = checked.error.message; return checked; }
         entry.confirmed = true; entry.error = null; return success(undefined);
       } catch (error) {
         entry.error = error instanceof Error ? error.message : 'Native stop receipt could not be recorded';
@@ -41,7 +44,7 @@ export function createNativeStopReceipts(options: { clock: Clock; signal: AbortS
   }
   const running = (async () => {
     while (!lifetime.aborted) {
-      const pending = [...entries.values()].filter(entry => entry.receipt && !entry.confirmed);
+      const pending = [...entries.values()].filter(entry => entry.receipt && !entry.confirmed && current(entry));
       let position = 0;
       await Promise.all(Array.from({ length: Math.min(4, pending.length) }, async () => {
         for (;;) {
@@ -68,7 +71,7 @@ export function createNativeStopReceipts(options: { clock: Clock; signal: AbortS
     },
     confirm,
     forget(agentId: string) { entries.delete(agentId); },
-    error: () => [...entries.values()].find(entry => entry.receipt && entry.error)?.error ?? null,
+    error: () => [...entries.values()].find(entry => entry.receipt && entry.error && current(entry))?.error ?? null,
     async close() { stop.abort(); await running; },
   };
 }

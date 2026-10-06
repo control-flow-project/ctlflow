@@ -14,7 +14,7 @@ import { applicationFixture, secret, value } from './support/application.js';
 function introduction(ownerMatrixId: string, count: number, prefix: string) {
   return { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: 'team-' + prefix,
     controller: { name: prefix + '-controller' },
-    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: prefix + '-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy() })) };
+    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: prefix + '-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) })) };
 }
 
 test('administrator default capacity is 100 while member owners retain the configured limit', async scope => {
@@ -49,7 +49,8 @@ test('twenty administrators agents share one approved request without policy ove
   assert.equal(value(services.collection.pendingIdentityCount(admin.actor.principalId)), 0);
   for (const item of items) {
     const agent = value(services.directory.agent(item.agentId!))!;
-    assert.equal(agent.agent.wakeMode, 'owner');
+    assert.equal(agent.agent.wakeMode, 'selected');
+    assert.deepEqual(value(services.collection.wakeSenders({ agentId: item.agentId! })), [{ agentId: item.agentId!, senderPrincipalId: admin.actor.principalId, includeAgents: false }]);
     assert.deepEqual(value(services.collection.roomGrants({ agentId: item.agentId! })), []);
   }
   assert.equal(value(services.repositories.instancePolicy.find({ id: 'instance' }))!.maxOwnerAgents, 10);

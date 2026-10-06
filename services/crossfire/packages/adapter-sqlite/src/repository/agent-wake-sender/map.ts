@@ -4,5 +4,6 @@ export function mapAgentWakeSender(row: Tables['agent_wake_sender']): AgentWakeS
   return {
     agentId: row.agent_id,
     senderPrincipalId: row.sender_principal_id,
+    includeAgents: row.include_agents === 1,
   };
 }

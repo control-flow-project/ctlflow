@@ -10,6 +10,7 @@ import type { ControllerBinding } from '@ctlflow/crossfire-agent-core/listener-c
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, matrixFixture, message, ROOM, until, CONTROLLER } from '../scripts/test-support/listener.js';
 import { withClock } from '../scripts/test-support/clock.js';
+import { createListenerBudget } from '@ctlflow/crossfire-agent-core/budget';
 
 test('listener activity receipts retain the exact submitted controller capability across HTTP lease turnover', async scope => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
@@ -64,6 +65,48 @@ test('fleet gate pauses one receiver, cancels pending publication and retains un
     && !(request.body as { stopped: boolean }).stopped), 'Run callbacks follow successful initial activity reporting');
 }));
 
+test('rapid controller lease turnover rebinds immutable activity runs without replacing the receiver or native history', withClock(async (scope, clock) => {
+  const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
+  const binding = createListenerControl(async () => {}, () => matrix.reporting.controller); binding.update({ active: true, input: null });
+  const receipts: { runId: string; binding: ControllerBinding }[] = [];
+  let finished = false;
+  const receiving = listen({ ...matrix, control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20,
+    activity: (runId, controller) => receipts.push({ runId, binding: controller }),
+  }, stop.signal).catch(error => error).finally(() => { finished = true; });
+  cleanup(scope, async () => { stop.abort(); await clock.complete(receiving); });
+  await clock.until(() => receipts.length === 1 && matrix.waiting() === 1);
+  binding.update({ active: false, input: null });
+  matrix.reporting.controller = { ...CONTROLLER, connectionId: 'dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee' };
+  binding.update({ active: true, input: null });
+  await clock.until(() => receipts.length === 2, 'A new lease requires a new activity run even when pause and resume coalesce');
+  assert.equal(finished, false); assert.deepEqual(receipts[0]!.binding, CONTROLLER); assert.deepEqual(receipts[1]!.binding, matrix.reporting.controller);
+  assert.notEqual(receipts[0]!.runId, receipts[1]!.runId);
+  const stopped = matrix.requests.find(request => request.path.endsWith('/listener-runs/' + receipts[0]!.runId) && (request.body as { stopped: boolean }).stopped);
+  assert.deepEqual((stopped?.body as { controller: ControllerBinding }).controller, CONTROLLER);
+  matrix.add(ROOM, message('$after-turnover'));
+  await clock.until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
+  assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1); assert(matrix.maximumWaiting() <= 1);
+}));
+
+test('controller cancellation while queued for publication keeps the receiver alive and unread work resumable', withClock(async (scope, clock) => {
+  const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
+  const budget = createListenerBudget(), release = await Promise.all(Array.from({ length: 8 }, () => budget.acquire('publication', stop.signal)));
+  let queued = 0, finished = false;
+  matrix.host.budget.acquire = async (kind, signal) => { if (kind === 'publication') queued++; return budget.acquire(kind, signal); };
+  const binding = createListenerControl(async () => {}, () => CONTROLLER); binding.update({ active: true, input: null });
+  const receiving = listen({ ...matrix, control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, stop.signal)
+    .catch(error => error).finally(() => { finished = true; });
+  cleanup(scope, async () => { release.forEach(unlock => unlock()); stop.abort(); await clock.complete(receiving); });
+  await clock.until(() => queued > 0);
+  binding.update({ active: false, input: null }); await clock.advance(10);
+  assert.equal(finished, false, 'Canceling queued work is not a listener failure');
+  matrix.add(ROOM, message('$queued-unread')); release.forEach(unlock => unlock()); binding.update({ active: true, input: null });
+  await clock.until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
+  assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
+}));
+
 test('controller listener timing and page bounds are validated before native or network work', async scope => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory);
   for (const field of ['pollMs', 'debounceMs', 'reconcileMs', 'limit'] as const) {
@@ -78,7 +121,7 @@ test('controller listener timing and page bounds are validated before native or 
 
 test('controller messages bypass room wake filtering without consuming room cursors', async scope => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
-  matrix.joined.delete(ROOM); matrix.waking.policy = 'nobody'; matrix.waking.senders = [];
+  matrix.joined.delete(ROOM); matrix.waking.policy = 'selected'; matrix.waking.senders = [];
   const receipts: string[] = [];
   let ended: unknown;
   const binding = createListenerControl(async id => { receipts.push(id); binding.update({ active: true, input: null }); }, () => CONTROLLER);

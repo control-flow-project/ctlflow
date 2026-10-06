@@ -13,19 +13,24 @@ import { instanceView } from '@ctlflow/fleetd-contracts/api';
 test('role coordination options are separate from native options and strictly validate modes, capabilities and selected identities', () => {
   const native = { name: 'Analyst', runtime: 'codex', runtime_options: { model: 'fixture', native_option: true } };
   assert(definition(native).ok);
-  const options = { wake_mode: 'owner-agents', permissions: ['room.agent.invite'] };
+  const options = { wake_mode: 'selected', wake_senders: [{ matrix_user_id: '@owner:test', include_agents: true }], permissions: ['room.agent.invite'] };
   const valid = definition({ ...native, coordination_options: options });
   assert(valid.ok); assert.deepEqual(valid.value.runtime_options, native.runtime_options);
   for (const invalid of [{ ...options, extra: true }, { ...options, wake_mode: 'agents' },
     { ...options, permissions: ['policy.manage'] }, { ...options, permissions: ['room.agent.invite', 'room.agent.invite'] },
-    { ...options, sender_matrix_ids: ['@person:test'] }, { ...options, permissions: undefined },
-    { ...options, wake_mode: 'selected', sender_matrix_ids: ['@person:test', '@person:test'] },
-    { ...options, wake_mode: 'selected', sender_matrix_ids: ['person'] }]) {
+    { ...options, sender_matrix_ids: ['@person:test'] }, { ...options, permissions: undefined }, { ...options, wake_mode: 'owner-agents' },
+    { ...options, wake_mode: 'everyone' }, { ...options, wake_senders: undefined },
+    { ...options, wake_senders: [options.wake_senders[0], options.wake_senders[0]] },
+    { ...options, wake_senders: [{ matrix_user_id: 'person', include_agents: true }] },
+    { ...options, wake_senders: [{ matrix_user_id: '@person:test' }] }]) {
     assert.equal(definition({ ...native, coordination_options: invalid }).ok, false);
   }
   const selected = parseToml('name = "Analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "fixture"\n'
-    + '[coordination_options]\nwake_mode = "selected"\nsender_matrix_ids = ["@owner:test", "@peer:test"]\npermissions = []\n', definition);
-  assert(selected.ok); assert.deepEqual(selected.value.coordination_options!.sender_matrix_ids, ['@owner:test', '@peer:test']);
+    + '[coordination_options]\nwake_mode = "selected"\npermissions = []\n'
+    + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@owner:test"\ninclude_agents = true\n'
+    + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@peer:test"\ninclude_agents = false\n', definition);
+  assert(selected.ok); assert.deepEqual(selected.value.coordination_options!.wake_senders,
+    [{ matrix_user_id: '@owner:test', include_agents: true }, { matrix_user_id: '@peer:test', include_agents: false }]);
 });
 
 test('all instances inherit one complete role policy and changing it changes the deployed configuration digest', scope => {
@@ -38,14 +43,16 @@ test('all instances inherit one complete role policy and changing it changes the
   writeFileSync(join(role, 'agent.toml'), source, { mode: 0o600 });
   writeFileSync(join(role, 'AGENTS.md'), 'Deterministic role fixture.', { mode: 0o600 });
   const initial = loadConfiguration(directory); assert(initial.ok);
-  assert.deepEqual(initial.value.definitions.analyst!.coordinationPolicy, defaultCoordinationPolicy());
-  writeFileSync(join(role, 'agent.toml'), source + '[coordination_options]\nwake_mode = "owner-agents"\npermissions = ["room.agent.invite"]\n', { mode: 0o600 });
+  assert.deepEqual(initial.value.definitions.analyst!.coordinationPolicy, defaultCoordinationPolicy('@owner:test'));
+  writeFileSync(join(role, 'agent.toml'), source + '[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n'
+    + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@owner:test"\ninclude_agents = true\n', { mode: 0o600 });
   const configured = loadConfiguration(directory); assert(configured.ok);
   assert.notEqual(configured.value.digest, initial.value.digest);
-  assert.deepEqual(configured.value.definitions.analyst!.coordinationPolicy, { wakeMode: 'owner-agents', senderMatrixIds: [], permissions: ['room.agent.invite'] });
+  assert.deepEqual(configured.value.definitions.analyst!.coordinationPolicy,
+    { wakeMode: 'selected', senders: [{ matrixUserId: '@owner:test', includeAgents: true }], permissions: ['room.agent.invite'] });
   assert.deepEqual(configured.value.roster.instances.map(instance => configured.value.definitions[instance.definition]!.coordinationPolicy),
     [configured.value.definitions.analyst!.coordinationPolicy, configured.value.definitions.analyst!.coordinationPolicy]);
-  assert.deepEqual(configured.value.definitions.analyst!.options, { model: 'fixture' });
+  assert.deepEqual(configured.value.definitions.analyst!.options, Object.assign(Object.create(null), { model: 'fixture' }));
 });
 
 test('listener history options have one camelCase domain and API representation with an explicit TOML boundary', scope => {

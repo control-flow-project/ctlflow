@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
-import { matrixFixture, message, ROOM, OBSERVER, until } from '../test-support/listener.js';
+import { matrixFixture, message, mention, ROOM, OBSERVER, SELF, until } from '../test-support/listener.js';
 import { nativeCodex } from '../test-support/native-codex.js';
 
 test('owned native Codex receipts, interruption recovery, commands and Matrix integration', { timeout: 60_000 }, async context => {
@@ -147,7 +147,7 @@ test('a human Matrix control cancels the owned native Codex run during receipt w
   assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
   assert.equal(native.acknowledgements().length, 1);
   assert(native.notifications.some(event => event.method === 'turn/completed' && (event.params.turn as { id: string; status: string }).id === captured));
-  matrix.add(ROOM, message('$redirect-native', OBSERVER, '!! Only do this new work.'));
+  matrix.add(ROOM, mention('$redirect-native', OBSERVER, 'Only do this new work.', SELF));
   await until(() => native.requests.some(request => JSON.stringify(request).includes('Only do this new work.')));
   assert(!native.relayRequests.some(request => ['thread/resume', 'thread/start', 'thread/fork'].includes(request.method ?? '')));
   console.log('PASS noncontrolling exact-turn cancellation, paused unread input, and human redirect through the real Codex server.');

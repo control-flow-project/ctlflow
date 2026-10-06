@@ -3,6 +3,7 @@ import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval } from '@ctlflow/crossfire-agent-core/runtime';
 import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
+import { canRecoverFailure } from '@ctlflow/crossfire-kernel/lifecycle';
 
 type Observation = Extract<RuntimeObservationEvent, { kind: 'state' }>['observation'];
 type Context = { context: string; runtime: string; sessionId: string };
@@ -21,9 +22,6 @@ export type NativeLifecycleServices = {
 };
 
 function nativeError(code: string, message: string): Error { return Object.assign(new Error(message), { code }); }
-function permanent(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && !['native', 'unavailable', 'ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'].includes(String(error.code));
-}
 
 export async function createNativeLifecycle(services: NativeLifecycleServices, signal: AbortSignal) {
   const saved = await services.saved();
@@ -131,12 +129,13 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         recovery ??= (async () => {
           await discard(connection);
           emit('sleeping', contexts.filter(context => context.context !== services.primary));
+          if (!canRecoverFailure(error)) return;
           for (let attempt = 0; !lifetime.aborted; attempt++) {
             try { await ensure(); return; }
             catch (error) {
               if (lifetime.aborted) return;
               report(error);
-              if (permanent(error)) return;
+              if (!canRecoverFailure(error)) return;
               await services.clock.delay(Math.min(60000, 1000 * 2 ** Math.min(attempt, 6)), lifetime);
             }
           }
@@ -229,6 +228,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         return call(connection => connection.settle());
       },
       acknowledge: ids => {
+        if (!ids.length) return;
         if (!native || native.signal.aborted) throw nativeError('unavailable', 'Exact native receipt acknowledgment is waiting for recovery');
         native.acknowledge(ids);
         for (const id of ids) unsettled.delete(id);

@@ -103,7 +103,6 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     const agentCommand = positionals[0] === 'agent', command = positionals[agentCommand ? 1 : 0], fleetKey = positionals[agentCommand ? 2 : 1];
     const fleet = listed.find(fleet => fleet.fleetKey === fleetKey || fleet.fleetId === fleetKey);
     if (!fleet) throw new Error('Fleet not found: ' + fleetKey);
-    if (fleet.error && command !== 'stop' && command !== 'show') throw new Error(fleet.error);
     const params = { fleetId: fleet.fleetId };
     if (!agentCommand && ['activate', 'deactivate'].includes(command ?? '') && positionals.length === 2) {
       if (!fleet.connection.connected || fleet.connection.revision === null) throw new Error('Fleet controller is not connected to Crossfire');

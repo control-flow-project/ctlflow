@@ -28,7 +28,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   const { services, admin } = fixture;
   const other = await fixture.member('other');
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
-    fleetKey: 'research', controller: { name: 'desktop', metadata: { zone: 'local' } }, instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy() }, { instanceKey: 'second', name: 'second', coordinationPolicy: defaultCoordinationPolicy() }] };
+    fleetKey: 'research', controller: { name: 'desktop', metadata: { zone: 'local' } }, instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }, { instanceKey: 'second', name: 'second', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] };
   value(await preflightEnrollment(services, input));
   const introduced = value(await introduceEnrollment(services, input));
   assert.deepEqual(value(await introduceEnrollment(services, input)), introduced);
@@ -36,7 +36,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   assert.equal(value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: 'research' })), null, 'An anonymous roster does not reserve a fleet');
   assert.equal((await preflightEnrollment(services, { ...input, ownerMatrixId: other.member.principal.matrixUserId })).ok, false);
   const late = value(await introduceEnrollment(services, { ...input, enrollmentId: randomUUID(), claimSecret: secret(),
-    instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy() }, { instanceKey: 'third', name: 'third', coordinationPolicy: defaultCoordinationPolicy() }] }));
+    instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }, { instanceKey: 'third', name: 'third', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] }));
   assert.equal(late.instances[0]?.failureCode, 'name_collision');
   assert.equal(late.instances[1]?.outcome, 'claimed');
   assert.equal(decideEnrollment(services, other.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()).ok, false);
@@ -47,7 +47,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   assert.equal(ready.status, 'ready');
   assert.equal(exchangeEnrollment(services, input.enrollmentId, secret()).ok, false);
   const restored = { ...input, controllerCredential: ready.fleet!.controllerCredential!, enrollmentId: randomUUID(), claimSecret: secret(),
-    instances: ready.instances.map(item => ({ instanceKey: item.instanceKey, name: item.name, coordinationPolicy: defaultCoordinationPolicy(), identity: { agentId: item.agentId!, accessToken: item.account!.accessToken } })) };
+    instances: ready.instances.map(item => ({ instanceKey: item.instanceKey, name: item.name, coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId), identity: { agentId: item.agentId!, accessToken: item.account!.accessToken } })) };
   value(await preflightEnrollment(services, restored));
   assert.equal(value(await introduceEnrollment(services, restored)).request.status, 'approved');
   assert.equal(value(services.directory.activeAgentCount()), 2);
@@ -140,7 +140,7 @@ test('selected wake and explicit blocked mentions use durable sender cooldown wi
   const copy = [...native.notices.values()][0]!.body;
   assert(copy.includes(outsider.member.principal.matrixUserId) && copy.includes(admin.member.member.displayName) && copy.includes(admin.member.principal.matrixUserId));
   value(changeWakePolicy(services, admin.actor, receiver.id, { expectedRevision: value(services.directory.agent(receiver.id))!.principal.revision,
-    mode: 'selected', senderIds: [outsider.actor.principalId] }, randomUUID()));
+    mode: 'selected', senders: [outsider.actor.principalId].map(principalId => ({ principalId, includeAgents: false })) }, randomUUID()));
   assert.deepEqual(value(deliveryPolicy(services, receiver.actor, receiver.id)).wake.senders, [outsider.member.principal.matrixUserId]);
   assert.equal(value(await requestWakeNotice(services, receiver.actor, receiver.id, roomIds[0]!, event(roomIds[0]!))).outcome, 'not-applicable');
 });

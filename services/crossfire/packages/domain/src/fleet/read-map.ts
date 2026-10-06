@@ -8,11 +8,12 @@ import { readActivity, type AgentActivity } from '../listener/activity.js';
 import { wakeSenderMatrixIds } from '../wake/resolve-policy.js';
 import { readFleet, type FleetDetails } from './read-fleet.js';
 import { readRoom } from '../room/read-room.js';
+import type { WakeSelection } from '../wake/types.js';
 
 export type FleetMapAgent = { instanceKey: string; record: AgentRecord; sourceId: string; activity: AgentActivity };
 export type FleetMapConnection = { agentId: string; roomId: string; grant: AgentRoomGrant | null; application: RoomGrantApplication | null };
 export type FleetMapRoom = { roomId: string; name: string | null; alias: string | null };
-export type FleetMapSource = { sourceId: string; mode: AgentRecord['agent']['wakeMode']; selectedPrincipalIds: string[]; eligiblePrincipalIds: string[] };
+export type FleetMapSource = { sourceId: string; mode: AgentRecord['agent']['wakeMode']; senders: WakeSelection[]; eligiblePrincipalIds: string[] };
 export type FleetMap = { fleet: FleetDetails; capturedAt: number; agents: FleetMapAgent[]; rooms: FleetMapRoom[];
   connections: FleetMapConnection[]; sources: FleetMapSource[]; principals: PrincipalSummary[] };
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'roomGrantRead' | 'listenerRead' | 'matrix' | 'clock' | 'identity' | 'runtime'>;
@@ -62,13 +63,14 @@ export async function readFleetMap(services: Dependencies, actor: Actor, fleetId
   const principalIds = new Set<string>();
   for (const record of records.value.items) {
     const senders = selectedByAgent.get(record.principal.id) ?? [];
-    const selectedPrincipalIds = record.agent.wakeMode === 'selected' ? senders.map(sender => sender.senderPrincipalId).sort() : [];
-    const sourceId = services.identity.hash(record.agent.wakeMode + '\0' + selectedPrincipalIds.join('\0'));
-    const source = sources.get(sourceId) ?? { sourceId, mode: record.agent.wakeMode, selectedPrincipalIds, eligiblePrincipalIds: [] };
+    const selections = senders.map(sender => ({ principalId: sender.senderPrincipalId, includeAgents: sender.includeAgents }))
+      .sort((left, right) => left.principalId.localeCompare(right.principalId));
+    const sourceId = services.identity.hash(record.agent.wakeMode + '\0' + JSON.stringify(selections));
+    const source = sources.get(sourceId) ?? { sourceId, mode: record.agent.wakeMode, senders: selections, eligiblePrincipalIds: [] };
     const eligible = new Set(source.eligiblePrincipalIds);
     for (const matrixId of wakeSenderMatrixIds(record, active.value, senders)) eligible.add(activeByMatrixId.get(matrixId)!);
     source.eligiblePrincipalIds = [...eligible].sort(); sources.set(sourceId, source); sourceByAgent.set(record.principal.id, sourceId);
-    for (const id of [...source.selectedPrincipalIds, ...source.eligiblePrincipalIds]) principalIds.add(id);
+    for (const id of [...source.senders.map(sender => sender.principalId), ...source.eligiblePrincipalIds]) principalIds.add(id);
   }
   if (principalIds.size > FLEET_MAP_LIMITS.principals) return failure('limit', 'Fleet map exceeds the identity limit');
   const principals = services.discovery.selected([...principalIds]); if (!principals.ok) return principals;

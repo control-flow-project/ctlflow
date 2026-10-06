@@ -12,13 +12,13 @@ export type Tables = {
     agent_id: string | null; failure_code: string | null;
   };
   enrollment_archive_policy: {
-    request_id: string; instance_key: string; wake_mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected';
+    request_id: string; instance_key: string; wake_mode: 'humans' | 'everyone' | 'selected';
     expected_agent_revision: number | null;
   };
   enrollment_archive_permission: {
     request_id: string; instance_key: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room';
   };
-  enrollment_archive_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string };
+  enrollment_archive_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string; include_agents: number };
   enrollment_archive_metadata: { enrollment_id: string; key: string; value: string };
   fleet_native_stop: { agent_id: string; receipt_id: string; sequence: number; fleet_id: string; run_id: string; connection_id: string;
     credential_id: string; native_stopped_at: number; invalidated_at: number | null };
@@ -29,9 +29,9 @@ export type Tables = {
   fleet_runtime_operation: { id: string; fleet_id: string; agent_id: string | null; author_principal_id: string;
     action: 'start' | 'stop' | 'reset'; expected_revision: number; status: 'pending' | 'running' | 'succeeded' | 'failed';
     created_at: number; completed_at: number | null; error_message: string | null; connection_id: string | null; credential_id: string | null };
-  enrollment_item_policy: { request_id: string; instance_key: string; wake_mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected'; expected_agent_revision: number | null };
+  enrollment_item_policy: { request_id: string; instance_key: string; wake_mode: 'humans' | 'everyone' | 'selected'; expected_agent_revision: number | null };
   enrollment_item_permission: { request_id: string; instance_key: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room' };
-  enrollment_item_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string };
+  enrollment_item_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string; include_agents: number };
   fleet_instance_policy: { agent_id: string; approved_by_member_id: string; approved_at: number };
   fleet_instance_permission: { agent_id: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room' };
   listener_stat_checkpoint: { run_id: string; sequence: number; digest: string; captured_at: number };
@@ -90,7 +90,7 @@ export type Tables = {
     principal_kind: 'agent';
     owner_id: string;
     display_name_override: string | null;
-    wake_mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected';
+    wake_mode: 'humans' | 'everyone' | 'selected';
   };
   agent_credential: {
     agent_id: string;
@@ -223,6 +223,7 @@ export type Tables = {
   agent_wake_sender: {
     agent_id: string;
     sender_principal_id: string;
+    include_agents: number;
   };
   member_invitation: {
     id: string;

@@ -18,7 +18,7 @@ them out of Git. Every command accepts `--output /absolute/private/report.json`.
 | --- | --- | --- | --- |
 | `release` | `--origin`, `--release-directory` | `--web-directory` | Local manifest/artifact contract; live release; exact published bytes and hashes; optional management entry/assets |
 | `server` | `--origin`, `--credentials` | `--expect` | Anonymous access refusal, normal human login, complete visible roster, native invite discovery, runtime observations and fleet maps |
-| `browser` | `--origin`, `--credentials`, `--browser`, `--evidence` | None | Real login, authorized management sections, desktop/mobile geometry, tables, software history, map selection/URL/keyboard and personalized onboarding link |
+| `browser` | `--origin`, `--credentials`, `--browser`, `--evidence` | None | Real login, authorized management sections, desktop/mobile geometry, tables, software history, wake picker inspection/cancel without writes, map selection/URL/keyboard and personalized onboarding link |
 | `content` | `--url`, `--main-origin`, `--browser`, `--evidence` | None | An existing public HTML report's headers, opaque browser origin, blocked cookies/storage/main-site reads and absent application routes; no upload or deletion |
 | `database` | `--file` | `--expect`, `--schema` | Current Crossfire application/schema, integrity, foreign keys and every table count; optional columns/keys/index metadata |
 | `preservation` | `--before`, `--after` | None | Protected existing domain records unchanged, allowing appended records |
@@ -104,7 +104,7 @@ or missing files are created. Current normalized tables are queried through
 Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
 
 ```json
-{"schemaVersion":13,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
+{"schemaVersion":14,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
 ```
 
 The schema version and table counts are optional exact expectations. `--schema`
@@ -161,7 +161,7 @@ container restart, extraction, privileged command or package installation occurs
 ## Enrollment review
 
 ```json
-{"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","currentName":null,"requestedName":"helper","coordinationPolicy":{"wakeMode":"owner-agents","senderMatrixIds":[],"permissions":["room.agent.invite"]}}]}
+{"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","currentName":null,"requestedName":"helper","coordinationPolicy":{"wakeMode":"selected","senders":[{"matrixUserId":"@operator:example.test","includeAgents":true}],"permissions":["room.agent.invite"]}}]}
 ```
 
 Every enrollment supplies its fleet key, controller name and each item's complete
@@ -184,13 +184,14 @@ management editor or this tool only when intentionally adjusting current policie
 The plan specifies every enrolled instance in the fleet, not a subset:
 
 ```json
-{"fleetId":"00000000-0000-4000-8000-000000000001","fleetKey":"research","ownerMatrixId":"@operator:example.test","controllerName":"laptop","instances":[{"instanceKey":"analyst","name":"analyst","mode":"owner-agents","senderIds":[]},{"instanceKey":"helper","name":"helper","mode":"owner-agents","senderIds":[]}]}
+{"fleetId":"00000000-0000-4000-8000-000000000001","fleetKey":"research","ownerMatrixId":"@operator:example.test","controllerName":"laptop","instances":[{"instanceKey":"analyst","name":"analyst","mode":"selected","senders":[{"principalId":"00000000-0000-4000-8000-000000000002","includeAgents":true}]},{"instanceKey":"helper","name":"helper","mode":"selected","senders":[{"principalId":"00000000-0000-4000-8000-000000000002","includeAgents":false}]}]}
 ```
 
 Use the actual immutable fleet ID and exact current owner, controller name,
-instance keys and enrolled agent names. Every instance selects one of the six
-canonical wake modes. Only `selected` accepts sender IDs: immutable registered
-principal UUIDs, not display names or Matrix IDs. Empty selection wakes nobody.
+instance keys and enrolled agent names. Every instance selects `selected`,
+`humans` or `everyone`. Entries contain immutable registered principal UUIDs,
+not display names or Matrix IDs, and `includeAgents` Boolean flags. Only humans
+can include their agents; everyone requires no entries. Empty selected wakes nobody.
 Duplicate instances/senders, self-selection, unavailable senders, inactive agents,
 wrong owners/controllers and incomplete rosters fail before policy writes.
 
@@ -209,9 +210,9 @@ reports the verified writes and last attempted instance, and exits nonzero.
 An attempted write may have succeeded even if its response was lost. Review
 again before continuing; no automatic retry, rollback or permission overwrite.
 
-`owner-agents` allows the owner and all active agents belonging to that owner,
-including agents outside this fleet; self and other owners' agents are excluded.
-Use `selected` when a smaller or cross-owner set is required. Room membership,
+A person entry with `includeAgents: true` allows that person and their current
+active agents, including agents outside this fleet. Entries combine; selecting
+several people does not admit unrelated owners. Self is always excluded. Room membership,
 read/write access, mute state, invitation authority and wake authority stay
 separate. This command changes only wake policies: it neither enrolls, starts nor
 restarts agents, joins rooms, sends prompts or changes native settings.

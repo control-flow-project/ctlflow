@@ -16,7 +16,7 @@ import { applicationFixture, secret, value } from './support/application.js';
 function request(fixture: Awaited<ReturnType<typeof applicationFixture>>, agent: Awaited<ReturnType<Awaited<ReturnType<typeof applicationFixture>>['agent']>>, name = 'ada-max') {
   return { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: fixture.admin.member.principal.matrixUserId,
     fleetKey: 'test-ada', controller: { name: 'Test controller' }, controllerCredential: agent.controller.credential,
-    instances: [{ instanceKey: 'ada', name, identity: { agentId: agent.id, accessToken: agent.token }, coordinationPolicy: defaultCoordinationPolicy() }] };
+    instances: [{ instanceKey: 'ada', name, identity: { agentId: agent.id, accessToken: agent.token }, coordinationPolicy: defaultCoordinationPolicy(fixture.admin.member.principal.matrixUserId) }] };
 }
 
 test('owner-reviewed names preserve accounts, grants, native histories and meaningful existing DM titles', async scope => {

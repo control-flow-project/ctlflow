@@ -12,7 +12,7 @@ import { loadControl, saveControl, humanEvents, humanText, isControl, publishCon
 import { decisions } from './decisions.js';
 import { ownerObservation } from './owner-observation.js';
 import { INPUT_BYTES } from '@ctlflow/crossfire-contracts/runtime';
-import { reportActivity } from './activity.js';
+import { createListenerActivity } from './listener-activity.js';
 import { requireCurrentRelease } from './release.js';
 import type { Manifest } from '@ctlflow/crossfire-contracts/release';
 import { isListenerNotice, mentionsAgent } from '@ctlflow/crossfire-contracts/notices';
@@ -105,10 +105,13 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       },
     });
   } catch (error) { failed.abort(error); runReady(); await approval.close(); await observer.close(); throw error; }
-  let activity: Awaited<ReturnType<typeof reportActivity>> | undefined;
+  let activity: ReturnType<typeof createListenerActivity> | undefined;
   try {
   const updates = releaseUpdates(storage, options.cursorFile, options.release.release, options.settings.owner, destination.sessionId);
   const signal = AbortSignal.any([stop, destination.signal, failed.signal]);
+  activity = createListenerActivity({ client: options.coordination, agentId: options.id, release: options.release, control: options.control,
+    clock: options.clock, statistics, updated: release => { updates.available(release); changed(); }, failed: error => failed.abort(error),
+    started: (runId, binding) => { reportingRun = runId; runReady(); approval.start(); observer.start(runId); options.activity?.(runId, binding); } }, signal);
   const client = options.transport(signal, 45_000);
   const artifacts = messageArtifacts(storage, options.cursorFile + '.messages', options.clock.now, observer.busy,
     () => new Set([...snapshotContentFiles(storage, options.cursorFile), ...chat.contentFiles(), ...queries.contentFiles()]));
@@ -120,7 +123,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let synchronized = false;
   let allowed = new Set<string>();
   let senders = new Set<string>();
-  const urgentControl = () => senders.has(options.settings.owner) ? state.controls.findLast(control => control.status === 'interrupted') : undefined;
+  const urgentControl = () => state.controls.findLast(control => control.status === 'interrupted');
   let cycle = loadWake(storage, options.cursorFile);
   let windowEnd = 0;
   let lastAccess = -Infinity;
@@ -134,8 +137,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let sending: { cancel: AbortController; done: Promise<boolean> } | undefined;
   const scheduled = scheduledPublisher({ storage, clock: options.clock, file: options.cursorFile + '.wake-input', coordination: options.coordination,
     agentId: options.id, runtime: destination, artifacts, get maximum() { return maximum; }, attachment: () => {
-      if (!activity) throw new Error('Scheduled delivery requires a reporting listener');
-      return { runId: activity.runId, sessionId: destination.sessionId };
+      const runId = activity?.runId();
+      if (!runId) throw new Error('Scheduled delivery requires a reporting listener');
+      return { runId, sessionId: destination.sessionId };
     } });
   let completed: { batch: ReadBatch; messageIds: string[]; membership: number } | undefined;
   const chat = chatPublication({ storage, file: options.cursorFile + '.chat-publication', settings: options.settings, runtime: destination,
@@ -194,15 +198,16 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const cancel = new AbortController();
     const done = (async () => {
       const scope = AbortSignal.any([cancel.signal, signal, generation]);
-      const release = await budget.acquire('publication', scope);
+      let release: (() => void) | undefined;
       try {
+        release = await budget.acquire('publication', scope);
         await operation(scope);
         return true;
       } catch (error) {
         signal.throwIfAborted();
         if (cancel.signal.aborted || generation.aborted) return false;
         throw error;
-      } finally { release(); }
+      } finally { release?.(); }
     })();
     sending = { cancel, done };
     try { return await done; }
@@ -272,15 +277,6 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     }
     changed();
   });
-  async function startActivity(): Promise<void> {
-    if (activity) return;
-    const binding = { ...options.control.binding() };
-    activity = await reportActivity(options.coordination, options.id, options.release, signal, binding, options.clock, statistics, release => { updates.available(release); changed(); });
-    activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
-    if (activity.signal.aborted) failed.abort(activity.signal.reason);
-    reportingRun = activity.runId; runReady(); approval.start(); observer.start(activity.runId);
-    options.activity?.(activity.runId, binding);
-  }
   try {
     if (approval) {
       const authorized = await approval.authorize();
@@ -300,7 +296,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const selected = options.room ? selectRoom(options.room) : undefined;
     let joined = new Set(await joinedRooms(client));
     retainJoinedCursors(storage, options.cursorFile, joined);
-    if (options.control.current().active) await startActivity();
+    if (options.control.current().active) await activity.activate();
     signal.throwIfAborted();
     options.ready?.(() => {
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
@@ -354,12 +350,15 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           retainJoinedCursors(storage, options.cursorFile, new Set([...membership].filter(room => !reset.has(room))));
           state.controls = state.controls.filter(control => !reset.has(control.room));
         }
-        for await (const event of humanEvents(client, options.settings, synced, since, selected)) {
-          if (!allowed.has(event.room_id)) continue;
-          humanCount++;
+        for await (const event of humanEvents(client, synced, since, selected)) {
           if (!joined.has(event.room_id) || !membership.has(event.room_id) || reset.has(event.room_id)) continue;
           if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id)) continue;
-          if (!await isControl(client, options.settings, options.account, event)) {
+          const candidate = mentionsAgent(event, options.account.user_id)
+            || event.sender === options.settings.owner && String(event.content.body).trim() === '!!';
+          if (candidate) await retry(() => access(scope), scope);
+          if (!allowed.has(event.room_id)) continue;
+          humanCount++;
+          if (!await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) {
             if (state.paused && humanText(event, options.settings.owner)) { state.paused = false; changed(); }
             continue;
           }
@@ -373,8 +372,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
               continue;
             }
             const turn = await destination.turnControl.activeTurn(options.historyMode === 'per-room' ? event.room_id : undefined);
-            for (const earlier of state.controls) if (earlier.status === 'interrupted') earlier.status = 'superseded';
-            const control = { room: event.room_id, event: event.event_id, stop: String(event.content.body).trim() === '!!',
+            await retry(() => access(scope), scope);
+            if (!allowed.has(event.room_id) || !await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) continue;
+            scope.throwIfAborted();
+            for (const earlier of state.controls) if (earlier.status === 'interrupted'
+              && (options.historyMode !== 'per-room' || earlier.room === event.room_id)) earlier.status = 'superseded';
+            const control = { room: event.room_id, event: event.event_id, stop: event.sender === options.settings.owner && String(event.content.body).trim() === '!!',
               turn, status: 'interrupting' as const };
             state.controls.push(control);
             saveControl(storage, controlFile, state);
@@ -419,11 +422,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       const generation = options.control.current().signal;
       try {
       if (!options.control.current().active) {
-        const reporter = activity; activity = undefined;
-        await reporter?.close();
+        await activity.pause();
         await wait(previous); continue;
       }
-      await startActivity();
+      if (!await activity.activate() || generation.aborted) continue;
       if (!synchronized) { await wait(previous); continue; }
       await work((_client, scope) => retry(() => queries.recover(), scope));
       if (queries.pending()) { await wait(previous, 1000); continue; }
@@ -453,8 +455,13 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (urgent) {
         if (!joined.has(urgent.room) || !allowed.has(urgent.room)) { urgent.status = 'superseded'; saveControl(storage, controlFile, state); continue; }
         const event = await client.get<Event>(`${API}/rooms/${segment(urgent.room)}/event/${segment(urgent.event)}`);
-        if (event.event_id !== urgent.event || event.sender !== options.settings.owner) throw new Error('Urgent event identity changed');
-        if (controlling || state.paused) continue;
+        if (event.event_id !== urgent.event) throw new Error('Urgent event identity changed');
+        await access();
+        if (!joined.has(urgent.room) || !allowed.has(urgent.room)
+          || !await isControl(client, options.settings, options.account, eventView(event, urgent.room), options.coordination, senders, signal)) {
+          urgent.status = 'superseded'; saveControl(storage, controlFile, state); continue;
+        }
+        if (controlling || state.paused || urgent.status !== 'interrupted' || urgentControl() !== urgent) continue;
         const attempt = await deliver([eventView(event, urgent.room)]);
         if (attempt.accepted || await settle()) {
           urgent.status = 'delivered';

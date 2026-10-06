@@ -17,9 +17,9 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(root, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
   const fleetId = randomUUID(), inputs: { operationId: string; action: string; target: { kind: string; instanceKey?: string } }[] = [];
-  let loseResponse = false;
+  let loseResponse = false, rejectOperation = false;
   const fleet = { fleetId, fleetKey: 'test', directory: '/private/fixture', label: 'Test', revision: 0, controller: { name: 'test' }, phase: 'stopped',
-    connection: { connected: true, deliveryEnabled: false, revision: 0, error: null }, error: null,
+    connection: { connected: true, deliveryEnabled: false, revision: 0, error: null }, error: null as string | null,
     instances: [{ instance: { key: 'one', name: 'one', definition: 'analyst', workarea: 'agents/analyst/workarea/one' }, phase: 'stopped',
       listenerActive: false, desiredActive: false, lastActivityAt: null, historyAvailable: null,
       sessionId: null, error: null, startedAt: null }] };
@@ -31,6 +31,10 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
       const bytes: Buffer[] = []; for await (const chunk of request) bytes.push(Buffer.from(chunk));
       const parsed = operations.operate.input(JSON.parse(Buffer.concat(bytes).toString())); assert(parsed.ok);
       inputs.push(parsed.value); status = 202;
+      if (rejectOperation) {
+        response.writeHead(409, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ error: { code: 'conflict', message: 'Native configuration rejected by controller' }, meta })); return;
+      }
       if (loseResponse) { response.destroy(); return; }
       data = { ...parsed.value, status: 'succeeded', createdAt: 1, completedAt: 2, approval: null, errors: [] };
     }
@@ -57,10 +61,19 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
   await assert.rejects(cli('enroll', 'test', '--fresh-history'), /Option is not valid/u);
   await assert.rejects(cli('agent', 'enroll', 'test', 'one'), /whole fleet|fleet enroll/u);
   assert.equal(inputs.length, 7, 'Invalid enrollment targets cannot submit an operation');
+  fleet.error = 'Fleet files changed after their last accepted revision; review them and run an explicit update';
+  await cli('update', 'test', '--release-directory', join(directory, 'release'));
+  await cli('agent', 'update', 'test', 'one', '--release-directory', join(directory, 'release'));
+  assert.deepEqual(inputs.slice(-2).map(input => [input.action, input.target.kind]), [['update', 'fleet'], ['update', 'agent']],
+    'A retained restoration error cannot block the explicit controller-validated update that repairs it');
+  rejectOperation = true;
+  await assert.rejects(cli('start', 'test'), /Native configuration rejected by controller/u);
+  assert.equal(inputs.length, 10, 'The controller, not a cached list error, owns authoritative lifecycle rejection');
+  rejectOperation = false; fleet.error = null;
   loseResponse = true;
   const retryId = randomUUID();
   await assert.rejects(cli('start', 'test', '--fresh-history', '--operation-id', retryId), (error: unknown) =>
     error instanceof Error && 'stdout' in error && typeof error.stdout === 'string' && error.stdout.includes(retryId),
   'An uncertain submission must expose its stable identity before the remote response');
-  assert.equal(inputs.length, 8);
+  assert.equal(inputs.length, 11);
 });

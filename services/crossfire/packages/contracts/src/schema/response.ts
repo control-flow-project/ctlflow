@@ -31,7 +31,12 @@ export const agent = check.object({ agentId: check.identifier, matrixUserId: che
   owner, status: check.status, revision: check.integer(), createdAt: check.integer(), application, activity, nativeRuntime: check.nullable(nativeRuntimeSummary),
   deployment: check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), controllerName: check.text(100), reportedAt: check.integer(), instanceKey: check.name }),
   canRetire: check.boolean, allowedActions: check.list(check.choice('configure', 'room-grant.manage', 'retire'), 3) });
-export const wakePolicy = check.object({ agentId: check.identifier, revision: check.integer(), mode: check.wakeMode, senders: check.list(principal, 2000) });
+export const wakeSender = check.refine(check.object({ identity: principal, includeAgents: check.boolean }),
+  sender => !sender.includeAgents || sender.identity.kind === 'human', 'Only people can include their agents');
+export const wakePolicy = check.refine(check.object({ agentId: check.identifier, revision: check.integer(), mode: check.wakeMode, senders: check.list(wakeSender, 2000) }),
+  policy => new Set(policy.senders.map(sender => sender.identity.principalId)).size === policy.senders.length
+    && policy.senders.every(sender => sender.identity.principalId !== policy.agentId)
+    && (policy.mode !== 'everyone' || policy.senders.length === 0), 'Invalid selected wake authority');
 export const grant = check.object({ agentId: check.identifier, roomId: check.roomId, generation: check.identifier, authorizerId: check.identifier,
   addedById: check.identifier, accessMode: check.choice('none', 'read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)),
   muted: check.boolean, revision: check.integer(), accessRevision: check.integer(), updatedAt: check.integer() });
@@ -55,8 +60,7 @@ export const deliveryPolicy = check.refine(check.object({ agentId: check.identif
   && new Set(policy.roomGrants.map(grant => grant.roomId)).size === policy.roomGrants.length
   && policy.roomGrants.every(grant => (grant.accessMode === 'custom') === (grant.powerLevel !== null))
   && (policy.ownerConversation === null || policy.roomGrants.some(grant => grant.roomId === policy.ownerConversation && grant.accessMode === 'reply' && !grant.muted))
-  && (policy.status !== 'active' || policy.ownerStatus !== 'active' || policy.wakeMode === 'nobody' ? policy.senderMatrixIds.length === 0
-    : policy.wakeMode === 'selected' || policy.senderMatrixIds.includes(policy.ownerMatrixId)), 'Invalid resolved delivery authority');
+  && (policy.status === 'active' && policy.ownerStatus === 'active' || policy.senderMatrixIds.length === 0), 'Invalid resolved delivery authority');
 export const roomAuthority = check.refine(check.object({ matrixUserId: check.matrixUserId, powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), creator: check.boolean,
   creatorIds: check.list(check.matrixUserId, 100), readLevel: check.integer(Number.MIN_SAFE_INTEGER), replyLevel: check.integer(Number.MIN_SAFE_INTEGER),
   inviteLevel: check.integer(Number.MIN_SAFE_INTEGER), kickLevel: check.integer(Number.MIN_SAFE_INTEGER), changePowerLevel: check.integer(Number.MIN_SAFE_INTEGER),

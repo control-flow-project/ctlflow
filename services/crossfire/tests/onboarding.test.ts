@@ -21,7 +21,7 @@ test('public guide and owner approval enroll a controller-bound roster without c
   assert(!documentation.includes(fixture.application.config.jwtSecret));
   const publicClient = createClient({ origin });
   const roster = { ownerMatrixId: admin.member.principal.matrixUserId, fleetKey: 'holmes', controller: { name: 'Holmes controller' },
-    instances: [{ instanceKey: 'holmes', name: 'holmes', coordinationPolicy: defaultCoordinationPolicy() }] };
+    instances: [{ instanceKey: 'holmes', name: 'holmes', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] };
   assert.equal(value(await publicClient.call(operations.preflight, {}, roster)).data.available, true);
   const introduction = { ...roster, enrollmentId: randomUUID(), claimSecret: secret() };
   const requested = value(await publicClient.call(operations.introduceEnrollment, {}, introduction)).data;

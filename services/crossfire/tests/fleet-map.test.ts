@@ -29,9 +29,10 @@ async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
   for (const name of ['Credit review', 'Covenant review', 'Risk review', 'Source documents', 'Unavailable name']) rooms.push(value(await fixture.native.createRoom(admin.member.principal.matrixUserId, name)));
   for (let index = 0; index < instances.length; index++) {
     const id = instances[index]!.agentId!, agent = value(services.directory.agent(id))!;
-    const mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
+    const mode = WAKE_POLICIES[index % 6 === 4 ? 1 : index % 6 === 5 ? 2 : 0]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: agent.principal.revision, mode,
-      senderIds: mode === 'selected' ? [specialist.id, other.actor.principalId] : [] }, randomUUID()));
+      senders: mode === 'selected' ? index % 6 === 3 ? [] : [specialist.id, other.actor.principalId].map(principalId => ({ principalId,
+        includeAgents: principalId === other.actor.principalId && index % 6 === 1 })) : mode === 'humans' ? [{ principalId: other.actor.principalId, includeAgents: true }] : [] }, randomUUID()));
     if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'test', messagesDelivered: 0, controller, stopped: false }, 'test'));
     if (index === instances.length - 1) continue;
     const roomId = rooms[index % rooms.length]!.roomId, current = value(services.directory.agent(id))!;
@@ -63,7 +64,7 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
     } } };
   const snapshot = value(await readFleetMap(dependencies, admin.actor, fleet.id));
   const map = value(mapSchema(mapRepresentation(snapshot)));
-  assert.equal(map.agents.length, 24); assert.equal(map.connections.length, 24); assert.equal(map.rooms.length, 6); assert.equal(map.sources.length, 6);
+  assert.equal(map.agents.length, 24); assert.equal(map.connections.length, 24); assert.equal(map.rooms.length, 6); assert.equal(map.sources.length, 5);
   assert.equal(batchGrants, 1); assert.equal(batchWake, 1); assert.equal(activeReads, 1); assert(maximumNative <= 4); assert(maximumNative > 1);
   assert.equal(map.rooms.find(room => room.name === null)?.alias, null);
   assert.equal(map.connections.filter(connection => connection.agentId === instances[23]!.agentId).length, 1);
@@ -73,8 +74,9 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
       .map(principal => principal.matrixUserId).sort();
     assert.deepEqual(matrixIds, value(resolveWakePolicy(services, agent.record)).senders);
   }
-  const selected = map.sources.find(source => source.mode === 'selected')!;
-  assert(selected.selectedPrincipalIds.includes(specialist.id)); assert(!selected.eligiblePrincipalIds.includes(specialist.id));
+  const selected = map.sources.find(source => source.mode === 'selected' && source.senders.some(sender => sender.principalId === specialist.id))!;
+  assert(selected.senders.some(sender => sender.principalId === specialist.id)); assert(!selected.eligiblePrincipalIds.includes(specialist.id));
+  assert(map.sources.some(source => source.senders.some(sender => sender.includeAgents)), 'Ownership group scope is part of the grouped source identity');
   assert(selected.eligiblePrincipalIds.includes(other.actor.principalId));
   assert(map.connections.some(connection => connectionState(connection).status === 'failed'));
   assert(map.connections.some(connection => connectionState(connection).status === 'pending'));

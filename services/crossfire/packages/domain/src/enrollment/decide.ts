@@ -61,7 +61,7 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
           const principal = registerPrincipal(services, { id: agentId, matrixUserId: '@agent-' + agentId + ':' + services.instance.serverName,
             kind: 'agent', status: 'active', revision: 0, createdAt: now }, 'agent', request.ownerId);
           if (!principal.ok) return principal;
-          const agent = services.repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId: request.ownerId, displayNameOverride: null, wakeMode: 'owner' });
+          const agent = services.repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId: request.ownerId, displayNameOverride: null, wakeMode: 'selected' });
           if (!agent.ok) return agent;
           const credentials = services.repositories.agentCredential.insert({ agentId, provisioningPassword: services.identity.secret(), accessToken: null, updatedAt: now });
           if (!credentials.ok) return credentials;

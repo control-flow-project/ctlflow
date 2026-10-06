@@ -15,7 +15,7 @@ import { eventView } from '@ctlflow/crossfire-agent-core/receive';
 import { isListenerNotice, LISTENER_NOTICE } from '@ctlflow/crossfire-contracts/notices';
 import { createHash } from 'node:crypto';
 import { API } from '@ctlflow/crossfire-contracts/matrix';
-import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD, temporary } from './test-support/listener.js';
+import { fakeCodex, inputReceipt, matrixFixture, message, mention, OBSERVER, ROOM, SELF, THREAD, temporary } from './test-support/listener.js';
 
 async function fixture(context: TestContext, clock: ReturnType<typeof testClock>) {
   const native = await fakeCodex(context, { mode: 'accepted' });
@@ -137,7 +137,7 @@ for (const kind of ['read-only', 'native-denial'] as const) {
 test('automatic peer notices neither wake the model nor contaminate subsequent authorized context', withClock(async (context, clock) => {
 
   const { matrix, native, starts } = await fixture(context, clock);
-  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER];
   matrix.add(ROOM, message('$pending-context', '@other:test.localhost', 'Keep this context.'));
   const automatic = { ...message('$peer-notice'), content: { msgtype: 'm.notice', [LISTENER_NOTICE]: true,
     body: 'Listener delivery is paused. This runtime connection cannot interrupt the current turn; stop it in the coding session.' } };
@@ -145,7 +145,7 @@ test('automatic peer notices neither wake the model nor contaminate subsequent a
   matrix.add(ROOM, automatic);
   await clock.advance(200);
   assert.equal(starts().length, 0);
-  matrix.waking.policy = 'owner-agents'; matrix.waking.senders = [OBSERVER, automatic.sender];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER, automatic.sender];
   matrix.wake();
   await clock.until(() => matrix.requests.filter(request => request.path.endsWith('/delivery-policy')).length >= 3);
   await clock.advance(150);
@@ -167,7 +167,7 @@ test('urgent redirect precedes unread ordinary input and cannot advance its cont
   const { native, matrix, starts } = await fixture(context, clock);
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
-  matrix.add(ROOM, message('$redirect', OBSERVER, '!! Inspect configuration instead.'));
+  matrix.add(ROOM, mention('$redirect'));
   await clock.until(() => starts().length === 2);
   const urgent = starts()[1]!.params!;
   assert(JSON.stringify(urgent.input).includes('$redirect'));
@@ -188,7 +188,7 @@ test('a receipt published during human interruption is acknowledged without repl
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
   const original = starts()[0]!.params!;
-  matrix.add(ROOM, message('$redirect', OBSERVER, '!! Inspect configuration instead.'));
+  matrix.add(ROOM, mention('$redirect'));
   await clock.until(() => native.requests().some(request => request.method === 'turn/interrupt'));
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(original.clientUserMessageId), original.input) });
   native.update({ mode: 'normal' });
@@ -202,10 +202,12 @@ test('a receipt published during human interruption is acknowledged without repl
 test('human control authority uses exact identity and shared-room native mentions, never display names', async context => {
   const matrix = await matrixFixture(context, temporary(context));
   const client = nativeMatrix({base: matrix.settings.homeserver, token: matrix.account.access_token});
-  const check = (event: Event) => isControl(client, matrix.settings, matrix.account, eventView(event, ROOM));
-  assert(await check(message('$human', OBSERVER, '!! stop')));
+  const check = (event: Event) => isControl(client, matrix.settings, matrix.account, eventView(event, ROOM),
+    matrix.coordination, new Set(matrix.waking.senders), new AbortController().signal);
+  assert(await check(message('$human', OBSERVER, '!!')));
   for (const sender of [SELF, '@human:elsewhere', '@agent-human:test.localhost']) assert.equal(await check(message('$spoof', sender, '!! stop')), false);
   for (const body of ['!!nospace', '> !! stop', '```\n!! stop\n```', 'example !! stop']) assert.equal(await check(message('$example', OBSERVER, body)), false);
+  assert.equal(await check(message('$old-redirect', OBSERVER, '!! Inspect configuration instead.')), false);
   const nonControlContent: Event['content'][] = [{ msgtype: 'm.notice', body: '!!' },
     { msgtype: 'm.text', body: '!!', 'm.relates_to': { rel_type: 'm.replace', event_id: '$old' } },
     { msgtype: 'm.text', body: '!!', 'm.new_content': { body: '!!' } }];
@@ -216,6 +218,175 @@ test('human control authority uses exact identity and shared-room native mention
   assert.equal(await check(message('$shared', OBSERVER, '!! stop')), false);
   assert(await check({ ...message('$targeted', OBSERVER, '!! stop'), content: { msgtype: 'm.text', body: '!! stop', 'm.mentions': { user_ids: [SELF] } } }));
 });
+
+test('native human mentions use verified wake identity and membership, including replies but never edits or text names', async context => {
+  const matrix = await matrixFixture(context, temporary(context));
+  const client = nativeMatrix({ base: matrix.settings.homeserver, token: matrix.account.access_token });
+  const human = '@permitted:test.localhost', peer = '@agent-holmes:test.localhost';
+  matrix.identities.set(human, { matrixUserId: human, kind: 'human', ownerMatrixId: null, displayName: 'Same name', ownerDisplayName: null });
+  matrix.extraMembers.add(human);
+  const senders = new Set([OBSERVER, human, peer, SELF, '@unknown:test.localhost']);
+  const check = (event: Event) => isControl(client, matrix.settings, matrix.account, eventView(event, ROOM),
+    matrix.coordination, senders, new AbortController().signal);
+  assert(await check(mention('$owner')));
+  assert(await check(mention('$human', human)));
+  assert(await check({ ...mention('$reply', human), content: { ...mention('$reply', human).content,
+    'm.relates_to': { 'm.in_reply_to': { event_id: '$previous' } } } }));
+  for (const sender of [peer, SELF, '@unknown:test.localhost']) assert.equal(await check(mention('$rejected', sender)), false);
+  assert.equal(await check(message('$plain', human, 'Inspect configuration instead.')), false);
+  assert.equal(await check(message('$name', human, '@' + SELF + ' Inspect configuration instead.')), false);
+  assert.equal(await check(mention('$other-target', human, 'Inspect configuration instead.', peer)), false);
+  for (const change of [{ msgtype: 'm.notice' }, { 'm.new_content': { body: 'Edit' } },
+    { 'm.relates_to': { rel_type: 'm.replace', event_id: '$previous' } }]) {
+    const event = mention('$edited', human);
+    assert.equal(await check({ ...event, content: { ...event.content, ...change } }), false);
+  }
+  senders.delete(human); assert.equal(await check(mention('$not-allowed', human)), false);
+  senders.add(human); matrix.extraMembers.delete(human);
+  assert.equal(await check(mention('$left', human)), false);
+  senders.clear(); assert.equal(await check(mention('$nobody')), false);
+});
+
+test('a permitted non-owner human mention interrupts and delivers exact attribution before the blocked backlog', withClock(async (context, clock) => {
+  const { native, matrix, starts, controls } = await fixture(context, clock);
+  const human = '@permitted:test.localhost';
+  matrix.identities.set(human, { matrixUserId: human, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null });
+  matrix.extraMembers.add(human); matrix.waking.policy = 'selected'; matrix.waking.senders = [human];
+  await clock.until(() => matrix.requests.filter(request => request.path.endsWith('/delivery-policy')).length >= 2);
+  matrix.add(ROOM, message('$ordinary', human));
+  await clock.until(() => starts().length === 1);
+  matrix.add(ROOM, mention('$human-steer', human, 'Please inspect the new evidence instead.'));
+  await clock.until(() => starts().length === 2);
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
+  assert.equal(starts()[1]!.params!.threadId, THREAD);
+  const input = JSON.stringify(starts()[1]!.params!.input);
+  assert(input.includes('$human-steer')); assert(input.includes(human)); assert(input.includes(ROOM));
+  assert(input.includes('Please inspect the new evidence instead.')); assert(!input.includes('$ordinary'));
+  assert.equal(controls().paused, false);
+  assert.equal(readJson<Record<string, string>>(matrix.cursorFile)[ROOM], 'sync-0');
+}));
+
+test('an allowed agent mention is ordinary context and cannot cancel a human-controlled native turn', withClock(async (context, clock) => {
+  const { native, matrix, starts, controls } = await fixture(context, clock);
+  matrix.add(ROOM, message('$ordinary'));
+  await clock.until(() => starts().length === 1);
+  matrix.add(ROOM, mention('$peer-steer', '@agent-holmes:test.localhost'));
+  await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-2');
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 0);
+  assert.equal(starts().length, 1); assert.equal(controls().controls.length, 0);
+}));
+
+test('a newly permitted human mention in limited sync uses current policy rather than cached sender filtering', withClock(async (context, clock) => {
+  const { native, matrix, starts } = await fixture(context, clock);
+  matrix.add(ROOM, message('$ordinary'));
+  await clock.until(() => starts().length === 1);
+  const human = '@newly-permitted:test.localhost';
+  matrix.identities.set(human, { matrixUserId: human, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null });
+  matrix.extraMembers.add(human); matrix.waking.senders.push(human); matrix.waking.policy = 'humans';
+  matrix.add(ROOM, mention('$new-authority', human), ...Array.from({ length: 25 }, (_, index) => message('$peer-' + index)));
+  await clock.until(() => starts().length === 2);
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
+  const input = JSON.stringify(starts()[1]!.params!.input);
+  assert(input.includes('$new-authority')); assert(input.includes(human));
+  assert(!input.includes('$ordinary')); assert(!input.includes('$peer-'));
+}));
+
+test('a newer mention supersedes fetched urgent input before publication without losing unread evidence', withClock(async (context, clock) => {
+  const { native, matrix, starts, controls } = await fixture(context, clock);
+  matrix.add(ROOM, message('$ordinary'));
+  await clock.until(() => starts().length === 1);
+  const fetched = matrix.hold(`${API}/rooms/${ROOM}/event/$first-steer`);
+  cleanup(context, fetched.release);
+  matrix.add(ROOM, mention('$first-steer'));
+  await clock.until(fetched.entered);
+  matrix.add(ROOM, mention('$latest-steer'));
+  await clock.until(() => controls().controls.some(control => control.event === '$latest-steer' && control.status === 'interrupted'));
+  fetched.release();
+  await clock.until(() => starts().length === 2);
+  const input = JSON.stringify(starts()[1]!.params!.input);
+  assert(input.includes('$latest-steer')); assert(!input.includes('$first-steer')); assert(!input.includes('$ordinary'));
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
+  assert.equal(readJson<Record<string, string>>(matrix.cursorFile)[ROOM], 'sync-0');
+}));
+
+test('oversized steering uses the same private-file budget and preserves complete source attribution', withClock(async (context, clock) => {
+  const { native, matrix, starts } = await fixture(context, clock);
+  matrix.add(ROOM, message('$ordinary'));
+  await clock.until(() => starts().length === 1);
+  const body = 'Review this evidence instead. ' + 'Ω'.repeat(50_000);
+  matrix.add(ROOM, mention('$large-steer', OBSERVER, body));
+  await clock.until(() => starts().length === 2);
+  const input = starts()[1]!.params!.input as { text: string }[];
+  assert.equal(input.length, 1); assert(Buffer.byteLength(input[0]!.text) <= 65536);
+  const pointer = JSON.parse(input[0]!.text.slice(input[0]!.text.indexOf('\n') + 1)) as { kind: string; manifest: string };
+  assert.equal(pointer.kind, 'crossfire-message-files');
+  const manifest = readJson<{ messages: { file: string }[] }>(pointer.manifest);
+  assert.equal(manifest.messages.length, 1);
+  const event = readJson<{ event_id: string; room_id: string; sender: string; timestamp: string; content: { body: string } }>(manifest.messages[0]!.file);
+  assert.equal(event.event_id, '$large-steer'); assert.equal(event.room_id, ROOM); assert.equal(event.sender, OBSERVER);
+  assert.equal(event.timestamp, new Date(1).toISOString()); assert.equal(event.content.body, body);
+  assert.equal(starts()[1]!.params!.threadId, THREAD);
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
+}));
+
+test('revoked human authority during turn capture cannot interrupt or publish replacement input', withClock(async (context, clock) => {
+  const native = await fakeCodex(context, { mode: 'accepted' });
+  const matrix = await matrixFixture(context, native.directory, clock), stop = new AbortController();
+  let captured = false, release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const runtime: RuntimeAdapter = async (signal, pollMs, hooks) => {
+    const connection = await native.runtime(signal, pollMs, hooks);
+    return { ...connection, turnControl: { ...connection.turnControl, activeTurn: async () => {
+      const turn = await connection.turnControl.activeTurn(); captured = true; await held; return turn;
+    } } };
+  };
+  const result = listen({ ...matrix, runtime, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0 }, stop.signal).catch(error => error);
+  cleanup(context, async () => { release(); stop.abort(); await clock.complete(result); });
+  await clock.until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
+  matrix.add(ROOM, message('$ordinary'));
+  await clock.until(() => native.requests().filter(request => request.method === 'turn/start').length === 1);
+  matrix.add(ROOM, mention('$revoked'));
+  await clock.until(() => captured);
+  matrix.waking.senders = []; matrix.waking.policy = 'selected'; release();
+  await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-2');
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 0);
+  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
+  assert.equal(loadControl(storage, matrix.cursorFile + '.control', THREAD).controls.length, 0);
+}));
+
+test('a muted room cannot steer, while an idle human mention enters the same history exactly once', withClock(async (context, clock) => {
+  const { native, matrix, starts } = await fixture(context, clock);
+  matrix.muted.add(ROOM); matrix.add(ROOM, mention('$muted'));
+  await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-1');
+  assert.equal(starts().length, 0);
+  matrix.muted.delete(ROOM); matrix.wake(); native.update({ mode: 'normal' });
+  await clock.until(() => matrix.waiting() === 1);
+  matrix.add(ROOM, mention('$idle', OBSERVER, 'Use this new instruction.'));
+  await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '2');
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 0);
+  assert.equal(starts().filter(request => JSON.stringify(request.params!.input).includes('$idle')).length, 1);
+  assert(starts().every(request => request.params!.threadId === THREAD));
+}));
+
+test('an interrupted listener resumes captured mention evidence without cancelling a replacement turn or replaying input', withClock(async (context, clock) => {
+  const current = await fixture(context, clock);
+  const { native, matrix, starts, controls } = current;
+  native.update({ delayInterrupt: true });
+  matrix.add(ROOM, message('$original'));
+  await clock.until(() => starts().length === 1);
+  matrix.add(ROOM, mention('$steer-after-restart'));
+  await clock.until(() => native.requests().some(request => request.method === 'turn/interrupt'));
+  assert.equal(controls().controls.at(-1)?.status, 'interrupting');
+  current.stop.abort(new Error('restart during interruption')); await clock.complete(current.result);
+  native.update({ mode: 'normal' });
+  native.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status: 'interrupted', error: null } });
+  const stop = new AbortController(), restarted = listen(current.options, stop.signal).catch(error => error);
+  cleanup(context, async () => { stop.abort(); await clock.complete(restarted); });
+  await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '2');
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
+  assert.equal(starts().filter(request => JSON.stringify(request.params!.input).includes('$steer-after-restart')).length, 1);
+  assert(starts().every(request => request.params!.threadId === THREAD));
+}));
 
 test('limited sync recovers an earlier control instead of losing it behind peer traffic', withClock(async (context, clock) => {
 
@@ -280,12 +451,14 @@ test('historical initial snapshots and edited or quoted messages have no cancell
 
   const native = await fakeCodex(context);
   const matrix = await matrixFixture(context, native.directory, clock);
-  matrix.add(ROOM, message('$old', OBSERVER, '!!'));
+  matrix.add(ROOM, mention('$old'));
   const stop = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(context, async () => { stop.abort(); await clock.complete(result); });
   await clock.until(() => existsSync(matrix.cursorFile));
-  matrix.add(ROOM, { ...message('$edit', OBSERVER, '!!'), content: { msgtype: 'm.text', body: '!!', 'm.relates_to': { rel_type: 'm.replace', event_id: '$old' } } }, message('$quote', OBSERVER, '> !!'));
+  const edited = mention('$edit');
+  matrix.add(ROOM, { ...edited, content: { ...edited.content, 'm.relates_to': { rel_type: 'm.replace', event_id: '$old' } } },
+    message('$quote', OBSERVER, '> @' + SELF + ' Inspect configuration instead.'));
   await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '3');
   assert(!native.requests().some(request => request.method === 'turn/interrupt'));
   assert.equal(loadControl(storage, matrix.cursorFile + '.control', THREAD).paused, false);

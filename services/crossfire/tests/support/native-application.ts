@@ -40,7 +40,7 @@ export async function nativeApplication(scope: TestContext) {
     const ownerRecord = value(services.directory.member(owner.principalId))!;
     const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerRecord.principal.matrixUserId,
       fleetKey: 'test-' + name, controller: { name: 'Native test controller' },
-      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy() }] };
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerRecord.principal.matrixUserId) }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, owner, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const item = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!;

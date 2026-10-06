@@ -34,7 +34,8 @@ for (const status of ['expired', 'rejected', 'pending', 'unauthorized'] as const
     const directory = mkdtempSync(join(tmpdir(), 'fleet-review-recovery-')), role = join(directory, 'agents/analyst');
     cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
     mkdirSync(role, { recursive: true, mode: 0o700 });
-    writeFileSync(join(role, 'agent.toml'), 'name = "Analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "fixture"\n[coordination_options]\nwake_mode = "owner-agents"\npermissions = ["room.agent.invite"]\n', { mode: 0o600 });
+    writeFileSync(join(role, 'agent.toml'), 'name = "Analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "fixture"\n[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n'
+      + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@owner:test"\ninclude_agents = true\n', { mode: 0o600 });
     writeFileSync(join(role, 'AGENTS.md'), 'Role fixture.', { mode: 0o600 });
     const origin = 'http://127.0.0.1:' + address.port;
     writeFileSync(join(directory, 'runtime.toml'), 'fleet = "agreements"\n[coordination]\nadapter = "crossfire"\nserver = "' + origin + '"\nowner = "@owner:test"\n'

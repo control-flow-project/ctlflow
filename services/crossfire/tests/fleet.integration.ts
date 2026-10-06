@@ -25,11 +25,13 @@ import { runtimeOperation, type FleetRuntimeOperation } from '@ctlflow/crossfire
 import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
+import { codexInput } from '@ctlflow/crossfire-adapter-codex/input';
 
 const execute = promisify(execFile);
-async function until(predicate: () => boolean): Promise<void> {
+async function until(predicate: () => boolean | Promise<boolean>): Promise<void> {
   const deadline = Date.now() + 30000;
-  while (!predicate()) { assert(Date.now() < deadline, 'Native integration observation timed out'); await delay(30); }
+  while (!await predicate()) { assert(Date.now() < deadline, 'Native integration observation timed out'); await delay(30); }
 }
 type Fleet = { fleetId: string; phase: string; connection: { connected: boolean; deliveryEnabled: boolean; revision: number | null }; instances: { instance: { key: string }; phase: string; sessionId: string | null; listenerActive: boolean }[] };
 type Binding = { fleetId: string; controllerCredential: string; identities: { instanceKey: string; agentId: string; account: { user_id: string; access_token: string } }[] };
@@ -42,7 +44,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [cliPath, ...args], { env, timeout: 60000 });
   const definition = join(fleet, 'agents/analyst'); mkdirSync(definition, { recursive: true, mode: 0o700 });
-  const coordinationOptions = '\n[coordination_options]\nwake_mode = "owner-agents"\npermissions = ["room.agent.invite"]\n';
+  const coordinationOptions = '\n[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n[[coordination_options.wake_senders]]\nmatrix_user_id = "' + admin.member.principal.matrixUserId + '"\ninclude_agents = true\n';
   writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.2"\nmodel_reasoning_effort = "high"\nsandbox_mode = "read-only"\napproval_policy = "never"\n' + coordinationOptions, { mode: 0o600 });
   writeFileSync(join(definition, 'AGENTS.md'), 'Inert research fixture. Never contact an external provider.', { mode: 0o600 });
   const keys = ['north', 'south'];
@@ -82,18 +84,23 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const cursor = join(definition, 'workarea/north/.crossfire/state/north/cursors.json.sync');
   const journal = join(definition, 'workarea/north/.codex/crossfire-session.json.receipt');
   async function acquired() {
-    const snapshot = value(await nativeOk({ base: fixture.native.base, token: north.account.access_token }, 'GET', API + '/sync?timeout=0'));
-    assert.equal(typeof snapshot.next_batch, 'string');
-    await until(() => existsSync(cursor) && readJson<string>(cursor) === snapshot.next_batch);
+    await until(async () => {
+      if (!existsSync(cursor)) return false;
+      const checkpoint = readJson<string>(cursor);
+      const snapshot = value(await nativeOk({ base: fixture.native.base, token: north.account.access_token }, 'GET',
+        API + '/sync?timeout=0&since=' + segment(checkpoint)));
+      assert.equal(typeof snapshot.next_batch, 'string');
+      return snapshot.next_batch === checkpoint && readJson<string>(cursor) === checkpoint;
+    });
   }
   async function acknowledged() {
     await until(() => {
-      if (!existsSync(journal)) return false;
-      const state = readJson<{ pending: unknown; confirmed: unknown[] }>(journal);
+      const session = readJson<{ sessionId: string }>(join(definition, 'workarea/north/.codex/crossfire-session.json'));
+      const state = readDeliveryJournal(journal, session.sessionId, codexInput);
       return state.pending === null && state.confirmed.length === 0;
     });
   }
-  assert.equal((await controller.call(operations.changeWakePolicy, { agentId: north.agentId }, { expectedRevision: 0, mode: 'nobody', senderIds: [] })).ok, false);
+  assert.equal((await controller.call(operations.changeWakePolicy, { agentId: north.agentId }, { expectedRevision: 0, mode: 'selected', senders: [] })).ok, false);
   assert.equal((await controller.call(operations.fleet, { fleetId: randomUUID() }, {})).ok, false);
   const ownerNative = { base: fixture.native.base, token: admin.token };
   const created = value(await nativeOk(ownerNative, 'POST', API + '/createRoom', { name: 'Native fleet room', preset: 'private_chat',

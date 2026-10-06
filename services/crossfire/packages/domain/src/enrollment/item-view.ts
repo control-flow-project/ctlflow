@@ -17,7 +17,7 @@ export function enrollmentItemViews(services: Pick<Services, 'repositories' | 'd
     const agent = item.agentId === null ? success(null) : services.directory.agent(item.agentId);
     if (!agent.ok) return agent;
     views.push({ ...item, currentName: agent.value?.name ?? null, coordinationPolicy: { wakeMode: policy.wakeMode,
-      senderMatrixIds: [...policy.senderMatrixIds].sort(), permissions: policy.permissions } });
+      senders: [...policy.matrixSenders].sort((left, right) => left.matrixUserId.localeCompare(right.matrixUserId)), permissions: policy.permissions } });
   }
   return success(views);
 }

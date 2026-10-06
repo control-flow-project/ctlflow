@@ -11,13 +11,11 @@ export function readSelection(value: string | null): MapSelection | null {
 }
 export function sourceLabel(source: MapSource): string { return WAKE_LABELS[source.mode]; }
 export function sourceTitle(map: FleetMapView, source: MapSource): string {
-  if (source.mode === 'owner') return map.fleet.owner.displayName;
-  if (source.mode === 'owner-agents') return map.fleet.owner.displayName + ' + agents';
-  if (source.mode === 'humans') return 'Humans + owner’s agents';
+  if (source.mode === 'humans') return 'All people + selected agents';
   if (source.mode === 'everyone') return 'Everyone';
-  if (source.mode === 'nobody') return 'Nobody';
-  const selected = new Set(source.selectedPrincipalIds);
-  const names = map.principals.filter(principal => selected.has(principal.principalId)).map(principal => principal.displayName).sort();
+  const selected = new Map(source.senders.map(sender => [sender.principalId, sender.includeAgents]));
+  const names = map.principals.filter(principal => selected.has(principal.principalId))
+    .map(principal => principal.displayName + (selected.get(principal.principalId) ? ' + agents' : '')).sort();
   return names.length ? names.slice(0, 2).join(', ') + (names.length > 2 ? ' +' + (names.length - 2) : '') : 'No selected authors';
 }
 export function connectionState(connection: MapConnection) {

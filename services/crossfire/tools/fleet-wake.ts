@@ -4,10 +4,11 @@ import { wakePolicy } from '@ctlflow/crossfire-contracts/schema/response';
 import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { withHuman, type Human, type Credentials } from './auth.js';
+import { wakeSelection } from '@ctlflow/crossfire-contracts/schema/request';
 
 const instancePolicy = check.refine(check.object({ instanceKey: check.name, name: check.name, mode: check.wakeMode,
-  senderIds: check.list(check.identifier, 2000) }), entry => new Set(entry.senderIds).size === entry.senderIds.length
-    && (entry.mode === 'selected' || entry.senderIds.length === 0), 'Only selected mode accepts unique sender IDs');
+  senders: check.list(wakeSelection, 2000) }), entry => new Set(entry.senders.map(sender => sender.principalId)).size === entry.senders.length
+    && (entry.mode !== 'everyone' || entry.senders.length === 0), 'Select unique identities; everyone requires no individual selections');
 export const fleetWakePlan = check.refine(check.object({ fleetId: check.identifier, fleetKey: check.name,
   ownerMatrixId: check.matrixUserId, controllerName: check.text(100), instances: check.list(instancePolicy, 100, 1) }), plan =>
   new Set(plan.instances.map(entry => entry.instanceKey)).size === plan.instances.length
@@ -22,7 +23,8 @@ function sameIds(first: string[], second: string[]): boolean {
   return JSON.stringify([...first].sort()) === JSON.stringify([...second].sort());
 }
 function matches(policy: Policy, desired: Plan['instances'][number]): boolean {
-  return policy.mode === desired.mode && sameIds(policy.senders.map(sender => sender.principalId), desired.senderIds);
+  return policy.mode === desired.mode && sameIds(policy.senders.map(sender => sender.identity.principalId + ':' + sender.includeAgents),
+    desired.senders.map(sender => sender.principalId + ':' + sender.includeAgents));
 }
 async function readRoster(human: Human, plan: Plan) {
   const current = await human.client.call(operations.fleet, { fleetId: plan.fleetId }, {});
@@ -41,19 +43,21 @@ async function readRoster(human: Human, plan: Plan) {
 }
 async function prepare(human: Human, plan: Plan): Promise<Result<PolicyChange[]>> {
   const roster = await readRoster(human, plan); if (!roster.ok) return roster;
-  const selectedIds = new Set(plan.instances.flatMap(entry => entry.senderIds));
+  const selectedIds = new Set(plan.instances.flatMap(entry => entry.senders.map(sender => sender.principalId)));
   if (selectedIds.size) {
     const available = await collectPages(query => human.client.call(operations.principals, {}, {}, query), entry => entry.principalId);
     if (!available.ok) return available;
     if ([...selectedIds].some(id => !available.value.some(entry => entry.principalId === id))) return failure('invalid', 'Selected senders must be active registered identities');
+    if (plan.instances.some(entry => entry.senders.some(sender => sender.includeAgents
+      && !available.value.some(identity => identity.principalId === sender.principalId && identity.kind === 'human')))) return failure('invalid', 'Only people can include their agents');
   }
   const changes: PolicyChange[] = [];
   for (const desired of plan.instances) {
     const instance = roster.value.instances.find(entry => entry.instanceKey === desired.instanceKey)!;
     const agentId = instance.agent.agentId;
-    if (desired.senderIds.includes(agentId)) return failure('invalid', 'An agent cannot select itself as a wake sender');
+    if (desired.senders.some(sender => sender.principalId === agentId)) return failure('invalid', 'An agent cannot select itself as a wake sender');
     const policy = await human.client.call(operations.wakePolicy, { agentId }, {}); if (!policy.ok) return policy;
-    if (policy.value.data.agentId !== agentId || new Set(policy.value.data.senders.map(sender => sender.principalId)).size !== policy.value.data.senders.length) return failure('native', 'Wake policy returned inconsistent identities');
+    if (policy.value.data.agentId !== agentId || new Set(policy.value.data.senders.map(sender => sender.identity.principalId)).size !== policy.value.data.senders.length) return failure('native', 'Wake policy returned inconsistent identities');
     changes.push({ instanceKey: desired.instanceKey, name: desired.name, agentId, before: policy.value.data, after: policy.value.data,
       desired, changeRequired: !matches(policy.value.data, desired) });
   }
@@ -76,7 +80,7 @@ export async function reviewFleetWake(origin: string, account: Credentials, inpu
       if (!change.changeRequired) continue;
       attempted = change.instanceKey;
       const changed = await human.client.call(operations.changeWakePolicy, { agentId: change.agentId }, {
-        expectedRevision: change.before.revision, mode: change.desired.mode, senderIds: change.desired.senderIds,
+        expectedRevision: change.before.revision, mode: change.desired.mode, senders: change.desired.senders,
       });
       if (!changed.ok) return partial(changed.error);
       const policy = changed.value.data;
@@ -89,7 +93,8 @@ export async function reviewFleetWake(origin: string, account: Credentials, inpu
     for (const change of prepared.value) {
       const current = await human.client.call(operations.wakePolicy, { agentId: change.agentId }, {}); if (!current.ok) return partial(current.error);
       if (current.value.data.agentId !== change.agentId || current.value.data.revision !== change.after.revision
-        || current.value.data.mode !== change.after.mode || !sameIds(current.value.data.senders.map(sender => sender.principalId), change.after.senders.map(sender => sender.principalId))) return partial({ code: 'conflict', message: 'Wake policy changed during verification' });
+        || !matches(current.value.data, { ...change.desired, mode: change.after.mode,
+          senders: change.after.senders.map(sender => ({ principalId: sender.identity.principalId, includeAgents: sender.includeAgents })) })) return partial({ code: 'conflict', message: 'Wake policy changed during verification' });
     }
     return success({ fleetId: plan.fleetId, fleetKey: plan.fleetKey, ownerMatrixId: plan.ownerMatrixId,
       controllerName: plan.controllerName, executed: execute, changed: completed.length, instances: prepared.value });

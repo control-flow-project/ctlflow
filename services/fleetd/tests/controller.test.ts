@@ -172,6 +172,32 @@ test('owner disconnect is intentional, stops the owned generation and never auto
   assert.equal(value(fixture.controller.view(fixture.record.fleetId)).instances[0]!.error, null);
 });
 
+test('transport cancellation recovers desired listeners with exact history and preserves explicit stops', async scope => {
+  for (const reason of [new DOMException('Connection canceled', 'AbortError'), new DOMException('Connection timed out', 'TimeoutError'),
+    Object.assign(new Error('Connection canceled'), { code: 'ABORT_ERR' }), Object.assign(new Error('Connection reset'), { code: 'ECONNRESET' })]) {
+    const native: AbortController[] = [], calls: string[] = [], waits: { milliseconds: number; release(): void }[] = [];
+    const fixture = fixtureController({ start: async (_configuration, instance, _signal, mode) => {
+      calls.push(mode + ':' + instance.key); const stop = new AbortController(); native.push(stop);
+      return success(runtimeFixture({ sessionId: 'retained-native-history', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+        pointer: { runtime: 'fixture', sessionId: 'retained-native-history', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } }));
+    } }); cleanup(scope, () => fixture.controller.close());
+    fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
+      const release = () => { signal.removeEventListener('abort', release); resolve(); };
+      waits.push({ milliseconds, release }); if (signal.aborted) release(); else signal.addEventListener('abort', release, { once: true });
+    });
+    value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: {
+      key: 'stopped-peer', name: 'stopped-peer', definition: 'analyst', workarea: 'agents/analyst/workarea/stopped-peer' } }));
+    await fixture.finish(await fixture.operation('start', 'analyst'));
+    native[0]!.abort(reason); await until(() => waits.length === 1);
+    assert.equal(waits[0]!.milliseconds, 1000); waits[0]!.release();
+    await until(() => value(fixture.controller.view(fixture.record.fleetId)).instances[0]!.phase === 'running');
+    const current = value(fixture.controller.view(fixture.record.fleetId));
+    assert.deepEqual(calls, ['operator:analyst', 'recovery:analyst']);
+    assert.equal(current.instances[0]!.sessionId, 'retained-native-history'); assert.equal(current.instances[0]!.desiredActive, true);
+    assert.equal(current.instances[1]!.desiredActive, false); assert.equal(current.instances[1]!.listenerActive, false);
+  }
+});
+
 test('explicit context reset closes the owned process before reset and retains identity and configured startup', async scope => {
   const calls: string[] = [], sessions: string[] = [];
   const fixture = fixtureController({ reset: async (_configuration, instance) => { calls.push('reset-' + instance.key); return success(undefined); },
@@ -481,6 +507,39 @@ test('desired bindings restore exact histories without enrollment and explicit s
   const states = value(restarted.view(fixture.record.fleetId)).instances;
   assert.equal(states[0]!.phase, 'stopped'); assert.equal(states[0]!.desiredActive, false);
   assert.equal(states[1]!.sessionId, sessions.get('peer')); assert.equal(states[1]!.desiredActive, true);
+});
+
+test('thrown restoration and retry failures retain their transient or permanent classification', async scope => {
+  for (const recoverable of [true, false]) {
+    const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+    await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
+    let attempts = 0;
+    const waits: { milliseconds: number; release(): void }[] = [];
+    fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
+      const release = () => { signal.removeEventListener('abort', release); resolve(); };
+      if (milliseconds !== 30000) waits.push({ milliseconds, release });
+      if (signal.aborted) release(); else signal.addEventListener('abort', release, { once: true });
+    });
+    fixture.services.execution.start = async (_configuration, _instance, _signal, mode) => {
+      assert.equal(mode, 'recovery'); attempts++;
+      if (attempts <= 2) throw Object.assign(new Error('Exact restoration failure'), { code: recoverable ? 'ABORT_ERR' : 'forbidden' });
+      const stop = new AbortController();
+      return success(runtimeFixture({ sessionId: 'retained-native-history', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+        pointer: { runtime: 'fixture', sessionId: 'retained-native-history', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } }));
+    };
+    const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); await restarted.ready();
+    if (recoverable) {
+      await until(() => waits.length === 1); assert.equal(waits[0]!.milliseconds, 1000); waits[0]!.release();
+      await until(() => waits.length === 2); assert.equal(attempts, 2); assert.equal(waits[1]!.milliseconds, 2000); waits[1]!.release();
+      await until(() => value(restarted.view(fixture.record.fleetId)).phase === 'running');
+      assert.equal(attempts, 3); assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.sessionId, 'retained-native-history');
+    } else {
+      await yieldLoop(); assert.equal(attempts, 1); assert.deepEqual(waits, []);
+      assert.equal(value(restarted.view(fixture.record.fleetId)).phase, 'failed');
+      assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.error, 'Exact restoration failure');
+    }
+    assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.desiredActive, true);
+  }
 });
 
 test('desired intent must reach durable storage before activation and before explicit stop cleanup', async scope => {

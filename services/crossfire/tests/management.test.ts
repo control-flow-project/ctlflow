@@ -19,17 +19,18 @@ test('wake modes resolve active verified identities and never modify room author
   const current = () => value(services.directory.agent(agent.id))!;
   const originalGrants = value(services.collection.roomGrants({ agentId: agent.id }));
   const senders = () => value(deliveryPolicy(services, agent.actor, agent.id)).wake.senders.toSorted();
-  const change = (mode: 'nobody' | 'owner' | 'owner-agents' | 'humans' | 'everyone' | 'selected', senderIds: string[] = []) =>
-    value(changeWakePolicy(services, alice.actor, agent.id, { expectedRevision: current().principal.revision, mode, senderIds }, randomUUID()));
+  const change = (mode: 'humans' | 'everyone' | 'selected', senders: { principalId: string; includeAgents: boolean }[] = []) =>
+    value(changeWakePolicy(services, alice.actor, agent.id, { expectedRevision: current().principal.revision, mode, senders }, randomUUID()));
   assert.deepEqual(senders(), [alice.member.principal.matrixUserId]);
-  assert.equal(changeWakePolicy(services, bob.actor, agent.id, { expectedRevision: 0, mode: 'everyone', senderIds: [] }, randomUUID()).ok, false);
-  change('owner-agents'); assert.deepEqual(senders(), [alice.member.principal.matrixUserId, peer.matrixUserId].sort());
-  change('humans'); assert.deepEqual(senders(), [alice.member.principal.matrixUserId, peer.matrixUserId, bob.member.principal.matrixUserId, admin.member.principal.matrixUserId].sort());
+  assert.equal(changeWakePolicy(services, bob.actor, agent.id, { expectedRevision: 0, mode: 'everyone', senders: [] }, randomUUID()).ok, false);
+  change('selected', [{ principalId: alice.actor.principalId, includeAgents: true }]); assert.deepEqual(senders(), [alice.member.principal.matrixUserId, peer.matrixUserId].sort());
+  change('humans'); assert.deepEqual(senders(), [alice.member.principal.matrixUserId, bob.member.principal.matrixUserId, admin.member.principal.matrixUserId].sort());
+  change('humans', [{ principalId: alice.actor.principalId, includeAgents: true }]); assert(senders().includes(peer.matrixUserId));
   change('everyone'); assert(senders().includes(foreign.matrixUserId));
-  change('selected', [bob.actor.principalId, peer.id]); assert.deepEqual(senders(), [bob.member.principal.matrixUserId, peer.matrixUserId].sort());
+  change('selected', [{ principalId: bob.actor.principalId, includeAgents: false }, { principalId: peer.id, includeAgents: false }]); assert.deepEqual(senders(), [bob.member.principal.matrixUserId, peer.matrixUserId].sort());
   value(changeMember(services, admin.actor, bob.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
   value(changeAgent(services, alice.actor, peer.id, { expectedRevision: value(services.repositories.principal.find({ id: peer.id }))!.revision, status: 'suspended' }, randomUUID()));
-  assert.deepEqual(senders(), []); change('nobody'); assert.deepEqual(senders(), []);
+  assert.deepEqual(senders(), []); change('selected'); assert.deepEqual(senders(), []);
   assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.id })), originalGrants);
 });
 

@@ -6,16 +6,11 @@ import type { AgentWakeSender } from '../room-access/types.js';
 type ActiveIdentities = Extract<ReturnType<DirectoryRepository['activePrincipals']>, { ok: true }>['value'];
 export function wakeSenderMatrixIds(agent: AgentRecord, identities: ActiveIdentities, selected: AgentWakeSender[]): string[] {
   const selectedIds = new Set(selected.map(sender => sender.senderPrincipalId));
+  const selectedOwners = new Set(selected.filter(sender => sender.includeAgents).map(sender => sender.senderPrincipalId));
   return identities.filter(({ principal, ownerId }) => {
     if (principal.id === agent.principal.id) return false;
-    switch (agent.agent.wakeMode) {
-      case 'nobody': return false;
-      case 'selected': return selectedIds.has(principal.id);
-      case 'owner': return principal.id === agent.owner.id;
-      case 'owner-agents': return ownerId === agent.owner.id;
-      case 'humans': return principal.kind === 'human' || ownerId === agent.owner.id;
-      case 'everyone': return true;
-    }
+    return agent.agent.wakeMode === 'everyone' || agent.agent.wakeMode === 'humans' && principal.kind === 'human'
+      || selectedIds.has(principal.id) || principal.kind === 'agent' && selectedOwners.has(ownerId);
   }).map(value => value.principal.matrixUserId).sort();
 }
 

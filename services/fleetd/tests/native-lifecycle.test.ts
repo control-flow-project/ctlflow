@@ -106,6 +106,47 @@ test('recovery binds sleeping histories without a process and concurrent inputs 
   assert.equal(fixture_.started.length, 1); assert.deepEqual(fixture_.delivered.toSorted(), ['one', 'two']);
 });
 
+test('empty receipt checkpoints settle while sleeping without waking native history; real receipts remain fenced', async scope => {
+  for (const initial of ['running', 'sleeping'] as const) {
+    const fixture_ = fixture(); fixture_.services.initial = initial;
+    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    if (initial === 'running') { await fixture_.advance(1800000); await until(() => managed.nativeState().phase === 'sleeping'); }
+    const starts = fixture_.started.length;
+    assert.doesNotThrow(() => managed.runtime.acknowledge([]), initial);
+    assert.throws(() => managed.runtime.acknowledge(['unsettled']), error => error instanceof Error && 'code' in error && error.code === 'unavailable');
+    assert.equal(fixture_.started.length, starts); assert.equal(managed.nativeState().phase, 'sleeping');
+    assert.equal(managed.runtime.signal.aborted, false); assert.equal(managed.runtime.sessionId, 'exact-history');
+  }
+});
+
+test('native recovery retries transport cancellation during resume without replacing saved history', async scope => {
+  for (const reason of [new DOMException('Transport canceled', 'AbortError'), Object.assign(new Error('Transport canceled'), { code: 'ABORT_ERR' })]) {
+    const fixture_ = fixture(), start = fixture_.services.start;
+    let attempts = 0;
+    fixture_.services.start = async (...input) => {
+      if (++attempts === 2) throw reason;
+      return start(...input);
+    };
+    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    fixture_.started[0]!.abort(new Error('Native transport disconnected'));
+    await until(() => managed.nativeState().phase === 'running' && attempts === 3);
+    assert.equal(fixture_.started.length, 2); assert.equal(managed.runtime.sessionId, 'exact-history');
+    assert.equal(managed.runtime.signal.aborted, false); assert.equal(fixture_.failures.length, 1);
+  }
+});
+
+test('a permanent native disconnect closes its exact generation without an automatic restart', async scope => {
+  for (const reason of [Object.assign(new Error('Native authorization denied'), { code: 'forbidden' }),
+    new DOMException('Native transport policy denied', 'SecurityError')]) {
+    const fixture_ = fixture();
+    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    fixture_.started[0]!.abort(reason); await until(() => fixture_.closed.length === 1); await yieldLoop();
+    assert.equal(fixture_.started.length, 1); assert.equal(managed.nativeState().phase, 'failed');
+    assert.equal(managed.runtime.sessionId, 'exact-history'); assert.deepEqual(fixture_.failures, [reason]);
+    assert.equal(fixture_.recovered(), 1);
+  }
+});
+
 test('all native activity, unresolved decisions, pending listener work and unknown inspection veto sleep', async scope => {
   for (const condition of ['busy', 'decisions', 'pending', 'unknown'] as const) {
     const fixture_ = fixture();

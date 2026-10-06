@@ -59,6 +59,15 @@ Element invitations grant read/reply access within native permissions. Wake
 rules independently select triggering senders; other permitted chat remains
 context. Steering, blocked mentions and software checks use code, not model calls.
 
+Select the agent's real Matrix mention and type a new instruction to steer it
+like Esc followed by input in its terminal. An eligible human's fresh mention
+cancels the exact active turn, confirms cancellation and delivers the instruction
+with history preserved. Other agents, display-name text, historical messages and
+edits cannot interrupt. Wake policy and unmuted room access still apply; an empty
+selected audience disables mention steering. Completed side effects are not rolled back, and
+steering does not answer pending permission requests or questions. The owner's
+bare `!!` remains a separate pause command, not a steering prefix.
+
 Enrollment creates no conversations. The first owner DM, terminal output or
 native decision establishes a protected private owner conversation. Established
 owner DMs cannot be muted, downgraded, delegated or joined by another agent.
