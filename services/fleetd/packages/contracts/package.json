@@ -1,5 +1,5 @@
 {
-  "name": "@ctlflow/fleetd-contracts", "version": "0.1.4", "private": true, "type": "module",
+  "name": "@ctlflow/fleetd-contracts", "version": "0.1.5", "private": true, "type": "module",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/crossfire-contracts": "0.1.4", "@ctlflow/crossfire-kernel": "0.1.4", "smol-toml": "1.9.0" }
+  "dependencies": { "@ctlflow/crossfire-contracts": "0.1.5", "@ctlflow/crossfire-kernel": "0.1.5", "smol-toml": "1.9.0" }
 }

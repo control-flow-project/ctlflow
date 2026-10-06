@@ -120,9 +120,10 @@ test('nobody blocks urgent owner prompts without disabling owner stop or startin
 
   const { native, matrix, cursors } = await fixture(context, clock, { debounceMs: 0 }, 'nobody');
   const before = cursors();
-  matrix.add(ROOM, message('$urgent', OBSERVER, '!! do this now'));
+  matrix.add(ROOM, { ...message('$urgent', OBSERVER, 'do this now'), content: { msgtype: 'm.text', body: 'do this now', 'm.mentions': { user_ids: [matrix.account.user_id] } } });
   const controls = () => readJson<{ paused: boolean; controls: { event: string; status: string }[] }>(matrix.cursorFile + '.control');
-  await clock.until(() => controls().controls.some(control => control.event === '$urgent' && control.status === 'interrupted'));
+  await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-1');
+  assert.equal(controls().controls.some(control => control.event === '$urgent'), false);
   await clock.advance(300);
   assert.equal(submissions(native).length, 0); assert.deepEqual(cursors(), before);
   matrix.add(ROOM, message('$stop', OBSERVER, '!!'));

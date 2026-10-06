@@ -160,6 +160,11 @@ export function message(id: string, sender = '@agent-holmes:test.localhost', bod
     content: { msgtype: 'm.text', body } };
 }
 
+export function mention(id: string, sender = OBSERVER, body = 'Inspect configuration instead.', receiver = SELF): Event {
+  const event = message(id, sender, body);
+  return { ...event, content: { ...event.content, 'm.mentions': { user_ids: [receiver] } } };
+}
+
 export async function until(predicate: () => boolean | Promise<boolean>, message = 'Condition did not become true', timeoutMs = 5000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!await predicate()) {

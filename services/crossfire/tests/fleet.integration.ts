@@ -29,9 +29,9 @@ import { readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal'
 import { codexInput } from '@ctlflow/crossfire-adapter-codex/input';
 
 const execute = promisify(execFile);
-async function until(predicate: () => boolean): Promise<void> {
+async function until(predicate: () => boolean | Promise<boolean>): Promise<void> {
   const deadline = Date.now() + 30000;
-  while (!predicate()) { assert(Date.now() < deadline, 'Native integration observation timed out'); await delay(30); }
+  while (!await predicate()) { assert(Date.now() < deadline, 'Native integration observation timed out'); await delay(30); }
 }
 type Fleet = { fleetId: string; phase: string; connection: { connected: boolean; deliveryEnabled: boolean; revision: number | null }; instances: { instance: { key: string }; phase: string; sessionId: string | null; listenerActive: boolean }[] };
 type Binding = { fleetId: string; controllerCredential: string; identities: { instanceKey: string; agentId: string; account: { user_id: string; access_token: string } }[] };
@@ -84,9 +84,14 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const cursor = join(definition, 'workarea/north/.crossfire/state/north/cursors.json.sync');
   const journal = join(definition, 'workarea/north/.codex/crossfire-session.json.receipt');
   async function acquired() {
-    const snapshot = value(await nativeOk({ base: fixture.native.base, token: north.account.access_token }, 'GET', API + '/sync?timeout=0'));
-    assert.equal(typeof snapshot.next_batch, 'string');
-    await until(() => existsSync(cursor) && readJson<string>(cursor) === snapshot.next_batch);
+    await until(async () => {
+      if (!existsSync(cursor)) return false;
+      const checkpoint = readJson<string>(cursor);
+      const snapshot = value(await nativeOk({ base: fixture.native.base, token: north.account.access_token }, 'GET',
+        API + '/sync?timeout=0&since=' + segment(checkpoint)));
+      assert.equal(typeof snapshot.next_batch, 'string');
+      return snapshot.next_batch === checkpoint && readJson<string>(cursor) === checkpoint;
+    });
   }
   async function acknowledged() {
     await until(() => {

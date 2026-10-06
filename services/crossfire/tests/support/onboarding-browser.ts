@@ -69,12 +69,13 @@ export async function checkOnboardingPolicy(page: Page, memberPage: Page, origin
     const confirmation = await opened;
     await expect(confirmation.getByRole('heading', { name: 'Confirm your account', exact: true })).toBeVisible();
     const completion = signup.waitForResponse(response => response.request().method() === 'POST'
-      && new URL(response.url()).pathname === '/_matrix/client/v3/register');
+      && new URL(response.url()).pathname === '/_matrix/client/v3/register')
+      .then(async response => ({ status: response.status(), body: await response.text() }));
     await confirmation.getByRole('button', { name: 'Create account', exact: true }).click();
     await expect(confirmation.getByRole('heading', { name: 'Account confirmed', exact: true })).toBeVisible();
     const response = await completion;
-    assert.equal(response.status(), 200, await response.text());
-    assert.equal((await response.json() as { user_id: string }).user_id, '@open-reader:' + services.instance.serverName);
+    assert.equal(response.status, 200, response.body);
+    assert.equal((JSON.parse(response.body) as { user_id: string }).user_id, '@open-reader:' + services.instance.serverName);
     const principal = value(services.directory.principalByMatrixId('@open-reader:' + services.instance.serverName))!;
     assert.equal(value(services.directory.member(principal.id))!.role.roleCode, 'member');
   } finally { await signupContext.close(); }

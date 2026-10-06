@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-web",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,10 +10,10 @@
   "dependencies": {
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "@ctlflow/crossfire-contracts": "0.1.4",
-    "@ctlflow/crossfire-adapter-crossfire": "0.1.4",
-    "@ctlflow/crossfire-kernel": "0.1.4",
-    "@ctlflow/crossfire-adapter-matrix": "0.1.4"
+    "@ctlflow/crossfire-contracts": "0.1.5",
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.5",
+    "@ctlflow/crossfire-kernel": "0.1.5",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.5"
   },
   "devDependencies": {
     "@types/react": "19.2.17",

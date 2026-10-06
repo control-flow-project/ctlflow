@@ -1748,8 +1748,19 @@ The model-free `agent test` checks fleetd's existing receiver, effective
 authentication and exact native binding, including observed busy state. It
 neither starts an engine nor treats saved credentials as readiness. Native turn
 interruption is a typed capability, not assumed from a runtime name. Codex
-supports captured-turn interruption. An addressed owner `!!` pauses/interrupts;
-`!! New instruction` interrupts and redirects through the same receipt path.
+supports captured-turn interruption. A fresh native Matrix mention by an eligible
+verified human acts like Esc followed by new input: capture the exact active
+turn, confirm native interruption, then deliver the full attributed instruction
+through the same receipt path and history ahead of unread backlog. Current wake
+authors, native sender/agent membership, unmuted room access and controller
+admission remain authoritative, including Nobody. Agent-to-agent mentions,
+display names, historical snapshots, edits and automated notices cannot interrupt;
+fresh explicitly mentioned replies can. Shared mode steers the shared history;
+per-room mode targets only that room history. Idle/sleeping agents reuse their
+saved history without an interruption or dummy turn. Revocation during capture
+or before delivery prevents new admission. Steering never answers a native
+question or permission request. No `!!`-prefixed redirect alias is retained.
+The separate addressed owner `!!` pauses/interrupts until later owner input.
 Cancellation is not rollback. Stale control cannot cancel a replacement turn.
 Generated control, approval and blocked-wake notices use one explicit marker
 and are excluded from wake evaluation and later model context. Ordinary unmarked
