@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-adapter-codex",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,11 +10,11 @@
   "dependencies": {
     "smol-toml": "1.9.0",
     "ws": "8.21.3",
-    "@ctlflow/crossfire-contracts": "0.1.8",
-    "@ctlflow/crossfire-kernel": "0.1.8",
-    "@ctlflow/crossfire-agent-core": "0.1.8",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.8",
-    "@ctlflow/crossfire-adapter-runtime": "0.1.8"
+    "@ctlflow/crossfire-contracts": "0.1.9",
+    "@ctlflow/crossfire-kernel": "0.1.9",
+    "@ctlflow/crossfire-agent-core": "0.1.9",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.9",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.9"
   },
   "exports": {
     "./*": {

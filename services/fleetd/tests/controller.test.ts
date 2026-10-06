@@ -72,15 +72,15 @@ function fixture(execution?: Partial<Execution>) {
 
 test('enrollment reviews a stopped fleet without starting, resetting or enabling delivery', async scope => {
   const calls: string[] = [];
-  const fixture = fixtureController({ prepare: async (_configuration, _controller, _signal, approval) => {
-    calls.push('prepare'); approval({ url: 'https://example.test/manage/enrollments/review', code: 'ABCDEF123456' });
+  const fixture = fixtureController({ prepare: async (_configuration, _controller, intent, _signal, approval) => {
+    calls.push('prepare:' + intent); approval({ url: 'https://example.test/manage/enrollments/review', code: 'ABCDEF123456' });
     return success({ failed: [] });
   }, reset: async () => { calls.push('reset'); return success(undefined); },
   delivery: async () => { calls.push('delivery'); return failure('conflict', 'Enrollment must never change delivery'); } });
   cleanup(scope, () => fixture.controller.close());
   const enrolled = await fixture.finish(await fixture.operation('enroll'));
   assert.equal(enrolled.status, 'succeeded');
-  assert.deepEqual(calls, ['prepare']);
+  assert.deepEqual(calls, ['prepare:enroll']);
   assert.deepEqual(fixture.started, []);
   const current = value(fixture.controller.view(fixture.record.fleetId));
   assert.equal(current.phase, 'stopped');
@@ -97,6 +97,7 @@ test('enrollment reviews a stopped fleet without starting, resetting or enabling
   await fixture.finish(await fixture.operation('enroll'));
   assert.equal(value(fixture.controller.view(current.fleetId)).instances[0]!.sessionId, session);
   assert.equal(fixture.started.length, 1);
+  assert.deepEqual(calls, ['prepare:enroll', 'prepare:resume', 'prepare:enroll']);
 });
 
 test('rosters are strict, disjoint and bounded; empty stopped fleets and persistent work areas are valid', () => {
@@ -337,7 +338,7 @@ test('terminal pointers exist only for live instances and never leak into regist
 });
 
 test('approval waiting is model-free and stop cancels a pending start', async scope => {
-  const fixture = fixtureController({ prepare: async (_config, _controller, signal, approval) => {
+  const fixture = fixtureController({ prepare: async (_config, _controller, _intent, signal, approval) => {
     approval({ url: 'http://127.0.0.1/manage/enrollments/test', code: 'ABCDEF123456' });
     await new Promise<void>(resolve => { if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true }); });
     return failure('unavailable', 'Cancelled');

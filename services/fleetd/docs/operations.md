@@ -168,9 +168,13 @@ receipts are confirmed. Neither operation detaches an agent or deletes history.
 - [UI/CLI session controls and confirmation](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/sessions.md)
 
 Role `coordination_options` requests exact Crossfire wake rules and invitation
-defaults with enrollment. Owner review is required for new/changed settings;
+defaults with initial or explicit enrollment. Owner review is required for new/changed settings;
 the controller credential cannot approve them. Approved settings apply through
 Crossfire's normal wake and room-access domains, not controller-side permissions.
+Ordinary resume validates the existing approved roster and accounts without
+requesting enrollment or writing policies. UI-edited wake rules and permissions
+remain intact. Invalid credentials, inactive accounts or mismatched saved
+identities fail rather than requesting replacement authority.
 - [Configuration, approval, admission and removal](coordination.md)
 
 ## Source ownership

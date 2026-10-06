@@ -121,10 +121,10 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         return success(undefined);
       } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Cannot verify the owning listener'); }
     },
-    async prepare(configuration, controller, signal, approval) {
+    async prepare(configuration, controller, intent, signal, approval) {
       try {
         const inspected = await inspect(configuration, signal); if (!inspected.ok) return inspected;
-        protectFleet(configuration.directory); return await prepareEnrollment(configuration, controller, signal, approval);
+        protectFleet(configuration.directory); return await prepareEnrollment(configuration, controller, intent, signal, approval);
       }
       catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Fleet enrollment failed'); }
     },

@@ -74,14 +74,20 @@ authority at approval. Enrollment cannot select an uncreated identity by name.
 
 ## Approval and changes
 
-1. `fleet start <fleet>` submits names, controller identity and each exact policy.
+1. Initial `fleet start <fleet>` or explicit `fleet enroll <fleet>` submits names,
+   controller identity and each exact policy.
 2. The owner opens the displayed approval URL, verifies the code and reviews the
    complete roster, wake authors and invitation capability.
 3. Approval applies wake rules and invitation defaults atomically. No additional
    management configuration or model call is required.
 
 An existing identity or controller credential cannot authorize new capabilities.
-Changed policies require owner review on stop/start, including existing agents.
+Changed coordination policies require explicit `fleet enroll <fleet>` while
+stopped and owner review, including existing agents. Normal start/resume of an
+approved roster checks current fleet/account authority without enrollment or
+policy writes. Owner-edited wake rules remain authoritative even when they differ
+from the original TOML defaults. Invalid saved authority fails; it never silently
+requests replacement enrollment.
 Stale agent revisions, changed senders or expired/rejected requests cannot grant
 authority. An explicit subsequent start can request a fresh review; the daemon
 does not resubmit a rejected request while waiting.
@@ -90,7 +96,9 @@ Unchanged reconnects preserve identities, histories and room-specific permission
 edits. Management remains available for deliberate adjustments. A changed policy
 approval replaces defaults on all current ordinary grants and future admissions;
 the review explicitly describes this effect. Editing a running file has no effect
-until stop/start. Retiring an instance or archiving a fleet requires confirmed
+until explicit enrollment. Native runtime options instead take effect on native
+resume. New or renamed identities require the normal enrollment review. Retiring
+an instance or archiving a fleet requires confirmed
 native stop and settled decisions. The identity remains fleet-bound and preserved
 for audit; no independent listener or detach path is created.
 

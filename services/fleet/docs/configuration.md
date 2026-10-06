@@ -134,8 +134,10 @@ Omitting the whole block requests an explicit person-only selection for the
 actual configured owner and no invitation delegation. Each selected person can
 include their currently owned agents. Multiple entries combine; individual
 agents require `include_agents = false`. Use `wake_senders = []` for no entries.
-Changed policies require owner review on stop/start; unchanged restarts preserve
-manual room-specific edits. Configuration grants no room membership or native power.
+Changed coordination policies require explicit `fleet enroll` while stopped and
+owner review. Ordinary restarts validate existing identities and preserve live
+wake rules and manual room-specific edits. Configuration grants no room membership
+or native power.
 - [Fields, selected identities, approval and removal rules](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/coordination.md)
 
 | Field | Accepted values | When omitted |

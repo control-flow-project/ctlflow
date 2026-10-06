@@ -26,6 +26,15 @@ The UI separately presented historical native activity as a prominent badge.
   Controls observe current operations even while browsing older history pages.
 - Management confirmations share a themed, accessible modal with pending/error
   handling. The wake audience picker is a URL-addressable page with Back/Cancel.
+- Approved fleet resume validates existing identities and active accounts using
+  the current scoped controller credential, without enrollment or policy writes.
+  Initial/new/renamed identities and explicit enrollment retain owner review.
+
+During restoration, normal start incorrectly compared TOML enrollment defaults
+against Nell's owner-edited wake policy and requested a new whole-fleet approval.
+The unwanted request was rejected through the normal owner API without changing
+authority. Separating resume from explicit enrollment at fleetd's preparation
+interface fixes this defect without approving replacement defaults.
 
 ## Recovery and verification
 
@@ -44,12 +53,15 @@ direct URLs, mobile layout and revision conflicts.
 ## Integrated source results
 
 - Typecheck and all service builds passed.
-- All 687 tests passed across 158 isolated files on 24 parallel workers; no
-  failures or cancellations. Test execution took 96.577 seconds after preparation.
+- All 702 tests passed across 159 isolated files on 24 parallel workers; no
+  failures or cancellations. Test execution took 89.744 seconds after 2.316
+  seconds of shared preparation, including 15 resume-authority boundary cases.
 - All 33 architecture checks and four public installation checks passed.
 - Container checks passed for startup, native Matrix/Element routes, authenticated
   attachment downloads, management, artifacts, shutdown and persisted rooms.
-- The immutable listener release is `0.1.8-2fa06475ac6a316a2511f041`.
+- The final immutable listener release is `0.1.9-2fa06475ac6a316a2511f041`.
+  Matching public CLI/controller packages are `0.1.9`; internal packages stay
+  private. Already published `0.1.8` archives are not replaced.
 
 These are integrated source and native-fixture results, not a claim that every
 real model task or production failure mode has been certified. The production

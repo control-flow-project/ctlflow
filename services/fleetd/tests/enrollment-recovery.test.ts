@@ -49,7 +49,7 @@ for (const status of ['expired', 'rejected', 'pending', 'unauthorized'] as const
     const enrollmentId = randomUUID();
     saveBinding(directory, { ...loaded.value, request: { enrollmentId, claimSecret: randomBytes(32).toString('base64url'), digest } });
     const notices: string[] = [];
-    const prepared = await prepareEnrollment(configuration.value, controller, new AbortController().signal, approval => { notices.push(approval.url); });
+    const prepared = await prepareEnrollment(configuration.value, controller, 'resume', new AbortController().signal, approval => { notices.push(approval.url); });
     assert(!prepared.ok); assert.equal(prepared.error.code, status === 'unauthorized' ? 'unauthorized' : 'unavailable');
     const final = loadBinding(configuration.value); assert(final.ok); assert(final.value.request);
     const renewed = status === 'expired' || status === 'rejected';

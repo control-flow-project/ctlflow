@@ -8,11 +8,36 @@ import { initializeHistory } from '@ctlflow/fleetd-storage/history';
 import { migrateInstanceProfiles } from '@ctlflow/fleetd-storage/profile-migration';
 import type { Configuration, Controller, Approval } from '@ctlflow/fleetd-domain/model';
 
-export async function prepareEnrollment(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (value: Approval) => void) {
+export async function prepareEnrollment(configuration: Configuration, controller: Controller, intent: 'resume' | 'enroll', signal: AbortSignal, approval: (value: Approval) => void) {
   const loaded = loadBinding(configuration);
   if (!loaded.ok) return loaded;
   const binding = loaded.value, roster = configuration.roster;
   if (binding.server !== roster.coordination.server || binding.owner !== roster.coordination.owner || binding.fleetKey !== roster.fleet) return failure('conflict', 'Fleet connection differs from its saved identity; it cannot be silently replaced');
+  if (intent === 'resume' && binding.fleetId && binding.controllerCredential
+    && roster.instances.every(instance => binding.identities.some(identity => identity.instanceKey === instance.key && identity.name === instance.name))) {
+    const authenticated = createClient({ origin: binding.server, token: binding.controllerCredential, signal });
+    const current = await authenticated.call(operations.fleet, { fleetId: binding.fleetId }, {});
+    if (!current.ok) return current;
+    if (current.value.data.fleetId !== binding.fleetId || current.value.data.fleetKey !== binding.fleetKey
+      || current.value.data.owner.matrixUserId !== binding.owner) return failure('conflict', 'Approved fleet authority differs from its saved identity');
+    const registered = await authenticated.call(operations.fleetAgents, { fleetId: binding.fleetId }, {}, new URLSearchParams({ page: '1', pageSize: '100' }));
+    if (!registered.ok) return registered;
+    const { data, meta } = registered.value;
+    if (meta.page !== 1 || meta.pageSize !== 100 || meta.totalPages !== 1 || meta.totalItems !== data.length
+      || data.length !== roster.instances.length || new Set(data.map(item => item.instanceKey)).size !== data.length
+      || new Set(data.map(item => item.agent.agentId)).size !== data.length) return failure('conflict', 'Approved fleet roster is incomplete or differs from its configured instances');
+    for (const instance of roster.instances) {
+      const expected = binding.identities.find(identity => identity.instanceKey === instance.key)!;
+      const observed = data.find(item => item.instanceKey === instance.key)?.agent;
+      if (!observed || observed.agentId !== expected.agentId || observed.name !== instance.name
+        || observed.matrixUserId !== expected.account.user_id || observed.deployment.fleetId !== binding.fleetId
+        || observed.deployment.instanceKey !== instance.key || observed.owner.matrixUserId !== binding.owner)
+        return failure('conflict', 'Approved fleet instance differs from its saved identity: ' + instance.key);
+      if (observed.status !== 'active' || observed.owner.status !== 'active') return failure('forbidden', 'Fleet resume requires active existing agent and owner accounts');
+    }
+    migrateInstanceProfiles(configuration, binding);
+    return success({ failed: [] });
+  }
   migrateInstanceProfiles(configuration, binding);
   const instances = roster.instances.map(instance => {
     const existing = binding.identities.find(item => item.instanceKey === instance.key);

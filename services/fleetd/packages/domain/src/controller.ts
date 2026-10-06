@@ -462,7 +462,7 @@ export function createController(services: Services) {
         }
         for (const instance of selected) if (!running.has(key(fleetId, instance.key)) && !operation.errors.some(error => error.instanceKey === instance.key)) states.set(key(fleetId, instance.key), { instance, phase: 'starting', error: null,
           sessionId: operation.action === 'enroll' ? states.get(key(fleetId, instance.key))?.sessionId ?? null : null, startedAt: null });
-        const prepared = await services.execution.prepare(configuration, services.controller, signal, approval => {
+        const prepared = await services.execution.prepare(configuration, services.controller, operation.action === 'enroll' ? 'enroll' : 'resume', signal, approval => {
           operation.status = 'awaiting-approval'; operation.approval = approval; saveOperation(operation);
           for (const instance of selected) if (!running.has(key(fleetId, instance.key)) && !operation.errors.some(error => error.instanceKey === instance.key)) states.set(key(fleetId, instance.key), { ...states.get(key(fleetId, instance.key))!, phase: 'awaiting-approval' });
         });

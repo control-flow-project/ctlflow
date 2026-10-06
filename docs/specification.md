@@ -2988,6 +2988,12 @@ Requirements, prerequisite/provider installation and optional TOML/root details
 are concise progressive disclosure behind the guide, not another installer.
 Fleet approvals show exact names, failures, owner, controller, wake authors and
 invitation defaults. Unchanged setup/resumption is not described as re-enrollment.
+Resume validates the complete approved fleet, owner, immutable instance/account
+bindings and active accounts with the saved scoped controller credential. It
+performs no enrollment, coordination-policy, metadata or credential write. Owner
+UI changes remain authoritative; TOML coordination defaults apply during initial,
+new or renamed identity enrollment, or explicit `fleet enroll`. Invalid authority
+fails visibly and never falls back to requesting enrollment.
 
 All data lists use one first/previous/page/next/last pagination treatment. Server
 queries are bounded and stably ordered with matching scoped counts. URL navigation
