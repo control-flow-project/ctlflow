@@ -20,7 +20,7 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   async function enroll(owner: typeof admin, count: number, prefix: string) {
     const request = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
       fleetKey: 'research', controller: { name: prefix + '-computer', metadata: { site: prefix } },
-      instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy() })) };
+      instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) })) };
     const introduced = value(await introduceEnrollment(services, request));
     value(decideEnrollment(services, owner.actor, request.enrollmentId,
       { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
@@ -51,7 +51,7 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   assert(value(services.repositories.fleetInstance.findByAgent(agent.agentId!))?.retiredAt);
   const restoration = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
     fleetKey: 'research', controller: { name: 'Laptop', metadata: { zone: 'desk' } }, controllerCredential: first.fleet!.controllerCredential!,
-    instances: [{ instanceKey: agent.instanceKey, name: agent.name, coordinationPolicy: defaultCoordinationPolicy(),
+    instances: [{ instanceKey: agent.instanceKey, name: agent.name, coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId),
       identity: { agentId: agent.agentId!, accessToken: agent.account!.accessToken } }] };
   assert.equal((await introduceEnrollment(services, { ...restoration, instances: [{ ...restoration.instances[0]!, identity: { agentId: agent.agentId!, accessToken: secret() } }] })).ok, false);
   const pending = value(await introduceEnrollment(services, restoration));

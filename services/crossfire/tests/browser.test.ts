@@ -171,7 +171,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const stateDirectory = join(directory, 'controller-state'); mkdirSync(stateDirectory);
   const enrollment = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: config.administrator, fleetKey: 'project',
     controller: { name: 'Browser workstation', metadata: {} }, instances: [{ instanceKey: 'holmes', name: 'holmes',
-      coordinationPolicy: { ...defaultCoordinationPolicy(), wakeMode: 'owner' as const } }] };
+      coordinationPolicy: { ...defaultCoordinationPolicy(config.administrator), wakeMode: 'selected' as const } }] };
   const introduced = value(await introduceEnrollment(services, enrollment));
   const request = { approvalUrl: origin + '/manage/enrollments/' + enrollment.enrollmentId, code: introduced.request.verificationCode };
   await page.goto(request.approvalUrl);
@@ -207,21 +207,23 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await expect(page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link')).toHaveText(['Rooms', 'Session', 'Activity', 'Settings']);
   await expect(page.getByLabel('Configured display name')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Who can wake this agent?', exact: true })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue('owner');
-  await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
-  await expect(page.getByRole('combobox', { name: 'Wake-up authority' }).locator('option')).toHaveCount(6);
-  await page.getByText('Context and blocked messages', { exact: true }).click();
-  await expect(page.getByText('Nobody disables chat-triggered input', { exact: false })).toBeVisible();
-  for (const policy of ['nobody', 'owner-agents', 'humans', 'everyone', 'owner']) {
-    await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption(policy);
-    await submit(page, 'Save wake-up policy');
-    await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
+  await expect(page.getByRole('table', { name: 'Selected wake-up people and agents' })).toContainText(config.administrator);
+  assert.deepEqual(identityReads, [], 'The directory is not fetched until the picker is opened');
+  await page.getByText('How wake authority works', { exact: true }).click();
+  await expect(page.getByText('Room membership, reply permissions and muted delivery remain separate.', { exact: false })).toBeVisible();
+  for (const policy of ['humans', 'everyone', 'selected'] as const) {
+    await page.getByRole('button', { name: 'Choose who can wake' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByLabel('Audience').locator('option')).toHaveCount(3);
+    await page.getByLabel('Audience').selectOption(policy);
+    if (policy === 'selected') await page.getByLabel('Allow ' + config.administrator, { exact: true }).check();
+    await page.getByRole('button', { name: 'Save wake-up policy', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue(policy);
     assert.equal(value(services.directory.agent(profile.id))!.agent.wakeMode, policy);
     assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);
   }
-  assert.deepEqual(identityReads, [], 'Identity selection is read only when the selected wake-up mode is open');
+  assert(identityReads.length > 0, 'The picker uses the authorized directory');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Rooms', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Engineering', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('read');
@@ -268,9 +270,10 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const engine = await nativeEngine(scope, home, workspace);
   await materialize(engine, provider);
   await page.goto(origin + '/manage/agents/' + profile.id);
-  await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('nobody');
-  await submit(page, 'Save wake-up policy');
-  await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Choose who can wake' }).click();
+  await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
+  await page.getByRole('button', { name: 'Save wake-up policy', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   const stop = new AbortController();
   let listenerFailure: unknown;
   let listenerReady = false;
@@ -297,19 +300,20 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const previousSync = readJson<string>(cursorFile + '.sync');
   assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/e2e', { msgtype: 'm.text', body: 'Crossfire integrated native delivery' })).ok);
   await until(() => existsSync(cursorFile + '.sync')
-    && readJson<string>(cursorFile + '.sync') !== previousSync, 'The native receiver must consume the room notification before testing Nobody');
-  assert.equal(provider.requests.length, 0, 'Nobody must prevent real Matrix chat from reaching the native model transport');
+    && readJson<string>(cursorFile + '.sync') !== previousSync, 'The native receiver must consume the room notification before testing empty authority');
+  assert.equal(provider.requests.length, 0, 'Empty selection must prevent real Matrix chat from reaching the native model transport');
   assert.equal(listenerFailure, undefined, String(listenerFailure));
-  await engine.call('turn/start', { threadId: engine.session, input: [{ type: 'text', text: 'Direct native user input with Nobody selected.', text_elements: [] }] });
+  await engine.call('turn/start', { threadId: engine.session, input: [{ type: 'text', text: 'Direct native user input with no chat authors selected.', text_elements: [] }] });
   await until(() => !!provider.held());
   assert.equal(provider.requests.length, 1);
   assert(!JSON.stringify(provider.requests).includes('Crossfire integrated native delivery'));
   provider.finish();
   await until(() => engine.notifications.some(notice => notice.method === 'turn/completed'));
   provider.hold();
-  await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('owner');
-  await submit(page, 'Save wake-up policy');
-  await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Choose who can wake' }).click();
+  await page.getByLabel('Allow ' + config.administrator, { exact: true }).check();
+  await page.getByRole('button', { name: 'Save wake-up policy', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await until(() => provider.requests.some(value => JSON.stringify(value).includes('Crossfire integrated native delivery')) || listenerFailure !== undefined);
   assert.equal(listenerFailure, undefined, String(listenerFailure));
   provider.finish();
@@ -359,12 +363,18 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'agent-decision.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);
   await page.screenshot({ path: join(directory, 'agent-decision-mobile.png'), fullPage: true });
-  const submission = page.waitForResponse(response => response.url().endsWith('/runtime-decisions/' + decision.id + '/answer') && response.request().method() === 'POST')
-    .then(async response => ({ status: response.status(), body: await response.text() }));
+  const answerUrl = origin + '/api/agents/' + profile.id + '/runtime-decisions/' + decision.id + '/answer';
+  let answered: { status: number; body: string } | undefined;
+  await page.route(answerUrl, async route => {
+    const response = await route.fetch({ maxRedirects: 0 });
+    answered = { status: response.status(), body: await response.text() };
+    await route.fulfill({ response });
+  });
   await page.getByRole('button', { name: 'Submit answer', exact: true }).click();
-  const answered = await submission;
-  assert.equal(answered.status, 200, answered.body);
   await expect(page.getByText('Answer submitted. Native response publication is reported separately; this is not proof that execution has resumed.', { exact: true })).toBeVisible();
+  await page.unroute(answerUrl);
+  assert(answered);
+  assert.equal(answered.status, 200, answered.body);
   assert.equal(value(await coordination.pollDecision(profile.id, decision.id)).answers[0]?.text, 'private browser answer');
   await expect(page.getByLabel('Private answer')).toHaveValue('');
   assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Browser review and answer are ordinary code, not model housekeeping');
@@ -520,7 +530,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const aliceSession = value(await createSession(services, String(aliceAccount.access_token))), aliceActor = value(await authenticateMember(services, aliceSession.secret)).actor;
   for (const [name, actor, ownerMatrixId] of [['archived', adminActor, config.administrator], ['alice-agent', aliceActor, '@alice:architecture.localhost']] as const) {
     const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: name, controller: { name: name + ' workstation', metadata: {} },
-      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy() }] };
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const id = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!.agentId!;

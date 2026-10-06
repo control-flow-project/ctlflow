@@ -11,7 +11,7 @@ function policyStore() {
     value(repositories.member.insert({ principalId: id, principalKind: 'human', displayName: id }));
   }
   value(repositories.principal.insert({ id: 'ada', matrixUserId: '@ada:test', kind: 'agent', status: 'active', revision: 7, createdAt: 1 }));
-  value(repositories.agent.insert({ principalId: 'ada', principalKind: 'agent', ownerId: 'owner', displayNameOverride: null, wakeMode: 'owner-agents' }));
+  value(repositories.agent.insert({ principalId: 'ada', principalKind: 'agent', ownerId: 'owner', displayNameOverride: null, wakeMode: 'selected' }));
   value(repositories.agentCredential.insert({ agentId: 'ada', provisioningPassword: 'private-password', accessToken: 'private-token', updatedAt: 10 }));
   value(repositories.agentName.insert({ name: 'ada', agentId: 'ada', requestId: null, instanceKey: null }));
   value(repositories.fleet.insert({ id: 'fleet', ownerId: 'owner', fleetKey: 'agreements', label: 'Agreements', controllerName: 'Computer',
@@ -33,16 +33,16 @@ test('normalized requested and approved policies enforce principal, catalog, own
       verificationCode: 'CODE00000000', claimHash: 'hash', rosterDigest: 'digest', status: 'pending', revision: 0, createdAt: 1, expiresAt: 100, decidedByMemberId: null, decidedAt: null }));
     value(repositories.enrollmentItem.insert({ requestId: 'request', instanceKey: 'ada', requestedName: 'ada', agentId: 'ada', outcome: 'existing', failureCode: null }));
     const key = { requestId: 'request', instanceKey: 'ada' }, requested = { wakeMode: 'selected' as const,
-      senderIds: ['other', 'owner'], permissions: ['room.agent.invite' as const], expectedAgentRevision: 7 };
+      senders: ['other', 'owner'].map(principalId => ({ principalId, includeAgents: false })), permissions: ['room.agent.invite' as const], expectedAgentRevision: 7 };
     value(repositories.fleetPolicy.insertRequested(key, requested));
     assert.deepEqual(value(repositories.fleetPolicy.requested(key.requestId)), [
-      { ...requested, instanceKey: 'ada', senderMatrixIds: ['@other:test', '@owner:test'] },
+      { ...requested, instanceKey: 'ada', matrixSenders: ['@other:test', '@owner:test'].map(matrixUserId => ({ matrixUserId, includeAgents: false })) },
     ]);
     assert.equal(repositories.fleetPolicy.approve({ agentId: 'ada', approvedByMemberId: 'other', approvedAt: 1, permissions: [] }).ok, false);
     value(repositories.fleetPolicy.approve({ agentId: 'ada', approvedByMemberId: 'owner', approvedAt: 10, permissions: ['room.agent.invite'] }));
     assert.deepEqual(value(repositories.fleetPolicy.approved('ada'))!.permissions, ['room.agent.invite']);
     assert.throws(() => database.prepare('INSERT INTO fleet_instance_permission VALUES (?, ?, ?)').run('ada', 'policy.manage', 'agent_room'));
-    assert.throws(() => database.prepare('INSERT INTO enrollment_item_wake_sender VALUES (?, ?, ?)').run('request', 'ada', 'missing'));
+    assert.throws(() => database.prepare('INSERT INTO enrollment_item_wake_sender VALUES (?, ?, ?, ?)').run('request', 'ada', 'missing', 0));
     for (const name of ['ix_enrollment_item_permission_code', 'ix_enrollment_item_wake_sender_principal', 'ix_fleet_instance_policy_owner', 'ix_fleet_instance_permission_code']) {
       assert(database.prepare("SELECT name FROM sqlite_schema WHERE type='index' AND name=?").get(name), name);
     }

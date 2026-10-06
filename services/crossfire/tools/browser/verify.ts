@@ -9,6 +9,7 @@ import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
 import { withHuman, type Credentials } from '../auth.js';
 import { checkPaperLayout } from './layout.js';
 import { managementViews, managementViewports } from './views.js';
+import { verifyWakePicker } from './wake-picker.js';
 
 export function browserFailureMessage(error: unknown, secrets: readonly (string | undefined)[]): string {
   let message = error instanceof Error ? error.message : 'Unknown browser verification failure';
@@ -28,6 +29,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
     let phase = 'sign-in';
     const errors: string[] = [];
     const views = managementViews(human.viewer, policy.value.data, agents.value, fleets.value);
+    let wakePickerViewports = 0;
     const abort = () => { void context.close().catch(() => {}); };
     signal.addEventListener('abort', abort, { once: true });
     try {
@@ -74,6 +76,11 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
             await expect(navigation.locator('[aria-current="page"]')).toHaveText(view.navigation.current);
           }
           await checkPaperLayout(page);
+          const agent = agents.value[0];
+          if (agent && agent.allowedActions.includes('configure') && agent.status !== 'revoked' && view.route === '/manage/agents/' + agent.agentId) {
+            await verifyWakePicker(page, agent.agentId, viewport, join(directory, viewport.width + '-wake-picker.png'));
+            wakePickerViewports++;
+          }
           if (view.route.endsWith('/activity?view=traffic')) {
             await expect(page.getByLabel('Period', { exact: true })).toBeVisible();
             await expect(page.getByRole('button', { name: 'Refresh summaries', exact: true })).toBeVisible();
@@ -103,7 +110,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
       const link = await page.getByRole('link', { name: 'Read the full guide for your account →', exact: true }).getAttribute('href');
       if (!link || new URL(link, origin).searchParams.get('ownerMatrixId') !== account.matrixUserId) return failure('native', 'Onboarding link does not identify the signed-in user');
       if (errors.length) return failure('native', 'Management browser reported a page error');
-      return success({ origin, human: account.matrixUserId, managementRoutes: views.length * managementViewports.length, screenshots: directory, modelCalls: 0 });
+      return success({ origin, human: account.matrixUserId, managementRoutes: views.length * managementViewports.length, wakePickerViewports, screenshots: directory, modelCalls: 0 });
     } catch (error) {
       const message = browserFailureMessage(error, [account.password, human.nativeAccessToken, token, csrf]);
       writeJson(join(directory, 'failure.json'), { phase, message });

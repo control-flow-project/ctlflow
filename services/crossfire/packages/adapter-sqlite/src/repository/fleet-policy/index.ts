@@ -16,7 +16,8 @@ export function createFleetPolicyRepository(database: Database.Database): FleetP
           .join(query.from('principal'), sender => sender.sender_principal_id, principal => principal.id, (sender, principal) => ({ sender, principal }))
           .where(row => row.sender.request_id === params.requestId)
           .orderBy(row => row.sender.instance_key).thenBy(row => row.sender.sender_principal_id)
-          .select(row => ({ instanceKey: row.sender.instance_key, principalId: row.sender.sender_principal_id, matrixUserId: row.principal.matrix_user_id })), { requestId });
+          .select(row => ({ instanceKey: row.sender.instance_key, principalId: row.sender.sender_principal_id, matrixUserId: row.principal.matrix_user_id,
+            includeAgents: row.sender.include_agents })), { requestId });
         const permissions = executeSelect(database, schema, (query, params) => query.from('enrollment_item_permission')
           .where(row => row.request_id === params.requestId).orderBy(row => row.instance_key).thenBy(row => row.permission_code), { requestId });
         const bySender = new Map<string, typeof senders>(), byPermission = new Map<string, 'room.agent.invite'[]>();
@@ -27,8 +28,8 @@ export function createFleetPolicyRepository(database: Database.Database): FleetP
           const group = byPermission.get(permission.instance_key) ?? []; group.push(permission.permission_code); byPermission.set(permission.instance_key, group);
         }
         return success(policies.map(policy => ({ instanceKey: policy.instance_key, wakeMode: policy.wake_mode,
-          expectedAgentRevision: policy.expected_agent_revision, senderIds: (bySender.get(policy.instance_key) ?? []).map(sender => sender.principalId),
-          senderMatrixIds: (bySender.get(policy.instance_key) ?? []).map(sender => sender.matrixUserId), permissions: byPermission.get(policy.instance_key) ?? [] })));
+          expectedAgentRevision: policy.expected_agent_revision, senders: (bySender.get(policy.instance_key) ?? []).map(sender => ({ principalId: sender.principalId, includeAgents: sender.includeAgents === 1 })),
+          matrixSenders: (bySender.get(policy.instance_key) ?? []).map(sender => ({ matrixUserId: sender.matrixUserId, includeAgents: sender.includeAgents === 1 })), permissions: byPermission.get(policy.instance_key) ?? [] })));
       });
     },
     insertRequested(key, policy) {
@@ -36,8 +37,9 @@ export function createFleetPolicyRepository(database: Database.Database): FleetP
         executeInsert(database, schema, (query, params) => query.insertInto('enrollment_item_policy').values({
           request_id: params.requestId, instance_key: params.instanceKey, wake_mode: params.wakeMode,
           expected_agent_revision: params.expectedAgentRevision }), { ...key, ...policy });
-        for (const senderId of policy.senderIds) executeInsert(database, schema, (query, params) => query.insertInto('enrollment_item_wake_sender').values({
-          request_id: params.requestId, instance_key: params.instanceKey, sender_principal_id: params.senderId }), { ...key, senderId });
+        for (const sender of policy.senders) executeInsert(database, schema, (query, params) => query.insertInto('enrollment_item_wake_sender').values({
+          request_id: params.requestId, instance_key: params.instanceKey, sender_principal_id: params.principalId,
+          include_agents: params.includeAgents }), { ...key, ...sender, includeAgents: sender.includeAgents ? 1 : 0 });
         for (const permissionCode of policy.permissions) executeInsert(database, schema, (query, params) => query.insertInto('enrollment_item_permission').values({
           request_id: params.requestId, instance_key: params.instanceKey, permission_code: params.permissionCode, grant_scope: 'agent_room' }), { ...key, permissionCode });
         return success(undefined);

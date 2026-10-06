@@ -14,7 +14,7 @@ export async function reviewEnrollment(origin: string, account: Credentials, pla
     if (!current.ok) return current;
     const review = current.value.data, record = review.enrollment;
     const roster = (instances: typeof plan.instances) => JSON.stringify(instances.map(item => [item.instanceKey, item.currentName, item.requestedName,
-      item.coordinationPolicy ? { wakeMode: item.coordinationPolicy.wakeMode, senderMatrixIds: [...item.coordinationPolicy.senderMatrixIds].sort(),
+      item.coordinationPolicy ? { wakeMode: item.coordinationPolicy.wakeMode, senders: [...item.coordinationPolicy.senders].sort((left, right) => left.matrixUserId.localeCompare(right.matrixUserId)),
         permissions: [...item.coordinationPolicy.permissions].sort() } : null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))));
     if (record.status !== 'pending' || record.owner.matrixUserId !== plan.ownerMatrixId || record.fleetKey !== plan.fleetKey
       || record.controllerName !== plan.controllerName || record.verificationCode !== plan.verificationCode

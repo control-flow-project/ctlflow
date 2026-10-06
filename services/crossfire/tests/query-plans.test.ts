@@ -51,7 +51,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
       for (let agentIndex = 0; agentIndex < 200; agentIndex++) {
         const agentId = ownerId + '-agent-' + String(agentIndex).padStart(3, '0');
         value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: agentIndex }));
-        value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
+        value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'selected' }));
         value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
         application(agentId);
         value(repositories.fleetInstance.insert({ ownerId, fleetKey: ownerId, instanceKey: agentId, agentId, retiredAt: null }));
@@ -188,7 +188,7 @@ test('sender identity batches seek exact Matrix indexes across large human and a
       value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
       value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
-      value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
+      value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'selected' }));
       value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
     }
   })();
@@ -233,7 +233,7 @@ test('fleet enrollment review hydrates the entire roster and selected identities
         value(repositories.enrollmentItem.insert({ requestId, instanceKey, requestedName: requestId + '-' + instanceKey,
           agentId: null, outcome: 'claimed', failureCode: null }));
         value(repositories.fleetPolicy.insertRequested({ requestId, instanceKey }, { wakeMode: 'selected', expectedAgentRevision: null,
-          permissions: ['room.agent.invite'], senderIds: Array.from({ length: 100 }, (_, senderIndex) => 'sender-' + senderIndex) }));
+          permissions: ['room.agent.invite'], senders: Array.from({ length: 100 }, (_, senderIndex) => ({ principalId: 'sender-' + senderIndex, includeAgents: senderIndex % 2 === 0 })) }));
       }
     }
   })();
@@ -242,8 +242,10 @@ test('fleet enrollment review hydrates the entire roster and selected identities
     statements = [];
     const policies = value(repositories.fleetPolicy.requested(requestId));
     assert.equal(policies.length, count);
-    assert(policies.every(policy => policy.senderIds.length === 100 && policy.senderMatrixIds.length === 100
-      && policy.senderMatrixIds.every(matrixId => matrixId.startsWith('@sender-'))
+    assert(policies.every(policy => policy.senders.length === 100 && policy.matrixSenders.length === 100
+      && policy.matrixSenders.every(sender => sender.matrixUserId.startsWith('@sender-'))
+      && policy.senders.filter(sender => sender.includeAgents).length === 50
+      && policy.matrixSenders.filter(sender => sender.includeAgents).length === 50
       && policy.permissions.length === 1 && policy.permissions[0] === 'room.agent.invite'));
     assert.equal(statements.length, 3, 'Policy, permission and selected-sender queries are roster-wide');
     for (const statement of statements) {

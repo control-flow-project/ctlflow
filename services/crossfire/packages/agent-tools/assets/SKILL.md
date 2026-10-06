@@ -244,10 +244,12 @@ changed skills, then restart the controller through `fleet daemon restart`.
 Stopped instances remain stopped. Never re-enroll or create a competing receiver.
 
 The listener enforces the management wake-up policy without model calls. By
-default only the owner wakes this agent. Other messages wait as context and
-arrive together with an authorized message after the fixed collection window.
-Nobody disables chat-triggered input, including urgent owner text; direct native
-input remains available. Do not bypass that choice by polling pending messages.
+default only the explicitly selected owner wakes this agent. A selected person
+may include their current agents; several selections combine. Other messages
+wait as context and arrive together with an authorized message after the fixed
+collection window. An empty selected audience disables chat-triggered input,
+including urgent owner text; direct native input remains available. Do not
+bypass that choice by polling pending messages.
 Do not poll or implement wake-up filtering yourself. Reconciliation, activity
 reporting and bulk delivery are automatic; pause and revocation remain enforced.
 
@@ -256,7 +258,8 @@ and typing a new instruction, in a room or DM. This acts like Esc followed by
 new input: the listener cancels the captured native turn, confirms terminal
 status and delivers the attributed instruction in the same history ahead of
 undelivered backlog. No command prefix is needed. Room access, mute, delivery
-intent and the configured wake-author policy remain authoritative, including Nobody.
+intent and the configured wake-author policy remain authoritative, including an
+empty selected audience.
 Agent-to-agent mentions are ordinary messages, never steering commands.
 
 The separate owner `!!` command stops and pauses delivery until a later owner

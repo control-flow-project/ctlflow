@@ -9,7 +9,7 @@ import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordina
 
 const configuration: Configuration = { directory: '/fixture', digest: 'fixture',
   roster: { fleet: 'fixture', instances: [], coordination: { adapter: 'crossfire', server: 'https://example.test', owner: '@human:example.test' } },
-  definitions: { analyst: { name: 'Analyst', runtime: 'codex', instructions: '', coordinationPolicy: defaultCoordinationPolicy(), options: { sandbox_mode: 'workspace-write', approval_policy: 'on-request' } } } };
+  definitions: { analyst: { name: 'Analyst', runtime: 'codex', instructions: '', coordinationPolicy: defaultCoordinationPolicy('@human:example.test'), options: { sandbox_mode: 'workspace-write', approval_policy: 'on-request' } } } };
 
 test('native policies are validated without manual approval-room configuration', () => {
   const execution = createExecution({ codex: codexRuntime() }, '/fixture/assets');

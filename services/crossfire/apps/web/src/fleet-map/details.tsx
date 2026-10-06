@@ -23,7 +23,7 @@ function Connections({ map, connections, agent }: { map: FleetMapView; connectio
 function Identities({ map, source, agent }: { map: FleetMapView; source: MapSource; agent?: MapAgent }) {
   const enabled = !agent || agent.status === 'active' && agent.owner.status === 'active';
   const eligible = new Set(enabled ? source.eligiblePrincipalIds.filter(id => id !== agent?.agentId) : []);
-  const configured = new Set(source.selectedPrincipalIds);
+  const configured = new Map(source.senders.map(sender => [sender.principalId, sender.includeAgents]));
   const identities = map.principals.filter(identity => eligible.has(identity.principalId) || configured.has(identity.principalId))
     .sort((left, right) => left.displayName.localeCompare(right.displayName) || left.matrixUserId.localeCompare(right.matrixUserId));
   return <><p className="support">{eligible.size} active identities allowed by this rule.{!agent && ' Each agent excludes itself.'} Room access and unmuted delivery are still required.</p>
@@ -31,7 +31,7 @@ function Identities({ map, source, agent }: { map: FleetMapView; source: MapSour
     <PageItems items={identities} parameter="authorsPage">{items => items.length ? <div className="table-wrap"><table aria-label="Wake-up identities">
       <thead><tr><th>Identity</th><th>Type</th><th>Wake eligibility</th></tr></thead><tbody>{items.map(identity => <tr key={identity.principalId}>
         <td><strong>{identity.displayName}</strong><span className="subline mono">{identity.matrixUserId}</span></td><td>{identity.kind}</td>
-        <td>{eligible.has(identity.principalId) ? 'Allowed' : 'Selected, not eligible'}</td></tr>)}</tbody></table></div>
+        <td>{eligible.has(identity.principalId) ? 'Allowed' : 'Selected, not eligible'}{configured.get(identity.principalId) && <span className="subline">Includes their agents</span>}</td></tr>)}</tbody></table></div>
       : <p className="support">Nobody can trigger chat input under this rule{!enabled ? ' while the account is inactive' : ''}. Scheduled Wake-ups and terminal input remain separate.</p>}</PageItems></>;
 }
 

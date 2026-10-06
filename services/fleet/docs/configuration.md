@@ -114,8 +114,12 @@ sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
 
 [coordination_options]
-wake_mode = "owner-agents"
+wake_mode = "selected"
 permissions = ["room.agent.invite"]
+
+[[coordination_options.wake_senders]]
+matrix_user_id = "@owner:YOUR_SERVER"
+include_agents = true
 ```
 
 The roster's optional workspace, or private workarea by default, supplies native
@@ -126,7 +130,10 @@ options; fleetd does not interpret Codex-specific settings.
 The role's separate `coordination_options` declares Crossfire wake authority and
 invitation defaults for every instance. Owner approval applies the exact policy
 to current ordinary grants and future admissions without another setup step.
-Omitting the whole block requests owner-only wake and no invitation delegation.
+Omitting the whole block requests an explicit person-only selection for the
+actual configured owner and no invitation delegation. Each selected person can
+include their currently owned agents. Multiple entries combine; individual
+agents require `include_agents = false`. Use `wake_senders = []` for no entries.
 Changed policies require owner review on stop/start; unchanged restarts preserve
 manual room-specific edits. Configuration grants no room membership or native power.
 - [Fields, selected identities, approval and removal rules](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/coordination.md)

@@ -41,6 +41,7 @@ export type RoomGrantApplication = {
 };
 
 export type AgentWakeSender = {
+  includeAgents: boolean;
   agentId: string;
   senderPrincipalId: string;
 };

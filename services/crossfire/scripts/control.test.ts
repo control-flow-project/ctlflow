@@ -137,7 +137,7 @@ for (const kind of ['read-only', 'native-denial'] as const) {
 test('automatic peer notices neither wake the model nor contaminate subsequent authorized context', withClock(async (context, clock) => {
 
   const { matrix, native, starts } = await fixture(context, clock);
-  matrix.waking.policy = 'owner'; matrix.waking.senders = [OBSERVER];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER];
   matrix.add(ROOM, message('$pending-context', '@other:test.localhost', 'Keep this context.'));
   const automatic = { ...message('$peer-notice'), content: { msgtype: 'm.notice', [LISTENER_NOTICE]: true,
     body: 'Listener delivery is paused. This runtime connection cannot interrupt the current turn; stop it in the coding session.' } };
@@ -145,7 +145,7 @@ test('automatic peer notices neither wake the model nor contaminate subsequent a
   matrix.add(ROOM, automatic);
   await clock.advance(200);
   assert.equal(starts().length, 0);
-  matrix.waking.policy = 'owner-agents'; matrix.waking.senders = [OBSERVER, automatic.sender];
+  matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER, automatic.sender];
   matrix.wake();
   await clock.until(() => matrix.requests.filter(request => request.path.endsWith('/delivery-policy')).length >= 3);
   await clock.advance(150);
@@ -347,7 +347,7 @@ test('revoked human authority during turn capture cannot interrupt or publish re
   await clock.until(() => native.requests().filter(request => request.method === 'turn/start').length === 1);
   matrix.add(ROOM, mention('$revoked'));
   await clock.until(() => captured);
-  matrix.waking.senders = []; matrix.waking.policy = 'nobody'; release();
+  matrix.waking.senders = []; matrix.waking.policy = 'selected'; release();
   await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-2');
   assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 0);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);

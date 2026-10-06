@@ -84,7 +84,7 @@ test('sender resolution retains its exact request while the independent receiver
 
 test('idle and blocked traffic perform no sender lookups; authorized delivery includes buffered verified ownership', async scope => {
   const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory), stop = new AbortController();
-  fixture.waking.policy = 'owner'; fixture.waking.senders = [OBSERVER];
+  fixture.waking.policy = 'selected'; fixture.waking.senders = [OBSERVER];
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await receiving; });
   await until(() => fixture.waiting() === 1);

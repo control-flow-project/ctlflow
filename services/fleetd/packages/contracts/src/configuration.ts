@@ -10,12 +10,14 @@ export const instance = check.object({ key: check.name, name: check.name, defini
   listener_options: check.optional(listenerOptions) });
 export const coordination = check.object({ adapter: check.choice('crossfire'), server: check.text(2048), owner: check.matrixUserId });
 export const roster = check.object({ fleet: check.name, coordination, instances: check.list(instance, 100) });
-const coordinationOptions = check.object({ wake_mode: check.wakeMode, sender_matrix_ids: check.optional(check.list(check.matrixUserId, 2000)),
+const coordinationOptions = check.object({ wake_mode: check.wakeMode,
+  wake_senders: check.list(check.object({ matrix_user_id: check.matrixUserId, include_agents: check.boolean }), 2000),
   permissions: check.list(check.choice('room.agent.invite'), 1) });
 export const definition = check.object({ name: check.text(100), runtime: check.choice('codex'), coordination_options: check.optional(input => {
   const parsed = coordinationOptions(input);
   if (!parsed.ok) return parsed;
-  const valid = coordinationPolicy({ wakeMode: parsed.value.wake_mode, senderMatrixIds: parsed.value.sender_matrix_ids ?? [], permissions: parsed.value.permissions });
+  const valid = coordinationPolicy({ wakeMode: parsed.value.wake_mode,
+    senders: parsed.value.wake_senders.map(sender => ({ matrixUserId: sender.matrix_user_id, includeAgents: sender.include_agents })), permissions: parsed.value.permissions });
   return valid.ok ? parsed : valid;
 }), runtime_options: (input: unknown): Result<Record<string, unknown>> =>
   input && typeof input === 'object' && !Array.isArray(input) ? success(input as Record<string, unknown>) : failure('invalid', 'Expected runtime options') });

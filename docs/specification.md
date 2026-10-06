@@ -165,7 +165,7 @@ Revision checks prevent lost edits. Current configuring-human authority, rule
 owner access, target/owner access, listener generation and any fleet delivery
 gate are checked at admission. A rule grants no Matrix membership or tool
 permission. Explicit schedules are independent of chat wake authority, including
-Nobody. Scheduling and reporting use ordinary code, never model polling.
+an empty selected audience. Scheduling and reporting use ordinary code, never model polling.
 
 The shared listener observes server-clock deadlines and publishes the configured
 message as clearly identified scheduled input through the ordinary runtime
@@ -954,8 +954,12 @@ sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
 
 [coordination_options]
-wake_mode = "owner-agents"
+wake_mode = "selected"
 permissions = ["room.agent.invite"]
+
+[[coordination_options.wake_senders]]
+matrix_user_id = "@owner:YOUR_SERVER"
+include_agents = true
 ```
 
 `name` is the definition's human-readable label, not an account name. Its
@@ -964,13 +968,18 @@ runtime's instruction mechanism. Identity-specific context, where needed, is
 generated deterministically rather than maintained as copied role documents.
 
 `coordination_options` is a runtime-independent, strict role configuration. It
-requires `wake_mode` and `permissions` when present; omission requests `owner`
-and an empty permission list. Modes are `nobody`, `owner`, `owner-agents`, `humans`,
-`everyone` and `selected`. Permissions are empty or exactly `room.agent.invite`.
-Only `selected` accepts the optional `sender_matrix_ids` array: up to 2000 unique
-registered immutable Matrix identities, resolved to active principals at request
-and approval. Empty selection wakes nobody; owner and self are not implicit.
-Unknown fields/capabilities, duplicate IDs or senders on another mode are rejected.
+requires `wake_mode`, `permissions` and `wake_senders` when present. Omission
+requests `selected` with the actual configured owner as one person-only entry
+and no invitation permission. Modes are `selected`, `humans` and `everyone`.
+Permissions are empty or exactly `room.agent.invite`. Each of up to 2000 unique
+`wake_senders` entries supplies `matrix_user_id` and `include_agents`. Only a
+human entry can include that person's currently owned active agents. Individual
+agent entries require false. `humans` allows all active humans plus selected
+entries; `everyone` requires an empty list. Empty `selected` wakes nobody;
+owner and self are not implicit. Use `wake_senders = []` for an empty list.
+Unknown fields/capabilities, duplicate IDs, invalid flags and old presets/flat
+sender-ID fields are rejected. Active identity and ownership are checked at
+request and approval and resolved afresh for listener delivery.
 All instances inherit their definition's complete policy; no instance override,
 native-option alias or per-fleet permission system exists.
 
@@ -1199,7 +1208,7 @@ validation, expected failures and bounded payloads.
 Enrollment receives coordination information: owner, fleet, instance keys,
 registered names, reporting controller descriptor, per-item coordination policies
 and private request/authentication material. Every fleet item requires the complete
-`coordinationPolicy: {wakeMode, senderMatrixIds, permissions}` shape, including
+`coordinationPolicy: {wakeMode, senders: [{matrixUserId, includeAgents}], permissions}` shape, including
 one-item fleets. Fleet/controller fields are mandatory; superseded payloads
 without them are rejected. Read representations always include each item's
 complete policy. Selected identities persist as normalized principal IDs.
@@ -1341,7 +1350,7 @@ This grant cannot be muted, downgraded, removed or delegated through single,
 bulk or room-permission operations. It does not consume the discretionary room
 allowance. Native reconciliation repairs membership and reply permission while
 both accounts are active. Suspension/revocation still removes access. Controller
-and listener disconnection and chat wake policy remain independent: Nobody and
+and listener disconnection and chat wake policy remain independent: empty selection and
 selected-sender restrictions still apply to owner chat. Exact approval decisions
 are handled independently of paused chat and wake eligibility.
 
@@ -1604,20 +1613,25 @@ Allowed wake authors are configured in management or approved fleet definitions:
 
 | Policy | Wake authority |
 | --- | --- |
-| `nobody` | No room author wakes the agent; direct runtime input is independent. |
-| `owner` | Verified owner only; default. |
-| `owner-agents` | Owner and that owner's agents. |
-| `humans` | Owner, owner's agents and other humans. |
-| `everyone` | Humans and their agents. |
-| `selected` | Only the explicitly selected verified people and agents. |
+| `selected` | Explicit person-only, person-plus-their-agents and individual-agent entries, combined with OR. Empty selection disables chat wake. Default is an explicit owner-only entry. |
+| `humans` | All active registered humans plus explicit entries, including selected people's agents. No implicit owner-agent group. |
+| `everyone` | All active registered humans and agents; requires no explicit entries. |
 
-Selected-author configuration is a bounded set of immutable Matrix identities,
-not display-name matching or a permission level in the predefined-mode ordering.
-The management editor offers search, human/agent filters, checkboxes, selected
-count and clear identity/owner labels. Selected entries remain visible while
-searching or paging; saving replaces the complete selection atomically with
-revision checks. Empty selection wakes nobody. The owner is not implicitly
-included; the agent never wakes itself.
+Selected-author configuration is a bounded relation of immutable principal IDs
+and `includeAgents` flags, not display-name matching or a preset ordering. A
+person entry includes that person; true also includes currently owned active
+agents, including agents enrolled later. Individual-agent entries require false.
+Two person groups admit both people and both ownership groups, not everyone.
+The Rooms view shows a compact policy summary and selected-entry table. Its
+picker is a native modal dialog with search, paginated people/individual-agent
+discovery and a per-person scope selector. On small screens it fills the screen
+but retains modal focus, Escape/Cancel, background isolation and focus return.
+Draft entries remain visible across searches/pages. Cancel discards them. Save
+atomically replaces mode and all entries with an exact revision check. Conflicts
+retain the draft, load the current policy and require explicit discard before
+replacement. Empty selection wakes nobody. Owner is not implicit; self is excluded.
+REST writes use `{expectedRevision, mode, senders: [{principalId, includeAgents}]}`;
+reads return `{agentId, revision, mode, senders: [{identity, includeAgents}]}`.
 
 The server resolves all modes through one wake-authorization owner. Suspended
 or revoked identities and agents whose owners are inactive cannot wake listeners.
@@ -1753,7 +1767,7 @@ verified human acts like Esc followed by new input: capture the exact active
 turn, confirm native interruption, then deliver the full attributed instruction
 through the same receipt path and history ahead of unread backlog. Current wake
 authors, native sender/agent membership, unmuted room access and controller
-admission remain authoritative, including Nobody. Agent-to-agent mentions,
+admission remain authoritative, including an empty selected audience. Agent-to-agent mentions,
 display names, historical snapshots, edits and automated notices cannot interrupt;
 fresh explicitly mentioned replies can. Shared mode steers the shared history;
 per-room mode targets only that room history. Idle/sleeping agents reuse their
@@ -2187,28 +2201,28 @@ are in [Public static reports](../services/crossfire/docs/publications.md).
 ## 11. Normalized persistence and authorization
 
 One canonical schema and permission catalog own current state. Fresh stores
-initialize schema 13 directly. An inventoried deployed schema 12 advances to 13
-transactionally after a verified backup. Versions 1–11, foreign stores and future
+initialize schema 14 directly. An inventoried deployed schema 13 advances to 14
+transactionally after a verified backup. Versions 1–12, foreign stores and future
 versions are refused without mutation; there is no historical migration ladder,
 historical runtime reader or reset-on-error behavior.
 
 The canonical schema has 63 singular tables. The forward migration preserves
 immutable identities, native credentials and histories, room/access records,
-receipt and usage history, publications, policy and audit. It adds historical
-enrollment archives, fleet archive/instance retirement timestamps, exact immutable
-controller-generation identifiers and independent native-stop receipts.
+receipt and usage history, publications, policy and audit. It converts agent,
+pending/current enrollment and historical archive wake policies into explicit
+selections without changing effective authority: owner becomes a person-only
+entry; owner-agents becomes owner plus agents; nobody becomes empty selected;
+humans retains its former owner-agent exception as an explicit owner group;
+selected IDs retain false flags. Everyone remains everyone with an empty list.
+Revisions and room/invitation grants do not change. Pending enrollment digests
+are recomputed from their exact converted review snapshots so the same canonical
+request resumes; other historical digests remain unchanged. All table replacement,
+archive-guard restoration, digest conversion and foreign-key checks are atomic.
+Failure restores the original schema, values and version.
 
-Historical requests lacking a fleet key, controller name or controller credential
-hash, or lacking a policy for a successful item, move to `enrollment_archive` and
-its normalized item, policy, permission, selected-wake-sender and metadata
-relations. All fourteen original request fields and existing child rows retain
-exact values, including nullable historical controller fields. No fleet, policy
-or authority is fabricated to make incomplete historical requests operational.
-Complete managed requests remain in the current enrollment relations.
-
-After preserving history, the migration releases archived requests' pending name
-reservations and removes their current operational request rows. Foreign keys
-retain original owner, decider, identity, principal and permission attribution.
+Retained archives and their normalized item/policy/permission/sender/metadata
+relations remain historical records, never operational approval authority.
+Foreign keys retain original owner, decider, identity and permission attribution.
 Update/delete triggers protect all six archive relations. These are immutable
 historical data, not another enrollment reader, approval API or authority source.
 Unbound identities are not invented into fleets, discarded or given live
@@ -2217,9 +2231,7 @@ nonretired binding in a nonarchived fleet. Restoration requires a newly
 owner-reviewed fleet enrollment and surviving private identity proof.
 
 Current enrollment requires fleet/controller fields and a complete coordination
-policy for every item. The migration removes obsolete listener-disconnect
-permissions and rebuilds listener reporting around fleet/connection/credential
-IDs. Existing reporting runs close at their stored last observation; their
+policy for every item. Listener reporting uses fleet/connection/credential IDs;
 activity, receipts and runtime/statistics history remain intact. Only stopped
 historical runs may retain an all-null controller tuple. Every new run must prove
 its exact active fleet instance and current live controller lease; database
@@ -2319,7 +2331,7 @@ repository methods serve issuance and native account operations only.
 | `enrollment_item` | `request_id FK enrollment_request`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. |
 | `enrollment_item_policy` | `request_id`, `instance_key`, `wake_mode`, `expected_agent_revision?`; composite PK/FK to `enrollment_item ON DELETE CASCADE`. Exact review snapshot and stale-existing-agent guard. |
 | `enrollment_item_permission` | `request_id`, `instance_key`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; composite PK; item-policy FK with cascade; catalog FK `(permission_code, grant_scope)`. |
-| `enrollment_item_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`; composite PK; item-policy FK with cascade. Immutable selected-author review rows. |
+| `enrollment_item_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`, `include_agents` checked 0/1; composite PK; item-policy FK with cascade. Exact selected-author review rows. |
 | `agent_name` | `name PK`, `request_id?`, `instance_key?`, `agent_id? UQ/FK agent`; pending-item composite FK; `UQ(request_id, instance_key)`. |
 | `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `delivery_enabled`, `revision`, `created_at`, `updated_at`, `archived_at?`; `PK(owner_id, fleet_key)`. |
 | `fleet_connection` | `fleet_id PK/FK fleet`, `connection_id UQ`, `credential_id FK fleet_credential`, `last_seen_at`, `expires_at`, `closed_at?`. One exclusive controller generation. |
@@ -2337,7 +2349,7 @@ repository methods serve issuance and native account operations only.
 | `enrollment_archive_item` | `request_id FK enrollment_archive`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. Historical result/identity attribution; failed outcome requires failure code. |
 | `enrollment_archive_policy` | `request_id`, `instance_key`, `wake_mode`, `expected_agent_revision?`; composite PK/FK to `enrollment_archive_item`. Closed wake-mode domain and nonnegative expected revision retain the exact reviewed policy, not an effective current policy. |
 | `enrollment_archive_permission` | `request_id`, `instance_key`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; `PK(request_id, instance_key, permission_code)`; composite item-policy FK and catalog FK `(permission_code, grant_scope)`. Historical requested authority only. |
-| `enrollment_archive_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`; `PK(request_id, instance_key, sender_principal_id)`; composite FK to archive policy. Exact historical selected identities, not current wake eligibility. |
+| `enrollment_archive_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`, `include_agents` checked 0/1; `PK(request_id, instance_key, sender_principal_id)`; composite FK to archive policy. Exact historical selections, not current wake eligibility. |
 | `enrollment_archive_metadata` | `enrollment_id FK enrollment_archive`, `key`, `value`; `PK(enrollment_id, key)`. Exact historical controller metadata, never routing/authentication authority. |
 
 All six enrollment archive relations have rejecting UPDATE/DELETE triggers.
@@ -2383,7 +2395,7 @@ enrollment decision state.
 | `agent_owner_conversation` | `agent_id PK`, `owner_id`, `room_id UQ`, `created_at`; composite FKs to `agent(principal_id, owner_id)` and `agent_room_grant(agent_id, room_id)`. Schema guards require permanent owner-authorized unmuted reply access and reject grant downgrade/deletion. |
 | `agent_room_permission` | `agent_id`, `room_id`, `generation`, `permission_code`, `grant_scope = agent_room`, `granted_by_member_id FK member`, `granted_at`; `PK(agent_id, room_id, permission_code)`; composite FKs to the exact room-grant generation and `permission(code, grant_scope)`. |
 | `room_grant_application` | `agent_id`, `room_id`, `observed_generation?`, `applied_revision?`, `applied_access_revision?`, `membership?`, `creator`, `power_level?`, `last_attempt_at?`, `last_success_at?`, `next_check_at`, `error_code?`, `error_message?`; composite PK/FK to `agent_room_grant(agent_id, room_id)`. Native creators have no finite power level. |
-| `agent_wake_sender` | `agent_id FK agent`, `sender_principal_id FK principal`; composite PK; self-selection rejected. |
+| `agent_wake_sender` | `agent_id FK agent`, `sender_principal_id FK principal`, `include_agents` checked 0/1; composite PK; self-selection rejected; only human selections can include their agents. |
 | `wake_rule` | `id PK`, `owner_id FK member`, `configured_by_id FK member`, `name`, `message`, `schedule_kind`, `interval_seconds?`, `cron_expression?`, `time_zone?`, `enabled`, `revision`, `created_at`, `updated_at`. A check requires exactly the interval or cron columns, never both. |
 | `wake_rule_agent` | `rule_id FK wake_rule ON DELETE CASCADE`, `agent_id FK agent`, `next_due_at`, `last_delivered_at?`; `PK(rule_id, agent_id)`. One independent deadline/last receipt per target. |
 | `wake_delivery` | `id PK`, `rule_id`, `agent_id`, `rule_revision`, `run_id FK listener_run`, `session_id`, `scheduled_at`, `created_at`, `status`, `delivered_at?`; composite FK to `wake_rule_agent ON DELETE CASCADE`. Status is pending/delivered/cancelled; only delivered has a receipt time. |
@@ -2731,7 +2743,7 @@ ownership. The management website remains under `/manage`.
 | `GET /api/fleets/{fleetId}/statistics` | Fleet owner/admin hourly summaries, bounded period selection, SQL-paginated sender/recipient flows and optional native usage; approximate counts and unknown billing remain explicit. |
 | `GET, POST /api/fleets/{fleetId}/session-operations`, `PUT /api/fleets/{fleetId}/session-operations/{operationId}/claim`, `PUT /api/fleets/{fleetId}/session-operations/{operationId}/receipt` | Human-authorized paginated session requests and controller-only generation-bound outcomes; Crossfire never launches native processes. |
 | `GET /api/agents`, `GET, PATCH /api/agents/{agentId}` | Scoped list/details and configuration/lifecycle changes. |
-| `GET, PUT /api/agents/{agentId}/wake-policy` | One complete mode/selected-sender configuration. |
+| `GET, PUT /api/agents/{agentId}/wake-policy` | One complete mode and additive person/ownership-group/individual-agent selection configuration, with exact revision replacement. |
 | `GET /api/agents/{agentId}/delivery-policy` | This authenticated agent's resolved native delivery policy. |
 | `POST /api/agents/{agentId}/owner-conversation` | This authenticated agent ensures its canonical private owner DM; empty request, `{ roomId }` response. No caller-selected room or other-agent access. |
 | `GET, POST /api/wake-rules` | Human owner/admin paginated rule list or idempotent named schedule creation; creation is CSRF protected. |
@@ -3042,14 +3054,14 @@ Required banks:
 - Real-browser Wake-ups CRUD, weekday/cron editors, assignment selection,
   owner/admin visibility, pagination, confirmations and desktop/mobile geometry.
   Actual Codex publication through the shared listener with
-  inert providers, including owner-DM-only/Nobody delivery, native busy and owner pause.
+  inert providers, including owner-DM-only/empty-audience delivery, native busy and owner pause.
 - Enrollment name races, exact one-roster approval, private credential recovery,
   complete role coordination review, stale-policy rollback, selected-sender
   authority, unchanged restart preservation, automatic current/future room
   permission materialization, cross-owner invitations and provenance-only removal,
   scoped fleet credentials, membership changes/controller updates and no leaks.
 - Native Conduit grants/invitations/removal, cross-owner authority/provenance,
-  revocation, selected/nobody wake rules and durable blocked-mention cooldown.
+  revocation, selected/empty wake rules and durable blocked-mention cooldown.
 - One receipt/cursor path, buffering/debounce/size limits, approvals and metadata
   reporting without model turns; no duplicated receivers after restart.
 - Effective approval-policy capabilities, private unencrypted owner-DM validation,
@@ -3078,8 +3090,8 @@ Required banks:
 - Real Element invited/open signup, issuer-policy scope, registration denial,
   independent managed-session setup, model-free listener tests,
   consent-notice receipts/restart deduplication, private-lock suspension/death,
-  and transactional schema-12-to-13 migration preserving identities, histories,
-  grants, receipts and audit while archiving historical non-controller requests.
+  and transactional schema-13-to-14 migration preserving identities, histories,
+  grants, receipts and audit while converting current and archived wake authority.
 - Zero-question pinned npm setup, optional configuration, active verified owner
   descriptors, stable private defaults, approval/idempotency and explicit stop
   preservation. Strict unsupported-runtime and superseded-route/payload rejection.

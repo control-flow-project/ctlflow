@@ -18,7 +18,7 @@ CREATE TABLE enrollment_archive_item (
 CREATE INDEX ix_enrollment_archive_item_agent ON enrollment_archive_item(agent_id,request_id,instance_key);
 CREATE TABLE enrollment_archive_policy (
   request_id TEXT NOT NULL, instance_key TEXT NOT NULL,
-  wake_mode TEXT NOT NULL CHECK(wake_mode IN ('nobody','owner','owner-agents','humans','everyone','selected')),
+  wake_mode TEXT NOT NULL CHECK(wake_mode IN ('humans','everyone','selected')),
   expected_agent_revision INTEGER CHECK(expected_agent_revision IS NULL OR expected_agent_revision >= 0),
   PRIMARY KEY(request_id,instance_key),
   FOREIGN KEY(request_id,instance_key) REFERENCES enrollment_archive_item(request_id,instance_key)
@@ -34,6 +34,7 @@ CREATE TABLE enrollment_archive_permission (
 CREATE INDEX ix_enrollment_archive_permission_code ON enrollment_archive_permission(permission_code,grant_scope,request_id,instance_key);
 CREATE TABLE enrollment_archive_wake_sender (
   request_id TEXT NOT NULL, instance_key TEXT NOT NULL, sender_principal_id TEXT NOT NULL REFERENCES principal(id),
+  include_agents INTEGER NOT NULL CHECK(include_agents IN (0,1)),
   PRIMARY KEY(request_id,instance_key,sender_principal_id),
   FOREIGN KEY(request_id,instance_key) REFERENCES enrollment_archive_policy(request_id,instance_key)
 ) STRICT;

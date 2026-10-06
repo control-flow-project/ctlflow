@@ -44,7 +44,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [cliPath, ...args], { env, timeout: 60000 });
   const definition = join(fleet, 'agents/analyst'); mkdirSync(definition, { recursive: true, mode: 0o700 });
-  const coordinationOptions = '\n[coordination_options]\nwake_mode = "owner-agents"\npermissions = ["room.agent.invite"]\n';
+  const coordinationOptions = '\n[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n[[coordination_options.wake_senders]]\nmatrix_user_id = "' + admin.member.principal.matrixUserId + '"\ninclude_agents = true\n';
   writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.2"\nmodel_reasoning_effort = "high"\nsandbox_mode = "read-only"\napproval_policy = "never"\n' + coordinationOptions, { mode: 0o600 });
   writeFileSync(join(definition, 'AGENTS.md'), 'Inert research fixture. Never contact an external provider.', { mode: 0o600 });
   const keys = ['north', 'south'];
@@ -100,7 +100,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
       return state.pending === null && state.confirmed.length === 0;
     });
   }
-  assert.equal((await controller.call(operations.changeWakePolicy, { agentId: north.agentId }, { expectedRevision: 0, mode: 'nobody', senderIds: [] })).ok, false);
+  assert.equal((await controller.call(operations.changeWakePolicy, { agentId: north.agentId }, { expectedRevision: 0, mode: 'selected', senders: [] })).ok, false);
   assert.equal((await controller.call(operations.fleet, { fleetId: randomUUID() }, {})).ok, false);
   const ownerNative = { base: fixture.native.base, token: admin.token };
   const created = value(await nativeOk(ownerNative, 'POST', API + '/createRoom', { name: 'Native fleet room', preset: 'private_chat',

@@ -63,7 +63,7 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
     const ownerRecord = value(services.directory.member(owner.principalId))!;
     const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerRecord.principal.matrixUserId,
       fleetKey: 'test-' + name, controller: { name: 'Test controller' },
-      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy() }] };
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerRecord.principal.matrixUserId) }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, owner, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const item = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!;

@@ -172,6 +172,6 @@ test("management core applies and verifies direct native authority", { timeout: 
     assert.equal(changeMember(services, owner.actor, admin.actor.principalId, { expectedRevision: 0, status: "revoked" }, randomUUID()).ok, false);
     assert.equal((await introduceEnrollment(services, { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: "@outsider:architecture.localhost",
       fleetKey: 'unknown-owner-fleet', controller: { name: 'Unknown owner controller' },
-      instances: [{ instanceKey: "unknown", name: "unknown", coordinationPolicy: defaultCoordinationPolicy() }] })).ok, false);
+      instances: [{ instanceKey: "unknown", name: "unknown", coordinationPolicy: defaultCoordinationPolicy('@outsider:architecture.localhost') }] })).ok, false);
   });
 });

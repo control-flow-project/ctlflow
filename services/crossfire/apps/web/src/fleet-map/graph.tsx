@@ -37,7 +37,7 @@ export function FleetGraph({ map, selection, onSelect }: { map: FleetMapView; se
       return { title: room.name ?? 'Name unavailable', caption: countLabel(roomCounts.get(node.id) ?? 0, 'agent'), status: '', warning: '' };
     }
     const source = sources.get(node.id)!;
-    return { title: sourceTitle(map, source), caption: countLabel(sourceCounts.get(node.id) ?? 0, 'agent') + (source.mode === 'selected' ? ' · ' + source.selectedPrincipalIds.length + ' chosen' : ''), status: '', warning: '' };
+    return { title: sourceTitle(map, source), caption: countLabel(sourceCounts.get(node.id) ?? 0, 'agent') + (source.senders.length ? ' · ' + source.senders.length + ' chosen' : ''), status: '', warning: '' };
   }
   return <div ref={container} className="fleet-map-viewport" tabIndex={0} aria-label="Scrollable fleet connection map">
     <div className={'fleet-map-canvas' + (selected ? ' has-selection' : '')} role="group" aria-label="Fleet connection graph" style={{ width: layout.width, height: layout.height }}>

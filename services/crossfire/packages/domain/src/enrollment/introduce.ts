@@ -12,6 +12,7 @@ import { validateRoster } from './input.js';
 import { coordinationPolicyMatches } from '../fleet/policy.js';
 import { validateWakeSenders } from '../wake/replace-policy.js';
 import { enrollmentItemViews, type EnrollmentItemView } from './item-view.js';
+import { enrollmentRosterValue } from './roster-digest.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'matrix' | 'unitOfWork' | 'identity' | 'clock'>;
 export type EnrollmentReceipt = EnrollmentOverview & { instances: EnrollmentItemView[] };
@@ -25,11 +26,8 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
   if (!/^[a-f0-9-]{36}$/u.test(input.enrollmentId) || !/^[A-Za-z0-9_-]{43}$/u.test(input.claimSecret)) return failure('invalid', 'Persist a request UUID and private 32-byte claim before enrollment');
   const valid = validateRoster(input);
   if (!valid.ok) return valid;
-  const rosterDigest = services.identity.hash(JSON.stringify({ owner: input.ownerMatrixId, fleet: input.fleetKey,
-    controller: { name: input.controller.name, metadata: Object.entries(input.controller.metadata ?? {}).sort(([left], [right]) => left.localeCompare(right)) },
-    items: input.instances.map(item => [item.instanceKey, item.name, item.identity?.agentId ?? null,
-      { wakeMode: item.coordinationPolicy.wakeMode, senderMatrixIds: [...item.coordinationPolicy.senderMatrixIds].sort(),
-        permissions: [...item.coordinationPolicy.permissions].sort() }]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))) }));
+  const rosterDigest = services.identity.hash(enrollmentRosterValue({ ...input,
+    instances: input.instances.map(item => ({ ...item, agentId: item.identity?.agentId ?? null })) }));
   const prior = services.repositories.enrollmentRequest.find({ id: input.enrollmentId }); if (!prior.ok) return prior;
   if (prior.value) {
     if (prior.value.expiresAt <= services.clock.now() || prior.value.rosterDigest !== rosterDigest || !services.identity.matches(input.claimSecret, prior.value.claimHash)) return failure('conflict', 'Enrollment request belongs to different credentials or roster, or has expired');
@@ -86,7 +84,7 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       if (!added.ok) return added;
       const requestedPolicy = verified.value.policies.find(entry => entry.instanceKey === item.instanceKey)?.policy;
       if (requestedPolicy) {
-        const valid = validateWakeSenders(services, existing?.agentId ?? null, requestedPolicy.wakeMode, requestedPolicy.senderIds);
+        const valid = validateWakeSenders(services, existing?.agentId ?? null, requestedPolicy.wakeMode, requestedPolicy.senders);
         if (!valid.ok) return valid;
         const savedPolicy = services.repositories.fleetPolicy.insertRequested(record, requestedPolicy);
         if (!savedPolicy.ok) return savedPolicy;

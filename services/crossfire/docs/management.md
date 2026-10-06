@@ -40,11 +40,20 @@ administrators manage any agent. Current native permission, membership generatio
 and original addition provenance are checked. Membership alone grants neither
 invitation delegation nor wake authority.
 
-The same Rooms view separately edits **Who can wake this agent**. Owner-only
-is the default. Other modes are Nobody, owner plus owner's agents, additional
-humans, everyone, or selected people/agents through searchable paginated
-checkboxes. Selection survives search/page changes; saving replaces the complete
-set with revision checks. Empty selection wakes nobody. Non-waking chat remains
+The Rooms view separately shows **Who can wake this agent**. The default is
+one explicit person-only entry for the owner. **Choose who can wake** opens a
+popup with searchable, paginated people and individual agents. Select several
+people; each can allow just that person or that person plus their currently owned
+agents. Ownership groups include agents enrolled later. All entries combine.
+The owner is not an implicit exception; self is always excluded. Broader audiences
+are all active people plus selected entries, or everyone. Everyone requires no
+individual entries. Empty selected-only authority disables chat wake.
+
+The popup fills small screens while retaining focus trapping, Escape/Cancel and
+focus return. Draft selections survive search/page changes. Cancel discards them;
+Save atomically replaces the complete set with revision checks. A concurrent edit
+keeps your draft and offers explicit discard/load latest, never an overwrite.
+Non-waking chat remains
 context for the next eligible message, within the instance inline/file policy.
 
 A native explicit mention excluded by wake rules can produce one deterministic
@@ -68,8 +77,8 @@ Only the verified owner and bound agent may participate; other agents' owner
 DMs are excluded from assignment pickers. Privacy and native message powers
 are rechecked; suspension/revocation remain authoritative.
 
-Chat wake eligibility and fleet delivery intent are independent. Nobody does
-not wake even for owner chat. Native human decision responses are control input
+Chat wake eligibility and fleet delivery intent are independent. Empty selected
+authority does not wake even for owner chat. Native human decision responses are control input
 and can be submitted while ordinary chat is paused.
 
 ## Agent Session

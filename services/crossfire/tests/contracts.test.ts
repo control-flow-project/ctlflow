@@ -45,16 +45,16 @@ test('member labels retain every accepted signup username across requests and ow
 
 test('listener policy is explicit and rejects missing authority, self triggers and competing fields', () => {
   const policy = { agentId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', ownerMatrixId: '@owner:test.localhost', matrixUserId: '@agent:test.localhost',
-    status: 'active', ownerStatus: 'active', ownerConversation: null, fleetIdleTimeoutSeconds: 1800, maxMessageBytes: 65536, roomGrants: [], wakeMode: 'owner', senderMatrixIds: ['@owner:test.localhost'] };
+    status: 'active', ownerStatus: 'active', ownerConversation: null, fleetIdleTimeoutSeconds: 1800, maxMessageBytes: 65536, roomGrants: [], wakeMode: 'selected', senderMatrixIds: ['@owner:test.localhost'] };
   assert(deliveryPolicy(policy).ok);
-  assert(deliveryPolicy({ ...policy, wakeMode: 'nobody', senderMatrixIds: [] }).ok);
-  assert.equal(deliveryPolicy({ ...policy, wakeMode: 'nobody' }).ok, false);
-  for (const invalid of [{ ...policy, wakeMode: 'all' }, { ...policy, senderMatrixIds: [] }, { ...policy, senderMatrixIds: ['@owner:test.localhost', '@agent:test.localhost'] },
+  assert(deliveryPolicy({ ...policy, wakeMode: 'selected', senderMatrixIds: [] }).ok);
+  assert(deliveryPolicy({ ...policy, wakeMode: 'selected' }).ok);
+  for (const invalid of [{ ...policy, wakeMode: 'all' }, { ...policy, wakeMode: 'owner' }, { ...policy, status: 'suspended' }, { ...policy, senderMatrixIds: ['@owner:test.localhost', '@agent:test.localhost'] },
     { ...policy, senderMatrixIds: ['@owner:test.localhost', '@owner:test.localhost'] }, { ...policy, senderMatrixIds: ['Alice'] }, { ...policy, wake: true }]) {
     assert.equal(deliveryPolicy(invalid).ok, false);
   }
   const { wakeMode, ...missing } = policy;
-  assert.equal(wakeMode, 'owner'); assert.equal(deliveryPolicy(missing).ok, false);
+  assert.equal(wakeMode, 'selected'); assert.equal(deliveryPolicy(missing).ok, false);
 });
 
 test("pagination rejects duplicate parameters and unbounded pages", () => {

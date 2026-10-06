@@ -27,7 +27,7 @@ test('operator database inspection is readonly, complete and proves protected re
   const request: EnrollmentIntroduction = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: fixture.admin.member.principal.matrixUserId,
     fleetKey: fleet.fleetKey, controllerCredential: agent.controller.credential, controller: { name: 'laptop' }, instances: [{ instanceKey: 'helper', name: 'helper',
       identity: { agentId: agent.id, accessToken: agent.token }, coordinationPolicy: {
-        wakeMode: 'owner-agents' as const, senderMatrixIds: [], permissions: ['room.agent.invite'],
+        wakeMode: 'selected' as const, senders: [], permissions: ['room.agent.invite'],
       } }] };
   const introduced = value(await introduceEnrollment(fixture.services, request));
   value(decideEnrollment(fixture.services, fixture.admin.actor, request.enrollmentId, {
@@ -35,7 +35,7 @@ test('operator database inspection is readonly, complete and proves protected re
   }, randomUUID()));
   copyFileSync(current, before);
   const bytes = readFileSync(current);
-  const report = value(inspectDatabase(current, { schemaVersion: 13, counts: { agent: 1, management_conversation: 0, fleet_instance_permission: 1 } }, true));
+  const report = value(inspectDatabase(current, { schemaVersion: 14, counts: { agent: 1, management_conversation: 0, fleet_instance_permission: 1 } }, true));
   assert.equal(Object.keys(report.counts).length, 63);
   assert.equal(report.schema?.length, 63);
   assert.equal(report.integrity, 'ok');
@@ -91,7 +91,7 @@ test('operator preservation covers immutable archived children and exact native-
       executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_permission').values({ request_id: params.requestId,
         instance_key: 'historical', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }), record);
       executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_wake_sender').values({ request_id: params.requestId,
-        instance_key: 'historical', sender_principal_id: params.ownerId }), record);
+        instance_key: 'historical', sender_principal_id: params.ownerId, include_agents: 1 }), record);
       executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_metadata').values({ enrollment_id: params.requestId,
         key: 'private-label', value: 'Archived private metadata' }), record);
     }).immediate();
@@ -99,7 +99,7 @@ test('operator preservation covers immutable archived children and exact native-
     const relationNames = ['enrollment_archive', 'enrollment_archive_item', 'enrollment_archive_policy', 'enrollment_archive_permission',
       'enrollment_archive_wake_sender', 'enrollment_archive_metadata', 'fleet_native_stop'] as const;
     const bytes = readFileSync(current), report = value(inspectDatabase(current, {
-      schemaVersion: 13, counts: Object.fromEntries(relationNames.map(name => [name, 1])),
+      schemaVersion: 14, counts: Object.fromEntries(relationNames.map(name => [name, 1])),
     }, true));
     assert.equal(Object.keys(report.counts).length, 63); assert.deepEqual(readFileSync(current), bytes);
     for (const privateText of [agent.token, agent.controller.credential, record.claimHash, 'Archived private metadata'])

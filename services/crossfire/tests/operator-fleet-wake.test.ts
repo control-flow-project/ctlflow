@@ -18,12 +18,12 @@ import { value, secret } from './support/application.js';
 async function enrolled(fixture: Awaited<ReturnType<typeof operatorFixture>>, owner = fixture.admin) {
   const { services } = fixture, enrollmentId = randomUUID(), claimSecret = secret();
   const introduced = value(await introduceEnrollment(services, { enrollmentId, claimSecret, ownerMatrixId: owner.member.principal.matrixUserId,
-    fleetKey: 'research', controller: { name: 'laptop' }, instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy() }, { instanceKey: 'second', name: 'second', coordinationPolicy: defaultCoordinationPolicy() }] }));
+    fleetKey: 'research', controller: { name: 'laptop' }, instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }, { instanceKey: 'second', name: 'second', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }] }));
   value(decideEnrollment(services, owner.actor, enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
   for (const item of value(services.collection.enrollmentItems({ requestId: enrollmentId }))) value(await reconcilePrincipal(services, item.agentId!));
   const ready = value(exchangeEnrollment(services, enrollmentId, claimSecret));
   const plan = value(fleetWakePlan({ fleetId: ready.fleet!.fleetId, fleetKey: 'research', ownerMatrixId: owner.member.principal.matrixUserId,
-    controllerName: 'laptop', instances: ready.instances.map(instance => ({ instanceKey: instance.instanceKey, name: instance.name, mode: 'owner-agents', senderIds: [] })) }));
+    controllerName: 'laptop', instances: ready.instances.map(instance => ({ instanceKey: instance.instanceKey, name: instance.name, mode: 'selected', senders: [{ principalId: owner.actor.principalId, includeAgents: true }] })) }));
   return { ready, plan };
 }
 const signal = () => new AbortController().signal;
@@ -53,13 +53,13 @@ test('fleet wake review is nonmutating and execution preserves grants, identitie
   const beforeGrants = value(services.collection.roomGrants({ agentId: firstId })), beforeNative = structuredClone([...native.rooms]);
   const reviewed = value(await reviewFleetWake(fixture.origin, fixture.account, plan, false, signal()));
   assert.equal(reviewed.executed, false); assert.equal(reviewed.changed, 0);
-  assert(reviewed.instances.every(instance => instance.before.mode === 'owner' && instance.changeRequired));
+  assert(reviewed.instances.every(instance => instance.before.mode === 'selected' && !instance.before.senders[0]!.includeAgents && instance.changeRequired));
   assert.equal(fixture.requests.filter(request => request.method === 'PUT').length, 0);
   const applied = value(await reviewFleetWake(fixture.origin, fixture.account, plan, true, signal()));
   assert.equal(applied.executed, true); assert.equal(applied.changed, 2);
   for (const instance of ready.instances) {
     const resolved = value(deliveryPolicy(services, { kind: 'agent', principalId: instance.agentId! }, instance.agentId!));
-    assert.equal(resolved.wake.mode, 'owner-agents');
+    assert.equal(resolved.wake.mode, 'selected');
     assert.deepEqual(resolved.wake.senders, [admin.member.principal.matrixUserId, peer.matrixUserId,
       ready.instances.find(other => other.agentId !== instance.agentId)!.account!.matrixUserId].sort());
     assert(!resolved.wake.senders.includes(foreign.matrixUserId));
@@ -76,8 +76,8 @@ test('fleet wake preflight refuses wrong identities, partial rosters and invalid
   const fixture = await operatorFixture(scope), { plan, ready } = await enrolled(fixture), entry = plan.instances[0]!;
   for (const changed of [{ fleetId: randomUUID() }, { ownerMatrixId: '@different:test.localhost' }, { controllerName: 'other' },
     { fleetKey: 'other' }, { instances: [entry] }, { instances: [{ ...entry, name: 'other' }, plan.instances[1]!] },
-    { instances: [{ ...entry, mode: 'selected' as const, senderIds: [ready.instances[0]!.agentId!] }, plan.instances[1]!] },
-    { instances: [{ ...entry, mode: 'selected' as const, senderIds: [randomUUID()] }, plan.instances[1]!] }]) {
+    { instances: [{ ...entry, mode: 'selected' as const, senders: [{ principalId: ready.instances[0]!.agentId!, includeAgents: false }] }, plan.instances[1]!] },
+    { instances: [{ ...entry, mode: 'selected' as const, senders: [{ principalId: randomUUID(), includeAgents: false }] }, plan.instances[1]!] }]) {
     assert.equal((await reviewFleetWake(fixture.origin, fixture.account, { ...plan, ...changed }, true, signal())).ok, false);
   }
   const principal = value(fixture.services.repositories.principal.find({ id: ready.instances[1]!.agentId! }))!;
@@ -89,8 +89,9 @@ test('fleet wake preflight refuses wrong identities, partial rosters and invalid
 test('fleet wake configuration uses all canonical modes including explicit cross-owner selections', async scope => {
   const fixture = await operatorFixture(scope), owner = await fixture.member('owner'), other = await fixture.member('other'), { plan, ready } = await enrolled(fixture, owner);
   const foreign = await fixture.agent(other.actor, 'foreign');
-  for (const mode of ['nobody', 'owner', 'owner-agents', 'humans', 'everyone', 'selected'] as const) {
-    const configured = { ...plan, instances: plan.instances.map(instance => ({ ...instance, mode, senderIds: mode === 'selected' ? [foreign.id, fixture.admin.actor.principalId] : [] })) };
+  for (const mode of ['humans', 'everyone', 'selected'] as const) {
+    const configured = { ...plan, instances: plan.instances.map(instance => ({ ...instance, mode,
+      senders: mode === 'selected' ? [foreign.id, fixture.admin.actor.principalId].map(principalId => ({ principalId, includeAgents: false })) : [] })) };
     const report = value(await reviewFleetWake(fixture.origin, fixture.account, configured, true, signal()));
     assert(report.instances.every(instance => instance.after.mode === mode));
     if (mode === 'selected') for (const instance of ready.instances) assert.deepEqual(value(deliveryPolicy(fixture.services,
@@ -109,8 +110,9 @@ test('fleet wake failures report partial writes, stop immediately and support re
     assert.match(result.error.message, /verified writes: first; last attempted: second/);
     assert(!result.error.message.includes(fixture.admin.token));
   }
-  assert.equal(value(services.directory.agent(ready.instances[0]!.agentId!))!.agent.wakeMode, 'owner-agents');
-  assert.equal(value(services.directory.agent(secondId))!.agent.wakeMode, 'owner');
+  assert.equal(value(services.directory.agent(ready.instances[0]!.agentId!))!.agent.wakeMode, 'selected');
+  assert.equal(value(services.collection.wakeSenders({ agentId: ready.instances[0]!.agentId! }))[0]!.includeAgents, true);
+  assert.equal(value(services.collection.wakeSenders({ agentId: secondId }))[0]!.includeAgents, false);
   services.repositories.agent.update = previous;
   assert.equal(value(await reviewFleetWake(fixture.origin, fixture.account, plan, true, signal())).changed, 1);
 });
@@ -128,7 +130,8 @@ test('fleet wake refuses stale agent revisions rather than replacing concurrent 
   const result = await reviewFleetWake(fixture.origin, fixture.account, plan, true, signal());
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.error.code, 'conflict');
-  assert.equal(value(services.directory.agent(secondId))!.agent.wakeMode, 'owner');
+  assert.equal(value(services.directory.agent(secondId))!.agent.wakeMode, 'selected');
+  assert.equal(value(services.collection.wakeSenders({ agentId: secondId }))[0]!.includeAgents, false);
 });
 
 test('fleet wake cannot report complete success after the fleet changes during writes', async scope => {

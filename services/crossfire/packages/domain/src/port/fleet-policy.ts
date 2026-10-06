@@ -1,9 +1,10 @@
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Agent } from '../identity/types.js';
+import type { WakeSelection, MatrixWakeSelection } from '../wake/types.js';
 
 export type RequestedFleetPolicy = {
   wakeMode: Agent['wakeMode'];
-  senderIds: string[];
+  senders: WakeSelection[];
   permissions: 'room.agent.invite'[];
   expectedAgentRevision: number | null;
 };
@@ -14,7 +15,7 @@ export type ApprovedFleetPolicy = {
   permissions: 'room.agent.invite'[];
 };
 export type FleetPolicyKey = { requestId: string; instanceKey: string };
-export type RequestedFleetPolicyRecord = RequestedFleetPolicy & { instanceKey: string; senderMatrixIds: string[] };
+export type RequestedFleetPolicyRecord = RequestedFleetPolicy & { instanceKey: string; matrixSenders: MatrixWakeSelection[] };
 export type FleetPolicyRepository = {
   requested(requestId: string): Result<RequestedFleetPolicyRecord[]>;
   insertRequested(key: FleetPolicyKey, policy: RequestedFleetPolicy): Result<void>;

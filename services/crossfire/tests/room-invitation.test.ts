@@ -82,7 +82,7 @@ test('native room and direct-message invitations use the canonical grant authori
     assert.equal(grant(roomId)?.muted, false);
     assert.equal(value(services.repositories.ownerConversation.find({ agentId: target.id }))!.roomId, roomId);
     value(await native(target.token, 'PUT', '/rooms/' + segment(roomId) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body: 'Direct reply' }));
-    assert.equal(value(services.repositories.agent.find({ principalId: target.id }))?.wakeMode, 'owner');
+    assert.equal(value(services.repositories.agent.find({ principalId: target.id }))?.wakeMode, 'selected');
     assert.deepEqual(value(deliveryPolicy(services, target.actor, target.id)).wake.senders, [ownerId]);
   });
 

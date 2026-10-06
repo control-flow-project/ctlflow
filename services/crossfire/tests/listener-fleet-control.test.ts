@@ -121,7 +121,7 @@ test('controller listener timing and page bounds are validated before native or 
 
 test('controller messages bypass room wake filtering without consuming room cursors', async scope => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
-  matrix.joined.delete(ROOM); matrix.waking.policy = 'nobody'; matrix.waking.senders = [];
+  matrix.joined.delete(ROOM); matrix.waking.policy = 'selected'; matrix.waking.senders = [];
   const receipts: string[] = [];
   let ended: unknown;
   const binding = createListenerControl(async id => { receipts.push(id); binding.update({ active: true, input: null }); }, () => CONTROLLER);

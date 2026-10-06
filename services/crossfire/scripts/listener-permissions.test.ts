@@ -18,7 +18,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
 
   const fixture = await matrixFixture(scope, temporary(scope), clock);
   if (mode === 'nobody') fixture.joined.delete(OWNER_DM);
-  if (mode === 'nobody') { fixture.waking.policy = 'nobody'; fixture.waking.senders = []; }
+  if (mode === 'nobody') { fixture.waking.policy = 'selected'; fixture.waking.senders = []; }
   const stop = new AbortController();
   let hooks: RuntimeHooks | undefined;
   const delivered: string[] = [];
@@ -51,7 +51,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   fixture.add(ROOM, message('$resume', OBSERVER, 'Continue the project'));
   if (mode === 'nobody') {
     await clock.advance(150); assert.equal(delivered.length, 0);
-    fixture.waking.policy = 'owner'; fixture.waking.senders = [OBSERVER];
+    fixture.waking.policy = 'selected'; fixture.waking.senders = [OBSERVER];
   }
   await clock.until(() => delivered.some(text => text.includes('$resume')));
   assert(delivered.every(text => !text.includes('$approval') && !text.includes('$outsider')));

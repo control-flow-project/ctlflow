@@ -36,7 +36,7 @@ CREATE TABLE agent (
   FOREIGN KEY(principal_id, principal_kind) REFERENCES principal(id, kind),
   FOREIGN KEY(owner_id) REFERENCES member(principal_id),
   UNIQUE(principal_id, owner_id),
-  CHECK(wake_mode IN ('nobody','owner','owner-agents','humans','everyone','selected'))
+  CHECK(wake_mode IN ('humans','everyone','selected'))
 ) STRICT;
 CREATE INDEX ix_agent_owner ON agent(owner_id, principal_id);
 

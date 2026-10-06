@@ -1,8 +1,8 @@
 {
-  "name": "@ctlflow/fleetd-daemon", "version": "0.1.5", "private": true, "type": "module",
+  "name": "@ctlflow/fleetd-daemon", "version": "0.1.6", "private": true, "type": "module",
   "dependencies": {
-    "@ctlflow/fleetd-contracts": "0.1.5", "@ctlflow/fleetd-domain": "0.1.5", "@ctlflow/fleetd-storage": "0.1.5",
-    "@ctlflow/crossfire-contracts": "0.1.5", "@ctlflow/crossfire-kernel": "0.1.5", "@ctlflow/crossfire-agent-core": "0.1.5",
-    "@ctlflow/crossfire-adapter-crossfire": "0.1.5", "@ctlflow/crossfire-adapter-filesystem": "0.1.5", "@ctlflow/crossfire-adapter-codex": "0.1.5", "@ctlflow/crossfire-adapter-runtime": "0.1.5", "@ctlflow/crossfire-adapter-matrix": "0.1.5"
+    "@ctlflow/fleetd-contracts": "0.1.6", "@ctlflow/fleetd-domain": "0.1.6", "@ctlflow/fleetd-storage": "0.1.6",
+    "@ctlflow/crossfire-contracts": "0.1.6", "@ctlflow/crossfire-kernel": "0.1.6", "@ctlflow/crossfire-agent-core": "0.1.6",
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.6", "@ctlflow/crossfire-adapter-filesystem": "0.1.6", "@ctlflow/crossfire-adapter-codex": "0.1.6", "@ctlflow/crossfire-adapter-runtime": "0.1.6", "@ctlflow/crossfire-adapter-matrix": "0.1.6"
   }
 }

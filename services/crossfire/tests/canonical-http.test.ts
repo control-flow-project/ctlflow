@@ -61,7 +61,7 @@ test('canonical HTTP has scoped REST resources, strict envelopes, CSRF and no cr
   const content = await listed.text();
   assert(!content.includes(invitation.data.claimSecret) && !content.includes('claimHash') && !content.includes('nativeAccessToken'));
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: fixture.application.config.administrator,
-    fleetKey: 'research', controller: { name: 'desktop' }, instances: [{ instanceKey: 'analyst', name: 'analyst', coordinationPolicy: defaultCoordinationPolicy() }] };
+    fleetKey: 'research', controller: { name: 'desktop' }, instances: [{ instanceKey: 'analyst', name: 'analyst', coordinationPolicy: defaultCoordinationPolicy(fixture.application.config.administrator) }] };
   const introduced = await request('/api/enrollments', 'POST', input);
   assert.equal(introduced.status, 201, await introduced.clone().text());
   const intro = await introduced.json() as { data: { enrollment: { enrollment: { verificationCode: string } }; approvalUrl: string } };

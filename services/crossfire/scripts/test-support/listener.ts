@@ -200,7 +200,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   const accessModes = new Map<string, 'read' | 'reply' | 'custom'>();
   const access = { ownerStatus: 'active', status: 'active' };
   const decisions = new Map<string, { id: string; questions: { id: string }[]; status: string; answers: { questionId: string; optionId: string | null; text: string | null }[] }>();
-  const waking: { policy: WakePolicy; senders: string[] } = { policy: 'owner-agents', senders: [OBSERVER, '@agent-holmes:test.localhost'] };
+  const waking: { policy: WakePolicy; senders: string[] } = { policy: 'selected', senders: [OBSERVER, '@agent-holmes:test.localhost'] };
   const release = builtRelease().release.manifest;
   const publication = { release: builtRelease().release };
   const reporting = { disconnect: false, current: release, controller: { ...CONTROLLER } };

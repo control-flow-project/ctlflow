@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-agent-core",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,8 +8,8 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
-    "@ctlflow/crossfire-contracts": "0.1.5",
-    "@ctlflow/crossfire-kernel": "0.1.5"
+    "@ctlflow/crossfire-contracts": "0.1.6",
+    "@ctlflow/crossfire-kernel": "0.1.6"
   },
   "exports": {
     "./*": {

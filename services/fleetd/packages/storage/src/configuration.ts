@@ -42,7 +42,9 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
         const policy = role.value.coordination_options;
         definitions[item.definition] = { name: role.value.name, runtime: role.value.runtime, options: role.value.runtime_options,
           instructions: [instructions, setup.value.instructions].filter(Boolean).join('\n\n'),
-          coordinationPolicy: policy ? { wakeMode: policy.wake_mode, senderMatrixIds: policy.sender_matrix_ids ?? [], permissions: policy.permissions } : defaultCoordinationPolicy() };
+          coordinationPolicy: policy ? { wakeMode: policy.wake_mode,
+            senders: policy.wake_senders.map(sender => ({ matrixUserId: sender.matrix_user_id, includeAgents: sender.include_agents })),
+            permissions: policy.permissions } : defaultCoordinationPolicy(parsed.value.coordination.owner) };
         hash.update(item.definition).update(text).update(instructions);
       }
       const segments = item.workarea.split('/');

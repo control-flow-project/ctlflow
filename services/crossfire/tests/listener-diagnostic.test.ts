@@ -22,10 +22,10 @@ test('listener diagnostics distinguish live readiness, no rooms, nobody policy, 
   const { turnControl: _controls, ...withoutControl } = runtime;
   assert.equal((await testListener({ ...options, runtime: withoutControl })).busy, false, 'Native inspection is independent of interruption support');
   assert.equal((await testListener({ ...options, paused: true })).canReceiveRoomTasks, false);
-  fixture.waking.senders = []; fixture.waking.policy = 'nobody';
+  fixture.waking.senders = []; fixture.waking.policy = 'selected';
   const nobody = await testListener(options);
   assert.equal(nobody.canReceiveRoomTasks, false);
-  assert.equal(nobody.wakeMode, 'nobody');
+  assert.equal(nobody.wakeMode, 'selected');
   fixture.joined.clear();
   const empty = await testListener(options);
   assert.equal(empty.rooms, 0);

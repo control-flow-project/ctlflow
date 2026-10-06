@@ -18,7 +18,7 @@ test('management read models hydrate recognizable identities in one batch after 
   const alice = await fixture.member('alice'), bob = await fixture.member('bob'), agent = await fixture.agent(alice.actor, 'bea');
   for (const owner of [alice, bob]) value(await introduceEnrollment(services, {
     enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
-    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName, coordinationPolicy: defaultCoordinationPolicy() }],
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName, coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }],
   }));
   const calls: string[][] = [];
   const projected = { ...services, discovery: { ...services.discovery, selected(ids: string[]) { calls.push(ids); return services.discovery.selected(ids); } } };
@@ -66,7 +66,7 @@ test('canonical enrollment and activity HTTP contracts expose identities without
     ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + session.secret },
   }) });
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: alice.member.principal.matrixUserId,
-    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending', name: 'pending', coordinationPolicy: defaultCoordinationPolicy() }] };
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending', name: 'pending', coordinationPolicy: defaultCoordinationPolicy(alice.member.principal.matrixUserId) }] };
   const introduced = value(await client(alice).call(operations.introduceEnrollment, {}, input)).data;
   assert.equal(introduced.enrollment.enrollment.owner.displayName, 'alice');
   assert.equal(introduced.enrollment.enrollment.owner.matrixUserId, alice.member.principal.matrixUserId);

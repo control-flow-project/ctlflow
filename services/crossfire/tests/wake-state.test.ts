@@ -19,9 +19,9 @@ test('one schema refuses unrelated storage without modifying it', () => {
 });
 test('wake mode and selected senders persist in their canonical normalized relations', async scope => {
   const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'wake');
-  for (const mode of ['owner-agents', 'humans', 'everyone', 'nobody', 'selected', 'owner'] as const) {
+  for (const mode of ['humans', 'everyone', 'selected'] as const) {
     const revision = value(fixture.services.directory.agent(agent.id))!.principal.revision;
-    value(changeWakePolicy(fixture.services, fixture.admin.actor, agent.id, { expectedRevision: revision, mode, senderIds: mode === 'selected' ? [fixture.admin.actor.principalId] : [] }, randomUUID()));
+    value(changeWakePolicy(fixture.services, fixture.admin.actor, agent.id, { expectedRevision: revision, mode, senders: mode === 'selected' ? [fixture.admin.actor.principalId].map(principalId => ({ principalId, includeAgents: false })) : [] }, randomUUID()));
     assert.equal(value(deliveryPolicy(fixture.services, agent.actor, agent.id)).wake.mode, mode);
     assert.equal(value(fixture.services.collection.wakeSenders({ agentId: agent.id })).length, mode === 'selected' ? 1 : 0);
   }

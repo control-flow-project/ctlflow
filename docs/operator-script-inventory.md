@@ -30,7 +30,7 @@ or copied test checkouts. One current implementation owns each reusable check.
 | Management deployment/status/software/runtime checks | Crossfire `release`, `server`, shared `browser/layout.ts` and fleetd verification; Session owns native parameters, Settings owns current/latest software |
 | Approval readiness and observation checks | Existing native/approval/observation regressions plus fleetd read-only native inspection; no operator prompt/answer injection |
 | Invitation/discovery/native-room checks | Crossfire `server` native directory checks and fleetd `--no-rooms`; mutating invite/wake/delivery proofs stay in isolated application tests |
-| Protected owner-DM, lazy-conversation and database snapshots | Crossfire `database` and `preservation` against consistent SQLite snapshots; schema13's 63 normalized tables with immutable historical archives and Tinqer ownership, not copied raw domain SQL |
+| Protected owner-DM, lazy-conversation and database snapshots | Crossfire `database` and `preservation` against consistent SQLite snapshots; schema14's 63 normalized tables with immutable historical archives and Tinqer ownership, not copied raw domain SQL |
 | Controller/fleet/provider preservation scripts | fleetd `--snapshot`/`--preserve`, exact current bindings and native IDs, private provider file fingerprints |
 | Source/artifact/image/host evidence scripts | Crossfire `source`, `release`, `files`, `archive`, `host`; expectation-driven revision/tree/image/labels |
 | Production desktop/mobile layout scripts | One Crossfire `tools/browser/layout.ts` shared by real-browser operator checks and all existing application browser suites |

@@ -22,7 +22,7 @@ test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized 
       value(repositories.fleetCredential.insert({ id: credentialId, fleetId, secretHash: 'hash-' + ownerId, createdAt: 1, revokedAt: null }));
       value(repositories.fleetConnection.save({ fleetId, credentialId, connectionId, lastSeenAt: 1, expiresAt: 1000, closedAt: null }));
       value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
-      value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
+      value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'selected' }));
       value(repositories.fleetInstance.insert({ ownerId, fleetKey: ownerId, instanceKey: agentId, agentId, retiredAt: null }));
       value(repositories.listenerRun.insert({ id: 'run-' + ownerIndex, agentId, release: 'proof', controller: { fleetId, connectionId, credentialId }, startedAt: 1, lastSeenAt: 1,
         activeMs: 0, messagesDelivered: 0, stoppedAt: null, disconnectRequestedAt: null }));

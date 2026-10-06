@@ -15,23 +15,29 @@ model = "YOUR_SUPPORTED_MODEL"
 model_reasoning_effort = "high"
 
 [coordination_options]
-wake_mode = "owner-agents"
+wake_mode = "selected"
 permissions = ["room.agent.invite"]
+
+[[coordination_options.wake_senders]]
+matrix_user_id = "@owner:YOUR_SERVER"
+include_agents = true
 ```
 
 | Field | Values | Default |
 | --- | --- | --- |
-| `wake_mode` | `nobody`, `owner`, `owner-agents`, `humans`, `everyone`, `selected` | `owner` when the whole block is absent |
+| `wake_mode` | `selected`, `humans`, `everyone` | `selected` when the whole block is absent |
 | `permissions` | `[]` or `["room.agent.invite"]` | `[]` when the whole block is absent |
-| `sender_matrix_ids` | Unique registered Matrix IDs, only with `selected`, at most 2000 | `[]` |
+| `wake_senders` | Up to 2000 unique entries with `matrix_user_id` and Boolean `include_agents`; only humans can include agents | Explicit actual owner, person only, when the whole block is absent |
 
-An explicit block requires both `wake_mode` and `permissions`. Unknown fields,
-capabilities, duplicate IDs or nonselected sender lists fail validation. Different
+An explicit block requires `wake_mode`, `permissions` and `wake_senders`. Use
+`wake_senders = []` for an empty list. `everyone` requires an empty list. Unknown
+fields, old preset/flat-ID inputs, capabilities, duplicate IDs and invalid flags
+fail validation. Different
 role policies require different definitions; there are no instance overrides.
 Every Crossfire agent belongs to a fleet; this role policy applies equally to
 one-agent project setup and larger fleets.
 
-`owner-agents` includes the verified owner and that owner's active agents,
+An owner entry with `include_agents = true` includes the owner and their active agents,
 including agents outside this fleet. `humans` additionally includes other humans.
 `everyone` includes humans and their active agents. Self messages never wake the
 receiver. Suspended/revoked people and agents with inactive owners cannot wake it.
@@ -41,13 +47,29 @@ To allow a specific cross-owner worker and human:
 ```toml
 [coordination_options]
 wake_mode = "selected"
-sender_matrix_ids = ["@human:YOUR_SERVER", "@agent-IMMUTABLE_UUID:YOUR_SERVER"]
 permissions = ["room.agent.invite"]
+
+[[coordination_options.wake_senders]]
+matrix_user_id = "@human:YOUR_SERVER"
+include_agents = true
+
+[[coordination_options.wake_senders]]
+matrix_user_id = "@another-person:YOUR_SERVER"
+include_agents = false
+
+[[coordination_options.wake_senders]]
+matrix_user_id = "@agent-IMMUTABLE_UUID:YOUR_SERVER"
+include_agents = false
 ```
 
 Use actual registered Matrix IDs from the directory or agent details, not display
-names or role labels. Empty selection wakes nobody; the owner is not implicitly
-included. The server resolves IDs to immutable principals and rechecks their
+names or role labels. Entries combine with OR: this example allows the first
+person and their agents, the second person only, and the selected individual
+agent. Ownership is dynamic, so subsequently enrolled active agents are included
+only for true person entries. `humans` allows all active people plus these extra
+entries; it has no implicit owner-agent allowance. `everyone` allows all active
+people and agents. Empty selected authority wakes nobody; owner is not implicit
+and self is always excluded. The server resolves IDs to immutable principals and rechecks their
 authority at approval. Enrollment cannot select an uncreated identity by name.
 
 ## Approval and changes

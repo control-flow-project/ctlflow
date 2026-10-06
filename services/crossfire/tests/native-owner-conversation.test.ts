@@ -77,7 +77,7 @@ test('native enrollment creates no chats; owner-first and approval-first DMs ret
     if (index === 1) value(await native(admin.token, 'PUT', base + '/state/m.room.name', { name: 'Human title' }));
     const renamed = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerId,
       fleetKey: 'test-' + ['ada', 'jo'][index], controller: { name: 'Test controller' }, controllerCredential: target.controller.credential,
-      instances: [{ instanceKey: ['ada', 'jo'][index]!, name, identity: { agentId: target.id, accessToken: target.token }, coordinationPolicy: defaultCoordinationPolicy() }] };
+      instances: [{ instanceKey: ['ada', 'jo'][index]!, name, identity: { agentId: target.id, accessToken: target.token }, coordinationPolicy: defaultCoordinationPolicy(ownerId) }] };
     const receipt = value(await introduceEnrollment(services, renamed));
     value(decideEnrollment(services, admin.actor, renamed.enrollmentId,
       { expectedRevision: 0, decision: 'approve', verificationCode: receipt.request.verificationCode }, randomUUID()));

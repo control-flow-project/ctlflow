@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "bin": {
     "crossfire": "./crossfire"
@@ -8,20 +8,20 @@
   "type": "module",
   "description": "Human-led Matrix coordination and agent management",
   "devDependencies": {
-    "@ctlflow/crossfire-test-support": "0.1.5",
-    "@ctlflow/crossfire-operator-support": "0.1.5",
-    "@ctlflow/crossfire-adapter-crossfire": "0.1.5",
-    "@ctlflow/crossfire-adapter-matrix": "0.1.5",
-    "@ctlflow/crossfire-adapter-sqlite": "0.1.5",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.5",
-    "@ctlflow/crossfire-contracts": "0.1.5",
-    "@ctlflow/crossfire-kernel": "0.1.5",
+    "@ctlflow/crossfire-test-support": "0.1.6",
+    "@ctlflow/crossfire-operator-support": "0.1.6",
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.6",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.6",
+    "@ctlflow/crossfire-adapter-sqlite": "0.1.6",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.6",
+    "@ctlflow/crossfire-contracts": "0.1.6",
+    "@ctlflow/crossfire-kernel": "0.1.6",
     "@tinqerjs/better-sqlite3-adapter": "0.0.28",
     "better-sqlite3": "13.0.3",
     "@playwright/test": "1.63.0",
-    "@ctlflow/crossfire-agent-tools": "0.1.5",
-    "@ctlflow/fleet": "0.1.5",
-    "@ctlflow/fleetd-contracts": "0.1.5"
+    "@ctlflow/crossfire-agent-tools": "0.1.6",
+    "@ctlflow/fleet": "0.1.6",
+    "@ctlflow/fleetd-contracts": "0.1.6"
   },
   "engines": {
     "node": ">=26.0.0",

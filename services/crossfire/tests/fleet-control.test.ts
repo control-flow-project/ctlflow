@@ -21,7 +21,7 @@ import { runtimeRequest, runtimeOperation, runtimeReceipt } from '@ctlflow/cross
 async function enroll(fixture: Awaited<ReturnType<typeof applicationFixture>>, owner = fixture.admin, name = 'team') {
   const { services } = fixture;
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId, fleetKey: name,
-    controller: { name: 'desktop' }, instances: [{ instanceKey: 'one', name: name + '-one', coordinationPolicy: defaultCoordinationPolicy() }, { instanceKey: 'two', name: name + '-two', coordinationPolicy: defaultCoordinationPolicy() }] };
+    controller: { name: 'desktop' }, instances: [{ instanceKey: 'one', name: name + '-one', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }, { instanceKey: 'two', name: name + '-two', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }] };
   const proposed = value(await introduceEnrollment(services, input));
   value(decideEnrollment(services, owner.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: proposed.request.verificationCode }, randomUUID()));
   for (const item of value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))) value(await reconcilePrincipal(services, item.agentId!));

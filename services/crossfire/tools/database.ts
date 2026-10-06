@@ -6,6 +6,7 @@ import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 
 function counts(database: Database.Database) {
   return {
@@ -120,11 +121,17 @@ export function inspectDatabase(file: string, expected: check.Parsed<typeof data
 export function verifyPreservation(before: string, after: string) {
   const first = inspectDatabase(before, {}, false), second = inspectDatabase(after, {}, false);
   if (!first.ok) return first; if (!second.ok) return second;
-  let original: Database.Database | undefined, current: Database.Database | undefined;
+  let original: Database.Database | undefined, current: Database.Database | undefined, converted: Database.Database | undefined;
   try {
     original = new Database(before, { readonly: true, fileMustExist: true });
     current = new Database(after, { readonly: true, fileMustExist: true });
-    const firstDatabase = original, secondDatabase = current;
+    if (first.value.schemaVersion !== second.value.schemaVersion) {
+      if (first.value.schemaVersion !== 13 || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
+      converted = new Database(original.serialize());
+      converted.pragma('foreign_keys = ON');
+      createSchema(converted);
+    }
+    const firstDatabase = converted ?? original, secondDatabase = current;
     return firstDatabase.transaction(() => secondDatabase.transaction(() => {
       const previous = protectedRecords(firstDatabase), next = protectedRecords(secondDatabase), preserved: Record<string, number> = {};
       for (const name of Object.keys(previous) as (keyof typeof previous)[]) {
@@ -140,11 +147,11 @@ export function verifyPreservation(before: string, after: string) {
         }
         preserved[name] = existing.length;
       }
-      return success({ beforeSchema: first.value.schemaVersion, afterSchema: second.value.schemaVersion, preserved,
+      return success({ beforeSchema: first.value.schemaVersion, afterSchema: second.value.schemaVersion, forwardMigration: converted !== undefined, preserved,
         beforeCounts: first.value.counts, afterCounts: second.value.counts });
     })())();
   } catch { return failure('invalid', 'Cannot inspect protected records using the current schema'); }
-  finally { original?.close(); current?.close(); }
+  finally { converted?.close(); original?.close(); current?.close(); }
 }
 
 function protectedRecords(database: Database.Database) {
