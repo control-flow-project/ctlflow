@@ -8,6 +8,7 @@ import { approveFleet } from '../fleet/approve-fleet.js';
 import { expireEnrollments } from './expire.js';
 import { enrollmentCapacity } from './capacity.js';
 import { applyCoordinationPolicy } from '../fleet/policy.js';
+import { applyEnrolledName } from './rename.js';
 
 export function decideEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'instance' | 'runtime'>,
   actor: Actor, enrollmentId: string, input: { expectedRevision: number; decision: 'approve' | 'reject'; verificationCode: string }, requestId: string) {
@@ -89,6 +90,8 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
           }
           const applied = applyCoordinationPolicy(services, actor, item.agentId, policy, requestId);
           if (!applied.ok) return applied;
+          const renamed = applyEnrolledName(services, actor, item, requestId);
+          if (!renamed.ok) return renamed;
           if (restoring) {
             const current = services.repositories.principal.find({ id: item.agentId }); if (!current.ok) return current;
             const changed = services.repositories.principal.update({ ...current.value!, revision: current.value!.revision + 1 }); if (!changed.ok) return changed;

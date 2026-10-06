@@ -40,14 +40,16 @@ export function matrixAuthorityFixture() {
     async profileName(id) { return success(accounts.get(id)?.displayName ?? null); },
     async setDisplayName(id, name) { const account = accounts.get(id); if (!account) return failure('missing', 'Native account missing'); account.displayName = name; return success(undefined); },
     async joined(id) { return success([...rooms].filter(([, room]) => room.members.get(id)?.membership === 'join').map(([id]) => id)); },
-    async ownerConversation(owner, agent, selected) {
+    async ownerConversation(owner, agent, selected, previousName) {
       const key = JSON.stringify([owner, agent]);
       const existing = selected ?? ownerRooms.get(key);
-      const created = existing ? success({ roomId: existing }) : await createRoom(owner, 'Owner DM');
+      const displayName = accounts.get(agent)?.displayName ?? agent;
+      const created = existing ? success({ roomId: existing }) : await createRoom(owner, displayName);
       if (!created.ok) return created;
       const roomId = created.value.roomId;
       const room = rooms.get(roomId);
       if (!room || room.creator !== owner || [...room.members].some(([id, member]) => id !== owner && id !== agent && ['join', 'invite'].includes(member.membership))) return failure('forbidden', 'Invalid private owner DM');
+      if (!room.name || previousName !== null && room.name === previousName) room.name = displayName;
       room.members.set(owner, { matrixUserId: owner, displayName: owner, membership: 'join', creator: true, powerLevel: null });
       const previous = room.members.get(agent);
       room.members.set(agent, { matrixUserId: agent, displayName: agent, membership: 'join', creator: false, powerLevel: previous?.powerLevel ?? 0 });

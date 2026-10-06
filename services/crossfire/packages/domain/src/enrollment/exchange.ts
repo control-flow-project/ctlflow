@@ -1,5 +1,6 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { controllerToken } from '../fleet/authority.js';
+import { agentDisplayName } from '../identity/display-name.js';
 import type { Services } from '../port/services.js';
 export type ExchangedInstance = { instanceKey: string; name: string; agentId: string | null; status: 'ready' | 'provisioning' | 'failed'; errorCode: string | null;
   account: { matrixUserId: string; accessToken: string; deviceId: string } | null };
@@ -32,7 +33,10 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
     const credentials = services.repositories.agentCredential.find({ agentId: item.agentId });
     if (!agent.ok) return agent; if (!credentials.ok) return credentials;
     if (!agent.value || !credentials.value || agent.value.principal.status !== 'active' || agent.value.owner.status !== 'active') return failure('forbidden', 'Agent access is no longer active');
-    const ready = credentials.value.accessToken !== null && agent.value.application.appliedStatus === 'active' && agent.value.application.errorCode === null;
+    if (agent.value.name !== item.requestedName) return failure('conflict', 'This enrollment no longer matches the registered agent name');
+    const ready = credentials.value.accessToken !== null && agent.value.application.appliedStatus === 'active'
+      && agent.value.application.nativeDisplayName === agentDisplayName(agent.value.name, agent.value.ownerMember.displayName, agent.value.agent.displayNameOverride)
+      && agent.value.application.errorCode === null;
     instances.push({ ...base, status: ready ? 'ready' : 'provisioning', errorCode: agent.value.application.errorCode,
       account: ready ? { matrixUserId: agent.value.principal.matrixUserId, accessToken: credentials.value.accessToken!, deviceId: 'CROSSFIRE_AGENT' } : null });
   }

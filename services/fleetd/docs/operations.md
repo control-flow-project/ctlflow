@@ -1,5 +1,11 @@
 # Controller operation
 
+`enroll` is a private whole-fleet operation on a stopped registration. It runs
+the ordinary enrollment prepare/review/exchange but never enables delivery,
+records active intent or starts/resets native sessions. Existing histories and
+session identifiers are retained. The CLI exposes it as `fleet enroll FLEET`.
+Name changes use that same human-owner-reviewed request, not another rename API.
+
 Start through `fleet daemon start` or directly:
 ```sh
 fleetd --name laptop --root /absolute/private/controller

@@ -8,7 +8,7 @@ export function enrollment({ request: value, owner }: EnrollmentOverview) {
     revision: value.revision, createdAt: value.createdAt, expiresAt: value.expiresAt, decidedByMemberId: value.decidedByMemberId, decidedAt: value.decidedAt };
 }
 export function enrollmentItem(value: EnrollmentItemView) {
-  return { instanceKey: value.instanceKey, requestedName: value.requestedName, outcome: value.outcome, agentId: value.agentId,
+  return { instanceKey: value.instanceKey, requestedName: value.requestedName, currentName: value.currentName, outcome: value.outcome, agentId: value.agentId,
     failureCode: value.failureCode, coordinationPolicy: value.coordinationPolicy };
 }
 export function enrollmentDetails(value: EnrollmentReceipt) {

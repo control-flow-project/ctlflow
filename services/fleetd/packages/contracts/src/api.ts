@@ -19,7 +19,7 @@ export const fleetView = check.object({ fleetId: check.identifier, fleetKey: che
   phase, instances: check.list(instanceView, 100), error: check.nullable(check.text(4096)),
   connection: check.object({ connected: check.boolean, deliveryEnabled: check.boolean, revision: check.nullable(check.integer()), error: check.nullable(check.text(4096)) }) });
 export const target = check.object({ kind: check.choice('fleet', 'agent', 'daemon'), fleetId: check.optional(check.identifier), instanceKey: check.optional(check.name) });
-const operationFields = { operationId: check.identifier, target, action: check.choice('start', 'stop', 'reset', 'update'), expectedRevision: check.integer(),
+const operationFields = { operationId: check.identifier, target, action: check.choice('enroll', 'start', 'stop', 'reset', 'update'), expectedRevision: check.integer(),
   releaseDirectory: check.optional(releaseDirectory) };
 export const operationInput = check.refine(check.object(operationFields), value => (value.action === 'update') === (value.releaseDirectory !== undefined),
   'Only an explicit software update supplies its installed release directory');

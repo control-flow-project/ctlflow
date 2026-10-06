@@ -51,10 +51,16 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
   await assert.rejects(cli('stop', 'test', '--fresh-history'), /Option is not valid/u);
   await assert.rejects(cli('agent', 'reset', 'test', 'one'), /fleet agent start/u);
   assert.equal(inputs.length, 6, 'Invalid commands cannot submit a lifecycle action');
+  await cli('enroll', 'test');
+  assert.equal(inputs[6]!.action, 'enroll');
+  assert.equal(inputs[6]!.target.kind, 'fleet');
+  await assert.rejects(cli('enroll', 'test', '--fresh-history'), /Option is not valid/u);
+  await assert.rejects(cli('agent', 'enroll', 'test', 'one'), /whole fleet|fleet enroll/u);
+  assert.equal(inputs.length, 7, 'Invalid enrollment targets cannot submit an operation');
   loseResponse = true;
   const retryId = randomUUID();
   await assert.rejects(cli('start', 'test', '--fresh-history', '--operation-id', retryId), (error: unknown) =>
     error instanceof Error && 'stdout' in error && typeof error.stdout === 'string' && error.stdout.includes(retryId),
   'An uncertain submission must expose its stable identity before the remote response');
-  assert.equal(inputs.length, 7);
+  assert.equal(inputs.length, 8);
 });

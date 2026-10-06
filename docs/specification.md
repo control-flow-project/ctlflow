@@ -1094,6 +1094,29 @@ Registered agent names are unique across all owners on one Crossfire instance,
 including single-agent enrollment, fleet enrollment and authorized rename.
 Mutable native display names do not own identity or uniqueness.
 
+Changing a registered name follows this same enrollment pipeline, not a second
+rename API. Private controller/native identity proof binds the immutable owner,
+fleet key, instance key and agent UUID. Introduction reserves the proposed name
+while retaining the current name; owner review displays `currentName` alongside
+`requestedName`. Any changed name requires that active human owner's explicit
+approval, even with unchanged coordination policy and valid saved credentials.
+Captured principal revisions reject stale reviews; approval atomically replaces
+the unique name and schedules native display-name reconciliation. Rejection or
+expiry releases only the proposed claim. Old names are not aliases. Matrix IDs,
+credentials, room grants, provenance and native histories stay intact. Exchange
+rejects an old approved request whose name no longer matches the current identity.
+An existing protected owner conversation follows a changed automatic title, but
+a human-customized title is preserved; name reconciliation creates no chats.
+
+`fleet enroll FLEET` invokes the same preflight/introduction/approval/exchange
+for a stopped whole fleet without enabling delivery or starting/resetting sessions.
+The private controller operation action is `enroll`; public native lifecycle
+actions remain unchanged. Local profiles, cursor directories and messaging-tool
+profile selectors are owned by immutable instance keys, never registered names.
+An identity-checked forward storage migration uses an interruption-recoverable
+journal and rejects active writers, target collisions or history merging. After
+cutover only the immutable-key runtime path exists.
+
 ### Preflight
 
 The controller validates duplicate names/keys locally and asks the server about

@@ -161,12 +161,13 @@ container restart, extraction, privileged command or package installation occurs
 ## Enrollment review
 
 ```json
-{"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","requestedName":"helper","coordinationPolicy":{"wakeMode":"owner-agents","senderMatrixIds":[],"permissions":["room.agent.invite"]}}]}
+{"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","currentName":null,"requestedName":"helper","coordinationPolicy":{"wakeMode":"owner-agents","senderMatrixIds":[],"permissions":["room.agent.invite"]}}]}
 ```
 
 Every enrollment supplies its fleet key, controller name and each item's complete
 `coordinationPolicy`, including a one-item roster. Plans specify exact policies, including
 selected Matrix IDs and permission codes. The complete pending roster, policy,
+current and requested names (`currentName` is null for a new identity),
 exact owner, controller and code must match; failed
 items or nonpending requests are refused. Without `--execute`, this is review
 only. With it, the tool invokes the existing revision-checked approval REST

@@ -23,7 +23,7 @@ fleet daemon start [--name NAME] [--root DIRECTORY]
 fleet daemon status|stop|restart --root DIRECTORY
 fleet remote add NAME --ssh USER@HOST --root DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] add DIRECTORY
-fleet [--root DIRECTORY | --remote NAME] list|show|test|start|stop|remove [FLEET]
+fleet [--root DIRECTORY | --remote NAME] list|show|test|enroll|start|stop|remove [FLEET]
 fleet [--root DIRECTORY | --remote NAME] start FLEET [--fresh-history] [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] stop FLEET [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] update FLEET [--operation-id UUID] [--release-directory DIRECTORY]
@@ -52,7 +52,7 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     ...(positionals[0] === 'daemon' && positionals[1] === 'start' ? ['name'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'add' ? ['definition'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'attach' ? ['context'] : []),
-    ...((['start', 'stop', 'update'].includes(positionals[0] ?? '') || positionals[0] === 'agent' && ['start', 'stop', 'update'].includes(positionals[1] ?? '')) ? ['operation-id'] : []),
+    ...((['enroll', 'start', 'stop', 'update'].includes(positionals[0] ?? '') || positionals[0] === 'agent' && ['start', 'stop', 'update'].includes(positionals[1] ?? '')) ? ['operation-id'] : []),
     ...((positionals[0] === 'update' || positionals[0] === 'agent' && positionals[1] === 'update') ? ['release-directory'] : []),
     ...((positionals[0] === 'start' || positionals[0] === 'agent' && positionals[1] === 'start') ? ['fresh-history'] : []),
     ...(positionals[0] === 'message' ? ['text', 'message-id'] : [])]);
@@ -128,7 +128,8 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     if (agentCommand && command === 'remove') { output(value(await client.call(operations.removeAgent, { ...params, instanceKey: instanceKey! }, { expectedRevision: fleet.revision })).data); return; }
     if (agentCommand && command === 'contexts') { output(value(await client.call(operations.contexts, { ...params, instanceKey: instanceKey! }, {})).data); return; }
     if (agentCommand && command === 'attach') { const pointer = value(await terminalPointer(client, fleet.fleetId, instanceKey!, { codex: codexTerminal() }, remote?.ssh, values.context)); process.stdout.write(pointer.command + '\n'); return; }
-    if (command !== 'start' && command !== 'stop' && command !== 'update') throw new Error(usage);
+    if (command === 'enroll' && agentCommand) throw new Error('Use fleet enroll for the stopped whole fleet');
+    if (command !== 'enroll' && command !== 'start' && command !== 'stop' && command !== 'update') throw new Error(usage);
     if (command === 'update' && remote && !values['release-directory']) throw new Error('Remote update requires --release-directory with the installed fleetd artifact directory on its computer, or run its installed fleet CLI over SSH');
     const request: OperationInput = { operationId: value(identifier(values['operation-id'] ?? randomUUID())), action: values['fresh-history'] ? 'reset' : command, expectedRevision: fleet.revision,
       target: agentCommand ? { kind: 'agent' as const, fleetId: fleet.fleetId, instanceKey: instanceKey! } : { kind: 'fleet' as const, fleetId: fleet.fleetId },

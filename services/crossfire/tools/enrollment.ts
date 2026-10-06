@@ -6,14 +6,14 @@ import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-po
 
 export const enrollmentPlan = check.object({ enrollmentId: check.identifier, ownerMatrixId: check.matrixUserId,
   verificationCode: check.text(12, 12), fleetKey: check.nullable(check.name), controllerName: check.nullable(check.text(100)),
-  instances: check.list(check.object({ instanceKey: check.name, requestedName: check.name, coordinationPolicy: check.nullable(coordinationPolicy) }), 100, 1) });
+  instances: check.list(check.object({ instanceKey: check.name, currentName: check.nullable(check.name), requestedName: check.name, coordinationPolicy: check.nullable(coordinationPolicy) }), 100, 1) });
 
 export async function reviewEnrollment(origin: string, account: Credentials, plan: check.Parsed<typeof enrollmentPlan>, execute: boolean, signal: AbortSignal) {
   return withHuman(origin, account, signal, async human => {
     const current = await human.client.call(operations.enrollment, { enrollmentId: plan.enrollmentId }, {});
     if (!current.ok) return current;
     const review = current.value.data, record = review.enrollment;
-    const roster = (instances: typeof plan.instances) => JSON.stringify(instances.map(item => [item.instanceKey, item.requestedName,
+    const roster = (instances: typeof plan.instances) => JSON.stringify(instances.map(item => [item.instanceKey, item.currentName, item.requestedName,
       item.coordinationPolicy ? { wakeMode: item.coordinationPolicy.wakeMode, senderMatrixIds: [...item.coordinationPolicy.senderMatrixIds].sort(),
         permissions: [...item.coordinationPolicy.permissions].sort() } : null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))));
     if (record.status !== 'pending' || record.owner.matrixUserId !== plan.ownerMatrixId || record.fleetKey !== plan.fleetKey

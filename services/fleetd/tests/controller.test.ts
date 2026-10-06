@@ -59,7 +59,7 @@ function fixture(execution?: Partial<Execution>) {
         pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
         close: async () => { closed.push(instance.key); stop.abort(); } })); }, ...execution } satisfies Execution };
   const controller = value(createController(services)), record = value(controller.add(fleet));
-  async function operation(action: 'start' | 'stop' | 'reset', instanceKey?: string) {
+  async function operation(action: 'enroll' | 'start' | 'stop' | 'reset', instanceKey?: string) {
     const current = value(controller.view(record.fleetId));
     return value(await controller.operate({ operationId: randomUUID(), action, target: instanceKey ? { kind: 'agent', fleetId: record.fleetId, instanceKey } : { kind: 'fleet', fleetId: record.fleetId }, expectedRevision: current.revision }));
   }
@@ -69,6 +69,35 @@ function fixture(execution?: Partial<Execution>) {
   }
   return { controller, services, registry, directory, fleet, definition, record, closed, started, operation, finish };
 }
+
+test('enrollment reviews a stopped fleet without starting, resetting or enabling delivery', async scope => {
+  const calls: string[] = [];
+  const fixture = fixtureController({ prepare: async (_configuration, _controller, _signal, approval) => {
+    calls.push('prepare'); approval({ url: 'https://example.test/manage/enrollments/review', code: 'ABCDEF123456' });
+    return success({ failed: [] });
+  }, reset: async () => { calls.push('reset'); return success(undefined); },
+  delivery: async () => { calls.push('delivery'); return failure('conflict', 'Enrollment must never change delivery'); } });
+  cleanup(scope, () => fixture.controller.close());
+  const enrolled = await fixture.finish(await fixture.operation('enroll'));
+  assert.equal(enrolled.status, 'succeeded');
+  assert.deepEqual(calls, ['prepare']);
+  assert.deepEqual(fixture.started, []);
+  const current = value(fixture.controller.view(fixture.record.fleetId));
+  assert.equal(current.phase, 'stopped');
+  assert.equal(current.instances[0]!.desiredActive, false);
+  assert.equal(current.instances[0]!.listenerActive, false);
+  assert.deepEqual(value(fixture.registry.desiredIntent()), []);
+  assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'enroll',
+    target: { kind: 'agent', fleetId: current.fleetId, instanceKey: 'analyst' }, expectedRevision: current.revision })).ok, false);
+  await fixture.finish(await fixture.operation('start'));
+  assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'enroll',
+    target: { kind: 'fleet', fleetId: current.fleetId }, expectedRevision: value(fixture.controller.view(current.fleetId)).revision })).ok, false);
+  await fixture.finish(await fixture.operation('stop'));
+  const session = value(fixture.controller.view(current.fleetId)).instances[0]!.sessionId;
+  await fixture.finish(await fixture.operation('enroll'));
+  assert.equal(value(fixture.controller.view(current.fleetId)).instances[0]!.sessionId, session);
+  assert.equal(fixture.started.length, 1);
+});
 
 test('rosters are strict, disjoint and bounded; empty stopped fleets and persistent work areas are valid', () => {
   const roster = { fleet: 'team', coordination: { adapter: 'crossfire', server: 'https://example.test', owner: '@owner:test' }, instances: [] };

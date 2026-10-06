@@ -52,7 +52,7 @@ export async function markDirect(client: Native, identity: string, counterpart: 
 
 export function createOwnerConversations(accounts: Authority, serverName: string) {
   const operations = new Map<string, Promise<void>>();
-  async function ensure(owner: string, agent: string, selected: string | null): Promise<Result<string>> {
+  async function ensure(owner: string, agent: string, selected: string | null, previousName: string | null): Promise<Result<string>> {
     if (!userId(owner) || !userId(agent) || owner === agent || !owner.endsWith(':' + serverName)
       || !agent.endsWith(':' + serverName) || selected !== null && !roomId(selected)) return failure('invalid', 'Invalid owner conversation identities');
     const ownerClient = await accounts.asUser(owner), agentClient = await accounts.asUser(agent);
@@ -97,7 +97,7 @@ export function createOwnerConversations(accounts: Authority, serverName: string
     if (!members.ok) return members;
     const title = members.value.find(event => event.type === 'm.room.name' && event.state_key === '')?.content.name;
     if (title !== undefined && typeof title !== 'string') return failure('native', 'Invalid native conversation name');
-    if (title === undefined || typeof title === 'string' && !title.trim()) {
+    if (title === undefined || typeof title === 'string' && !title.trim() || previousName !== null && title === previousName) {
       const name = await conversationName(ownerClient.value, agent);
       if (!name.ok) return name;
       const named = await nativeOk(ownerClient.value, 'PUT', API + '/rooms/' + segment(room) + '/state/m.room.name', { name: name.value });
@@ -125,13 +125,13 @@ export function createOwnerConversations(accounts: Authority, serverName: string
     const markedAgent = await markDirect(agentClient.value, agent, owner, room);
     return markedAgent.ok ? success(room) : markedAgent;
   }
-  return async (owner: string, agent: string, room: string | null): Promise<Result<string>> => {
+  return async (owner: string, agent: string, room: string | null, previousName: string | null): Promise<Result<string>> => {
     const previous = operations.get(owner) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>(resolve => { release = resolve; });
     operations.set(owner, current);
     await previous;
-    try { return await ensure(owner, agent, room); }
+    try { return await ensure(owner, agent, room, previousName); }
     finally { release(); if (operations.get(owner) === current) operations.delete(owner); }
   };
 }

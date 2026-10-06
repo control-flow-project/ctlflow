@@ -45,23 +45,28 @@ test("native authority shutdown aborts reads and serialized provisioning without
 test("private service starts with real native bootstrap and shuts down idempotently", { timeout: 120_000 }, async scope => {
   const jwtSecret = secret();
   const native = await conduitFixture(scope, { jwtSecret });
-  const probe = createServer();
-  probe.listen(0, "127.0.0.1");
-  await once(probe, "listening");
-  const address = probe.address();
-  assert(address && typeof address === "object");
-  const port = address.port;
-  await new Promise<void>(resolve => probe.close(() => resolve()));
+  const probes = [createServer(), createServer()];
+  const ports: number[] = [];
+  for (const probe of probes) {
+    probe.listen(0, "127.0.0.1");
+    await once(probe, "listening");
+    cleanup(scope, () => new Promise<void>(resolve => probe.listening ? probe.close(() => resolve()) : resolve()));
+    const address = probe.address();
+    assert(address && typeof address === "object");
+    ports.push(address.port);
+  }
+  const [port, contentPort] = ports as [number, number];
   mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), ".temp/service-lifecycle-"));
   const config: Config = { instance: "lifecycle", serverName: "architecture.localhost",
-    publicOrigin: "http://127.0.0.1:" + port, contentOrigin: 'http://localhost:' + (port + 1), matrixOrigin: native.base,
+    publicOrigin: "http://127.0.0.1:" + port, contentOrigin: 'http://localhost:' + contentPort, matrixOrigin: native.base,
     administrator: "@admin:architecture.localhost", registrationSecret: native.registrationToken, jwtSecret };
   writeJson(join(directory, "config.json"), config);
   writeJson(join(directory, "bootstrap.json"), { servicePassword: secret(), administratorPassword: secret() });
   const output = join(directory, "release");
   const release = await buildRelease(process.cwd(), output);
-  const service = await serve(directory, join(output, "onboarding", release.release), port, {}, port + 1);
+  for (const probe of probes) await new Promise<void>(resolve => probe.close(() => resolve()));
+  const service = await serve(directory, join(output, "onboarding", release.release), port, {}, contentPort);
   cleanup(scope, service.close);
   const health = await fetch(config.publicOrigin + "/api/health", { signal: AbortSignal.timeout(5000) });
   assert.equal(health.status, 200);

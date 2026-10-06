@@ -30,7 +30,7 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
       if (!verified.ok) return verified;
       roomId = invitation.roomId;
     } else {
-      const native = await services.matrix.ownerConversation(identity.owner.matrixUserId, identity.principal.matrixUserId, previous.value?.roomId ?? null);
+      const native = await services.matrix.ownerConversation(identity.owner.matrixUserId, identity.principal.matrixUserId, previous.value?.roomId ?? null, null);
       if (!native.ok) return native;
       roomId = native.value;
     }
@@ -90,7 +90,7 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
     const observation = services.repositories.roomGrantApplication.find({ agentId, roomId });
     if (!observation.ok) return observation;
     if (observation.value?.membership !== 'join' || observation.value.errorCode !== null) return failure('unavailable', observation.value?.errorMessage ?? 'Owner conversation read and reply is not ready');
-    const marked = await services.matrix.ownerConversation(identity.owner.matrixUserId, identity.principal.matrixUserId, roomId);
+    const marked = await services.matrix.ownerConversation(identity.owner.matrixUserId, identity.principal.matrixUserId, roomId, null);
     if (!marked.ok) return marked;
     if (marked.value !== roomId) return failure('conflict', 'The native owner conversation changed');
     const bound = services.unitOfWork.run(() => {

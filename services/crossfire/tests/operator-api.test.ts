@@ -57,11 +57,12 @@ test('operator enrollment is read-only until explicit execution and verifies the
   const introduced = value(await introduceEnrollment(fixture.services, { enrollmentId, claimSecret: secret(), ownerMatrixId,
     fleetKey: 'research', controller: { name: 'laptop', metadata: {} }, instances: [{ instanceKey: 'helper', name: 'helper', coordinationPolicy: defaultCoordinationPolicy() }] }));
   const plan = { enrollmentId, ownerMatrixId, verificationCode: introduced.request.verificationCode, fleetKey: 'research', controllerName: 'laptop',
-    instances: [{ instanceKey: 'helper', requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy() }] };
+    instances: [{ instanceKey: 'helper', currentName: null, requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy() }] };
   value(await reviewEnrollment(fixture.origin, fixture.account, plan, false, new AbortController().signal));
   assert.equal(fixture.requests.filter(request => request.method === 'POST' && request.path.endsWith('/decision')).length, 0);
   for (const changes of [{ ownerMatrixId: '@wrong:test' }, { controllerName: 'wrong' }, { verificationCode: 'WRONGWRONG00' },
-    { instances: [{ instanceKey: 'wrong', requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy() }] },
+    { instances: [{ instanceKey: 'wrong', currentName: null, requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy() }] },
+    { instances: [{ ...plan.instances[0]!, currentName: 'other-name' }] },
     { instances: [{ ...plan.instances[0]!, coordinationPolicy: { ...defaultCoordinationPolicy(), permissions: ['room.agent.invite' as const] } }] }]) {
     assert.equal((await reviewEnrollment(fixture.origin, fixture.account, { ...plan, ...changes }, true, new AbortController().signal)).ok, false);
   }

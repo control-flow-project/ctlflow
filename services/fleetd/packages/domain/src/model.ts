@@ -20,7 +20,7 @@ export type InstanceState = { instance: Instance; phase: Phase; sessionId: strin
 export type FleetState = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; controller: Controller; phase: Phase;
   connection: ControllerState; instances: (InstanceState & { listenerActive: boolean; desiredActive: boolean; lastActivityAt: number | null; historyAvailable: boolean | null })[]; error: string | null };
 export type Target = { kind: 'fleet' | 'agent' | 'daemon'; fleetId?: string; instanceKey?: string };
-export type OperationInput = { operationId: string; target: Target; action: 'start' | 'stop' | 'reset' | 'update'; expectedRevision: number; releaseDirectory?: string };
+export type OperationInput = { operationId: string; target: Target; action: 'enroll' | 'start' | 'stop' | 'reset' | 'update'; expectedRevision: number; releaseDirectory?: string };
 export type Approval = { url: string; code: string };
 export type Operation = OperationInput & { status: 'accepted' | 'running' | 'awaiting-approval' | 'succeeded' | 'failed'; createdAt: number; completedAt: number | null;
   receiptPending?: true;

@@ -110,7 +110,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         const binding = loadBinding(configuration); if (!binding.ok) return binding;
         const identity = binding.value.identities.find(item => item.instanceKey === instance.key);
         if (!identity) return failure('missing', 'Instance has no enrolled identity');
-        const local = paths(join(configuration.directory, instance.workarea), instance.name);
+        const local = paths(join(configuration.directory, instance.workarea), instance.key);
         const tested = await listenerRequest(local.state, { action: 'test' });
         if (!tested) return failure('unavailable', 'The owning listener is not connected');
         if (!tested.ok) return tested;
@@ -175,7 +175,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
         const workspace = instance.workspace ?? stateDirectory;
         prepareProject(stateDirectory);
-        const local = paths(stateDirectory, instance.name);
+        const local = paths(stateDirectory, instance.key);
         const listenerHost = await (host ??= createListenerHost());
         release = await acquireProcessLock(join(local.state, 'listener'));
         const software = reason === 'recovery' || existsSync(join(local.root, 'client.mjs')) ? installedSoftware(local.root) : await installSoftware(local.root, artifacts);
@@ -186,7 +186,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         writeJson(local.profile, { id: identity.agentId, workspace: stateDirectory, account: identity.account, settings });
         software.activate();
         const instructions = [definition.instructions, 'Crossfire identity: ' + instance.name + '. This instance is already enrolled and its listener is managed by the fleet controller. Do not reconnect, enroll or start another listener.',
-          'Use the intentional Crossfire tools from CROSSFIRE_PROJECT: node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" --profile ' + instance.name + '. Connection and telemetry require no model action. Never disclose host paths or private machine configuration outside the owner DM.',
+          'Use the intentional Crossfire tools from CROSSFIRE_PROJECT: node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" --profile ' + instance.key + '. The profile is this instance\'s immutable local key, not its display name. Connection and telemetry require no model action. Never disclose host paths or private machine configuration outside the owner DM.',
           resetInstructions(local.state), readFileSync(software.skill.path, 'utf8')].join('\n\n');
         let ready!: () => void, rejectReady!: (error: unknown) => void;
         bindingControl = connection.listener(identity.agentId);
@@ -270,7 +270,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
       let listener: (() => Promise<void>) | undefined, receiver: (() => Promise<void>) | undefined;
       try {
         signal.throwIfAborted();
-        const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), local = paths(stateDirectory, instance.name);
+        const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), local = paths(stateDirectory, instance.key);
         listener = await acquireProcessLock(join(local.state, 'listener'));
         receiver = await acquireProcessLock(join(local.state, 'receiver'));
         const software = await installSoftware(local.root, releaseDirectory);
