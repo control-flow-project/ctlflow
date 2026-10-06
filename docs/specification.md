@@ -1908,6 +1908,17 @@ message size determines Unicode-safe chunks; Markdown/HTML expansion is not
 applied to terminal text. Native protocol/review resource limits are independent
 of ordinary chat input and the former approval-display cap.
 
+The verified pre-idle journal schema requires an explicit offline operator
+conversion before current-schema activation. Under exclusive controller/receiver
+writer locks, exact enrolled profiles and every observation are validated; all
+original journal bytes are durably backed up and verified before atomic writes.
+The missing lastActivityAt/historyAvailable metadata becomes null, never invented
+history or activity. Pending output, timestamps, identities, cursors, provider
+files and native conversations remain intact. Interrupted per-file conversion
+is safely repeatable; current files are no-ops and other schemas are refused.
+The runtime accepts only the current schema, with no compatibility reader.
+This source-checkout operator tool is not part of either public npm bundle.
+
 Native permission requests and structured yes/no, multiple-choice or free-text
 questions use one runtime-independent human-decision owner. Adapters decode and
 answer supported native requests; the shared listener owns delivery/cancellation,

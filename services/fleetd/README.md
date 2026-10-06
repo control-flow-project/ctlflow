@@ -81,6 +81,7 @@ No systemd, privileged daemon,
 global skill, host package installer or shell supervisor is installed.
 
 - [Abrupt controller death and native writer ownership](docs/operations.md#abrupt-controller-death)
+- [Source-checkout verification and explicit observation conversion](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
 
 - [CLI and first-run workflow](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/README.md)
 - [Canonical API, data and lifecycle specification](https://github.com/control-flow-project/crossfire/blob/main/docs/specification.md)
