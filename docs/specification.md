@@ -2080,6 +2080,11 @@ is applied through the same receipt-confirmed native developer-instruction
 producer, including when resuming an existing history. Identity, grants, unread positions,
 pending receipts and stop intent are preserved; no new identity or competing
 receiver is created. Detection, installation and reporting are model-free.
+A refused restoration of changed fleet files preserves activation intent. An
+explicit update validates and accepts reviewed current configuration, reconnects
+through the same execution port, clears the obsolete restoration error and
+resumes only prior desired bindings. CLI status is descriptive, not a duplicate
+lifecycle validation owner; the controller validates every submitted operation.
 Remote CLI update requires `--release-directory` naming already installed remote
 assets, or the human runs the installed CLI on the controller host. There is no
 HTTP fallback. Restart uses the new executable while preserving

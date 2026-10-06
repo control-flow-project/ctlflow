@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -252,6 +252,39 @@ test('explicit stop while initial approval is pending prevents subsequent setup 
   assert.equal((await current.operate(first.fleet.fleetId, 'stop')).status, 'succeeded');
   assert.equal(value(await current.controller.setup(current.input)).status, 'stopped');
   assert.equal(current.calls.some(call => call.startsWith('start:')), false);
+});
+
+test('reviewed update repairs refused configuration restoration without losing history or stopped intent', async scope => {
+  const current = fixture(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  const initial = value(await current.controller.setup(current.input)); assert(initial.operation); await current.finish(initial.operation);
+  const fleetId = initial.fleet.fleetId, before = value(current.controller.view(fleetId)), first = before.instances[0]!;
+  await current.operate(fleetId, 'stop');
+  value(await current.controller.editInstance(fleetId, 0, { kind: 'add', instance: { key: 'stopped-peer', name: 'stopped-peer', definition: 'project', workarea: 'agents/project/workarea/stopped-peer' } }));
+  await current.operate(fleetId, 'start', first.instance.key); await current.controller.close();
+  const intent = value(current.registry.desiredIntent()), registered = value(current.registry.registrations())[0]!;
+  writeFileSync(join(before.directory, 'agents/project/AGENTS.md'), 'Reviewed current role instructions.', { mode: 0o600 });
+  current.calls.length = 0;
+  const restarted = value(createController(current.services)); cleanup(scope, () => restarted.close()); await restarted.ready();
+  assert.match(value(restarted.view(fleetId)).error!, /Fleet files changed/u);
+  assert.equal(current.calls.some(call => call.startsWith('start:')), false, 'Unreviewed changed files cannot restore a native binding');
+  const validate = current.services.execution.validate;
+  current.services.execution.validate = () => failure('invalid', 'Invalid native configuration');
+  const refused = await restarted.operate({ operationId: randomUUID(), action: 'update', target: { kind: 'fleet', fleetId },
+    expectedRevision: registered.revision, releaseDirectory: '/owned/installed/release' });
+  assert.equal(refused.ok, false); if (!refused.ok) assert.equal(refused.error.code, 'invalid');
+  assert.equal(value(current.registry.registrations())[0]!.digest, registered.digest);
+  assert.equal(current.calls.some(call => call.startsWith('update:')), false, 'Validation precedes software installation and configuration acceptance');
+  current.services.execution.validate = validate;
+  const updated = value(await restarted.operate({ operationId: randomUUID(), action: 'update', target: { kind: 'fleet', fleetId },
+    expectedRevision: registered.revision, releaseDirectory: '/owned/installed/release' }));
+  await until(() => value(restarted.operation(updated.operationId)).completedAt !== null);
+  assert.equal(value(restarted.operation(updated.operationId)).status, 'succeeded');
+  const after = value(restarted.view(fleetId));
+  assert.equal(after.error, null); assert.equal(after.revision, registered.revision + 1);
+  assert.equal(after.instances[0]!.sessionId, first.sessionId); assert.equal(after.instances[0]!.desiredActive, true);
+  assert.equal(after.instances[1]!.desiredActive, false); assert.equal(after.instances[1]!.phase, 'stopped');
+  assert.deepEqual(value(current.registry.desiredIntent()), intent);
+  assert.equal(current.calls.includes('prepare'), false); assert.equal(current.calls.includes('reset'), false);
 });
 
 test('consented update owns stop/install/resume with the same histories and never activates stopped agents', async scope => {

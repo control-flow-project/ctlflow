@@ -367,7 +367,7 @@ export function createController(services: Services) {
         const valid = services.execution.validate(configuration.value);
         const error = selected.length !== desired.length ? 'Desired binding is missing from the saved roster; stop this fleet and review its files'
           : configuration.value.roster.fleet !== record.fleetKey || configuration.value.digest !== record.digest
-            ? 'Fleet files changed after their last accepted revision; stop this fleet and review before applying them' : !valid.ok ? valid.error.message : null;
+            ? 'Fleet files changed after their last accepted revision; review them and run an explicit update' : !valid.ok ? valid.error.message : null;
         if (error) {
           connectionErrors.set(record.directory, error);
           for (const instance of selected) states.set(key(record.fleetId, instance.key), { instance, phase: 'failed', sessionId: null, startedAt: null, error });
@@ -431,6 +431,8 @@ export function createController(services: Services) {
             states.set(key(fleetId, instance.key), { instance, phase: 'failed', error: updated.error.message, sessionId: states.get(key(fleetId, instance.key))?.sessionId ?? null, startedAt: null });
           }
         }
+        connect(configuration);
+        if (connectionErrors.has(configuration.directory)) throw new Error(connectionErrors.get(configuration.directory)!);
         for (const instance of activated) {
           if (!wanted.has(key(fleetId, instance.key)) || operation.errors.some(error => error.instanceKey === instance.key)) continue;
           const resumed = await services.execution.start(configuration, instance, AbortSignal.any([signal, lifetime.signal]), 'operator');

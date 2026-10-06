@@ -34,7 +34,11 @@ fleet, or `fleet agent update FLEET INSTANCE`. The canonical lifecycle operation
 stops selected receivers/native processes, validates and installs the package's
 pinned local tools/skill assets, then resumes only previously desired agents.
 Stopped agents stay stopped. Exact identities, histories and unread positions are
-retained. Failures are per-instance, without discarding successful peers.
+retained. Failures are per-instance, without discarding successful peers. If a
+daemon restart refuses restoration because reviewed fleet files changed, run the
+explicit update operation to validate and accept those files without clearing
+saved activation. The controller owns lifecycle validation; a prior status error
+does not prevent submitting the operation that repairs it.
 
 Then `fleet daemon restart` replaces the controller binary at the same private
 root, preserving desired activation and exact histories. Do not reverse this
