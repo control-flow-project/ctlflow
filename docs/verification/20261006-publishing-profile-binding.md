@@ -23,6 +23,24 @@ including both OCR tiers. No further public rename or identity change is needed.
 All 27 workspace manifests and the lock move together to 0.1.3; only fleet and
 fleetd are public. Internal packages remain private and bundled.
 
+## Observation journal upgrade
+
+Enabling the existing fleet exposed an omitted forward conversion for its
+pre-idle observation journals. Their exact previous schema lacked lastActivityAt
+and historyAvailable; the current runtime correctly rejected it. The six newly
+initialized instances already used the current schema.
+
+The internal fleetd observation-migration operator validates the known previous
+schema, holds controller/receiver writer locks, verifies durable byte-exact
+backups, then atomically converts each file. Unknown historical metadata becomes
+null; pending output and every other observation field remain intact. Current
+files are no-ops and other schemas fail without mutation. The runtime retains
+one strict schema, without a fallback reader or deleted output/history.
+
+The operator is source-checkout-only and excluded from public npm bundles. Its
+five tests cover boundaries, active writers, exact backups/output retention,
+preflight rejection, interruption-safe retry and current-schema idempotency.
+
 ## Verification
 
 - Current source typecheck/build passes.
@@ -31,20 +49,70 @@ fleetd are public. Internal packages remain private and bundled.
   private state, previous conversation and native session identity.
 - Missing, null, empty, malformed and oversized profile keys fail without
   touching native state or invoking the unavailable test executable.
-- Canonical npm test passes 647 tests in 150 isolated files on 24 workers.
+- Final canonical npm test passes 652 tests in 151 isolated files on 24 workers.
 - All 33 architecture and four installation checks pass.
-- The actual native container gate passes on the current 0.1.3 image.
+- The actual native container gate passes on the 0.1.3 product image. Adding the
+  internal operator does not change either published runtime bundle's bytes.
 - Both edited skills pass skill-creator validation; package ownership and
   whitespace checks pass. No paid-provider or macOS certification is claimed.
+- All 40 production management routes pass desktop/mobile browser checks,
+  producing 103 screenshots after fleet activation. Element's welcome/native
+  sign-in pages also pass at both widths. Fleet details/map show online delivery
+  and the distinction between sleeping and working native sessions.
 
 The first direct test-runner invocation lacked npm_execpath and correctly failed
 the installed-product test. It is retained as failed evidence. The unmodified
-canonical npm rerun passes; no assertion or quality gate is weakened.
+canonical npm rerun passes. An initial final-suite run hit the existing native
+fleet integration's bounded sync-token observation timeout; the unchanged focused
+rerun and complete unchanged 652-test rerun pass. Migration fixture failures and
+initial browser selector failures are retained too. No assertion, timeout or
+quality gate is weakened.
 
 ## Deployment
 
-Deployment and final preservation checks are in progress. The deliberately
-stopped fleet must not be started, resumed, reset or assigned work for this update.
-The content host's existing DNS, dedicated HTTPS certificate, nginx upstream,
-credential stripping and opaque-origin sandbox are verified; no site rewrite
-or additional hosting path is required.
+Both public 0.1.3 packages are published and anonymously downloaded with exact
+archive integrity. Initial registry processing returned 404; subsequent complete
+verification passes. No internal workspace is published.
+
+The website runs gaap-runtime:75dfc887b571a4be631b with product source 4211de5 and
+release 0.1.3-c8b432a02e989aecc268d6fc. A verified full backup precedes deployment.
+Schema 13/all 63-table integrity and foreign keys pass; all 37 protected
+relations and 134 original audit entries are retained at the quiescent deployment
+checkpoint. No production data is reset.
+
+Large public responses initially truncated because native nginx workers could
+not write inherited proxy-buffer subdirectories. GAAP source a0ec7c7 declares
+one private www-data-owned request/response buffer tree in both canonical vhosts.
+A verified native configuration/certificate-renewal backup precedes installation,
+nginx validation and reload. All release and management asset bytes now verify;
+a large invalid request reaches application validation, proving request spooling
+too. No disabled buffering, protocol fallback, broader permissions or other
+tenant change is used. These host-only changes do not require a new product image.
+
+content.gaap.lol has correct DNS, dedicated valid HTTPS, active certificate-renewal
+timer and the canonical loopback upstream. Cookie/Authorization stripping,
+no Set-Cookie, denied main/Matrix routes and CSP sandbox allow-scripts without
+allow-same-origin remain verified. Main application cross-origin POSTs fail.
+No fresh public report or renewal dry-run is performed in this task; prior
+deployed six-file publication/browser/deletion proof and current native report
+tests remain separate evidence, not a new live publication claim.
+
+Turbine uses the exact public 0.1.3 pair and agreements instructions 61eac7f.
+Both pre-update and pre-conversion full backups verify. All 22 existing journals
+convert with separately verified original-byte backups. Controller restoration
+then binds all 28 receivers asleep, retaining all 28 accounts/provider files,
+the exact 22 existing histories and the six first-initialized histories.
+
+The user's later instruction explicitly enables the fleet, superseding its
+earlier stop intent. Controller/delivery and all 28 logical receivers are online;
+native sessions resume saved history only when eligible work arrives and sleep
+after the configured 1,800-second idle period. Retained eligible messages have
+already awakened workers. No synthetic assignment or model prompt is sent.
+The strict fleet test rejects a busy worker as intended; individual diagnostics
+confirm authentication, exact histories, current release and unpaused delivery
+without requiring ordinary work to stop. Normal processing may create needed
+owner DMs; the quiescent no-new-room checkpoint is not a claim of no later rooms.
+
+Private evidence is under .analysis/20261006-content-publication-check/evidence.
+All three repositories use pushed feature branches and manual PR creation;
+there is no main push, automatic PR, global service or unrelated host change.
