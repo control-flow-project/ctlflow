@@ -10,12 +10,15 @@ This correction starts from merged Crossfire main `2707443`. GAAP main
 `759ad2d` and Agreements main `9d57e5d` remain untouched. The branch is
 `fix/gaap-preserving-rollout`.
 
-The authorized private npm credential successfully publishes both public 0.1.0
-products, verified by anonymous registry download and independent installation.
-Crossfire and all internal modules remain explicitly private. The canonical GAAP
-website upgrade and forward schema migration succeed. Actual controller software
-replacement exposes an installer defect; the corrected coordinated release is
-0.1.1. Its remaining publication and preserving activation are not yet complete.
+Publication and preserving deployment are complete. The authorized private npm
+credential publishes `@ctlflow/fleetd@0.1.1` and `@ctlflow/fleet@0.1.1`, verified
+by anonymous registry download, exact archive integrity and independent
+installation. Crossfire and all internal modules remain explicitly private;
+none is published. Already-published 0.1.0 artifacts remain immutable.
+
+The canonical GAAP website upgrade, forward schema migration, public-package
+controller replacement and all 22 explicit agent software updates succeed.
+A normal controller restart retains stopped intent and saved histories.
 There is no alternate installer or runtime path.
 
 ## Final-review corrections
@@ -59,14 +62,24 @@ check, quality gate or native lifecycle guarantee is weakened.
 | Structure and architecture | Structure gate and all 33 architecture checks pass. |
 | Installation | All four checks pass, including clean external-prefix public-package installation. |
 | Actual browser regressions | Real Conduit, SQLite, REST and Chromium reproduce independent writers; pristine refresh, retained dirty drafts, explicit conflict review and current-revision saves pass. |
-| Actual container | `crossfire-runtime:918bfeb538413563a018`; Element, management, authenticated attachment download, shutdown and second-start persisted rooms pass. |
+| Actual container | Final `crossfire-runtime:50370b448e4ee19d2f9b`; Element, management, exact authenticated attachment bytes, shutdown and second-start persisted rooms pass. |
 | Production migration rehearsal | A consistent readonly schema-12 snapshot advances to schema 13 only in a local copy; all 63 tables, integrity and foreign keys pass. Original snapshots and production are unchanged. |
+| Public npm installation | Both exact 0.1.1 registry archives match their prepared SHA-512 digests; a fresh independent prefix installs only the two public packages and runs the CLI outside the monorepo. |
+| Actual production release and APIs | Live immutable release and both management assets match the selected build. Normal login, complete 22-agent roster, native invitation directory and fleet-map reads pass without model calls. |
+| Actual production browser | Forty desktop/mobile management views pass, including normal native login, retained route navigation, tables, software/session views, map URL/keyboard behavior and personalized onboarding. |
+| Actual public site | Branded Element welcome and native sign-in forms pass at desktop/mobile widths without page errors or overflow. The content host rejects all four application endpoint probes with 404 and no cookies. |
+| Actual production database | A final native SQLite backup has schema 13, all 63 tables, valid integrity/foreign keys and exact required counts. Strict comparison with the canonically migrated original snapshot preserves all 37 protected relations and all 104 original audit records. |
+| Actual Docker host | Exact selected image and all three provenance labels match. Healthy rootless Docker retains its readonly filesystem, dropped capabilities, no-new-privileges and only loopback ports 4012/4020. |
+| Actual Turbine controller | Connected, delivery disabled, all 22 instances stopped, no active listeners or desired activation. Generic preservation retains every original account/context/session binding and provider-file fingerprint after a normal public-package restart. |
 
 The rehearsal separately compares unchanged identity, credential, room grant,
 owner/management conversation, policy, fleet binding, publication and audit
 fields across 19 relations. The canonical migration archives four historical
-enrollment requests rather than inventing live controllers. This is rehearsal
-evidence, not a deployed migration or a full native-history content comparison.
+enrollment requests rather than inventing live controllers. The subsequent
+production upgrade applies that forward migration, and the final strict
+37-relation comparison passes without suppressing fields or altering snapshots.
+Native-history bindings and files are preserved; this does not claim a semantic
+review of every native conversation.
 
 The full suite and actual Docker descendants use verified finite cgroups:
 16 GiB memory, zero swap and 4096 tasks. Focused probes use 8 GiB, zero swap and
@@ -75,21 +88,54 @@ execution are not certified. Earlier failing runs remain in private evidence.
 
 ## Preserved production state and rollout
 
-Read-only Turbine inspection confirms controller `turbine-gaap` connected,
-delivery disabled, all 22 agents stopped and no active listeners. Existing
-account/history/provider fingerprints are retained. The first website upgrade
-uses a freshly verified quiescent full backup and canonical forward schema-13
-migration. Turbine's orderly controller replacement follows a verified full
-controller/fleet/native-provider archive. The controller runs the public package
-with all desired agent bindings stopped and delivery disabled. The original
-failed update outcome is retained; it is not represented as a completed update.
+The deployed runtime source is Crossfire
+`fe40848bae5b3ee71597d421046e1dd16aad8113`, with GAAP's canonical resource-bound
+deployment scripts at `bfa6295` and unchanged Agreements definitions at `9d57e5d`.
+The production image is `gaap-runtime:968de44b4933237008c2`; the immutable
+listener release is `0.1.1-1bb0435202babe9bda37e291`. This report's subsequent
+documentation-only commit is not a different deployed runtime build.
 
-After final corrected gates, publish only the two exact 0.1.1 public artifacts,
-daemon first. Complete canonical preserving website deployment and the explicit
-controller/software update without starting native agents. Then verify actual
-release/package provenance, database and history preservation, stopped intent
-and important browser flows. Package packing is not publication; disposable
-container verification is not production deployment.
+The final website activation takes and verifies the quiescent full backup
+`/home/gaapuser/gaap/backups/20261006T021619Z-968de44b4933.tar.gz` before data
+changes. Independent checksum, gzip and tar-list checks pass afterward.
+Turbine's fresh stopped controller/fleet/native-provider archive also passes
+all three checks. Its SHA-256 is
+`f376ba759960e958a9f4686d4ba291dcd902e9559cf1f321feac65614efc777f`.
 
-Private evidence is under `.analysis/20261006-gaap-preserving-rollout/` and
-`.temp/test-runs/2026-10-06T00-48-29.605Z-3243513/`.
+Both public products install into Turbine's private 0.1.1 prefix. Explicit
+`fleet update agreements` updates all 22 immutable agent software installations;
+their current manifests and artifact hashes match the deployed listener release.
+The ordinary `fleet daemon restart` then retains every original native binding,
+stopped intent and disabled delivery. Stable executable links point to those
+installed public binaries, not monorepo source. The original failed 0.1.0 update
+outcome remains recorded, separately from the successful corrected update.
+
+Final production database counts retain 22 agents/names/credentials, 23 room
+grants, five room permissions, nine owner conversations, one management
+conversation, one fleet with 22 instances and two publication records with 12
+files. Both existing publication records were already deleted; deployment does
+not republish them or create a replacement report. Consequently an existing
+public-report browser isolation probe is not claimed for this rollout. The
+current release's disposable native container checks remain separate evidence.
+
+At the final postdeployment Turbine observation, the controller is connected,
+delivery is disabled and all 22 native agents remain deliberately stopped.
+No assignment, start, resume, native reset, production reset or paid model call
+is performed. The remote fleet's untracked operator exclusions are preserved.
+The authorized npm key is never printed, copied to servers or persisted in
+repository/global npm configuration; temporary private npm configuration is
+removed.
+
+Private evidence is under `.analysis/20261006-gaap-preserving-rollout/`, with
+final suite timings under
+`.temp/test-runs/2026-10-06T01-59-36.915Z-3486654/`.
+
+## Known independent advisories
+
+Native npm audit reports two preexisting external dependency advisories:
+moderate TOML parser complexity in `smol-toml` and high indexed-source-map
+denial of service in `source-map-js`. The 97 external lock records are unchanged;
+this rollout neither performs an unrelated dependency update nor claims an
+advisory-free dependency tree. Passing product correctness, architecture and
+isolation checks do not dismiss those advisories. Private audit evidence records
+their exact ranges and suggested fixes for a separately scoped dependency update.
