@@ -37,6 +37,11 @@ saved history; only `--fresh-history` requests replacement. Read-only commands
 never start a controller or wake a native session. `fleet test FLEET` checks
 actual listener/authentication/native readiness without a model turn.
 
+`fleet enroll FLEET` reviews a stopped registered fleet without starting sessions.
+Use it for additional agents or proposed public names while retaining histories.
+Only the human owner approves the exact roster/code; immutable instance keys and
+workareas remain unchanged. See [enrollment operations](docs/operations.md#enroll-without-starting).
+
 Startup creates no chats. Private owner DMs open on first contact, visible output
 or native permission request; additional room membership is explicit.
 

@@ -7,7 +7,7 @@ import { enrollmentCapacity } from './capacity.js';
 import { resolveCoordinationPolicy } from '../fleet/policy.js';
 import type { RequestedFleetPolicy } from '../port/fleet-policy.js';
 
-export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; revision: number; retired: boolean; operational: boolean }[];
+export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; name: string; revision: number; retired: boolean; operational: boolean }[];
   policies: { instanceKey: string; policy: RequestedFleetPolicy }[] };
 export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
   const valid = validateRoster(input);
@@ -33,9 +33,9 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
     const current = services.repositories.fleetInstance.findByAgent(item.identity.agentId);
     if (!current.ok) return current;
     const retired = current.value !== null && current.value.retiredAt !== null;
-    if (!record.value || record.value.agent.ownerId !== owner.value.id || record.value.owner.status !== 'active' || record.value.name !== item.name
+    if (!record.value || record.value.agent.ownerId !== owner.value.id || record.value.owner.status !== 'active'
       || record.value.principal.status !== 'active' && !(retired && record.value.principal.status === 'suspended'))
-      return failure('forbidden', 'Existing identity proof does not match the owner, agent and registered name');
+      return failure('forbidden', 'Existing identity proof does not match the owner and agent');
     if (retired) {
       const credentials = services.repositories.agentCredential.find({ agentId: item.identity.agentId }); if (!credentials.ok) return credentials;
       if (!credentials.value?.accessToken || credentials.value.accessToken !== item.identity.accessToken)
@@ -46,7 +46,7 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
     }
     if (current.value && (current.value.fleetKey !== input.fleetKey || current.value.ownerId !== owner.value.id || current.value.instanceKey !== item.instanceKey))
       return failure('conflict', 'Agent already belongs to another fleet instance');
-    existing.push({ instanceKey: item.instanceKey, agentId: item.identity.agentId, revision: record.value.principal.revision, retired,
+    existing.push({ instanceKey: item.instanceKey, agentId: item.identity.agentId, name: record.value.name, revision: record.value.principal.revision, retired,
       operational: current.value !== null && current.value.retiredAt === null && fleet.value?.archivedAt === null });
   }
   const policies: VerifiedRoster['policies'] = [];

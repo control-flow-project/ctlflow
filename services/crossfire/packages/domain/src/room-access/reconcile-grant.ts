@@ -54,7 +54,7 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
   async function apply(): Promise<Result<void>> {
     if (grant.accessMode === 'none' || agent.principal.status !== 'active' || agent.owner.status !== 'active') return remove();
     if (repairOwnerDirect) {
-      const verified = await services.matrix.ownerConversation(agent.owner.matrixUserId, agent.principal.matrixUserId, roomId);
+      const verified = await services.matrix.ownerConversation(agent.owner.matrixUserId, agent.principal.matrixUserId, roomId, null);
       if (!verified.ok) return verified;
       if (verified.value !== roomId) return failure('conflict', 'The owner DM changed during reconciliation');
     }

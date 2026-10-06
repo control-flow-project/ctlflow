@@ -5,6 +5,7 @@ import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { loadBinding, saveBinding } from '@ctlflow/fleetd-storage/binding';
 import { initializeHistory } from '@ctlflow/fleetd-storage/history';
+import { migrateInstanceProfiles } from '@ctlflow/fleetd-storage/profile-migration';
 import type { Configuration, Controller, Approval } from '@ctlflow/fleetd-domain/model';
 
 export async function prepareEnrollment(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (value: Approval) => void) {
@@ -12,12 +13,12 @@ export async function prepareEnrollment(configuration: Configuration, controller
   if (!loaded.ok) return loaded;
   const binding = loaded.value, roster = configuration.roster;
   if (binding.server !== roster.coordination.server || binding.owner !== roster.coordination.owner || binding.fleetKey !== roster.fleet) return failure('conflict', 'Fleet connection differs from its saved identity; it cannot be silently replaced');
+  migrateInstanceProfiles(configuration, binding);
   const instances = roster.instances.map(instance => {
     const existing = binding.identities.find(item => item.instanceKey === instance.key);
     return { instanceKey: instance.key, name: instance.name, coordinationPolicy: configuration.definitions[instance.definition]!.coordinationPolicy,
       ...(existing ? { identity: { agentId: existing.agentId, accessToken: existing.account.access_token } } : {}) };
   });
-  if (roster.instances.some(instance => binding.identities.some(identity => identity.instanceKey === instance.key && identity.name !== instance.name))) return failure('conflict', 'An enrolled instance name is immutable');
   const client = createClient({ origin: binding.server, signal });
   const input = { ownerMatrixId: binding.owner, fleetKey: binding.fleetKey, controller, instances, ...(binding.controllerCredential ? { controllerCredential: binding.controllerCredential } : {}) };
   const digest = createHash('sha256').update(JSON.stringify(input)).digest('hex');

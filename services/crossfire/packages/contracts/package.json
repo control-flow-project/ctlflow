@@ -1,11 +1,11 @@
 {
   "name": "@ctlflow/crossfire-contracts",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "dependencies": {
-    "@ctlflow/crossfire-domain": "0.1.1",
+    "@ctlflow/crossfire-domain": "0.1.2",
     "smol-toml": "1.8.0",
-    "@ctlflow/crossfire-kernel": "0.1.1"
+    "@ctlflow/crossfire-kernel": "0.1.2"
   },
   "type": "module",
   "engines": {

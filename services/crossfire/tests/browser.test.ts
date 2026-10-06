@@ -185,6 +185,17 @@ test('real browser member/admin flows and a fleet-managed listener span native C
     access_token: enrolledAgent.account.accessToken, device_id: enrolledAgent.account.deviceId },
     settings: { instance: config.instance, homeserver: origin, server_name: config.serverName, owner: config.administrator, max_upload_bytes: 16 * 1024 * 1024 } };
   const fleetId = enrolled.fleet.fleetId;
+  const rename = { ...enrollment, enrollmentId: randomUUID(), claimSecret: secret(), controllerCredential: enrolled.fleet.controllerCredential,
+    instances: [{ ...enrollment.instances[0]!, name: 'holmes-max', identity: { agentId: profile.id, accessToken: profile.account.access_token } }] };
+  const review = value(await introduceEnrollment(services, rename));
+  await page.goto(origin + '/manage/enrollments/' + rename.enrollmentId);
+  await expect(page.getByText('Rename from holmes', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Renamed agents keep their accounts, conversations, permissions and saved histories/u)).toBeVisible();
+  await page.getByLabel('Verification code').fill(review.request.verificationCode);
+  await page.getByRole('button', { name: 'Reject', exact: true }).click();
+  await expect(page.getByText('rejected', { exact: true })).toBeVisible();
+  assert.equal(value(services.directory.agent(profile.id))!.name, 'holmes');
+  await page.goto(request.approvalUrl);
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: profile.id })), null);
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
   value(await connectOwnerConversation(services, { principalId: profile.id, kind: 'agent' }, profile.id));

@@ -64,7 +64,7 @@ export const roomAuthority = check.refine(check.object({ matrixUserId: check.mat
   authority => authority.creator === (authority.powerLevel === null), 'Native creator authority has no finite power level');
 export const room = check.object({ roomId: check.roomId, name: check.text(255), topic: check.text(4096, 0), alias: check.nullable(check.text(255)),
   authority: check.nullable(roomAuthority) });
-export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, outcome: check.choice('claimed', 'existing', 'failed'),
+export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, currentName: check.nullable(check.name), outcome: check.choice('claimed', 'existing', 'failed'),
   agentId: check.nullable(check.identifier), failureCode: check.nullable(check.text(100)), coordinationPolicy });
 export const enrollment = check.object({ owner: principal, controllerName: check.text(100), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.name,
   verificationCode: check.text(12, 12), status: check.choice('pending', 'approved', 'rejected', 'expired'), revision: check.integer(),

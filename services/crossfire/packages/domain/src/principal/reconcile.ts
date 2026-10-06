@@ -80,7 +80,23 @@ async function applyPrincipal(services: Dependencies, principalId: string): Prom
         if (!left.ok) return left;
       }
     }
-    if (application.ok && application.value?.appliedIntentHash !== intentHash) return services.matrix.setDisplayName(principal.matrixUserId, displayName);
+    if (application.ok && application.value?.appliedIntentHash !== intentHash) {
+      const named = await services.matrix.setDisplayName(principal.matrixUserId, displayName);
+      if (!named.ok) return named;
+      if (principal.kind === 'agent' && ownerId !== null && application.value?.nativeDisplayName !== displayName) {
+        const conversation = services.repositories.ownerConversation.find({ agentId: principalId });
+        if (!conversation.ok) return conversation;
+        if (conversation.value) {
+          const owner = services.repositories.principal.find({ id: ownerId });
+          if (!owner.ok) return owner;
+          if (!owner.value) return failure('missing', 'Owner no longer exists');
+          const updated = await services.matrix.ownerConversation(owner.value.matrixUserId, principal.matrixUserId,
+            conversation.value.roomId, application.value?.nativeDisplayName ?? null);
+          if (!updated.ok) return updated;
+          if (updated.value !== conversation.value.roomId) return failure('conflict', 'Owner conversation changed during renaming');
+        }
+      }
+    }
     return success(undefined);
   }
   const result = await apply();

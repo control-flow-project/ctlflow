@@ -1,5 +1,26 @@
 # Fleet operations
 
+## Enroll without starting
+
+`fleet enroll FLEET` reviews the complete roster of an already registered,
+stopped fleet. It uses the same enrollment and owner-approval flow as start,
+but never starts/resets native sessions or enables message delivery. An active
+fleet or per-agent enrollment target is rejected. Inspect `fleet show FLEET`
+after completion; starting later remains a separate explicit resume.
+
+Change an instance's `name` in `runtime.toml` to propose a new registered name.
+Keep its immutable `key`, workarea and saved credentials. The approval page shows
+the old and requested names. Only that active human owner can approve; collision,
+rejection or expiry cannot replace the current name/account. Approved names replace
+old names without aliases. Matrix IDs, grants, rooms and native histories remain
+the same. Existing automatically named owner DMs follow the new display name;
+human conversation titles stay unchanged. No new conversations are created.
+
+Local Crossfire profiles and unread cursors use the immutable instance key.
+The owning storage migration moves previously display-name-keyed state once,
+with an identity-checked durable journal, exclusive listener lock checks and no
+history merging, overwrite or alternate runtime reader. Back up before upgrading.
+
 ## Update and deploy
 
 Use an exact verified public package release after human consent. Before changing

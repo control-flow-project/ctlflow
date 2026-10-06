@@ -11,6 +11,10 @@ import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy'
 import { nativeApplication } from './support/native-application.js';
 import { httpFixture } from './support/http.js';
 import { value } from './support/application.js';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { secret } from './support/application.js';
 
 test('native enrollment creates no chats; owner-first and approval-first DMs retain readable names, privacy and reply repair', { timeout: 180000 }, async scope => {
   const fixture = await nativeApplication(scope), { services, admin } = fixture;
@@ -66,6 +70,21 @@ test('native enrollment creates no chats; owner-first and approval-first DMs ret
     assert.equal(value(await connectOwnerConversation(services, agent.actor, agent.id)).roomId, bound.roomId);
     assert.deepEqual(value(await services.matrix.joined(agent.matrixUserId)), [bound.roomId]);
     assert.equal(value(deliveryPolicy(services, agent.actor, agent.id)).ownerConversation, bound.roomId);
+  }
+  for (const [index, name] of ['ada-max', 'jo-max'].entries()) {
+    const target = agents[index]!, bound = value(services.repositories.ownerConversation.find({ agentId: target.id }))!;
+    const base = '/rooms/' + segment(bound.roomId);
+    if (index === 1) value(await native(admin.token, 'PUT', base + '/state/m.room.name', { name: 'Human title' }));
+    const renamed = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerId,
+      fleetKey: 'test-' + ['ada', 'jo'][index], controller: { name: 'Test controller' }, controllerCredential: target.controller.credential,
+      instances: [{ instanceKey: ['ada', 'jo'][index]!, name, identity: { agentId: target.id, accessToken: target.token }, coordinationPolicy: defaultCoordinationPolicy() }] };
+    const receipt = value(await introduceEnrollment(services, renamed));
+    value(decideEnrollment(services, admin.actor, renamed.enrollmentId,
+      { expectedRevision: 0, decision: 'approve', verificationCode: receipt.request.verificationCode }, randomUUID()));
+    value(await reconcilePrincipal(services, target.id));
+    const displayName = value(await native(admin.token, 'GET', '/profile/' + segment(target.matrixUserId) + '/displayname')).displayname;
+    assert.equal(value(await native(admin.token, 'GET', base + '/state/m.room.name')).name, index === 1 ? 'Human title' : displayName);
+    assert.equal(value(services.repositories.ownerConversation.find({ agentId: target.id }))!.roomId, bound.roomId);
   }
   const http = await httpFixture(scope, fixture.application), target = agents[0]!;
   const response = await http.request('/api/agents/' + target.id + '/owner-conversation', 'POST', {},

@@ -451,7 +451,8 @@ export function createController(services: Services) {
             }
           }
         }
-        for (const instance of selected) if (!running.has(key(fleetId, instance.key)) && !operation.errors.some(error => error.instanceKey === instance.key)) states.set(key(fleetId, instance.key), { instance, phase: 'starting', error: null, sessionId: null, startedAt: null });
+        for (const instance of selected) if (!running.has(key(fleetId, instance.key)) && !operation.errors.some(error => error.instanceKey === instance.key)) states.set(key(fleetId, instance.key), { instance, phase: 'starting', error: null,
+          sessionId: operation.action === 'enroll' ? states.get(key(fleetId, instance.key))?.sessionId ?? null : null, startedAt: null });
         const prepared = await services.execution.prepare(configuration, services.controller, signal, approval => {
           operation.status = 'awaiting-approval'; operation.approval = approval; saveOperation(operation);
           for (const instance of selected) if (!running.has(key(fleetId, instance.key)) && !operation.errors.some(error => error.instanceKey === instance.key)) states.set(key(fleetId, instance.key), { ...states.get(key(fleetId, instance.key))!, phase: 'awaiting-approval' });
@@ -462,6 +463,14 @@ export function createController(services: Services) {
         if (connectionErrors.has(configuration.directory)) { operation.errors.push({ instanceKey: null, code: 'unavailable', message: connectionErrors.get(configuration.directory)! }); return; }
         operation.errors.push(...prepared.value.failed);
         operation.status = 'running'; operation.approval = null; saveOperation(operation);
+        if (operation.action === 'enroll') {
+          for (const instance of selected) {
+            const error = operation.errors.find(error => error.instanceKey === instance.key);
+            states.set(key(fleetId, instance.key), { instance, phase: error ? 'failed' : 'stopped',
+              sessionId: states.get(key(fleetId, instance.key))?.sessionId ?? null, startedAt: null, error: error?.message ?? null });
+          }
+          return;
+        }
         const eligible = selected.filter(instance => !operation.errors.some(error => error.instanceKey === instance.key));
         const intentSaved = changeIntent(fleetId, eligible.map(instance => instance.key), true);
         if (!intentSaved.ok) { operation.errors.push({ instanceKey: null, ...intentSaved.error }); return; }
@@ -486,7 +495,7 @@ export function createController(services: Services) {
       if (signal.aborted && operation.action !== 'stop') for (const instance of selected) await stopInstance(fleetId, instance);
       for (const instance of selected) {
         const identity = key(fleetId, instance.key), state = states.get(identity);
-        if (state && ['starting', 'awaiting-approval'].includes(state.phase)) states.set(identity, { ...state, phase: 'failed', error: operation.errors[0]?.message ?? 'Start did not complete' });
+        if (state && ['starting', 'awaiting-approval'].includes(state.phase)) states.set(identity, { ...state, phase: 'failed', error: operation.errors[0]?.message ?? 'Operation did not complete' });
       }
       if (!operation.errors.length && operation.action === 'start') {
         const completed = services.registry.completeSetup(operation.operationId);
@@ -516,6 +525,7 @@ export function createController(services: Services) {
       return success(operation);
     }
     if (!target.fleetId || target.kind === 'agent' && !target.instanceKey || target.kind === 'fleet' && target.instanceKey !== undefined) return failure('invalid', 'Invalid lifecycle target');
+    if (input.action === 'enroll' && (target.kind !== 'fleet' || executing(target.fleetId))) return failure('conflict', 'Enrollment without startup requires a stopped whole fleet');
     if (mutations.has(target.fleetId)) return failure('conflict', 'A roster change is in progress');
     const record = records.find(item => item.fleetId === target.fleetId);
     if (!record) return failure('missing', 'Fleet is not registered');

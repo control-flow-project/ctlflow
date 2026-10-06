@@ -28,7 +28,7 @@ export function resetInstructions(state: string): string {
     + 'New input begins after each exported room boundary. Use agent history to browse further; use Crossfire messaging tools for replies.';
 }
 export async function resetInstance(configuration: Configuration, instance: Instance, agentId: string, resetId: string, adapter: OwnedRuntimeAdapter, signal: AbortSignal) {
-  const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), workspace = instance.workspace ?? stateDirectory, local = paths(stateDirectory, instance.name);
+  const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), workspace = instance.workspace ?? stateDirectory, local = paths(stateDirectory, instance.key);
   const release = await acquireProcessLock(join(local.state, 'listener'));
   let receiver: (() => Promise<void>) | undefined;
   try {

@@ -78,6 +78,7 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       const existing = verified.value.existing.find(proof => proof.instanceKey === item.instanceKey);
       const claim = services.repositories.agentName.find({ name: item.name });
       if (!claim.ok) return claim;
+      if (existing && claim.value && claim.value.agentId !== existing.agentId) return failure('name_collision', 'Name collision: ' + item.name);
       const failureCode = !existing && claim.value ? 'name_collision' : !existing && remaining <= 0 ? 'capacity' : null;
       const record: EnrollmentItem = { requestId: request.id, instanceKey: item.instanceKey, requestedName: item.name,
         outcome: existing ? 'existing' : failureCode ? 'failed' : 'claimed', agentId: existing?.agentId ?? null, failureCode };
@@ -90,16 +91,17 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
         const savedPolicy = services.repositories.fleetPolicy.insertRequested(record, requestedPolicy);
         if (!savedPolicy.ok) return savedPolicy;
       }
-      if (record.outcome === 'claimed') {
+      if (record.outcome === 'claimed' || existing && existing.name !== item.name) {
         const claimed = services.repositories.agentName.insert({ name: item.name, requestId: request.id, instanceKey: item.instanceKey, agentId: null });
         if (!claimed.ok) return claimed;
-        remaining--;
+        if (record.outcome === 'claimed') remaining--;
       }
       instances.push(record);
     }
     const existingFleet = services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey: input.fleetKey });
     if (!existingFleet.ok) return existingFleet;
-    let unchanged = existingFleet.value?.archivedAt === null && !verified.value.existing.some(item => item.retired);
+    let unchanged = existingFleet.value?.archivedAt === null && !verified.value.existing.some(item => item.retired
+      || input.instances.find(instance => instance.instanceKey === item.instanceKey)?.name !== item.name);
     for (const item of instances) {
       if (item.outcome !== 'existing' || !item.agentId) continue;
       const requestedPolicy = verified.value.policies.find(entry => entry.instanceKey === item.instanceKey)?.policy;
