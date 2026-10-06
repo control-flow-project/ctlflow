@@ -213,7 +213,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
               start: async (scope, observe) => {
                 const unlock = await listenerHost.budget.acquire('native-start', scope);
                 try {
-                  const opened = await adapter.start({ name: instance.name, workspace, stateDirectory, instructions, options: definition.options, hooks: { ...hooks, observe },
+                  const opened = await adapter.start({ profile: instance.key, name: instance.name, workspace, stateDirectory, instructions, options: definition.options, hooks: { ...hooks, observe },
                     allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
                     ...(instance.listenerOptions ? { listenerOptions: instance.listenerOptions } : {}) }, scope);
                   if (opened.ok) initializedHistory(configuration.directory, identity.agentId);

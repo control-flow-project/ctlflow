@@ -1908,6 +1908,17 @@ message size determines Unicode-safe chunks; Markdown/HTML expansion is not
 applied to terminal text. Native protocol/review resource limits are independent
 of ordinary chat input and the former approval-display cap.
 
+The verified pre-idle journal schema requires an explicit offline operator
+conversion before current-schema activation. Under exclusive controller/receiver
+writer locks, exact enrolled profiles and every observation are validated; all
+original journal bytes are durably backed up and verified before atomic writes.
+The missing lastActivityAt/historyAvailable metadata becomes null, never invented
+history or activity. Pending output, timestamps, identities, cursors, provider
+files and native conversations remain intact. Interrupted per-file conversion
+is safely repeatable; current files are no-ops and other schemas are refused.
+The runtime accepts only the current schema, with no compatibility reader.
+This source-checkout operator tool is not part of either public npm bundle.
+
 Native permission requests and structured yes/no, multiple-choice or free-text
 questions use one runtime-independent human-decision owner. Adapters decode and
 answer supported native requests; the shared listener owns delivery/cancellation,
@@ -2075,6 +2086,13 @@ same typed intentional tool:
 streams bounded regular files through typed binary operations and explicitly
 commits only the complete, verified bundle. There is no archive extraction,
 server-side execution, extra daemon or model-based integrity workflow.
+
+The owned runtime receives its immutable local profile separately from its
+mutable display name. fleetd supplies the instance key as that required profile;
+native tools receive it in CROSSFIRE_AGENT_NAME and private state in
+CROSSFIRE_PROJECT. Display-name changes cannot select a different credential,
+cursor, workspace or native history. Invalid/missing profiles fail before native
+startup; there is no display-name alias or profile-discovery fallback.
 
 The server supplies a 256-bit, 43-character base64url public key. Committed files
 are served at the explicitly configured separate content origin under

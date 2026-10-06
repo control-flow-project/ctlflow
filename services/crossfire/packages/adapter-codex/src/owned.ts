@@ -8,17 +8,19 @@ import { codexHistories } from './histories.js';
 import { resetCodex } from './reset.js';
 import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { codexSavedContexts } from './context-state.js';
+import { profileName } from '@ctlflow/crossfire-contracts/client';
 
 export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
   return { validate: ownedOptions, inspect: (input, stop) => inspectCodex(binary, input, stop), reset: resetCodex, savedContexts: codexSavedContexts, async start(input, stop) {
     const parsed = ownedOptions(input.options);
     if (!parsed.ok) return parsed;
+    if (!profileName(input.profile)) return failure('invalid', 'Native tools require the immutable controller-assigned profile');
     let process: Awaited<ReturnType<typeof startProcess>> | undefined;
     let histories: ReturnType<typeof codexHistories> | undefined;
     try {
       nativeDirectories(input);
       const home = prepareHome(input.stateDirectory);
-      process = await startProcess(home, input.workspace, input.stateDirectory, input.name, stop, binary, parsed.value.options.features?.default_mode_request_user_input === true);
+      process = await startProcess(home, input.workspace, input.stateDirectory, input.profile, stop, binary, parsed.value.options.features?.default_mode_request_user_input === true);
       const owner = process;
       const attachment = { runtime: 'codex', workspace: input.workspace,
         connection: { endpoint: owner.endpoint, tokenFile: owner.tokenFile, home, binary: owner.binary, path: owner.path } };

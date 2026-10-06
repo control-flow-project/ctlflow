@@ -6,7 +6,7 @@ export type SavedRuntimeContext = { context: string; runtime: string; sessionId:
 export type OwnedRuntimeConnection = RuntimeConnection & { attachment: RuntimeAttachment; turnControl: TurnControl;
   attachments: () => Promise<{ context: string; attachment: RuntimeAttachment }[]> };
 export type OwnedRuntimeInput = {
-  name: string; workspace: string; stateDirectory: string; instructions: string;
+  profile: string; name: string; workspace: string; stateDirectory: string; instructions: string;
   options: Record<string, unknown>; hooks: RuntimeHooks;
   listenerOptions?: ListenerOptions;
   allowNewHistory?: boolean;

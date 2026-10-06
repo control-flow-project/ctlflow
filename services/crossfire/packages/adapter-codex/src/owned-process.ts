@@ -8,9 +8,9 @@ import { ownedVersion, ownedQuestionCapability } from './owned-options.js';
 import { nativeEnvironment } from './prerequisites.js';
 import { inspectInstructionCapability } from './capability.js';
 
-export async function startProcess(home: string, workspace: string, stateDirectory: string, name: string, stop: AbortSignal, binary = 'codex', questions = false) {
+export async function startProcess(home: string, workspace: string, stateDirectory: string, profile: string, stop: AbortSignal, binary = 'codex', questions = false) {
   stop.throwIfAborted();
-  const environment = nativeEnvironment(realpathSync(home), stateDirectory, name);
+  const environment = nativeEnvironment(realpathSync(home), stateDirectory, profile);
   const version = execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 10000, maxBuffer: 4096, env: environment, cwd: workspace }).trim();
   const supported = ownedVersion(version);
   if (!supported.ok) throw new Error(supported.error.message);

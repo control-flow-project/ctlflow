@@ -2,14 +2,24 @@ import { options, textOption, inputFile, runTool, saveReport } from '@ctlflow/cr
 import { failure, type Result } from '@ctlflow/crossfire-kernel/result';
 import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { verifyFleet, preservation } from './verify.js';
+import { migrateObservationJournals } from './observation-migration.js';
 
 const usage = `fleetd operator tools (run after npm run build)
 verify --root PATH --directory PATH [--running] [--fresh] [--no-rooms]
   [--skills NAME,NAME] [--preserve PATH] [--snapshot PATH] [--output PATH]
-Read-only: no native turns, replies, approvals, room creation or lifecycle changes.
---snapshot writes only private account/history/provider-fingerprint preservation evidence.`;
+Verify is read-only: no native turns, replies, approvals, room creation or lifecycle changes.
+--snapshot writes only private account/history/provider-fingerprint preservation evidence.
+migrate-observations --root PATH --directory PATH --backup NEW_PATH [--output PATH]
+Explicit offline conversion of the verified pre-idle observation schema only.
+Requires stopped writers; verified byte-exact backups precede atomic conversion.`;
 
 export async function inspect(arguments_: string[], signal: AbortSignal): Promise<Result<unknown>> {
+  if (arguments_[0] === 'migrate-observations') {
+    const parsed = options(arguments_.slice(1), ['root', 'directory', 'backup'], ['output']);
+    if (!parsed.ok) return parsed;
+    return saveReport(migrateObservationJournals({ root: textOption(parsed.value, 'root')!, directory: textOption(parsed.value, 'directory')!,
+      backup: textOption(parsed.value, 'backup')! }, signal), parsed.value);
+  }
   if (arguments_[0] !== 'verify') return failure('invalid', usage);
   const parsed = options(arguments_.slice(1), ['root', 'directory'], ['skills', 'preserve', 'snapshot', 'output'], ['running', 'fresh', 'no-rooms']);
   if (!parsed.ok) return parsed;

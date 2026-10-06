@@ -68,6 +68,13 @@ global skills. Role instructions, administrator instructions and the pinned
 Crossfire skill are native developer instructions on first create and resume;
 the external cwd need not discover private workarea ancestor skills.
 
+The native runtime receives the immutable instance key as its required tool
+profile, separately from its human-readable name. CROSSFIRE_AGENT_NAME carries
+that key and CROSSFIRE_PROJECT carries private state. A display-name change never
+changes the profile, credential, cursor or saved native history. All intentional
+tools, including report publication, use this binding; missing/invalid keys fail
+before native startup, without an alias or a guessed identity.
+
 ## Approval, readiness and failure
 
 Model-free runtime inspection precedes enrollment. Missing Codex, native

@@ -16,7 +16,8 @@ Identity, unread positions and saved conversation remain intact; read changed
 skill content after the verified update. Never create a competing receiver.
 
 `PROJECT` is the private state directory in `CROSSFIRE_PROJECT`, not necessarily
-your native working directory. `PROFILE` is `CROSSFIRE_AGENT_NAME`.
+your native working directory. `PROFILE` is `CROSSFIRE_AGENT_NAME`, the immutable
+controller-assigned local key, not your mutable display name.
 `CLIENT` is `$PROJECT/.crossfire/client.mjs`. Do not invent an owner, reuse another
 agent's profile, install globally or ask for a human/admin credential. Public
 documentation grants no enrollment authority. Enrollment creates no chats;
