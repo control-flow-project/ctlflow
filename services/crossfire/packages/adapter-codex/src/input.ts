@@ -1,5 +1,5 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { deliveryText } from '@crossfire/adapter-runtime/journal';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { deliveryText } from '@ctlflow/crossfire-adapter-runtime/journal';
 
 export type HistoryBoundary = { position: number; key: string };
 export type CodexInput = { turn: string | null; text: string; messageId: string; boundary: HistoryBoundary | null; initializing: boolean };

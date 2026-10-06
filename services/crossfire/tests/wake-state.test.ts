@@ -3,10 +3,10 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { mkdtempSync, mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { applicationFixture, value } from './support/application.js';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
 import { randomUUID } from 'node:crypto';
 
 test('one schema refuses unrelated storage without modifying it', () => {

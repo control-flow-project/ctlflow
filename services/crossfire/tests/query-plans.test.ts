@@ -1,16 +1,17 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
-import { createSchema } from '@crossfire/adapter-sqlite/schema/create-schema';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
-import { createDirectoryRepository } from '@crossfire/adapter-sqlite/repository/directory/index';
-import { createDiscoveryRepository } from '@crossfire/adapter-sqlite/repository/discovery/index';
-import { createListenerReadRepository } from '@crossfire/adapter-sqlite/repository/listener-read/index';
-import { createRoomGrantReadRepository } from '@crossfire/adapter-sqlite/repository/room-grant-read/index';
-import { createRuntimeRepository } from '@crossfire/adapter-sqlite/repository/runtime/index';
-import { roomGrants } from '@crossfire/contracts/schema/query';
-import type { Result } from '@crossfire/kernel/result';
+import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
+import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
+import { createDiscoveryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/discovery/index';
+import { createListenerReadRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/listener-read/index';
+import { createRoomGrantReadRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/room-grant-read/index';
+import { createRuntimeRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/runtime/index';
+import { roomGrants } from '@ctlflow/crossfire-contracts/schema/query';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
+import { canRetireAgent } from '@ctlflow/crossfire-domain/fleet/native-stop';
 
 function value<T>(result: Result<T>): T {
   if (!result.ok) assert.fail(result.error.message);
@@ -41,15 +42,21 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
       value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
       application(ownerId);
+      const fleetId = 'fleet-' + ownerId, credentialId = 'credential-' + ownerId, connectionId = 'connection-' + ownerId;
+      value(repositories.fleet.insert({ id: fleetId, ownerId, fleetKey: ownerId, label: ownerId, controllerName: 'Computer',
+        revision: 0, deliveryEnabled: true, archivedAt: null, createdAt: 1, updatedAt: 1 }));
+      value(repositories.fleetCredential.insert({ id: credentialId, fleetId, secretHash: 'hash-' + ownerId, createdAt: 1, revokedAt: null }));
+      value(repositories.fleetConnection.save({ fleetId, credentialId, connectionId, lastSeenAt: 1, expiresAt: 1000, closedAt: null }));
       for (let agentIndex = 0; agentIndex < 200; agentIndex++) {
         const agentId = ownerId + '-agent-' + String(agentIndex).padStart(3, '0');
         value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: agentIndex }));
         value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
         value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
         application(agentId);
+        value(repositories.fleetInstance.insert({ ownerId, fleetKey: ownerId, instanceKey: agentId, agentId, retiredAt: null }));
         for (let runIndex = 0; runIndex < 3; runIndex++) {
           const runId = agentId + '-run-' + runIndex;
-          value(repositories.listenerRun.insert({ id: runId, agentId, release: 'proof', controllerBound: false, startedAt: 1,
+          value(repositories.listenerRun.insert({ id: runId, agentId, release: 'proof', controller: { fleetId, connectionId, credentialId }, startedAt: 1,
             lastSeenAt: 100 + runIndex, activeMs: 100, messagesDelivered: 2,
             stoppedAt: runIndex === 2 ? null : 101, disconnectRequestedAt: null }));
           value(runtime.saveObservation(agentId, { runId, sessionId: 'shared', roomId: null, runtime: 'codex',
@@ -94,6 +101,25 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
     assert.match(plan(statements[7]!), /SEARCH .*runtime_observation.*run_id=/u);
     scope.diagnostic(JSON.stringify({ agents: 1000, listenerRuns: 3000, page: 2, pageSize,
       statements: statements.length, elapsedMs: Math.ceil(performance.now() - started) }));
+    statements = [];
+    const retirementStarted = performance.now(), retirement = value(activity.retirement({ agentIds }, 500));
+    assert.equal(retirement.agents.length, pageSize);
+    assert(retirement.agents.every(agent => agent.fleetId === 'fleet-owner-2' && agent.ownerActive
+      && agent.hasObservedRuntime && agent.latestRun?.id === agent.agentId + '-run-2' && !canRetireAgent(agent, 500)));
+    assert.equal(statements.length, 11, 'Retirement facts use eleven indexed batch queries for one, twenty or one hundred agents');
+    assert.match(plan(statements[0]!), /SEARCH .*fleet_instance.*agent_id=/u);
+    assert.match(plan(statements[2]!), /SEARCH .*ix_listener_run_agent.*agent_id=/u);
+    assert.match(plan(statements[3]!), /SEARCH .*fleet_native_stop.*agent_id=/u);
+    assert.match(plan(statements[4]!), /SEARCH .*runtime_observation.*agent_id=/u);
+    assert.match(plan(statements[5]!), /SEARCH .*runtime_observation.*run_id=/u);
+    assert.match(plan(statements[6]!), /SEARCH .*runtime_decision USING INDEX ix_runtime_decision_(agent_created|pending).*=/u);
+    assert.match(plan(statements[7]!), /SEARCH .*wake_delivery.*agent_id=/u);
+    assert.match(plan(statements[8]!), /SEARCH .*fleet_message_delivery.*status=/u);
+    assert.match(plan(statements[9]!), /SEARCH .*fleet_connection.*fleet_id=/u);
+    assert.match(plan(statements[10]!), /SEARCH .*fleet_credential.*id=/u);
+    assert(!statements.join('\n').includes('review_text'), 'Eligibility must not hydrate native questions or provider payloads');
+    scope.diagnostic(JSON.stringify({ agents: 1000, listenerRuns: 3000, retirementAgents: pageSize,
+      statements: statements.length, elapsedMs: Math.ceil(performance.now() - retirementStarted) }));
   }
   statements = [];
   const other = value(directory.agents({ ownerId: 'owner-3', statuses: ['active'], search: 'owner-2', page: 1, pageSize: 100 }));
@@ -121,7 +147,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
     assert.equal(roomGrants(new URLSearchParams({ roomIds: source })).ok, false);
   }
   assert.equal(roomGrants(new URLSearchParams('roomIds=[]&roomIds=[]')).ok, false);
-  value(repositories.listenerRun.insert({ id: agentId + '-new-run', agentId, release: 'proof', controllerBound: false,
+  value(repositories.listenerRun.insert({ id: agentId + '-new-run', agentId, release: 'proof', controller: { fleetId: 'fleet-owner-2', connectionId: 'connection-owner-2', credentialId: 'credential-owner-2' },
     startedAt: 2, lastSeenAt: 103, activeMs: 0, messagesDelivered: 0, stoppedAt: null, disconnectRequestedAt: null }));
   value(runtime.saveObservation(agentId, { runId: agentId + '-new-run', sessionId: 'shared', roomId: null,
     runtime: 'codex', state: 'waking', observedAt: 103, historyMode: 'shared', maxInputBytes: 100000,
@@ -130,6 +156,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   assert.equal(value(runtime.summaries(['missing-agent'])).size, 0);
   statements = [];
   assert.equal(value(runtime.summaries([])).size, 0); assert.equal(statements.length, 0);
+  assert.deepEqual(value(activity.retirement({ agentIds: [] }, 500)), { agents: [], pendingFleetIds: [] }); assert.equal(statements.length, 0);
   for (const contexts of [1, 100]) {
     for (let position = 0; position < contexts; position++) value(runtime.saveObservation(agentId, {
       runId: agentId + '-new-run', sessionId: 'context-' + position, roomId: '!context-' + position + ':test', runtime: 'codex',

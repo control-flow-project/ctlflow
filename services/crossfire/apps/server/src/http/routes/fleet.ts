@@ -1,11 +1,11 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { readFleetMap } from '@crossfire/domain/fleet/read-map';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { readFleetMap } from '@ctlflow/crossfire-domain/fleet/read-map';
 import { fleetMap } from '../representation/fleet-map.js';
-import { changeFleetDelivery, reportFleetConnection } from '@crossfire/domain/fleet/control';
-import { createFleetMessage, listFleetMessages, readFleetControl, acknowledgeFleetMessage } from '@crossfire/domain/fleet/message';
+import { changeFleetDelivery, reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
+import { createFleetMessage, listFleetMessages, readFleetControl, acknowledgeFleetMessage } from '@ctlflow/crossfire-domain/fleet/message';
 import { bind, actor, fleetActor, paged, reply } from '../bind.js';
-import { readFleetStatistics } from '@crossfire/domain/fleet/read-statistics';
-import { listFleetRuntime, requestFleetRuntime, claimFleetRuntime, receiptFleetRuntime } from '@crossfire/domain/fleet/runtime';
+import { readFleetStatistics } from '@ctlflow/crossfire-domain/fleet/read-statistics';
+import { listFleetRuntime, requestFleetRuntime, claimFleetRuntime, receiptFleetRuntime } from '@ctlflow/crossfire-domain/fleet/runtime';
 
 export function fleetRoutes() {
   return [

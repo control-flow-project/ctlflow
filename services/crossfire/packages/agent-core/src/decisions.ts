@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { API, segment } from '@crossfire/contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import { ownerNotice, ownerNoticeChunks } from './owner-notices.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { Json } from '@crossfire/contracts/json';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { Json } from '@ctlflow/crossfire-contracts/json';
 import type { RuntimeDecision } from './runtime.js';
 import type { Clock, Matrix, LocalState } from './port.js';
 import type { Coordination } from './coordination.js';
-import type { Settings } from '@crossfire/contracts/client';
-import { ownerConversationState, roomState, roomPowers } from '@crossfire/contracts/matrix-room';
-import * as check from '@crossfire/contracts/schema/validation';
+import type { Settings } from '@ctlflow/crossfire-contracts/client';
+import { ownerConversationState, roomState, roomPowers } from '@ctlflow/crossfire-contracts/matrix-room';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 const journal = check.list(check.object({ id: check.identifier, native: check.text(1000),
   status: check.choice('pending', 'responded', 'cancelled') }), 4096);

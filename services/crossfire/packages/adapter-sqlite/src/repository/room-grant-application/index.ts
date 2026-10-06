@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapRoomGrantApplication } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '@crossfire/kernel/result';
-import type { RoomGrantApplicationRepository } from '@crossfire/domain/port/repositories';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { RoomGrantApplicationRepository } from '@ctlflow/crossfire-domain/port/repositories';
 
 export function createRoomGrantApplicationRepository(database: Database.Database): RoomGrantApplicationRepository {
   return {

@@ -2,7 +2,7 @@
 
 Start through `fleet daemon start` or directly:
 ```sh
-node services/fleetd/dist/apps/daemon/src/main.js --name laptop --root /absolute/private/controller
+fleetd --name laptop --root /absolute/private/controller
 ```
 
 The private root contains descriptor, registry, desired binding intent, operation state, log and
@@ -18,8 +18,11 @@ process-name scan decides native ownership.
 
 ## Private API
 
-Resources include `/api/status`, `/api/fleets`, nested fleet `/agents`,
-`/delivery`, `/messages`, `/api/operations` and agent `/attachment`/`/contexts`.
+Resources include `/api/setup`, `/api/status`, `/api/fleets`, nested fleet `/agents`,
+`/delivery`, `/messages`, fleet `/readiness`, `/api/operations` and agent
+`/attachment`/`/contexts`. Setup and update use these domain operations, not CLI
+native-process orchestration. `GET /readiness` checks the actual shared listener's
+model-free diagnostic and never starts a stopped controller/session.
 Local and SSH CLI commands use the same typed requests. UUID operation keys and
 expected revisions reject conflicting reuse. Accepted operations continue after
 CLI disconnect and have per-instance outcomes.
@@ -46,7 +49,7 @@ idle; pending input, decisions, receipts, initialization, cleanup or unknown
 native activity prevent sleep. Heartbeats and policy checks do not count as work.
 Sleep closes the owned native process, not its listener/controller connection.
 Eligible room, DM, scheduled or broadcast input resumes the exact saved history.
-Directly attached coding sessions cannot be put to sleep by fleetd.
+The independent coding session performing setup is not owned by fleetd.
 
 `desired-intent.json` in the private controller root durably owns active binding
 intent. Start persists it before activation; explicit Stop removes it before
@@ -58,9 +61,35 @@ sleeping until input arrives. Manually stopped agents remain stopped.
 Startup restoration is bounded and generation-fenced. Missing histories,
 unreviewed configuration, invalid intent or failed process cleanup remain
 visible errors; they never authorize a new history or overlapping native owner.
+The private controller API opens independently of native restoration. Queued
+desired agents show `starting`; status and explicit stop remain available even
+when a large fleet's native starts are delayed. Controller API availability does
+not prove listener readiness: setup and `fleet test` check actual receivers.
 Read-only inspection never accepts changed files or increments revisions.
 Use an explicit revision-checked start/reset to apply configuration changes.
 No automatic host boot service is installed.
+
+### Abrupt controller death
+
+Orderly controller shutdown awaits the owned Codex engine's close. A full machine
+restart or power failure ends that engine; the same private root and workareas
+retain desired activation and saved histories for normal restoration.
+
+Killing only fleetd with `SIGKILL` does not provide the same guarantee. The verified
+stock Codex WebSocket app-server can survive its controller and keep an active
+writer for the exact native history. A replacement rejects the conflicting
+writer. This prevents two owners, but is not successful automatic recovery.
+It is an owned-engine lifetime limitation, separate from detached tool children.
+
+Inspect the reported native error and safely stop the verified orphaned
+app-server on its owning machine. Preserve the controller root, native home,
+workarea, identities and histories. Normal restoration or explicit Resume can
+proceed only after native writer ownership and ordinary receipt/history checks
+succeed. Never delete lock/history state to force replacement, guess processes
+by name or PID, adopt the orphan, or use fresh history as an implicit recovery.
+There is no substitute supervisor, emulated native transport or hidden fallback.
+Linux inert-provider verification does not certify abrupt-death recovery or
+macOS behavior.
 
 Unexpected startup/listener/native failures are recorded in each fleet's private
 `.fleet/failures.json` before reporting through its scoped controller credential.
@@ -83,7 +112,7 @@ and operation IDs protect interrupted preparation. Normal recovery is not reset.
 Default start requires saved native history unless first enrollment or an explicit
 reset authorized initialization; losing established bindings cannot create new
 contexts. A failed instance does not discard successful peers' outcomes.
-- [Context reset contract](../../crossfire/docs/history.md)
+- [Context reset contract](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
 
 ## Crossfire connection
 
@@ -94,7 +123,7 @@ Scoped controller credentials cannot approve identities, change room/wake
 permissions, manage another fleet or act as human credentials.
 
 Deactivate retains engines/sessions/controller connection; Stop ends owned
-listeners and processes. Direct listeners remain independent. Ordinary models do
+listeners and processes. Every receiver is fleet-bound. Ordinary models do
 not enroll, poll for work, send telemetry or maintain controller credentials.
 Management session requests arrive through this same connection. A separate
 worker claims the current lease generation and calls the existing durable
@@ -102,7 +131,18 @@ lifecycle domain, so long native operations do not block lease renewal. Receipt
 uncertainty retains the identical operation ID and pins its native outcome until
 acknowledged. A restart marks unfinished operations failed; it never guesses or
 replays destructive work under a replacement ID.
-- [UI/CLI session controls and confirmation](../../fleet/docs/sessions.md)
+
+Local stop reports exact authenticated listener-run and controller-generation
+evidence only after listener settlement and awaited native close. At most one
+pending proof per current fleet member is retained; retries keep its receipt ID.
+Proof-report failures remain visible separately from native-cleanup failures and
+do not block automatic native recovery. New authenticated activity invalidates
+older proof. A lost controller generation requires a current binding's explicit
+resume/stop before retirement; no stale lease or sleeping heartbeat proves stop.
+Instance retirement and fleet archive use the same canonical server operations
+and fail closed until actual native stop and all outstanding decisions/input
+receipts are confirmed. Neither operation detaches an agent or deletes history.
+- [UI/CLI session controls and confirmation](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/sessions.md)
 
 Role `coordination_options` requests exact Crossfire wake rules and invitation
 defaults with enrollment. Owner review is required for new/changed settings;

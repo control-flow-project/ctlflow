@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { authorize } from '../authorization/authorize.js';
 import { registerPrincipal } from '../principal/register.js';
@@ -33,10 +33,25 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
       const capacity = enrollmentCapacity(services, request.ownerId);
       if (!capacity.ok) return capacity;
       if (capacity.value.remaining < 0) return failure('limit', 'Agent capacity changed; adjust the instance limits');
+      let restorations = 0;
+      for (const item of items.value) {
+        if (item.outcome !== 'existing' || !item.agentId) continue;
+        const binding = services.repositories.fleetInstance.findByAgent(item.agentId); if (!binding.ok) return binding;
+        if (!binding.value || binding.value.retiredAt !== null) restorations++;
+      }
+      if (restorations > capacity.value.remaining) return failure('capacity', 'Agent restoration exceeds the current owner or instance capacity');
       const fleet = approveFleet(services, request); if (!fleet.ok) return fleet;
+      const restoringIds = new Set<string>();
       for (const item of items.value) {
         if (item.outcome === 'failed') continue;
         let agentId = item.agentId;
+        if (item.outcome === 'existing' && agentId) {
+          const principal = services.repositories.principal.find({ id: agentId }); if (!principal.ok) return principal;
+          const binding = services.repositories.fleetInstance.findByAgent(agentId); if (!binding.ok) return binding;
+          if (!principal.value || principal.value.status === 'revoked' || principal.value.status === 'suspended' && binding.value?.retiredAt == null)
+            return failure('forbidden', 'Only explicitly retired identities may be restored through enrollment');
+          if (principal.value.status === 'suspended') restoringIds.add(agentId);
+        }
         if (item.outcome === 'claimed') {
           const name = services.repositories.agentName.find({ name: item.requestedName });
           if (!name.ok) return name;
@@ -55,7 +70,7 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
           if (!assigned.ok) return assigned;
         }
       }
-      if (request.fleetKey !== null) {
+      {
         const approved = services.collection.enrollmentItems({ requestId: enrollmentId }); if (!approved.ok) return approved;
         const bound = bindRoster(services, request.ownerId, request.fleetKey, approved.value); if (!bound.ok) return bound;
         const requested = services.repositories.fleetPolicy.requested(enrollmentId); if (!requested.ok) return requested;
@@ -64,8 +79,23 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
           if (item.outcome === 'failed' || !item.agentId) continue;
           const policy = policies.get(item.instanceKey);
           if (!policy) return failure('conflict', 'Fleet coordination policy is missing; submit a new request');
+          const principal = services.repositories.principal.find({ id: item.agentId }); if (!principal.ok) return principal;
+          if (!principal.value || principal.value.status === 'revoked') return failure('forbidden', 'Revoked agent identities cannot be restored');
+          if (policy.expectedAgentRevision !== null && principal.value.revision !== policy.expectedAgentRevision)
+            return failure('conflict', 'Agent changed before enrollment approval');
+          const restoring = restoringIds.has(item.agentId);
+          if (restoring) {
+            const restored = services.repositories.principal.update({ ...principal.value, status: 'active' }); if (!restored.ok) return restored;
+          }
           const applied = applyCoordinationPolicy(services, actor, item.agentId, policy, requestId);
           if (!applied.ok) return applied;
+          if (restoring) {
+            const current = services.repositories.principal.find({ id: item.agentId }); if (!current.ok) return current;
+            const changed = services.repositories.principal.update({ ...current.value!, revision: current.value!.revision + 1 }); if (!changed.ok) return changed;
+            const application = services.repositories.principalApplication.find({ principalId: item.agentId }); if (!application.ok) return application;
+            if (!application.value) return failure('unavailable', 'Agent native account state is missing');
+            const scheduled = services.repositories.principalApplication.update({ ...application.value, nextCheckAt: now }); if (!scheduled.ok) return scheduled;
+          }
         }
       }
     } else {

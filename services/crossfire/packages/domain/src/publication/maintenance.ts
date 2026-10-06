@@ -1,4 +1,4 @@
-import { success, type Result } from '@crossfire/kernel/result';
+import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { PublicationDependencies } from './authority.js';
 export async function maintainPublications(services: PublicationDependencies): Promise<Result<number>> {
   const pending = services.publication.repository.maintenance(services.clock.now(), 50); if (!pending.ok) return pending;

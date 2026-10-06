@@ -1,9 +1,9 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { connectCodex } from '@crossfire/adapter-codex/connection';
-import { listen } from '@crossfire/adapter-crossfire/listener';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, THREAD, until } from './test-support/listener.js';
 
 function oldHistory(count: number, completed = true) {

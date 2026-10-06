@@ -1,21 +1,46 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { createListenerControl, controlledPublisher } from '@crossfire/agent-core/listener-control';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
-import type { LocalState } from '@crossfire/agent-core/port';
-import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { fakeCodex, matrixFixture, message, ROOM, until } from '../scripts/test-support/listener.js';
+import { createListenerControl, controlledPublisher } from '@ctlflow/crossfire-agent-core/listener-control';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
+import type { LocalState } from '@ctlflow/crossfire-agent-core/port';
+import type { RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
+import type { ControllerBinding } from '@ctlflow/crossfire-agent-core/listener-control-port';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { fakeCodex, matrixFixture, message, ROOM, until, CONTROLLER } from '../scripts/test-support/listener.js';
 import { withClock } from '../scripts/test-support/clock.js';
+
+test('listener activity receipts retain the exact submitted controller capability across HTTP lease turnover', async scope => {
+  const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
+  let current = { ...CONTROLLER }, submitted = false;
+  const binding = createListenerControl(async () => {}, () => current);
+  binding.update({ active: true, input: null });
+  const receipts: { runId: string; binding: ControllerBinding }[] = [];
+  const coordination = { ...matrix.coordination, report: async (...parameters: Parameters<typeof matrix.coordination.report>) => {
+    const response = await matrix.coordination.report(...parameters);
+    if (!submitted) { submitted = true; current = { ...CONTROLLER, connectionId: 'dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee' }; }
+    return response;
+  } };
+  let failed: unknown;
+  const receiving = listen({ ...matrix, coordination, control: binding.connection, runtime: native.runtime,
+    reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20,
+    activity: (runId, controller) => receipts.push({ runId, binding: controller }),
+  }, stop.signal).catch(error => { failed = error; return error; });
+  cleanup(scope, async () => { stop.abort(); await receiving; });
+  await until(() => { if (failed) throw failed; return receipts.length === 1; });
+  assert.notDeepEqual(current, CONTROLLER);
+  assert.deepEqual(receipts[0]!.binding, CONTROLLER, 'Receipt binds to the lease accepted by the activity request, not a later controller getter');
+  const report = matrix.requests.find(request => request.path.endsWith('/listener-runs/' + receipts[0]!.runId));
+  assert.deepEqual((report?.body as { controller: ControllerBinding }).controller, receipts[0]!.binding);
+});
 
 test('fleet gate pauses one receiver, cancels pending publication and retains unread/native identity', withClock(async (scope, clock) => {
 
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
-  const binding = createListenerControl(async () => {}); binding.update({ active: true, input: null });
-  const running = listen({ ...matrix, control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 500, limit: 20 }, stop.signal).catch(error => error);
+  const binding = createListenerControl(async () => {}, () => CONTROLLER); binding.update({ active: true, input: null });
+  const activityRuns: string[] = [];
+  const running = listen({ ...matrix, activity: runId => activityRuns.push(runId), control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 500, limit: 20 }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(running); });
   await clock.until(() => matrix.waiting() === 1);
   matrix.add(ROOM, message('$one'));
@@ -34,14 +59,29 @@ test('fleet gate pauses one receiver, cancels pending publication and retains un
   await clock.until(() => native.requests().filter(request => request.method === 'turn/start').length === 2);
   assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
   assert(matrix.maximumWaiting() <= 1, 'Activation never starts another receiver');
+  assert.equal(activityRuns.length, 3); assert.equal(new Set(activityRuns).size, 3, 'Each activation reports its exact authenticated listener run');
+  for (const runId of activityRuns) assert(matrix.requests.some(request => request.path.endsWith('/listener-runs/' + runId)
+    && !(request.body as { stopped: boolean }).stopped), 'Run callbacks follow successful initial activity reporting');
 }));
+
+test('controller listener timing and page bounds are validated before native or network work', async scope => {
+  const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory);
+  for (const field of ['pollMs', 'debounceMs', 'reconcileMs', 'limit'] as const) {
+    const invalid = field === 'pollMs' ? [0, 99, 30001, NaN, Infinity, 0.5]
+      : field === 'debounceMs' ? [-1, 60001, NaN, Infinity, 0.5]
+      : field === 'reconcileMs' ? [999, 600001, NaN, Infinity, 0.5] : [0, 101, NaN, Infinity, 0.5];
+    for (const value of invalid) await assert.rejects(listen({ ...matrix, runtime: native.runtime,
+      reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20, [field]: value }, new AbortController().signal), /Listener.*must/u);
+  }
+  assert.equal(native.requests().length, 0); assert.equal(matrix.requests.length, 0); assert.equal(matrix.host.size(), 0);
+});
 
 test('controller messages bypass room wake filtering without consuming room cursors', async scope => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
   matrix.joined.delete(ROOM); matrix.waking.policy = 'nobody'; matrix.waking.senders = [];
   const receipts: string[] = [];
   let ended: unknown;
-  const binding = createListenerControl(async id => { receipts.push(id); binding.update({ active: true, input: null }); });
+  const binding = createListenerControl(async id => { receipts.push(id); binding.update({ active: true, input: null }); }, () => CONTROLLER);
   binding.update({ active: true, input: null });
   const running = listen({ ...matrix, control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, stop.signal).catch(error => { ended = error; return error; });
   cleanup(scope, async () => { stop.abort(); await running; });
@@ -58,7 +98,7 @@ test('controller checkpoint retries only receipts after native acceptance and re
   const storage: LocalState = { exists: file => values.has(file), read: <Value>(file: string) => structuredClone(values.get(file)) as Value,
     write: (file, value) => { values.set(file, structuredClone(value)); }, remove: file => { values.delete(file); } };
   let fail = true;
-  const binding = createListenerControl(async () => { if (fail) throw Error('Lost receipt response'); binding.update({ active: true, input: null }); });
+  const binding = createListenerControl(async () => { if (fail) throw Error('Lost receipt response'); binding.update({ active: true, input: null }); }, () => CONTROLLER);
   const text = 'Complete fleet task. '.repeat(500);
   binding.update({ active: true, input: { messageId: 'message', text, expiresAt: Date.now() + 10000 } });
   const runtime: RuntimeConnection = { sessionId: 'same-session', approval: 'none', signal: new AbortController().signal,
@@ -83,7 +123,7 @@ test('expired controller input recovers its exact accepted receipt rather than d
   const storage: LocalState = { exists: file => values.has(file), read: <Value>(file: string) => structuredClone(values.get(file)) as Value,
     write: (file, value) => { values.set(file, structuredClone(value)); }, remove: file => { values.delete(file); } };
   values.set('checkpoint', { sessionId: 'native-session', input: { messageId: 'accepted', text: 'Exact input', expiresAt: 1 }, text: 'Exact input', stage: 'publishing' });
-  const binding = createListenerControl(async (id, status) => { receipts.push(id + ':' + status); });
+  const binding = createListenerControl(async (id, status) => { receipts.push(id + ':' + status); }, () => CONTROLLER);
   const runtime: RuntimeConnection = { sessionId: 'native-session', approval: 'none', signal: new AbortController().signal,
     deliver: async () => { assert.fail('Receipt recovery must not submit input'); }, recover: async (text, id) => { assert.equal(text, 'Exact input'); recovered.push(id); return true; },
     acknowledge: ids => { assert.deepEqual(ids, ['accepted']); }, inspect: async () => ({ busy: false }), settle: async () => false, close: () => {} };
@@ -91,14 +131,19 @@ test('expired controller input recovers its exact accepted receipt rather than d
   assert.deepEqual(recovered, ['accepted']); assert.deepEqual(receipts, ['accepted:delivered']); assert(!storage.exists('checkpoint'));
 });
 
-test('direct listeners remain independent when the same agent’s fleet-bound listener is inactive', async scope => {
-  const native = await fakeCodex(scope), direct = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
-  const binding = createListenerControl(async () => {});
-  const bound = listen({ ...matrix, control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, stop.signal).catch(error => error);
-  const standalone = listen({ ...matrix, cursorFile: join(direct.directory, 'cursor.json'), runtime: direct.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, stop.signal).catch(error => error);
-  cleanup(scope, async () => { stop.abort(); await bound; await standalone; });
-  await until(() => matrix.waiting() === 1);
-  matrix.add(ROOM, message('$direct'));
-  await until(() => direct.requests().filter(request => request.method === 'turn/start').length === 1);
-  assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
-});
+test('every listener waits for its owning controller and no direct receiver can bypass its disabled delivery', withClock(async (scope, clock) => {
+  const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
+  const binding = createListenerControl(async () => {}, () => CONTROLLER);
+  const running = listen({ ...matrix, control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, stop.signal).catch(error => error);
+  cleanup(scope, async () => { stop.abort(); await clock.complete(running); });
+  await clock.advance(1000);
+  assert.equal(matrix.requests.length, 0, 'Inactive controllers cannot acquire room history or agent policy');
+  assert.equal(native.requests().length, 0, 'Inactive controllers cannot connect or launch native conversations');
+  binding.update({ active: true, input: null });
+  await clock.until(() => matrix.waiting() === 1);
+  matrix.add(ROOM, message('$controlled'));
+  await clock.until(() => native.requests().filter(request => request.method === 'turn/start').length === 1);
+  const report = matrix.requests.find(request => request.path.includes('/listener-runs/') && !request.path.endsWith('/runtime'));
+  assert.deepEqual((report?.body as { controller: unknown }).controller, CONTROLLER);
+  assert.equal(Object.hasOwn(report?.body as object, 'controllerBound'), false);
+}));

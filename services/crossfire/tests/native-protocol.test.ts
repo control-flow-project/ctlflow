@@ -1,10 +1,10 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import test, { type TestContext } from 'node:test';
 import { WebSocketServer } from 'ws';
 import { setTimeout as delay } from 'node:timers/promises';
-import { codexProtocol, type NativeRequest } from '@crossfire/adapter-codex/protocol';
+import { codexProtocol, type NativeRequest } from '@ctlflow/crossfire-adapter-codex/protocol';
 
 async function fixture(scope: TestContext, mode: string, approval = async (_request: NativeRequest, _signal: AbortSignal): Promise<unknown> => {
   throw new Error('Unexpected approval request');

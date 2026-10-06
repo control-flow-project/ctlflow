@@ -1,24 +1,27 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { createServer, type ServerResponse } from 'node:http';
-import { mkdtempSync, mkdirSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
-import { API } from '@crossfire/contracts/matrix';
-import { writeJson, readJson } from '@crossfire/adapter-filesystem/index';
-import type { Account, Event, Settings } from '@crossfire/contracts/client';
-import { connectCodex } from '@crossfire/adapter-codex/connection';
-import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { writeJson, readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import type { Account, Event, Settings } from '@ctlflow/crossfire-contracts/client';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import type { RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
 import { builtRelease } from './release.js';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
 import { serveArtifact } from '../../apps/server/src/artifacts.js';
-import type { WakePolicy } from '@crossfire/contracts/wake';
-import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
-import { nativeClock } from '@crossfire/adapter-runtime/clock';
-import type { Clock } from '@crossfire/agent-core/port';
+import type { WakePolicy } from '@ctlflow/crossfire-contracts/wake';
+import type { PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
+import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
+import type { Clock } from '@ctlflow/crossfire-agent-core/port';
+import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import type { ControllerBinding } from '@ctlflow/crossfire-agent-core/listener-control-port';
+import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
 
 export const THREAD = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 export const OBSERVER = '@human:test.localhost';
@@ -26,6 +29,8 @@ export const AGENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeef';
 export const SELF = '@agent-' + AGENT_ID + ':test.localhost';
 export const ROOM = '!coordination:test.localhost';
 export const OWNER_DM = '!owner-dm:test.localhost';
+export const CONTROLLER: ControllerBinding = { fleetId: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee',
+  connectionId: 'cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee', credential: 'fixture-only-controller-capability' };
 
 export function temporary(_context: TestContext): string {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
@@ -76,9 +81,11 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       if (mode === 'oversized') { socket.send('x'.repeat(8 * 1024 * 1024 + 1)); return; }
       send({ id: request.id, result: { userAgent: 'protocol fixture' } });
     } else if (['thread/start', 'thread/resume', 'thread/read'].includes(request.method)) {
-      send({ id: request.id, result: { approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
+      send({ id: request.id, result: { ...(configuration.selection as Record<string, unknown> | undefined), approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
         status: { type: configuration.status ?? 'idle' },
         canAcceptDirectInput: 'directInput' in configuration ? configuration.directInput : true } } });
+    } else if (request.method === 'thread/name/set') {
+      send({ id: request.id, result: {} });
     } else if (request.method === 'thread/turns/list') {
       if (configuration.unmaterialized && turns.size === 0) {
         send({ id: request.id, error: { code: -32600, message: `thread ${THREAD} is not materialized yet; thread/turns/list is unavailable before first user message` } });
@@ -133,8 +140,6 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
   }));
   const update = (changes: Record<string, unknown>) => { Object.assign(configuration, changes); };
   update({});
-  writeJson(join(directory, 'connection.json'), { version: 1, endpoint: `ws://127.0.0.1:${address.port}`, tokenFile: 'token' });
-  writeFileSync(join(directory, 'token'), 'fixture-only', { mode: 0o600 });
   return {
     directory, update, notify, publish: () => { for (const publish of publications.splice(0)) publish(); },
     disconnect: () => { for (const client of server.clients) client.terminate(); },
@@ -164,6 +169,11 @@ export async function until(predicate: () => boolean | Promise<boolean>, message
 }
 
 export async function matrixFixture(t: TestContext, workspace: string, clock: Clock = nativeClock) {
+  const host = await createListenerHost();
+  cleanup(t, host.close);
+  const controller = createListenerControl(async () => {}, () => CONTROLLER);
+  controller.update({ active: true, input: null });
+  cleanup(t, controller.close);
   const settings: Settings = { instance: 'test', server_name: 'test.localhost',
     homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };
   const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture' };
@@ -248,12 +258,16 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
         status: access.status, revision: 0, createdAt: 1,
         application: { appliedRevision: 0, appliedStatus: 'active', nativeDisplayName: 'Watson (Human)',
           lastAttemptAt: 1, lastSuccessAt: 1, errorCode: null, errorMessage: null },
-        activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, nativeRuntime: null, deployment: null, allowedActions: [] });
+        activity: { status: 'offline', activeMs: 0, messagesDelivered: 0, lastSeenAt: null, activeRuns: [] }, nativeRuntime: null,
+        deployment: { fleetId: CONTROLLER.fleetId, fleetKey: 'fixture', label: 'Fixture fleet', controllerName: 'Fixture controller', reportedAt: 1, instanceKey: 'watson' }, allowedActions: [] });
     } else if (path === '/api/agents/' + AGENT_ID + '/wake-deliveries' && request.method === 'GET') {
       api(response, { now: Date.now(), nextDueAt: null });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && path.endsWith('/runtime') && request.method === 'PUT') {
       api(response, { accepted: true });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/listener-runs/') && request.method === 'PUT') {
+      if (JSON.stringify((body as { controller?: ControllerBinding }).controller) !== JSON.stringify(CONTROLLER)) {
+        send(response, { error: { code: 'forbidden', message: 'Fixture listener requires its exact controller capability' }, meta: { requestId: AGENT_ID } }, 403); return;
+      }
       api(response, { statisticsAccepted: true, disconnect: reporting.disconnect, currentRelease: reporting.current.release });
     } else if (path.startsWith('/api/agents/' + AGENT_ID + '/wake-notices/') && request.method === 'PUT') {
       send(response, { data: { outcome: 'not-applicable' }, meta: { requestId: AGENT_ID } }, 202);
@@ -339,12 +353,12 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { binding: 'fixture', clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
+  return { binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
     answerDecision(id: string, optionId = '0', text: string | null = null) {
       const decision = decisions.get(id)!; decision.status = 'answered';
       decision.answers = decision.questions.map(question => ({ questionId: question.id, optionId: text === null ? optionId : null, text }));
     },
-    env: { ...process.env, RUNCODEX_CONNECTION_FILE: join(workspace, 'connection.json'), CODEX_THREAD_ID: THREAD }, reporting, publication,
+    env: { ...process.env, CROSSFIRE_PROJECT: workspace }, reporting, publication,
     wake, waiting: () => waiters.size, maximumWaiting: () => maximumWaiters,
     hold: (path: string) => {
       let entered = false;

@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { createFleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
-import { createFleetRuntimeWorker } from '@crossfire/adapter-crossfire/fleet-runtime';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { success } from '@crossfire/kernel/result';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
+import { createFleetRuntimeWorker } from '@ctlflow/crossfire-adapter-crossfire/fleet-runtime';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { until } from '../scripts/test-support/listener.js';
-import type { FleetRuntimeOperation } from '@crossfire/contracts/fleet-runtime';
+import type { FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
 
 function command(): FleetRuntimeOperation {
   return { operationId: randomUUID(), fleetId: randomUUID(), agentId: null, action: 'reset', expectedRevision: 0,

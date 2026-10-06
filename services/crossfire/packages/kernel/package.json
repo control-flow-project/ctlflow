@@ -1,5 +1,5 @@
 {
-  "name": "@crossfire/kernel",
+  "name": "@ctlflow/crossfire-kernel",
   "version": "0.1.0",
   "private": true,
   "type": "module",

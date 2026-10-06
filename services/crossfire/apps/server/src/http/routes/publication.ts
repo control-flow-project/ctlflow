@@ -1,9 +1,9 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { createPublication } from '@crossfire/domain/publication/create';
-import { readPublication, readPublications } from '@crossfire/domain/publication/read';
-import { uploadPublicationFile } from '@crossfire/domain/publication/upload';
-import { commitPublication } from '@crossfire/domain/publication/commit';
-import { deletePublication } from '@crossfire/domain/publication/delete';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { createPublication } from '@ctlflow/crossfire-domain/publication/create';
+import { readPublication, readPublications } from '@ctlflow/crossfire-domain/publication/read';
+import { uploadPublicationFile } from '@ctlflow/crossfire-domain/publication/upload';
+import { commitPublication } from '@ctlflow/crossfire-domain/publication/commit';
+import { deletePublication } from '@ctlflow/crossfire-domain/publication/delete';
 import { bind, actor, reply, paged } from '../bind.js';
 export function publicationRoutes() {
   return [

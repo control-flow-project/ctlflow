@@ -1,20 +1,20 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { scheduledPublisher } from '@crossfire/agent-core/scheduled';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
-import { nativeClock } from '@crossfire/adapter-runtime/clock';
-import { nativeDelivery } from '@crossfire/adapter-runtime/delivery';
-import { deliveryText } from '@crossfire/adapter-runtime/journal';
-import { localState } from '@crossfire/adapter-filesystem/state';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { createWakeRule, changeWakeRule } from '@crossfire/domain/wake-up/manage';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { readWakeRule } from '@crossfire/domain/wake-up/read';
-import * as check from '@crossfire/contracts/schema/validation';
+import { scheduledPublisher } from '@ctlflow/crossfire-agent-core/scheduled';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
+import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
+import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
+import { deliveryText } from '@ctlflow/crossfire-adapter-runtime/journal';
+import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { createWakeRule, changeWakeRule } from '@ctlflow/crossfire-domain/wake-up/manage';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { readWakeRule } from '@ctlflow/crossfire-domain/wake-up/read';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
 const nativeInput = check.object({ text: deliveryText, messageId: check.text(200), boundary: check.integer() });
@@ -23,9 +23,9 @@ const prepare = (text: string, messageId: string) => ({ text, messageId, boundar
 test('scheduled checkpoints recover only receipts before other input and retain unacknowledged delivery', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, http = await httpFixture(scope, fixture.application);
   const agent = await fixture.agent(admin.actor, 'ada'), runId = randomUUID(), ruleId = randomUUID();
-  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controllerBound: false }, 'test'));
+  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controller: agent.controller }, 'test'));
   const configuration = { name: 'Fetch report', message: 'Exact configured message. '.repeat(250), schedule: { kind: 'interval' as const, seconds: 60 }, enabled: true, agentIds: [agent.id] };
-  value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID())); fixture.advance(60000);
+  value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID())); fixture.advanceConnected(60000, agent.controller);
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/scheduled-'));
   let publications = 0, receipt = false;
   const inputs: string[] = [];
@@ -55,7 +55,7 @@ test('scheduled checkpoints recover only receipts before other input and retain 
   assert.equal(value(readWakeRule(services, admin.actor, ruleId)).lastDeliveredAt, fixture.now());
   await runtime.deliver('Separate urgent owner input.', 'owner-input'); assert.equal(publications, 2);
   runtime.acknowledge(['owner-input']);
-  fixture.advance(60000); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controllerBound: false }, 'test'));
+  fixture.advanceConnected(60000, agent.controller); value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controller: agent.controller }, 'test'));
   receipt = false; await assert.rejects(publisher().publish(runtime.signal), /Lost native publication response/);
   const saved = localState.read<{ command: { sessionId: string } }>(file); saved.command.sessionId = 'different-native-session'; localState.write(file, saved);
   await assert.rejects(publisher().recover(runtime.signal), /retargeted/); assert.equal(publications, 3);
@@ -65,8 +65,8 @@ test('busy schedules make no claims or model submissions and a disabled queued i
   const fixture = await applicationFixture(scope), { services, admin } = fixture, http = await httpFixture(scope, fixture.application);
   const agent = await fixture.agent(admin.actor, 'ada'), runId = randomUUID(), ruleId = randomUUID();
   const configuration = { name: 'Report', message: 'Scheduled report.', schedule: { kind: 'interval' as const, seconds: 60 }, enabled: true, agentIds: [agent.id] };
-  value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID())); fixture.advance(60000);
-  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controllerBound: false }, 'test'));
+  value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID())); fixture.advanceConnected(60000, agent.controller);
+  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'test', stopped: false, messagesDelivered: 0, controller: agent.controller }, 'test'));
   mkdirSync('.temp', { recursive: true }); const directory = mkdtempSync(join(process.cwd(), '.temp/scheduled-busy-'));
   let busy = true, published = 0;
   const cancel = new AbortController(), runtime = nativeDelivery({ sessionId: 'native-session', approval: 'none', signal: new AbortController().signal, verify: () => {},

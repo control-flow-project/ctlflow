@@ -1,9 +1,9 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { releaseUpdates } from '@crossfire/agent-core/updates';
-import type { LocalState } from '@crossfire/agent-core/port';
-import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
+import { releaseUpdates } from '@ctlflow/crossfire-agent-core/updates';
+import type { LocalState } from '@ctlflow/crossfire-agent-core/port';
+import type { RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
 import { fakeCodex, matrixFixture, THREAD } from '../scripts/test-support/listener.js';
 import { updatedRelease } from './release-fixture.js';
 import { builtRelease } from '../scripts/test-support/release.js';

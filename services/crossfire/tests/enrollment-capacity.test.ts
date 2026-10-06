@@ -1,14 +1,14 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { enrollmentCapacity } from '@crossfire/domain/enrollment/capacity';
-import { preflightEnrollment } from '@crossfire/domain/enrollment/preflight';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { changeMember } from '@crossfire/domain/member/change-member';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
-import { preflight as preflightRequest } from '@crossfire/contracts/schema/request';
+import { enrollmentCapacity } from '@ctlflow/crossfire-domain/enrollment/capacity';
+import { preflightEnrollment } from '@ctlflow/crossfire-domain/enrollment/preflight';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
+import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
+import { preflight as preflightRequest } from '@ctlflow/crossfire-contracts/schema/request';
 import { applicationFixture, secret, value } from './support/application.js';
 
 function introduction(ownerMatrixId: string, count: number, prefix: string) {

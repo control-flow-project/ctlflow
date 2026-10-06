@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { executeSelect, executeInsert, executeUpdate } from '@tinqerjs/better-sqlite3-adapter';
-import { failure, success } from '@crossfire/kernel/result';
-import type { FleetMessageDelivery, FleetMessageDeliveryRepository } from '@crossfire/domain/fleet/control-types';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { FleetMessageDelivery, FleetMessageDeliveryRepository } from '@ctlflow/crossfire-domain/fleet/control-types';
 import { schema, type Tables } from '../../schema/tables.js';
 import { stored } from '../stored.js';
 

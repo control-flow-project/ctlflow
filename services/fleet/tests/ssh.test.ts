@@ -1,5 +1,5 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn, execFile } from 'node:child_process';
@@ -12,12 +12,12 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
 import { createServer as createProvider } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
-import { openTunnel } from '@fleet/ssh-transport/tunnel';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
-import { sshTerminalCommand } from '@fleet/ssh-transport/terminal';
-import { codexTerminal } from '@crossfire/adapter-codex/terminal';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import type { OwnedRuntimeConnection } from '@crossfire/agent-core/owned-runtime';
+import { openTunnel } from '@ctlflow/fleet-ssh-transport/tunnel';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
+import { sshTerminalCommand } from '@ctlflow/fleet-ssh-transport/terminal';
+import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { randomUUID } from 'node:crypto';
 
 const execute = promisify(execFile);
@@ -84,7 +84,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   const providerAddress = provider.address(); assert(providerAddress && typeof providerAddress !== 'string');
   writeFileSync(join(nativeHome, 'config.toml'), 'model_provider = "fixture"\n[model_providers.fixture]\nname = "Inert SSH fixture"\nbase_url = "http://127.0.0.1:' + providerAddress.port + '/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n', { mode: 0o600 });
   trustWorkspace(nativeHome, workspace);
-  const runtime = await codexRuntime().start({ name: 'ssh-native', workspace, instructions: 'Inert verification. No work is requested.', allowNewHistory: true,
+  const runtime = await codexRuntime().start({ name: 'ssh-native', workspace, stateDirectory: workspace, instructions: 'Inert verification. No work is requested.', allowNewHistory: true,
     options: { model: 'gpt-5.1', model_reasoning_effort: 'medium', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No tool approval is expected'); } } }, scope.signal);
   assert(runtime.ok); nativeRuntime = runtime.value;

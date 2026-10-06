@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import { readFileSync, lstatSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { operatorClient } from './auth.js';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { ARTIFACTS, manifest, MAX_ARTIFACT_BYTES } from '@crossfire/contracts/release';
-import { loadRelease } from '@crossfire/adapter-filesystem/release';
-import { fetchBytes } from '@crossfire/operator-support/http';
-import { failure, success } from '@crossfire/kernel/result';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { ARTIFACTS, manifest, MAX_ARTIFACT_BYTES } from '@ctlflow/crossfire-contracts/release';
+import { loadRelease } from '@ctlflow/crossfire-adapter-filesystem/release';
+import { fetchBytes } from '@ctlflow/crossfire-operator-support/http';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 
 export async function verifyRelease(origin: string, releaseDirectory: string, webDirectory: string | undefined, signal: AbortSignal) {
   try {

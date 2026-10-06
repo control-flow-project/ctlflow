@@ -1,11 +1,11 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect, type Page } from '@playwright/test';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { decodeResponse } from '@crossfire/contracts/rest/envelope';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
@@ -31,7 +31,8 @@ test('Policy browser edits idle sleep in minutes, validates durations and keeps 
   await page.goto(origin + '/manage/policy');
   const minutes = page.getByLabel('Sleep after idle minutes', { exact: true }), save = page.getByRole('button', { name: 'Save settings', exact: true });
   await expect(minutes).toHaveValue('30'); assert.equal(await idleSeconds(page, origin), 1800);
-  await expect(page.getByRole('region', { name: 'Fleet idle sleep', exact: true })).toContainText('Directly connected agents are never stopped');
+  await expect(page.getByRole('region', { name: 'Fleet idle sleep', exact: true })).toContainText('applies to every agent');
+  await expect(page.getByRole('region', { name: 'Fleet idle sleep', exact: true })).toContainText('manually stopped session stays stopped');
   for (const invalid of ['', '-1', '0.001', '10081']) {
     await minutes.fill(invalid); await expect(minutes).toHaveAttribute('aria-invalid', 'true'); await expect(save).toBeDisabled();
     assert.equal(await idleSeconds(page, origin), 1800, 'Invalid local input never changes the persisted policy');

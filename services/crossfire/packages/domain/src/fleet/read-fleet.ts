@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { PageRequest, Page } from '../port/directory.js';
 import type { Fleet } from '../enrollment/types.js';
@@ -9,9 +9,21 @@ import { agentActions, type AgentDetails } from '../agent/read-agent.js';
 import type { PrincipalSummary } from '../port/discovery.js';
 import { connectionView } from './control.js';
 import type { FleetConnectionView } from './control-types.js';
+import type { FleetConnection } from './control-types.js';
+import { retirementEligibility, type RetirementEligibility } from './native-stop.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'clock'>;
-export type FleetDetails = Fleet & { metadata: Record<string, string>; owner: PrincipalSummary; connection: FleetConnectionView };
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'clock' | 'runtime' | 'listenerRead'>;
+export type FleetDetails = Fleet & { metadata: Record<string, string>; owner: PrincipalSummary; connection: FleetConnectionView;
+  canArchive: boolean; allowedActions: string[] };
+function actionsForFleet(services: Dependencies, actor: FleetActor, fleet: Fleet, eligibility: RetirementEligibility, connection: FleetConnection | null) {
+  const authority = authorizeFleet(services, actor, fleet, true);
+  if (!authority.ok) return authority.error.code === 'forbidden' ? success({ canArchive: false, allowedActions: [] as string[] }) : authority;
+  if (actor.kind === 'agent') return success({ canArchive: false, allowedActions: ['configure'] });
+  const live = actor.kind !== 'controller' || connection !== null && connection.credentialId === actor.credentialId
+    && connection.closedAt === null && connection.expiresAt > services.clock.now();
+  const canArchive = live && eligibility.fleets.get(fleet.id) === true;
+  return success({ canArchive, allowedActions: canArchive ? ['configure', 'archive'] : ['configure'] });
+}
 export function listFleets(services: Dependencies, actor: Actor, input: PageRequest & { ownerId?: string; search?: string }): Result<Page<FleetDetails>> {
   const scope = ownerScope(services, actor, 'agent.read', input.ownerId);
   if (!scope.ok) return scope;
@@ -25,8 +37,13 @@ export function listFleets(services: Dependencies, actor: Actor, input: PageRequ
   if (page.value.items.some(fleet => !byOwner.has(fleet.ownerId))) return failure('unavailable', 'Fleet owner record is missing');
   const entries = new Map<string, [string, string][]>();
   for (const entry of metadata.value) { const group = entries.get(entry.fleetId) ?? []; group.push([entry.key, entry.value]); entries.set(entry.fleetId, group); }
-  const items = page.value.items.map(fleet => ({ ...fleet, owner: byOwner.get(fleet.ownerId)!, metadata: Object.fromEntries(entries.get(fleet.id) ?? []),
-    connection: connectionView(byConnection.get(fleet.id) ?? null, services.clock.now()) }));
+  const eligibility = retirementEligibility(services, { fleetIds: page.value.items.map(fleet => fleet.id) }); if (!eligibility.ok) return eligibility;
+  const items: FleetDetails[] = [];
+  for (const fleet of page.value.items) {
+    const actions = actionsForFleet(services, actor, fleet, eligibility.value, byConnection.get(fleet.id) ?? null); if (!actions.ok) return actions;
+    items.push({ ...fleet, ...actions.value, owner: byOwner.get(fleet.ownerId)!, metadata: Object.fromEntries(entries.get(fleet.id) ?? []),
+      connection: connectionView(byConnection.get(fleet.id) ?? null, services.clock.now()) });
+  }
   return success({ ...page.value, items });
 }
 export function readFleet(services: Dependencies, actor: FleetActor, fleetId: string): Result<FleetDetails> {
@@ -38,7 +55,9 @@ export function readFleet(services: Dependencies, actor: FleetActor, fleetId: st
   const owners = services.discovery.selected([fleet.value.ownerId]); if (!owners.ok) return owners;
   const owner = owners.value[0]; if (!owner) return failure('unavailable', 'Fleet owner record is missing');
   const connection = services.repositories.fleetConnection.find(fleetId); if (!connection.ok) return connection;
-  return success({ ...fleet.value, owner, metadata: Object.fromEntries(metadata.value.map(entry => [entry.key, entry.value])), connection: connectionView(connection.value, services.clock.now()) });
+  const eligibility = retirementEligibility(services, { fleetIds: [fleetId] }); if (!eligibility.ok) return eligibility;
+  const actions = actionsForFleet(services, actor, fleet.value, eligibility.value, connection.value); if (!actions.ok) return actions;
+  return success({ ...fleet.value, ...actions.value, owner, metadata: Object.fromEntries(metadata.value.map(entry => [entry.key, entry.value])), connection: connectionView(connection.value, services.clock.now()) });
 }
 export function listFleetAgents(services: Dependencies & Pick<Services, 'listenerRead' | 'clock' | 'runtime'>, actor: FleetActor, fleetId: string, page: PageRequest): Result<Page<{ instanceKey: string; agent: AgentDetails }>> {
   const fleet = readFleet(services, actor, fleetId); if (!fleet.ok) return fleet;
@@ -51,9 +70,15 @@ export function listFleetAgents(services: Dependencies & Pick<Services, 'listene
   const keys = new Map(instances.value.map(instance => [instance.agentId, instance.instanceKey]));
   const permissions = actor.kind === 'controller' ? success([]) : services.directory.permissions(actor.principalId);
   if (!permissions.ok) return permissions;
-  return success({ ...records.value, items: records.value.items.map(record => ({ instanceKey: keys.get(record.principal.id)!,
-    agent: { record, activity: activity.value.get(record.principal.id)!, nativeRuntime: native.value.get(record.principal.id) ?? null,
+  const eligibility = retirementEligibility(services, { agentIds: records.value.items.map(record => record.principal.id) }); if (!eligibility.ok) return eligibility;
+  const items: { instanceKey: string; agent: AgentDetails }[] = [];
+  for (const record of records.value.items) {
+    const retirement = eligibility.value.agents.get(record.principal.id), eligible = retirement?.fleetId === fleetId && retirement.eligible;
+    items.push({ instanceKey: keys.get(record.principal.id)!, agent: { record, activity: activity.value.get(record.principal.id)!,
+      nativeRuntime: native.value.get(record.principal.id) ?? null, canRetire: eligible,
       deployment: { agentId: record.principal.id, fleetId, fleetKey: fleet.value.fleetKey,
-      label: fleet.value.label, controllerName: fleet.value.controllerName, reportedAt: fleet.value.updatedAt, instanceKey: keys.get(record.principal.id)! },
-      allowedActions: actor.kind === 'controller' ? [] : agentActions(actor, record, permissions.value) } })) });
+        label: fleet.value.label, controllerName: fleet.value.controllerName, reportedAt: fleet.value.updatedAt, instanceKey: keys.get(record.principal.id)! },
+      allowedActions: actor.kind === 'controller' ? [] : agentActions(actor, record, permissions.value, eligible) } });
+  }
+  return success({ ...records.value, items });
 }

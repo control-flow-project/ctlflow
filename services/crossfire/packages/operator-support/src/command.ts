@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { readPrivateBytes, writeJson } from '@crossfire/adapter-filesystem/index';
-import type { Parser } from '@crossfire/contracts/schema/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { readPrivateBytes, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
 
 export type Options = Readonly<Record<string, string | boolean | undefined>>;
 export function options(arguments_: string[], required: string[], optional: string[] = [], flags: string[] = []): Result<Options> {

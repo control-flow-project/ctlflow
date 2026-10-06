@@ -1,20 +1,16 @@
 import { controller } from './controller.js';
 import * as check from './validation.js';
 import type { Parser } from './validation.js';
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { HUMAN_SIGNUP } from '../policy.js';
 import { statisticsBatch } from '../statistics.js';
 import { coordinationPolicy } from '../coordination-policy.js';
 const revision = check.integer();
 const accountProof = check.object({ agentId: check.identifier, accessToken: check.text(8192) });
-const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof), coordinationPolicy: check.optional(coordinationPolicy) });
-const roster = { controller: check.optional(controller), controllerCredential: check.optional(check.text(200)), ownerMatrixId: check.matrixUserId, fleetKey: check.nullable(check.name), instances: check.list(instance, 100, 1) };
-function hasCoordinationPolicies(value: { fleetKey: string | null; instances: { coordinationPolicy?: unknown }[] }) {
-  return value.instances.every(item => value.fleetKey === null ? item.coordinationPolicy === undefined : item.coordinationPolicy !== undefined);
-}
-export const preflight = check.refine(check.object(roster), hasCoordinationPolicies, 'Fleet instances require coordination policies; individual enrollment does not accept them');
-export const enrollment = check.refine(check.object({ ...roster, enrollmentId: check.identifier, claimSecret: check.secret }), hasCoordinationPolicies,
-  'Fleet instances require coordination policies; individual enrollment does not accept them');
+const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof), coordinationPolicy });
+const roster = { controller, controllerCredential: check.optional(check.text(200)), ownerMatrixId: check.matrixUserId, fleetKey: check.name, instances: check.list(instance, 100, 1) };
+export const preflight = check.object(roster);
+export const enrollment = check.object({ ...roster, enrollmentId: check.identifier, claimSecret: check.secret });
 export const enrollmentDecision = check.object({ expectedRevision: revision, decision: check.choice('approve', 'reject'), verificationCode: check.text(12, 12) });
 export const exchange = check.object({ claimSecret: check.secret });
 export const session = check.object({ nativeAccessToken: check.text(8192) });
@@ -28,8 +24,8 @@ export const grantIntent = check.object({ roomId: check.roomId, accessMode: chec
 export const roomGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier), accessMode: check.choice('read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
 export const removeGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier) });
 export const roomPermissions = check.object({ expectedRevision: revision, expectedGeneration: check.identifier, permissions: check.list(check.choice('room.agent.invite'), 1) });
-export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean, controllerBound: check.boolean, statistics: check.nullable(statisticsBatch) });
-export const disconnection = check.object({ expectedRevision: revision, runIds: check.list(check.identifier, 100, 1) });
+export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean,
+  controller: check.object({ fleetId: check.identifier, connectionId: check.identifier, credential: check.text(200) }), statistics: check.nullable(statisticsBatch) });
 export const wakeNotice = check.object({ roomId: check.roomId });
 export const principalResolution = check.object({ matrixUserIds: check.refine(check.list(check.matrixUserId, 100, 1),
   ids => new Set(ids).size === ids.length, 'Resolve unique Matrix identities') });
@@ -57,6 +53,5 @@ export function pagination(input: URLSearchParams) {
 }
 
 export const fleetChange = check.object({ expectedRevision: revision, label: check.text(100), controller });
-export const fleetRemoval = check.object({ expectedRevision: revision });
-export const fleetBinding = check.object({ expectedRevision: revision, instanceKey: check.name, accessToken: check.optional(check.text(8192)) });
-export const fleetUnbinding = check.object({ expectedRevision: revision, instanceKey: check.name });
+export const fleetArchive = check.object({ expectedRevision: revision });
+export const fleetAgentRemoval = check.object({ expectedRevision: revision, instanceKey: check.name });

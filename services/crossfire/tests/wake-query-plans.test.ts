@@ -1,9 +1,9 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
-import { createSchema } from '@crossfire/adapter-sqlite/schema/create-schema';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
+import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
 
 test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized indexes', scope => {
@@ -16,9 +16,15 @@ test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized 
       const ownerId = 'owner-' + ownerIndex, agentId = 'agent-' + ownerIndex;
       value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
+      const fleetId = 'fleet-' + ownerId, credentialId = 'credential-' + ownerId, connectionId = 'connection-' + ownerId;
+      value(repositories.fleet.insert({ id: fleetId, ownerId, fleetKey: ownerId, label: ownerId, controllerName: 'Computer',
+        revision: 0, deliveryEnabled: true, archivedAt: null, createdAt: 1, updatedAt: 1 }));
+      value(repositories.fleetCredential.insert({ id: credentialId, fleetId, secretHash: 'hash-' + ownerId, createdAt: 1, revokedAt: null }));
+      value(repositories.fleetConnection.save({ fleetId, credentialId, connectionId, lastSeenAt: 1, expiresAt: 1000, closedAt: null }));
       value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'owner' }));
-      value(repositories.listenerRun.insert({ id: 'run-' + ownerIndex, agentId, release: 'proof', controllerBound: false, startedAt: 1, lastSeenAt: 1,
+      value(repositories.fleetInstance.insert({ ownerId, fleetKey: ownerId, instanceKey: agentId, agentId, retiredAt: null }));
+      value(repositories.listenerRun.insert({ id: 'run-' + ownerIndex, agentId, release: 'proof', controller: { fleetId, connectionId, credentialId }, startedAt: 1, lastSeenAt: 1,
         activeMs: 0, messagesDelivered: 0, stoppedAt: null, disconnectRequestedAt: null }));
       for (let index = 0; index < 1000; index++) {
         const ruleId = ownerId + '-rule-' + index;

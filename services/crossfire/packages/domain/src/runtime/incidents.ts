@@ -1,6 +1,6 @@
 import type { Services } from '../port/services.js';
 import type { Incident } from './types.js';
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
 import { agentDisplayName } from '../identity/display-name.js';
 

@@ -1,18 +1,18 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { codexRuntime } from '@crossfire/adapter-codex/owned';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { until } from '../scripts/test-support/listener.js';
-import { value } from './support/application.js';
-import type { RuntimeDecision, RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
-import { success } from '@crossfire/kernel/result';
-import { codexTerminal } from '@crossfire/adapter-codex/terminal';
-import type { UsageSample } from '@crossfire/contracts/statistics';
+import { value } from '@ctlflow/crossfire-test-support/result';
+import type { RuntimeDecision, RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
+import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 
 async function environment(scope: Parameters<typeof nativeProvider>[0]) {
   const directory = mkdtempSync(join(process.cwd(), '.temp/native-histories-'));
@@ -26,7 +26,7 @@ async function environment(scope: Parameters<typeof nativeProvider>[0]) {
 
 test('controller-owned reset creates a fresh native context without changing identity, parameters or provider authentication', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope), usage: UsageSample[] = [];
-  const input = { name: 'reset-proof', workspace, instructions: 'Native reset proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'danger-full-access', approval_policy: 'never' },
+  const input = { name: 'reset-proof', workspace, stateDirectory: workspace, instructions: 'Native reset proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high', sandbox_mode: 'danger-full-access', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No decision expected'); }, usage: (sample: UsageSample) => usage.push(sample) } };
   let runtime = value(await adapter.start(input, new AbortController().signal)); cleanup(scope, () => runtime.close());
   const previous = runtime.sessionId, authentication = readFileSync(join(workspace, '.codex/auth.json'));
@@ -36,12 +36,12 @@ test('controller-owned reset creates a fresh native context without changing ide
   assert.equal((await runtime.inspect()).busy, true, 'An idle native model with an unacknowledged receipt cannot sleep');
   runtime.acknowledge(['before-reset']); assert.equal((await runtime.inspect()).busy, false); await runtime.close();
   assert(usage.length > 0, 'Native app-server token counters reach the optional adapter hook');
-  const resetId = randomUUID(); value(await adapter.reset({ workspace, resetId }));
+  const resetId = randomUUID(); value(await adapter.reset({ workspace, stateDirectory: workspace, resetId }));
   assert(existsSync(join(workspace, '.codex/crossfire-archive', resetId, 'crossfire-session.json')));
   runtime = value(await adapter.start(input, new AbortController().signal)); assert.notEqual(runtime.sessionId, previous);
   const current = runtime.sessionId; assert.equal(provider.requests.length, 1, 'Reset and native startup make no model calls');
   assert.deepEqual(readFileSync(join(workspace, '.codex/auth.json')), authentication);
-  value(await adapter.reset({ workspace, resetId }));
+  value(await adapter.reset({ workspace, stateDirectory: workspace, resetId }));
   await runtime.deliver('Only the new context.', 'after-reset'); runtime.acknowledge(['after-reset']); await until(async () => !(await runtime.inspect()).busy);
   assert(!JSON.stringify(provider.requests[1]).includes('Prior private context must not appear after reset.'));
   assert.equal(runtime.sessionId, current); assert.equal(provider.requests.length, 2);
@@ -49,7 +49,7 @@ test('controller-owned reset creates a fresh native context without changing ide
 
 test('default native start resumes complete history and refuses absent or broken bindings without a fresh fallback', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
-  const input = { name: 'resume-proof', workspace, instructions: 'Inert retained history proof.', options: { sandbox_mode: 'read-only', approval_policy: 'never' },
+  const input = { name: 'resume-proof', workspace, stateDirectory: workspace, instructions: 'Inert retained history proof.', options: { sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } };
   const missing = await adapter.start(input, new AbortController().signal);
   assert.equal(missing.ok, false); if (!missing.ok) assert.equal(missing.error.code, 'missing');
@@ -80,7 +80,7 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
   const { workspace, provider, adapter } = await environment(scope);
   const observed: RuntimeObservationEvent[] = [], stop = new AbortController();
   let pendingDecision = false;
-  const input = { name: 'room-proof', workspace, instructions: 'Inert history proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
+  const input = { name: 'room-proof', workspace, stateDirectory: workspace, instructions: 'Inert history proof.', allowNewHistory: true, options: { model: 'gpt-5.2', model_reasoning_effort: 'high' },
     listenerOptions: { historyMode: 'per-room' as 'per-room' | 'shared' },
     hooks: { requestDecision: async () => { throw new Error('No permission expected'); }, pendingDecisions: () => pendingDecision,
       observe: (event: RuntimeObservationEvent) => observed.push(event) } };
@@ -111,7 +111,7 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
   assert(observed.some(event => event.kind === 'output' && event.text.includes('Fixture complete.')));
   await runtime.close();
   input.listenerOptions.historyMode = 'shared';
-  const saved = value(await adapter.savedContexts({ workspace }));
+  const saved = value(await adapter.savedContexts({ workspace, stateDirectory: workspace }));
   assert.deepEqual(saved.map(entry => [entry.context, entry.sessionId]), retained);
   assert.equal(provider.requests.length, 2, 'Reading sleeping contexts never starts a model');
   const blocked = await adapter.start(input, stop.signal);
@@ -146,7 +146,7 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
 test('stock Codex structured questions preserve native attribution and exact responses without a routing model call', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
   const requests: RuntimeDecision[] = [], observed: RuntimeObservationEvent[] = [];
-  const runtime = value(await adapter.start({ name: 'question-proof', workspace, instructions: 'Use native structured questions when a human decision is necessary.', allowNewHistory: true,
+  const runtime = value(await adapter.start({ name: 'question-proof', workspace, stateDirectory: workspace, instructions: 'Use native structured questions when a human decision is necessary.', allowNewHistory: true,
     options: { features: { default_mode_request_user_input: true } },
     listenerOptions: { historyMode: 'per-room' },
     hooks: { observe: (event: RuntimeObservationEvent) => observed.push(event), requestDecision: async request => {
@@ -184,7 +184,7 @@ test('corrupt native history bindings cannot share a session or ambiguously sele
     [{ room: '!alpha:test', sessionId: other }, { room: '!alpha:test', sessionId: randomUUID() }],
   ]) {
     writeFileSync(join(workspace, '.codex', 'crossfire-contexts.json'), JSON.stringify({ mode: 'per-room', control: null, rooms }), { mode: 0o600 });
-    const started = await adapter.start({ name: 'invalid-history', workspace, instructions: 'No input.', options: {},
+    const started = await adapter.start({ name: 'invalid-history', workspace, stateDirectory: workspace, instructions: 'No input.', options: {},
       listenerOptions: { historyMode: 'per-room' }, hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } }, new AbortController().signal);
     assert(!started.ok && started.error.message.includes('unique rooms and distinct session identities'));
     assert.equal(provider.requests.length, 0);

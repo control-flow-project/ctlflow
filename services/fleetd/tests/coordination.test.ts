@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { definition, parseToml } from '@fleetd/contracts/configuration';
-import { loadConfiguration } from '@fleetd/storage/configuration';
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
-import { createRegistry } from '@fleetd/storage/registry';
-import { instanceView } from '@fleetd/contracts/api';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { definition, parseToml } from '@ctlflow/fleetd-contracts/configuration';
+import { loadConfiguration } from '@ctlflow/fleetd-storage/configuration';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { createRegistry } from '@ctlflow/fleetd-storage/registry';
+import { instanceView } from '@ctlflow/fleetd-contracts/api';
 
 test('role coordination options are separate from native options and strictly validate modes, capabilities and selected identities', () => {
   const native = { name: 'Analyst', runtime: 'codex', runtime_options: { model: 'fixture', native_option: true } };

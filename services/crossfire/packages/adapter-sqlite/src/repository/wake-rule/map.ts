@@ -1,4 +1,4 @@
-import type { WakeRule } from '@crossfire/domain/wake-up/types';
+import type { WakeRule } from '@ctlflow/crossfire-domain/wake-up/types';
 import type { Tables } from '../../schema/tables.js';
 
 export function mapWakeRule(row: Tables['wake_rule']): WakeRule {

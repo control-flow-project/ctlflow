@@ -1,5 +1,5 @@
-import { endpoint } from '@crossfire/contracts/origin';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { endpoint } from '@ctlflow/crossfire-contracts/origin';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export async function fetchBytes(origin: string, path: string, maximum: number, signal: AbortSignal, transport: typeof fetch = fetch): Promise<Result<Buffer>> {
   const base = endpoint(origin);

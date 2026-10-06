@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 export function Alert({ children }: { children?: ReactNode }) {
   return children ? <div className="alert" role="alert">{children}</div> : null;

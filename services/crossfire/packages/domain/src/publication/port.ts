@@ -1,5 +1,5 @@
-import type { Result } from '@crossfire/kernel/result';
-import type { BinaryInput } from '@crossfire/kernel/bytes';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
+import type { BinaryInput } from '@ctlflow/crossfire-kernel/bytes';
 import type { Page } from '../port/directory.js';
 import type { Publication, PublicationFile, PublicationQuery, PublicationBudget } from './values.js';
 export type PublicationRecord = { publication: Publication; agentName: string; ownerId: string; ownerName: string };

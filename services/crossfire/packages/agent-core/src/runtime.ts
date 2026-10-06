@@ -1,7 +1,7 @@
-import type { Json } from '@crossfire/contracts/json';
-import type { Result } from '@crossfire/kernel/result';
-import type { DecisionCreation, RuntimeObservation } from '@crossfire/contracts/runtime';
-import type { UsageSample } from '@crossfire/contracts/statistics';
+import type { Json } from '@ctlflow/crossfire-contracts/json';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
+import type { DecisionCreation, RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
+import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 
 export type RuntimeApproval = 'none' | 'runtime' | 'listener';
 

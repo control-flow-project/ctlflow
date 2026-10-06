@@ -1,7 +1,7 @@
 import * as check from './schema/validation.js';
 import { principal } from './schema/response.js';
 import { listQuery } from './schema/request.js';
-import { failure } from '@crossfire/kernel/result';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 export type WakeSchedule = { kind: 'interval'; seconds: number } | { kind: 'cron'; expression: string; timeZone: string };
 export const wakeSchedule: check.Parser<WakeSchedule> = input => {

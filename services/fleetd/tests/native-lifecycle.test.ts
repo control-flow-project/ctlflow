@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
-import { success, failure, type Result } from '@crossfire/kernel/result';
-import type { Clock } from '@crossfire/agent-core/port';
-import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
-import type { RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
-import { createNativeLifecycle, type NativeLifecycleServices } from '@fleetd/domain/native-lifecycle';
+import { success, failure, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { Clock } from '@ctlflow/crossfire-agent-core/port';
+import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
+import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 async function until(predicate: () => boolean): Promise<void> {

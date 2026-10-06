@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID, createHash } from 'node:crypto';
-import { binaryBytes } from '@crossfire/kernel/bytes';
-import { createPublication } from '@crossfire/domain/publication/create';
-import { uploadPublicationFile } from '@crossfire/domain/publication/upload';
-import { commitPublication } from '@crossfire/domain/publication/commit';
-import { deletePublication } from '@crossfire/domain/publication/delete';
-import { readPublication, readPublications } from '@crossfire/domain/publication/read';
-import { maintainPublications } from '@crossfire/domain/publication/maintenance';
-import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
-import { validatePublication } from '@crossfire/domain/publication/validation';
-import { publicationCreation, publicationQuery } from '@crossfire/contracts/publication';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
-import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
+import { binaryBytes } from '@ctlflow/crossfire-kernel/bytes';
+import { createPublication } from '@ctlflow/crossfire-domain/publication/create';
+import { uploadPublicationFile } from '@ctlflow/crossfire-domain/publication/upload';
+import { commitPublication } from '@ctlflow/crossfire-domain/publication/commit';
+import { deletePublication } from '@ctlflow/crossfire-domain/publication/delete';
+import { readPublication, readPublications } from '@ctlflow/crossfire-domain/publication/read';
+import { maintainPublications } from '@ctlflow/crossfire-domain/publication/maintenance';
+import { PUBLICATION_LIMITS } from '@ctlflow/crossfire-domain/publication/values';
+import { validatePublication } from '@ctlflow/crossfire-domain/publication/validation';
+import { publicationCreation, publicationQuery } from '@ctlflow/crossfire-contracts/publication';
+import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
+import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
 import { applicationFixture, value } from './support/application.js';
 
 function manifest(body = '<!doctype html><p>Report</p>') {
@@ -36,7 +36,7 @@ test('static manifests reject traversal, MIME confusion, archives, aliases, dupl
 });
 
 test('staging reserves storage without public visibility; complete verified commit and owner deletion are idempotent', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher'), data = manifest();
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher'), data = manifest();
   const staged = value(createPublication(fixture.services, agent.actor, data.input, randomUUID()));
   assert.equal(staged.state, 'staging'); assert.equal(staged.url, null); assert.equal(staged.files[0]!.uploaded, false);
   const key = value(fixture.services.publication.repository.find(staged.id))!.publication.publicKey;
@@ -58,7 +58,7 @@ test('staging reserves storage without public visibility; complete verified comm
 
 test('publication access uses verified agent identity and current human ownership rather than room membership', async scope => {
   const fixture = await applicationFixture(scope), owner = await fixture.member('owner'), other = await fixture.member('other');
-  const agent = await fixture.agent(owner.actor, 'publisher'), another = await fixture.agent(other.actor, 'another');
+  const agent = await fixture.listeningAgent(owner.actor, 'publisher'), another = await fixture.listeningAgent(other.actor, 'another');
   const report = value(createPublication(fixture.services, agent.actor, manifest().input, randomUUID()));
   assert.equal(createPublication(fixture.services, owner.actor, manifest().input, randomUUID()).ok, false);
   assert.equal(readPublication(fixture.services, another.actor, report.id).ok, false);
@@ -74,7 +74,7 @@ test('publication access uses verified agent identity and current human ownershi
 
 test('owner-scoped report pages filter before counting, ordering and hydration without widening the scope', async scope => {
   const fixture = await applicationFixture(scope), owner = await fixture.member('owner'), other = await fixture.member('other');
-  const agent = await fixture.agent(owner.actor, 'publisher'), foreign = await fixture.agent(other.actor, 'foreign-publisher');
+  const agent = await fixture.listeningAgent(owner.actor, 'publisher'), foreign = await fixture.listeningAgent(other.actor, 'foreign-publisher');
   const reports: string[] = [];
   for (let index = 0; index < 3; index++) {
     fixture.advance(1);
@@ -92,7 +92,7 @@ test('owner-scoped report pages filter before counting, ordering and hydration w
 });
 
 test('quota reservations include incomplete and pending-deletion bytes; expired staging is reclaimed without publication', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher'), data = manifest();
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher'), data = manifest();
   fixture.services.publication.budget.agentBytes = data.bytes.length;
   const first = value(createPublication(fixture.services, agent.actor, data.input, randomUUID()));
   assert.equal(createPublication(fixture.services, agent.actor, data.input, randomUUID()).ok, false);
@@ -101,11 +101,12 @@ test('quota reservations include incomplete and pending-deletion bytes; expired 
   assert.equal(value(await maintainPublications(fixture.services)), 1);
   assert.equal(value(readPublication(fixture.services, fixture.admin.actor, first.id)).state, 'deleted');
   assert.equal(value(fixture.services.publication.repository.usage(agent.id)).agentBytes, 0);
+  fixture.renewController(agent.controller); fixture.listen(agent);
   assert(createPublication(fixture.services, agent.actor, data.input, randomUUID()).ok);
 });
 
 test('zero-byte reports still consume agent and instance count quotas; published reports never expire as staging', async scope => {
-  const fixture = await applicationFixture(scope), first = await fixture.agent(fixture.admin.actor, 'first-publisher'), second = await fixture.agent(fixture.admin.actor, 'second-publisher');
+  const fixture = await applicationFixture(scope), first = await fixture.listeningAgent(fixture.admin.actor, 'first-publisher'), second = await fixture.listeningAgent(fixture.admin.actor, 'second-publisher');
   const data = manifest(''); fixture.services.publication.budget.agentCount = 1; fixture.services.publication.budget.instanceCount = 2;
   const report = value(createPublication(fixture.services, first.actor, data.input, randomUUID()));
   value(await uploadPublicationFile(fixture.services, first.actor, report.id, report.files[0]!.id, binaryBytes(data.bytes), new AbortController().signal));
@@ -115,6 +116,7 @@ test('zero-byte reports still consume agent and instance count quotas; published
   fixture.services.publication.budget.agentCount = 2;
   assert.equal(createPublication(fixture.services, first.actor, data.input, randomUUID()).ok, false);
   fixture.advance(PUBLICATION_LIMITS.stagingMilliseconds + 1);
+  fixture.renewController(first.controller); fixture.listen(first);
   assert.equal(value(fixture.services.publication.repository.usage(first.id)).instanceCount, 2);
   assert.equal(createPublication(fixture.services, first.actor, data.input, randomUUID()).ok, false);
   assert.equal(value(await maintainPublications(fixture.services)), 1);
@@ -124,7 +126,7 @@ test('zero-byte reports still consume agent and instance count quotas; published
 });
 
 test('hash mismatch and aborted uploads retain private staging and cannot be committed', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher'), data = manifest();
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher'), data = manifest();
   const report = value(createPublication(fixture.services, agent.actor, data.input, randomUUID()));
   const changed = Buffer.alloc(data.bytes.length, 65);
   assert.equal((await uploadPublicationFile(fixture.services, agent.actor, report.id, report.files[0]!.id, binaryBytes(changed), new AbortController().signal)).ok, false);
@@ -135,7 +137,7 @@ test('hash mismatch and aborted uploads retain private staging and cannot be com
 });
 
 test('deletion fences the database before a concurrently blocked upload completes; cleanup later frees bytes', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher'), data = manifest();
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher'), data = manifest();
   const report = value(createPublication(fixture.services, agent.actor, data.input, randomUUID()));
   let entered!: () => void, proceed!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; }), gate = new Promise<void>(resolve => { proceed = resolve; });
@@ -151,7 +153,7 @@ test('deletion fences the database before a concurrently blocked upload complete
 });
 
 test('instance idle policy has canonical 1800-second default, configurable zero and delivery propagation', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher');
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher');
   const policy = value(fixture.services.repositories.instancePolicy.find({ id: 'instance' }))!;
   assert.equal(policy.fleetIdleTimeoutSeconds, 1800);
   assert.equal(value(deliveryPolicy(fixture.services, agent.actor, agent.id)).fleetIdleTimeoutSeconds, 1800);

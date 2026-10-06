@@ -1,8 +1,8 @@
 import { executeSelect, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
-import { success } from '@crossfire/kernel/result';
-import type { CollectionRepository } from '@crossfire/domain/port/collection';
+import { success } from '@ctlflow/crossfire-kernel/result';
+import type { CollectionRepository } from '@ctlflow/crossfire-domain/port/collection';
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapEnrollmentItem } from '../enrollment-item/map.js';
@@ -34,7 +34,7 @@ export function createCollectionRepository(database: Database.Database): Collect
     },
     fleetInstances(input) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('fleet_instance')
-        .where(row => row.owner_id === params.ownerId && row.fleet_key === params.fleetKey).orderBy(row => row.instance_key), input).map(mapFleetInstance)));
+        .where(row => row.owner_id === params.ownerId && row.fleet_key === params.fleetKey && row.retired_at === null).orderBy(row => row.instance_key), input).map(mapFleetInstance)));
     },
     roomGrants(input) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('agent_room_grant')
@@ -110,17 +110,17 @@ export function createCollectionRepository(database: Database.Database): Collect
       return stored(() => {
         const params = { offset: (input.page - 1) * input.pageSize, limit: input.pageSize, ownerId: input.ownerId ?? '', search: (input.search ?? '').toLowerCase() };
         if (input.ownerId !== undefined) {
-          const total = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.owner_id === params.ownerId
+          const total = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && row.owner_id === params.ownerId
             && (row.label.toLowerCase().includes(params.search) || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search))).count(), params);
-          const rows = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.owner_id === params.ownerId
+          const rows = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && row.owner_id === params.ownerId
             && (row.label.toLowerCase().includes(params.search) || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search)))
             .orderByDescending(row => row.created_at).thenBy(row => row.id).skip(params.offset).take(params.limit), params);
           return success(page(rows.map(mapFleet), total, input));
         }
-        const total = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.label.toLowerCase().includes(params.search)
-          || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search)).count(), params);
-        const rows = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.label.toLowerCase().includes(params.search)
-          || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search))
+        const total = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && (row.label.toLowerCase().includes(params.search)
+          || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search))).count(), params);
+        const rows = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && (row.label.toLowerCase().includes(params.search)
+          || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search)))
           .orderByDescending(row => row.created_at).thenBy(row => row.id).skip(params.offset).take(params.limit), params);
         return success(page(rows.map(mapFleet), total, input));
       });

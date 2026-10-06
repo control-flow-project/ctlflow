@@ -1,7 +1,7 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { createDecision, listDecisions, readDecision, answerDecision, pollDecision, receiptDecision } from '@crossfire/domain/runtime/decisions';
-import { readRuntime, reportRuntime } from '@crossfire/domain/runtime/observations';
-import { reportFleetFailure } from '@crossfire/domain/runtime/fleet-failure';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { createDecision, listDecisions, readDecision, answerDecision, pollDecision, receiptDecision } from '@ctlflow/crossfire-domain/runtime/decisions';
+import { readRuntime, reportRuntime } from '@ctlflow/crossfire-domain/runtime/observations';
+import { reportFleetFailure } from '@ctlflow/crossfire-domain/runtime/fleet-failure';
 import { bind, reply, paged, actor, fleetActor } from '../bind.js';
 
 export function runtimeRoutes() {

@@ -1,12 +1,12 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
-import { createWakeRule } from '@crossfire/domain/wake-up/manage';
-import { readWakeRule } from '@crossfire/domain/wake-up/read';
+import { createWakeRule } from '@ctlflow/crossfire-domain/wake-up/manage';
+import { readWakeRule } from '@ctlflow/crossfire-domain/wake-up/read';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';

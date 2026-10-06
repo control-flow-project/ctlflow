@@ -2,20 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value } from './support/application.js';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { createDecision, readDecision, answerDecision, pollDecision, receiptDecision, expireDecisions, listDecisions } from '@crossfire/domain/runtime/decisions';
-import { reportRuntime } from '@crossfire/domain/runtime/observations';
-import { reconcileRuntime, openIncident } from '@crossfire/domain/runtime/incidents';
-import type { DecisionCreation } from '@crossfire/contracts/runtime';
-import { listRooms, readRoom } from '@crossfire/domain/room/read-room';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { acceptRoomInvitation } from '@crossfire/domain/room-access/accept-invitation';
-import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { createDecision, readDecision, answerDecision, pollDecision, receiptDecision, expireDecisions, listDecisions } from '@ctlflow/crossfire-domain/runtime/decisions';
+import { reportRuntime } from '@ctlflow/crossfire-domain/runtime/observations';
+import { reconcileRuntime, openIncident } from '@ctlflow/crossfire-domain/runtime/incidents';
+import type { DecisionCreation } from '@ctlflow/crossfire-contracts/runtime';
+import { listRooms, readRoom } from '@ctlflow/crossfire-domain/room/read-room';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { acceptRoomInvitation } from '@ctlflow/crossfire-domain/room-access/accept-invitation';
+import { setRoomPermission } from '@ctlflow/crossfire-domain/room-access/set-permission';
 
 async function fixture(scope: Parameters<typeof applicationFixture>[0]) {
   const fixture = await applicationFixture(scope), owner = await fixture.member('owner'), stranger = await fixture.member('stranger');
   const agent = await fixture.agent(owner.actor, 'ada'), runId = randomUUID();
-  value(reportListener(fixture.services, agent.actor, agent.id, runId, { statistics: null, release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(fixture.services, agent.actor, agent.id, runId, { statistics: null, release: 'fixture', stopped: false, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
   const request: DecisionCreation = { id: randomUUID(), runId, runtime: 'codex', sessionId: randomUUID(), requestId: '42', turnId: 'turn-original', itemId: 'item-original',
     kind: 'question', action: 'Choose a destination', review: 'Exact native review', blocking: true, expiresAt: null,
     questions: [{ id: 'destination', title: 'Destination', prompt: 'Select one', allowText: true, secret: true,
@@ -98,23 +98,23 @@ test('future native activity is rejected without overwriting the last confirmed 
 });
 
 test('idle heartbeat recovery restores contact without declaring a failed native history recovered', async scope => {
-  const { services, agent, runId, owner, advance } = await fixture(scope);
+  const { services, agent, runId, owner, advanceConnected } = await fixture(scope);
   value(openIncident(services, { ownerId: owner.actor.principalId, agentId: agent.id, fleetId: null, runId,
     sessionId: 'failed-history', kind: 'failure', message: 'Original failure' }));
-  advance(90001); value(await reconcileRuntime(services, () => false));
+  advanceConnected(90001, agent.controller); value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()).map(incident => incident.kind).sort(), ['contact', 'failure']);
-  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(services, agent.actor, agent.id, runId, { statistics: null, release: 'fixture', stopped: false, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
   value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()).map(incident => incident.kind), ['failure']);
   assert.equal(value(services.runtime.notifications(services.clock.now())).filter(notice => notice.phase === 'recovery').length, 1);
 });
 
 test('a newer intentional stop suppresses false lost-contact notices from an older abandoned run', async scope => {
-  const { services, agent, advance } = await fixture(scope);
+  const { services, agent, advance, advanceConnected } = await fixture(scope);
   advance(1); const next = randomUUID();
-  value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: false, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
-  value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: true, controllerBound: false, messagesDelivered: 0 }, 'fixture'));
-  advance(90001); value(await reconcileRuntime(services, () => false));
+  value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: false, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(services, agent.actor, agent.id, next, { statistics: null, release: 'fixture', stopped: true, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
+  advanceConnected(90001, agent.controller); value(await reconcileRuntime(services, () => false));
   assert.deepEqual(value(services.runtime.activeIncidents()), []);
 });
 

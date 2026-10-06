@@ -1,8 +1,8 @@
-import { failure, success, type Result, type Failure } from '@crossfire/kernel/result';
-import type { Clock } from '@crossfire/agent-core/port';
-import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval } from '@crossfire/agent-core/runtime';
-import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@crossfire/agent-core/owned-runtime';
-import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
+import { failure, success, type Result, type Failure } from '@ctlflow/crossfire-kernel/result';
+import type { Clock } from '@ctlflow/crossfire-agent-core/port';
+import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval } from '@ctlflow/crossfire-agent-core/runtime';
+import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 
 type Observation = Extract<RuntimeObservationEvent, { kind: 'state' }>['observation'];
 type Context = { context: string; runtime: string; sessionId: string };

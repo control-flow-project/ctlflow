@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chmodSync, mkdirSync, mkdtempSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
-import { createUnitOfWork } from '@crossfire/adapter-sqlite/unit-of-work';
-import { failure } from '@crossfire/kernel/result';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
+import { createUnitOfWork } from '@ctlflow/crossfire-adapter-sqlite/unit-of-work';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 import { value } from './support/application.js';
 
 function directory() { mkdirSync('.temp', { recursive: true }); return mkdtempSync(join(process.cwd(), '.temp/storage-')); }

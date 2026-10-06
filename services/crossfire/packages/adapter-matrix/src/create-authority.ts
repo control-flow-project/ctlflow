@@ -1,14 +1,14 @@
 import { authority, type Config } from './account/authority.js';
 import { joined, roomFacts } from './room/facts.js';
-import { roomCreators, roomPowers } from '@crossfire/contracts/matrix-room';
+import { roomCreators, roomPowers } from '@ctlflow/crossfire-contracts/matrix-room';
 import { createInvitationReader, invitationEvent } from './room/invitation.js';
 import { createOwnerConversations, verifyOwnerConversation, markDirect } from './room/owner-conversation.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { MatrixAuthority, RoomFacts, RoomMembership } from '@crossfire/domain/port/matrix-authority';
-import { API, segment } from '@crossfire/contracts/matrix';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { MatrixAuthority, RoomFacts, RoomMembership } from '@ctlflow/crossfire-domain/port/matrix-authority';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk, nativeRequest, nativeState } from './http.js';
-import { object, text, userId } from '@crossfire/contracts/validation';
-import { LISTENER_NOTICE, isListenerNotice } from '@crossfire/contracts/notices';
+import { object, text, userId } from '@ctlflow/crossfire-contracts/validation';
+import { LISTENER_NOTICE, isListenerNotice } from '@ctlflow/crossfire-contracts/notices';
 
 export function createMatrixAuthority(config: Config): MatrixAuthority {
   const accounts = authority(config);

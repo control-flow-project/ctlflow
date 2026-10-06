@@ -2,8 +2,9 @@
 
 ## Management
 
-Open a fleet and select **Sessions**. An individual fleet-managed agent also has a
-**Sessions** tab. The fleet owner and administrators can request:
+Open a fleet's **Agents** tab: the agents table comes first, followed by the
+fleet-wide **Native sessions** controls. For one agent, open its **Session** tab.
+The fleet owner and administrators can request:
 
 | Action | Native execution | History and delivery |
 | --- | --- | --- |
@@ -32,7 +33,7 @@ Crossfire's Policy page sets fleet idle sleep; the default is 30 minutes and zer
 disables it. An idle native engine can be closed while its receiver remains
 online. Sleeping is not stopped: eligible chat, scheduled or broadcast input
 wakes it and resumes the exact saved history. Busy histories, pending decisions,
-input or receipts and unknown activity prevent sleep. Direct agents are unaffected.
+input or receipts and unknown activity prevent sleep.
 
 `fleet show` exposes native phase, desired binding intent, last native activity,
 listener activity and history availability separately. `fleet agent contexts`
@@ -70,7 +71,7 @@ fleet agent start research analyst-west --fresh-history --operation-id YOUR_UUID
 
 The flag is the CLI's explicit destructive intent. The command prints an operation
 ID; retry uncertain submission with that same ID and identical arguments, not a
-new ID. Fleet and individual start and stop commands all accept `--operation-id UUID`.
+new ID. Fleet-wide and per-agent start and stop commands accept `--operation-id UUID`.
 The controller persists outcomes and pins unacknowledged remote operations
 so reconnects cannot repeat a completed reset. If the controller dies during an
 operation, it reports that interrupted operation as failed rather than guessing
@@ -84,11 +85,25 @@ another initialization only after the old context is safely retired. In per-room
 mode, a new room obtains its own history when first used; changing history mode is
 an explicit configuration change, not an ordinary restart fallback.
 
-Direct agents are not fleet-owned processes; their owners control native sessions
-in the coding application. Neither management nor this CLI resets them. Native
-history is not a guarantee that an unfinished shell process survives a stop.
+Every Crossfire agent is fleet-owned. The coding session performing setup remains
+independent and is never adopted, stopped or reset. Native history is not a
+guarantee that an unfinished shell process survives a stop.
 This feature does not delete workarea files, Matrix chats or old native archives.
 
-- [History exports, unread positions and reset preparation](../../crossfire/docs/history.md)
+A full machine restart and abruptly killing only fleetd are different. A native
+app-server can survive `SIGKILL` of fleetd and retain its history's writer lock.
+The replacement refuses that competing writer, not silently resumes or adopts
+it. Safely stop the verified orphan before ordinary saved-history restoration.
+
+Local stop records actual native close through the same current controller/run
+receipt used by management operations. If acknowledgment fails, native processes
+remain stopped and the error stays visible; automatic recovery is not blocked by
+that network failure. Retry stop with a new operation ID after checking the
+reported outcome. Pending proofs retry only while their exact controller
+generation remains valid. After generation turnover, explicitly resume and stop
+the binding to obtain current evidence. Retirement and fleet archive stay refused
+until Crossfire confirms settled receipts and actual native stop.
+
+- [History exports, unread positions and reset preparation](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
 - [Configured runtime parameters and history modes](configuration.md)
-- [Controller recovery and private API](../../fleetd/docs/operations.md)
+- [Controller recovery and private API](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)

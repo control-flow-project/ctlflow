@@ -1,18 +1,18 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { failure, success } from '@crossfire/kernel/result';
-import { privateDir, readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import { archiveState } from '@crossfire/adapter-filesystem/archive';
-import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
-import { localState } from '@crossfire/adapter-filesystem/state';
-import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
-import { matrix } from '@crossfire/adapter-matrix/http';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { exportResetHistory } from '@crossfire/agent-core/reset-history';
-import type { OwnedRuntimeAdapter } from '@crossfire/agent-core/owned-runtime';
-import type { Configuration, Instance } from '@fleetd/domain/model';
-import * as check from '@crossfire/contracts/schema/validation';
-import { initializeHistory } from '@fleetd/storage/history';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { archiveState } from '@ctlflow/crossfire-adapter-filesystem/archive';
+import { paths, readProfile } from '@ctlflow/crossfire-adapter-filesystem/project';
+import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
+import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { exportResetHistory } from '@ctlflow/crossfire-agent-core/reset-history';
+import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { Configuration, Instance } from '@ctlflow/fleetd-domain/model';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { initializeHistory } from '@ctlflow/fleetd-storage/history';
 
 const resetState = check.object({ resetId: check.identifier, phase: check.choice('collecting', 'prepared', 'retired', 'reset'), manifest: check.text(4096),
   cursors: check.list(check.object({ room: check.roomId, cursor: check.text(4096) }), 1000) });
@@ -28,7 +28,7 @@ export function resetInstructions(state: string): string {
     + 'New input begins after each exported room boundary. Use agent history to browse further; use Crossfire messaging tools for replies.';
 }
 export async function resetInstance(configuration: Configuration, instance: Instance, agentId: string, resetId: string, adapter: OwnedRuntimeAdapter, signal: AbortSignal) {
-  const workspace = privateDir(join(configuration.directory, instance.workarea)), local = paths(workspace, instance.name);
+  const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), workspace = instance.workspace ?? stateDirectory, local = paths(stateDirectory, instance.name);
   const release = await acquireProcessLock(join(local.state, 'listener'));
   let receiver: (() => Promise<void>) | undefined;
   try {
@@ -61,7 +61,7 @@ export async function resetInstance(configuration: Configuration, instance: Inst
         settings: profile.settings, account: profile.account, agentId: profile.id, runtime: definition.runtime, runtimeOptions: definition.options,
         historyMode: instance.listenerOptions?.historyMode ?? 'shared', signal });
       if (verified.manifest !== state.manifest || JSON.stringify(verified.cursors) !== JSON.stringify(Object.fromEntries(state.cursors.map(entry => [entry.room, entry.cursor])))) return failure('conflict', 'Reset history boundaries changed; context was not replaced');
-      const rotated = await adapter.reset({ workspace, resetId: generation });
+      const rotated = await adapter.reset({ workspace, stateDirectory, resetId: generation });
       if (!rotated.ok) return rotated;
       archiveState(local.state, join(root, 'listener-archive'), name => name === 'cursors.json' || name.startsWith('cursors.json.'));
       state = { ...state, phase: 'retired' }; writeJson(file, state);

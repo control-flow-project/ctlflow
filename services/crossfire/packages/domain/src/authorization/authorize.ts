@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { PermissionCode } from './catalog.js';
 import type { Actor, Services } from '../port/services.js';
 import type { Principal } from '../identity/types.js';
@@ -21,6 +21,11 @@ export function activeActor(services: Pick<Services, 'repositories' | 'clock'>, 
     const owner = services.repositories.principal.find({ id: agent.value.ownerId });
     if (!owner.ok) return owner;
     if (!owner.value || owner.value.status !== 'active') return failure('forbidden', 'Agent owner must be active');
+    const binding = services.repositories.fleetInstance.findByAgent(actor.principalId);
+    if (!binding.ok) return binding;
+    if (!binding.value || binding.value.retiredAt !== null) return failure('forbidden', 'Agent requires a current approved fleet controller');
+    const fleet = services.repositories.fleet.find(binding.value); if (!fleet.ok) return fleet;
+    if (!fleet.value || fleet.value.archivedAt !== null) return failure('forbidden', 'Agent fleet is archived');
   }
   return success(principal.value);
 }
@@ -34,12 +39,16 @@ export function authorize(services: Pick<Services, 'repositories' | 'directory' 
 }
 
 export function authorizeAgent(services: Pick<Services, 'repositories' | 'directory' | 'clock'>, actor: Actor, agentId: string,
-  action: 'read' | 'configure' | 'room-grant.manage' | 'listener.disconnect') {
+  action: 'read' | 'configure' | 'room-grant.manage') {
   const principal = activeActor(services, actor);
   if (!principal.ok) return principal;
   const agent = services.directory.agent(agentId);
   if (!agent.ok) return agent;
   if (!agent.value) return failure('missing', 'Agent not found');
+  const binding = services.repositories.fleetInstance.findByAgent(agentId); if (!binding.ok) return binding;
+  if (!binding.value || binding.value.retiredAt !== null) return failure('missing', 'Current fleet-managed agent not found');
+  const fleet = services.repositories.fleet.find(binding.value); if (!fleet.ok) return fleet;
+  if (!fleet.value || fleet.value.archivedAt !== null) return failure('missing', 'Current fleet-managed agent not found');
   const permissions = services.directory.permissions(actor.principalId);
   if (!permissions.ok) return permissions;
   const allowed = permissions.value.includes('agent.' + action + '.any')

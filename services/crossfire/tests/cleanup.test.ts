@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 
 test('fixture cleanup is reverse acquisition order, isolated and complete even after failures', async () => {
   const hooks: (() => Promise<void>)[] = [], otherHooks: (() => Promise<void>)[] = [], events: string[] = [];

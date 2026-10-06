@@ -1,5 +1,5 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -9,25 +9,28 @@ import { chromium, expect } from '@playwright/test';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value, secret } from './support/application.js';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { createFleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
-import { API } from '@crossfire/contracts/matrix';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { mapFleet } from './support/map-fleet.js';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { WAKE_POLICIES, WAKE_LABELS } from '@crossfire/contracts/wake';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { connectOwnerConversation } from '@ctlflow/crossfire-domain/owner-conversation/connect';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { WAKE_POLICIES, WAKE_LABELS } from '@ctlflow/crossfire-contracts/wake';
 import { elementAssets } from './support/element.js';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { listen } from '@crossfire/adapter-crossfire/listener';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
 import { fakeCodex, until } from '../scripts/test-support/listener.js';
-import { success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 import { browserOptions } from './support/tls.js';
+import { browserController } from './support/browser-controller.js';
 
 test('browser fleet review, room-plan confirmation, invitation delegation and selected wake identities share canonical APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
@@ -68,23 +71,39 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByRole('link', { name: 'Agent details →' })).toHaveCount(2); await worker.drain();
   const fleet = value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: 'research' }))!;
   const ready = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
-  const runtimeCommands: { action: string; agentId: string | null }[] = [];
-  const control = createFleetControlConnection({ origin, credential: ready.fleet!.controllerCredential!, fleetId: fleet.id,
-    owner: admin.member.principal.matrixUserId, signal: new AbortController().signal, acknowledged: () => success(undefined), execute: async command => {
-      runtimeCommands.push({ action: command.action, agentId: command.agentId }); return success({ status: 'succeeded', errorMessage: null });
-    } });
-  cleanup(scope, () => control.close());
+  const controller = { fleetId: fleet.id, connectionId: randomUUID(), credential: ready.fleet!.controllerCredential! };
+  const controllerActor = value(authenticateController(services, controller.credential));
+  value(reportFleetConnection(services, controllerActor, fleet.id, controller.connectionId, false));
   const instances = value(services.collection.fleetInstances({ ownerId: admin.actor.principalId, fleetKey: 'research' }));
   const alpha = instances.find(instance => instance.instanceKey === 'alpha')!;
   const roomId = value(await nativeOk({ base: fixture.native.base, token: admin.token }, 'POST', API + '/createRoom', { name: 'Research', preset: 'private_chat' })).room_id as string;
   const reportTime = services.clock.now();
   const reporting = value(reportListener(services, { kind: 'agent', principalId: alpha.agentId }, alpha.agentId, randomUUID(), {
-    release: 'browser', stopped: true, controllerBound: false, messagesDelivered: 12, statistics: { sequence: 1,
+    release: 'browser', stopped: true, controller, messagesDelivered: 12, statistics: { sequence: 1,
       startedAt: reportTime - 300000, endedAt: reportTime, dropped: 2,
       flows: Array.from({ length: 25 }, (_, index) => ({ roomId, senderMatrixId: admin.member.principal.matrixUserId,
         messageType: 'type-' + index, observed: 1, delivered: 1, contentBytes: 1024, deliveredBytes: 1024, attachmentBytes: 0, largestBytes: 1024 })),
       usage: [] } }, 'browser'));
   assert(reporting.statisticsAccepted);
+  const runtimeCommands: { action: string; agentId: string | null }[] = [];
+  const runtimeRuns = new Map<string, string>();
+  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId, execute: async command => {
+      runtimeCommands.push({ action: command.action, agentId: command.agentId });
+      for (const instance of instances) {
+        if (command.agentId !== null && command.agentId !== instance.agentId) continue;
+        const binding = control.listener(instance.agentId), proof = binding.control.binding(); binding.close();
+        const previousId = runtimeRuns.get(instance.agentId);
+        const previous = previousId ? value(services.repositories.listenerRun.find({ id: previousId })) : null;
+        if (command.action === 'reset' && previous?.stoppedAt === null) value(reportListener(services,
+          { kind: 'agent', principalId: instance.agentId }, instance.agentId, previous.id,
+          { release: 'browser', controller: proof, stopped: true, messagesDelivered: 0, statistics: null }, 'browser'));
+        const runId = command.action === 'stop' ? previousId! : command.action === 'start' && previous?.stoppedAt === null ? previous.id : randomUUID();
+        runtimeRuns.set(instance.agentId, runId);
+        value(reportListener(services, { kind: 'agent', principalId: instance.agentId }, instance.agentId, runId,
+          { release: 'browser', controller: proof, stopped: command.action === 'stop', messagesDelivered: 0, statistics: null }, 'browser'));
+      }
+      return success({ status: 'succeeded', errorMessage: null });
+    } });
   await page.goto(origin + '/manage/fleets');
   await page.getByLabel('Search fleets or controllers').fill('workstation');
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Apply filters', exact: true }).click()]);
@@ -94,31 +113,40 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByRole('table', { name: 'Fleet agents', exact: true })).toBeVisible();
   await expect(page.getByLabel('Fleet label')).toHaveCount(0);
   await expect(page.getByLabel('Room plan TOML')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Deactivate fleet', exact: true })).toHaveCount(0);
-  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Delivery', exact: true }).click();
+  await expect(page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link')).toHaveText(['Agents', 'Map', 'Activity', 'Settings']);
+  await expect(page.getByRole('button', { name: 'Resume sessions', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause delivery', exact: true })).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Activity', exact: true }).click();
   const delivery = page.getByRole('region', { name: 'Fleet delivery', exact: true });
   await delivery.getByText('Connection and recovery', { exact: true }).click();
   await expect(delivery.getByText('online', { exact: true })).toBeVisible();
-  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Deactivate fleet' }).click();
+  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Pause delivery' }).click();
   assert.equal(value(services.repositories.fleet.findById(fleet.id))!.deliveryEnabled, true);
   page.once('dialog', dialog => dialog.accept());
-  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Deactivate fleet' }).click()]);
-  await expect(page.getByRole('button', { name: 'Activate fleet', exact: true })).toBeVisible();
-  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Messages', exact: true }).click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Pause delivery' }).click()]);
+  await expect(page.getByRole('button', { name: 'Resume delivery', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Send to fleet', exact: true })).toBeDisabled();
-  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Delivery', exact: true }).click();
   page.once('dialog', dialog => dialog.accept());
-  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Activate fleet' }).click()]);
-  await expect(page.getByRole('button', { name: 'Deactivate fleet', exact: true })).toBeVisible();
-  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Sessions', exact: true }).click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Resume delivery' }).click()]);
+  await expect(page.getByRole('button', { name: 'Pause delivery', exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Agents', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Resume sessions', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Resume sessions', exact: true }).click();
   try { await expect(page.getByRole('table', { name: 'Session operations', exact: true })).toContainText('succeeded'); }
   catch (error) { scope.diagnostic('Controller session-control status: ' + JSON.stringify(control.status())); throw error; }
   assert.deepEqual(runtimeCommands, [{ action: 'start', agentId: null }], 'Default UI start is resume, not reset');
+  await expect(page.getByRole('table', { name: 'Fleet agents', exact: true }).getByText('online', { exact: true })).toHaveCount(2);
+  await page.clock.install(); await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1000));
+  await page.reload();
+  await expect(page.getByRole('table', { name: 'Fleet agents', exact: true }).getByText('online', { exact: true })).toHaveCount(2);
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Stop sessions', exact: true }).click();
+  await until(() => value(services.repositories.fleetRuntimeOperation.page(fleet.id, { page: 1, pageSize: 10 })).items.some(operation => operation.action === 'stop' && operation.agentId === null && operation.status === 'succeeded'));
+  await page.clock.fastForward(3001);
   await expect(page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({ hasText: 'Stop' })).toContainText('succeeded');
   assert.deepEqual(runtimeCommands.at(-1), { action: 'stop', agentId: null });
+  await expect(page.getByRole('table', { name: 'Fleet agents', exact: true }).getByText('offline', { exact: true })).toHaveCount(2);
+  await page.clock.resume();
+  await page.getByText('Start over with fresh history', { exact: true }).click();
   page.once('dialog', async dialog => { assert(dialog.message().includes('replaces their model contexts')); await dialog.dismiss(); });
   await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
   assert.equal(runtimeCommands.length, 2, 'Cancelling destructive confirmation sends no operation');
@@ -129,24 +157,31 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   for (const width of [1440, 390]) { await page.setViewportSize({ width, height: 1000 }); await checkPaperLayout(page);
     await page.screenshot({ path: join(directory, 'fleet-sessions-' + width + '.png'), fullPage: true }); }
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(origin + '/manage/agents/' + alpha.agentId + '/sessions');
-  await expect(page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Sessions', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.goto(origin + '/manage/agents/' + alpha.agentId + '/session');
+  await expect(page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link')).toHaveText(['Rooms', 'Session', 'Activity', 'Settings']);
+  await expect(page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Session', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('button', { name: 'Resume session', exact: true })).toBeEnabled();
-  const individualOperations = page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({
-    has: page.locator('a[href="/manage/agents/' + alpha.agentId + '/sessions"]') });
+  const agentOperations = page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({
+    has: page.locator('a[href="/manage/agents/' + alpha.agentId + '/session"]') });
   await page.getByRole('button', { name: 'Resume session', exact: true }).click();
-  await expect(individualOperations.filter({ hasText: 'Resume' })).toContainText('succeeded');
+  await expect(agentOperations.filter({ hasText: 'Resume' })).toContainText('succeeded');
   assert.deepEqual(runtimeCommands.at(-1), { action: 'start', agentId: alpha.agentId });
+  await page.clock.pauseAt(new Date(await page.evaluate(() => Date.now()) + 1000)); await page.reload();
+  await expect(page.locator('.subject-status').getByText('online', { exact: true })).toBeVisible();
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Stop session', exact: true }).click();
-  await expect(individualOperations.filter({ hasText: 'Stop' })).toContainText('succeeded');
+  await until(() => value(services.repositories.fleetRuntimeOperation.page(fleet.id, { page: 1, pageSize: 10 })).items.some(operation => operation.action === 'stop' && operation.agentId === alpha.agentId && operation.status === 'succeeded'));
+  await page.clock.fastForward(3001);
+  await expect(agentOperations.filter({ hasText: 'Stop' })).toContainText('succeeded');
   assert.deepEqual(runtimeCommands.at(-1), { action: 'stop', agentId: alpha.agentId });
+  await expect(page.locator('.subject-status').getByText('offline', { exact: true })).toBeVisible();
+  await page.clock.resume();
+  await page.getByText('Start over with fresh history', { exact: true }).click();
   page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
   assert.equal(runtimeCommands.length, 5);
   page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Start with fresh history', exact: true }).click();
-  await expect(individualOperations.filter({ hasText: 'Fresh history' })).toContainText('succeeded');
+  await expect(agentOperations.filter({ hasText: 'Fresh history' })).toContainText('succeeded');
   assert.deepEqual(runtimeCommands.at(-1), { action: 'reset', agentId: alpha.agentId });
-  await page.goto(origin + '/manage/fleets/' + fleet.id + '/delivery');
-  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Messages', exact: true }).click();
+  await page.goto(origin + '/manage/fleets/' + fleet.id + '/activity');
   await page.getByLabel('Message the fleet').fill('Browser-reviewed explicit fleet task');
   page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Send to fleet', exact: true }).click();
   assert.equal(value(services.repositories.fleetMessage.page(fleet.id, { page: 1, pageSize: 10 })).totalItems, 0);
@@ -168,7 +203,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(messagePreview.locator('p')).toBeVisible();
   await messagePreview.locator('summary').click();
   await history.getByRole('link', { name: 'Next' }).click();
-  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/messages?messagesPage=2');
+  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/activity?messagesPage=2');
   await expect(history.locator('tbody tr')).toHaveCount(1);
   await expect(history.getByRole('table')).toContainText('Browser-reviewed explicit fleet task');
   await history.getByRole('link', { name: 'Previous' }).click();
@@ -179,7 +214,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save label' }).click()]);
   await expect(page.getByLabel('Fleet label')).toHaveValue('Research team');
   const toml = 'fleet = "research"\n[[agents]]\ninstance = "alpha"\n[[agents.grants]]\nroom = ' + JSON.stringify(roomId) + '\naccess = "reply"\nmuted = false\n';
-  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Room plan', exact: true }).click();
+  await page.getByText('Bulk room access (advanced)', { exact: true }).click();
   await page.getByLabel('Room plan TOML').fill(toml);
   await page.getByRole('button', { name: 'Preview room access' }).click();
   const plan = page.getByRole('region', { name: 'Room plan', exact: true });
@@ -202,7 +237,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Save invitation permission' }).click()]);
   await expect(page.getByLabel('Allow this agent to invite other registered agents')).toBeChecked();
   assert.deepEqual(value(services.collection.roomPermissions({ agentId: alpha.agentId, roomId })).map(permission => permission.permissionCode), ['room.agent.invite']);
-  await page.goto(origin + agentUrl + '/wake');
+  await page.goto(origin + agentUrl);
   await page.getByLabel('Wake-up authority').selectOption('selected');
   await page.getByLabel('Search identities').fill('visitor');
   await page.getByLabel('Allow ' + guest.matrixUserId, { exact: true }).check();
@@ -213,19 +248,20 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByLabel('Wake-up authority')).toHaveValue('selected');
   await expect(page.getByRole('list', { name: 'Selected wake-up identities' })).toContainText(guest.matrixUserId);
   assert.deepEqual(value(services.collection.wakeSenders({ agentId: alpha.agentId })).map(sender => sender.senderPrincipalId), [guest.id]);
-  await page.goto(origin + '/manage/fleets/' + fleet.id + '/statistics');
+  await page.goto(origin + '/manage/fleets/' + fleet.id + '/activity');
+  await page.getByRole('navigation', { name: 'Fleet activity' }).getByRole('link', { name: 'Traffic & usage', exact: true }).click();
   await expect(page.getByRole('table', { name: 'Message flows', exact: true }).locator('tbody tr')).toHaveCount(20);
   await expect(page.getByRole('region', { name: 'Traffic', exact: true })).toContainText('25');
   await expect(page.getByRole('region', { name: 'Native usage', exact: true })).toContainText('Not reported by this runtime');
-  await page.getByRole('navigation', { name: 'Pagination', exact: true }).getByRole('link', { name: 'Next', exact: true }).click();
-  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/statistics?page=2');
+  await page.getByRole('region', { name: 'Sender → recipient', exact: true }).getByRole('link', { name: 'Next', exact: true }).click();
+  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/activity?view=traffic&page=2');
   await expect(page.getByRole('table', { name: 'Message flows', exact: true }).locator('tbody tr')).toHaveCount(5);
   await page.getByLabel('Period', { exact: true }).selectOption('168');
-  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/statistics?hours=168');
+  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/activity?view=traffic&hours=168');
   assert.equal((await page.request.get(origin + '/api/fleets/' + fleet.id + '/statistics?hours=0')).status(), 400);
   for (const width of [1920, 390]) {
     await page.setViewportSize({ width, height: 1000 });
-    for (const route of ['/manage/fleets', '/manage/fleets/' + fleet.id, ...['delivery', 'messages', 'statistics', 'rooms', 'settings'].map(section => '/manage/fleets/' + fleet.id + '/' + section), agentUrl, ...['wake', 'activity', 'software', 'settings'].map(section => agentUrl + '/' + section), agentUrl + '/rooms/' + encodeURIComponent(roomId)]) {
+    for (const route of ['/manage/fleets', '/manage/fleets/' + fleet.id, ...['activity', 'activity?view=traffic', 'settings'].map(section => '/manage/fleets/' + fleet.id + '/' + section), agentUrl, ...['session', 'activity', 'settings'].map(section => agentUrl + '/' + section), agentUrl + '/rooms/' + encodeURIComponent(roomId)]) {
       await page.goto(origin + route); await expect(page.locator('h1')).toBeVisible(); await expect(page.locator('.loading')).toHaveCount(0);
       await expect(page.getByRole('alert')).toHaveCount(0);
       await checkPaperLayout(page);
@@ -240,7 +276,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
           const row = table.getByRole('row').filter({ has: page.getByRole('cell', { name: instance.instanceKey, exact: true }) });
           await expect(row.getByRole('link')).toHaveAttribute('href', '/manage/agents/' + instance.agentId);
           await expect(row.getByRole('link')).toHaveText(instance.instanceKey + ' (' + admin.member.member.displayName + ')');
-          await expect(row.getByRole('cell').nth(2)).toHaveText('offline');
+          await expect(row.getByRole('cell').nth(2)).toHaveText('online');
           await expect(row.getByRole('cell').nth(3)).toHaveText('UnknownNo native observation');
           await expect(row.getByRole('cell').nth(4)).toHaveText('active');
         }
@@ -255,14 +291,17 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   }
   const otherContext = await browser.newContext(); await otherContext.addCookies([{ name: COOKIE_NAME, value: other.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const otherPage = await otherContext.newPage(); await otherPage.goto(origin + '/manage/fleets');
-  await expect(otherPage.getByRole('heading', { name: 'No fleets' })).toBeVisible();
+  await expect(otherPage.getByRole('table', { name: 'Fleets', exact: true })).not.toContainText('Research team');
   await checkPaperLayout(otherPage);
   assert.equal((await otherPage.request.get(origin + '/api/fleets/' + fleet.id)).status(), 403);
   assert.equal((await otherPage.request.get(origin + '/api/fleets/' + fleet.id + '/messages')).status(), 403);
   assert.equal((await otherPage.request.get(origin + '/api/fleets/' + fleet.id + '/statistics')).status(), 403);
   await page.goto(origin + '/manage/fleets/' + fleet.id + '/settings');
-  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Remove fleet grouping' }).click();
-  await expect(page.getByRole('heading', { name: 'No fleets' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove fleet grouping' })).toHaveCount(0);
+  for (const route of ['/manage/connect/fleet', ...['delivery', 'sessions', 'messages', 'statistics', 'rooms'].map(section => '/manage/fleets/' + fleet.id + '/' + section), ...['wake', 'runtime', 'sessions', 'decisions', 'software'].map(section => '/manage/agents/' + alpha.agentId + '/' + section)]) {
+    await page.goto(origin + route);
+    await expect(page.getByRole('heading', { name: 'Page unavailable', exact: true })).toBeVisible();
+  }
   await checkPaperLayout(page);
   assert.equal(value(services.directory.agent(alpha.agentId))!.principal.status, 'active');
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: alpha.agentId, roomId }))!.accessMode, 'reply');
@@ -313,14 +352,18 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   const created = value(await nativeOk({ base: origin, token: owner.token }, 'POST', API + '/createRoom', { name: 'Samosas', preset: 'private_chat' }));
   assert(typeof created.room_id === 'string');
   const roomId = created.room_id, runtime = await fakeCodex(scope), stop = new AbortController();
+  const host = await createListenerHost(); cleanup(scope, () => host.close());
+  const controller = await browserController(scope, { origin, controller: agent.controller, owner: owner.accepted.account.userId,
+    execute: async () => failure('invalid', 'This invitation fixture does not execute native lifecycle operations') });
+  const binding = controller.listener(agent.id);
   let ended: unknown;
-  const receiver = listen({ binding: 'fixture', coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
     id: agent.id, release: release.manifest, cursorFile: join(runtime.directory, 'cursor.json'),
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000, runtime: runtime.runtime,
   }, stop.signal).catch(error => { ended = error; });
-  cleanup(scope, async () => { stop.abort(); await receiver; });
+  cleanup(scope, async () => { stop.abort(); await receiver; binding.close(); });
   const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } }), page = await context.newPage();
@@ -392,7 +435,9 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
 
 test('browser fleet connection map uses management theme, full roster, adaptive geometry and durable accessible selection', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
-  const { fleet, instances } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
+  const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
+  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId,
+    execute: async () => failure('unavailable', 'This map fixture has no native lifecycle executor') });
   for (const instance of [instances[0]!, instances.at(-1)!]) value(await connectOwnerConversation(services,
     { kind: 'agent', principalId: instance.agentId! }, instance.agentId!));
   const other = await fixture.member('map-visitor');
@@ -402,7 +447,11 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   for (let index = 0; index < instances.length; index++) {
     const id = instances[index]!.agentId!, principal = value(services.directory.agent(id))!.principal, mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: principal.revision, mode, senderIds: mode === 'selected' ? [other.actor.principalId] : [] }, randomUUID()));
-    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'browser-map', messagesDelivered: 0, controllerBound: false, stopped: false }, 'browser-map'));
+    if (index < 12) {
+      const binding = control.listener(id), proof = binding.control.binding(); binding.close();
+      value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(),
+        { statistics: null, release: 'browser-map', messagesDelivered: 0, controller: proof, stopped: false }, 'browser-map'));
+    }
     if (index >= 20) continue;
     const record = value(services.directory.agent(id))!, modeIndex = index % 3;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId: roomIds[index % roomIds.length]!, expectedRevision: record.principal.revision,
@@ -417,7 +466,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
   page.on('pageerror', error => errors.push(error.message));
   const base = '/manage/fleets/' + fleet.id, route = base + '/map';
   await page.goto(origin + base);
-  await page.getByRole('link', { name: 'Connection map', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Map', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Fleet map', exact: true })).toBeVisible();
   await expect(page.locator('.map-node-agent')).toHaveCount(24);
   await expect(page.locator('.map-node-room')).toHaveCount(6);

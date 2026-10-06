@@ -28,7 +28,8 @@ permissions = ["room.agent.invite"]
 An explicit block requires both `wake_mode` and `permissions`. Unknown fields,
 capabilities, duplicate IDs or nonselected sender lists fail validation. Different
 role policies require different definitions; there are no instance overrides.
-This block is fleet-only. Individual connections retain their managed wake rules.
+Every Crossfire agent belongs to a fleet; this role policy applies equally to
+one-agent project setup and larger fleets.
 
 `owner-agents` includes the verified owner and that owner's active agents,
 including agents outside this fleet. `humans` additionally includes other humans.
@@ -67,8 +68,9 @@ Unchanged reconnects preserve identities, histories and room-specific permission
 edits. Management remains available for deliberate adjustments. A changed policy
 approval replaces defaults on all current ordinary grants and future admissions;
 the review explicitly describes this effect. Editing a running file has no effect
-until stop/start. Detaching an agent removes its future fleet defaults, not its
-existing ordinary room grants or wake settings.
+until stop/start. Retiring an instance or archiving a fleet requires confirmed
+native stop and settled decisions. The identity remains fleet-bound and preserved
+for audit; no independent listener or detach path is created.
 
 ## Room admission and removal
 

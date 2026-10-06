@@ -1,13 +1,13 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { createFleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
 import { until } from '../scripts/test-support/listener.js';
-import { success } from '@crossfire/kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 
 test('controller retains uncertain acquisition ownership and closes that exact generation before reconnecting', async scope => {
   const fleetId = randomUUID(), agentId = randomUUID(), stop = new AbortController();

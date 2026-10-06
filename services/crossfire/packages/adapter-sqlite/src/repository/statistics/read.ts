@@ -1,8 +1,8 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
-import type { StatisticsRepository, Flow, Tokens } from '@crossfire/domain/statistics/types';
-import { success } from '@crossfire/kernel/result';
+import type { StatisticsRepository, Flow, Tokens } from '@ctlflow/crossfire-domain/statistics/types';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { stored } from '../stored.js';
 
 export function statisticsReader(database: Database.Database): StatisticsRepository['read'] {

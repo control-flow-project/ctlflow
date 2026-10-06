@@ -1,5 +1,5 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import test, { before } from 'node:test';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
@@ -8,15 +8,13 @@ import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { matrix } from '@crossfire/adapter-matrix/http';
-import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '@crossfire/adapter-matrix/commands';
-import { kebab } from '@crossfire/adapter-matrix/schema';
-import { encodeOutput, outputBytes } from '@crossfire/contracts/limits';
-import { uploadStream, saveStream } from '@crossfire/adapter-matrix/files';
+import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { operations, nativeRequest, selectOperation, executeOperation, requestBody } from '@ctlflow/crossfire-adapter-matrix/commands';
+import { kebab } from '@ctlflow/crossfire-adapter-matrix/schema';
+import { encodeOutput, outputBytes } from '@ctlflow/crossfire-contracts/limits';
+import { uploadStream, saveStream } from '@ctlflow/crossfire-adapter-matrix/files';
 import { matrixFixture, temporary, ROOM } from './test-support/listener.js';
-import { buildClient } from './build-client.js';
-
-before(() => buildClient(process.cwd()));
+import { builtClient } from './test-support/release.js';
 
 test('all 157 official operations have one mechanically derived spelling and exact native path', () => {
   assert.equal(operations.length, 157);
@@ -111,7 +109,7 @@ test('binary streams are bounded, exclusive, hashed and remove partial files', a
 });
 
 test('CLI exposes the native manifest and rejects every superseded top-level command', async () => {
-  const execute = promisify(execFile), script = join(process.cwd(), 'dist/crossfire-client.mjs');
+  const execute = promisify(execFile), script = builtClient();
   const result = await execute(process.execPath, [script, 'matrix', 'get-room-events', '--help']);
   assert.equal(JSON.parse(result.stdout).id, 'getRoomEvents');
   for (const command of ['init', 'read', 'listen', 'send', 'history', 'rooms', 'who', 'upload', 'download']) {

@@ -1,11 +1,11 @@
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { failure, success } from '@crossfire/kernel/result';
-import { loadBinding, saveBinding } from '@fleetd/storage/binding';
-import { initializeHistory } from '@fleetd/storage/history';
-import type { Configuration, Controller, Approval } from '@fleetd/domain/model';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { loadBinding, saveBinding } from '@ctlflow/fleetd-storage/binding';
+import { initializeHistory } from '@ctlflow/fleetd-storage/history';
+import type { Configuration, Controller, Approval } from '@ctlflow/fleetd-domain/model';
 
 export async function prepareEnrollment(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (value: Approval) => void) {
   const loaded = loadBinding(configuration);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { openStore } from '@crossfire/adapter-sqlite/open-store';
-import { createRepositories } from '@crossfire/adapter-sqlite/create-repositories';
+import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
 
 function policyStore() {
@@ -15,8 +15,8 @@ function policyStore() {
   value(repositories.agentCredential.insert({ agentId: 'ada', provisioningPassword: 'private-password', accessToken: 'private-token', updatedAt: 10 }));
   value(repositories.agentName.insert({ name: 'ada', agentId: 'ada', requestId: null, instanceKey: null }));
   value(repositories.fleet.insert({ id: 'fleet', ownerId: 'owner', fleetKey: 'agreements', label: 'Agreements', controllerName: 'Computer',
-    deliveryEnabled: true, revision: 4, createdAt: 10, updatedAt: 10 }));
-  value(repositories.fleetInstance.insert({ ownerId: 'owner', fleetKey: 'agreements', instanceKey: 'ada', agentId: 'ada' }));
+    archivedAt: null, deliveryEnabled: true, revision: 4, createdAt: 10, updatedAt: 10 }));
+  value(repositories.fleetInstance.insert({ ownerId: 'owner', fleetKey: 'agreements', instanceKey: 'ada', agentId: 'ada', retiredAt: null }));
   value(repositories.fleetCredential.insert({ id: 'controller', fleetId: 'fleet', secretHash: 'private-controller-hash', revokedAt: null, createdAt: 10 }));
   value(repositories.agentRoomGrant.insert({ agentId: 'ada', roomId: '!matter:test', generation: 'generation', authorizerId: 'owner', addedById: 'owner',
     admissionKind: 'managed', invitationEventId: null, accessMode: 'reply', powerLevel: null, muted: false, revision: 3, accessRevision: 1, updatedAt: 10 }));
@@ -25,7 +25,7 @@ function policyStore() {
   return database;
 }
 
-test('normalized requested and approved policies enforce principal, catalog, owner and fleet boundaries with indexed cascades', () => {
+test('normalized requested and approved policies enforce principal, catalog, owner and fleet boundaries while preserving retired policy history', () => {
   const database = policyStore();
   try {
     const repositories = createRepositories(database);
@@ -46,10 +46,11 @@ test('normalized requested and approved policies enforce principal, catalog, own
     for (const name of ['ix_enrollment_item_permission_code', 'ix_enrollment_item_wake_sender_principal', 'ix_fleet_instance_policy_owner', 'ix_fleet_instance_permission_code']) {
       assert(database.prepare("SELECT name FROM sqlite_schema WHERE type='index' AND name=?").get(name), name);
     }
-    value(repositories.fleetInstance.remove({ ownerId: 'owner', fleetKey: 'agreements', instanceKey: 'ada' }));
-    assert.equal(value(repositories.fleetPolicy.approved('ada')), null);
-    assert.deepEqual(database.prepare('SELECT * FROM fleet_instance_permission').all(), []);
-    assert(value(repositories.agentRoomPermission.find({ agentId: 'ada', roomId: '!matter:test', permissionCode: 'room.agent.invite' })), 'Grouping removal preserves explicitly granted room authority');
+    const binding = value(repositories.fleetInstance.findByAgent('ada'))!;
+    value(repositories.fleetInstance.update({ ...binding, retiredAt: 10 }));
+    assert.deepEqual(value(repositories.fleetPolicy.approved('ada'))!.permissions, ['room.agent.invite']);
+    assert.deepEqual(database.prepare('SELECT * FROM fleet_instance_permission').all(), [{ agent_id: 'ada', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }]);
+    assert(value(repositories.agentRoomPermission.find({ agentId: 'ada', roomId: '!matter:test', permissionCode: 'room.agent.invite' })), 'Retirement preserves explicitly granted room history without independent execution');
     assert.deepEqual(database.pragma('foreign_key_check'), []);
   } finally { database.close(); }
 });

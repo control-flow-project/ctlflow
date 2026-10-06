@@ -1,4 +1,4 @@
-import type { FleetMapView, MapAgent, MapConnection, MapSource } from '@crossfire/contracts/schema/fleet-map';
+import type { FleetMapView, MapAgent, MapConnection, MapSource } from '@ctlflow/crossfire-contracts/schema/fleet-map';
 import { Empty, PageItems, Status, timestamp } from '../ui.js';
 import { accessLabel, connectionState, sourceLabel, type MapSelection } from './model.js';
 
@@ -32,7 +32,7 @@ function Identities({ map, source, agent }: { map: FleetMapView; source: MapSour
       <thead><tr><th>Identity</th><th>Type</th><th>Wake eligibility</th></tr></thead><tbody>{items.map(identity => <tr key={identity.principalId}>
         <td><strong>{identity.displayName}</strong><span className="subline mono">{identity.matrixUserId}</span></td><td>{identity.kind}</td>
         <td>{eligible.has(identity.principalId) ? 'Allowed' : 'Selected, not eligible'}</td></tr>)}</tbody></table></div>
-      : <p className="support">Nobody can trigger chat input under this rule{!enabled ? ' while the account is inactive' : ''}. Direct runtime input remains separate.</p>}</PageItems></>;
+      : <p className="support">Nobody can trigger chat input under this rule{!enabled ? ' while the account is inactive' : ''}. Scheduled Wake-ups and terminal input remain separate.</p>}</PageItems></>;
 }
 
 export function FleetMapDetails({ map, selection, onClear }: { map: FleetMapView; selection: MapSelection | null; onClear: () => void }) {

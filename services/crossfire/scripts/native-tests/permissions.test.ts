@@ -1,18 +1,18 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import test from 'node:test';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { connectCodex, type CodexConnection } from '@crossfire/adapter-codex/connection';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { connectCodex, type CodexConnection } from '@ctlflow/crossfire-adapter-codex/connection';
 import { nativeEngine, materialize } from '../test-support/native-engine.js';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { matrixFixture, message, temporary, until, ROOM, OWNER_DM, SELF, OBSERVER } from '../test-support/listener.js';
 import { installTestRelease } from '../test-support/release.js';
-import { prepareProject } from '@crossfire/adapter-filesystem/project';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
-import { failure } from '@crossfire/kernel/result';
+import { prepareProject } from '@ctlflow/crossfire-adapter-filesystem/project';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 test('a real native permission is answered through the exact owner decision and single receiver', { timeout: 30_000 }, async scope => {
   const directory = temporary(scope);

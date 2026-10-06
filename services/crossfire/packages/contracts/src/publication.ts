@@ -1,9 +1,9 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
-import type { PublicationQuery } from '@crossfire/domain/publication/values';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { PUBLICATION_LIMITS } from '@ctlflow/crossfire-domain/publication/values';
+import type { PublicationQuery } from '@ctlflow/crossfire-domain/publication/values';
 import * as check from './schema/validation.js';
 import { pagination, listQuery } from './schema/request.js';
-export type { PublicationCreation, PublicationQuery, PublicationSummary, PublicationDetails } from '@crossfire/domain/publication/values';
+export type { PublicationCreation, PublicationQuery, PublicationSummary, PublicationDetails } from '@ctlflow/crossfire-domain/publication/values';
 export const publicationState = check.choice('staging', 'published', 'deleted');
 const file = { path: check.text(240), mediaType: check.text(100), bytes: check.integer(0, PUBLICATION_LIMITS.fileBytes),
   sha256: check.refine(check.text(64, 64), value => /^[a-f0-9]{64}$/u.test(value), 'Expected SHA-256 hex') };

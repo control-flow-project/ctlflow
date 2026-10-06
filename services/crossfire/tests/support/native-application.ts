@@ -1,17 +1,20 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { randomUUID } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import { conduitFixture } from '../../scripts/architecture-proof/conduit-fixture.js';
 import { createApplication } from '../../apps/server/src/composition.js';
-import { createSession } from '@crossfire/domain/session/create-session';
-import { authenticateMember } from '@crossfire/domain/session/authenticate';
-import { createMemberInvitation } from '@crossfire/domain/member/invitation';
-import { acceptMemberInvitation } from '@crossfire/domain/member/accept-invitation';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
-import type { Actor } from '@crossfire/domain/port/services';
+import { createSession } from '@ctlflow/crossfire-domain/session/create-session';
+import { authenticateMember } from '@ctlflow/crossfire-domain/session/authenticate';
+import { createMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
+import { acceptMemberInvitation } from '@ctlflow/crossfire-domain/member/accept-invitation';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
+import type { Actor } from '@ctlflow/crossfire-domain/port/services';
 import { value, secret } from './application.js';
 export async function nativeApplication(scope: TestContext) {
   const started = performance.now();
@@ -35,13 +38,19 @@ export async function nativeApplication(scope: TestContext) {
   }
   async function agent(owner: Actor, name: string) {
     const ownerRecord = value(services.directory.member(owner.principalId))!;
-    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerRecord.principal.matrixUserId, fleetKey: null, instances: [{ instanceKey: name, name }] };
+    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerRecord.principal.matrixUserId,
+      fleetKey: 'test-' + name, controller: { name: 'Native test controller' },
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy() }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, owner, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const item = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!;
     value(await reconcilePrincipal(services, item.agentId!));
-    const account = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret)).instances[0]!.account!;
-    return { id: item.agentId!, matrixUserId: account.matrixUserId, token: account.accessToken, actor: { principalId: item.agentId!, kind: 'agent' as const }, input };
+    const ready = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
+    const controller = { fleetId: ready.fleet!.fleetId, connectionId: randomUUID(), credential: ready.fleet!.controllerCredential! };
+    value(reportFleetConnection(services, value(authenticateController(services, controller.credential)), controller.fleetId, controller.connectionId, false));
+    const account = ready.instances[0]!.account!;
+    return { id: item.agentId!, matrixUserId: account.matrixUserId, token: account.accessToken, controller,
+      actor: { principalId: item.agentId!, kind: 'agent' as const }, input };
   }
   return { application, services, native, service, admin, member, agent };
 }

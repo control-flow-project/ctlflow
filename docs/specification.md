@@ -26,13 +26,12 @@ services/
   crossfire/
     apps/server/
     apps/web/
-    apps/client/
     packages/
+      agent-tools/assets/
     tests/
     scripts/
     tools/
     docs/
-    skills/
   fleetd/
     apps/daemon/
     packages/domain/
@@ -53,16 +52,35 @@ documentation and shared verification tooling; it contains no application source
 or repository-wide package pool. Cross-project reuse is through declared package
 exports and dependencies. Applications never import another application's source.
 There is one listener and one native integration per supported runtime, not per-product copies.
-Only concrete, supported capabilities have packages. Individual agent attachment
-supports Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+. Fleet execution supports
-Codex; Claude Code/Pi fleet execution is a separate capability, not implicit in
-their individual-agent adapters.
+Only concrete, supported capabilities have packages. Every agent belongs to a
+fleet managed by fleetd, including a one-agent fleet. There is no standalone
+deployment, existing-session attachment, optional controller or detach-to-direct
+operation. Runtime behavior remains behind pure adapter interfaces. Codex
+0.158.0+ is the only implemented runtime; Claude Code and Pi are unimplemented,
+not selectable alternatives, placeholders or retained legacy integrations.
+
+All npm names use @ctlflow. Product names are @ctlflow/crossfire,
+@ctlflow/fleetd and @ctlflow/fleet; internal modules consistently use
+@ctlflow/<service>-<module>. Only fleet and fleetd are public distributables.
+Every other workspace, including Crossfire and the repository workspace, remains
+private. Public packages ship verified standalone builds with exact dependencies
+and never require publishing internal modules. The reviewed implementation plan
+is [Universal fleet controller](plans/20261005-universal-fleet-controller.md).
+
+Crossfire and both public products share one exact package version. The setup
+descriptor derives its pinned Fleet version from Crossfire's version; Fleet's
+public fleetd dependency is an exact pin. The seven-day npm release-age policy
+has only exact named product exclusions for `@ctlflow/fleet` and `@ctlflow/fleetd`
+alongside the existing named Tinqer exclusions. No organization wildcard, private
+package exemption, hook enablement or global age-policy disabling is allowed.
+Controlled-registry gates verify those named positives and nonexempt negatives;
+public installation cannot require publishing a private internal module.
 
 - Crossfire owns identity, enrollment, human authorization, room access, native
-  reconciliation, wake policies, listener activity, fleet grouping and React UI.
+  reconciliation, wake policies, listener activity, fleet identity and React UI.
   Fleet membership alone confers no room permission, wake authority or new agent
   kind. Owner-reviewed role coordination settings use the same wake and
-  generation-bound room-permission owners as individual agents.
+  generation-bound room-permission owners as every ordinary agent.
 - fleetd owns user-scoped controller configuration, registered fleet directories,
   fleet execution operations, native runtime ownership, automatic resumption and
   assembling runtime/coordination/listener adapters.
@@ -172,83 +190,108 @@ publication, not after model work completes. Accepted work is never rolled back.
 Client metadata checks are bounded to 30-second refreshes, server-clock due
 deadlines and a one-second busy recheck; they cause no model turn.
 
-### Individual agent connection
+### Noninteractive agent setup
 
-The user opens an existing Codex, Claude Code or Pi session in a project and
-pastes one sentence directing it to the personalized setup URL. That guide owns
-all setup instructions, the verified owner ID, prerequisite installers and any
-administrator-authored agent instructions. Owner details are always dynamic.
+The user pastes one sentence directing the existing coding assistant to a
+personalized setup URL. That assistant runs the noninteractive `fleet setup`
+command; it is not connected, adopted or imported into Crossfire. fleetd starts
+a new managed agent with its own conversation. Existing coding sessions remain
+untouched. Later managed starts resume exact saved histories by default.
 
-The client checks prerequisites and verifies downloaded artifacts with Node's
-SHA-256 implementation. Missing Node.js 26+, Git, Bash, curl or the selected native
-runtime produces
-actionable official installation guidance; installation follows the human's
-normal permission policy. No global skills or system settings are changed.
-Individual runtime minimums are Codex 0.158.0, Claude Code 2.1.285 and Pi 0.99.1.
-Native Linux evidence does not certify macOS or paid-provider behavior.
-Codex and Pi client transports use Linux or macOS. Claude attachment requires
-Linux procfs process-birth verification and rejects unsupported platforms before
-native integration or enrollment.
+The guide dynamically supplies the verified owner/server and pins the public npm
+release. Setup uses private persisted defaults without configuration questions:
+current project workspace, project-derived stable fleet/agent identifiers,
+existing configured local controller or a new local controller, native model
+defaults, danger-full-access/on-request with bypass disabled, shared history and
+the instance-wide 30-minute idle policy. Explicit optional configuration uses the
+same validated owners. Repeated setup reuses registrations/identities/history;
+invalid or ambiguous authority fails with an actionable error rather than asking
+a question, guessing identity or silently creating a replacement.
 
-The approved account, listener settings and temporary setup choices are private
-project-local records with distinct ownership. Runtime settings contain only the
-selected adapter. Approval routing is the agent's verified private owner DM. The approved account owns its server and
-owner; pre-enrollment setup retains those choices only until pending enrollment
-durably owns them. Neither reconnect nor an upgrade changes the settings format
-or requires another identity. A failed native activation preserves setup choices.
-First setup asks for a name; reconnects and upgrades reuse the existing account.
-Several saved profiles require a human selection. The client owns approval
-waiting, verified installation and starting/reusing exactly one listener.
-Approval creates an account without creating or joining any room. The owner's
-first private direct invitation or a native tool approval establishes the
-canonical owner DM with permanent read/reply access. Enrollment, listener
-startup, reconnection, diagnostics and heartbeats do not create conversations.
-The owner can invite its agent
-into an existing room in Element. The listener accepts authorized native invitations automatically,
-with a durable read-and-reply grant; no second management action is required.
+Setup checks prerequisites and reports official installation/native login steps
+when needed. It installs the pinned CLI/controller privately, creates or reuses
+the controller, submits enrollment, prints its exact approval link/code, waits
+in ordinary code for owner authorization, and verifies actual listener/native
+readiness. No install lifecycle script starts a process. Human approval remains
+required and is not a configuration prompt. Setup creates no room or conversation
+in Matrix and sends no dummy model prompt. Owner DMs remain lazy and protected.
 
-The Codex adapter uses the tool-provided exact native thread ID and private
-native app-server Unix socket, or an explicit authenticated loopback WebSocket
-descriptor. It verifies the selected session's workspace and input capability.
-No process scanning, guessed IDs or hidden engine launch is permitted. Embedded
-or `--no-daemon` sessions have no external app-server transport: the guide asks
-the human to reopen/resume that saved session in native app-server mode.
+The canonical guide is `GET /onboarding/setup?ownerMatrixId=MATRIX_ID`.
+`GET /onboarding/setup.json` with the same exact query returns its strict machine
+descriptor. Both require one valid, registered active human owner; absent,
+duplicate or unknown fields and unsupported methods fail. Owner and server are
+verified dynamically, never hardcoded to a deployment's administrator.
 
-`runcodex.sh` is an optional Linux/macOS download. It starts a private loopback
-server and the normal terminal together. The Scripts repository owns its source;
-Crossfire distributes a commit- and SHA-256-pinned static artifact. It is never
-a prerequisite for connecting an existing app-server-backed session.
-The launcher publishes canonical private paths even when the platform's temporary
-directory uses symlink aliases. Its default shell syntax supports Bash 3.2.
+The descriptor is:
 
-`agent test` uses the private listener control to check actual runtime readiness,
-native authentication, active owner/agent access and applied/joined room grants.
-It verifies an established private owner DM and both participants' native
-message permissions without creating a missing conversation. An authenticated
-listener without rooms is ready for the owner's first invitation or an
-on-demand native approval; saved credentials alone do not establish readiness.
-It does not send a prompt or advance unread positions. Paused delivery and
-absence of additional room grants are reported explicitly; saved credentials alone do not pass this test.
+```json
+{
+  "schemaVersion": 1,
+  "server": "https://example.test",
+  "ownerMatrixId": "@member:example.test",
+  "package": {"name": "@ctlflow/fleet", "version": "0.1.0"},
+  "instructions": "The current instance administrator's agent instructions."
+}
+```
+
+`server` is an exact HTTPS origin, except explicit loopback HTTP fixtures.
+`package.version` is one exact supported npm version, not a range or tag.
+`instructions` is bounded to 128 KiB. The CLI accepts only the fixed descriptor
+path with one owner query, refuses redirects, and verifies response origin,
+owner and version against that request and installed package. It neither
+accepts credentials in the descriptor nor forwards secrets across origins.
+
+The guide installs the pinned public CLI/controller into private user-owned
+storage and invokes:
+
+```sh
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test'
+```
+
+Optional `--config /absolute/runtime.toml` and `--root /absolute/controller`
+select the same configuration and controller owners, not another setup mode.
+The selected config must match the descriptor's server and owner. No configuration
+is generated merely to repeat defaults. Setup records its exact private
+operation and authority before submission; interrupted setup observes or retries
+that operation instead of enrolling another identity. An explicitly stopped
+previous setup returns Stopped and remains stopped until an explicit start.
+
+`agent test` is an intentional tool over fleetd's existing private receiver.
+It checks actual readiness, native authentication, active owner/agent access,
+controller binding and applied/joined room grants without a model prompt,
+dummy message, cursor advancement or conversation creation. An established
+owner DM additionally requires both participants' native read/reply permissions.
+A missing owner DM is a valid lazy state. Busy, sleeping, delivery-paused and
+stopped are distinct; saved credentials or a controller process alone are not
+proof of delivery. A missing receiver is an actionable error, never authority
+to start a replacement listener.
 
 ### Fleet lifecycle
 
-The human starts a named daemon in a chosen controller root. The root holds
-controller configuration and a registry of explicit fleet directories. Directories
+Noninteractive setup creates or reuses the user's private controller and its
+persisted project-derived fleet. Explicit configuration may select a different
+controller root, name or fleet directory through the same validated owner.
+The root holds controller configuration and a registry of explicit fleet directories. Directories
 may be under that root or elsewhere on the daemon's machine. There is no implicit
 filesystem discovery. Each fleet directory is self-contained; runtime state and
 Crossfire credentials travel with the stopped fleet directory.
 
 The CLI supports:
+- fleet setup --descriptor URL [--config ABSOLUTE_FILE] [--root DIR]
 - fleet daemon start --name NAME --root DIR
 - fleet daemon status --root DIR
 - fleet daemon stop --root DIR
+- fleet daemon restart --root DIR
 - fleet remote add NAME --ssh USER@HOST --root DIR
 - fleet --remote NAME list
 - fleet add DIR; fleet list; fleet show KEY
+- fleet test KEY
 - fleet start KEY; fleet stop KEY; fleet remove KEY
+- fleet update KEY [--release-directory ABSOLUTE_DIRECTORY]
 - fleet agent list KEY
 - fleet agent add KEY INSTANCE --definition DEFINITION
 - fleet agent start KEY INSTANCE; fleet agent stop KEY INSTANCE
+- fleet agent update KEY INSTANCE [--release-directory ABSOLUTE_DIRECTORY]
 - fleet agent remove KEY INSTANCE
 - fleet agent contexts KEY INSTANCE
 - fleet agent attach KEY INSTANCE [--context EXISTING_CONTEXT]
@@ -264,9 +307,11 @@ a private Unix socket locally and SSH stream forwarding remotely.
 Starting the daemon does not start a model turn. Closing the management CLI or
 its SSH connection does not stop the daemon. An explicit stop operation stops
 the addressed owned listeners and runtimes; stopping the daemon stops its fleets.
-Removal unregisters local membership without deleting retained files, native
-history or Crossfire accounts. Removing an agent detaches fleet membership but
-does not revoke its ordinary Crossfire identity.
+Removal decommissions the selected registration or instance without deleting
+retained files, native histories or immutable Crossfire identities. Server-side
+archive and retirement terminate operational authority; they never detach an
+identity into another deployment mode. Native stop completion requires exact
+controller evidence before the corresponding destructive coordination operation.
 
 First fleet start:
 1. Validate all definitions, native options, instructions, paths and unique names.
@@ -278,13 +323,14 @@ First fleet start:
    wake/invitation settings. These apply automatically without another setup step.
    Room grants are a separate explicit human decision and start empty.
 5. Privately exchange credentials and persist stable identity/session bindings.
-6. Install verified project-local integration artifacts, start/resume each native
+6. Install the public package's verified private integration artifacts, start/resume each native
    runtime through the adapter and attach the shared listener automatically.
 
 No agent is asked to discover ports, UUIDs, tokens, download releases, approve
 itself, poll enrollment or report telemetry. Runtime connection metadata is passed
 directly between code components, never copied through prompts. Codex receives
-role/coordination instructions through native configuration. Starting, enrollment,
+role/coordination instructions through the adapter's receipt-confirmed native
+developer-instruction producer. Starting, enrollment,
 connection, release verification, filtering, approvals and heartbeats make zero
 model calls. An authorized task/message is what starts model work.
 
@@ -305,19 +351,35 @@ Native settings (model, reasoning, sandbox, approval policy and cwd) are validat
 and applied by the runtime adapter. Only stock Codex 0.158.0 or newer is supported.
 Daemon orchestration contains no Codex-specific option translation. Native
 authentication stays private and uses the user's authorized provider login.
-The Codex adapter creates each work area's private `.codex` home. On first use,
-it copies the user's private native login if the home has none; subsequent starts
-retain that home's authentication. No controller credential enters model context.
-Native thread creation and resumption receive the validated model, reasoning,
-permission and instruction configuration. An initial native history read persists
-an empty session without a dummy prompt, allowing zero-turn resumption.
-Normal stop closes the listener and owned Codex process. Descendant-process
-supervision and crash-proof tool cleanup are not product guarantees.
+The Codex adapter creates each instance state directory's private `.codex` home.
+On first use it copies the authorized user's native provider/model configuration,
+selected profile and private login into that home. It never imports native
+histories, workspace trust or approval bypasses from the coding session.
+Subsequent starts retain the managed home's authentication. Optional workspace
+configuration changes native cwd, not private identity/state ownership.
+No controller credential enters model context.
+Native thread creation and resumption receive validated model, reasoning and
+permission configuration. Instructions use the separate canonical native producer
+below, not a model-dependent configuration setting. Its durable developer item
+materializes a zero-turn native history without a dummy user prompt or model call.
+Normal stop closes the listener and owned Codex process. Abruptly killing fleetd
+can leave the native app-server running; the native history's active-writer lock
+then rejects another process attempting the same private home and session UUID.
+This prevents a competing writer but does not establish automatic crash recovery.
+Resume may remain blocked until that exact surviving process is stopped. A full
+machine restart, where the old processes no longer exist, is a different case;
+retained history still requires successful native resume. The audited stock
+Codex protocol has no supported parent-lifetime control retaining its required
+native remote TUI. This is an external native dependency limitation, not an
+unimplemented Crossfire supervision capability.
+No proxy, watchdog, process-name guess or orphan adoption substitutes for that
+limitation. Descendant-process supervision and crash-proof cleanup are not
+product guarantees.
 
 ### Fleet session controls
 
 Management exposes controller-owned **Stop**, **Resume** and **Start with fresh
-history** at fleet and individual fleet-managed-agent scope. Ordinary UI/CLI start
+history** at fleet and per-agent scope. Ordinary UI/CLI start
 always resumes the full saved native history, identity, configured parameters and
 unread positions. Native response pagination/excluded turn payloads do not truncate
 the runtime's own conversation context. First enrollment and an explicit reset
@@ -346,6 +408,9 @@ independent of lengthy lifecycle work. A reconnect recovers the exact original
 operation ID; uncertain or failed reset is never replayed as another operation.
 Management reports pending/running/succeeded/failed outcomes, not speculative
 success, and clearly distinguishes controller connectivity from native execution.
+An observed terminal operation receipt refreshes the affected fleet agent list
+and exact agent details, not only the fleet record; polling is not the
+invalidation contract for a completed user action.
 The initial claim rechecks current human account/permissions, bound target and
 unchanged revision. It does not impersonate a login session or require the human
 to remain logged in. Storage failures leave the command pending. A running claim
@@ -372,21 +437,31 @@ Local shutdown always closes its delivery gate and listeners. Native lease relea
 is attempted independently; an unreachable server is not required for local exit
 and an unconfirmed remote release remains bounded by the server's lease expiry.
 
-Fleet-bound listeners retain a typed local control connection to their controller.
-They continue to use their normal Crossfire/Matrix adapters for coordination and
-room acquisition. They publish input only while the controller connection is live
+fleetd embeds one shared listener host with independent per-agent bindings.
+Every binding requires typed controller authority; there is no unbound listener.
+Bindings use ordinary Crossfire/Matrix adapters for coordination and room reads
+and admit input only while their exact authenticated controller lease is live
 and the fleet's delivery intent is enabled. Connection loss, controller death or
-deactivation cancels queued publication without consuming unread positions.
-Already accepted turns are not rolled back. Directly attached listeners have no
-fleet control binding and are unaffected, even if their identity is a fleet member.
+deactivation closes the delivery gate without consuming unread positions.
+Already accepted turns are not rolled back.
+
+Each reporting run receives `controller: {fleetId, connectionId, credential}`.
+The server verifies the private fleet credential, the exact current live lease,
+the agent's immutable active fleet/instance membership, active owner/agent and
+delivery intent before admission. A caller's controller boolean or fleet label
+is never proof. Only fleet, connection and credential IDs are stored in the run;
+the secret is absent from logs, audits, UI projections and model input.
+An existing run cannot switch generations. Reconnection reports a new run with
+its new exact lease; stale runs cannot publish runtime, decisions or scheduled
+input as though their generation were live.
 
 Owners and administrators can deactivate/reactivate the fleet in management;
 the fleet CLI uses the same server intent through fleetd. Deactivation stops room
 acquisition, model publication and activity reporting, not the controller or owned
 native engines. Listener control connections and native sessions remain available.
 Reactivation resumes those same listeners, sessions and unread positions, not
-another enrollment or engine. Runtime/explicit per-listener termination remains
-distinct from reversible fleet deactivation.
+another enrollment or engine. Explicit controller-owned native session Stop
+remains distinct from reversible fleet delivery deactivation.
 
 An explicit fleet message is delivered through the controller and the shared
 listener's serialized receipt path to the enrolled roster snapshot. This direct
@@ -465,13 +540,39 @@ status; a controller label never causes a model call or authenticates a request.
 A fleet is identified externally by immutable UUID and internally has a unique
 (owner, fleet key). Agent identities remain immutable and belong to one human.
 A fleet may group only that owner's agents. Native room invitations may cross
-owners independently of fleet membership. One agent binds to at most one fleet
-instance. Detachment removes the grouping, not the account, grants or native data.
+owners independently of fleet membership. Every operational agent has exactly one
+authoritative active fleet-instance binding. Retirement retains that binding,
+account and history but removes operational authority. An archived fleet has no
+operational credential or live lease. Restoration requires a new exact owner
+review and surviving private identity proof, not a name-based takeover.
+
+Retirement accepts `{expectedRevision, instanceKey}` with the fleet's current
+revision. Archive accepts `{expectedRevision}` through one resource used by
+management and Fleet CLI. An authorized human or that fleet's authenticated
+controller can archive; controller authorization additionally requires its current
+live lease. Labels, public fleet IDs and another fleet's credential cannot grant
+this authority. Both operations recheck every relevant
+operation, native decision, scheduled delivery and fleet-message receipt before
+mutation. The never-started exemption requires both no native observation and no
+listener run; it cannot treat a missing receipt as proof of inactivity. Otherwise
+the latest listener run must be stopped and have immutable actual native-close
+evidence bound to its exact current live controller connection and credential.
+The owner must remain active and the credential unrevoked. Sleeping, lost
+contact, an earlier run's close or a stopped database reporting row alone is
+insufficient. Renewed native observations invalidate prior proof. The server projects `Agent.canRetire`/
+`Fleet.canArchive` and authorized `retire`/`archive` actions from these same
+eligibility rules; a UI label cannot substitute for them. Current stop evidence
+is a separate normalized receipt, not a second lifecycle owner.
+Its `{connectionId, runId, receiptId}` binds immutable native-close evidence.
+An identical valid retry is idempotent; a stale, invalidated or differently bound
+receipt is a conflict, never a replacement generation's stop acknowledgment.
 
 One initial owner approval issues a private fleet-scoped controller credential
 alongside approved agent credentials. Its verifier is stored, never the secret.
-The credential can read/update that fleet's reporting metadata, bind/detach proved
-owned agents and introduce new enrollment requests for that fleet. It cannot
+The credential can read/update that fleet's reporting metadata, retire its exact
+instances, archive its own fleet with the current live lease, and introduce new
+enrollment requests for that fleet with proved identity material. Retirement and
+archive still require the settled native proof and expected revision above. It cannot
 approve enrollment, change roles/room permissions/wake policy, access other
 fleets or impersonate a human Matrix login. Owner suspension/revocation disables
 the credential. New agents still require explicit owner approval. Names and
@@ -565,9 +666,9 @@ no placeholder alternative backend.
 | Server | Configuration, composition, authentication boundary, routing and worker scheduling. |
 | Fleet core | Roster validation, local work/state ownership, coordinated instance lifecycle and per-instance outcomes. |
 | Runtime adapter | Validate native options, create/resume the exact session, expose its delivery/approval binding and receipt-only recovery, stop its owned connection/process. |
-| Coordination adapter | Preflight, enrollment, approval waiting, credential exchange, coordination attachment, release/activity/disconnect communication. |
+| Coordination adapter | Preflight, enrollment, approval waiting, credential exchange, exact live controller binding, release/activity and delivery-intent communication. |
 | Shared listener core | One bounded acquisition/wake/batch/cursor/receipt/control path per instance; no native transport or model-driven housekeeping. |
-| Filesystem adapter | Private project-local state, atomic files, owned local locks and validated paths. |
+| Filesystem adapter | Private instance state independent of optional native workspace, atomic files, owned local locks and validated paths. |
 | Management UI | Human review/actions and truthful resource views using the same API contracts as the CLI. |
 | GAAP definitions | Research roles, native settings, instance roster and room topology. |
 
@@ -606,15 +707,17 @@ not another operation implementation. Unknown fields/routes/methods fail.
 | Resource | Contract |
 | --- | --- |
 | GET /api/status | Controller descriptor and daemon health. |
+| POST /api/setup | Private local setup operation; verified descriptor, existing workspace and optional validated configuration produce/reuse the same fleet/controller state. |
 | GET, POST /api/fleets | Paginated registry or register a validated explicit fleet directory. |
-| GET, PATCH, DELETE /api/fleets/{fleetId} | Inspect, update allowed metadata/configuration or unregister. |
+| GET, PATCH, DELETE /api/fleets/{fleetId} | Inspect/update registration or decommission it after exact native stop, retaining files/histories and archiving coordination authority. |
+| GET /api/fleets/{fleetId}/readiness | Model-free diagnostic through desired agents' actual existing shared-host bindings; no controller/session start, cursor advancement or test message. |
 | PUT /api/fleets/{fleetId}/delivery | Revision-checked activation/deactivation through Crossfire. |
 | POST /api/fleets/{fleetId}/messages | Submit an idempotent direct fleet message through Crossfire. |
 | GET, POST /api/fleets/{fleetId}/agents | List or add an instance using a validated existing definition. |
-| GET, PATCH, DELETE /api/fleets/{fleetId}/agents/{instanceKey} | Inspect/update/remove an instance. |
+| GET, PATCH, DELETE /api/fleets/{fleetId}/agents/{instanceKey} | Inspect/update configuration or decommission the exact instance after native stop and coordination retirement; retain its identity/history. |
 | GET /api/fleets/{fleetId}/agents/{instanceKey}/contexts | Existing shared/control/room histories and observed native state; no new history or model turn. |
 | GET /api/fleets/{fleetId}/agents/{instanceKey}/attachment | Private exact running-session pointer; optional `context` selects an existing history, never creates one. |
-| POST /api/operations | Idempotent start/stop request for a fleet, instance or daemon shutdown; explicit reset targets one enrolled fleet instance or the entire fleet. |
+| POST /api/operations | Idempotent start/stop/reset/update for a fleet or instance, or daemon shutdown. Update consumes the explicit installed verified local release directory, never HTTP discovery. |
 | GET /api/operations/{operationId} | Observe accepted/running/awaiting-approval/succeeded/failed results. |
 
 Operation creation accepts a client-generated UUID idempotency key, a typed target,
@@ -631,15 +734,15 @@ bounded automatic recovery, with exponential delays from one to sixty seconds.
 Recovery retains the deployed configuration, account, native histories and receipts;
 it uses installed software, never installs a new release or discards uncertain input.
 Permanent authorization/configuration failures require operator action. Explicit
-stop or owner-requested listener disconnect cancels recovery; cleanup failure
+session stop or retirement cancels recovery; cleanup failure
 prevents an unsafe replacement process. Intentional listener stops are distinct
 from crashes at the shared lifecycle boundary and cannot be silently restarted.
 Failure and recovery remain visible through the existing management incident path.
 
 ### Binding lifetime, native sleep and durable intent
 
-fleetd is the fleet's listening process. It embeds the same listener core as
-standalone attachment, with independent authorized agent bindings and one shared
+fleetd is the fleet's listening process. It embeds the shared listener core,
+with independent authorized agent bindings and one shared
 private loopback control server. There is no second fleet listener subprocess.
 If every native session is sleeping, one fleetd application process remains;
 this is not a promise about unrelated host/container/tool processes.
@@ -653,8 +756,7 @@ granted. Capacity or cancellation never acknowledges unread input.
 
 Instance policy `fleetIdleTimeoutSeconds` defaults to 1800 (30 minutes), permits
 integer values 0–604800, and zero disables automatic sleep. Management presents
-minutes. Only fleetd-owned native processes can sleep; an attached standalone
-session has no lifecycle authority. Heartbeats, policy/release checks, filtered
+minutes. fleetd owns every supported native process. Heartbeats, policy/release checks, filtered
 traffic and statistics do not count as model activity.
 
 Sleep requires confirmed idle across every opened, initializing and retained
@@ -702,7 +804,7 @@ Per-room high-water cursors are captured before fresh execution; the new history
 receives the export manifest as native instructions, not a paid bootstrap turn.
 Saved phase/operation identities make interrupted preparation retryable. Incomplete
 or changed exports cannot replace a context. Normal recovery/start is not reset.
-This capability exists only for controller-owned fleet agents, not attached sessions.
+Only the controller can perform this operation on its exact owned instances.
 Each instance's reset preparation/outcome remains independent: a failed export
 cannot start that instance fresh, and successful peers retain truthful outcomes.
 One receipt-pinned native operation per fleet plus unfinished operations and the
@@ -720,10 +822,12 @@ remote command also proves that the prior command's server receipt finalized.
 | POST /api/enrollments/{enrollmentId}/decision | Owner decision; administrator may reject but not approve as another owner. |
 | POST /api/enrollments/{enrollmentId}/exchange | Private request obtains status and ready credentials. |
 | GET /api/fleets | SQL-paginated own/all authorized views including controller and activity summaries. |
-| GET, PATCH, DELETE /api/fleets/{fleetId} | Read/update/delete grouping. Deletion never revokes agent accounts. |
+| GET, PATCH /api/fleets/{fleetId} | Scoped read and revision-checked label/controller update. |
+| POST /api/fleets/{fleetId}/archive | Authorized human or that fleet's authenticated current live controller performs the same expected-revision decommission after settled native-stop proof; retain identity/history, retire instances and revoke controller authority. |
 | GET /api/fleets/{fleetId}/agents | Paginated ordinary agent projections. |
 | GET /api/fleets/{fleetId}/statistics | Owner/admin read-only hourly traffic and optional native usage summaries; bounded time window and SQL pagination. |
-| PUT, DELETE /api/fleets/{fleetId}/agents/{agentId} | Authorized, revision-checked association/detachment. |
+| DELETE /api/fleets/{fleetId}/agents/{agentId} | Scoped revision-checked retirement of the exact instance/agent after confirmed native stop; no detach or identity deletion. |
+| PUT /api/fleets/{fleetId}/agents/{agentId}/native-stop | Current fleet credential records `{connectionId, runId, receiptId}` only after actual owned native close and settled decisions/wake/message receipts; exact active membership, stopped run and live lease required. Exact immutable retry is idempotent. |
 | PUT /api/fleets/{fleetId}/delivery | Owner/admin/controller changes delivery intent with expectedRevision. |
 | PUT /api/fleets/{fleetId}/controller-connections/{connectionId} | Controller-only exclusive lease acquisition, renewal or closure. |
 | GET /api/fleets/{fleetId}/control | Controller-only bounded long poll of intent, pending direct messages and at most one session operation, including while delivery is paused. |
@@ -781,7 +885,9 @@ history_mode = "per-room"
 
 - `fleet` is stable within the authenticated owner.
 - Each instance has a stable key, registered name, definition reference and
-  distinct relative work area.
+  distinct relative work area, which is its private state directory.
+  An optional `workspace` absolute path selects an existing native working
+  directory without relocating state or adopting its existing coding session.
 - `definition` resolves to `agents/<definition>/agent.toml`.
 - The coordination block is supplied once for the fleet. It has no password,
   access token, runtime endpoint or thread ID.
@@ -847,7 +953,8 @@ room-specific permission edits within the same generation. A fresh admission
 applies the approved defaults again. A changed policy review explicitly authorizes
 replacing defaults on existing ordinary grants. Management can adjust current
 wake/room policies; a wake edit differing from the file requires a new review on
-next start. Detachment removes future defaults, not current grants or wake state.
+next start. Retirement removes operational authorization; retained grant and
+wake records are historical state, not authority for a detached listener.
 
 The runtime adapter owns the typed `runtime_options` schema and native settings
 translation. Model/reasoning settings reach the headless native session directly.
@@ -855,7 +962,9 @@ Codex reasoning efforts are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`,
 `max` and `ultra`, subject to the selected native model's actual support. Values
 are passed unchanged; `max` neither aliases `xhigh` nor enables `ultra`'s native
 automatic delegation. Unknown efforts fail boundary validation.
-The roster's work area supplies native cwd. Permission settings retain native
+The roster's work area supplies native cwd unless its validated optional
+`workspace` selects an existing directory. State remains in the private work area
+in either case. Permission settings retain native
 semantics; unsupported settings fail rather than being ignored or elevated.
 Codex defaults to `sandbox_mode = "danger-full-access"` and
 `approval_policy = "on-request"` when omitted. Both remain configurable.
@@ -939,7 +1048,7 @@ fleet/
       workarea/
         ocr-east/
           .codex/                 native home, authentication and session data
-          .crossfire/             identity, client release and delivery state
+          .crossfire/             identity, tool release and delivery state
           ...                     instance work and artifacts
         ocr-west/
           .codex/
@@ -956,9 +1065,12 @@ The fleet manifest owns roster-to-instance bindings and enrollment claims.
 Each native adapter owns its session state; Crossfire owns its identity and
 delivery state. These records do not become competing copies of authority.
 
-Work areas are distinct and non-overlapping. Path validation prevents escaping
-the chosen fleet directory. Private directories use mode 0700 and secret/state
-files mode 0600, with atomic writes where interruption could corrupt bindings.
+Work areas are distinct and non-overlapping. Path validation prevents private
+state escaping the chosen fleet directory. Optional native workspace references
+must resolve to validated existing directories; references grant no controller
+authority and establish no second state reader. Managed credentials remain in
+private instance state. Private directories use mode 0700 and secret/state files
+mode 0600, with atomic writes where interruption could corrupt bindings.
 `.fleet/` and `**/workarea/` are Git-ignored; definitions remain trackable.
 Generated files and logs do not expose credentials.
 
@@ -1029,9 +1141,10 @@ validation, expected failures and bounded payloads.
 Enrollment receives coordination information: owner, fleet, instance keys,
 registered names, reporting controller descriptor, per-item coordination policies
 and private request/authentication material. Every fleet item requires the complete
-`coordinationPolicy: {wakeMode, senderMatrixIds, permissions}` shape; individual
-enrollment forbids that field. Read representations include the policy or `null`
-for an individual item. Selected identities persist as normalized principal IDs.
+`coordinationPolicy: {wakeMode, senderMatrixIds, permissions}` shape, including
+one-item fleets. Fleet/controller fields are mandatory; superseded payloads
+without them are rejected. Read representations always include each item's
+complete policy. Selected identities persist as normalized principal IDs.
 It rejects definitions, model settings, work areas and local commands.
 
 The controller persists its private idempotency key and claim secret before
@@ -1049,7 +1162,7 @@ roster lookup. Recovery must require the named owner's authenticated authority;
 it cannot use a Matrix password requested by an agent.
 
 Approval transactionally creates/reserves all reviewed successful new identities
-with the reviewed fleet wake policy, or owner-only for individual enrollment.
+with the reviewed fleet wake policy.
 Fleet approval stores exact-owner defaults and materializes generation-bound
 permissions using the ordinary room-access domain. Existing-agent revisions and
 selected-sender access are rechecked before any identity, grouping or policy write;
@@ -1069,7 +1182,7 @@ and use the instance-wide capacity, which defaults to one hundred agents. The
 current normalized human role is resolved at preflight, claim and approval;
 controller labels, request fields and the approving actor cannot substitute for
 the intended owner's role. A role or policy change is rechecked at approval.
-The same capacity calculation serves single and fleet enrollment and is checked
+The same capacity calculation serves one-item and many-item fleet enrollment and is checked
 transactionally at claim and approval. Instance capacity remains authoritative
 for every role and includes the other owners' agents and pending reservations.
 Twenty-instance approval must work when configured capacity permits twenty;
@@ -1081,10 +1194,10 @@ The selected bounds must support the twenty-instance acceptance flow, including
 its room-plan review, without hidden request splitting. Policy rejection states
 the actual limit and the required administrator action.
 
-Single-agent and fleet workflows use the same name, issuance, capacity,
-provisioning and audit owners. Both submit the same bounded item-list contract;
-a single-agent request has one item and no fleet key. The same routes, request
-record, decision transaction and per-item provisioning path serve both.
+One-item and many-item fleets use the same name, issuance, capacity, provisioning
+and audit owners. Every request has a fleet key, controller descriptor/private
+claim and complete item policies. The same routes, request record, decision
+transaction and per-item provisioning path serve all rosters.
 
 
 ## 9. Room authorization and invitations
@@ -1226,7 +1339,7 @@ report success after a native invite that the grant reconciler immediately
 undoes. Desired authorization, native invitation, target acceptance and joined
 membership remain distinguishable statuses.
 
-The project client exposes `agent directory`, `room agent-access`,
+The intentional agent tool exposes `agent directory`, `room agent-access`,
 `room invite-agent` and `room remove-agent`. The coordination adapter reads the
 current grant and submits its exact revision/generation through the same REST
 resource used by management. Native Matrix invitations are verified by the
@@ -1275,9 +1388,8 @@ outcomes remain independently verified rather than assumed from a database write
 
 Shared context across people, rooms and DMs is the normal product model. Each
 agent has its own history; agents do not automatically share histories with one
-another. Regular directly connected agents always retain one shared native
-conversation. Fleet-managed agents also default to that model, but may explicitly
-select `history_mode = "per-room"` for an individual instance.
+another. Every managed agent defaults to one shared native conversation, but
+an instance may explicitly select `history_mode = "per-room"`.
 
 Shared mode delivers eligible collected input across conversations into the
 agent's one existing history. Per-room mode routes each immutable Matrix room ID,
@@ -1463,7 +1575,7 @@ it does not turn a collected trail into one model call per event. File-backed
 delivery preserves complete large context without inserting it into model input.
 
 Crossfire instance policy owns `maxMessageBytes`, default 65536 UTF-8 bytes,
-accepted range 4096–4194304. It applies equally to every direct and fleet agent.
+accepted range 4096–4194304. It applies equally to every agent binding.
 The complete inline envelope counts, including origin, sender metadata and routing
 instructions. If a single message or aggregate batch exceeds the threshold, the
 shared listener writes complete content into owned private 0600 JSON files under
@@ -1505,113 +1617,106 @@ authority. A director-to-worker workflow needs an explicit compatible wake
 policy. Selected meaningful room-state notices use the same receiver and
 receipt path rather than a separate listener.
 
-### Individual runtime adapters
+### Managed runtime adapters
 
-Individual sessions use the shared receiver, activity reporter, wake controls,
-release installer and cursor owner. Harness-specific discovery, publication,
-history, lifecycle and native controls live in functional `adapter-codex`,
-`adapter-claude` and `adapter-pi` directories. Shared bounded publication journals
-and native-file validation live in `adapter-runtime`; the listener contains no
-runtime-name dispatch or native protocol decoding.
-An exclusive native SQLite transaction owns each session's publication journal for the
-attachment lifetime. Different profiles cannot concurrently mutate one native
-journal. Close or process death releases that ownership; uncertainty remains
-durable for the next attachment, not another input submission.
-Positive native busy/waiting state keeps pending input attached without a
-turn-duration deadline or an early receipt. An idle, unconfirmed publication
-retains its finite uncertainty deadline; native operation deadlines and attachment
-closure still stop failed connections. Only the exact native receipt advances
-Matrix read positions.
-Every runtime exposes native attachment inspection independently of optional
-turn interruption. The model-free listener test verifies live binding and busy
-state without claiming a runtime can cancel a turn it cannot control.
+fleetd composes the shared receiver, activity reporter, wake controls, artifact
+installer and cursor owner with a runtime-owned native lifecycle adapter.
+Codex is the only implementation. Claude Code and Pi values are rejected at
+configuration boundaries; no selectable placeholder, extension, hook or retained
+direct-session implementation exists. The architecture keeps pure runtime ports
+so another concrete implementation must satisfy the same capabilities rather
+than adding runtime dispatch to listener or fleet domain code.
 
-The composition root selects an explicit `--runtime` or exact native tool context.
-Ambiguous contexts require an explicit runtime, not process scanning. One saved
-project profile keeps its identity across reconnects, runtime selection and
-upgrades. A native setup/activation state is reported separately from a ready
-listener; enrollment or saved credentials cannot masquerade as delivery.
-Before enrollment, private runtime settings retain the selected runtime,
-while private setup state retains the chosen server and owner.
-The profile's directory binds the chosen name. Native activation never makes
-the user repeat those choices:
-the same option-free connect command continues the selected setup. Multiple
-saved profiles require an explicit selection; no latest-profile guess is used.
+Codex prerequisites are checked in ordinary code before enrollment/start:
+supported stock version, configured provider authentication, selected native
+features and private state/workspace safety. Linux and macOS use portable native
+ownership/child-process mechanisms; Linux inert-provider evidence does not
+certify macOS hardware or paid provider entitlements. Only the runtime adapter
+interprets native model/provider settings.
 
-Claude Code supplies its session UUID, PID, authenticated peer Unix socket and
-child token to tools. The adapter verifies the native registry's exact session,
-workspace, process birth and peer protocol. A project-local native hook captures
-the exact transcript path; no encoded-path guessing or history-directory scan is
-used. First setup returns before waiting for its own hook. Native settings reload
-activates the project hooks; `PreToolUse`/`PostToolUse` on Bash and `SessionStart`
-capture the native context. A subsequent connect uses that context without
-restarting Claude Code or enabling channels. A setup-required result never claims
-the settings watcher or hook has already run.
-No global Claude settings, permission modes, MCP servers or organization controls
-are changed.
+Required `stateDirectory` owns private native home, history, receipts and
+Crossfire identity/cursors. Required `workspace` is native tool cwd. They are
+identical for a normal self-contained role instance unless explicit
+`instances.workspace` selects another owned project. The native environment
+supplies `CROSSFIRE_PROJECT=stateDirectory` and `CROSSFIRE_AGENT_NAME` to
+intentional tools. Tools never infer private state from native cwd, adopt the
+calling coding session, discover arbitrary processes or ask for a name.
+An explicitly selected profile or the uniquely saved profile must be unambiguous.
 
-Claude peer messaging is an explicit version-tested native dependency, protocol
-1 on stock 2.1.285. Inputs carry the native correlation UUID. Receipt confirmation
-matches exact session, publisher PID, content and native peer wrapper in the
-bounded transcript interval captured before publication. The native wrapper
-retains Claude's peer-permission warning. Native peer sockets are short-lived per
-publication, not listener-lifetime connections: the native idle-input deadline
-must not disconnect an otherwise idle listener. On Linux the exact native process
-birth is checked against procfs, including forced death that leaves stale native
-registry/socket paths. Native endpoint removal, registry removal,
-workspace/session switching or process-birth change stops the listener. A new
-native binding cannot silently retarget an old listener. This peer connection
-does not expose native turn interruption or permission brokering.
+First startup creates the managed native history; later startup resumes that
+exact history. Initial instruction publication materializes zero-turn native
+history without a dummy user message. No runtime-session import or history copying is
+part of setup. Model, sandbox and approval use validated native configuration;
+role/skill/admin instruction text uses the single receipt-confirmed developer
+producer on creation, exact resumption and changed instruction revisions.
 
-Pi uses a verified project-local extension, loaded by the native extension
-lifecycle. First installation and native-module upgrades need `/reload` in an
-existing Pi session; project trust is required, not silently enabled. The native
-entry uses Pi's required default factory export; implementation modules use named
-functional exports. The small stable project entry resolves the current verified
-release on every native load and imports its immutable native module. It does not
-depend on a loader refreshing a symlinked module's cached code. The native module
-verifies the complete release before registering handlers. `session_start` creates an authenticated loopback connection
-and a private exact session/generation descriptor for subsequent tools. Exit,
-reload, session replacement and tree navigation close that connection. The
-descriptor includes the loaded native module's hash; a client never claims a new
-module is running merely because its files were downloaded.
+The Codex adapter's canonical `applyNativeInstructions` producer uses supported
+`thread/inject_items` with an actual native message `role: "developer"` and
+`content: [{type: "input_text", text}]`. It runs only against the exact idle owned
+context before task publication and makes no turn/model call. Native generated-
+schema capability inspection requires this actual method before enrollment/start;
+unsupported binaries fail with an actionable prerequisite error. No additional
+minimum-version claim substitutes for the selected binary's protocol capability.
 
-The Pi adapter serializes pending external publication at its native boundary.
-Busy input waits for native idle events without model polling. Only an exact
-native `custom_message` carrying the Crossfire ID and unchanged content on the
-captured branch confirms publication. A cancelled, not-yet-submitted publication
-can be retired by its exact identity; already submitted input is never retracted
-or marked absent by assumption. Captured native operation identities gate Pi
-interruption, so a stale control cannot cancel a newer operation.
+A private durable instruction journal owns the stable content digest and exact
+submission identity. Confirmation requires the matching native history path,
+session, developer role, item ID and unchanged text. Lost responses recover from
+that exact receipt before another append; unchanged confirmed revisions do not
+append duplicates or rescan growing native history. Pending receipt recovery
+streams the post-publication file snapshot once in bounded chunks with a bounded
+record buffer; additional history growth is not an arbitrary whole-file size
+failure. Changed role, skill or administrator text uses the same
+producer and remains in retained native history across resume. Instruction
+receipts do not acknowledge Matrix input or advance unread cursors. There is no
+`developerInstructions`/settings-update fallback, spoofed user message,
+model-dependent branch or direct rollout-file writer. Stock Codex 0.160 Linux
+source proofs with Sol/max settings and an inert provider cover zero-model
+creation, exact resume, changed instructions and receipt recovery. They do not
+certify an installed release, macOS or paid-model behavior; the integration owner
+must verify the produced artifacts and complete current native gates.
 
-Runtime turn control is an explicit optional native capability. For an attachment
-without it, an owner `!!` control pauses listener delivery and, only with current
-unmuted send access, posts a deterministic notice directing the owner to stop the
-native turn in the coding session. Native send denial leaves the receiver paused
-and connected, with unread positions unchanged. Generated control, approval and blocked-wake
-notices share one explicit wire marker and are excluded from both wake selection
-and later model context; legitimate unmarked notices remain eligible. It does
-not claim cancellation or send the redirect into the model. A later owner message
-resumes normal wake-eligible delivery. Codex and Pi expose exact native turn
-control. Native permission handling remains in Claude Code/Pi. All adapters
-share the owner DM; only Codex uses listener-mediated native approvals.
+Shared bounded publication journals and native-file validation belong to
+`adapter-runtime`; native transport, settings, history, permissions and terminal
+pointers belong to `adapter-codex`. An exclusive native SQLite transaction owns
+each session's publication journal for the connection lifetime. Another profile
+cannot concurrently mutate it. Close or process death releases ownership while
+uncertainty remains durable for exact receipt recovery, not a new submission.
+Positive native busy/waiting state keeps pending input without a turn-duration
+deadline or early receipt. An idle unconfirmed publication retains its finite
+uncertainty deadline; native operation deadlines and connection closure remain
+authoritative. Only the exact native receipt advances Matrix unread positions.
 
-The complete immutable release includes `crossfire-pi.mjs` alongside the client,
-skill, README, Matrix license and optional Codex launcher. All artifacts are
-verified before activation.
-Project-only native integration files are separate from credentials and preserve
-unrelated project configuration. No new global installation, service, launcher,
-model-generated receipt or telemetry prompt is introduced.
+The model-free `agent test` checks fleetd's existing receiver, effective
+authentication and exact native binding, including observed busy state. It
+neither starts an engine nor treats saved credentials as readiness. Native turn
+interruption is a typed capability, not assumed from a runtime name. Codex
+supports captured-turn interruption. An addressed owner `!!` pauses/interrupts;
+`!! New instruction` interrupts and redirects through the same receipt path.
+Cancellation is not rollback. Stale control cannot cancel a replacement turn.
+Generated control, approval and blocked-wake notices use one explicit marker
+and are excluded from wake evaluation and later model context. Ordinary unmarked
+messages remain eligible.
 
-Acceptance includes real installed CLI/native-extension tests against inert local
-providers: attachment without model input, idle/busy publication, exact receipts,
-lost-response/reconnect safety, bounded native history, native interruption where
-available, shared Matrix batching, session replacement, release activation and
-owner disconnect. These tests do not certify paid-provider behavior or an
-untested operating system. Fleet orchestration is not extended by this work.
-Acceptance also covers canonical approved-profile reconnects, first-activation
-choice retention and retirement, read-only/native-denied notices preserving the
-paused receiver, and peer automatic notices causing no model call or lost context.
+Intentional agent commands remain separate from lifecycle ownership:
+`agent status`, `agent test`, `agent read`, `agent history`, `agent directory`,
+room invitation/removal, native Matrix operations and report publication. They
+cannot enroll, connect, disconnect or launch listeners. Read/history uses the
+sole active receiver; its absence is an error, not an offline receiver fallback.
+Native read-marker mutation cannot race the controller's receiver ownership.
+
+The immutable tool release has exactly four artifacts: `README.md`,
+`SKILL.md`, `crossfire-client.mjs` and `matrix-spec-LICENSE.txt`.
+One private `@ctlflow/crossfire-agent-tools/build` export generates and verifies
+the same bytes for the Crossfire server and public fleetd package. Internal
+modules stay private and bundled. The installed public package owns the pinned
+local release directory; no HTTP controller installer, optional launcher,
+extension module or machine-wide skill is part of installation.
+
+Acceptance requires installed CLI/native tests with inert local providers:
+zero-turn enrollment/start/resume, busy/idle input, exact receipts, lost-response
+recovery, interruption, owner decisions, bounded history, private tool invocation
+and explicit software update. Results certify their actual protocol/platform
+only, not paid-model quality or every native subprocess capability.
 
 ### Native tool approvals
 
@@ -1666,7 +1771,7 @@ Fleet runtime failure immediately makes listener activity false, preserves the
 bounded actual abort cause and retains successful peers. An explicit restart
 cannot race pending failure cleanup. A cleanup error is secondary to the
 original cause, not a replacement diagnosis. Controller-owned transient recovery
-uses the bounded, same-history lifecycle above; attached runtimes remain human-owned.
+uses the bounded, same-history lifecycle above for every managed instance.
 
 Project privacy preserves subprocess errors such as `EPERM`, `ENOENT` and
 `EACCES`, distinguishing them from genuine Git exit codes. Sandbox subprocess
@@ -1676,9 +1781,9 @@ model turn verifies connection and authorization, not paid-model work or every
 native tool execution path.
 
 A user-selected native no-approval policy or explicit native bypass option is
-a deliberate choice, not the default or model-authorized elevation. Owned Codex
-defaults to full access with on-request approval. Attached sessions retain their
-human-owned native model, sandbox and approval policy.
+a deliberate choice, not the default or model-authorized elevation. Managed Codex
+defaults to full access with on-request approval. The independent coding session
+performing setup retains its own settings; fleetd does not attach or import it.
 
 ### Runtime failures and management conversations
 
@@ -1714,9 +1819,9 @@ in that agent's separate owner DM.
 
 Crossfire independently detects expired controller/listener liveness. A controller
 that has died cannot report its own death. Lost contact is reported as unknown
-execution state, not an invented confirmed crash. Directly connected agents use
-the same management-incident owner, with native failure when reported and lost
-contact otherwise. Intentional stop/disconnection, disabled fleet delivery,
+execution state, not an invented confirmed crash. Every fleet, including a
+one-agent fleet, uses the same management-incident owner. Intentional native
+Stop, disabled fleet delivery,
 ordinary idle and native decision waits are not unexpected crashes.
 
 One incident episode produces one initial notice, with recovery or material state
@@ -1857,34 +1962,45 @@ call is required for typing.
 
 ### Releases and listener activity
 
-Reconnect checks the manifest and verifies artifact sizes/hashes before starting
-software. Changed skill content is supplied through the adapter's native context
-mechanism, without requiring a separate model-led installation conversation.
+The installed public fleetd package contains a pinned immutable tool release.
+First setup verifies its complete artifact sizes/hashes before activation.
+Recovery, sleep/wake, reconnect and repeated setup reuse the installed release;
+they do not fetch a current HTTP artifact or silently replace software.
+An incompatible release fails with an actionable update requirement.
 
-An incompatible client reports the required update and does not pretend to be
-connected. Running listeners are not silently hot-replaced. Updating software
-preserves identities, native sessions, grants and cursors.
+Ordinary code compares the reporting release with the server's current manifest.
+A different release queues one maintenance notice per native session/release.
+The shared receipt owner publishes its stable ID; private durable state prevents
+repeated notices across restart. It consumes neither chat cursors nor chat counts.
+Sleeping sessions are not woken for maintenance. Pause and native uncertainty
+retain the same publication authority.
 
-When a different release is reported, ordinary code queues one maintenance
-notice per native session/release. The shared runtime receipt owner publishes it
-with a stable ID; private durable notification state suppresses repeats across
-restarts. It does not consume chat unread positions or count as a chat message.
-Pause, interrupt and disconnect apply through the same delivery owner. The notice
-asks the model to obtain explicit human consent, then run the normal verified
-connection command and read changed skill content. Detection, installation and
-telemetry remain model-free. No automatic consent or silent replacement is inferred.
+The notice asks the human for update consent. After installing the pinned public
+package into private storage, the human uses its newly installed executable for
+`fleet update FLEET` or `fleet agent update FLEET INSTANCE`, then explicitly
+runs `fleet daemon restart` with the selected private root.
+Controller update verifies local bundled artifacts, stops/switches the selected
+execution and resumes only previously desired-active targets with their exact
+saved histories. Explicitly stopped targets remain stopped. Changed skill content
+is applied through the same receipt-confirmed native developer-instruction
+producer, including when resuming an existing history. Identity, grants, unread positions,
+pending receipts and stop intent are preserved; no new identity or competing
+receiver is created. Detection, installation and reporting are model-free.
+Remote CLI update requires `--release-directory` naming already installed remote
+assets, or the human runs the installed CLI on the controller host. There is no
+HTTP fallback. Restart uses the new executable while preserving
+desired activation, explicit stop intent and exact saved histories.
 
-Each listener reports release, run identity and heartbeat automatically, using
-the shared activity implementation: 30-second heartbeats and offline after
-90 seconds without a heartbeat. Management shows observed active time,
-receipt-confirmed message counts and last seen. Online means a reporting
-listener, not proof of model progress or native Matrix presence. Reporting involves
-no model calls; optional native usage observations share this ordinary-code path.
+Each agent binding reports its release, run and ordinary-code heartbeat:
+30-second heartbeats and offline after 90 seconds without contact. The exact
+server-verified controller generation owns every live reporting run.
+Management shows observed active time, receipt-confirmed counts and last seen.
+Online means a reporting binding, not a model turn or native Matrix presence.
+The shared listener remains online while owned native sessions sleep.
 
-The owner's confirmed management disconnect stops the selected listener through
-the existing server-driven control. Disconnecting coordination is not authority
-to kill unrelated or externally owned runtimes.
-
+Native Stop/Resume, fleet delivery Pause/Resume and explicit confirmed Fresh
+history are separate controller-owned operations. There is no individual
+listener-disconnection API or client command.
 
 ### Fleet traffic and native usage summaries
 
@@ -1921,14 +2037,14 @@ in 1, 24, 168 or 720 (default 24), canonical `page` and `pageSize` (default 20,
 maximum 100); unknown/duplicate parameters fail. Only the fleet owner or an
 administrator can read it. SQL aggregation and pagination supply fleet totals,
 per-agent traffic/usage and sender-to-recipient flows without storing message
-bodies. Management's Stats tab supports period selection, explicit refresh,
+bodies. Management's fleet Activity traffic view supports period selection, explicit refresh,
 paginated flows and clear unknown/approximate measurement labels. No realtime
 analytics subscription, periodic model use or provider-billing polling exists.
 
 ### Public static reports
 
 An enrolled active agent can publish a dedicated static directory through the
-same typed client in individual or fleet mode:
+same typed intentional tool:
 `report publish --directory DIRECTORY --title TITLE`. It stages a manifest,
 streams bounded regular files through typed binary operations and explicitly
 commits only the complete, verified bundle. There is no archive extraction,
@@ -1983,24 +2099,51 @@ are in [Public static reports](../services/crossfire/docs/publications.md).
 
 ## 11. Normalized persistence and authorization
 
-One canonical schema and permission catalog own current state. Fresh development
-stores initialize that schema directly. Deployed stores advance transactionally
-from the inventoried deployed schema 11 to schema 12 after a verified backup;
-existing identities, native access,
-credentials, controller authority, policy and audit remain intact. Runtime code
-has no historical-schema reader, importer, compatibility handler or dual
-read/write path. Production resets and automatic reset-on-startup-error are
-prohibited. Source work, operator configuration, external credentials and other
-projects remain intact.
+One canonical schema and permission catalog own current state. Fresh stores
+initialize schema 13 directly. An inventoried deployed schema 12 advances to 13
+transactionally after a verified backup. Versions 1–11, foreign stores and future
+versions are refused without mutation; there is no historical migration ladder,
+historical runtime reader or reset-on-error behavior.
 
-The canonical schema has 56 singular tables. The transactional forward migration
-preserve existing principal, access, listener, credential and audit rows while
-adds publication/file relations, idle policy and sleeping/waking observation
-fields. Versions 1–10, foreign stores and future versions are refused without
-changes; there is no historical migration ladder. Requested policies
-and approved invitation defaults use normalized tables, not serialized settings.
-Existing fleets acquire no invented policy approval during migration; their next
-configured start requests owner review when approval is absent.
+The canonical schema has 63 singular tables. The forward migration preserves
+immutable identities, native credentials and histories, room/access records,
+receipt and usage history, publications, policy and audit. It adds historical
+enrollment archives, fleet archive/instance retirement timestamps, exact immutable
+controller-generation identifiers and independent native-stop receipts.
+
+Historical requests lacking a fleet key, controller name or controller credential
+hash, or lacking a policy for a successful item, move to `enrollment_archive` and
+its normalized item, policy, permission, selected-wake-sender and metadata
+relations. All fourteen original request fields and existing child rows retain
+exact values, including nullable historical controller fields. No fleet, policy
+or authority is fabricated to make incomplete historical requests operational.
+Complete managed requests remain in the current enrollment relations.
+
+After preserving history, the migration releases archived requests' pending name
+reservations and removes their current operational request rows. Foreign keys
+retain original owner, decider, identity, principal and permission attribution.
+Update/delete triggers protect all six archive relations. These are immutable
+historical data, not another enrollment reader, approval API or authority source.
+Unbound identities are not invented into fleets, discarded or given live
+authority. Normal directories and operational authentication require an active
+nonretired binding in a nonarchived fleet. Restoration requires a newly
+owner-reviewed fleet enrollment and surviving private identity proof.
+
+Current enrollment requires fleet/controller fields and a complete coordination
+policy for every item. The migration removes obsolete listener-disconnect
+permissions and rebuilds listener reporting around fleet/connection/credential
+IDs. Existing reporting runs close at their stored last observation; their
+activity, receipts and runtime/statistics history remain intact. Only stopped
+historical runs may retain an all-null controller tuple. Every new run must prove
+its exact active fleet instance and current live controller lease; database
+guards prevent mutable-generation reassignment. No raw controller credential
+enters a run, projection, log or model context.
+
+Schema conversion checks foreign-key integrity before committing the new version.
+Current SQL and domain code operate only on the resulting schema. Necessary data
+conversion is not permission to preserve a second enrollment, authentication,
+listener or deletion path. Source work, operator configuration and external
+credentials remain intact; production resets are prohibited.
 
 ### Relational conventions
 
@@ -2057,7 +2200,6 @@ Representative role permission codes distinguish the actual authority:
 `agent.read.self`, `agent.read.owned`, `agent.read.any`,
 `agent.configure.owned`, `agent.configure.any`,
 `agent.room-grant.manage.owned`, `agent.room-grant.manage.any`,
-`agent.listener.disconnect.owned`, `agent.listener.disconnect.any`,
 `listener.report.self`, `enrollment.approve.owned`,
 `enrollment.reject.owned`, `enrollment.reject.any`,
 `member.manage`, `policy.manage` and `audit.read.any`.
@@ -2086,23 +2228,35 @@ repository methods serve issuance and native account operations only.
 
 | Table | Complete logical columns and keys |
 | --- | --- |
-| `enrollment_request` | `id PK`, `owner_id FK member`, `fleet_key?`, `verification_code UQ`, `claim_hash`, `controller_name?`, `controller_credential_hash?`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. |
+| `enrollment_request` | `id PK`, `owner_id FK member`, `fleet_key`, `verification_code UQ`, `claim_hash`, `controller_name`, `controller_credential_hash`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. |
 | `enrollment_item` | `request_id FK enrollment_request`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. |
 | `enrollment_item_policy` | `request_id`, `instance_key`, `wake_mode`, `expected_agent_revision?`; composite PK/FK to `enrollment_item ON DELETE CASCADE`. Exact review snapshot and stale-existing-agent guard. |
 | `enrollment_item_permission` | `request_id`, `instance_key`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; composite PK; item-policy FK with cascade; catalog FK `(permission_code, grant_scope)`. |
 | `enrollment_item_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`; composite PK; item-policy FK with cascade. Immutable selected-author review rows. |
 | `agent_name` | `name PK`, `request_id?`, `instance_key?`, `agent_id? UQ/FK agent`; pending-item composite FK; `UQ(request_id, instance_key)`. |
-| `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `delivery_enabled`, `revision`, `created_at`, `updated_at`; `PK(owner_id, fleet_key)`. |
+| `fleet` | `id UQ`, `owner_id FK member`, `fleet_key`, `label`, `controller_name`, `delivery_enabled`, `revision`, `created_at`, `updated_at`, `archived_at?`; `PK(owner_id, fleet_key)`. |
 | `fleet_connection` | `fleet_id PK/FK fleet`, `connection_id UQ`, `credential_id FK fleet_credential`, `last_seen_at`, `expires_at`, `closed_at?`. One exclusive controller generation. |
 | `fleet_runtime_operation` | `id PK`, `fleet_id FK fleet ON DELETE CASCADE`, `agent_id? FK agent`, `author_principal_id FK member`, `action` start/stop/reset, `expected_revision`, `status` pending/running/succeeded/failed, `created_at`, `completed_at?`, `error_message?`, `connection_id?`, `credential_id?`; composite credential/fleet FK, matching terminal/error/claim checks. One pending/running operation per fleet. |
 | `fleet_message` | `id PK`, `fleet_id FK fleet`, `author_principal_id? FK member`, `author_credential_id? FK fleet_credential`, `body`, `created_at`, `expires_at`; exactly one author; `(fleet_id, created_at, id)` index. |
 | `fleet_message_delivery` | `message_id FK fleet_message`, `agent_id FK agent`, `status`, `completed_at?`, `error_message?`; composite PK; status is pending/delivered/failed/skipped; `(status, message_id, agent_id)` index. |
 | `fleet_controller_metadata` | `fleet_id FK fleet(id)`, `key`, `value`; `PK(fleet_id, key)`. |
-| `fleet_credential` | `id PK`, `fleet_id FK fleet(id)`, `secret_hash`, `created_at`, `revoked_at?`. Fleet-scoped authority, not a human login. |
+| `fleet_credential` | `id PK`, `fleet_id FK fleet(id)`, `secret_hash`, `created_at`, `revoked_at?`; `UQ(id, fleet_id)`. Fleet-scoped authority, not a human login. |
 | `enrollment_controller_metadata` | `enrollment_id FK enrollment_request`, `key`, `value`; `PK(enrollment_id, key)`. Exact approval snapshot. |
-| `fleet_instance` | `owner_id`, `fleet_key`, `instance_key`, `agent_id UQ`; `PK(owner_id, fleet_key, instance_key)`; composite FKs to `fleet(owner_id, fleet_key)` and `agent(principal_id, owner_id)`. |
+| `fleet_instance` | `owner_id`, `fleet_key`, `instance_key`, `agent_id UQ`, `retired_at?`; `PK(owner_id, fleet_key, instance_key)`; composite FKs to `fleet(owner_id, fleet_key)` and `agent(principal_id, owner_id)`. |
 | `fleet_instance_policy` | `agent_id PK/FK fleet_instance(agent_id) ON DELETE CASCADE`, `approved_by_member_id FK member`, `approved_at`; composite FK `(agent_id, approved_by_member_id)` to `agent(principal_id, owner_id)` enforces exact owner. No duplicate wake mode/selection. |
 | `fleet_instance_permission` | `agent_id`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; composite PK; policy FK with cascade; catalog FK `(permission_code, grant_scope)`. Approved admission defaults, not effective room authorization. |
+| `fleet_native_stop` | `agent_id FK agent`, `receipt_id`, `sequence` (>0), `fleet_id FK fleet`, `run_id`, `connection_id`, `credential_id`, `native_stopped_at`, `invalidated_at?`; `PK(agent_id, receipt_id)`, `UQ(agent_id, sequence)`; composite FKs `(run_id, agent_id)` to `listener_run` and `(credential_id, fleet_id)` to `fleet_credential`. Immutable idempotent native-close evidence, invalidated by renewed native observations; not inferred from heartbeat or sleeping state. |
+| `enrollment_archive` | `controller_name?`, `controller_credential_hash?`, `fleet_key?`, `id PK`, `owner_id FK member`, `verification_code`, `claim_hash`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. Exact fourteen-field historical request; original lifecycle, revision, expiry and paired-decision constraints, with no operational authorization API. |
+| `enrollment_archive_item` | `request_id FK enrollment_archive`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. Historical result/identity attribution; failed outcome requires failure code. |
+| `enrollment_archive_policy` | `request_id`, `instance_key`, `wake_mode`, `expected_agent_revision?`; composite PK/FK to `enrollment_archive_item`. Closed wake-mode domain and nonnegative expected revision retain the exact reviewed policy, not an effective current policy. |
+| `enrollment_archive_permission` | `request_id`, `instance_key`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; `PK(request_id, instance_key, permission_code)`; composite item-policy FK and catalog FK `(permission_code, grant_scope)`. Historical requested authority only. |
+| `enrollment_archive_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`; `PK(request_id, instance_key, sender_principal_id)`; composite FK to archive policy. Exact historical selected identities, not current wake eligibility. |
+| `enrollment_archive_metadata` | `enrollment_id FK enrollment_archive`, `key`, `value`; `PK(enrollment_id, key)`. Exact historical controller metadata, never routing/authentication authority. |
+
+All six enrollment archive relations have rejecting UPDATE/DELETE triggers.
+Their restrictive foreign keys prevent erasing referenced identity/catalog
+history. They are retained by the forward migration without any operational
+archive read/write path, JSON policy bag or compatibility enrollment mode.
 
 One item or many items use the same request/decision/provisioning pipeline.
 `requested_name` is an immutable review snapshot. Only `agent_name` owns the
@@ -2197,7 +2351,7 @@ batched current assignments and their last recorded delivery, not model completi
 | --- | --- |
 | `member_invitation` | `id PK`, `created_by_member_id FK member`, `claim_hash`, `role_code`, `principal_kind = human`, `created_at`, `expires_at`, `consumed_by_member_id? FK member`, `revoked_at?`, `claim_matrix_user_id? UQ`, `claim_display_name?`, `claim_fingerprint?`; composite role-kind FK requires a human role. |
 | `member_session` | `secret_hash PK`, `member_id FK member`, `csrf_secret`, `native_access_token`, `created_at`, `expires_at`. |
-| `listener_run` | `id PK`, `agent_id FK agent`, `release?`, `controller_bound`, `started_at`, `last_seen_at`, `active_ms`, `messages_delivered`, `stopped_at?`, `disconnect_requested_at?`. Controller binding is immutable per run and does not follow fleet membership alone. |
+| `listener_run` | `id PK`, `agent_id FK agent`, `release?`, `controller_fleet_id? FK fleet`, `controller_connection_id?`, `controller_credential_id?`, `started_at`, `last_seen_at`, `active_ms`, `messages_delivered`, `stopped_at?`, `disconnect_requested_at?`; composite credential/fleet FK. The controller tuple is immutable and all-present on every new run; all-null is permitted only on stopped archived runs. No secret is stored here. |
 | `wake_notice` | `receiver_agent_id FK agent`, `event_id`, `sender_matrix_id`, `room_id`, `reserved_at`, `message_body`, `status`, `sent_at?`, `native_event_id?`, `next_attempt_at?`, `last_error?`; `PK(receiver_agent_id, event_id)`. |
 | `instance_policy` | `id PK = instance`, `revision`, `max_owner_agents`, `max_agents`, `max_pending`, `enrollment_seconds`, `reconcile_seconds`, `agent_instructions`, `signup_mode` (`invitation` or `open`), `invitation_issuers` (`administrators` or `members`), `max_message_bytes` (4096–4194304, default 65536), `fleet_idle_timeout_seconds` (0–604800, default 1800; zero disables). |
 | `audit_event` | `id PK`, `request_id`, `actor_kind`, `actor_principal_id? FK principal`, `actor_credential_id?`, `owner_id? FK member`, `target_kind`, `target_id`, `room_id?`, `membership_generation?`, `authorizer_id? FK principal`, `added_by_id? FK principal`, `permission_code? FK permission`, `action`, `outcome`, `message`, `created_at`. |
@@ -2220,7 +2374,7 @@ Audit events are append-only, attributed facts. Bulk operations emit the
 necessary per-target records under one request ID in the same transaction.
 Actor kind distinguishes authenticated principals, private enrollment claims
 and system operations, including a fleet controller's credential identity. The
-historical credential identifier is not a live FK: deleting a fleet cannot erase
+historical credential identifier is not a live FK: archiving a fleet cannot erase
 its audit attribution. Queryable actor/owner/target/room/generation/provenance/
 permission facts are columns; `message` is readable audit copy, never serialized
 permission or roster state. No generic JSON `detail` or untyped property bag.
@@ -2301,11 +2455,18 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `principal_application` | `(next_check_at, principal_id)` | Bounded reconciliation. |
 | `enrollment_request` | `(owner_id, created_at, id)`, `(created_at, id)`, `(status, expires_at, id)` | Review lists and pending expiry/capacity. |
 | `enrollment_item` | `(agent_id, request_id, instance_key)` | Existing identity and provisioning references. |
+| `enrollment_archive` | `(owner_id, created_at, id)`, `(decided_by_member_id, id)` | Preserved owner/decider attribution and foreign-key lookups, never current operational approval. |
+| `enrollment_archive_item` | `(agent_id, request_id, instance_key)` | Historical result-to-identity references. |
+| `enrollment_archive_policy` | PK `(request_id, instance_key)` | Exact historical item-policy and composite foreign-key lookup. |
+| `enrollment_archive_permission` | `(permission_code, grant_scope, request_id, instance_key)`; PK request/item prefix | Historical catalog foreign-key/reverse lookup and requested permission identity. |
+| `enrollment_archive_wake_sender` | `(sender_principal_id, request_id, instance_key)`; PK request/item prefix | Historical principal reference and selected-author lookup. |
+| `enrollment_archive_metadata` | PK `(enrollment_id, key)` | Preserved metadata and historical request foreign-key lookup. |
 | `enrollment_item_policy` | composite PK `(request_id, instance_key)` | Exact reviewed item and policy FK prefix. |
 | `enrollment_item_permission` | `(permission_code, grant_scope, request_id, instance_key)` | Catalog FK and reverse permission lookup; item-policy prefix covered by PK. |
 | `enrollment_item_wake_sender` | `(sender_principal_id, request_id, instance_key)` | Selected-sender FK/reverse lookup; item-policy prefix covered by PK. |
 | `fleet_instance_policy` | `(approved_by_member_id, agent_id)` | Exact-owner FK/lifecycle lookup; agent prefix covered by PK. |
 | `fleet_instance_permission` | `(permission_code, grant_scope, agent_id)` | Catalog FK/reverse lookup; agent-policy prefix covered by PK. |
+| `fleet_native_stop` | `(fleet_id, agent_id)`, `(run_id, agent_id)`, `(credential_id, fleet_id)` | Current retirement eligibility and exact run/credential FK lookups. |
 | `fleet` | `(created_at, fleet_key)` | Global fleet list. Owner lists use the composite primary-key prefix. |
 | `fleet_credential` | `(fleet_id, revoked_at)`; UQ `(id, fleet_id)` | Fleet credential lifecycle and exact fleet-scoped connection/message authority. |
 | `fleet_runtime_operation` | partial UQ `(fleet_id)` for pending/running; `(fleet_id, created_at DESC, id DESC)`, `(agent_id, created_at DESC)`, `(author_principal_id)`, `(credential_id, fleet_id)` | Exclusive native-operation admission, stable paginated outcomes and target/author/credential FK lookups. |
@@ -2321,7 +2482,7 @@ Every PK/UQ supplies its constraint index. Additional indexes follow
 | `wake_delivery` | partial UQ `(agent_id)` for pending status; `(rule_id, created_at DESC, id)`, `(agent_id, created_at DESC, id)` | One pending claim per receiver and indexed receipt history. |
 | `member_invitation` | `(created_at, id)`, `(expires_at, id)`, `(created_by_member_id, created_at DESC, id)` | Instance-wide administrator and scoped issuer listings/expiry. |
 | `member_session` | `(member_id, expires_at)`, `(expires_at)` | Session limits/revocation/expiry. |
-| `listener_run` | `(agent_id, last_seen_at DESC, id)`, `(agent_id, started_at DESC, id DESC)`; partial `(last_seen_at, agent_id, id)` for unstopped runs; UQ `(id,agent_id)` | History, latest-run observation/contact selection and exact runtime FK binding. |
+| `listener_run` | `(agent_id, last_seen_at DESC, id)`, `(agent_id, started_at DESC, id DESC)`; partial `(last_seen_at, agent_id, id)` and `(controller_fleet_id, controller_connection_id, agent_id)` for unstopped runs; UQ `(id,agent_id)` | History, latest-run contact, exact live controller generation and runtime FK binding. |
 | `runtime_decision` | `(agent_id,created_at DESC,id)`, `(status,expires_at,run_id)` | Paginated summaries without full review hydration, expiry maintenance. |
 | `runtime_observation` | `(agent_id,observed_at DESC,run_id)`, `(run_id,state)` | Latest run/all native contexts and batched directory summaries. |
 | `runtime_incident` | `(recovered_at,owner_id,created_at,id)`; partial UQ active `(agent_id,COALESCE(session_id,''),kind)` and `(fleet_id,kind)` | Episode selection/deduplication and recovery. |
@@ -2365,7 +2526,8 @@ Tinqer owns all application reads/writes. Raw SQL is restricted to schema,
 configuration and metadata/query-plan inspection. Private store creation and
 credential access remain validated and access-restricted.
 
-Private controller state is project-local and atomic. Public availability checks
+Private controller and instance state is user-owned and atomic, separate from
+an optional existing native workspace. Public availability checks
 return no credentials or private workspaces. Enrollment claim proof and exact
 roster/digest bind approval/exchange. Preview/apply binds the normalized plan and
 expected revisions; a preview is not an authorization token.
@@ -2391,8 +2553,9 @@ public responses redact credential/claim material.
 
 Crossfire exposes REST with JSON resource representations and explicitly typed
 binary file-upload bodies. It does not add GraphQL. The canonical product
-API prefix is `/api`; Matrix's native `/_matrix` endpoints and immutable release
-artifacts under `/onboarding/<releaseId>/` retain their separate protocol/asset
+API prefix is `/api`; Matrix's native `/_matrix` endpoints, the personalized
+`/onboarding/setup` guide/JSON descriptor and immutable tool release artifacts
+under `/onboarding/<releaseId>/` retain their separate protocol/asset
 ownership. The management website remains under `/manage`.
 
 ### Uniform rules
@@ -2442,6 +2605,7 @@ ownership. The management website remains under `/manage`.
 
 | Method / path | Purpose and authority |
 | --- | --- |
+| `GET /onboarding/setup`, `GET /onboarding/setup.json` | One required active human `ownerMatrixId`, verified native identity, trusted configured server and exact public package version; HTML instructions or canonical schema-version-one descriptor. No credentials or enrollment mutation. |
 | `POST /api/sessions` | Human login; establish private cookie and CSRF state. |
 | `GET, DELETE /api/sessions/current` | Read/end this human session. |
 | `GET /api/principals` | Authorized, bounded identity discovery for wake selection and invitation targets; minimal directory projection. |
@@ -2466,7 +2630,10 @@ ownership. The management website remains under `/manage`.
 | `GET /api/enrollments/{enrollmentId}` | Exact reviewed roster and application outcomes. |
 | `POST /api/enrollments/{enrollmentId}/decision` | Owner approves/rejects; administrator may reject others' requests. |
 | `POST /api/enrollments/{enrollmentId}/exchange` | Private initiating claim obtains status/ready credentials. |
-| `GET /api/fleets`, `GET, PATCH, DELETE /api/fleets/{fleetId}`, `GET /api/fleets/{fleetId}/agents`, `PUT, DELETE /api/fleets/{fleetId}/agents/{agentId}` | Authorized durable fleet/instance views; not native process control. |
+| `GET /api/fleets`, `GET, PATCH /api/fleets/{fleetId}`, `GET /api/fleets/{fleetId}/agents` | Authorized durable fleet/instance views and revision-checked metadata; not native process control. |
+| `POST /api/fleets/{fleetId}/archive` | Authorized human or that fleet's authenticated current live controller uses the same expected-revision archive after settled native-stop proof; retires instances, closes the lease and revokes credentials, retaining histories/identities. |
+| `DELETE /api/fleets/{fleetId}/agents/{agentId}` | Authorized exact `instanceKey` and `expectedRevision` retirement after native stop; no unbinding, reassignment or identity deletion. |
+| `PUT /api/fleets/{fleetId}/agents/{agentId}/native-stop` | Current controller's exact live lease/run proof of actual native close, with settled receipts; records no guessed stop from heartbeat or idle state. |
 | `GET /api/fleets/{fleetId}/map` | Human-authorized complete fleet topology: wake sources, agents, desired room access and last observed application. No controller access or mutation. |
 | `GET /api/fleets/{fleetId}/statistics` | Fleet owner/admin hourly summaries, bounded period selection, SQL-paginated sender/recipient flows and optional native usage; approximate counts and unknown billing remain explicit. |
 | `GET, POST /api/fleets/{fleetId}/session-operations`, `PUT /api/fleets/{fleetId}/session-operations/{operationId}/claim`, `PUT /api/fleets/{fleetId}/session-operations/{operationId}/receipt` | Human-authorized paginated session requests and controller-only generation-bound outcomes; Crossfire never launches native processes. |
@@ -2487,8 +2654,7 @@ ownership. The management website remains under `/manage`.
 | `POST /api/room-grant-previews` | Validate/normalize a bulk plan and expose changes/digest/revisions; no mutation. |
 | `POST /api/room-grant-changes` | Apply the exact confirmed plan atomically to desired state through the same grant domain. |
 | `GET /api/agents/{agentId}/listener-runs` | Authorized run/version/activity history. |
-| `PUT /api/agents/{agentId}/listener-runs/{runId}` | This agent reports ready/activity/stopped state under one stable run ID; server owns time/accounting. |
-| `POST /api/agents/{agentId}/listener-disconnections` | Confirmed owner/admin request targets observed run IDs; acknowledgment and actual stop are separate. |
+| `PUT /api/agents/{agentId}/listener-runs/{runId}` | This active bound agent proves its exact live `{fleetId,connectionId,credential}` controller tuple; server persists only immutable IDs and owns time/accounting. Stale/replaced/closed leases are rejected. |
 | `PUT /api/agents/{agentId}/wake-notices/{eventId}` | Idempotent model-free blocked-mention handling; verify original native event and current permission. |
 | `GET, PATCH /api/instance-policy` | Read policy; administrator updates it, including instruction text. |
 | `GET /api/audit-events` | Scoped, filtered and paginated immutable audit history. |
@@ -2505,7 +2671,7 @@ use the durable room-grant resources exclusively. Scope-changing routes must
 declare their actor kinds and permission codes in the operation catalog.
 
 The complete change includes server, management UI, CLI, runtime/coordination
-adapters, bootstrap/onboarding copy, released client bundles, routing/deployment
+adapters, npm/onboarding copy, released intentional tool bundles, routing/deployment
 configuration, tests and documentation. All owned consumers use this contract.
 Removed routes/payload forms are rejected; no aliases or compatibility handlers
 are retained. Public API examples and generated clients use the actual canonical
@@ -2548,84 +2714,84 @@ action directly: no slogans, promotional eyebrows, filler headings or decorative
 empty-state illustrations. Necessary permission, lifecycle and security
 explanations remain visible.
 
-Fleet list/detail and durable agent/room routes show names first,
-not opaque IDs. Owners see their scope; administrators may filter all owners.
-Fleet `/manage/fleets/{fleetId}/sessions` and fleet-managed-agent
-`/manage/agents/{agentId}/sessions` expose the same controller-owned actions:
-resume defaults to full saved native history; stop retains it; fresh history is
-separate, scope-labelled and confirmed before submission. Direct agents have no
-native-session tab. Paginated outcomes distinguish requested work from completion.
-Agent and fleet directories use compact tables, not cards. Lists have useful
-status/search filters and pagination, except the fleet directory: it displays
-the complete authorized filtered collection without page controls, by reading
-bounded 100-row REST pages. Filters and failures retain their normal API
-authority; stale requests are cancelled and errors never masquerade as an empty
-or complete partial result. Refresh does not imply an atomic multi-page snapshot.
-Revoked entries are
-explicitly included by filter. Fleet controller labels are visible in fleet
-summaries and agent deployment context, without implying heartbeat freshness.
-Fleet views separately show observed controller connectivity and desired delivery
-state. Confirmed activation/deactivation and an explicit message composer use the
-same scoped REST contract as the CLI; neither starts nor stops native engines.
-Paginated message history shows recipient outcomes without claiming model completion.
-Long message bodies have compact previews with inspectable, exact full text;
-room topics and protocol details do not displace access controls.
-Fleet detail opens on its agent roster. Shared accessible navigation exposes
-durable URLs for agents (the fleet base path), `map`, `delivery`, `sessions`, `messages`, `statistics`,
-`rooms` (room-plan review) and `settings`. Agent detail opens on room access;
-its other durable views are `wake`, `activity`, `runtime`, `decisions`, `software` and `settings`,
-plus `sessions` for fleet-managed agents only.
-Decision detail lives at `/manage/agents/{agentId}/decisions/{decisionId}`. Choice
-query hints do not preselect or submit. Review preserves all required questions,
-uses private inputs for secret text, and requires explicit owner confirmation.
-No human GET reads saved answers.
-The durable `runtime` view shows all supported public configured and observed
-effective native settings, model, reasoning effort, permission policy, native
-version, history mode and instance inline-message limit. Configured and observed values
-are distinct, with observation time and explicit unavailable fields. Per-room
-native observations retain their conversation attribution. Controller/deployment
-labels are descriptive; credentials, private endpoints and authentication fields
-are absent from public-safe REST projections.
-Only the selected task mounts and reads its resources. Links work with direct
-navigation, reload, browser history and keyboard navigation; unknown sections
-are unavailable, not aliases. Primary list pages link to the base detail path.
-The wake-up identity picker reads the directory only in selected-identity mode;
-selections survive searches and changes of mode. Native room permission thresholds
-remain available in an explicit disclosure, below the current authority summary.
-Empty software history explains how to begin reporting rather than showing an
-empty table.
-Software opens on the actively reported installed release, the latest release
-offered by this server, observation/check times and the normal consent-based
-update instructions. An offline agent's last reported installation is labelled
-as such, not presented as a currently running listener. Historical runs live in
-an inspectable paginated section and are not marked as needing updates. Opaque
-release IDs are compared for equality, not ordered as semantic versions.
-Activity shows native waiting state, pending decisions and the bounded original
-failure cause. Self-debugging guidance uses fleet show and the native attachment
-pointer on the actual controller; an unavailable/stopped engine is reported
-explicitly rather than launching a competing runtime or changing identity.
-Decision links open durable authenticated review pages with clear agent, origin,
-scope, choices and lifecycle state. Obsolete/answered requests cannot be
-submitted again. These views use the shared management theme and paper-like
-hierarchy, not the deployed Element theme.
-Identity/status context stays compact above navigation. Forms and explicit
-confirmations retain native permission checks, scoped REST mutations, revisions,
-CSRF and request idempotency. Policy sections distinguish signup, capacity,
-enrollment/reconciliation and onboarding, with one atomic settings save.
-Enrollment review includes the owner's current display identity and compact
-per-instance wake/invitation columns. Selected-author disclosure shows exact Matrix
-IDs. The page explains automatic application to existing/future ordinary grants,
-no membership grant and private-DM protection. No post-approval setup is required.
-Activity shows
-recognizable actors, affected principals and readable action labels, with exact
-record identifiers and provenance in a disclosure. Domain read models hydrate
-these identities in one page-wide directory batch, only after resource-scope
-authorization. Stored enrollment/audit records remain normalized and audit
-identifiers remain immutable; display labels are current, not historical name
-snapshots. No per-row network requests or broader permission are introduced.
-Each fleet's agents appear in a compact paginated table: linked agent name,
-instance key, listener status and account status. Agent details are reached through
-the name link; fleet rosters have no per-agent cards or duplicated detail controls.
+Fleet list/detail and durable agent/room routes show names first, not opaque
+IDs. Owners see their scope; administrators may filter all owners. Every agent
+shows its fleet and named controller. Agent and fleet directories use compact
+tables, not cards. Lists have status/search filters and pagination, except the
+fleet directory: it displays the complete authorized filtered collection without
+page controls, reading bounded 100-row REST pages. Counts and filters share API
+scope; failures never masquerade as an empty or complete partial result. Refresh
+does not imply an atomic multi-page snapshot.
+
+Fleet detail has exactly four durable sections: Agents at the base path,
+`/map`, `/activity` and `/settings`. Agents opens on the roster table with
+scope-labelled Stop sessions, Resume sessions and confirmed Start with fresh
+history controls. Ordinary resume uses exact saved histories. Requested,
+running, succeeded and failed controller operation outcomes remain distinct;
+no human HTTP acknowledgment is presented as native completion.
+
+Fleet Activity groups delivery intent and broadcasts at `/activity`, and traffic/
+usage at `/activity?view=traffic`. Pause delivery retains native processes and
+bindings; it is not Stop sessions. The composer and paginated recipient outcomes
+use the same scoped contracts as the CLI and never claim model completion.
+Traffic uses bounded periods, SQL pagination, explicit refresh and asynchronous
+summary evidence. Fleet Settings owns descriptive controller metadata, advanced
+room-plan diff/review/application and confirmed archive. Archive requires
+receipt-confirmed native stop and retains historical identities/data; it cannot
+make agents independent or authorize another owner's approval.
+
+Agent detail has exactly four durable sections: Rooms at the base path,
+`/session`, `/activity` and `/settings`. Rooms groups current room access,
+native enforcement and clearly separate wake eligibility; selected-author
+controls read the authorized directory only when needed and preserve choices
+across searches. `/rooms/{roomId}` preserves native permission details,
+generation-bound delegation and provenance-limited removal.
+
+Session owns native lifecycle controls, pending decisions, runtime observations,
+history contexts and terminal pointers. It distinguishes configured from observed
+model, reasoning, sandbox/approval, native version, history mode, message size and
+observation time; unknown fields are unavailable, not invented defaults.
+Per-room observations retain immutable conversation attribution. Public-safe
+projections contain no credentials, private endpoints, host paths or authentication
+fields. Private terminal inspection uses the actual controller/SSH channel and
+exact running context. Stopped/unavailable engines require explicit Resume;
+inspection cannot create another engine, receiver or identity.
+
+Decision detail remains at
+`/manage/agents/{agentId}/decisions/{decisionId}`. Query hints never preselect
+or submit. The authenticated page preserves all required choices/questions and
+secret inputs; only explicit verified-owner confirmation submits, under CSRF
+protection. GET never reads saved secret answers. Answered, cancelled, expired
+and obsolete decisions cannot be answered again, and native receipt determines
+actual resolution.
+
+Agent Activity shows listener receipt/connectivity evidence and bounded original
+failure causes, not another native configuration editor. Settings shows identity,
+account access, fleet-instance retirement and installed/latest software. Software
+opens on the active reported release, server's latest offered release and check
+times. Offline observations are labelled last reported. Paginated historical
+runs are inspectable but are not marked as awaiting upgrades. Release IDs compare
+for exact equality, not guessed semantic order. Update guidance follows the
+explicit pinned-package/controller workflow; no competing installer exists.
+
+Only the selected task mounts and reads its resources. Navigation supports
+direct URLs, reload, browser history and keyboard access. Superseded sections
+and unknown URLs are unavailable, not redirects/aliases. Shared management
+colors and paper-like hierarchy are independent of Element's site theme.
+Identity/status context stays compact above navigation; permission ceilings,
+pending/failed enforcement and destructive consequences remain immediately
+visible. Mutations retain scoped authority, expected revisions, CSRF and
+idempotency even when controls are hidden.
+
+Policy differentiates signup, capacity, enrollment/reconciliation and onboarding
+sections with one atomic save. Enrollment review shows the exact owner,
+controller, roster and each wake/invitation policy, including selected Matrix IDs.
+It explains automatic policy application, no membership grant and private-DM
+protection. Audit/activity hydrate recognizable current labels in one page-wide
+authorized directory batch while retaining immutable stored attribution, exact
+IDs and provenance in disclosures; there are no per-row network calls.
+Each fleet roster remains a compact paginated linked-agent table, not repeated
+agent detail cards.
 The fleet's separate `/manage/fleets/{fleetId}/map` view is a dense, flat connection
 graph: wake sources, packed agent nodes and shared room nodes. Its appearance uses
 only the shared management theme, independently of any deployed Element theme.
@@ -2659,17 +2825,21 @@ humans to Element for room creation/configuration and to agent management for
 access assignment.
 Delegated invitations, provenance-limited removal and selected wake senders have
 explicit controls; principal selection supports search and checkboxes. Bulk room
-TOML has a full diff/confirmation and revision validation. Destructive operations
-require confirmation; a disconnect targets observed listener run IDs only.
+TOML has a full diff/confirmation and revision validation. Native session stop,
+fresh-history reset, retirement and archive each state their different effects
+and require the appropriate explicit confirmation. Retirement/archive cannot
+bypass receipt-confirmed native stop or the server's current eligibility checks.
 
-The Connect page defaults to the single-agent flow, with three concise illustrated
-steps: paste one line, approve once, choose limited room access. Fleet setup has
-its own durable advanced tab. Requirements and the optional launcher live in a
-secondary inspectable area. Fleet approvals show exact names, failures, owner,
-controller, wake authors and room invitation defaults, including selected-identity
-disclosure. The review states the effect on existing and future ordinary room
-access and distinguishes permissions from membership. Reconnection is never
-described as re-enrollment.
+The Connect page presents one universal setup flow: paste the minimal personalized
+guide URL into an existing coding assistant, approve the exact roster once, then
+verify the new managed agent and assign only necessary room access. It clearly
+states that the coding conversation stays independent. One-agent and many-agent
+setup share that same controller/CLI workflow; there is no separate advanced
+deployment mode, optional launcher or current-session attachment instruction.
+Requirements, prerequisite/provider installation and optional TOML/root details
+are concise progressive disclosure behind the guide, not another installer.
+Fleet approvals show exact names, failures, owner, controller, wake authors and
+invitation defaults. Unchanged setup/resumption is not described as re-enrollment.
 
 All data lists use one first/previous/page/next/last pagination treatment. Server
 queries are bounded and stably ordered with matching scoped counts. URL navigation
@@ -2707,10 +2877,12 @@ Element configuration for the current hostname is rendered through the same
 policy owner. Deployment-owned brand/theme assets remain presentation data and
 cannot override signup authority.
 Account creation and invitation claims are audited and preserve role boundaries.
-Release notices follow the installed skill's lifecycle ownership. A project
-connection updates through its verified client after consent; a fleet-managed
-session asks the human to update its controller and restart the affected instance.
-Neither mode starts a competing listener.
+Release notices follow the installed skill's lifecycle ownership. After human
+consent, install the specified version-pinned public package, explicitly update
+the fleet or selected instance from its bundled verified local assets, then
+restart fleetd with that installed executable while preserving desired stop/resume
+intent and exact histories. Remote updates may specify the already installed
+absolute release directory; they never download an HTTP fallback.
 Update notices bind an exact opaque runtime session and release. Native identifier
 formats remain adapter-owned; durable notice filenames use a hash of the session.
 
@@ -2729,7 +2901,7 @@ Required banks:
 - Large ordinary native file changes/output, complete actual approval review,
   structured native questions, exact choice/free-text response routing and
   unsupported request classification without killing healthy listeners.
-- Shared history defaults and direct-session single-history enforcement;
+- Shared history defaults and exact managed-session history resumption;
   independent fleet instance modes, per-room/DM resumption, mode changes without
   context copying/replay, scoped wake trails, same identity/process/listener and
   zero model work for routing or attachment.
@@ -2758,7 +2930,7 @@ Required banks:
   disabled/edited/deleted rules and current configuring-human authority.
 - Real-browser Wake-ups CRUD, weekday/cron editors, assignment selection,
   owner/admin visibility, pagination, confirmations and desktop/mobile geometry.
-  Actual Codex, Claude Code and Pi publication through the shared listener with
+  Actual Codex publication through the shared listener with
   inert providers, including owner-DM-only/Nobody delivery, native busy and owner pause.
 - Enrollment name races, exact one-roster approval, private credential recovery,
   complete role coordination review, stale-policy rollback, selected-sender
@@ -2783,16 +2955,26 @@ Required banks:
   CLI error/status contracts, disconnected CLI survival and explicit stop.
 - Exclusive controller leases, loss/deadline deactivation, retained listener/runtime
   bindings, UI/CLI reactivation, queued-send cancellation, durable fleet-message
-  receipts/fan-out, authorization and unaffected direct listeners.
+  receipts/fan-out and exact current-generation authorization for every agent.
 - Native TUI pointers to the exact session locally and through SSH, no extra
   model call/receiver/engine, TUI exit leaves the fleet running, stopped-run
   refusal, shell quoting and exclusion of authentication tokens from output.
 - React browser flows for every management route, fleet/controller views,
   grants, principal selection, confirmations, auth boundaries and attachments.
 - Real Element invited/open signup, issuer-policy scope, registration denial,
-  current-session Unix attachment without a launcher, model-free listener tests,
+  independent managed-session setup, model-free listener tests,
   consent-notice receipts/restart deduplication, private-lock suspension/death,
-  and transactional schema migration preserving principals and audit records.
+  and transactional schema-12-to-13 migration preserving identities, histories,
+  grants, receipts and audit while archiving historical non-controller requests.
+- Zero-question pinned npm setup, optional configuration, active verified owner
+  descriptors, stable private defaults, approval/idempotency and explicit stop
+  preservation. Strict unsupported-runtime and superseded-route/payload rejection.
+  Clean-directory installation of only the public Fleet/fleetd tarballs proves
+  private-module bundling, finite file allowlists, no registry internal dependency
+  and no install-script activation. This is not registry-publication evidence.
+- Exact live controller tuple on every new reporting run, immutable generation
+  IDs, stale/closed/replaced-lease rejection, credential secrecy, retirement/archive
+  eligibility and no directory/authentication authority from historical identities.
 - Repository typecheck/build/test, architecture/import boundary and package-export
   checks, installation/release verification and final container/browser checks.
   No gate is weakened or skipped to call the product complete.
@@ -2803,9 +2985,10 @@ then executes independent test files in separate processes with a worker for
 every available CPU core. Browser and native fleet integration belong to that
 same run; architecture verification includes installation checks. Focused suite
 commands select subsets rather than adding duplicate certification runs.
-Runtime testing defaults to Codex. Claude Code, Pi and multi-adapter setup tests
-run only when the caller explicitly supplies `--all-runtimes`; their tests and
-product support remain intact. Test evidence identifies the selected runtimes.
+Runtime verification is Codex only. No alternate-runtime implementation, test
+bank or opt-in flag is retained. Native inert-provider evidence identifies its
+actual Linux/platform/protocol scope; it does not certify paid model behavior
+or untested macOS execution.
 Per-file output, durations and a machine-readable summary identify slow tails.
 Test fixtures own distinct directories, databases, runtime homes, ports and
 containers. Tests never mutate production or another fixture's state.

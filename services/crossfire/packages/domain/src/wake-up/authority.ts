@@ -1,9 +1,9 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { activeActor, authorize } from '../authorization/authorize.js';
 import type { Actor, Services } from '../port/services.js';
 import type { WakeRule } from './types.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
-import { connectionView } from '../fleet/control.js';
+import { controllerAdmission } from '../listener/controller.js';
 
 export function authorizedRule(services: Services, actor: Actor, ruleId: string, write = false) {
   if (actor.kind !== 'human') return failure('forbidden', 'Only members manage Wake-ups');
@@ -27,15 +27,7 @@ export function liveReceiver(services: Services, actor: Actor, agentId: string, 
   const run = scheduledReceiver(services, actor, agentId, runId); if (!run.ok) return run;
   if (run.value.stoppedAt !== null || run.value.disconnectRequestedAt !== null
     || run.value.lastSeenAt < services.clock.now() - HEARTBEAT_EXPIRY_MS) return success(false);
-  if (!run.value.controllerBound) return success(true);
-  const deployments = services.directory.deployments([agentId]); if (!deployments.ok) return deployments;
-  if (!deployments.value.length) return success(false);
-  for (const deployment of deployments.value) {
-    const fleet = services.repositories.fleet.findById(deployment.fleetId); if (!fleet.ok) return fleet;
-    const connection = services.repositories.fleetConnection.find(deployment.fleetId); if (!connection.ok) return connection;
-    if (!fleet.value?.deliveryEnabled || connectionView(connection.value, services.clock.now()).status !== 'online') return success(false);
-  }
-  return success(true);
+  return controllerAdmission(services, run.value);
 }
 export function ruleCanWake(services: Services, rule: WakeRule, agentId: string) {
   if (!rule.enabled) return success(false);

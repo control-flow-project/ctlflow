@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chatPublication } from '@crossfire/agent-core/chat-publication';
-import { messageArtifacts } from '@crossfire/agent-core/message-artifacts';
-import { eventView, type ReadBatch } from '@crossfire/agent-core/receive';
-import type { LocalState } from '@crossfire/agent-core/port';
-import type { RuntimeConnection } from '@crossfire/agent-core/runtime';
-import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
+import { chatPublication } from '@ctlflow/crossfire-agent-core/chat-publication';
+import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
+import { eventView, type ReadBatch } from '@ctlflow/crossfire-agent-core/receive';
+import type { LocalState } from '@ctlflow/crossfire-agent-core/port';
+import type { RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
+import type { PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
 
 function fixture(mode: 'shared' | 'per-room' = 'per-room', maximum = 65536) {
   const values = new Map<string, unknown>(), opened: string[] = [], inputs: { session: string; text: string; id: string }[] = [];

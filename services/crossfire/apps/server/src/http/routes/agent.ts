@@ -1,13 +1,12 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { readAgent, listAgents } from '@crossfire/domain/agent/read-agent';
-import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
-import { readWakePolicy } from '@crossfire/domain/wake/read-policy';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { readListenerRuns } from '@crossfire/domain/listener/read-runs';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { disconnectListeners } from '@crossfire/domain/listener/disconnect';
-import { requestWakeNotice } from '@crossfire/domain/notice/request-notice';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { readAgent, listAgents } from '@ctlflow/crossfire-domain/agent/read-agent';
+import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
+import { readWakePolicy } from '@ctlflow/crossfire-domain/wake/read-policy';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { readListenerRuns } from '@ctlflow/crossfire-domain/listener/read-runs';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { requestWakeNotice } from '@ctlflow/crossfire-domain/notice/request-notice';
 import { bind, reply, paged, actor } from '../bind.js';
 import * as view from '../representation/identity.js';
 export function agentRoutes() {
@@ -33,7 +32,6 @@ export function agentRoutes() {
     }))),
     bind(operations.listenerRuns, (context, params, query) => paged(readListenerRuns(context.services, actor(context), params.agentId, query), view.listenerRun)),
     bind(operations.reportListener, (context, params, _query, input) => reply(reportListener(context.services, actor(context), params.agentId, params.runId, input, context.manifest.release))),
-    bind(operations.disconnectListeners, (context, params, _query, input) => reply(disconnectListeners(context.services, actor(context), params.agentId, input, context.requestId))),
     bind(operations.wakeNotice, async (context, params, _query, input) => reply(await requestWakeNotice(context.services, actor(context), params.agentId, input.roomId, params.eventId))),
   ];
 }

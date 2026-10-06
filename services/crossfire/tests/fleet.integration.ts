@@ -1,5 +1,5 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { trustWorkspace } from '@crossfire/test-support/codex';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile, spawn } from 'node:child_process';
@@ -7,23 +7,24 @@ import { once } from 'node:events';
 import { promisify } from 'node:util';
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { nativeServer } from './support/native-server.js';
-import { releaseFixture } from './release-fixture.js';
+import { builtRelease } from '../scripts/test-support/release.js';
 import { value } from './support/application.js';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { openTerminal } from '../scripts/test-support/terminal.js';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { roomAccess } from '@crossfire/adapter-crossfire/room-access';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { runtimeOperation, type FleetRuntimeOperation } from '@crossfire/contracts/fleet-runtime';
-import { API, segment } from '@crossfire/contracts/matrix';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { readJson } from '@crossfire/adapter-filesystem/index';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { roomAccess } from '@ctlflow/crossfire-adapter-crossfire/room-access';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { runtimeOperation, type FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 const execute = promisify(execFile);
 async function until(predicate: () => boolean): Promise<void> {
@@ -34,9 +35,9 @@ type Fleet = { fleetId: string; phase: string; connection: { connected: boolean;
 type Binding = { fleetId: string; controllerCredential: string; identities: { instanceKey: string; agentId: string; account: { user_id: string; access_token: string } }[] };
 
 test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume without model housekeeping', { timeout: 180000 }, async scope => {
-  const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
+  const fixture = await nativeServer(scope, builtRelease().release), { services, admin, origin, worker } = fixture;
   const directory = mkdtempSync(join(tmpdir(), 'native-fleet-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
-  const cliPath = resolve('../fleet/dist/apps/cli/src/main.js');
+  const cliPath = fileURLToPath(import.meta.resolve('@ctlflow/fleet/executable'));
   const home = join(directory, 'home'); mkdirSync(home, { mode: 0o700 });
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [cliPath, ...args], { env, timeout: 60000 });

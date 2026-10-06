@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { WakeSchedule } from '@crossfire/contracts/wake-up';
+import type { WakeSchedule } from '@ctlflow/crossfire-contracts/wake-up';
 import { Field } from '../ui.js';
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

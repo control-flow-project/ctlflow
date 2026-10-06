@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Actor, Services } from '../port/services.js';
 import { authorize } from '../authorization/authorize.js';
 import type { PermissionCode } from '../authorization/catalog.js';
@@ -26,14 +26,16 @@ export function authenticateController(services: Pick<Services, 'repositories' |
   if (!found.value || found.value.revokedAt !== null || !services.identity.matches(token, found.value.secretHash)) return failure('unauthorized', 'Invalid controller credential');
   const fleet = services.repositories.fleet.findById(found.value.fleetId);
   if (!fleet.ok) return fleet;
-  if (!fleet.value) return failure('unauthorized', 'Fleet is unavailable');
+  if (!fleet.value || fleet.value.archivedAt !== null) return failure('unauthorized', 'Fleet is unavailable');
   const owner = services.repositories.principal.find({ id: fleet.value.ownerId });
   if (!owner.ok) return owner;
   return owner.value?.status === 'active' ? success({ kind: 'controller' as const, fleetId: fleet.value.id, credentialId: found.value.id })
     : failure('forbidden', 'Fleet owner is not active');
 }
 export function authorizeFleet(services: Pick<Services, 'repositories' | 'directory' | 'clock'>, actor: FleetActor, fleet: Fleet, write = false) {
+  if (write && fleet.archivedAt !== null) return failure('forbidden', 'Fleet is archived');
   if (actor.kind === 'controller') {
+    if (fleet.archivedAt !== null) return failure('forbidden', 'Fleet is archived');
     const credential = services.repositories.fleetCredential.find({ id: actor.credentialId });
     if (!credential.ok) return credential;
     const owner = services.repositories.principal.find({ id: fleet.ownerId });

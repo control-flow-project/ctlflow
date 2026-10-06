@@ -1,9 +1,9 @@
-import { roomId } from "@crossfire/contracts/validation";
-import { roomCreators, roomPowers } from '@crossfire/contracts/matrix-room';
-import { failure, success, type Result } from "@crossfire/kernel/result";
-import { API } from '@crossfire/contracts/matrix';
+import { roomId } from "@ctlflow/crossfire-contracts/validation";
+import { roomCreators, roomPowers } from '@ctlflow/crossfire-contracts/matrix-room';
+import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
+import { API } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk, nativeState, type Native } from "../http.js";
-import type { JsonObject } from "@crossfire/contracts/json";
+import type { JsonObject } from "@ctlflow/crossfire-contracts/json";
 
 export type RoomFacts = { room: string; name: string; topic: string; alias: string | null; ownerLevel: number; ownerCreator: boolean; creators: string[]; ceiling: number; ordinary: number; message: number; reaction: number; powers: JsonObject };
 

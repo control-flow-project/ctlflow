@@ -1,10 +1,10 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { discoverPrincipals, readRoles, readPermissions } from '@crossfire/domain/authorization/discover';
-import { resolvePrincipals } from '@crossfire/domain/identity/resolve-principals';
-import { readPolicy } from '@crossfire/domain/policy/read-policy';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
-import { readAuditEvents } from '@crossfire/domain/audit/read-events';
-import { success } from '@crossfire/kernel/result';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { discoverPrincipals, readRoles, readPermissions } from '@ctlflow/crossfire-domain/authorization/discover';
+import { resolvePrincipals } from '@ctlflow/crossfire-domain/identity/resolve-principals';
+import { readPolicy } from '@ctlflow/crossfire-domain/policy/read-policy';
+import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
+import { readAuditEvents } from '@ctlflow/crossfire-domain/audit/read-events';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { bind, reply, paged, actor } from '../bind.js';
 import * as view from '../representation/instance.js';
 export function instanceRoutes(instance: string, startedAt: number) {

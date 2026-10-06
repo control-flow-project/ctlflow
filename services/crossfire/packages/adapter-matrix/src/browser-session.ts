@@ -1,4 +1,4 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 export async function login(origin: string, username: string, password: string) {
   try {
     const response = await fetch(origin + '/_matrix/client/v3/login', { method: 'POST', redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(15000),

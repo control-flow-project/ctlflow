@@ -1,34 +1,39 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { realpathSync } from 'node:fs';
-import { setTimeout as delay } from 'node:timers/promises';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
-import { openTunnel } from '@fleet/ssh-transport/tunnel';
-import { name as nameParser, identifier } from '@crossfire/contracts/schema/validation';
-import type { Result } from '@crossfire/kernel/result';
-import { codexTerminal } from '@crossfire/adapter-codex/terminal';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
+import type { OperationInput } from '@ctlflow/fleetd-contracts/api';
+import { openTunnel } from '@ctlflow/fleet-ssh-transport/tunnel';
+import { name as nameParser, identifier } from '@ctlflow/crossfire-contracts/schema/validation';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
+import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
 import { loadConnections, saveConnections } from './configuration.js';
-import { launchDaemon } from './daemon.js';
+import { launchDaemon, restartDaemon } from './daemon.js';
 import { terminalPointer } from './attachment.js';
+import { setup } from './setup.js';
+import { observeOperation } from './operation.js';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message); return result.value; }
 function output(value: unknown): void { process.stdout.write(JSON.stringify(value, null, 2) + '\n'); }
-const usage = `fleet daemon start --name NAME --root DIRECTORY
-fleet daemon status|stop --root DIRECTORY
+const usage = `fleet setup [--descriptor PERSONALIZED_SETUP_URL] [--config /absolute/runtime.toml] [--root DIRECTORY]
+fleet daemon start [--name NAME] [--root DIRECTORY]
+fleet daemon status|stop|restart --root DIRECTORY
 fleet remote add NAME --ssh USER@HOST --root DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] add DIRECTORY
-fleet [--root DIRECTORY | --remote NAME] list|show|start|stop|remove [FLEET]
+fleet [--root DIRECTORY | --remote NAME] list|show|test|start|stop|remove [FLEET]
 fleet [--root DIRECTORY | --remote NAME] start FLEET [--fresh-history] [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] stop FLEET [--operation-id UUID]
+fleet [--root DIRECTORY | --remote NAME] update FLEET [--operation-id UUID] [--release-directory DIRECTORY]
 fleet [--root DIRECTORY | --remote NAME] activate|deactivate FLEET
 fleet [--root DIRECTORY | --remote NAME] message FLEET --text TEXT [--message-id UUID]
 fleet agent list FLEET
 fleet agent add FLEET INSTANCE --definition DEFINITION
 fleet agent start FLEET INSTANCE [--fresh-history] [--operation-id UUID]
 fleet agent stop FLEET INSTANCE [--operation-id UUID]
+fleet agent update FLEET INSTANCE [--operation-id UUID] [--release-directory DIRECTORY]
 fleet agent remove|contexts FLEET INSTANCE
 fleet agent attach FLEET INSTANCE [--context CONTEXT]
 
@@ -40,16 +45,22 @@ Attach only returns a live terminal pointer; resume a sleeping agent first.
 Status separates native phase, listener delivery, desired activation and saved history.`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, remote: { type: 'string' },
-    name: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, context: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, 'operation-id': { type: 'string' }, 'fresh-history': { type: 'boolean' }, help: { type: 'boolean' } } });
+    name: { type: 'string' }, descriptor: { type: 'string' }, config: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, context: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, 'operation-id': { type: 'string' }, 'release-directory': { type: 'string' }, 'fresh-history': { type: 'boolean' }, help: { type: 'boolean' } } });
   if (values.help || !positionals.length) { console.log(usage); return; }
   const allowed = new Set(['root', 'remote', ...(positionals[0] === 'remote' ? ['ssh'] : []),
+    ...(positionals[0] === 'setup' ? ['descriptor', 'config'] : []),
     ...(positionals[0] === 'daemon' && positionals[1] === 'start' ? ['name'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'add' ? ['definition'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'attach' ? ['context'] : []),
-    ...((['start', 'stop'].includes(positionals[0] ?? '') || positionals[0] === 'agent' && ['start', 'stop'].includes(positionals[1] ?? '')) ? ['operation-id'] : []),
+    ...((['start', 'stop', 'update'].includes(positionals[0] ?? '') || positionals[0] === 'agent' && ['start', 'stop', 'update'].includes(positionals[1] ?? '')) ? ['operation-id'] : []),
+    ...((positionals[0] === 'update' || positionals[0] === 'agent' && positionals[1] === 'update') ? ['release-directory'] : []),
     ...((positionals[0] === 'start' || positionals[0] === 'agent' && positionals[1] === 'start') ? ['fresh-history'] : []),
     ...(positionals[0] === 'message' ? ['text', 'message-id'] : [])]);
   for (const option of Object.keys(values)) if (!allowed.has(option)) throw new Error('Option is not valid for this command: --' + option);
+  if (positionals[0] === 'setup') {
+    if (positionals.length !== 1 || values.remote) throw new Error('Setup runs locally on the computer that will own the fleet');
+    await setup(values, signal, output); return;
+  }
   const connections = loadConnections();
   if (positionals[0] === 'remote') {
     if (positionals.length !== 3 || positionals[1] !== 'add' || !values.ssh || !values.root || !values.root.startsWith('/')) throw new Error(usage);
@@ -64,15 +75,21 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   if (remote) root = remote.root;
   if (!root) throw new Error('Select --root DIRECTORY or --remote NAME');
   if (positionals[0] === 'daemon' && positionals[1] === 'start') {
-    if (remote || !values.name || positionals.length !== 2) throw new Error('Start a named daemon locally on its computer');
+    if (remote || positionals.length !== 2) throw new Error('Start the daemon locally on its computer');
     const status = await launchDaemon(root, values.name, signal);
     connections.localRoot = root; saveConnections(connections); output(status); return;
   }
+  if (positionals[0] === 'start' && positionals.length !== 2 || positionals[0] === 'agent' && positionals[1] === 'start' && positionals.length !== 4) throw new Error(usage);
+  if (!remote && (positionals[0] === 'start' || positionals[0] === 'agent' && positionals[1] === 'start')) await launchDaemon(root, undefined, signal);
   const tunnel = remote ? await openTunnel(remote.ssh, root, signal) : undefined;
   try {
     const client = createDaemonClient(tunnel?.socketPath ?? join(root, 'fleetd.sock'), signal);
     if (positionals[0] === 'daemon') {
-      if (positionals.length !== 2 || !['status', 'stop'].includes(positionals[1]!)) throw new Error(usage);
+      if (positionals.length !== 2 || !['status', 'stop', 'restart'].includes(positionals[1]!)) throw new Error(usage);
+      if (positionals[1] === 'restart') {
+        if (remote) throw new Error('Restart runs locally on the controller computer; use its installed fleet CLI over SSH');
+        output(await restartDaemon(root, signal)); return;
+      }
       output(positionals[1] === 'status' ? value(await client.call(operations.status, {}, {})).data
         : value(await client.call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 })).data); return;
     }
@@ -98,6 +115,7 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
       output(value(await client.call(operations.createFleetMessage, params, { messageId, body: values.text })).data); return;
     }
     if (!agentCommand && command === 'show' && positionals.length === 2) { output(fleet); return; }
+    if (!agentCommand && command === 'test' && positionals.length === 2) { output(value(await client.call(operations.readiness, params, {})).data); return; }
     if (agentCommand && command === 'list' && positionals.length === 3) { output(fleet.instances); return; }
     if (!agentCommand && command === 'remove' && positionals.length === 2) { output(value(await client.call(operations.removeFleet, params, { expectedRevision: fleet.revision })).data); return; }
     const instanceKey = agentCommand ? value(nameParser(positionals[3])) : undefined;
@@ -110,18 +128,13 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     if (agentCommand && command === 'remove') { output(value(await client.call(operations.removeAgent, { ...params, instanceKey: instanceKey! }, { expectedRevision: fleet.revision })).data); return; }
     if (agentCommand && command === 'contexts') { output(value(await client.call(operations.contexts, { ...params, instanceKey: instanceKey! }, {})).data); return; }
     if (agentCommand && command === 'attach') { const pointer = value(await terminalPointer(client, fleet.fleetId, instanceKey!, { codex: codexTerminal() }, remote?.ssh, values.context)); process.stdout.write(pointer.command + '\n'); return; }
-    if (command !== 'start' && command !== 'stop') throw new Error(usage);
-    const request = { operationId: value(identifier(values['operation-id'] ?? randomUUID())), action: values['fresh-history'] ? 'reset' as const : command === 'stop' ? 'stop' as const : 'start' as const, expectedRevision: fleet.revision,
-      target: agentCommand ? { kind: 'agent' as const, fleetId: fleet.fleetId, instanceKey: instanceKey! } : { kind: 'fleet' as const, fleetId: fleet.fleetId } };
+    if (command !== 'start' && command !== 'stop' && command !== 'update') throw new Error(usage);
+    if (command === 'update' && remote && !values['release-directory']) throw new Error('Remote update requires --release-directory with the installed fleetd artifact directory on its computer, or run its installed fleet CLI over SSH');
+    const request: OperationInput = { operationId: value(identifier(values['operation-id'] ?? randomUUID())), action: values['fresh-history'] ? 'reset' : command, expectedRevision: fleet.revision,
+      target: agentCommand ? { kind: 'agent' as const, fleetId: fleet.fleetId, instanceKey: instanceKey! } : { kind: 'fleet' as const, fleetId: fleet.fleetId },
+      ...(command === 'update' ? { releaseDirectory: values['release-directory'] ?? dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts'))) } : {}) };
     output({ operationId: request.operationId });
-    let operation = value(await client.call(operations.operate, {}, request)).data, notified = '';
-    for (;;) {
-      if (operation.approval && operation.approval.code !== notified) { output({ status: 'awaiting-approval', ...operation.approval }); notified = operation.approval.code; }
-      if (operation.status === 'failed') { output(operation); throw new Error('Operation failed; successful peers are retained. Inspect fleet status.'); }
-      if (operation.status === 'succeeded') { output(operation); return; }
-      await delay(500, undefined, { signal });
-      operation = value(await client.call(operations.operation, { operationId: operation.operationId }, {})).data;
-    }
+    output(await observeOperation(client, value(await client.call(operations.operate, {}, request)).data, signal, output));
   } finally { await tunnel?.close(); }
 }
 if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {

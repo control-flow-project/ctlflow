@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import * as check from '@crossfire/contracts/schema/validation';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 const schema = check.object({ localRoot: check.nullable(check.text(4096)), remotes: check.list(check.object({ name: check.name, ssh: check.text(255), root: check.text(4096) }), 100) });
 export type Connections = check.Parsed<typeof schema>;
 const path = () => join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'fleet', 'connections.json');

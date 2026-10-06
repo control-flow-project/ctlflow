@@ -29,8 +29,8 @@ fleet execution running.
 For a per-room instance, first list contexts. Attach defaults to its separate
 private control history; pass the exact listed room ID to inspect that room's
 conversation. Multiple histories share one engine/identity/workarea. A pointer
-does not create, seed or replay a conversation. Direct attached agents have only
-their existing shared history.
+does not create, seed or replay a conversation. The coding session performing
+setup is independent and has no fleet attachment pointer.
 
 The runtime adapter owns session selection and native arguments. The private
 token is read from a run-local file into the client's environment, never printed

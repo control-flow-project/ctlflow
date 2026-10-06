@@ -1,5 +1,5 @@
 import * as check from '../schema/validation.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export const metadata = check.object({ requestId: check.identifier, page: check.optional(check.integer(1)),
   pageSize: check.optional(check.integer(1, 100)), totalItems: check.optional(check.integer()), totalPages: check.optional(check.integer()) });

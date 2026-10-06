@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Page, PageRequest } from '../port/directory.js';
 
 export const CONTROLLER_LEASE_MS = 30_000;

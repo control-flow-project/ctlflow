@@ -3,9 +3,12 @@
 ## Controller selection
 
 ```sh
+fleet setup --descriptor PERSONALIZED_SETUP_JSON_URL
+fleet setup --descriptor PERSONALIZED_SETUP_JSON_URL --config /absolute/private/research/runtime.toml
 fleet daemon start --name laptop --root /absolute/private/controller
 fleet daemon status
 fleet daemon stop
+fleet daemon restart
 fleet --root /absolute/private/controller list
 fleet remote add office --ssh operator@office-host --root /absolute/private/controller
 fleet --remote office list
@@ -20,6 +23,7 @@ Remote commands use SSH and the same private controller API.
 fleet add /absolute/private/research
 fleet list
 fleet show research
+fleet test research
 fleet start research
 fleet start research --fresh-history
 fleet agent list research
@@ -38,13 +42,17 @@ fleet remove research
 Add registers an explicit directory or instance. New identities need owner
 approval. Start automatically resumes the full saved native histories. Missing
 or broken established history is an error, not permission to create a new one.
-Stop ends addressed listeners and owned Codex processes. Remove requires stopped
-execution and preserves files, native history and ordinary Crossfire identity;
-it removes grouping, not the account. Closing the CLI does not cancel daemon work.
+Local start starts or reuses the configured controller. Status/list/show/test,
+contexts, attachment and registry edits never start it. Stop ends addressed
+listeners and owned Codex processes. Instance removal retires its fleet registration;
+whole-fleet removal archives the approved registration. Actual stopped native
+evidence and settled decisions are required. Files, history, identity and audit
+records are preserved; removal never creates an independent agent. Closing the
+CLI does not cancel accepted controller work.
 
 Operation results distinguish pending approval, success and per-instance failure.
 Idempotency keys and expected revisions prevent conflicting replays.
-Fleet and individual start and stop commands accept `--operation-id UUID` for an
+Fleet-wide and per-agent start and stop commands accept `--operation-id UUID` for an
 exact retry after uncertain submission; the command prints its ID before submission.
 Name collisions, missing credentials and invalid native settings stay errors.
 
@@ -61,9 +69,10 @@ one agent or the whole fleet. It stops selected owned processes, verifies comple
 available authorized history and nonsecret configuration exports, then starts fresh
 native contexts with the same identities and current definition parameters.
 It is not normal resumption. Use `--operation-id UUID` with the identical command
-to retry an uncertain request. A direct attached session is never controlled here.
+to retry an uncertain request. The independent coding session doing setup is
+never controlled here.
 - [Session controls, full-history resume and fresh-history confirmation](sessions.md)
-- [Export, boundaries and reset retention](../../crossfire/docs/history.md)
+- [Export, boundaries and reset retention](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
 
 ## Delivery control and broadcast
 
@@ -77,7 +86,7 @@ fleet message research --message-id YOUR_UUID --text "Review the updated assignm
 Deactivate pauses fleet-bound delivery but retains controller connections,
 engines and sessions. Activate resumes those bindings and unread positions.
 Crossfire UI provides equivalent revision-checked control. Connection loss pauses
-delivery; reconnect applies current server intent. Direct listeners are independent.
+delivery; reconnect applies current server intent. Every receiver is fleet-bound.
 
 Message queues explicit input per enrolled agent through the controller. It
 does not join rooms, alter wake rules or revive explicitly stopped agents.
@@ -89,3 +98,39 @@ controller connected; messages expire after ten minutes.
 
 Management exposes delivered/pending/skipped/failed/expired outcomes. A native
 receipt proves publication, not completed model work.
+
+## Model-free readiness
+
+`fleet test research` reads each desired receiver through the actual shared
+listener control endpoint. It checks exact native identity, authentication,
+membership, idle availability and enabled delivery. It creates no model turn,
+conversation or unread-position update. Busy, paused, unavailable and stopped
+bindings fail explicitly; a sleeping receiver can pass without waking Codex.
+
+## Explicit software update
+
+After human consent and installing the exact new public release, use that newly
+installed executable:
+
+```sh
+fleet update research
+fleet agent update research analyst-east
+fleet daemon restart
+```
+
+Update sends the installed controller's declared immutable artifact directory to
+fleetd. The lifecycle operation stops selected receivers/native processes,
+installs pinned agent tools/skills and resumes only previously desired agents
+with their exact histories. Stopped agents stay stopped. It never re-enrolls or
+uses a standalone connection command. Review every per-instance outcome.
+Restart replaces the controller binary after update and retains desired intent.
+
+For an SSH controller, the source directory must exist on that computer:
+
+```sh
+fleet --remote office update research --release-directory /absolute/private/installed/node_modules/@ctlflow/fleetd/dist/assets
+```
+
+The controller validates that exact directory and release before replacement.
+Alternatively invoke the newly installed CLI directly over SSH. `daemon restart`
+runs locally on the controller computer, not through the remote CLI tunnel.

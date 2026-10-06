@@ -21,7 +21,7 @@ export const member = check.object({ memberId: check.identifier, matrixUserId: c
   roleCode: check.choice('member', 'administrator'), status: check.status, revision: check.integer(), createdAt: check.integer(), application });
 export const session = check.object({ member, csrfSecret: check.secret, permissions: check.list(check.text(100), 100) });
 export const listenerRun = check.object({ runId: check.identifier, agentId: check.identifier, release: check.nullable(check.text(200)),
-  controllerBound: check.boolean,
+  controller: check.nullable(check.object({ fleetId: check.identifier, connectionId: check.identifier, credentialId: check.identifier })),
   startedAt: check.integer(), lastSeenAt: check.integer(), activeMs: check.integer(), messagesDelivered: check.integer(),
   stoppedAt: check.nullable(check.integer()), disconnectRequestedAt: check.nullable(check.integer()) });
 export const activity = check.object({ status: check.choice('online', 'offline', 'disconnecting'), activeMs: check.integer(),
@@ -29,8 +29,8 @@ export const activity = check.object({ status: check.choice('online', 'offline',
 export const owner = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(HUMAN_SIGNUP.labelMax), status: check.status });
 export const agent = check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, name: check.name, displayName: check.text(255),
   owner, status: check.status, revision: check.integer(), createdAt: check.integer(), application, activity, nativeRuntime: check.nullable(nativeRuntimeSummary),
-  deployment: check.nullable(check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), controllerName: check.text(100), reportedAt: check.integer(), instanceKey: check.name })),
-  allowedActions: check.list(check.choice('configure', 'room-grant.manage', 'listener.disconnect'), 3) });
+  deployment: check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), controllerName: check.text(100), reportedAt: check.integer(), instanceKey: check.name }),
+  canRetire: check.boolean, allowedActions: check.list(check.choice('configure', 'room-grant.manage', 'retire'), 3) });
 export const wakePolicy = check.object({ agentId: check.identifier, revision: check.integer(), mode: check.wakeMode, senders: check.list(principal, 2000) });
 export const grant = check.object({ agentId: check.identifier, roomId: check.roomId, generation: check.identifier, authorizerId: check.identifier,
   addedById: check.identifier, accessMode: check.choice('none', 'read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)),
@@ -65,8 +65,8 @@ export const roomAuthority = check.refine(check.object({ matrixUserId: check.mat
 export const room = check.object({ roomId: check.roomId, name: check.text(255), topic: check.text(4096, 0), alias: check.nullable(check.text(255)),
   authority: check.nullable(roomAuthority) });
 export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, outcome: check.choice('claimed', 'existing', 'failed'),
-  agentId: check.nullable(check.identifier), failureCode: check.nullable(check.text(100)), coordinationPolicy: check.nullable(coordinationPolicy) });
-export const enrollment = check.object({ owner: principal, controllerName: check.nullable(check.text(100)), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.nullable(check.name),
+  agentId: check.nullable(check.identifier), failureCode: check.nullable(check.text(100)), coordinationPolicy });
+export const enrollment = check.object({ owner: principal, controllerName: check.text(100), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.name,
   verificationCode: check.text(12, 12), status: check.choice('pending', 'approved', 'rejected', 'expired'), revision: check.integer(),
   createdAt: check.integer(), expiresAt: check.integer(), decidedByMemberId: check.nullable(check.identifier), decidedAt: check.nullable(check.integer()) });
 export const enrollmentDetails = check.object({ enrollment, instances: check.list(enrollmentItem, 100) });
@@ -79,7 +79,8 @@ export const enrollmentExchange = check.object({ status: check.choice('pending',
     status: check.choice('ready', 'provisioning', 'failed'), errorCode: check.nullable(check.text(100)), account: check.nullable(check.object({
       matrixUserId: check.matrixUserId, accessToken: check.text(8192), deviceId: check.text(255) })) }), 100) });
 export const fleet = check.object({ fleetId: check.identifier, owner: principal, fleetKey: check.name, label: check.text(100), controller,
-  revision: check.integer(), createdAt: check.integer(), updatedAt: check.integer(), delivery: fleetControl });
+  revision: check.integer(), createdAt: check.integer(), updatedAt: check.integer(), delivery: fleetControl,
+  canArchive: check.boolean, allowedActions: check.list(check.choice('configure', 'archive'), 2) });
 export const fleetAgent = check.object({ instanceKey: check.name, agent });
 export const invitation = check.object({ invitationId: check.identifier, createdByMemberId: check.identifier, roleCode: check.choice('member', 'administrator'),
   createdAt: check.integer(), expiresAt: check.integer(), consumedByMemberId: check.nullable(check.identifier), revokedAt: check.nullable(check.integer()) });

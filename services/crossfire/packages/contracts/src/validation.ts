@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import * as check from './schema/validation.js';
 export function object(value: unknown): Result<Record<string, unknown>> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)

@@ -1,4 +1,4 @@
-import { success } from '@crossfire/kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 import type { AgentRecord, DirectoryRepository } from '../port/directory.js';
 import type { AgentWakeSender } from '../room-access/types.js';

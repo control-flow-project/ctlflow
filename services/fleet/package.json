@@ -1,10 +1,14 @@
 {
-  "name": "@fleet/service",
+  "name": "@ctlflow/fleet",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "publishConfig": { "access": "public" },
   "type": "module",
-  "devDependencies": { "@crossfire/test-support": "0.1.0" },
-  "bin": { "fleet": "./dist/apps/cli/src/main.js" },
+  "devDependencies": { "@ctlflow/crossfire-test-support": "0.1.0" },
+  "bin": { "fleet": "./dist/bin/fleet.mjs" },
+  "files": ["dist/bin", "docs", "README.md"],
+  "exports": { "./executable": "./dist/bin/fleet.mjs", "./package.json": "./package.json" },
+  "dependencies": { "@ctlflow/fleetd": "0.1.0" },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"
@@ -12,6 +16,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "node ../../scripts/build-service.mjs fleet",
+    "build:package": "node scripts/build-package.mjs",
     "test": "node ../../scripts/test.mjs fleet all"
   }
 }

@@ -1,6 +1,6 @@
-import { API, segment } from '@crossfire/contracts/matrix';
-import { roomState } from '@crossfire/contracts/matrix-room';
-import { roomId, userId } from '@crossfire/contracts/validation';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { roomState } from '@ctlflow/crossfire-contracts/matrix-room';
+import { roomId, userId } from '@ctlflow/crossfire-contracts/validation';
 import type { Matrix } from './port.js';
 import type { ReceivedEvent } from './receive.js';
 

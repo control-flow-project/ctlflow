@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Principal, Member, Agent, PrincipalApplication } from '../identity/types.js';
 import type { PrincipalRole } from '../authorization/types.js';
 export type PageRequest = { page: number; pageSize: number };

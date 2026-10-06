@@ -1,12 +1,12 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { codexDelivery } from '@crossfire/adapter-codex/connection';
-import type { CodexSession } from '@crossfire/adapter-codex/session';
+import { codexDelivery } from '@ctlflow/crossfire-adapter-codex/connection';
+import type { CodexSession } from '@ctlflow/crossfire-adapter-codex/session';
 
 for (const published of [true, false]) test('lost native response preserves publication evidence across restart: ' + published, async scope => {
   const workspace = mkdtempSync(join(tmpdir(), 'receipt-proof-'));

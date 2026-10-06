@@ -1,10 +1,10 @@
 import type { LocalState } from './port.js';
-import { API, segment } from '@crossfire/contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import type { Matrix } from './port.js';
-import type { Settings, Account, Event } from '@crossfire/contracts/client';
+import type { Settings, Account, Event } from '@ctlflow/crossfire-contracts/client';
 import { eventView, incrementalEvents, type ReceivedEvent, type Sync } from './receive.js';
 import { createHash } from 'node:crypto';
-import { LISTENER_NOTICE } from '@crossfire/contracts/notices';
+import { LISTENER_NOTICE } from '@ctlflow/crossfire-contracts/notices';
 import type { Coordination } from './coordination.js';
 
 export type Control = {

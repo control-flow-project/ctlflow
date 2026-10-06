@@ -1,5 +1,5 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { connectOwnerConversation } from '@ctlflow/crossfire-domain/owner-conversation/connect';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
@@ -15,26 +15,30 @@ import { createApplication } from '../apps/server/src/composition.js';
 
 import { createWorker } from '../apps/server/src/worker.js';
 import { createHttpServer } from '../apps/server/src/http/create-server.js';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { createSession } from '@crossfire/domain/session/create-session';
-import { authenticateMember } from '@crossfire/domain/session/authenticate';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
+import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { createSession } from '@ctlflow/crossfire-domain/session/create-session';
+import { authenticateMember } from '@ctlflow/crossfire-domain/session/authenticate';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
 import { publicRouter } from '../apps/server/src/router.js';
 import { releaseFixture, updatedRelease } from './release-fixture.js';
-import { enroll, connect } from '../apps/client/src/enrollment.js';
-import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { API, segment } from '@crossfire/contracts/matrix';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { connectCodex } from '@crossfire/adapter-codex/connection';
-import { listen } from '@crossfire/adapter-crossfire/listener';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
 import { until } from '../scripts/test-support/listener.js';
-import { ARTIFACTS } from '@crossfire/contracts/release';
-import { onboardingUrl } from '@crossfire/contracts/onboarding';
+import { onboardingUrl } from '@ctlflow/crossfire-contracts/onboarding';
+import { checkEnrollmentInstructions, reviewLayouts } from './support/connect-browser.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { elementAssets } from './support/element.js';
 import { checkOnboardingPolicy } from './support/onboarding-browser.js';
@@ -89,88 +93,8 @@ async function submit(page: Page, name: string): Promise<void> {
   await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name, exact: true }).click()]);
 }
 
-async function checkEnrollmentInstructions(page: Page, origin: string, owner: string): Promise<string> {
-  await page.goto(origin + '/manage/connect');
-  const field = page.getByLabel('Instructions for your agent', { exact: true });
-  await expect(field).toBeVisible();
-  await checkPaperLayout(page);
-  await expect(field).toHaveAttribute('readonly', '');
-  const instructions = await field.inputValue();
-  const health = (await (await page.request.get(origin + '/api/health')).json() as { data: { release: string } }).data;
-  const base = origin + '/onboarding/' + health.release + '/';
-  const setupUrl = onboardingUrl(origin, owner);
-  assert.equal(instructions, 'Follow the setup instructions at ' + setupUrl + '.');
-  assert(instructions.length < 500, 'The copied connection message is concise');
-  assert.equal(instructions.split('\n').length, 1);
-  for (const content of ['curl ', 'sha256sum', 'README.md', 'manifest.json', 'SKILL.md', 'crossfire-client.mjs']) assert(!instructions.includes(content));
-  assert(!instructions.includes('$SERVER'));
-  assert(!instructions.includes('$OWNER'));
-  const details = page.locator('details.setup-details');
-  await expect(details).not.toHaveAttribute('open', '');
-  const guideResponse = await fetch(setupUrl);
-  assert.equal(guideResponse.status, 200, 'An agent can read the guide without a human session cookie');
-  const guide = await guideResponse.text();
-  for (const runtime of ['Claude Code', 'Pi', 'Codex']) assert(guide.includes(runtime), 'The setup guide describes each supported individual runtime');
-  await expect(page.getByText('Open your project in Codex, Claude Code or Pi', { exact: false })).toBeVisible();
-  assert(guide.includes('createHash("sha256")'));
-  assert(guide.includes('node .crossfire/client.mjs agent connect'));
-  assert(guide.includes('node .crossfire/client.mjs agent test'));
-  assert(guide.includes('Linux or macOS'));
-  assert(guide.includes('runcodex.sh download is NOT required'));
-  assert(guide.includes('https://nodejs.org/en/download'));
-  assert(guide.includes(owner));
-  assert(guide.includes(base + 'crossfire-client.mjs'));
-  await expect(page.getByRole('link', { name: 'Read the full guide for your account →', exact: true })).not.toBeVisible();
-  await details.locator('summary').click();
-  await expect(page.getByRole('link', { name: 'Read the full guide for your account →', exact: true })).toHaveAttribute('href', setupUrl);
-  await expect(page.getByRole('link', { name: 'Download optional runcodex.sh' })).toHaveAttribute('href', '/onboarding/' + health.release + '/runcodex.sh');
-  const names = ['manifest.json', ...ARTIFACTS];
-  for (const name of names) {
-    assert.equal((await fetch(base + name)).status, 200);
-  }
-  await expect(page.getByRole('link', { name: 'Review enrollment requests →', exact: true })).toHaveAttribute('href', '/manage/enrollments');
-  await expect(page.getByRole('heading', { name: 'Approve your agent', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Choose where it can listen', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'One agent', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('link', { name: 'Fleet · advanced', exact: true })).toHaveAttribute('href', '/manage/connect/fleet');
-  await expect(page.getByRole('link', { name: 'Rooms', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Manage rooms →', exact: true })).toHaveCount(0);
-  await expect(page.getByText('Approval creates its account, not a chat.', { exact: false })).toBeVisible();
-  assert(!instructions.includes('--session'));
-  assert(!instructions.includes('--token-file'));
-  await page.reload();
-  await expect(field).toHaveValue(instructions);
-  await expect(details).not.toHaveAttribute('open', '');
-  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.bringToFront();
-  await page.getByRole('button', { name: 'Copy instructions', exact: true }).click();
-  await expect(page.locator('.copy-text').getByRole('status')).toHaveText('Copied. Paste into your coding agent.');
-  assert.equal(await page.evaluate<string>('navigator.clipboard.readText()'), instructions);
-  return instructions;
-}
 
-async function reviewLayouts(page: Page, origin: string, directory: string, role: 'administrator' | 'member', routes: string[]) {
-  for (const viewport of [{ width: 1920, height: 1080 }, { width: 390, height: 844 }]) {
-    await page.setViewportSize(viewport);
-    for (const [index, route] of routes.entries()) {
-      await page.goto(origin + route);
-      await expect(page.locator('h1')).toBeVisible();
-      await expect(page.locator('.loading')).toHaveCount(0);
-      await expect(page.getByRole('alert')).toHaveCount(0);
-      await checkPaperLayout(page);
-      if (viewport.width === 1920) {
-        if (route === '/manage/connect') {
-          const gutters = await page.locator('.setup-step > div').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().left));
-          assert.equal(gutters.length, 3);
-          assert(gutters.every(left => left === gutters[0]), 'All illustrated steps share one text gutter');
-        }
-      }
-      await page.screenshot({ path: join(directory, 'review-' + role + '-' + viewport.width + '-' + index + '.png'), fullPage: true });
-    }
-  }
-}
-
-test('real browser member/admin flows and project listener span native Conduit, SQLite and Codex WS', { timeout: 180_000 }, async scope => {
+test('real browser member/admin flows and a fleet-managed listener span native Conduit, SQLite and owned Codex WS', { timeout: 180_000 }, async scope => {
   const element = elementAssets();
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), '.temp/browser-'));
@@ -244,17 +168,23 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert((await nativeOk(human, 'PUT', API + '/directory/room/' + segment(roomAlias), { room_id: room })).ok);
   assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/state/m.room.canonical_alias', { alias: roomAlias })).ok);
   const workspace = join(directory, 'project'); mkdirSync(workspace);
-  const destination = paths(workspace, 'holmes');
-  const enrolled = await enroll(destination, origin, config.administrator, 'holmes', release.manifest);
-  assert(enrolled.ok);
-  const request = enrolled.value as { code: string; approvalUrl: string };
+  const stateDirectory = join(directory, 'controller-state'); mkdirSync(stateDirectory);
+  const enrollment = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: config.administrator, fleetKey: 'project',
+    controller: { name: 'Browser workstation', metadata: {} }, instances: [{ instanceKey: 'holmes', name: 'holmes',
+      coordinationPolicy: { ...defaultCoordinationPolicy(), wakeMode: 'owner' as const } }] };
+  const introduced = value(await introduceEnrollment(services, enrollment));
+  const request = { approvalUrl: origin + '/manage/enrollments/' + enrollment.enrollmentId, code: introduced.request.verificationCode };
   await page.goto(request.approvalUrl);
   await page.getByLabel('Verification code').fill(request.code);
   await page.getByRole('button', { name: 'Approve roster', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Agent details →' })).toBeVisible();
   await worker.drain();
-  assert((await connect(destination, release.manifest)).ok);
-  const profile = readProfile(destination.profile);
+  const enrolled = value(exchangeEnrollment(services, enrollment.enrollmentId, enrollment.claimSecret)), enrolledAgent = enrolled.instances[0];
+  assert(enrolledAgent?.agentId && enrolledAgent.account && enrolled.fleet?.controllerCredential);
+  const profile = { id: enrolledAgent.agentId, workspace, account: { user_id: enrolledAgent.account.matrixUserId,
+    access_token: enrolledAgent.account.accessToken, device_id: enrolledAgent.account.deviceId },
+    settings: { instance: config.instance, homeserver: origin, server_name: config.serverName, owner: config.administrator, max_upload_bytes: 16 * 1024 * 1024 } };
+  const fleetId = enrolled.fleet.fleetId;
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: profile.id })), null);
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
   value(await connectOwnerConversation(services, { principalId: profile.id, kind: 'agent' }, profile.id));
@@ -263,9 +193,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), [mandatoryGrant]);
   await page.getByRole('link', { name: 'Agent details →' }).click();
   await expect(page.getByRole('region', { name: 'Rooms & access', exact: true })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link')).toHaveText(['Rooms', 'Session', 'Activity', 'Settings']);
   await expect(page.getByLabel('Configured display name')).toHaveCount(0);
-  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Wake-up rules', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Who can wake this agent?', exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' })).toHaveValue('owner');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
   await expect(page.getByRole('combobox', { name: 'Wake-up authority' }).locator('option')).toHaveCount(6);
@@ -326,25 +256,37 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, workspace);
   await materialize(engine, provider);
-  await page.goto(origin + '/manage/agents/' + profile.id + '/wake');
+  await page.goto(origin + '/manage/agents/' + profile.id);
   await page.getByRole('combobox', { name: 'Wake-up authority' }).selectOption('nobody');
   await submit(page, 'Save wake-up policy');
   await expect(page.getByRole('button', { name: 'Save wake-up policy' })).toBeDisabled();
   const stop = new AbortController();
   let listenerFailure: unknown;
   let listenerReady = false;
-  const receiving = listen({ binding: 'fixture', coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile: join(destination.state, 'cursors.json'),
+  const host = await createListenerHost();
+  cleanup(scope, () => host.close());
+  const control = createFleetControlConnection({ origin, credential: enrolled.fleet.controllerCredential, fleetId,
+    owner: config.administrator, signal: new AbortController().signal, acknowledged: () => success(undefined), execute: async command => {
+      if (command.action !== 'stop') return failure('invalid', 'This native browser fixture only executes its owned stop operation');
+      stop.abort(); await receiving; process.kill(-engine.child.pid!, 'SIGTERM'); await engine.ended;
+      return success({ status: 'succeeded', errorMessage: null });
+    } });
+  cleanup(scope, () => control.close());
+  const binding = control.listener(profile.id);
+  await until(() => control.status().connected);
+  const cursorFile = join(stateDirectory, 'cursors.json');
+  const receiving = listen({ binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile,
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
     runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, hooks }, signal),
-  }, stop.signal).catch(error => { listenerFailure = error; });
-  cleanup(scope, async () => { stop.abort(); await receiving; });
+  }, stop.signal).catch(error => { if (!stop.signal.aborted) listenerFailure = error; });
+  cleanup(scope, async () => { stop.abort(); await receiving; binding.close(); });
   await until(() => listenerReady || listenerFailure !== undefined);
   assert.equal(listenerFailure, undefined, String(listenerFailure));
-  await until(() => existsSync(join(destination.state, 'cursors.json.sync')));
-  const previousSync = readJson<string>(join(destination.state, 'cursors.json.sync'));
+  await until(() => existsSync(cursorFile + '.sync'));
+  const previousSync = readJson<string>(cursorFile + '.sync');
   assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/e2e', { msgtype: 'm.text', body: 'Crossfire integrated native delivery' })).ok);
-  await until(() => existsSync(join(destination.state, 'cursors.json.sync'))
-    && readJson<string>(join(destination.state, 'cursors.json.sync')) !== previousSync, 'The native receiver must consume the room notification before testing Nobody');
+  await until(() => existsSync(cursorFile + '.sync')
+    && readJson<string>(cursorFile + '.sync') !== previousSync, 'The native receiver must consume the room notification before testing Nobody');
   assert.equal(provider.requests.length, 0, 'Nobody must prevent real Matrix chat from reaching the native model transport');
   assert.equal(listenerFailure, undefined, String(listenerFailure));
   await engine.call('turn/start', { threadId: engine.session, input: [{ type: 'text', text: 'Direct native user input with Nobody selected.', text_elements: [] }] });
@@ -363,8 +305,9 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await page.goto(origin + '/manage/agents/' + profile.id + '/activity');
   const activity = page.getByRole('region', { name: 'Listener activity' });
   await expect(activity.getByText('online', { exact: true })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Software', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Settings', exact: true }).click();
   const software = page.getByRole('region', { name: 'Listener software', exact: true });
+  await expect(page.getByRole('button', { name: 'Retire agent', exact: true })).toBeDisabled();
   await expect(software.getByText('Current', { exact: true })).toBeVisible();
   const installedRelease = release.manifest.release;
   const requestsBeforeUpgrade = provider.requests.length;
@@ -374,7 +317,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(software.getByRole('table', { name: 'Current listener software', exact: true }).getByText(installedRelease, { exact: true })).toBeVisible();
   await expect(software.getByRole('link', { name: 'Update instructions for this server', exact: true })).toHaveAttribute('href', '/onboarding/' + release.manifest.release + '/README.md');
   assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Version discovery must not call the model');
-  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Runtime', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Session', exact: true }).click();
   await expect(page.getByRole('table', { name: 'Runtime settings', exact: true })).toBeVisible();
   await expect(page.getByText('65,536 UTF-8 bytes, including origin metadata; larger input uses private files', { exact: true })).toBeVisible();
   await checkPaperLayout(page);
@@ -390,6 +333,10 @@ test('real browser member/admin flows and project listener span native Conduit, 
     questions: [{ id: 'destination', title: 'Destination', prompt: 'Select an option or enter a private answer.', secret: true, allowText: true,
       options: [{ id: '0', label: 'A', description: 'First native choice' }, { id: '1', label: 'B', description: 'Second native choice' }] }] }));
   const decisionUrl = origin + '/manage/agents/' + profile.id + '/decisions/' + decision.id + '?choice=1';
+  await page.reload();
+  await expect(page.getByRole('table', { name: 'Pending decisions', exact: true }).getByRole('link', { name: 'Select a destination', exact: true })).toBeVisible();
+  await expect(page.getByText('Answer blocking requests so the agent can continue.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Decision history', exact: true })).toHaveCount(0);
   await page.goto(decisionUrl);
   await expect(page.getByRole('radio')).toHaveCount(2);
   for (const radio of await page.getByRole('radio').all()) await expect(radio).not.toBeChecked();
@@ -411,37 +358,38 @@ test('real browser member/admin flows and project listener span native Conduit, 
   assert.equal(provider.requests.length, requestsBeforeUpgrade, 'Browser review and answer are ordinary code, not model housekeeping');
   value(await coordination.receiptDecision(profile.id, decision.id, 'cancelled'));
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(origin + '/manage/agents/' + profile.id + '/software');
-  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.goto(origin + '/manage/agents/' + profile.id + '/settings');
   await page.getByLabel('Configured display name').fill('Unsaved name');
   await page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
   await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
+  const statusRefresh = page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
+  await page.getByRole('button', { name: 'Refresh status', exact: true }).click();
+  await statusRefresh;
+  await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Activity', exact: true }).click();
   await expect(activity.getByText('online', { exact: true })).toBeVisible();
-  const requestsBeforeDisconnect = provider.requests.length;
-  page.removeAllListeners('dialog');
-  page.once('dialog', dialog => dialog.dismiss());
-  await page.getByRole('button', { name: 'Disconnect listener', exact: true }).click();
-  await expect(activity.getByText('online', { exact: true })).toBeVisible();
-  page.on('dialog', dialog => dialog.accept());
+  const requestsBeforeStop = provider.requests.length;
+  await expect(page.getByRole('button', { name: 'Disconnect listener', exact: true })).toHaveCount(0);
   await page.evaluate('window.scrollTo(0, 0)');
   await page.screenshot({ path: join(directory, 'agent-activity-rooms.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert(await page.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
   await page.screenshot({ path: join(directory, 'agent-activity-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole('button', { name: 'Disconnect listener', exact: true }).click();
-  await expect(activity.getByText('disconnecting', { exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Session', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop session', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Session operations', exact: true }).locator('tbody tr').filter({ hasText: 'Stop' })).toContainText('succeeded');
+  await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Activity', exact: true }).click();
   await expect(activity.getByText('offline', { exact: true })).toBeVisible({ timeout: 45_000 });
   await receiving;
-  assert.match(String(listenerFailure), /requested.*disconnect/);
-  assert.equal(provider.requests.length, requestsBeforeDisconnect, 'Heartbeat and disconnect must not call the model');
+  assert.equal(listenerFailure, undefined, 'Controller stop completes without an unrequested listener failure');
+  assert.equal(provider.requests.length, requestsBeforeStop, 'Heartbeat and controller stop must not call the model');
   const report = await page.request.get(origin + '/api/agents/' + profile.id);
   const status = (await report.json() as { data: { activity: { messagesDelivered: number; activeMs: number } } }).data;
   assert(status.activity.messagesDelivered >= 1);
   assert(status.activity.activeMs > 0);
-  assert.equal(engine.child.exitCode, null, 'Stopping the listener must not stop the external engine');
-  await page.goto(origin + '/manage/agents/' + profile.id + '/software?runsPage=2');
+  assert(engine.child.exitCode !== null || engine.child.signalCode !== null, 'The controller receipt follows actual termination of its owned native process');
+  await page.goto(origin + '/manage/agents/' + profile.id + '/settings?runsPage=2');
   const lastReported = page.getByRole('table', { name: 'Last reported listener software', exact: true });
   await expect(lastReported.getByText(installedRelease, { exact: true })).toBeVisible();
   await expect(page.getByText('Last reported installation. No listener is currently reporting.', { exact: true })).toBeVisible();
@@ -451,7 +399,7 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await page.setViewportSize({ width: 390, height: 844 }); await checkPaperLayout(page);
   await page.screenshot({ path: join(directory, 'agent-software-offline-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  assert.equal(provider.requests.length, requestsBeforeDisconnect, 'Offline software inspection must not call the model');
+  assert.equal(provider.requests.length, requestsBeforeStop, 'Offline software inspection must not call the model');
   await page.getByRole('link', { name: 'Invitations', exact: true }).click();
   await page.getByRole('button', { name: 'Create invitation', exact: true }).click();
   const invitation = await page.getByLabel('Share this private link once').inputValue();
@@ -558,11 +506,12 @@ test('real browser member/admin flows and project listener span native Conduit, 
   const aliceAccount = value(await nativeOk({ base: origin }, 'POST', API + '/login', { type: 'm.login.password', identifier: { type: 'm.id.user', user: '@alice:architecture.localhost' }, password: 'browser-fixture-only-password' }));
   const aliceSession = value(await createSession(services, String(aliceAccount.access_token))), aliceActor = value(await authenticateMember(services, aliceSession.secret)).actor;
   for (const [name, actor, ownerMatrixId] of [['archived', adminActor, config.administrator], ['alice-agent', aliceActor, '@alice:architecture.localhost']] as const) {
-    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: null, instances: [{ instanceKey: name, name }] };
+    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: name, controller: { name: name + ' workstation', metadata: {} },
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy() }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const id = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!.agentId!;
-    if (name === 'archived') value(changeAgent(services, actor, id, { expectedRevision: 0, status: 'revoked' }, randomUUID()));
+    if (name === 'archived') value(changeAgent(services, actor, id, { expectedRevision: value(services.directory.agent(id))!.principal.revision, status: 'revoked' }, randomUUID()));
   }
   await worker.drain();
   await page.goto(origin + '/manage/agents');
@@ -583,7 +532,8 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(memberPage.getByRole('table', { name: 'Agents', exact: true }).locator('tbody tr')).toHaveCount(1);
   await expect(memberPage.getByRole('table', { name: 'Agents', exact: true })).toContainText('alice-agent');
   await reviewLayouts(page, origin, directory, 'administrator', ['/manage/agents', '/manage/agents/' + profile.id,
-    ...['wake', 'activity', 'software', 'settings'].map(section => '/manage/agents/' + profile.id + '/' + section),
+    ...['session', 'activity', 'settings'].map(section => '/manage/agents/' + profile.id + '/' + section),
+    '/manage/fleets/' + fleetId, '/manage/fleets/' + fleetId + '/activity', '/manage/fleets/' + fleetId + '/activity?view=traffic', '/manage/fleets/' + fleetId + '/settings',
     '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room), '/manage/connect', '/manage/enrollments',
     new URL(request.approvalUrl).pathname, '/manage/members', '/manage/invitations', '/manage/policy', '/manage/audit', '/manage/not-a-page']);
   await reviewLayouts(memberPage, origin, directory, 'member', ['/manage/agents', '/manage/fleets', '/manage/enrollments', '/manage/connect', '/manage/policy']);
@@ -602,6 +552,37 @@ test('real browser member/admin flows and project listener span native Conduit, 
   await expect(rowSave).not.toHaveClass(/primary/u);
   assert.equal(await page.evaluate<string>('getComputedStyle(document.querySelector(".room-save")).backgroundColor'), 'rgb(251, 252, 253)');
   await checkOnboardingPolicy(page, memberPage, origin, services, adminActor);
+  await page.goto(origin + '/manage/agents/' + profile.id + '/settings');
+  const retire = page.getByRole('button', { name: 'Retire agent', exact: true });
+  await expect(page.getByRole('region', { name: 'Retire agent', exact: true }).getByText('A session that has never started needs no stop request.', { exact: false })).toBeVisible();
+  await expect(retire).toBeEnabled();
+  page.removeAllListeners('dialog');
+  page.once('dialog', dialog => dialog.dismiss()); await retire.click();
+  assert.equal(value(services.repositories.fleetInstance.find({ ownerId: adminActor.principalId, fleetKey: 'project', instanceKey: 'holmes' }))!.retiredAt, null);
+  const memberRetirement = await memberPage.request.delete(origin + '/api/fleets/' + fleetId + '/agents/' + profile.id,
+    { data: { expectedRevision: value(services.repositories.fleet.findById(fleetId))!.revision, instanceKey: 'holmes' },
+      headers: { 'X-Crossfire-CSRF': value(await authenticateMember(services, (await memberContext.cookies(origin)).find(cookie => cookie.name === COOKIE_NAME)!.value)).csrfSecret } });
+  assert.equal(memberRetirement.status(), 403, 'Another owner cannot retire this managed identity');
+  page.once('dialog', dialog => dialog.accept()); await retire.click();
+  await expect(page).toHaveURL(origin + '/manage/fleets/' + fleetId);
+  await expect(page.getByRole('heading', { name: 'No agents', exact: true })).toBeVisible();
+  const retired = value(services.repositories.fleetInstance.find({ ownerId: adminActor.principalId, fleetKey: 'project', instanceKey: 'holmes' }))!;
+  assert(retired.retiredAt !== null);
+  assert.equal(value(services.repositories.principal.find({ id: profile.id }))!.matrixUserId, profile.account.user_id);
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: profile.id }))!.roomId, ownerConversation.roomId);
+  assert(engine.child.exitCode !== null || engine.child.signalCode !== null, 'Retirement follows an actual stopped native process');
+  await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Settings', exact: true }).click();
+  const archive = page.getByRole('button', { name: 'Archive fleet', exact: true });
+  await expect(page.getByRole('region', { name: 'Archive fleet', exact: true }).getByText('Sessions that have never started need no stop request.', { exact: false })).toBeVisible();
+  await expect(archive).toBeEnabled();
+  page.once('dialog', dialog => dialog.dismiss()); await archive.click();
+  assert.equal(value(services.repositories.fleet.findById(fleetId))!.archivedAt, null);
+  page.once('dialog', dialog => dialog.accept()); await archive.click();
+  await expect(page).toHaveURL(origin + '/manage/fleets');
+  await expect(page.getByRole('table', { name: 'Fleets', exact: true }).locator('a[href="/manage/fleets/' + fleetId + '"]')).toHaveCount(0);
+  assert(value(services.repositories.fleet.findById(fleetId))!.archivedAt !== null);
+  assert(value(services.repositories.fleetCredential.forFleet(fleetId)).every(credential => credential.revokedAt !== null));
+  assert.equal(provider.requests.length, requestsBeforeStop, 'Retirement and archival do not invoke a model');
   assert.deepEqual(errors, []);
   console.log('Browser evidence: ' + directory);
 });

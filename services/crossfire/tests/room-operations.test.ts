@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRoomOperations } from '@crossfire/domain/room-access/create-operations';
-import { failure, success } from '@crossfire/kernel/result';
+import { createRoomOperations } from '@ctlflow/crossfire-domain/room-access/create-operations';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 
 test('room application ownership serializes one room while other rooms remain independent', async () => {
   const owner = createRoomOperations();

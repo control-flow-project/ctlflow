@@ -1,7 +1,7 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { connectCodex } from '@crossfire/adapter-codex/connection';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
 import { fakeCodex, inputReceipt, THREAD, until } from './test-support/listener.js';
 
 test('native delivery verifies the selected workspace and uses only start-or-steer without policy overrides', async t => {

@@ -1,8 +1,8 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
-import { listen } from '@crossfire/adapter-crossfire/listener';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, matrixFixture, message, ROOM, until } from './test-support/listener.js';
 
 test('listener with only an owner DM reports activity without model input and obeys server disconnect', async scope => {

@@ -1,7 +1,8 @@
-import type { FleetInstance } from '@crossfire/domain/enrollment/types';
+import type { FleetInstance } from '@ctlflow/crossfire-domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapFleetInstance(row: Tables['fleet_instance']): FleetInstance {
   return {
+    retiredAt: row.retired_at,
     ownerId: row.owner_id,
     fleetKey: row.fleet_key,
     instanceKey: row.instance_key,

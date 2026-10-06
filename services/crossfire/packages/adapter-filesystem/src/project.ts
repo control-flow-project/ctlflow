@@ -1,8 +1,8 @@
 import { writeSync, realpathSync, openSync, closeSync, fstatSync, constants } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
-import { profile, profileName } from "@crossfire/contracts/client";
-import { endpoint } from "@crossfire/contracts/origin";
+import { profile, profileName } from "@ctlflow/crossfire-contracts/client";
+import { endpoint } from "@ctlflow/crossfire-contracts/origin";
 import { privateDir, readJson } from "./index.js";
 
 function gitExit(error: unknown, status: number): boolean {
@@ -22,8 +22,7 @@ export function paths(project: string, name: string) {
   const root = join(workspace, ".crossfire");
   assertIgnored(workspace, name);
   privateDir(root);
-  return { workspace, root, profile: join(root, "profiles", name + ".json"),
-    pending: join(root, "profiles", name + ".pending.json"), state: join(root, "state", name),
+  return { workspace, root, profile: join(root, "profiles", name + ".json"), state: join(root, "state", name),
     cursors: join(root, "state", name, "cursors.json") };
 }
 
@@ -71,7 +70,7 @@ function assertIgnored(workspace: string, name: string): void {
     throw gitFailure('Cannot run Git to verify project privacy', error);
   }
   try {
-    for (const path of [".crossfire/profiles/" + name + ".json", ".crossfire/profiles/" + name + ".pending.json", ".crossfire/state/" + name]) {
+    for (const path of [".crossfire/profiles/" + name + ".json", ".crossfire/state/" + name]) {
       execFileSync("git", ["-C", workspace, "check-ignore", "--quiet", "--", path], { stdio: "pipe" });
     }
   } catch (error) {

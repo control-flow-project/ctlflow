@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { verifyContent } from '../tools/browser/content.js';
@@ -9,10 +9,14 @@ import { value } from './support/application.js';
 import { nativeApplication } from './support/native-application.js';
 import { httpFixture } from './support/http.js';
 import { contentFixture, publishFixture, publicationHeaders } from './support/publication.js';
+import { browserPublisher } from './support/browser-controller.js';
+import { releaseFixture } from './release-fixture.js';
 
 test('real published HTML runs modules, CSS, images and data with an opaque origin and no application credentials', { timeout: 180_000 }, async scope => {
-  const fixture = await nativeApplication(scope), agent = await fixture.agent(fixture.admin.actor, 'public-reporter');
-  const api = await httpFixture(scope, fixture.application), content = await contentFixture(scope, fixture.application);
+  const release = await releaseFixture(), fixture = await nativeApplication(scope), agent = await fixture.agent(fixture.admin.actor, 'public-reporter');
+  const api = await httpFixture(scope, fixture.application, release), content = await contentFixture(scope, fixture.application);
+  await browserPublisher(scope, { origin: api.origin, agent, owner: fixture.admin.member.principal.matrixUserId,
+    release: release.manifest.release });
   const report = await publishFixture(api.origin, agent.token, {
     'index.html': '<!doctype html><html><head><link rel="stylesheet" href="assets/style.css"></head><body><h1>Report</h1><img id="illustration" src="assets/pixel.png"><pre id="proof">waiting</pre><script type="module" src="assets/main.mjs"></script></body></html>',
     'assets/style.css': 'h1{color:rgb(10,20,30)}',

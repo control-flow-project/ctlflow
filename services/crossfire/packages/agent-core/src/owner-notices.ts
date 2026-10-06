@@ -1,5 +1,5 @@
-import { MAX_MESSAGE_BYTES } from '@crossfire/contracts/limits';
-import { LISTENER_NOTICE } from '@crossfire/contracts/notices';
+import { MAX_MESSAGE_BYTES } from '@ctlflow/crossfire-contracts/limits';
+import { LISTENER_NOTICE } from '@ctlflow/crossfire-contracts/notices';
 
 export function ownerNotice(body: string) {
   const content = { msgtype: 'm.notice', body, [LISTENER_NOTICE]: true };

@@ -1,26 +1,27 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value, secret } from './support/application.js';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { preflightEnrollment } from '@crossfire/domain/enrollment/preflight';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { setRoomPermission } from '@crossfire/domain/room-access/set-permission';
-import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
-import { previewGrantPlan, applyGrantPlan } from '@crossfire/domain/room-access/grant-plan';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { deliveryPolicy } from '@crossfire/domain/agent/delivery-policy';
-import { requestWakeNotice } from '@crossfire/domain/notice/request-notice';
-import { publishWakeNotice } from '@crossfire/domain/notice/publish-notice';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { disconnectListeners } from '@crossfire/domain/listener/disconnect';
-import { listAgents } from '@crossfire/domain/agent/read-agent';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
-import { failure } from '@crossfire/kernel/result';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { preflightEnrollment } from '@ctlflow/crossfire-domain/enrollment/preflight';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { setRoomPermission } from '@ctlflow/crossfire-domain/room-access/set-permission';
+import { reconcileRoomGrant } from '@ctlflow/crossfire-domain/room-access/reconcile-grant';
+import { previewGrantPlan, applyGrantPlan } from '@ctlflow/crossfire-domain/room-access/grant-plan';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
+import { requestWakeNotice } from '@ctlflow/crossfire-domain/notice/request-notice';
+import { publishWakeNotice } from '@ctlflow/crossfire-domain/notice/publish-notice';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { changeFleetDelivery } from '@ctlflow/crossfire-domain/fleet/control';
+import { mapFleet } from './support/map-fleet.js';
+import { listAgents } from '@ctlflow/crossfire-domain/agent/read-agent';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 test('one enrollment pipeline preserves identity, name reservations, ownership and fleet bindings', async scope => {
   const fixture = await applicationFixture(scope);
@@ -95,15 +96,13 @@ test('room invitation capabilities cross owners but never transfer provenance or
 
 test('bulk room review is complete, revision-bound and atomic', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const agents = [await fixture.agent(admin.actor, 'alpha'), await fixture.agent(admin.actor, 'beta')];
-  const fleetId = randomUUID();
-  value(services.repositories.fleet.insert({ id: fleetId, label: 'Team', controllerName: 'desktop', revision: 0, deliveryEnabled: true, updatedAt: fixture.now(), ownerId: admin.actor.principalId, fleetKey: 'team', createdAt: fixture.now() }));
-  for (const [index, agent] of agents.entries()) value(services.repositories.fleetInstance.insert({ ownerId: admin.actor.principalId, fleetKey: 'team', instanceKey: 'worker-' + index, agentId: agent.id }));
+  const { fleet, instances } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 2);
+  const fleetId = fleet.id, agents = instances.map(instance => { assert(instance.agentId); return { id: instance.agentId }; });
   const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Team')).roomId;
-  const plan = { fleetId, agents: agents.map((_agent, index) => ({ instanceKey: 'worker-' + index,
+  const plan = { fleetId, agents: instances.map(instance => ({ instanceKey: instance.instanceKey,
     grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
-  value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: 0, displayName: 'Beta' }, randomUUID()));
+  value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: value(services.directory.agent(agents[1]!.id))!.principal.revision, displayName: 'Beta' }, randomUUID()));
   assert.equal((await applyGrantPlan(services, admin.actor, { plan, digest: preview.digest, snapshots: preview.snapshots }, randomUUID())).ok, false);
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agents[0]!.id, roomId })), null);
   const revised = value(await previewGrantPlan(services, admin.actor, plan));
@@ -146,21 +145,25 @@ test('selected wake and explicit blocked mentions use durable sender cooldown wi
   assert.equal(value(await requestWakeNotice(services, receiver.actor, receiver.id, roomIds[0]!, event(roomIds[0]!))).outcome, 'not-applicable');
 });
 
-test('listener activity is monotonic, targeted disconnection and owner visibility are exact', async scope => {
+test('listener activity is monotonic, controller pause and owner visibility are exact', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const other = await fixture.member('other'), owned = await fixture.agent(admin.actor, 'owned'), foreign = await fixture.agent(other.actor, 'foreign');
   const runId = randomUUID(), release = '0.1.0-test';
-  value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 3, controllerBound: false, stopped: false }, release));
-  fixture.advance(30_000);
-  value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 2, controllerBound: false, stopped: false }, release));
+  value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 3, controller: owned.controller, stopped: false }, release));
+  fixture.advanceConnected(30_000, owned.controller);
+  value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 2, controller: owned.controller, stopped: false }, release));
   assert.equal(value(services.repositories.listenerRun.find({ id: runId }))?.messagesDelivered, 3);
   assert.equal(value(services.repositories.listenerRun.find({ id: runId }))?.activeMs, 30_000);
-  assert.equal(reportListener(services, foreign.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 4, controllerBound: false, stopped: false }, release).ok, false);
-  value(disconnectListeners(services, admin.actor, owned.id, { expectedRevision: 0, runIds: [runId] }, randomUUID()));
+  assert.equal(reportListener(services, foreign.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 4, controller: owned.controller, stopped: false }, release).ok, false);
+  const fleet = value(services.repositories.fleet.findById(owned.controller.fleetId))!;
+  value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: fleet.revision, enabled: false }, randomUUID()));
+  assert.equal(value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 3, stopped: true, controller: owned.controller }, release)).disconnect, true);
+  const paused = value(services.repositories.fleet.findById(fleet.id))!;
+  value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: paused.revision, enabled: true }, randomUUID()));
   const newRun = randomUUID();
-  value(reportListener(services, owned.actor, owned.id, newRun, { statistics: null, release, messagesDelivered: 0, controllerBound: false, stopped: false }, release));
-  assert.equal(value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 3, controllerBound: false, stopped: false }, release)).disconnect, true);
-  assert.equal(value(reportListener(services, owned.actor, owned.id, newRun, { statistics: null, release, messagesDelivered: 0, controllerBound: false, stopped: false }, release)).disconnect, false);
+  value(reportListener(services, owned.actor, owned.id, newRun, { statistics: null, release, messagesDelivered: 0, controller: owned.controller, stopped: false }, release));
+  assert.equal(value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 3, controller: owned.controller, stopped: false }, release)).disconnect, true);
+  assert.equal(value(reportListener(services, owned.actor, owned.id, newRun, { statistics: null, release, messagesDelivered: 0, controller: owned.controller, stopped: false }, release)).disconnect, false);
   const filter = { page: 1, pageSize: 20, statuses: ['active' as const], search: '', listener: 'all' as const };
   assert.equal(value(listAgents(services, other.actor, filter)).totalItems, 1);
   assert.equal(value(listAgents(services, admin.actor, { ...filter, listener: 'online' })).totalItems, 1);

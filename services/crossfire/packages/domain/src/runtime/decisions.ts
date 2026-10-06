@@ -1,15 +1,18 @@
 import type { DecisionCreation, DecisionAnswer, DecisionView, DecisionSummary } from './values.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor, Services } from '../port/services.js';
 import { authorize, authorizeAgent } from '../authorization/authorize.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
 import { recordEvent } from '../audit/record-event.js';
+import { controllerAdmission } from '../listener/controller.js';
 
 export function liveRun(services: Services, agentId: string, runId: string) {
   const run = services.repositories.listenerRun.find({ id: runId });
   if (!run.ok) return run;
-  return run.value && run.value.agentId === agentId && run.value.stoppedAt === null && run.value.disconnectRequestedAt === null
-    && run.value.lastSeenAt + HEARTBEAT_EXPIRY_MS > services.clock.now() ? success(run.value) : failure('conflict', 'The original listener is no longer available');
+  if (!run.value || run.value.agentId !== agentId || run.value.stoppedAt !== null || run.value.disconnectRequestedAt !== null
+    || run.value.lastSeenAt + HEARTBEAT_EXPIRY_MS <= services.clock.now()) return failure('conflict', 'The original listener is no longer available');
+  const admission = controllerAdmission(services, run.value); if (!admission.ok) return admission;
+  return admission.value ? success(run.value) : failure('conflict', 'The original controller lease is no longer available');
 }
 function sameDecision(original: DecisionCreation, input: DecisionCreation): boolean {
   const fields = ['id', 'runId', 'runtime', 'sessionId', 'requestId', 'turnId', 'itemId', 'kind', 'action', 'review', 'blocking', 'expiresAt'] as const;
@@ -34,6 +37,7 @@ function currentDecision<Value extends DecisionSummary>(services: Services, valu
   return success(value);
 }
 export function createDecision(services: Services, actor: Actor, agentId: string, input: DecisionCreation) {
+  if (input.runtime !== 'codex') return failure('invalid', 'Codex is the only implemented runtime');
   return services.unitOfWork.run(() => {
     const authority = authorize(services, actor, 'runtime.report.self');
     if (!authority.ok) return authority;
@@ -61,10 +65,11 @@ export function readDecision(services: Services, actor: Actor, agentId: string, 
   if (!result.ok) return result;
   return result.value?.agentId === agentId ? services.unitOfWork.run(() => currentDecision(services, result.value!)) : failure('missing', 'Decision not found');
 }
-export function listDecisions(services: Services, actor: Actor, agentId: string, query: { page: number; pageSize: number }) {
+export function listDecisions(services: Services, actor: Actor, agentId: string, query: { page: number; pageSize: number; status?: 'pending' | null }) {
   const authority = authorizeAgent(services, actor, agentId, 'read');
   if (!authority.ok) return authority;
-  const values = services.runtime.decisions(agentId, query.page, query.pageSize);
+  const expired = expireDecisions(services); if (!expired.ok) return expired;
+  const values = services.runtime.decisions(agentId, query.page, query.pageSize, query.status ?? null);
   if (!values.ok) return values;
   return services.unitOfWork.run(() => {
     const items: DecisionSummary[] = [];

@@ -1,7 +1,7 @@
-import { fields, text, userId } from "@crossfire/contracts/validation";
-import { failure, success, type Result } from "@crossfire/kernel/result";
-import { endpoint } from '@crossfire/contracts/origin';
-import { PUBLICATION_LIMITS, type PublicationBudget } from '@crossfire/domain/publication/values';
+import { fields, text, userId } from "@ctlflow/crossfire-contracts/validation";
+import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
+import { endpoint } from '@ctlflow/crossfire-contracts/origin';
+import { PUBLICATION_LIMITS, type PublicationBudget } from '@ctlflow/crossfire-domain/publication/values';
 
 export type Config = {
   instance: string; serverName: string; publicOrigin: string; contentOrigin: string; matrixOrigin: string;

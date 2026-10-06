@@ -1,15 +1,16 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { API, segment } from '@crossfire/contracts/matrix';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { createInvitationReader } from '@crossfire/adapter-matrix/room/invitation';
-import { readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { createListenerControl } from '@crossfire/agent-core/listener-control';
-import { listen } from '@crossfire/adapter-crossfire/listener';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
+import { createInvitationReader } from '@ctlflow/crossfire-adapter-matrix/room/invitation';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, until } from '../scripts/test-support/listener.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
@@ -20,7 +21,8 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
   const owner = await fixture.member('alice'), outsider = await fixture.member('bob');
   const agent = await fixture.agent(owner.actor, 'ada');
   let unavailable: string | undefined;
-  const runtime = await fakeCodex(scope), stop = new AbortController(), control = createListenerControl(async () => {}, reason => { unavailable = reason; });
+  const runtime = await fakeCodex(scope), stop = new AbortController(), control = createListenerControl(async () => {}, () => agent.controller, reason => { unavailable = reason; });
+  const host = await createListenerHost(); cleanup(scope, () => host.close()); cleanup(scope, control.close);
   const native = (token: string, method: string, path: string, input?: unknown) => nativeOk({ base: origin, token }, method, API + path, input);
   const observer = createInvitationReader();
   assert.equal(value(await observer({ base: origin, token: agent.token }, agent.matrixUserId)).size, 0);
@@ -36,7 +38,7 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
     assert(!JSON.stringify(incremental.rooms ?? {}).includes(roomId), 'An unchanged pending invite is absent even from full-state incremental sync');
   }
   let ended: unknown, ready = false;
-  const receiver = listen({ binding: 'fixture', coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ binding: 'fixture', host, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
     id: agent.id, release: release.manifest, cursorFile,
@@ -45,11 +47,14 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
   }, stop.signal).catch(error => { ended = error; });
   cleanup(scope, async () => { stop.abort(); await receiver; });
   const admitted = (roomId: string) => value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId }))?.membership === 'join';
-  await until(() => ready || ended !== undefined, 'Native listener was not initialized', 30000);
+  await until(() => host.size() === 1 || ended !== undefined, 'Controller listener host was not initialized', 30000);
   assert.equal(ended, undefined);
+  assert.equal(ready, false); assert.equal(runtime.requests().length, 0, 'Inactive binding cannot start the native runtime');
   assert.equal(readJson(cursorFile + '.sync'), previous.next_batch, 'Inactive acquisition preserves the consumed timeline cursor');
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId })), null, 'Inactive fleet listeners do not accept room invitations');
   control.update({ active: true, input: null });
+  await until(() => ready || ended !== undefined, 'Native listener was not initialized', 30000);
+  assert.equal(ended, undefined);
   await until(() => admitted(roomId) || ended !== undefined, 'Pending room invitation was not accepted', 30000);
   assert.equal(ended, undefined);
   assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 0, 'Joining is model-free');

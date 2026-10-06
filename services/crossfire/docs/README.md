@@ -1,7 +1,7 @@
 # Crossfire guides
 
 ## Users
-- [Connect an existing coding session](onboarding/README.md)
+- [Set up a fleet-managed agent](onboarding/README.md)
 - [Agents, rooms, permissions, wake-ups and approvals](management.md)
 - [Runtime activity, histories, decisions and terminal diagnosis](runtime.md)
 - [Matrix commands, history, files and attachments](matrix-api.md)
@@ -9,7 +9,7 @@
 - [Fleet traffic and native usage statistics](statistics.md)
 - [Public reports, files and deletion](reports.md)
 - [Publish static reports with HTML, JavaScript, images and data](publications.md)
-- [Headless fleet setup](../../fleet/docs/getting-started.md)
+- [Fleet setup and controller commands](../../fleet/docs/getting-started.md)
 - [Fleet sessions, saved-history resume and fresh-history confirmation](../../fleet/docs/sessions.md)
 
 ## Operators

@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { request } from 'node:http';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { binaryBytes } from '@crossfire/kernel/bytes';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { deletePublication } from '@crossfire/domain/publication/delete';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { binaryBytes } from '@ctlflow/crossfire-kernel/bytes';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { deletePublication } from '@ctlflow/crossfire-domain/publication/delete';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contentFixture, publishFixture, publicationHeaders } from './support/publication.js';
@@ -20,7 +20,7 @@ function probe(url: string, method: string, headers: Record<string, string>, bod
 }
 
 test('typed streamed binary REST publishes only committed static bytes on the separate content listener', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher');
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher');
   const api = await httpFixture(scope, fixture.application); await contentFixture(scope, fixture.application);
   const report = await publishFixture(api.origin, agent.token, { 'index.html': '<!doctype html><p>Report</p>', 'assets/main.mjs': 'export const answer = 42;', 'data.json': '{"value":42}' });
   const publicResponse = await fetch(report.url!); assert.equal(publicResponse.status, 200); assert.match(await publicResponse.text(), /Report/u);
@@ -35,7 +35,7 @@ test('typed streamed binary REST publishes only committed static bytes on the se
 });
 
 test('binary uploads reject JSON, omitted length, unbounded declarations and foreign agents on the canonical operation', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher'), other = await fixture.agent(fixture.admin.actor, 'other');
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher'), other = await fixture.listeningAgent(fixture.admin.actor, 'other');
   const api = await httpFixture(scope, fixture.application), client = createClient({ origin: api.origin, token: agent.token }), data = Buffer.from('hello');
   const report = value(await client.call(operations.createPublication, {}, { title: 'Report', files: [{ path: 'index.html', mediaType: 'text/html', bytes: data.length, sha256: createHash('sha256').update(data).digest('hex') }] })).data;
   const path = '/api/publications/' + report.id + '/files/' + report.files[0]!.id;
@@ -51,7 +51,7 @@ test('binary uploads reject JSON, omitted length, unbounded declarations and for
 });
 
 test('the content service has no APIs, enrollment, credentials, path aliases or arbitrary-host routing', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher'), api = await httpFixture(scope, fixture.application);
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher'), api = await httpFixture(scope, fixture.application);
   const content = await contentFixture(scope, fixture.application), report = await publishFixture(api.origin, agent.token, { 'index.html': '<p>Public</p>', 'diagram.svg': '<svg xmlns="http://www.w3.org/2000/svg"></svg>' });
   for (const path of ['/api/health', '/api/publications', '/_matrix/client/v3/sync', '/onboarding/setup', '/config.json']) assert.equal((await fetch(content.origin + path)).status, 404, path);
   assert.equal((await fetch(report.url!, { method: 'POST', body: 'not allowed' })).status, 405);
@@ -65,7 +65,7 @@ test('the content service has no APIs, enrollment, credentials, path aliases or 
 });
 
 test('owner deletion fences a public read even after its private file descriptor has opened', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publisher');
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'publisher');
   const api = await httpFixture(scope, fixture.application); await contentFixture(scope, fixture.application);
   const report = await publishFixture(api.origin, agent.token, { 'index.html': '<p>Public report</p>' });
   const store = fixture.services.publication.store, original = store.read;

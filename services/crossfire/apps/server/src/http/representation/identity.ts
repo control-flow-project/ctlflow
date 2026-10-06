@@ -1,8 +1,8 @@
-import type { MemberRecord } from '@crossfire/domain/port/directory';
-import type { PrincipalApplication } from '@crossfire/domain/identity/types';
-import type { AgentDetails } from '@crossfire/domain/agent/read-agent';
-import type { ListenerRun } from '@crossfire/domain/activity/types';
-import { agentDisplayName } from '@crossfire/domain/identity/display-name';
+import type { MemberRecord } from '@ctlflow/crossfire-domain/port/directory';
+import type { PrincipalApplication } from '@ctlflow/crossfire-domain/identity/types';
+import type { AgentDetails } from '@ctlflow/crossfire-domain/agent/read-agent';
+import type { ListenerRun } from '@ctlflow/crossfire-domain/activity/types';
+import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
 export function application(value: PrincipalApplication) {
   return { appliedRevision: value.appliedRevision, appliedStatus: value.appliedStatus, nativeDisplayName: value.nativeDisplayName,
     lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt, errorCode: value.errorCode, errorMessage: value.errorMessage };
@@ -13,7 +13,7 @@ export function member(value: MemberRecord) {
     application: application(value.application) };
 }
 export function listenerRun(value: ListenerRun) {
-  return { runId: value.id, agentId: value.agentId, release: value.release, controllerBound: value.controllerBound, startedAt: value.startedAt, lastSeenAt: value.lastSeenAt,
+  return { runId: value.id, agentId: value.agentId, release: value.release, controller: value.controller, startedAt: value.startedAt, lastSeenAt: value.lastSeenAt,
     activeMs: value.activeMs, messagesDelivered: value.messagesDelivered, stoppedAt: value.stoppedAt, disconnectRequestedAt: value.disconnectRequestedAt };
 }
 export function agent(value: AgentDetails) {
@@ -25,7 +25,7 @@ export function agent(value: AgentDetails) {
     application: application(record.application), activity: { status: activity.status, activeMs: activity.activeMs,
       messagesDelivered: activity.messagesDelivered, lastSeenAt: activity.lastSeenAt, activeRuns: activity.activeRuns.map(listenerRun) },
     nativeRuntime: value.nativeRuntime,
-    deployment: value.deployment ? { fleetId: value.deployment.fleetId, fleetKey: value.deployment.fleetKey, label: value.deployment.label,
-      controllerName: value.deployment.controllerName, reportedAt: value.deployment.reportedAt, instanceKey: value.deployment.instanceKey } : null,
-    allowedActions: value.allowedActions };
+    deployment: { fleetId: value.deployment.fleetId, fleetKey: value.deployment.fleetKey, label: value.deployment.label,
+      controllerName: value.deployment.controllerName, reportedAt: value.deployment.reportedAt, instanceKey: value.deployment.instanceKey },
+    canRetire: value.canRetire, allowedActions: value.allowedActions };
 }

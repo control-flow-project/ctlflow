@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { GrantIntent, GrantAuthorization } from './authorize-change.js';
 import { authorizeGrantChange } from './authorize-change.js';
@@ -27,7 +27,7 @@ export async function previewGrantPlan(services: Dependencies, actor: Actor, pla
       || proposed.grants.some(grant => grant.accessMode === 'none')) return failure('invalid', 'A room plan lists up to 100 unique active grants per agent');
     const binding = services.repositories.fleetInstance.find({ ownerId: fleet.value.ownerId, fleetKey: fleet.value.fleetKey, instanceKey: proposed.instanceKey });
     if (!binding.ok) return binding;
-    if (!binding.value) return failure('missing', 'Fleet instance is not registered: ' + proposed.instanceKey);
+    if (!binding.value || binding.value.retiredAt !== null) return failure('missing', 'Fleet instance is not registered: ' + proposed.instanceKey);
     const target = authorizeAgent(services, actor, binding.value.agentId, 'room-grant.manage');
     if (!target.ok) return target;
     const current = services.collection.roomGrants({ agentId: binding.value.agentId });

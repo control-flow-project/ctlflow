@@ -8,7 +8,7 @@ import { serve } from './main.js';
 import { config } from './config.js';
 import { publicRouter } from './router.js';
 import { readElementPresentation } from './element-configuration.js';
-import { readJson, privateDir } from '@crossfire/adapter-filesystem/index';
+import { readJson, privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 process.umask(0o077);
 const directory = '/runtime';

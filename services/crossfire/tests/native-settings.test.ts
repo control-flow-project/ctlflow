@@ -1,11 +1,11 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { connectCodex } from '@crossfire/adapter-codex/connection';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
 
 test('external app-server owns model, reasoning and workspace settings', async scope => {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });

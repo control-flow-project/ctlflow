@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -6,8 +6,8 @@ import { once } from 'node:events';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
-import { codexProtocol, type NativeEvent } from '@crossfire/adapter-codex/protocol';
-import type { nativeProvider } from '@crossfire/test-support/native-provider';
+import { codexProtocol, type NativeEvent } from '@ctlflow/crossfire-adapter-codex/protocol';
+import type { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { setTimeout as delay } from 'node:timers/promises';
 
 export async function materialize(engine: Pick<Awaited<ReturnType<typeof nativeEngine>>, 'session' | 'call' | 'notifications'>, provider: Awaited<ReturnType<typeof nativeProvider>>) {
@@ -24,11 +24,10 @@ export async function materialize(engine: Pick<Awaited<ReturnType<typeof nativeE
 export async function nativeEngine(scope: TestContext, home: string, workspace: string, arguments_: string[] = []) {
   const token = randomBytes(32).toString('hex');
   const tokenFile = join(home, 'token');
-  const connectionFile = join(home, 'connection.json');
   writeFileSync(tokenFile, token, { mode: 0o600 });
   const child = spawn(process.env.CROSSFIRE_TEST_CODEX ?? 'codex', ['app-server', '--listen', 'ws://127.0.0.1:0',
     '--ws-auth', 'capability-token', '--ws-token-file', tokenFile, ...arguments_], {
-    cwd: workspace, env: { ...process.env, HOME: home, CODEX_HOME: home, RUNCODEX_CONNECTION_FILE: connectionFile }, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+    cwd: workspace, env: { ...process.env, HOME: home, CODEX_HOME: home, CROSSFIRE_PROJECT: workspace }, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   const ended = once(child, 'close');
   const terminate = (signal: NodeJS.Signals) => { try { process.kill(-child.pid!, signal); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; } };
@@ -46,7 +45,6 @@ export async function nativeEngine(scope: TestContext, home: string, workspace: 
     child.once('close', () => { clearTimeout(timer); reject(new Error('Native fixture closed: ' + output)); });
   });
   const notifications: NativeEvent[] = [];
-  writeFileSync(connectionFile, JSON.stringify({ version: 1, endpoint, tokenFile: 'token' }), { mode: 0o600 });
   const controller = new AbortController();
   const protocol = codexProtocol({ endpoint, token, timeoutMs: 10_000, event: notice => notifications.push(notice),
     approval: async () => { throw new Error('Unexpected approval on fixture owner connection'); },

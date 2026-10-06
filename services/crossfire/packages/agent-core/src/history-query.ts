@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import * as check from '@crossfire/contracts/schema/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import type { LocalState, Matrix } from './port.js';
-import type { Account, Settings } from '@crossfire/contracts/client';
+import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
 import type { Coordination } from './coordination.js';
 import { readUnread, loadCursors, acknowledge, acquisitionBytes, eventView, validatePage, joinedRooms, validReadBatch, validCursors, roomQuota, type ReadBatch } from './receive.js';
 import { historyPage, HISTORY_RESOURCE_BYTES } from './history-page.js';

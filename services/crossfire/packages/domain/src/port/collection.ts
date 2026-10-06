@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Page, PageRequest } from './directory.js';
 import type { EnrollmentItem } from '../enrollment/types.js';
 import type { FleetInstance } from '../enrollment/types.js';

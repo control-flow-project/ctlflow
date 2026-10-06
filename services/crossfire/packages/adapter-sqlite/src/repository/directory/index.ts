@@ -1,9 +1,9 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
-import { agentDisplayName } from '@crossfire/domain/identity/display-name';
+import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
 import type Database from 'better-sqlite3';
 import { schema, type Tables } from '../../schema/tables.js';
-import type { DirectoryRepository, Page, PageRequest, MemberRecord, AgentRecord, DirectoryFilter } from '@crossfire/domain/port/directory';
-import { success } from '@crossfire/kernel/result';
+import type { DirectoryRepository, Page, PageRequest, MemberRecord, AgentRecord, DirectoryFilter } from '@ctlflow/crossfire-domain/port/directory';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { stored } from '../stored.js';
 import { mapPrincipal } from '../principal/map.js';
 
@@ -87,22 +87,26 @@ function allAgents(database: Database.Database, filter: DirectoryFilter): Page<A
   const params = { filterIds: filter.agentIds !== undefined, agentIds: filter.agentIds ?? [], ownerId: filter.ownerId ?? '', statuses: filter.statuses, search: filter.search, offset: (filter.page - 1) * filter.pageSize, limit: filter.pageSize, activityMode: filter.activity?.mode ?? 'all', activityIds: filter.activity?.agentIds ?? [] };
   const total = executeSelect(database, schema, (query, params) => query.from('agent')
   .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+  .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+  .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
   .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
   .join(query.from('principal_application'), row => row.agent.principal_id, application => application.principal_id,
     (row, application) => ({ ...row, application }))
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
   const rows = executeSelect(database, schema, (query, params) => query.from('agent')
   .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+  .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+  .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
   .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
   .join(query.from('principal_application'), row => row.agent.principal_id, application => application.principal_id,
     (row, application) => ({ ...row, application }))
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
     .orderBy(row => row.principal.created_at).thenBy(row => row.principal.id).skip(params.offset).take(params.limit).select(row => ({
       agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
@@ -143,22 +147,26 @@ function ownedAgents(database: Database.Database, filter: DirectoryFilter): Page
   const params = { filterIds: filter.agentIds !== undefined, agentIds: filter.agentIds ?? [], ownerId: filter.ownerId ?? '', statuses: filter.statuses, search: filter.search, offset: (filter.page - 1) * filter.pageSize, limit: filter.pageSize, activityMode: filter.activity?.mode ?? 'all', activityIds: filter.activity?.agentIds ?? [] };
   const total = executeSelect(database, schema, (query, params) => query.from('agent')
   .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+  .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+  .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
   .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
   .join(query.from('principal_application'), row => row.agent.principal_id, application => application.principal_id,
     (row, application) => ({ ...row, application }))
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
   const rows = executeSelect(database, schema, (query, params) => query.from('agent')
   .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+  .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+  .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
   .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
   .join(query.from('principal_application'), row => row.agent.principal_id, application => application.principal_id,
     (row, application) => ({ ...row, application }))
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
     .orderBy(row => row.principal.created_at).thenBy(row => row.principal.id).skip(params.offset).take(params.limit).select(row => ({
       agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
@@ -200,7 +208,7 @@ export function createDirectoryRepository(database: Database.Database): Director
     deployments(agentIds) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('fleet_instance')
         .join(query.from('fleet'), instance => instance.owner_id, fleet => fleet.owner_id, (instance, fleet) => ({ instance, fleet }))
-        .where(row => row.instance.fleet_key === row.fleet.fleet_key && params.agentIds.includes(row.instance.agent_id)).orderBy(row => row.instance.agent_id)
+        .where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && params.agentIds.includes(row.instance.agent_id)).orderBy(row => row.instance.agent_id)
         .select(row => ({ agentId: row.instance.agent_id, fleetId: row.fleet.id, fleetKey: row.fleet.fleet_key, label: row.fleet.label,
           controllerName: row.fleet.controller_name, reportedAt: row.fleet.updated_at, instanceKey: row.instance.instance_key })), { agentIds })));
     },
@@ -334,11 +342,11 @@ export function createDirectoryRepository(database: Database.Database): Director
         .where(row => row.assigned.role_code === 'administrator' && row.principal.status === 'active').count())));
     },
     activeAgentCount(ownerId) {
-      return stored(() => success(ownerId === undefined
-        ? executeSelect(database, schema, query => query.from('principal').where(row => row.kind === 'agent' && row.status !== 'revoked').count())
-        : executeSelect(database, schema, (query, params) => query.from('agent').join(query.from('principal'),
-          agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
-          .where(row => row.agent.owner_id === params.ownerId && row.principal.status !== 'revoked').count(), { ownerId })));
+      return stored(() => success(executeSelect(database, schema, (query, params) => query.from('agent')
+                .join(query.from('principal').where(row => row.status !== 'revoked'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+        .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+        .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
+        .where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.owner_id === row.fleet.owner_id && row.instance.fleet_key === row.fleet.fleet_key && (params.ownerId === null || row.agent.owner_id === params.ownerId)).count(), { ownerId: ownerId ?? null })));
     },
     agentIds(ownerId) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('agent')
@@ -377,12 +385,14 @@ export function createDirectoryRepository(database: Database.Database): Director
         const agents = executeSelect(database, schema, query => query.from('agent')
   .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
   .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
+  .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+  .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
   .join(query.from('principal_application'), row => row.agent.principal_id, application => application.principal_id,
     (row, application) => ({ ...row, application }))
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.principal.status === 'active' && row.owner.status === 'active')
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.owner_id === row.fleet.owner_id && row.instance.fleet_key === row.fleet.fleet_key && row.principal.status === 'active' && row.owner.status === 'active')
           .select(row => ({ agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
       agent_owner_id: row.agent.owner_id,

@@ -1,6 +1,6 @@
-import { options, textOption, inputFile, runTool, saveReport } from '@crossfire/operator-support/command';
-import { failure, type Result } from '@crossfire/kernel/result';
-import { writeJson } from '@crossfire/adapter-filesystem/index';
+import { options, textOption, inputFile, runTool, saveReport } from '@ctlflow/crossfire-operator-support/command';
+import { failure, type Result } from '@ctlflow/crossfire-kernel/result';
+import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { verifyFleet, preservation } from './verify.js';
 
 const usage = `fleetd operator tools (run after npm run build)

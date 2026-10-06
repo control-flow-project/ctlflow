@@ -3,16 +3,19 @@ import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { writeFileSync, unlinkSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
-import { privateDir } from '@crossfire/adapter-filesystem/index';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { ownedVersion, ownedQuestionCapability } from './owned-options.js';
+import { nativeEnvironment } from './prerequisites.js';
+import { inspectInstructionCapability } from './capability.js';
 
-export async function startProcess(home: string, workspace: string, stop: AbortSignal, binary = 'codex', questions = false) {
+export async function startProcess(home: string, workspace: string, stateDirectory: string, name: string, stop: AbortSignal, binary = 'codex', questions = false) {
   stop.throwIfAborted();
-  const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: realpathSync(home) };
-  for (const name of Object.keys(environment)) if (name === 'CODEX_THREAD_ID' || name.startsWith('RUNCODEX_')) delete environment[name];
+  const environment = nativeEnvironment(realpathSync(home), stateDirectory, name);
   const version = execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 10000, maxBuffer: 4096, env: environment, cwd: workspace }).trim();
   const supported = ownedVersion(version);
   if (!supported.ok) throw new Error(supported.error.message);
+  const instructions = await inspectInstructionCapability(binary, home, workspace, environment, stop);
+  if (!instructions.ok) throw new Error(instructions.error.message);
   if (questions) {
     const listing = execFileSync(binary, ['features', 'list'], { encoding: 'utf8', timeout: 10000, maxBuffer: 65536, env: environment, cwd: workspace });
     const capability = ownedQuestionCapability(listing);

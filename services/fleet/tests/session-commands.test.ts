@@ -9,10 +9,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { operations } from '@fleetd/contracts/api';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { operations } from '@ctlflow/fleetd-contracts/api';
 
-test('CLI fleet and individual start resume by default; only --fresh-history selects reset', async scope => {
+test('CLI fleet-wide and per-agent start resume by default; only --fresh-history selects reset', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleet-session-cli-')), root = join(directory, 'controller'), home = join(directory, 'home');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(root, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
@@ -25,7 +25,8 @@ test('CLI fleet and individual start resume by default; only --fresh-history sel
       sessionId: null, error: null, startedAt: null }] };
   const server = createServer(async (request, response) => {
     let data: unknown, meta: object = { requestId: randomUUID() }, status = 200;
-    if (request.method === 'GET') { data = [fleet]; meta = { ...meta, page: 1, pageSize: 100, totalItems: 1, totalPages: 1 }; }
+    if (request.url === '/api/status') data = { controller: { name: 'test' }, startedAt: 1, stopping: false };
+    else if (request.method === 'GET') { data = [fleet]; meta = { ...meta, page: 1, pageSize: 100, totalItems: 1, totalPages: 1 }; }
     else {
       const bytes: Buffer[] = []; for await (const chunk of request) bytes.push(Buffer.from(chunk));
       const parsed = operations.operate.input(JSON.parse(Buffer.concat(bytes).toString())); assert(parsed.ok);

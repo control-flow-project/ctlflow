@@ -3,11 +3,11 @@ import type { RuntimeConnection } from './runtime.js';
 import type { ReadBatch, ReceivedEvent } from './receive.js';
 import { validReadBatch } from './receive.js';
 import { chatBatches } from './chat-batches.js';
-import type { Settings } from '@crossfire/contracts/client';
-import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
-import { principalIdentity } from '@crossfire/contracts/schema/response';
-import * as check from '@crossfire/contracts/schema/validation';
-import { json } from '@crossfire/contracts/matrix';
+import type { Settings } from '@ctlflow/crossfire-contracts/client';
+import type { PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
+import { principalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { json } from '@ctlflow/crossfire-contracts/matrix';
 import type { MessageArtifacts } from './message-artifacts.js';
 
 type Step = { indices: number[]; text: string; id: string; room: string | null; session: string | null; status: 'prepared' | 'publishing' | 'delivered' };

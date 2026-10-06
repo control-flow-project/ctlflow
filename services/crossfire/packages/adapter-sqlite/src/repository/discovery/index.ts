@@ -1,13 +1,13 @@
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
-import type { DiscoveryRepository, PrincipalSummary } from '@crossfire/domain/port/discovery';
+import type { DiscoveryRepository, PrincipalSummary } from '@ctlflow/crossfire-domain/port/discovery';
 import { schema } from '../../schema/tables.js';
-import { success } from '@crossfire/kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { stored } from '../stored.js';
 import { page } from '../directory/index.js';
 import { mapRole } from '../role/map.js';
 import { mapPermission } from '../permission/map.js';
-import { agentDisplayName } from '@crossfire/domain/identity/display-name';
+import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
 function namedAgent(row: Omit<PrincipalSummary, 'displayName'> & { name: string; ownerName: string; override: string | null }): PrincipalSummary {
   const { name, ownerName, override, ...principal } = row;
   return { ...principal, displayName: agentDisplayName(name, ownerName, override) };
@@ -57,10 +57,12 @@ export function createDiscoveryRepository(database: Database.Database): Discover
         .where(row => row.principal.status === 'active' && row.principal.id !== params.excludeId
           && (row.principal.matrix_user_id.toLowerCase().includes(params.search) || row.member.display_name.toLowerCase().includes(params.search))).count(), parameters);
         const agentCount = input.kind === 'human' ? 0 : executeSelect(database, schema, (query, params) => query.from('agent').join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+        .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+        .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
         .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
         .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id, (row, owner) => ({ ...row, owner }))
         .join(query.from('member'), row => row.agent.owner_id, member => member.principal_id, (row, member) => ({ ...row, member }))
-        .where(row => row.principal.status === 'active' && row.owner.status === 'active' && row.principal.id !== params.excludeId
+        .where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.principal.status === 'active' && row.owner.status === 'active' && row.principal.id !== params.excludeId
           && (row.principal.matrix_user_id.toLowerCase().includes(params.search) || row.name.name.toLowerCase().includes(params.search)
             || (row.agent.display_name_override ?? row.name.name).toLowerCase().includes(params.search))).count(), parameters);
         const offset = (input.page - 1) * input.pageSize;
@@ -73,10 +75,12 @@ export function createDiscoveryRepository(database: Database.Database): Discover
             displayName: row.member.display_name, ownerId: row.principal.id, ownerMatrixId: row.principal.matrix_user_id })),
           { ...parameters, offset, limit: humanLimit });
         if (input.kind !== 'human' && rows.length < input.pageSize) rows.push(...executeSelect(database, schema, (query, params) => query.from('agent').join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
+        .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
+        .join(query.from('fleet'), row => row.agent.owner_id, fleet => fleet.owner_id, (row, fleet) => ({ ...row, fleet }))
         .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
         .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id, (row, owner) => ({ ...row, owner }))
         .join(query.from('member'), row => row.agent.owner_id, member => member.principal_id, (row, member) => ({ ...row, member }))
-        .where(row => row.principal.status === 'active' && row.owner.status === 'active' && row.principal.id !== params.excludeId
+        .where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.principal.status === 'active' && row.owner.status === 'active' && row.principal.id !== params.excludeId
           && (row.principal.matrix_user_id.toLowerCase().includes(params.search) || row.name.name.toLowerCase().includes(params.search)
             || (row.agent.display_name_override ?? row.name.name).toLowerCase().includes(params.search)))
           .orderBy(row => row.name.name).thenBy(row => row.principal.id).skip(params.offset).take(params.limit)

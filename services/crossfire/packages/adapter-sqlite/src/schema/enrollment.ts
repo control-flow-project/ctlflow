@@ -1,10 +1,10 @@
 export const enrollmentSchema = `
 CREATE TABLE enrollment_request (
-  controller_name TEXT,
-  controller_credential_hash TEXT,
+  controller_name TEXT NOT NULL,
+  controller_credential_hash TEXT NOT NULL,
   id TEXT NOT NULL,
   owner_id TEXT NOT NULL,
-  fleet_key TEXT,
+  fleet_key TEXT NOT NULL,
   verification_code TEXT NOT NULL,
   claim_hash TEXT NOT NULL,
   roster_digest TEXT NOT NULL,
@@ -18,7 +18,6 @@ CREATE TABLE enrollment_request (
   FOREIGN KEY(owner_id) REFERENCES member(principal_id),
   FOREIGN KEY(decided_by_member_id) REFERENCES member(principal_id),
   UNIQUE(verification_code),
-  CHECK((fleet_key IS NULL AND controller_name IS NULL AND controller_credential_hash IS NULL) OR (fleet_key IS NOT NULL AND controller_name IS NOT NULL AND controller_credential_hash IS NOT NULL)),
   CHECK(status IN ('pending','approved','rejected','expired')),
   CHECK(revision >= 0),
   CHECK(expires_at > created_at),
@@ -59,6 +58,7 @@ CREATE TABLE agent_name (
 
 
 CREATE TABLE fleet (
+  archived_at INTEGER,
   id TEXT NOT NULL UNIQUE,
   delivery_enabled INTEGER NOT NULL DEFAULT 1 CHECK(delivery_enabled IN (0,1)),
   label TEXT NOT NULL,
@@ -74,6 +74,7 @@ CREATE TABLE fleet (
 
 
 CREATE TABLE fleet_instance (
+  retired_at INTEGER,
   owner_id TEXT NOT NULL,
   fleet_key TEXT NOT NULL,
   instance_key TEXT NOT NULL,
@@ -111,5 +112,6 @@ CREATE TABLE enrollment_controller_metadata (
 ) STRICT;
 
 CREATE INDEX ix_fleet_credential_fleet ON fleet_credential(fleet_id, revoked_at);
+CREATE UNIQUE INDEX ux_fleet_credential_binding ON fleet_credential(id, fleet_id);
 CREATE INDEX ix_fleet_created ON fleet(created_at, fleet_key);
 `;

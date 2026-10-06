@@ -1,6 +1,6 @@
-import { STATISTICS_INTERVAL_MS, STATISTICS_LIMITS, usageSample, type StatisticsBatch, type TrafficFlow, type UsageSample } from '@crossfire/contracts/statistics';
+import { STATISTICS_INTERVAL_MS, STATISTICS_LIMITS, usageSample, type StatisticsBatch, type TrafficFlow, type UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 import type { ReceivedEvent } from './receive.js';
-import { isListenerNotice } from '@crossfire/contracts/notices';
+import { isListenerNotice } from '@ctlflow/crossfire-contracts/notices';
 
 export function listenerStatistics(self: string, now: () => number) {
   const flows = new Map<string, TrafficFlow>(), usage = new Map<string, UsageSample>(), recent = new Map<string, { observed: boolean; delivered: boolean }>();

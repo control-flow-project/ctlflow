@@ -1,9 +1,9 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
-import type { Release } from '@crossfire/adapter-filesystem/release';
+import type { Release } from '@ctlflow/crossfire-adapter-filesystem/release';
 import { nativeApplication } from './native-application.js';
 import { createHttpServer } from '../../apps/server/src/http/create-server.js';
 import { createWorker } from '../../apps/server/src/worker.js';

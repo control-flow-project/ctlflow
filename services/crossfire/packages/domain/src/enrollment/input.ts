@@ -1,27 +1,27 @@
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { validateCoordinationPolicy, type CoordinationPolicy } from '../fleet/coordination-policy.js';
 export type EnrollmentIdentityProof = { agentId: string; accessToken: string };
-export type EnrollmentEntry = { instanceKey: string; name: string; identity?: EnrollmentIdentityProof; coordinationPolicy?: CoordinationPolicy };
+export type EnrollmentEntry = { instanceKey: string; name: string; identity?: EnrollmentIdentityProof; coordinationPolicy: CoordinationPolicy };
 export type ControllerDescriptor = { name: string; metadata?: Record<string, string> };
-export type EnrollmentRoster = { controller?: ControllerDescriptor; controllerCredential?: string; ownerMatrixId: string; fleetKey: string | null; instances: EnrollmentEntry[] };
+export type EnrollmentRoster = { controller: ControllerDescriptor; controllerCredential?: string; ownerMatrixId: string; fleetKey: string; instances: EnrollmentEntry[] };
 export type EnrollmentIntroduction = EnrollmentRoster & { enrollmentId: string; claimSecret: string };
 export function validName(value: string): boolean { return /^[a-z][a-z0-9-]{0,39}$/u.test(value); }
 export function validateController(controller: ControllerDescriptor) {
-  if (!controller.name.trim() || controller.name.length > 100 || Object.entries(controller.metadata ?? {}).length > 16
+  if (!controller || typeof controller.name !== 'string' || !controller.name.trim() || controller.name.length > 100 || Object.entries(controller.metadata ?? {}).length > 16
     || Object.entries(controller.metadata ?? {}).some(([key, value]) => !validName(key) || typeof value !== 'string' || value.length > 256)) return failure('invalid', 'Invalid controller descriptor');
   return success(controller);
 }
 export function validateRoster(roster: EnrollmentRoster) {
-  if (!/^@[^:\s]+:[^\s]+$/u.test(roster.ownerMatrixId) || roster.fleetKey !== null && !validName(roster.fleetKey)
-    || roster.instances.length < 1 || roster.instances.length > 100 || roster.fleetKey === null && roster.instances.length !== 1
+  if (!/^@[^:\s]+:[^\s]+$/u.test(roster.ownerMatrixId) || typeof roster.fleetKey !== 'string' || !validName(roster.fleetKey)
+    || !Array.isArray(roster.instances) || roster.instances.length < 1 || roster.instances.length > 100
     || roster.instances.some(item => !validName(item.instanceKey) || !validName(item.name))
     || new Set(roster.instances.map(item => item.instanceKey)).size !== roster.instances.length
     || new Set(roster.instances.map(item => item.name)).size !== roster.instances.length) return failure('invalid', 'Supply one owner and a unique roster of valid lowercase names and instance keys');
-  if (roster.fleetKey === null ? roster.controller !== undefined || roster.controllerCredential !== undefined : !roster.controller) return failure('invalid', 'Fleet enrollment requires exactly one controller descriptor');
-  if (roster.controller) { const controller = validateController(roster.controller); if (!controller.ok) return controller; }
+  if (!roster.controller) return failure('invalid', 'Enrollment requires a fleet controller');
+  const controller = validateController(roster.controller); if (!controller.ok) return controller;
   for (const item of roster.instances) {
-    if (roster.fleetKey === null ? item.coordinationPolicy !== undefined : item.coordinationPolicy === undefined) return failure('invalid', 'Coordination policies are required for fleet instances and are not individual enrollment fields');
-    if (item.coordinationPolicy) { const valid = validateCoordinationPolicy(item.coordinationPolicy); if (!valid.ok) return valid; }
+    if (!item.coordinationPolicy) return failure('invalid', 'Every instance requires an owner-reviewed coordination policy');
+    const valid = validateCoordinationPolicy(item.coordinationPolicy); if (!valid.ok) return valid;
   }
   return success(roster);
 }

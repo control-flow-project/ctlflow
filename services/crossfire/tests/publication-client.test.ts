@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { readPublications } from '@crossfire/domain/publication/read';
-import type { Profile } from '@crossfire/contracts/client';
-import { publishReport } from '../apps/client/src/publish.js';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { readPublications } from '@ctlflow/crossfire-domain/publication/read';
+import type { Profile } from '@ctlflow/crossfire-contracts/client';
+import { publishReport } from '@ctlflow/crossfire-agent-tools/publish';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { contentFixture } from './support/publication.js';
 
 test('the report command streams a local static directory through the canonical authenticated API', async scope => {
-  const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'reporter');
+  const fixture = await applicationFixture(scope), agent = await fixture.listeningAgent(fixture.admin.actor, 'reporter');
   const api = await httpFixture(scope, fixture.application); await contentFixture(scope, fixture.application);
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-publication-client-')); cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(join(directory, 'assets')); writeFileSync(join(directory, 'index.html'), '<p>Published by the command</p>');

@@ -1,7 +1,7 @@
 import type { LocalState } from './port.js';
 import type { Matrix } from './port.js';
-import type { Settings } from '@crossfire/contracts/client';
-import { roomId, userId } from '@crossfire/contracts/validation';
+import type { Settings } from '@ctlflow/crossfire-contracts/client';
+import { roomId, userId } from '@ctlflow/crossfire-contracts/validation';
 import { eventView, joinedRooms, loadCursors, readUnread, roomQuota, validCursors, validReadBatch, validatePage, type HistoryEnd, type ReadBatch, type ReceivedEvent } from './receive.js';
 import type { MessageArtifacts } from './message-artifacts.js';
 import { historyPage, HISTORY_RESOURCE_BYTES } from './history-page.js';

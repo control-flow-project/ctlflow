@@ -1,13 +1,14 @@
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { writeJson } from '@crossfire/adapter-filesystem/index';
-import { deliveryJournalExists, readDeliveryJournal } from '@crossfire/adapter-runtime/journal';
-import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
-import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
+import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { deliveryJournalExists, readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
+import type { RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
+import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 import { openSession } from './session.js';
 import { codexDelivery, type CodexConnection } from './connection.js';
 import { contextState } from './context-state.js';
 import { codexInput } from './input.js';
+import { applyNativeInstructions } from './instructions.js';
 
 export function codexHistories(options: { home: string; workspace: string; name: string; instructions: string; config: Record<string, unknown>;
   hooks: RuntimeHooks; mode: 'shared' | 'per-room'; endpoint: string; token: string; attachment: Omit<RuntimeAttachment, 'sessionId'>; allowNewHistory?: boolean }, signal: AbortSignal) {
@@ -47,8 +48,8 @@ export function codexHistories(options: { home: string; workspace: string; name:
       if (!previous && context !== 'shared' && context !== 'control' && state.rooms.length >= 2000) throw new Error('Native room history budget is exhausted');
       let connection: CodexConnection | undefined;
       const session = await openSession({ workspace: options.workspace, endpoint: options.endpoint, token: options.token }, previous
-        ? { kind: 'resume', id: previous, instructions: options.instructions, config: options.config }
-        : { kind: 'create', name: options.name + (context === 'shared' ? '' : ' · ' + context), instructions: options.instructions, config: options.config }, lifetime,
+        ? { kind: 'resume', id: previous, config: options.config }
+        : { kind: 'create', name: options.name + (context === 'shared' ? '' : ' · ' + context), config: options.config }, lifetime,
         { ...options.hooks, observe: event => options.hooks.observe?.(event.kind === 'state'
           ? { ...event, observation: { ...event.observation, roomId: context === 'shared' || context === 'control' ? null : context } } : event) },
         event => connection?.event(event));
@@ -59,6 +60,7 @@ export function codexHistories(options: { home: string; workspace: string; name:
         else if (context === 'control') state.control = session.sessionId;
         else if (!previous) state.rooms.push({ room: context, sessionId: session.sessionId });
         state.mode = options.mode; writeJson(file, state);
+        await applyNativeInstructions(session, { home: options.home, journal: receiptFile(context) + '.instructions', text: options.instructions });
         connection = codexDelivery(session, { pollMs: 1000, timeoutMs: 30000, receiptFile: receiptFile(context) });
         await connection.verify();
         const ended = () => failed.abort(session.signal.reason);

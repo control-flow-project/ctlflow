@@ -1,16 +1,18 @@
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { applicationFixture, value, secret } from './support/application.js';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { decideEnrollment } from '@crossfire/domain/enrollment/decide';
-import { exchangeEnrollment } from '@crossfire/domain/enrollment/exchange';
-import { reconcilePrincipal } from '@crossfire/domain/principal/reconcile';
-import { authenticateController } from '@crossfire/domain/fleet/authority';
-import { changeFleet, bindFleetAgent, removeFleet } from '@crossfire/domain/fleet/change-fleet';
-import { listFleetAgents, listFleets, readFleet } from '@crossfire/domain/fleet/read-fleet';
-import { previewGrantPlan, applyGrantPlan } from '@crossfire/domain/room-access/grant-plan';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
+import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
+import { reconcilePrincipal } from '@ctlflow/crossfire-domain/principal/reconcile';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
+import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
+import { changeFleet } from '@ctlflow/crossfire-domain/fleet/change-fleet';
+import { removeFleetAgent, archiveFleet } from '@ctlflow/crossfire-domain/fleet/retire';
+import { listFleetAgents, listFleets, readFleet } from '@ctlflow/crossfire-domain/fleet/read-fleet';
+import { previewGrantPlan, applyGrantPlan } from '@ctlflow/crossfire-domain/room-access/grant-plan';
 
 test('twenty-instance approval, scoped controller, and same-key fleets retain exact authority', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
@@ -38,16 +40,25 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   assert.equal(value(listFleets(services, other.actor, { page: 1, pageSize: 20 })).totalItems, 1);
   assert.equal(readFleet(services, controller, second.fleet!.fleetId).ok, false);
   value(changeFleet(services, controller, fleetId, { expectedRevision: expectedRevision(), label: 'Research', controller: { name: 'Laptop', metadata: { zone: 'desk' } } }, randomUUID()));
-  assert.equal(removeFleet(services, controller, fleetId, expectedRevision(), randomUUID()).ok, false);
+  assert.equal(archiveFleet(services, controller, fleetId, expectedRevision(), randomUUID()).ok, false);
   const audit = value(services.collection.audits({ page: 1, pageSize: 100 })).items.find(item => item.action === 'fleet.configure')!;
   assert.equal(audit.actorKind, 'controller'); assert.equal(audit.actorPrincipalId, null); assert.equal(audit.actorCredentialId, controller.credentialId);
   const agent = first.instances[0]!;
-  value(await bindFleetAgent(services, controller, fleetId, agent.agentId!, { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey, remove: true }, randomUUID()));
+  assert.equal(removeFleetAgent(services, controller, fleetId, agent.agentId!, { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey }, randomUUID()).ok, false);
+  value(reportFleetConnection(services, controller, fleetId, randomUUID(), false));
+  value(removeFleetAgent(services, controller, fleetId, agent.agentId!, { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey }, randomUUID()));
+  assert.equal(value(services.directory.agent(agent.agentId!))!.principal.status, 'suspended');
+  assert(value(services.repositories.fleetInstance.findByAgent(agent.agentId!))?.retiredAt);
+  const restoration = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
+    fleetKey: 'research', controller: { name: 'Laptop', metadata: { zone: 'desk' } }, controllerCredential: first.fleet!.controllerCredential!,
+    instances: [{ instanceKey: agent.instanceKey, name: agent.name, coordinationPolicy: defaultCoordinationPolicy(),
+      identity: { agentId: agent.agentId!, accessToken: agent.account!.accessToken } }] };
+  assert.equal((await introduceEnrollment(services, { ...restoration, instances: [{ ...restoration.instances[0]!, identity: { agentId: agent.agentId!, accessToken: secret() } }] })).ok, false);
+  const pending = value(await introduceEnrollment(services, restoration));
+  assert.equal(pending.request.status, 'pending', 'Restoration cannot implicitly regain authority');
+  value(decideEnrollment(services, admin.actor, restoration.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: pending.request.verificationCode }, randomUUID()));
   assert.equal(value(services.directory.agent(agent.agentId!))!.principal.status, 'active');
-  assert.equal((await bindFleetAgent(services, controller, fleetId, agent.agentId!,
-    { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey, remove: false, accessToken: secret() }, randomUUID())).ok, false);
-  value(await bindFleetAgent(services, controller, fleetId, agent.agentId!,
-    { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey, remove: false, accessToken: agent.account!.accessToken }, randomUUID()));
+  assert.equal(value(services.repositories.fleetInstance.findByAgent(agent.agentId!))?.retiredAt, null);
   const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Research')).roomId;
   const plan = { fleetId, agents: first.instances.map(instance => ({ instanceKey: instance.instanceKey,
     grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };

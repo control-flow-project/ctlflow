@@ -6,7 +6,7 @@ Run from the repository root after the normal build:
 node services/crossfire/dist/tools/main.js --help
 ```
 
-`npm run tools --workspace=@crossfire/service -- <command> <options>` invokes the
+`npm run tools --workspace=@ctlflow/crossfire -- <command> <options>` invokes the
 same implementation. Use absolute filesystem paths. Examples use an example
 server and operator paths, not deployment defaults. JSON inputs must be existing
 owned, private, bounded, nonsymlink files. Write them with `umask 077` and keep
@@ -100,7 +100,7 @@ or missing files are created. Current normalized tables are queried through
 Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
 
 ```json
-{"schemaVersion":12,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
+{"schemaVersion":13,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
 ```
 
 The schema version and table counts are optional exact expectations. `--schema`
@@ -112,7 +112,9 @@ canonical schema as the selected snapshots.
 principals, members, agents/credentials/names, policy, permission/role relations,
 selected wake senders, room grants/permissions, invitations, owner/management
 conversations, wake rules/assignments, fleets/instances/controller metadata/
-credentials, requested/approved fleet coordination policies, publications/files and existing audit events. Credential refresh timestamps and wake
+credentials, requested/approved fleet coordination policies, immutable archived
+enrollment relations, native-close receipt state, publications/files and existing
+audit events. Credential refresh timestamps and wake
 assignment deadlines are intentionally not immutable fields. Existing protected
 rows must still exist unchanged; additions are allowed. Volatile listener,
 session, reconciliation, delivery, observation, decision and incident rows are
@@ -121,7 +123,8 @@ exceeding that bound fails explicitly. Hashes are used internally for comparison
 reports contain counts, not private row data or credential hashes.
 
 This comparison is strict: configuration writes between snapshots, including a
-revision-only controller update or a fleet pause/resume, cause a conflict. Review
+revision-only controller update, a fleet pause/resume or renewed native
+observations invalidating a close receipt, cause a conflict. Review
 intentional changes against their audit records separately; do not modify a
 snapshot or suppress fields to make preservation pass.
 
@@ -157,8 +160,8 @@ container restart, extraction, privileged command or package installation occurs
 {"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","requestedName":"helper","coordinationPolicy":{"wakeMode":"owner-agents","senderMatrixIds":[],"permissions":["room.agent.invite"]}}]}
 ```
 
-Individual enrollment uses `null` for fleet key, controller name and each item's
-`coordinationPolicy`. Fleet plans specify each exact requested policy, including
+Every enrollment supplies its fleet key, controller name and each item's complete
+`coordinationPolicy`, including a one-item roster. Plans specify exact policies, including
 selected Matrix IDs and permission codes. The complete pending roster, policy,
 exact owner, controller and code must match; failed
 items or nonpending requests are refused. Without `--execute`, this is review

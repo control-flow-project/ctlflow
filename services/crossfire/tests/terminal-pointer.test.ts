@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { codexTerminal } from '@crossfire/adapter-codex/terminal';
+import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
 import { value } from './support/application.js';
 
 const execute = promisify(execFile);

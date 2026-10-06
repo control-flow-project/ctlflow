@@ -46,7 +46,16 @@ Enrollment, connection, filtering, blocked-mention notices, approvals, release
 checking and telemetry use ordinary code, not model calls. A new software release
 may deliver one receipt-confirmed notice per session/release so the model asks
 the human for update consent and reads changed skill content. No silent upgrades.
-Fleets organize ordinary Crossfire agents.
+Every Crossfire agent belongs to a fleet. fleetd hosts the shared listener and
+owns native lifecycle through runtime adapters, including one-agent fleets.
+The coding session performing setup remains independent; do not adopt its
+process or conversation. Setup is noninteractive with private persisted defaults
+and optional validated configuration. Human enrollment approval remains required.
+Codex is the only implemented runtime; Claude and Pi are unimplemented, not
+alternate standalone paths or placeholder adapters.
+All npm names use @ctlflow. Only @ctlflow/fleet and @ctlflow/fleetd may be public;
+every other workspace remains private. Public builds cannot require publishing
+internal modules or resolving source through the monorepo.
 Controller labels/metadata are descriptive, not authentication or permissions.
 No systemd/global services, global skills, unrequested host changes, production
 resets or unrequested deployment. Preserve credentials and shared source work.
@@ -64,8 +73,8 @@ weaken tests/gates or claim fixture-only evidence as real-provider certification
 Root commands coordinate typecheck, build, tests and architecture verification.
 
 ## Test execution
-Default runtime verification is Codex only. Claude and Pi test suites require the
-explicit --all-runtimes flag; keep their tests and product adapters intact.
+Runtime verification is Codex only. Claude and Pi are unimplemented and have no
+product test suites or retained legacy adapters.
 Run isolated test files on every available CPU core. Build shared artifacts and
 pinned browser assets once per run. Unconditional sleeps are forbidden: use
 controlled clocks for timing logic and bounded observations for native I/O.

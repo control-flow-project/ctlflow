@@ -1,56 +1,81 @@
 import type { Manifest } from './release.js';
+import type { SetupDescriptor } from '@ctlflow/crossfire-domain/onboarding/values';
+import * as check from './schema/validation.js';
+import { endpoint } from './origin.js';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+
+export const setupVersion = check.refine(check.text(100), value => /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/u.test(value), 'Use one exact npm version');
+const setupOrigin = check.refine(check.text(2048), value => { const parsed = endpoint(value); return parsed.ok && parsed.value === value; }, 'Use an exact HTTPS or loopback HTTP origin');
+const schemaVersion: check.Parser<1> = value => value === 1 ? success(1) : failure('invalid', 'Unsupported setup descriptor');
+export const setupDescriptorSchema: check.Parser<SetupDescriptor> = check.object({ schemaVersion, server: setupOrigin, ownerMatrixId: check.matrixUserId,
+  package: check.object({ name: check.choice('@ctlflow/fleet'), version: setupVersion }), instructions: check.plainText(128 * 1024) });
 
 function quote(value: string): string { return "'" + value.replaceAll("'", "'\\''") + "'"; }
 export function onboardingUrl(origin: string, owner: string): string {
   return origin + '/onboarding/setup?ownerMatrixId=' + encodeURIComponent(owner);
 }
-export function onboardingGuide(origin: string, owner: string, release: Manifest, instructions = ''): string {
-  return [
-    '# Connect your current coding session to Crossfire',
-    '',
-    'Crossfire lets people chat with this agent through Matrix. This guide connects the current coding session, not a new agent engine. The listener handles delivery, wake rules and activity reporting in ordinary code.',
-    'Server: ' + origin, 'Owner requested for this setup: ' + owner,
-    '',
-    '## 1. Check this project and prerequisites',
-    'Work in the project directory selected by the human. Support: Linux or macOS, Node.js 26+, Git, Bash and curl. Supported individual runtimes: Codex 0.158.0+, Claude Code 2.1.285+ and Pi 0.99.1+. Inspect this trusted server’s client before running it. Never ask for Matrix passwords, administrator credentials, ports, UUIDs or tokens.',
-    'Check node --version, git --version, curl --version and the current runtime’s version. If a prerequisite is missing, explain what is needed and help install it within the human’s normal permission policy. Official installers: https://nodejs.org/en/download ; https://git-scm.com/downloads ; https://curl.se/download.html ; https://developers.openai.com/codex/cli ; https://code.claude.com/docs/en/setup ; https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent . Do not silently use sudo, change system settings or install global skills.',
-    'Codex’s native local app-server socket and tool-provided thread identity select this exact session automatically. The optional runcodex.sh download is NOT required. Embedded / --no-daemon sessions expose no app-server connection: explain the limitation and ask the human to reopen/resume their saved session in normal app-server-backed Codex. Native daemon start is codex app-server daemon start; never silently launch a second engine or guess another session.',
-    'Claude Code supplies its native peer connection automatically. Project-local hooks capture its exact history without channels opt-in, a launcher or a restart. Pi requires project trust and a verified project extension. For first Pi setup, set CROSSFIRE_RUNTIME=pi before the command below. Do not use Codex startup instructions for Claude Code or Pi.',
-    'Codex and Pi clients use Linux or macOS. This Claude Code adapter requires Linux native process-birth verification. Native Linux tests do not certify untested macOS or paid-provider behavior.',
-    '',
-    '## 2. Connect or reuse the saved account',
-    'The client stores an approved Matrix account privately under this project’s Git-ignored .crossfire/profiles directory. That saved account is the agent’s identity. Runtime settings and temporary setup choices are also private. The client discovers and reuses the account for reconnects and upgrades. Do not propose a second identity.',
-    'Only when the client reports that no profile exists, ask what to call the agent. Set CROSSFIRE_AGENT_NAME to a lowercase name using letters, digits and hyphens, then rerun. If several profiles exist, ask which one to use. Do not ask the human to find technical connection details.',
-    'Inspect and run the following Bash command. Size and SHA-256 verify the downloaded bytes against this server, not an independent publisher identity.',
-    '', '```bash', onboardingCommand(origin, owner, release), '```', '',
-    'A runtime-setup-required result is not a connected listener. Let Claude’s successful installation command finish so native settings reload can activate its project hooks. The next Bash tool call captures exact native context; run agent connect again without repeating the name, server or owner. Pi first activation requires /reload, then the same option-free connect command. Pi native-module updates also require /reload; files are never silently hot-loaded.',
-    'If awaiting approval, show the exact approval URL and verification code immediately while the command continues waiting. A new account requires human approval once. The command resumes automatically after approval; never model-poll or start a separate listener.',
-    'Read changed skill content returned in the command output. Approval creates a private read/write DM with the verified owner automatically. No shared room is joined by default. The owner controls other access; never join additional rooms without an explicit grant. Codex native approvals go to this private DM and only the owner can answer.',
-    '',
-    '## 3. Test the actual listener',
-    'Run node .crossfire/client.mjs agent test. It tests the live listener, exact native session, authenticated server access and granted/joined rooms without sending a model prompt. No listener, stale credentials or a closed session is a failed test, not a successful connection. An agent with only its owner DM cannot receive shared-room tasks yet.',
-    'Give the human the connection/test result and management URL. Later reconnects or approved upgrades use node .crossfire/client.mjs agent connect. No new enrollment is needed.',
-    'If the listener announces a new release, ask the human whether to update. Only after consent, run connect again and read any changed skill from its output. A running listener is never silently replaced.',
-    ...(instructions ? ['', '## Additional instructions from the system administrator', instructions] : []),
-    '',
-  ].join('\n');
+export function setupDescriptorUrl(origin: string, owner: string): string {
+  return origin + '/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(owner);
 }
+export function setupDescriptor(origin: string, owner: string, release: Manifest, instructions = ''): SetupDescriptor {
+  return { schemaVersion: 1, server: origin, ownerMatrixId: owner,
+    package: { name: '@ctlflow/fleet', version: release.version }, instructions };
+}
+
 export function onboardingCommand(origin: string, owner: string, release: Manifest): string {
-  const client = release.artifacts['crossfire-client.mjs'];
   return [
     'set -eu', 'umask 077',
     'command -v node >/dev/null || { printf "%s\\n" "Install Node.js 26+: https://nodejs.org/en/download" >&2; exit 1; }',
     'node -e \'if(Number(process.versions.node.split(".")[0]) < 26) { console.error("Install Node.js 26+: https://nodejs.org/en/download"); process.exit(1); }\'',
+    'command -v npm >/dev/null || { printf "%s\\n" "Install npm with Node.js: https://nodejs.org/en/download" >&2; exit 1; }',
     'command -v git >/dev/null || { printf "%s\\n" "Install Git: https://git-scm.com/downloads" >&2; exit 1; }',
-    'options=()',
-    'if [ -n "${CROSSFIRE_AGENT_NAME:-}" ]; then options=(--profile "$CROSSFIRE_AGENT_NAME"); fi',
-    'if [ -n "${CROSSFIRE_RUNTIME:-}" ]; then options+=("--runtime" "$CROSSFIRE_RUNTIME"); fi',
-    'command -v curl >/dev/null || { printf "%s\\n" "Install curl: https://curl.se/download.html" >&2; exit 1; }',
-    'temporary=$(mktemp -d "${TMPDIR:-/tmp}/crossfire-setup.XXXXXX")',
-    'trap \'rm -f -- "$temporary/crossfire-client.mjs"; rmdir -- "$temporary"\' EXIT',
-    'client="$temporary/crossfire-client.mjs"',
-    'curl --fail --silent --show-error --max-time 30 --max-filesize ' + client.bytes + ' --output "$client" ' + quote(origin + '/onboarding/' + release.release + '/crossfire-client.mjs'),
-    'node --input-type=module -e \'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; const bytes=readFileSync(process.argv[1]); if(bytes.length !== Number(process.argv[2]) || createHash("sha256").update(bytes).digest("hex") !== process.argv[3]) throw new Error("Crossfire download verification failed");\' "$client" ' + client.bytes + ' ' + quote(client.sha256),
-    'node "$client" --project "$PWD" ${options[@]+"${options[@]}"} agent connect --server ' + quote(origin) + ' --owner ' + quote(owner),
+    'command -v codex >/dev/null || { printf "%s\\n" "Install Codex: https://developers.openai.com/codex/cli" >&2; exit 1; }',
+    'installation=$(node --input-type=module - ' + quote(release.version) + ' <<\'NODE\'',
+    'import { lstatSync, mkdirSync, realpathSync } from "node:fs";',
+    'import { homedir } from "node:os";',
+    'import { join } from "node:path";',
+    'let directory = realpathSync(homedir());',
+    'for (const part of [".local", "share", "ctlflow", "releases", process.argv[2]]) {',
+    '  directory = join(directory, part);',
+    '  try { mkdirSync(directory, { mode: 0o700 }); } catch (error) { if (error.code !== "EEXIST") throw error; }',
+    '  const stat = lstatSync(directory);',
+    '  if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o022)) throw new Error("Unsafe private installation directory");',
+    '}',
+    'console.log(directory);',
+    'NODE', ')',
+    'npm install --prefix "$installation" --ignore-scripts --omit=dev --no-audit --no-fund --save-exact ' + quote('@ctlflow/fleet@' + release.version),
+    '"$installation/node_modules/.bin/fleet" setup --descriptor ' + quote(setupDescriptorUrl(origin, owner)),
+  ].join('\n');
+}
+
+export function onboardingGuide(origin: string, owner: string, release: Manifest, instructions = ''): string {
+  return [
+    '# Set up a Crossfire agent',
+    '',
+    'Crossfire lets people message managed agents through Matrix. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.',
+    'Server: ' + origin, 'Verified human owner: ' + owner,
+    '',
+    '## 1. Check prerequisites',
+    'Use the human-selected project directory on Linux or macOS. Requires Node.js 26+, npm, Git, Bash and Codex. Check node --version, npm --version, git --version and codex --version. The controller performs model-free native capability and authentication checks before enrolling or starting an agent.',
+    'If something is missing, help install it within the human’s normal permission policy. Official installation instructions: https://nodejs.org/en/download ; https://git-scm.com/downloads ; https://developers.openai.com/codex/cli . Provider login uses native Codex authentication. Never request Matrix passwords, administrator tokens, ports or session IDs. Do not silently use sudo, change host services or install global skills.',
+    'This coding session only performs setup. It stays independent: its process, conversation and project-native settings are not adopted or imported. fleetd creates a separate managed session. Subsequent resume and wake reuse that managed session’s saved histories. Linux inert-provider checks are not macOS or paid-provider certification.',
+    '',
+    '## 2. Run the complete setup command',
+    'Inspect and run this Bash command from the project directory. It installs the pinned public CLI/controller into private user-owned storage and runs one noninteractive setup operation. It asks no naming, model, controller or room questions. Stable names and state are derived and persisted automatically.',
+    '', '```bash', onboardingCommand(origin, owner, release), '```', '',
+    'Optional overrides use fleet setup --descriptor ' + quote(setupDescriptorUrl(origin, owner)) + ' --config /absolute/runtime.toml. Do not generate a configuration just to repeat defaults.',
+    'When awaiting approval, immediately show the exact approval URL and matching code to the human. Ordinary controller code continues waiting and resumes after approval; do not model-poll, enroll twice or start a separate listener. Human approval remains required authorization.',
+    'Repeated setup reuses the selected project, controller, fleet, identities and histories. It never silently upgrades software or activates explicitly stopped sessions. Errors are actionable failures, not prompts to guess another identity.',
+    '',
+    '## 3. Confirm readiness and room access',
+    'Setup returns the fleet identity and model-free readiness result. Use fleet test FLEET_KEY to verify the receiver, fleet daemon status to inspect the controller and fleet show FLEET_KEY for read-only session details, using the returned fleet key. These checks never start or wake a stopped session. A controller process or saved credentials alone do not prove delivery is ready. Busy, paused, sleeping and stopped states are distinct; no artificial test message or model turn is needed.',
+    'Enrollment creates no rooms or conversations. Humans create rooms in Element and invite the agent; authorized invitations grant read/reply access. Wake-up rules separately determine which senders trigger a turn. The first owner DM, actual terminal output or pending decision establishes a protected private owner conversation.',
+    'The managed agent can check its receiver using node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" agent test. It does not start a listener, make a model call or advance unread positions.',
+    'Report the setup result and ' + origin + '/manage/fleets to the human. Lifecycle, fresh-history confirmations, model parameters, terminal pointers and software versions are available in management.',
+    '',
+    '## Software updates',
+    'Only @ctlflow/fleet and @ctlflow/fleetd are public npm packages. Internal modules stay bundled and private. A new release may notify the managed agent once. With human consent, install the pinned package version into the private installation, run fleet update FLEET_KEY and restart the controller with fleet daemon restart. Explicitly stopped agents remain stopped; running agents resume their saved histories. Read changed skill content after the verified update. Do not replace a live receiver or re-enroll.',
+    ...(instructions ? ['', '## Instructions from this instance’s administrator', instructions] : []),
+    '',
   ].join('\n');
 }

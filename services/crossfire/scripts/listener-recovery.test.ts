@@ -1,13 +1,13 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { withClock } from './test-support/clock.js';
-import { localState as storage } from '@crossfire/adapter-filesystem/state';
+import { localState as storage } from '@ctlflow/crossfire-adapter-filesystem/state';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { existsSync } from "node:fs";
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { readJson } from "@crossfire/adapter-filesystem/index";
-import { loadControl } from "@crossfire/agent-core/control";
-import { isListenerStop } from '@crossfire/kernel/lifecycle';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { readJson } from "@ctlflow/crossfire-adapter-filesystem/index";
+import { loadControl } from "@ctlflow/crossfire-agent-core/control";
+import { isListenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
 import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD } from "./test-support/listener.js";
 
 test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", withClock(async (scope, clock) => {

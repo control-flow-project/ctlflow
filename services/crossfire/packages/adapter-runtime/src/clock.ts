@@ -1,5 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import type { Clock } from '@crossfire/agent-core/port';
+import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 
 export const nativeClock: Clock = {
   now: Date.now,

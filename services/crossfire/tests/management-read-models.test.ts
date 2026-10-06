@@ -1,13 +1,14 @@
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
-import { failure } from '@crossfire/kernel/result';
-import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';
-import { listEnrollments, readEnrollment } from '@crossfire/domain/enrollment/read-enrollment';
-import { readAuditEvents } from '@crossfire/domain/audit/read-events';
-import { recordEvent } from '@crossfire/domain/audit/record-event';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { operations } from '@crossfire/contracts/rest/operations';
+import { failure } from '@ctlflow/crossfire-kernel/result';
+import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
+import { listEnrollments, readEnrollment } from '@ctlflow/crossfire-domain/enrollment/read-enrollment';
+import { readAuditEvents } from '@ctlflow/crossfire-domain/audit/read-events';
+import { recordEvent } from '@ctlflow/crossfire-domain/audit/record-event';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { auditActionLabel } from '../apps/web/src/audit-labels.js';
 import { applicationFixture, secret, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
@@ -17,7 +18,7 @@ test('management read models hydrate recognizable identities in one batch after 
   const alice = await fixture.member('alice'), bob = await fixture.member('bob'), agent = await fixture.agent(alice.actor, 'bea');
   for (const owner of [alice, bob]) value(await introduceEnrollment(services, {
     enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
-    fleetKey: null, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName }],
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName, coordinationPolicy: defaultCoordinationPolicy() }],
   }));
   const calls: string[][] = [];
   const projected = { ...services, discovery: { ...services.discovery, selected(ids: string[]) { calls.push(ids); return services.discovery.selected(ids); } } };
@@ -65,7 +66,7 @@ test('canonical enrollment and activity HTTP contracts expose identities without
     ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + session.secret },
   }) });
   const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: alice.member.principal.matrixUserId,
-    fleetKey: null, instances: [{ instanceKey: 'pending', name: 'pending' }] };
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending', name: 'pending', coordinationPolicy: defaultCoordinationPolicy() }] };
   const introduced = value(await client(alice).call(operations.introduceEnrollment, {}, input)).data;
   assert.equal(introduced.enrollment.enrollment.owner.displayName, 'alice');
   assert.equal(introduced.enrollment.enrollment.owner.matrixUserId, alice.member.principal.matrixUserId);
@@ -84,7 +85,8 @@ test('canonical enrollment and activity HTTP contracts expose identities without
 test('activity action labels are readable while unknown recorded actions retain their identity', () => {
   assert.equal(auditActionLabel('instance-policy.configure'), 'Change instance settings');
   assert.equal(auditActionLabel('room-permission.set'), 'Change invitation permission');
-  assert.equal(auditActionLabel('fleet.delivery.deactivate'), 'Deactivate fleet delivery');
+  assert.equal(auditActionLabel('fleet.delivery.deactivate'), 'Pause fleet delivery');
+  assert.equal(auditActionLabel('fleet.delivery.activate'), 'Resume fleet delivery');
   assert.equal(auditActionLabel('wake-rule.create'), 'Create Wake-up');
   assert.equal(auditActionLabel('wake-rule.update'), 'Update Wake-up');
   assert.equal(auditActionLabel('wake-rule.delete'), 'Delete Wake-up');

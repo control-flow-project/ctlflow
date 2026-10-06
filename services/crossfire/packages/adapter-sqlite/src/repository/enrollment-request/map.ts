@@ -1,4 +1,4 @@
-import type { EnrollmentRequest } from '@crossfire/domain/enrollment/types';
+import type { EnrollmentRequest } from '@ctlflow/crossfire-domain/enrollment/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapEnrollmentRequest(row: Tables['enrollment_request']): EnrollmentRequest {
   return {

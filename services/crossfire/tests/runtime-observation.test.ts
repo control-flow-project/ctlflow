@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { nativeObservation } from '@crossfire/adapter-codex/observation';
-import { observedEvent } from '@crossfire/adapter-codex/observed-event';
-import { ownerObservation } from '@crossfire/agent-core/owner-observation';
-import type { RuntimeObservationEvent } from '@crossfire/agent-core/runtime';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { nativeObservation } from '@ctlflow/crossfire-adapter-codex/observation';
+import { observedEvent } from '@ctlflow/crossfire-adapter-codex/observed-event';
+import { ownerObservation } from '@ctlflow/crossfire-agent-core/owner-observation';
+import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
 import { fakeCodex, matrixFixture, OWNER_DM, ROOM, SELF, until } from '../scripts/test-support/listener.js';
 import { testClock } from '../scripts/test-support/clock.js';
-import { localState } from '@crossfire/adapter-filesystem/state';
-import { matrix as matrixClient } from '@crossfire/adapter-matrix/http';
-import type { Transport } from '@crossfire/agent-core/port';
+import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
+import { matrix as matrixClient } from '@ctlflow/crossfire-adapter-matrix/http';
+import type { Transport } from '@ctlflow/crossfire-agent-core/port';
 
 test('current native observations use exact discriminants and never guess alternative output fields', () => {
   const events: RuntimeObservationEvent[] = [], observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => events.push(event) }, () => 'original');
@@ -134,17 +134,27 @@ test('owner streams coalesce before publication and uncertain delivery retries a
 test('a new reporting run republishes every retained native state without another native event or owner message', async scope => {
   const clock = testClock(scope), native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock);
   const stop = new AbortController();
+  const run = randomUUID();
+  let awaitingReceipt!: () => void, acknowledge!: () => void;
+  const awaiting = new Promise<void>(resolve => { awaitingReceipt = resolve; });
+  const receipt = new Promise<void>(resolve => { acknowledge = resolve; });
   const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
     transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
-    coordination: matrix.coordination, historyMode: 'per-room', maximum: 100000 }, stop.signal);
-  cleanup(scope, async () => { stop.abort(); await clock.complete(observer.close()); });
+    coordination: { ...matrix.coordination, async runtime(...args) {
+      const result = await matrix.coordination.runtime(...args);
+      if (args[1] === run && args[2].sessionId === 'room-two') { awaitingReceipt(); await receipt; }
+      return result;
+    } }, historyMode: 'per-room', maximum: 100000 }, stop.signal);
+  cleanup(scope, async () => { acknowledge(); stop.abort(); await clock.complete(observer.close()); });
   for (const sessionId of ['shared', 'room-one', 'room-two']) observer.observe({ kind: 'state', observation: {
     sessionId, roomId: sessionId === 'shared' ? null : '!' + sessionId + ':test', runtime: 'codex', state: 'idle', observedAt: clock.now(),
     settings: [{ name: 'model', configured: 'example', effective: 'example' }], errorMessage: null } });
-  const run = randomUUID(); observer.start(run);
+  observer.start(run);
   const posted = () => matrix.requests.filter(request => request.path.endsWith('/runtime'));
   await clock.until(() => posted().length === 3);
+  await awaiting;
   const next = randomUUID(); observer.start(next);
+  acknowledge();
   await clock.until(() => posted().length === 6);
   assert(posted().slice(0, 3).every(request => request.path.includes(run)));
   assert(posted().slice(3).every(request => request.path.includes(next)));

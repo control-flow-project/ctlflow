@@ -3,10 +3,12 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapFleetCredential } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '@crossfire/kernel/result';
-import type { FleetCredentialRepository } from '@crossfire/domain/port/repositories';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { FleetCredentialRepository } from '@ctlflow/crossfire-domain/port/repositories';
 export function createFleetCredentialRepository(database: Database.Database): FleetCredentialRepository {
   return {
+    forFleet(fleetId) { return stored(() => success(executeSelect(database, schema, (query, params) => query.from('fleet_credential')
+      .where(row => row.fleet_id === params.fleetId).orderBy(row => row.id), { fleetId }).map(mapFleetCredential))); },
     find(key) { return stored(() => {
       const row = executeSelect(database, schema, (query, params) => query.from('fleet_credential').where(row => row.id === params.id).firstOrDefault(), key);
       return success(row ? mapFleetCredential(row) : null);

@@ -1,4 +1,4 @@
-import type { AuditEvent } from '@crossfire/domain/audit/types';
+import type { AuditEvent } from '@ctlflow/crossfire-domain/audit/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapAuditEvent(row: Tables['audit_event']): AuditEvent {
   return {

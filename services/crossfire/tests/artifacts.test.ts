@@ -1,13 +1,13 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { buildRelease } from "../scripts/build-release.js";
-import { ARTIFACTS, manifest } from "@crossfire/contracts/release";
-import { artifactHash, loadRelease } from "@crossfire/adapter-filesystem/release";
+import { ARTIFACTS, manifest } from "@ctlflow/crossfire-contracts/release";
+import { artifactHash, loadRelease } from "@ctlflow/crossfire-adapter-filesystem/release";
 import { serveArtifact } from "../apps/server/src/artifacts.js";
 
 test("published project-local release is immutable, bounded, standalone and publicly inspectable", async context => {
@@ -42,12 +42,16 @@ test("published project-local release is immutable, bounded, standalone and publ
   assert.equal((await fetch(base.replace(metadata.release, "latest") + "SKILL.md")).status, 404);
   const isolated = join(output, "isolated-project");
   mkdirSync(isolated);
-  const client = join(isolated, "client.mjs");
-  copyFileSync(join(directory, "crossfire-client.mjs"), client);
+  cpSync(directory, isolated, { recursive: true });
+  const client = join(isolated, "crossfire-client.mjs");
   const help = JSON.parse(execFileSync(process.execPath, [client, "--help"], { cwd: isolated, encoding: "utf8" })) as { usage: string; agent: Record<string, unknown> };
   assert.match(help.usage, /--project/);
   assert(!("init" in help.agent));
   assert(!("conversation" in help.agent));
+  for (const removed of ['connect', 'disconnect', 'listen']) {
+    assert(!(removed in help.agent));
+    assert.throws(() => execFileSync(process.execPath, [client, 'agent', removed], { cwd: isolated, stdio: 'pipe' }));
+  }
   assert.throws(() => execFileSync(process.execPath, [client, "--instance", "old", "agent", "init"], { cwd: isolated, stdio: "pipe" }));
   const original = readFileSync(join(directory, "SKILL.md"));
   writeFileSync(join(directory, "SKILL.md"), "tampered");

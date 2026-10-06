@@ -1,17 +1,22 @@
 # fleetd
 
-A named, user-scoped controller for explicitly registered fleet directories.
+A user-scoped controller for every Crossfire agent, including one-agent fleets.
 The guides cover controller ownership and the shared runtime configuration:
 - [Controller documentation](docs/README.md)
+- [Noninteractive project setup and private workspace/state](docs/setup.md)
 - [Lifecycle, private API and execution boundaries](docs/operations.md)
-- [Read-only native fleet verification](tools/README.md)
-- [Fleet runtime defaults and overrides](../fleet/docs/configuration.md)
+- [Read-only native fleet verification](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
+- [Fleet runtime defaults and overrides](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
 - [Fleet-defined wake rules and invitation defaults](docs/coordination.md)
 
-Run it through the fleet CLI or directly:
+The public `@ctlflow/fleet` CLI depends on the exact matching public
+`@ctlflow/fleetd` release. Both ship self-contained bundles, not registry
+dependencies on private workspaces. Run the pinned installed CLI's setup command
+from the personalized Crossfire guide; it starts or reuses this controller.
+The existing coding session remains independent. For explicit controller startup:
 
 ```sh
-node services/fleetd/dist/apps/daemon/src/main.js --name laptop --root /absolute/private/controller
+fleetd --name laptop --root /absolute/private/controller
 ```
 
 The controller root contains its private descriptor, registry, operation state,
@@ -35,7 +40,7 @@ the controller root; invalid/symlinked/unowned private state is rejected.
 - Crossfire packages own enrollment, authorization, the shared listener and
   native Codex settings/protocol. No copied listener or native integration exists.
 
-The private API exposes `/api/status`, `/api/fleets`, nested fleet `/agents`,
+The private API exposes `/api/setup`, `/api/status`, `/api/fleets`, nested fleet `/agents`,
 fleet `/delivery` and `/messages`, and `/api/operations`. Delivery intent is distinct from
 engine lifecycle: pausing listeners retains their native sessions and bindings.
 Every approved registered fleet keeps an authenticated bounded long-poll
@@ -60,13 +65,22 @@ fleetd itself hosts the fleet listeners with one shared control endpoint; it
 does not launch a second listener process. Owned native processes sleep after
 30 idle minutes by default, while their independent receivers remain online.
 Eligible input resumes the exact saved native histories. Crossfire owns the
-instance-wide timeout; directly attached sessions are unaffected.
+instance-wide timeout. The independent coding session performing setup is not
+controlled by fleetd.
 
 Orderly shutdown stops all owned listeners and Codex processes, preserving
 desired activation for restart with the same root. Explicit Stop remains stopped.
-Whole descendant
-process supervision after a crash is not promised. No systemd, privileged daemon,
+A full machine restart ends the native engines; ordinary restoration retains
+their saved histories. Abruptly killing only fleetd is different: the verified
+native WebSocket app-server can survive and retain its history's writer lock.
+A replacement refuses the competing writer rather than adopting the orphan or
+creating fresh history. This is safe rejection, not successful automatic recovery.
+The verified orphan must stop before the same history can resume.
+Detached tool-subprocess supervision after a crash is also not promised.
+No systemd, privileged daemon,
 global skill, host package installer or shell supervisor is installed.
 
-- [CLI and first-run workflow](../fleet/README.md)
-- [Canonical API, data and lifecycle specification](../../docs/specification.md)
+- [Abrupt controller death and native writer ownership](docs/operations.md#abrupt-controller-death)
+
+- [CLI and first-run workflow](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/README.md)
+- [Canonical API, data and lifecycle specification](https://github.com/control-flow-project/crossfire/blob/main/docs/specification.md)

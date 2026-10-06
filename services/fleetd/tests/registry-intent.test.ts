@@ -4,8 +4,8 @@ import { mkdtempSync, readFileSync, writeFileSync, chmodSync, symlinkSync, rmSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { createRegistry } from '@fleetd/storage/registry';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { createRegistry } from '@ctlflow/fleetd-storage/registry';
 
 test('one canonical private desired-intent relation is unique, bounded, ordered and durable', scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleet-intent-')); cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));

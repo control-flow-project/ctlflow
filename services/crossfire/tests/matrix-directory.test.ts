@@ -5,17 +5,18 @@ import { applicationFixture, value, secret } from './support/application.js';
 import { httpFixture } from './support/http.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
-import { authenticateNativePrincipal, authenticateMember } from '@crossfire/domain/session/authenticate';
-import { changeAgent } from '@crossfire/domain/agent/change-agent';
-import { changeMember } from '@crossfire/domain/member/change-member';
-import { API } from '@crossfire/contracts/matrix';
-import type { MatrixDirectoryResult } from '@crossfire/contracts/matrix-directory';
+import { authenticateNativePrincipal, authenticateMember } from '@ctlflow/crossfire-domain/session/authenticate';
+import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
+import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import type { MatrixDirectoryResult } from '@ctlflow/crossfire-contracts/matrix-directory';
 
 const path = '/_matrix/client/v3/user_directory/search';
 test('Matrix directory authenticates native principals, bounds searches and retains REST session authority', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const owner = await fixture.member('alice'), other = await fixture.member('bob');
   const agent = await fixture.agent(owner.actor, 'bea');
+  const revision = () => value(services.repositories.principal.find({ id: agent.id }))!.revision;
   const { request, headers } = await httpFixture(scope, fixture.application);
   const search = (token: string, input: unknown = { search_term: 'bea' }, extra: Record<string, string> = {}) => request(path, 'POST', input, { Authorization: 'Bearer ' + token, ...extra });
   for (const token of [admin.token, owner.token, other.token, agent.token]) {
@@ -41,12 +42,12 @@ test('Matrix directory authenticates native principals, bounds searches and reta
   assert.equal((await search(unregistered.accessToken)).status, 403);
   assert.equal((await request('/api/members', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
   assert.equal((await request('/api/agents', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 0, displayName: 'Research Bea' }, randomUUID()));
+  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: revision(), displayName: 'Research Bea' }, randomUUID()));
   assert.equal((await (await search(owner.token, { search_term: 'research' })).json() as MatrixDirectoryResult).results[0]?.display_name, 'Research Bea');
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 1, status: 'suspended' }, randomUUID()));
+  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: revision(), status: 'suspended' }, randomUUID()));
   assert.equal((await search(agent.token)).status, 403);
   assert.deepEqual((await (await search(other.token)).json() as MatrixDirectoryResult).results, []);
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: 2, status: 'active' }, randomUUID()));
+  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: revision(), status: 'active' }, randomUUID()));
   value(changeMember(services, admin.actor, owner.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
   assert.equal((await search(owner.token)).status, 403); assert.equal((await search(agent.token)).status, 403);
   assert.deepEqual((await (await search(other.token)).json() as MatrixDirectoryResult).results, []);
@@ -55,7 +56,7 @@ test('Matrix directory authenticates native principals, bounds searches and reta
   fixture.advance(session.expiresAt - fixture.now() + 1);
   assert.equal((await authenticateMember(services, owner.secret)).ok, false);
   assert.equal((await authenticateNativePrincipal(services, owner.token)).ok, true, 'Native auth does not revive an expired management session');
-  value(changeAgent(services, value(await authenticateNativePrincipal(services, owner.token)), agent.id, { expectedRevision: 3, status: 'revoked' }, randomUUID()));
+  value(changeAgent(services, value(await authenticateNativePrincipal(services, owner.token)), agent.id, { expectedRevision: revision(), status: 'revoked' }, randomUUID()));
   assert.deepEqual((await (await search(other.token)).json() as MatrixDirectoryResult).results, []);
 });
 

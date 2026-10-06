@@ -1,5 +1,5 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 function connection(input: unknown): Result<Record<string, string>> {
   if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length > 8) return failure('invalid', 'Invalid runtime attachment data');

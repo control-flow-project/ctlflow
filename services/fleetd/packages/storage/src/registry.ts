@@ -2,14 +2,15 @@ import { existsSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync,
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { stringify } from 'smol-toml';
-import { privateDir, readJson, writeJson } from '@crossfire/adapter-filesystem/index';
-import * as check from '@crossfire/contracts/schema/validation';
-import { operationView } from '@fleetd/contracts/api';
-import { validateRoster } from '@fleetd/contracts/configuration';
-import type { Registry } from '@fleetd/domain/port';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { MAX_JSON_BYTES } from '@crossfire/contracts/limits';
+import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { operationView } from '@ctlflow/fleetd-contracts/api';
+import { validateRoster } from '@ctlflow/fleetd-contracts/configuration';
+import type { Registry } from '@ctlflow/fleetd-domain/port';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { MAX_JSON_BYTES } from '@ctlflow/crossfire-contracts/limits';
 import { loadConfiguration } from './configuration.js';
+import { createSetupStorage } from './setup.js';
 
 const registrations = check.list(check.object({ fleetId: check.identifier, fleetKey: check.name, directory: check.text(4096), label: check.text(100), revision: check.integer(), digest: check.text(64, 64) }), 100);
 const operations = check.list(operationView, 700);
@@ -33,6 +34,7 @@ function attempt<Value>(action: () => Result<Value>): Result<Value> {
 }
 export function createRegistry(root: string): Registry {
   privateDir(root);
+  const setup = createSetupStorage(root);
   function read<Value>(name: string, parser: check.Parser<Value>, initial: Value, maximum = MAX_JSON_BYTES): Result<Value> {
     return attempt(() => existsSync(join(root, name)) ? parser(readJson<unknown>(join(root, name), maximum)) : success(initial));
   }
@@ -40,6 +42,7 @@ export function createRegistry(root: string): Registry {
     return attempt(() => { const valid = parser(values); if (!valid.ok) return valid; writeJson(join(root, name), valid.value, maximum); return success(undefined); });
   }
   return {
+    setup: setup.setup, completeSetup: setup.complete, retrySetup: setup.retry,
     registrations: () => read('fleets.json', registrations, []), saveRegistrations: values => save('fleets.json', registrations, values),
     desiredIntent: () => read('desired-intent.json', desiredIntent, [], DESIRED_INTENT_BYTES), saveDesiredIntent: values => save('desired-intent.json', desiredIntent, values, DESIRED_INTENT_BYTES),
     operations: () => read('operations.json', operations, []), saveOperations: values => save('operations.json', operations, values),

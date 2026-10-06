@@ -147,6 +147,9 @@ private/
 /data/
 instances/
 verification/
+!/docs/verification/
+/docs/verification/*
+!/docs/verification/*.md
 .client-paths.json
 .analysis/
 .secrets/

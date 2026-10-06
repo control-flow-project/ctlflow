@@ -1,57 +1,59 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import test from 'node:test';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { nativeServer } from './support/native-server.js';
-import { value } from './support/application.js';
-import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, statSync } from "node:fs";
-import { join } from "node:path";
-import test from "node:test";
-import { paths, readProfile } from '@crossfire/adapter-filesystem/project';
-import { enroll, connect } from "../apps/client/src/enrollment.js";
-import { API } from '@crossfire/contracts/matrix';
-import { nativeOk } from '@crossfire/adapter-matrix/http';
-import { releaseFixture } from "./release-fixture.js";
+import { secret, value } from './support/application.js';
+import { ownerSession } from './support/owner-session.js';
+import { releaseFixture } from './release-fixture.js';
 
-
-test("public documentation and local pairing enroll one native identity without creating conversations", { timeout: 120_000 }, async scope => {
+test('public guide and owner approval enroll a controller-bound roster without creating conversations', { timeout: 120_000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release);
   const { services, origin, native, worker, admin } = fixture;
-  const human = { id: admin.member.principal.matrixUserId, token: admin.token };
-  const publicReadme = await fetch(origin + "/onboarding/" + release.manifest.release + "/README.md");
+  const publicReadme = await fetch(origin + '/onboarding/' + release.manifest.release + '/README.md');
   assert.equal(publicReadme.status, 200);
   const documentation = await publicReadme.text();
   assert(!documentation.includes(native.registrationToken));
   assert(!documentation.includes(fixture.application.config.jwtSecret));
-  mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
-  const project = mkdtempSync(join(process.cwd(), ".temp/project-onboarding-"));
-  const destination = paths(project, "holmes");
-  const requested = value(await enroll(destination, origin, human.id, "holmes", release.manifest)) as { code: string; approvalUrl: string };
-  assert(!JSON.stringify(requested).includes("secret"));
-  assert.equal((value(await connect(destination, release.manifest)) as { status: string }).status, "pending");
+  const publicClient = createClient({ origin });
+  const roster = { ownerMatrixId: admin.member.principal.matrixUserId, fleetKey: 'holmes', controller: { name: 'Holmes controller' },
+    instances: [{ instanceKey: 'holmes', name: 'holmes', coordinationPolicy: defaultCoordinationPolicy() }] };
+  assert.equal(value(await publicClient.call(operations.preflight, {}, roster)).data.available, true);
+  const introduction = { ...roster, enrollmentId: randomUUID(), claimSecret: secret() };
+  const requested = value(await publicClient.call(operations.introduceEnrollment, {}, introduction)).data;
+  const request = requested.enrollment.enrollment;
+  assert.equal(requested.approvalUrl, origin + '/manage/enrollments/' + introduction.enrollmentId);
+  assert(!JSON.stringify(requested).includes(introduction.claimSecret));
+  const exchange = () => publicClient.call(operations.exchangeEnrollment, { enrollmentId: introduction.enrollmentId }, { claimSecret: introduction.claimSecret });
+  assert.equal(value(await exchange()).data.status, 'pending');
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 0);
-  assert.equal((await fetch(origin + "/api/enrollments/" + requested.approvalUrl.split("/").at(-1) + "/decision", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: 0, decision: "approve", verificationCode: requested.code }),
+  const decision = { expectedRevision: 0, decision: 'approve' as const, verificationCode: request.verificationCode };
+  assert.equal((await fetch(origin + '/api/enrollments/' + request.enrollmentId + '/decision', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(decision),
   })).status, 403);
-  const login = await fetch(origin + "/api/sessions", { method: "POST", headers: { Origin: origin, "Content-Type": "application/json" },
-    body: JSON.stringify({ nativeAccessToken: human.token }) });
-  assert.equal(login.status, 201);
-  const session = await login.json() as { data: { csrfSecret: string } };
-  const cookie = login.headers.get("set-cookie")!.split(";", 1)[0]!;
-  const approved = await fetch(origin + "/api/enrollments/" + requested.approvalUrl.split("/").at(-1) + "/decision", {
-    method: "POST", headers: { Origin: origin, Cookie: cookie, "X-Crossfire-CSRF": session.data.csrfSecret, "Content-Type": "application/json" },
-    body: JSON.stringify({ expectedRevision: 0, decision: "approve", verificationCode: requested.code }),
-  });
-  assert.equal(approved.status, 202);
+  const owner = await ownerSession(origin, admin.token);
+  assert.equal(value(await owner.call(operations.decideEnrollment, { enrollmentId: request.enrollmentId }, decision)).data.status, 'approved');
   await worker.drain();
-  const connected = value(await connect(destination, release.manifest)) as { status: string };
-  assert.equal(connected.status, "connected");
-  const profile = readProfile(destination.profile);
-  assert.equal(profile.workspace, project);
-  assert.equal(profile.settings.owner, human.id);
-  assert.equal(statSync(destination.profile).mode & 0o777, 0o600);
-  assert.equal(statSync(destination.pending).mode & 0o777, 0o600);
-  assert.equal(value(services.repositories.ownerConversation.find({ agentId: profile.id })), null);
-  assert.deepEqual(value(await nativeOk({ base: native.base, token: profile.account.access_token }, "GET", API + "/joined_rooms")).joined_rooms, []);
-  assert.equal((await enroll(destination, origin, human.id, "holmes", release.manifest)).ok, false);
-  assert.equal((await connect(destination, release.manifest)).ok, true);
+  const connected = value(await exchange()).data;
+  assert.equal(connected.status, 'ready');
+  assert(connected.fleet?.controllerCredential);
+  const agent = connected.instances[0]!;
+  assert(agent.account && agent.agentId);
+  assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.agentId })), null);
+  assert.deepEqual(value(await nativeOk({ base: native.base, token: agent.account.accessToken }, 'GET', API + '/joined_rooms')).joined_rooms, []);
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1);
-  assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })), []);
+  assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.agentId })), []);
+  assert.deepEqual(value(await exchange()).data, connected, 'The private claim is retryable without another identity or controller');
+  const controller = createClient({ origin, token: connected.fleet.controllerCredential });
+  const fleet = value(await controller.call(operations.fleet, { fleetId: connected.fleet.fleetId }, {})).data;
+  assert.equal(fleet.controller.name, roster.controller.name);
+  for (const invalid of [{ ...introduction, fleetKey: null }, { ...introduction, controller: null },
+    { ...introduction, instances: [{ instanceKey: 'unbound', name: 'unbound' }] }]) {
+    assert.equal((await fetch(origin + '/api/enrollments', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(invalid) })).status, 400, 'Removed independent enrollment forms fail at the HTTP boundary');
+  }
 });

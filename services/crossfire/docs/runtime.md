@@ -2,30 +2,55 @@
 
 ## Activity versus connection
 
-The agent's Runtime tab reports observed native state independently of listener
+The agent's Session view reports observed native state independently of listener
 heartbeats: idle, working, waiting for approval, waiting for an answer, sleeping, waking, failed or
 unavailable. Online is not evidence of progress. Offline observations describe
 last reported state, not current native activity.
 
-Fleet-owned native sessions sleep after 30 idle minutes by default while their
-listeners remain connected. Crossfire's Policy page owns the instance-wide
+Managed native sessions sleep after 30 idle minutes by default while fleetd's
+agent bindings remain connected. Crossfire's Policy page owns the instance-wide
 timeout; zero disables sleep. Eligible chat/scheduled/fleet input resumes the
 exact saved native history. Pending decisions, receipts, input, other busy
-histories or unknown activity prevent sleep. Directly attached sessions never
-receive native shutdown authority. The Runtime view shows last native activity
+histories or unknown activity prevent sleep. Explicit Stop sessions prevents
+automatic wake/recovery, including after controller restart. Session shows last native activity
 and history availability independently of heartbeat freshness.
 
 The page shows native runtime/version, original session, observation time,
 history scope, instance inline-message limit and public runtime settings. Configured and
 effective values are separate; missing effective values are unknown, not copied
 from configuration. Credentials, private endpoints and decision answers never
-belong in these projections. Software leads with the currently reporting
+belong in these projections. The Settings software section leads with the currently reporting
 installed release and latest available release. Offline agents show a clearly
 labelled last reported installation independently of the selected history page;
 this is not a claim about a currently running listener. Historical runs are secondary,
 paginated evidence, not current installation or outstanding-update claims.
 
 ## Messages and replies
+
+### Managed instructions
+
+Role, installed skill and administrator instructions use one adapter-owned
+native instruction producer for new and resumed histories and changed revisions.
+For Codex it invokes supported `thread/inject_items` with a real native
+`role: "developer"` message containing `input_text`, not a disguised user prompt
+or a model-dependent setting. This creates no turn/model call and persists in
+the exact native history.
+
+The private journal compares a stable content digest and confirms the exact
+session/history/item ID, developer role and text. Unchanged confirmed instructions
+are not appended again; lost replies require receipt recovery before any append.
+Confirmed revisions require no growing-history rescan. Pending recovery scans
+the fixed post-publication snapshot with bounded chunk/record memory.
+Changing skills/roles uses this same producer, never a direct native-history edit
+or settings-update fallback. These receipts do not consume unread Matrix input.
+Native capability inspection rejects a binary without the required method before
+enrollment/start; there is no guessed additional minimum version. Stock Codex
+0.160 Linux source verification with Sol/max settings and an inert provider
+confirms zero-model creation, exact resume and changed native developer items.
+Installed-release gates remain the integration owner's responsibility; this is
+not macOS or paid-model certification.
+
+### Delivered context
 
 Delivered chat includes the coordination instance and verified owner, native
 room/event/sender IDs, native event time or explicit unknown, room/DM
@@ -109,17 +134,16 @@ list` before startup, in addition to the baseline stock Codex 0.158.0+ requireme
 Missing capabilities fail explicitly; there is no silent disabling or emulation.
 Actual question/answer/continuation is verified on Linux with an inert provider;
 that does not certify paid models or macOS. Native questions may be nonblocking
-and expire. Attached sessions retain their native settings and policy.
+and expire. Native provider restrictions remain authoritative.
 
-Claude Code and Pi retain native permission handling; their adapters do not
-emulate Codex-specific requests or arbitrary interactive stdin. Prose questions
+Codex is the only implemented runtime; unsupported runtime values fail validation.
+The adapter does not emulate arbitrary interactive stdin. Prose questions
 can be mirrored and answered through ordinary chat or a native terminal, but
 receive no invented native-decision links.
 
 ## Fleet histories
 
-Directly connected agents retain their one existing history. Fleet instances
-default to `history_mode = "shared"`: rooms, DMs and private operator input
+Every instance defaults to `history_mode = "shared"`: rooms, DMs and private operator input
 share one saved native history, like a human retaining context.
 
 `history_mode = "per-room"` gives each native room ID its own persistent history
@@ -169,7 +193,7 @@ input. One failed agent does not stop healthy peers. Avoidable protocol failures
 are fixed at their native adapter owner.
 
 For a missing response, check account and native read/reply access, wake sources,
-mute/owner pause/fleet gate, Runtime/Decisions and receipt-confirmed Activity.
+mute/owner pause/fleet gate, Session decisions and receipt-confirmed Activity.
 Obtain the exact native terminal pointer and inspect the original error before
 deliberately restarting. Printed terminal answers are private owner output, not
 room replies. Retired-room visibility on an existing Element device needs that

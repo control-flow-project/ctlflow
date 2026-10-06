@@ -1,7 +1,7 @@
 import { isAbsolute } from 'node:path';
-import type { RuntimeTerminalAdapter } from '@crossfire/agent-core/terminal';
-import * as check from '@crossfire/contracts/schema/validation';
-import { failure, success } from '@crossfire/kernel/result';
+import type { RuntimeTerminalAdapter } from '@ctlflow/crossfire-agent-core/terminal';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { localEndpoint } from './protocol.js';
 
 function quote(value: string): string { return "'" + value.replaceAll("'", "'\\''") + "'"; }

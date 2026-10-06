@@ -1,14 +1,14 @@
-import { authenticateController } from '@crossfire/domain/fleet/authority';
+import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
 import { createServer, type IncomingMessage } from 'node:http';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { HTTP_LIMITS } from '@crossfire/contracts/rest/limits';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { matrixUserId } from '@crossfire/contracts/schema/validation';
-import { onboardingGuide } from '@crossfire/contracts/onboarding';
-import { authenticateMember, authenticateAgent } from '@crossfire/domain/session/authenticate';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { HTTP_LIMITS } from '@ctlflow/crossfire-contracts/rest/limits';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { matrixUserId } from '@ctlflow/crossfire-contracts/schema/validation';
+import { onboardingGuide, setupDescriptor } from '@ctlflow/crossfire-contracts/onboarding';
+import { authenticateMember, authenticateAgent } from '@ctlflow/crossfire-domain/session/authenticate';
 import type { Application } from '../composition.js';
 import type { createWorker } from '../worker.js';
-import type { Release } from '@crossfire/adapter-filesystem/release';
+import type { Release } from '@ctlflow/crossfire-adapter-filesystem/release';
 import type { ElementPresentation } from '../element-configuration.js';
 import { serveArtifact } from '../artifacts.js';
 import { type Context, type Endpoint, type Reply } from './bind.js';
@@ -26,7 +26,7 @@ import { runtimeRoutes } from './routes/runtime.js';
 import { publicationRoutes } from './routes/publication.js';
 import { readBinary } from './binary.js';
 import { registrationTransport, invitationCookie, setInvitationCookie, registrationStage } from './registration.js';
-import { verifyInvitation } from '@crossfire/domain/member/registration';
+import { verifyInvitation } from '@ctlflow/crossfire-domain/member/registration';
 import { searchMatrixDirectory } from './matrix-directory.js';
 export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: ElementPresentation = {}) {
   const { services, config } = application;
@@ -101,16 +101,21 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
           disable_registration: !invited && !(policy.ok && policy.value?.signupMode === 'open'), room_directory: { servers: [] } })); return;
       }
       if (serveArtifact(release, method, url.pathname, response)) return;
-      if (url.pathname === '/onboarding/setup') {
+      if (url.pathname === '/onboarding/setup' || url.pathname === '/onboarding/setup.json') {
         if (method !== 'GET' && method !== 'HEAD') {
           response.setHeader('Allow', 'GET, HEAD'); send(response, requestId, failure('method_not_allowed', 'Method not allowed')); return;
         }
         const owner = matrixUserId(url.searchParams.get('ownerMatrixId'));
         if (!owner.ok || url.searchParams.size !== 1) { send(response, requestId, failure('invalid', 'Exactly one ownerMatrixId is required')); return; }
+        const principal = services.directory.principalByMatrixId(owner.value);
+        if (!principal.ok) { send(response, requestId, principal); return; }
+        if (!principal.value || principal.value.kind !== 'human' || principal.value.status !== 'active') { send(response, requestId, failure('forbidden', 'An active registered human owner is required')); return; }
         const policy = services.repositories.instancePolicy.find({ id: 'instance' });
         if (!policy.ok || !policy.value) { send(response, requestId, failure('unavailable', 'Onboarding policy unavailable')); return; }
-        const guide = Buffer.from(onboardingGuide(config.publicOrigin, owner.value, release.manifest, policy.value.agentInstructions));
-        response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Length': guide.length, 'Cache-Control': 'no-store',
+        const structured = url.pathname === '/onboarding/setup.json';
+        const guide = Buffer.from(structured ? JSON.stringify(setupDescriptor(config.publicOrigin, owner.value, release.manifest, policy.value.agentInstructions))
+          : onboardingGuide(config.publicOrigin, owner.value, release.manifest, policy.value.agentInstructions));
+        response.writeHead(200, { 'Content-Type': structured ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8', 'Content-Length': guide.length, 'Cache-Control': 'no-store',
           'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'" });
         response.end(method === 'HEAD' ? undefined : guide); return;
       }

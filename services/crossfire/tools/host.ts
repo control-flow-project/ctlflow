@@ -1,7 +1,7 @@
-import { command } from '@crossfire/operator-support/process';
-import { fingerprint } from '@crossfire/operator-support/files';
-import { failure, success } from '@crossfire/kernel/result';
-import * as check from '@crossfire/contracts/schema/validation';
+import { command } from '@ctlflow/crossfire-operator-support/process';
+import { fingerprint } from '@ctlflow/crossfire-operator-support/files';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 export const hostPlan = check.object({ container: check.refine(check.text(255), value => /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/u.test(value), 'Expected an exact container name or ID'),
   image: check.refine(check.text(255), value => !value.startsWith('-') && !/\s/u.test(value), 'Expected an exact image reference'),

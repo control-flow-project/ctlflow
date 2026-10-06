@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { initializeHistory, canInitializeHistory, initializedHistory } from '@fleetd/storage/history';
+import { initializeHistory, canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storage/history';
 
 test('only enrollment or explicit reset authorizes initial history creation, and successful binding consumes that authorization', scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleet-history-')), agentId = randomUUID();

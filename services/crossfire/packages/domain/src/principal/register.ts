@@ -1,7 +1,7 @@
 import type { Services } from '../port/services.js';
 import type { Principal, PrincipalApplication } from '../identity/types.js';
-import type { Result } from '@crossfire/kernel/result';
-import { success } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
+import { success } from '@ctlflow/crossfire-kernel/result';
 
 export function pendingApplication(principalId: string, now: number): PrincipalApplication {
   return { principalId, appliedRevision: null, appliedIntentHash: null, appliedStatus: null, nativeDisplayName: null,

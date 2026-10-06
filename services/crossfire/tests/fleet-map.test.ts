@@ -2,16 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
-import { FLEET_MAP_LIMITS } from '@crossfire/kernel/fleet-map';
-import { readFleetMap } from '@crossfire/domain/fleet/read-map';
-import { resolveWakePolicy } from '@crossfire/domain/wake/resolve-policy';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { changeRoomGrant } from '@crossfire/domain/room-access/change-grant';
-import { reconcileRoomGrant } from '@crossfire/domain/room-access/reconcile-grant';
-import { connectOwnerConversation } from '@crossfire/domain/owner-conversation/connect';
-import { reportListener } from '@crossfire/domain/listener/report';
-import { WAKE_POLICIES } from '@crossfire/contracts/wake';
-import { fleetMap as mapSchema, type FleetMapView } from '@crossfire/contracts/schema/fleet-map';
+import { FLEET_MAP_LIMITS } from '@ctlflow/crossfire-kernel/fleet-map';
+import { readFleetMap } from '@ctlflow/crossfire-domain/fleet/read-map';
+import { resolveWakePolicy } from '@ctlflow/crossfire-domain/wake/resolve-policy';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
+import { reconcileRoomGrant } from '@ctlflow/crossfire-domain/room-access/reconcile-grant';
+import { connectOwnerConversation } from '@ctlflow/crossfire-domain/owner-conversation/connect';
+import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { WAKE_POLICIES } from '@ctlflow/crossfire-contracts/wake';
+import { fleetMap as mapSchema, type FleetMapView } from '@ctlflow/crossfire-contracts/schema/fleet-map';
 import { fleetMap as mapRepresentation } from '../apps/server/src/http/representation/fleet-map.js';
 import { layoutFleetMap, adjacentNode } from '../apps/web/src/fleet-map/layout.js';
 import { connectionState, filterMap, highlightedMap, readSelection } from '../apps/web/src/fleet-map/model.js';
@@ -21,7 +21,7 @@ import { httpFixture } from './support/http.js';
 
 async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const { fleet, instances, ready } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
+  const { fleet, instances, ready, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
   const contacted = instances.at(-1)!.agentId!;
   value(await connectOwnerConversation(services, { kind: 'agent', principalId: contacted }, contacted));
   const other = await fixture.member('alice'), specialist = await fixture.agent(other.actor, 'specialist');
@@ -32,7 +32,7 @@ async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
     const mode = WAKE_POLICIES[index % WAKE_POLICIES.length]!;
     value(changeWakePolicy(services, admin.actor, id, { expectedRevision: agent.principal.revision, mode,
       senderIds: mode === 'selected' ? [specialist.id, other.actor.principalId] : [] }, randomUUID()));
-    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'test', messagesDelivered: 0, controllerBound: false, stopped: false }, 'test'));
+    if (index < 12) value(reportListener(services, { kind: 'agent', principalId: id }, id, randomUUID(), { statistics: null, release: 'test', messagesDelivered: 0, controller, stopped: false }, 'test'));
     if (index === instances.length - 1) continue;
     const roomId = rooms[index % rooms.length]!.roomId, current = value(services.directory.agent(id))!;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId, expectedRevision: current.principal.revision,

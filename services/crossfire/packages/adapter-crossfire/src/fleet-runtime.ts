@@ -1,6 +1,6 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import type { FleetRuntimeOperation } from '@crossfire/contracts/fleet-runtime';
-import type { Result } from '@crossfire/kernel/result';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import type { FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Client } from './client.js';
 
 export type FleetRuntimeExecutor = (operation: FleetRuntimeOperation) => Promise<Result<{ status: 'succeeded' | 'failed'; errorMessage: string | null }>>;

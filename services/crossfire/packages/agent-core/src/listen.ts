@@ -1,8 +1,8 @@
 import type { Clock, LocalState, Transport } from './port.js';
-import { API, segment } from '@crossfire/contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import type { Matrix } from './port.js';
-import { selectRoom } from '@crossfire/contracts/validation';
-import type { Account, Settings, Event } from '@crossfire/contracts/client';
+import { selectRoom } from '@ctlflow/crossfire-contracts/validation';
+import type { Account, Settings, Event } from '@ctlflow/crossfire-contracts/client';
 import type { Coordination } from './coordination.js';
 import { synchronize, loadSyncCursor, loadCursors, checkpointSync, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, eventView, joinedRooms, type ReceivedEvent } from './receive.js';
 import { captureWake, collectBatch, pendingBatch, wakeEvent, loadWake, saveWake, retireSnapshot, snapshotContentFiles } from './delivery.js';
@@ -11,17 +11,17 @@ import type { RuntimeAdapter } from './runtime.js';
 import { loadControl, saveControl, humanEvents, humanText, isControl, publishControlNotice } from './control.js';
 import { decisions } from './decisions.js';
 import { ownerObservation } from './owner-observation.js';
-import { INPUT_BYTES } from '@crossfire/contracts/runtime';
+import { INPUT_BYTES } from '@ctlflow/crossfire-contracts/runtime';
 import { reportActivity } from './activity.js';
 import { requireCurrentRelease } from './release.js';
-import type { Manifest } from '@crossfire/contracts/release';
-import { isListenerNotice, mentionsAgent } from '@crossfire/contracts/notices';
+import type { Manifest } from '@ctlflow/crossfire-contracts/release';
+import { isListenerNotice, mentionsAgent } from '@ctlflow/crossfire-contracts/notices';
 import { incrementalEvents } from './receive.js';
 import { deliveryEvents, resolveSenders } from './senders.js';
 import { testListener, type ListenerTest } from './diagnostic.js';
 import { releaseUpdates } from './updates.js';
 import { controlledPublisher, waitForActivation } from './listener-control.js';
-import type { ListenerControl } from './listener-control-port.js';
+import type { ControllerBinding, ListenerControl } from './listener-control-port.js';
 import type { ReadBatch } from './receive.js';
 import { scheduledPublisher } from './scheduled.js';
 import { chatPublication } from './chat-publication.js';
@@ -34,10 +34,11 @@ import { createListenerBudget, type ListenerBudget } from './budget.js';
 export type ListenerOptions = {
   clock: Clock;
   budget?: ListenerBudget;
-  control?: ListenerControl;
+  control: ListenerControl;
   storage: LocalState;
   transport: Transport;
   invitationRooms: (signal: AbortSignal) => Promise<readonly string[]>;
+  activity?: (runId: string, binding: ControllerBinding) => void;
   ready?: (test: () => Promise<ListenerTest>, queries: HistoryQueries) => void;
   release: Manifest;
   coordination: Coordination;
@@ -63,9 +64,14 @@ function retryable(error: unknown): boolean {
 export async function listen(options: ListenerOptions, stop: AbortSignal): Promise<void> {
   const storage = options.storage;
   const budget = options.budget ?? createListenerBudget();
+  if (!options.control || typeof options.control.binding !== 'function') throw new Error('Listeners require an authenticated fleet controller binding');
+  if (!Number.isSafeInteger(options.pollMs) || options.pollMs < 100 || options.pollMs > 30_000) throw new Error('Listener polling interval must be 100..30000 ms');
+  if (!Number.isSafeInteger(options.debounceMs) || options.debounceMs < 0 || options.debounceMs > 60_000) throw new Error('Listener collection interval must be 0..60000 ms');
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 100) throw new Error('Listener message page must contain 1..100 records');
   if (!Number.isSafeInteger(options.reconcileMs) || options.reconcileMs < 1000 || options.reconcileMs > 600_000) {
     throw new Error('Listener reconciliation interval must be 1000..600000 ms');
   }
+  await waitForActivation(options.control, stop);
   const current = await requireCurrentRelease(options.coordination, options.release, stop);
   if (!current.ok) throw Object.assign(new Error(current.error.message), { code: current.error.code });
   const failed = new AbortController();
@@ -106,8 +112,8 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const client = options.transport(signal, 45_000);
   const artifacts = messageArtifacts(storage, options.cursorFile + '.messages', options.clock.now, observer.busy,
     () => new Set([...snapshotContentFiles(storage, options.cursorFile), ...chat.contentFiles(), ...queries.contentFiles()]));
-  const controlled = options.control ? controlledPublisher({ storage, file: options.cursorFile + '.controller-input', control: options.control, runtime: destination,
-    artifacts, get maximum() { return maximum; } }) : undefined;
+  const controlled = controlledPublisher({ storage, file: options.cursorFile + '.controller-input', control: options.control, runtime: destination,
+    artifacts, get maximum() { return maximum; } });
   const controlFile = options.cursorFile + '.control';
   const state = loadControl(storage, controlFile, destination.sessionId);
   let since = loadSyncCursor(storage, options.cursorFile);
@@ -144,7 +150,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let lastInvitationCheck = -Infinity;
   const changed = () => { revision++; wake?.(); };
   pendingInput = () => acquiring || controlling || sending !== undefined || completed !== undefined || chat.pending()
-    || !!controlled?.pending() || scheduled.pending() || queries.pending() || cycle !== undefined
+    || controlled.pending() || scheduled.pending() || queries.pending() || cycle !== undefined
     || state.controls.some(control => control.status === 'interrupting' || control.status === 'interrupted');
   async function retry<Result>(operation: () => Promise<Result>, scope = signal): Promise<Result> {
     for (let failures = 0; ; failures++) {
@@ -157,7 +163,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     }
   }
   async function work<Result>(operation: (client: Matrix, scope: AbortSignal) => Promise<Result>): Promise<Result> {
-    const base = AbortSignal.any([signal, ...(options.control ? [options.control.current().signal] : [])]);
+    const base = AbortSignal.any([signal, options.control.current().signal]);
     const release = await budget.acquire('acquisition', base);
     const deadline = options.clock.deadline(options.reconcileMs);
     const scope = AbortSignal.any([base, deadline]);
@@ -175,7 +181,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     await new Promise<void>(resolve => {
       const finish = () => { cancelTimer(); signal.removeEventListener('abort', finish); wake = undefined; waitingForControl = false; resolve(); };
       const cancelTimer = options.clock.schedule(finish, !control && activity && synchronized && !state.paused
-        && (!options.control || options.control.current().active) ? Math.min(milliseconds, scheduled.waitMs()) : milliseconds);
+        && options.control.current().active ? Math.min(milliseconds, scheduled.waitMs()) : milliseconds);
       wake = finish;
       waitingForControl = control;
       signal.addEventListener('abort', finish, { once: true });
@@ -183,18 +189,18 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     signal.throwIfAborted();
   }
   async function send(operation: (scope: AbortSignal) => Promise<void>): Promise<boolean> {
-    if (options.control && !options.control.current().active) return false;
-    const generation = options.control?.current().signal;
+    if (!options.control.current().active) return false;
+    const generation = options.control.current().signal;
     const cancel = new AbortController();
     const done = (async () => {
-      const scope = AbortSignal.any([cancel.signal, signal, ...(options.control ? [options.control.current().signal] : [])]);
+      const scope = AbortSignal.any([cancel.signal, signal, generation]);
       const release = await budget.acquire('publication', scope);
       try {
         await operation(scope);
         return true;
       } catch (error) {
         signal.throwIfAborted();
-        if (cancel.signal.aborted || generation?.aborted) return false;
+        if (cancel.signal.aborted || generation.aborted) return false;
         throw error;
       } finally { release(); }
     })();
@@ -259,8 +265,8 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     lastAccess = options.clock.now();
     return different;
   }
-  const unsubscribe = options.control?.subscribe(() => {
-    if (!options.control?.current().active) {
+  const unsubscribe = options.control.subscribe(() => {
+    if (!options.control.current().active) {
       membershipRevision++;
       void cancelDelivery().catch(error => failed.abort(error));
     }
@@ -268,11 +274,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   });
   async function startActivity(): Promise<void> {
     if (activity) return;
-    try { activity = await reportActivity(options.coordination, options.id, options.release, signal, !!options.control, options.clock, statistics, release => { updates.available(release); changed(); }); }
-    catch (error) { throw error; }
+    const binding = { ...options.control.binding() };
+    activity = await reportActivity(options.coordination, options.id, options.release, signal, binding, options.clock, statistics, release => { updates.available(release); changed(); });
     activity.signal.addEventListener('abort', () => failed.abort(activity?.signal.reason), { once: true });
     if (activity.signal.aborted) failed.abort(activity.signal.reason);
     reportingRun = activity.runId; runReady(); approval.start(); observer.start(activity.runId);
+    options.activity?.(activity.runId, binding);
   }
   try {
     if (approval) {
@@ -293,19 +300,19 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const selected = options.room ? selectRoom(options.room) : undefined;
     let joined = new Set(await joinedRooms(client));
     retainJoinedCursors(storage, options.cursorFile, joined);
-    if (!options.control || options.control.current().active) await startActivity();
+    if (options.control.current().active) await startActivity();
     signal.throwIfAborted();
     options.ready?.(() => {
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
       return testListener({ coordination: options.coordination, runtime: destination, matrix: options.transport(deadline, 10000),
         ...(approval ? { authorizeApproval: approval.authorize } : {}),
-        id: options.id, owner: options.settings.owner, matrixUserId: options.account.user_id, paused: state.paused || !!options.control && !options.control.current().active, signal: deadline });
+        id: options.id, owner: options.settings.owner, matrixUserId: options.account.user_id, paused: state.paused || !options.control.current().active, signal: deadline });
     }, queries);
     acquisition = (async () => {
       for (;;) {
         signal.throwIfAborted();
-        if (options.control) await waitForActivation(options.control, signal);
-        const generation = options.control?.current().signal;
+        await waitForActivation(options.control, signal);
+        const generation = options.control.current().signal;
         try {
         await work(async (client, scope) => {
         const synced = await retry(() => synchronize(client, since, Math.min(options.pollMs, Math.floor(options.reconcileMs / 2))), scope);
@@ -400,7 +407,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         });
         } catch (error) {
           controlling = false;
-          if (generation?.aborted && !signal.aborted) continue;
+          if (generation.aborted && !signal.aborted) continue;
           if (retryable(error) && !signal.aborted) { await options.clock.delay(Math.min(options.pollMs, 5000), signal); continue; }
           throw error;
         }
@@ -409,9 +416,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     while (!signal.aborted) {
       artifacts.cleanup();
       const previous = revision;
-      const generation = options.control?.current().signal;
+      const generation = options.control.current().signal;
       try {
-      if (options.control && !options.control.current().active) {
+      if (!options.control.current().active) {
         const reporter = activity; activity = undefined;
         await reporter?.close();
         await wait(previous); continue;
@@ -464,7 +471,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         if (accepted && published) completed = { ...published, membership: membershipRevision };
         continue;
       }
-      if (controlled?.pending()) { await send(scope => controlled.publish(scope)); continue; }
+      if (controlled.pending()) { await send(scope => controlled.publish(scope)); continue; }
       if (updates.pending() && (!destination.lifecycle || destination.lifecycle.current().phase === 'running')) { await send(scope => updates.publish(destination, scope)); continue; }
       let scheduledHandled = false;
       await send(async scope => { scheduledHandled = await scheduled.publish(scope); });
@@ -518,7 +525,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       chat.prepare(batch, emitted, identities);
       } finally { acquiring = false; }
       } catch (error) {
-        if (options.control && (generation?.aborted || !options.control.current().active) && !signal.aborted) continue;
+        if ((generation.aborted || !options.control.current().active) && !signal.aborted) continue;
         if (retryable(error) && !signal.aborted) { await options.clock.delay(Math.min(options.pollMs, 5000), signal); continue; }
         throw error;
       }
@@ -526,7 +533,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     signal.throwIfAborted();
   } finally {
     cancelBackstop();
-    unsubscribe?.();
+    unsubscribe();
     failed.abort(new Error('Listener stopped'));
     runReady();
     wake?.();

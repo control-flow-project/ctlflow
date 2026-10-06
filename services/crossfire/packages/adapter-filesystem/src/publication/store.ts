@@ -2,10 +2,10 @@ import { constants, lstatSync, realpathSync } from 'node:fs';
 import { open, rename, unlink, opendir, rmdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { PublicationFile } from '@crossfire/domain/publication/values';
-import { PUBLICATION_LIMITS } from '@crossfire/domain/publication/values';
-import type { PublicationStore } from '@crossfire/domain/publication/port';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { PublicationFile } from '@ctlflow/crossfire-domain/publication/values';
+import { PUBLICATION_LIMITS } from '@ctlflow/crossfire-domain/publication/values';
+import type { PublicationStore } from '@ctlflow/crossfire-domain/publication/port';
 import { privateDir } from '../index.js';
 import { acquireFileLock } from '../lock.js';
 

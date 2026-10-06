@@ -3,10 +3,10 @@ import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { paths, prepareProject } from '@crossfire/adapter-filesystem/project';
-import { privateDir, readJson, writeJson } from "@crossfire/adapter-filesystem/index";
-import { MAX_JSON_BYTES } from "@crossfire/contracts/limits";
-import { account } from "@crossfire/contracts/client";
+import { paths, prepareProject } from '@ctlflow/crossfire-adapter-filesystem/project';
+import { privateDir, readJson, writeJson } from "@ctlflow/crossfire-adapter-filesystem/index";
+import { MAX_JSON_BYTES } from "@ctlflow/crossfire-contracts/limits";
+import { account } from "@ctlflow/crossfire-contracts/client";
 
 function directory(): string {
   mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
@@ -20,8 +20,9 @@ test("project identity requires ignored private storage and cannot overwrite unr
   assert.equal(existsSync(join(project, ".crossfire")), false);
   writeFileSync(join(project, ".gitignore"), ".crossfire/profiles/holmes.json\n");
   assert.throws(() => paths(project, "holmes"), /Ignore .crossfire/);
-  writeFileSync(join(project, ".gitignore"), ".crossfire/\n");
+  writeFileSync(join(project, ".gitignore"), ".crossfire/profiles/holmes.json\n.crossfire/state/holmes\n");
   const profile = paths(project, "holmes");
+  assert.deepEqual(Object.keys(profile).sort(), ['cursors', 'profile', 'root', 'state', 'workspace']);
   assert.equal(profile.root, join(project, ".crossfire"));
   assert.equal(statSync(profile.root).mode & 0o777, 0o700);
   assert.throws(() => paths(project, "../other"), /Profile names/);
@@ -64,7 +65,7 @@ test('project privacy preserves subprocess failures and never treats them as a G
   const project = directory(), executableDirectory = directory();
   const blocked = join(executableDirectory, 'git');
   writeFileSync(blocked, '#!/bin/sh\nexit 0\n', { mode: 0o600 });
-  const adapter = import.meta.resolve('@crossfire/adapter-filesystem/project');
+  const adapter = import.meta.resolve('@ctlflow/crossfire-adapter-filesystem/project');
   const script = `
 import { paths, prepareProject } from ${JSON.stringify(adapter)};
 const failures = [];

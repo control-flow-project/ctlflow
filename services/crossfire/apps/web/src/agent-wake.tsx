@@ -1,7 +1,7 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import { WAKE_POLICIES, WAKE_LABELS, wakePolicy } from '@crossfire/contracts/wake';
-import type { AgentView } from '@crossfire/contracts/schema/response';
-import type { OutputOf } from '@crossfire/contracts/rest/operation';
+import { WAKE_POLICIES, WAKE_LABELS, wakePolicy } from '@ctlflow/crossfire-contracts/wake';
+import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
+import type { OutputOf } from '@ctlflow/crossfire-contracts/rest/operation';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
 import { Alert, Empty, Field, Help, Loaded, Panel, Pagination, PageItems } from './ui.js';
@@ -36,7 +36,7 @@ function WakeForm({ agent, initial }: { agent: AgentView; initial: OutputOf<type
       <label htmlFor="wake-policy">Wake-up authority</label><select id="wake-policy" value={mode} onChange={event => { if (wakePolicy(event.target.value)) setMode(event.target.value); }}>
         {WAKE_POLICIES.map(mode => <option key={mode} value={mode}>{WAKE_LABELS[mode]}</option>)}</select>
       {mode === 'selected' && <IdentityPicker agentId={agent.agentId} senders={senders} setSenders={setSenders}/>}
-      <Help title="Context and blocked messages"><p>An allowed message delivers all pending context together. Nobody disables chat-triggered input; use the runtime directly. Unread context remains available.</p>
+      <Help title="Context and blocked messages"><p>An allowed message delivers all pending context together. Nobody disables chat-triggered input. Scheduled Wake-ups and explicit terminal input are separate. Unread context remains available.</p>
         <p>Explicitly addressed, blocked messages receive a short owner-named notice at most once per sender every ten minutes. Filtering and notices never call the model.</p></Help>
       <Alert>{action.error}</Alert><div className="actions"><button disabled={!changed}>Save wake-up policy</button></div>
     </fieldset></form>;

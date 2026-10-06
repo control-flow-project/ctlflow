@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { join } from "node:path";
-import { artifactHash, releaseHash, loadRelease, type Release } from "@crossfire/adapter-filesystem/release";
-import { ARTIFACTS, type ArtifactName, type Manifest } from '@crossfire/contracts/release';
+import { artifactHash, releaseHash, loadRelease, type Release } from "@ctlflow/crossfire-adapter-filesystem/release";
+import { ARTIFACTS, type ArtifactName, type Manifest } from '@ctlflow/crossfire-contracts/release';
 
 export function updatedRelease(release: Release, name: ArtifactName, content: string): Release {
   const files = { ...release.files, [name]: Buffer.from(content) };

@@ -26,12 +26,12 @@ test('all services have one strict implementation and declared package-export bo
     if (owner.includes('/packages/')) assert(manifests.get(owner)!.exports, 'Package must expose its supported entry points: ' + owner);
   }
   const dependencies = (service: string, name: string) => Object.keys(manifests.get('services/' + service + '/packages/' + name)!.dependencies ?? {});
-  assert.deepEqual(dependencies('crossfire', 'domain'), ['@crossfire/kernel']);
-  assert.deepEqual(dependencies('crossfire', 'agent-core').sort(), ['@crossfire/contracts', '@crossfire/kernel']);
-  assert.deepEqual(dependencies('crossfire', 'contracts').sort(), ['@crossfire/domain', '@crossfire/kernel', 'smol-toml']);
+  assert.deepEqual(dependencies('crossfire', 'domain'), ['@ctlflow/crossfire-kernel']);
+  assert.deepEqual(dependencies('crossfire', 'agent-core').sort(), ['@ctlflow/crossfire-contracts', '@ctlflow/crossfire-kernel']);
+  assert.deepEqual(dependencies('crossfire', 'contracts').sort(), ['@ctlflow/crossfire-domain', '@ctlflow/crossfire-kernel', 'smol-toml']);
   for (const name of ['files', 'matrix']) assert.equal(files(join(root, 'services/crossfire/packages', name, 'src')).length, 0);
-  for (const manifest of manifests.values()) if (manifest.name.startsWith('@crossfire/')) {
-    assert(!Object.keys(manifest.dependencies ?? {}).some(name => name.startsWith('@fleet')));
+  for (const manifest of manifests.values()) if (manifest.name.startsWith('@ctlflow/crossfire-')) {
+    assert(!Object.keys(manifest.dependencies ?? {}).some(name => /^@ctlflow\/(?:fleet|fleetd)(?:-|$)/u.test(name)));
   }
 });
 
@@ -53,20 +53,20 @@ test('every import form is inspected, including erased types, exports and curren
 test('declared dependencies cannot bypass semantic domain direction or package-export ownership', () => {
   const root = resolve(process.cwd(), '../..'), owner = 'services/fleetd/packages/domain';
   const manifests = new Map<string, PackageManifest>([
-    [owner, { name: '@fleetd/domain', dependencies: { '@crossfire/contracts': '0.1.0', '@crossfire/domain': '0.1.0', '@crossfire/adapter-sqlite': '0.1.0' } }],
-    ['services/crossfire/packages/contracts', { name: '@crossfire/contracts', exports: { './*': { source: './src/*.ts' } } }],
-    ['services/crossfire/packages/domain', { name: '@crossfire/domain', exports: { './*': { source: './src/*.ts' } } }],
-    ['services/crossfire/packages/adapter-sqlite', { name: '@crossfire/adapter-sqlite', exports: { './*': { source: './src/*.ts' } } }],
+    [owner, { name: '@ctlflow/fleetd-domain', dependencies: { '@ctlflow/crossfire-contracts': '0.1.0', '@ctlflow/crossfire-domain': '0.1.0', '@ctlflow/crossfire-adapter-sqlite': '0.1.0' } }],
+    ['services/crossfire/packages/contracts', { name: '@ctlflow/crossfire-contracts', exports: { './*': { source: './src/*.ts' } } }],
+    ['services/crossfire/packages/domain', { name: '@ctlflow/crossfire-domain', exports: { './*': { source: './src/*.ts' } } }],
+    ['services/crossfire/packages/adapter-sqlite', { name: '@ctlflow/crossfire-adapter-sqlite', exports: { './*': { source: './src/*.ts' } } }],
   ]);
   const file = join(root, owner, 'src/negative.ts');
-  for (const text of ["type Value = import('@crossfire/contracts/runtime').ListenerOptions;",
-    "import { createStore } from '@crossfire/adapter-sqlite/store';",
-    "import { introduceEnrollment } from '@crossfire/domain/enrollment/introduce';",
-    "type Value = import('@crossfire/domain/not-a-real-export').Value;",
+  for (const text of ["type Value = import('@ctlflow/crossfire-contracts/runtime').ListenerOptions;",
+    "import { createStore } from '@ctlflow/crossfire-adapter-sqlite/store';",
+    "import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';",
+    "type Value = import('@ctlflow/crossfire-domain/not-a-real-export').Value;",
     "type Value = import('@missing/package').Value;",
     "import { value } from '../../../crossfire/packages/domain/src/identity/types.js';"])
     assert.equal(auditSource(root, owner, file, text, manifests).length > 0, true, text);
-  assert.equal(auditSource(root, owner, file, "import type { CoordinationPolicy } from '@crossfire/domain/coordination/values';", manifests).length === 0, true);
+  assert.equal(auditSource(root, owner, file, "import type { CoordinationPolicy } from '@ctlflow/crossfire-domain/coordination/values';", manifests).length === 0, true);
 });
 
 test('domain imports pure core ports but rejects executable helpers even when those helpers import nothing', scope => {
@@ -78,19 +78,19 @@ test('domain imports pure core ports but rejects executable helpers even when th
   writeFileSync(join(source, 'destructured.ts'), "export const { value = Date.now() } = {};");
   writeFileSync(join(source, 'runtime.ts'), "export type NativeSessionState = { context: string; state: 'idle' | 'working' };\n");
   const manifests = new Map<string, PackageManifest>([
-    [owner, { name: '@fleetd/domain', dependencies: { '@crossfire/agent-core': '0.1.0' } }],
-    [core, { name: '@crossfire/agent-core', exports: { './*': { source: './src/*.ts' } } }],
+    [owner, { name: '@ctlflow/fleetd-domain', dependencies: { '@ctlflow/crossfire-agent-core': '0.1.0' } }],
+    [core, { name: '@ctlflow/crossfire-agent-core', exports: { './*': { source: './src/*.ts' } } }],
   ]);
   const file = join(root, owner, 'src/negative.ts');
-  for (const text of ["import { helper } from '@crossfire/agent-core/helper';", "type Helper = typeof import('@crossfire/agent-core/helper');",
-    "export * from '@crossfire/agent-core/helper';", "import('@crossfire/agent-core/helper');",
-    "import { values } from '@crossfire/agent-core/computed';", "import { value } from '@crossfire/agent-core/destructured';"])
+  for (const text of ["import { helper } from '@ctlflow/crossfire-agent-core/helper';", "type Helper = typeof import('@ctlflow/crossfire-agent-core/helper');",
+    "export * from '@ctlflow/crossfire-agent-core/helper';", "import('@ctlflow/crossfire-agent-core/helper');",
+    "import { values } from '@ctlflow/crossfire-agent-core/computed';", "import { value } from '@ctlflow/crossfire-agent-core/destructured';"])
     assert.equal(auditSource(root, owner, file, text, manifests).some(failure => failure.includes('pure core ports')), true, text);
-  for (const text of ["import type { NativeSessionState } from '@crossfire/agent-core/runtime';", "type State = import('@crossfire/agent-core/runtime').NativeSessionState;"])
+  for (const text of ["import type { NativeSessionState } from '@ctlflow/crossfire-agent-core/runtime';", "type State = import('@ctlflow/crossfire-agent-core/runtime').NativeSessionState;"])
     assert.equal(auditSource(root, owner, file, text, manifests).length === 0, true, text);
   const contracts = 'services/crossfire/packages/contracts';
-  manifests.set(contracts, { name: '@crossfire/contracts', dependencies: { '@crossfire/agent-core': '0.1.0' } });
+  manifests.set(contracts, { name: '@ctlflow/crossfire-contracts', dependencies: { '@ctlflow/crossfire-agent-core': '0.1.0' } });
   assert.equal(auditSource(root, contracts, join(root, contracts, 'src/negative.ts'),
-    "type State = import('@crossfire/agent-core/runtime').NativeSessionState;", manifests)
+    "type State = import('@ctlflow/crossfire-agent-core/runtime').NativeSessionState;", manifests)
     .some(failure => failure.includes('Wire contracts cannot depend on runtime ports')), true);
 });

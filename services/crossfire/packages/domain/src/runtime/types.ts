@@ -1,5 +1,5 @@
 import type { DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservationView, NativeRuntimeSummary } from './values.js';
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 export type Incident = { id: string; ownerId: string; agentId: string | null; fleetId: string | null; runId: string | null; sessionId: string | null;
   kind: 'failure' | 'contact'; message: string; createdAt: number; recoveredAt: number | null };
@@ -7,7 +7,7 @@ export type IncidentNotification = { incidentId: string; phase: 'initial' | 'rec
 export type ManagementConversation = { ownerId: string; roomId: string; createdAt: number };
 export type RuntimeRepository = {
   decision(id: string): Result<DecisionView | null>;
-  decisions(agentId: string, page: number, pageSize: number): Result<{ items: DecisionSummary[]; totalItems: number }>;
+  decisions(agentId: string, page: number, pageSize: number, status: 'pending' | 'answered' | null): Result<{ items: DecisionSummary[]; totalItems: number }>;
   pendingDecisions(): Result<DecisionSummary[]>;
   insertDecision(value: DecisionView): Result<void>;
   decisionStatus(id: string, status: DecisionView['status']): Result<void>;

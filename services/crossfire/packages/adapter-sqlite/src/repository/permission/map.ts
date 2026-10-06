@@ -1,4 +1,4 @@
-import type { Permission } from '@crossfire/domain/authorization/types';
+import type { Permission } from '@ctlflow/crossfire-domain/authorization/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapPermission(row: Tables['permission']): Permission {
   return {

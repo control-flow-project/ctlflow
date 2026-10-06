@@ -1,4 +1,4 @@
-import type { Result } from '@crossfire/kernel/result';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Page, PageRequest } from '../port/directory.js';
 
 export type RuntimeOperation = { operationId: string; fleetId: string; agentId: string | null; action: 'start' | 'stop' | 'reset';

@@ -1,4 +1,4 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 export type Parser<T> = (input: unknown) => Result<T>;
 export type Parsed<Check> = Check extends Parser<infer Value> ? Value : never;
 export function refine<Value>(parse: Parser<Value>, accepts: (value: Value) => boolean, message: string): Parser<Value> {

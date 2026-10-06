@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { once } from "node:events";
@@ -56,7 +56,8 @@ test("one native install policy governs host, Docker context and image identity"
   assert.match(policy, /^engine-strict=true$/m);
   assert.doesNotMatch(policy, /force|legacy-peer/i);
   assert.deepEqual(policy.split("\n").filter(line => line.startsWith("min-release-age-exclude")),
-    ["min-release-age-exclude[]=@tinqerjs/tinqer", "min-release-age-exclude[]=@tinqerjs/better-sqlite3-adapter"]);
+    ["min-release-age-exclude[]=@tinqerjs/tinqer", "min-release-age-exclude[]=@tinqerjs/better-sqlite3-adapter",
+      "min-release-age-exclude[]=@ctlflow/fleet", "min-release-age-exclude[]=@ctlflow/fleetd"]);
   assert.match(readFileSync(join(root, ".dockerignore"), "utf8"), /^!\.npmrc$/m);
   assert.match(readFileSync(join(service, "Dockerfile"), "utf8"),
     /COPY \.npmrc package\.json package-lock\.json tsconfig\.base\.json \.\//);
@@ -116,11 +117,12 @@ test("native age policy admits aged third parties and only the named owned exemp
   const now = Date.now();
   const aged = new Date(now - 8 * 86_400_000).toISOString();
   const fresh = new Date(now - 86_400_000).toISOString();
+  const exempt = ['@tinqerjs/tinqer', '@tinqerjs/better-sqlite3-adapter', '@ctlflow/fleet', '@ctlflow/fleetd'];
   const unexpected: string[] = [];
   let origin = "";
   const registry = createServer((request, response) => {
     const name = decodeURIComponent(request.url?.slice(1) ?? "");
-    if (!["aged-fixture", "fresh-fixture", "@tinqerjs/tinqer", "@tinqerjs/better-sqlite3-adapter", "@tinqerjs/not-approved"].includes(name)) {
+    if (!["aged-fixture", "fresh-fixture", ...exempt, "@tinqerjs/not-approved", "@ctlflow/crossfire-domain"].includes(name)) {
       unexpected.push(request.url ?? "");
       response.writeHead(404).end();
       return;
@@ -131,8 +133,7 @@ test("native age policy admits aged third parties and only the named owned exemp
       time: { created: aged, modified: fresh, "1.0.0": aged, "2.0.0": fresh },
       versions: Object.fromEntries(versions.map(version => [version, {
         name, version, dist: { tarball: `${origin}/${name}-${version}.tgz` },
-        dependencies: name === "@tinqerjs/tinqer" || name === "@tinqerjs/better-sqlite3-adapter"
-          ? { "aged-fixture": "*" } : {},
+        dependencies: exempt.includes(name) ? { "aged-fixture": "*" } : {},
       }])),
     }));
   });
@@ -161,7 +162,7 @@ test("native age policy admits aged third parties and only the named owned exemp
       return true;
     });
   }
-  for (const name of ["@tinqerjs/tinqer", "@tinqerjs/better-sqlite3-adapter"]) {
+  for (const name of exempt) {
     const approved = fixture();
     writeProject(approved.directory, { [name]: "2.0.0" });
     await npm(approved.directory, approved.environment, ["install", "--package-lock-only", "--ignore-scripts",
@@ -172,13 +173,15 @@ test("native age policy admits aged third parties and only the named owned exemp
     assert.equal(approvedLock.packages["node_modules/" + name]?.version, "2.0.0");
     assert.equal(approvedLock.packages["node_modules/aged-fixture"]?.version, "1.0.0");
   }
-  const unapproved = fixture();
-  writeProject(unapproved.directory, { "@tinqerjs/not-approved": "2.0.0" });
-  await assert.rejects(npm(unapproved.directory, unapproved.environment, ["install", "--package-lock-only", "--ignore-scripts",
-    "--no-audit", "--no-fund", "--registry", origin]), error => {
-    assert(error instanceof Error && "stderr" in error);
-    assert.match(String(error.stderr), /npm error code ETARGET/);
-    return true;
-  });
+  for (const name of ["@tinqerjs/not-approved", "@ctlflow/crossfire-domain"]) {
+    const unapproved = fixture();
+    writeProject(unapproved.directory, { [name]: "2.0.0" });
+    await assert.rejects(npm(unapproved.directory, unapproved.environment, ["install", "--package-lock-only", "--ignore-scripts",
+      "--no-audit", "--no-fund", "--registry", origin]), error => {
+      assert(error instanceof Error && "stderr" in error);
+      assert.match(String(error.stderr), /npm error code ETARGET/);
+      return true;
+    });
+  }
   assert.deepEqual(unexpected, []);
 });

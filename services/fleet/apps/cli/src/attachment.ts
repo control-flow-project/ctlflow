@@ -1,7 +1,7 @@
-import type { RuntimeAttachment, RuntimeTerminalAdapter } from '@crossfire/agent-core/terminal';
-import { createDaemonClient, operations } from '@fleet/daemon-client/client';
-import { sshTerminalCommand } from '@fleet/ssh-transport/terminal';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import type { RuntimeAttachment, RuntimeTerminalAdapter } from '@ctlflow/crossfire-agent-core/terminal';
+import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
+import { sshTerminalCommand } from '@ctlflow/fleet-ssh-transport/terminal';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export type TerminalPointer = Omit<RuntimeAttachment, 'connection'> & { command: string };
 

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { API, segment } from '@crossfire/contracts/matrix';
-import { roomId, userId } from '@crossfire/contracts/validation';
-import { ownerConversationState } from '@crossfire/contracts/matrix-room';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { roomId, userId } from '@ctlflow/crossfire-contracts/validation';
+import { ownerConversationState } from '@ctlflow/crossfire-contracts/matrix-room';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Authority } from '../account/authority.js';
 import { nativeOk, nativeRequest, nativeState, type Native } from '../http.js';
 

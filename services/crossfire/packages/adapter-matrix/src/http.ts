@@ -1,15 +1,15 @@
-import { failure, success, type Result } from "@crossfire/kernel/result";
-import { object } from "@crossfire/contracts/validation";
+import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
+import { object } from "@ctlflow/crossfire-contracts/validation";
 import type { Readable } from "node:stream";
-import { MAX_JSON_BYTES } from "@crossfire/contracts/limits";
+import { MAX_JSON_BYTES } from "@ctlflow/crossfire-contracts/limits";
 
-import type { Json, JsonObject } from '@crossfire/contracts/json';
+import type { Json, JsonObject } from '@ctlflow/crossfire-contracts/json';
 export type Native = { base: string; token?: string; signal?: AbortSignal; timeoutMs?: number };
 export type NativeResponse = { status: number; body: JsonObject };
-import { API, segment, json } from '@crossfire/contracts/matrix';
-import { endpoint } from '@crossfire/contracts/origin';
+import { API, segment, json } from '@ctlflow/crossfire-contracts/matrix';
+import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 import { markdownMessage } from './message.js';
-import { roomState, type RoomStateEvent } from '@crossfire/contracts/matrix-room';
+import { roomState, type RoomStateEvent } from '@ctlflow/crossfire-contracts/matrix-room';
 
 export async function nativeOpen(client: Native, method: string, path: string, body?: Buffer | Readable,
   contentType = "application/json"): Promise<Result<Response>> {

@@ -1,20 +1,18 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
-import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import assert from 'node:assert/strict';
-import { spawn, execFile } from 'node:child_process';
-import { once } from 'node:events';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { API } from '@crossfire/contracts/matrix';
-import { writeJson } from '@crossfire/adapter-filesystem/index';
-import { listen, type ListenerOptions } from '@crossfire/adapter-crossfire/listener';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { listen, type ListenerOptions } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, SELF, THREAD, until } from './test-support/listener.js';
 import { builtClient, installTestRelease } from './test-support/release.js';
 
 const execute = promisify(execFile);
-const CLIENT = builtClient();
 
 test('listener long-polls silently, wakes promptly, drains backlog, and checkpoints native acknowledgements', async t => {
   const native = await fakeCodex(t);
@@ -176,87 +174,40 @@ test('permanent Matrix errors and suspended ownership stop without native delive
   }
 });
 
-test('foreground CLI emits one session record, stays quiet on idle polls, rejects concurrent receivers and releases its lock', async t => {
-  const native = await fakeCodex(t);
-  const matrix = await matrixFixture(t, native.directory);
-  const base = [CLIENT, '--project', matrix.workspace, '--profile', 'watson'];
-  const args = [...base, 'agent', 'listen', '--runtime', 'codex', '--poll-ms', '100', '--debounce-ms', '0'];
-  const child = spawn(process.execPath, args, { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' }, stdio: ['ignore', 'pipe', 'pipe'] });
-  let output = '', errors = '';
-  child.stdout.on('data', chunk => { output += String(chunk); });
-  child.stderr.on('data', chunk => { errors += String(chunk); });
-  const stopped = once(child, 'close');
-  cleanup(t, async () => { child.kill('SIGTERM'); await stopped; });
-  await until(() => matrix.waiting() === 1, errors);
-  const liveRead = await execute(process.execPath, [...base, 'agent', 'read'], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } });
-  assert.deepEqual(JSON.parse(liveRead.stdout).events, []);
+test('controller-owned receiver shares one private host with intentional tools and rejects duplicate ownership', async scope => {
+  const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory), stop = new AbortController();
+  const client = installTestRelease(native.directory);
+  writeFileSync(join(native.directory, 'package.json'), '{"type":"commonjs"}');
+  const running = listen({ ...matrix, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 100 }, stop.signal).catch(error => error);
+  cleanup(scope, async () => { stop.abort(); await running; });
+  const args = [client, '--project', matrix.workspace, '--profile', 'watson'];
+  const command = (...arguments_: string[]) => execute(process.execPath, [...args, ...arguments_], { env: matrix.env, cwd: native.directory, timeout: 10000 });
+  await until(() => matrix.waiting() === 1);
+  assert.equal(matrix.host.size(), 1);
+  assert.deepEqual(JSON.parse((await command('agent', 'read')).stdout).events, []);
   assert.equal(matrix.maximumWaiting(), 1);
-  await assert.rejects(execute(process.execPath, args, { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } }), /already owns this private state/);
-  const who = await execute(process.execPath, [...base, 'matrix', 'get-joined-members-by-room', '--room-id', ROOM], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } });
+  await assert.rejects(listen({ ...matrix, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 100 }, stop.signal), /already owns this private state/u);
+  const who = await command('matrix', 'get-joined-members-by-room', '--room-id', ROOM);
   assert(JSON.parse(who.stdout).joined[SELF]);
   matrix.add(ROOM, message('$one'));
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
-  const priorPolls = matrix.requests.filter(request => request.path === API + '/sync').length;
-  matrix.wake();
-  await until(() => matrix.requests.filter(request => request.path === API + '/sync').length > priorPolls && matrix.waiting() === 1);
-  assert.deepEqual(JSON.parse(output), { runtime: 'codex', session: THREAD, workspace: matrix.workspace }); assert.equal(errors, '');
-  child.kill('SIGTERM');
-  assert.deepEqual(await stopped, [0, null]);
-  const read = await execute(process.execPath, [...base, 'agent', 'read'], { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' } });
-  assert.deepEqual(JSON.parse(read.stdout).events, []);
-});
-
-test('CLI validates listener-only controls before network use', async scope => {
-  const native = await fakeCodex(scope);
-  const fixture = await matrixFixture(scope, native.directory);
-  const base = [CLIENT, '--project', fixture.workspace, '--profile', 'watson'];
-  for (const args of [['read', '--thread', THREAD], ['listen'], ['run'], ['attach'], ['listen', '--runtime', 'unsupported'],
-    ['listen', '--runtime', 'codex', '--poll-ms', 'NaN'], ['listen', '--runtime', 'codex', '--poll-ms', '0'],
-    ['listen', '--runtime', 'codex', '--poll-ms', '30001'], ['listen', '--runtime', 'codex', '--request-timeout-ms', 'Infinity'],
-    ['read', '--debounce-ms', '10000'], ['listen', '--runtime', 'codex', '--thread', THREAD],
-    ['listen', '--runtime', 'codex', '--codex-socket', '/private/socket'], ['listen', '--runtime', 'codex', '--', '--listen', 'ws://0.0.0.0:1234'],
-    ...['', ' ', 'NaN', 'Infinity', '-1', '0.5', '60001'].map(value => ['listen', '--runtime', 'codex', '--debounce-ms=' + value])]) {
-    await assert.rejects(execute(process.execPath, [...base, 'agent', ...args], { env: { ...fixture.env, RUNCODEX_CONNECTION_FILE: '', CODEX_THREAD_ID: '' } }), /Unsupported option|Unknown command|[Ss]upported|must be|Unknown option|Expected one namespace|native thread identity/);
-  }
-});
-
-test('foreground SIGINT and SIGHUP close only their attached connection and receiver', async context => {
-  for (const signal of ['SIGINT', 'SIGHUP'] as const) {
-    const native = await fakeCodex(context);
-    const matrix = await matrixFixture(context, native.directory);
-    const child = spawn(process.execPath, [CLIENT, '--project', matrix.workspace, '--profile', 'watson', 'agent', 'listen',
-      '--runtime', 'codex', '--poll-ms', '100'],
-      { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' }, stdio: ['ignore', 'pipe', 'pipe'] });
-    const stopped = once(child, 'close');
-    cleanup(context, async () => { child.kill('SIGTERM'); await stopped; });
-    await until(() => matrix.waiting() > 0);
-    child.kill(signal);
-    assert.deepEqual(await stopped, [0, null]);
-    await (await acquireProcessLock(join(matrix.workspace, '.crossfire/state/watson/receiver')))();
-    assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
-    assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
-  }
-});
-
-test('the standalone bundle relays from a foreign project without node_modules', async t => {
-  const native = await fakeCodex(t);
-  const matrix = await matrixFixture(t, native.directory);
-  const script = installTestRelease(native.directory);
-  writeFileSync(join(native.directory, 'package.json'), '{"type":"commonjs"}');
-  matrix.subscribe(ROOM);
-  matrix.add(ROOM, message('$standalone'));
-  const child = spawn(process.execPath, [script, '--project', matrix.workspace, '--profile', 'watson', 'agent', 'listen', '--runtime', 'codex', '--debounce-ms', '0'],
-    { env: { ...matrix.env, FIXTURE_CODEX_TOKEN: 'fixture-only' }, cwd: native.directory, stdio: ['ignore', 'pipe', 'pipe'] });
-  const stopped = once(child, 'close');
-  let errors = '', output = '';
-  child.stderr.on('data', chunk => { errors += String(chunk); });
-  child.stdout.on('data', chunk => { output += String(chunk); });
-  cleanup(t, async () => { child.kill('SIGTERM'); await stopped; });
-  await until(() => child.exitCode !== null || existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
-  assert.equal(errors, ''); assert.deepEqual(JSON.parse(output), { runtime: 'codex', session: THREAD, workspace: matrix.workspace });
-  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], '1');
-  assert(!existsSync(join(native.directory, 'node_modules')));
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
-  child.kill('SIGTERM');
-  assert.deepEqual(await stopped, [0, null]);
+  assert(!existsSync(join(native.directory, 'node_modules')), 'Managed intentional client artifacts are self-contained');
+  stop.abort(new Error('Controller receiver stopped'));
+  assert.match(String(await running), /Controller receiver stopped/u);
+  assert.equal(matrix.host.size(), 0);
+  await assert.rejects(command('agent', 'read'), /controller|listener|receiver/iu, 'Unread queries cannot silently start an independent receiver');
+  await (await acquireProcessLock(join(matrix.workspace, '.crossfire/state/watson/receiver')))();
+});
+
+test('removed standalone lifecycle commands are rejected before network or native work', async scope => {
+  const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory);
+  const client = builtClient(), args = [client, '--project', fixture.workspace, '--profile', 'watson'];
+  for (const command of ['connect', 'disconnect', 'listen', 'run', 'attach', 'enroll', 'setup']) {
+    await assert.rejects(execute(process.execPath, [...args, 'agent', command], { env: fixture.env, timeout: 10000 }), /Unknown command/u);
+  }
+  for (const option of ['--thread', '--runtime', '--endpoint', '--debounce-ms']) {
+    await assert.rejects(execute(process.execPath, [...args, 'agent', 'read', option, 'invalid'], { env: fixture.env, timeout: 10000 }), /Unsupported option|Unknown option/u);
+  }
+  assert.equal(native.requests().length, 0); assert.equal(fixture.requests.length, 0);
 });

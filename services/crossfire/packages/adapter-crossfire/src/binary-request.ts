@@ -1,4 +1,4 @@
-import type { BinaryInput } from '@crossfire/kernel/bytes';
+import type { BinaryInput } from '@ctlflow/crossfire-kernel/bytes';
 export function binaryRequest(input: BinaryInput): ReadableStream<Uint8Array> {
   const iterator = input.chunks[Symbol.asyncIterator](); let size = 0;
   return new ReadableStream<Uint8Array>({

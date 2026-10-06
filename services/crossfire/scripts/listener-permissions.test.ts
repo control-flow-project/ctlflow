@@ -1,13 +1,13 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { withClock } from './test-support/clock.js';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import test from 'node:test';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import type { RuntimeHooks, RuntimeDecision } from '@crossfire/agent-core/runtime';
-import { isListenerNotice } from '@crossfire/contracts/notices';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import { success } from '@crossfire/kernel/result';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import type { RuntimeHooks, RuntimeDecision } from '@ctlflow/crossfire-agent-core/runtime';
+import { isListenerNotice } from '@ctlflow/crossfire-contracts/notices';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { fakeCodex, matrixFixture, temporary, message, ROOM, OWNER_DM, AGENT_ID, OBSERVER, SELF, THREAD } from './test-support/listener.js';
 
 const permission: RuntimeDecision = { runtime: 'codex', session: THREAD, request: 'fixture-request', action: 'command', turn: 'original-turn', item: 'original-item', blocking: true,

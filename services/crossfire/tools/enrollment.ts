@@ -1,8 +1,8 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { failure, success } from '@crossfire/kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { withHuman, type Credentials } from './auth.js';
-import { coordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 export const enrollmentPlan = check.object({ enrollmentId: check.identifier, ownerMatrixId: check.matrixUserId,
   verificationCode: check.text(12, 12), fleetKey: check.nullable(check.name), controllerName: check.nullable(check.text(100)),

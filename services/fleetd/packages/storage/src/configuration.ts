@@ -1,10 +1,12 @@
 import { openSync, closeSync, fstatSync, readFileSync, realpathSync, constants, lstatSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { parseToml, validateRoster, definition } from '@fleetd/contracts/configuration';
-import type { Configuration, Definition } from '@fleetd/domain/model';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { defaultCoordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import { parseToml, validateRoster, definition } from '@ctlflow/fleetd-contracts/configuration';
+import type { Configuration, Definition } from '@ctlflow/fleetd-domain/model';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 export function readText(file: string, maximum = 1024 * 1024): string {
   const path = resolve(file);
@@ -27,6 +29,10 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
     const source = replacement ?? readText(join(directory, 'runtime.toml')), parsed = parseToml(source, validateRoster);
     if (!parsed.ok) return parsed;
     const definitions: Record<string, Definition> = {}, hash = createHash('sha256').update(source);
+    const instructionFile = join(directory, '.fleet', 'setup-instructions.json');
+    const setup = existsSync(instructionFile) ? check.object({ instructions: check.plainText(128 * 1024) })(readJson<unknown>(instructionFile, 256 * 1024)) : success({ instructions: '' });
+    if (!setup.ok) return setup;
+    hash.update(setup.value.instructions);
     for (const item of parsed.value.instances) {
       if (!definitions[item.definition]) {
         const root = join(directory, 'agents', item.definition), text = readText(join(root, 'agent.toml'));
@@ -34,11 +40,17 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
         if (!role.ok) return role;
         const instructions = readText(join(root, 'AGENTS.md'), 128 * 1024);
         const policy = role.value.coordination_options;
-        definitions[item.definition] = { name: role.value.name, runtime: role.value.runtime, options: role.value.runtime_options, instructions,
+        definitions[item.definition] = { name: role.value.name, runtime: role.value.runtime, options: role.value.runtime_options,
+          instructions: [instructions, setup.value.instructions].filter(Boolean).join('\n\n'),
           coordinationPolicy: policy ? { wakeMode: policy.wake_mode, senderMatrixIds: policy.sender_matrix_ids ?? [], permissions: policy.permissions } : defaultCoordinationPolicy() };
         hash.update(item.definition).update(text).update(instructions);
       }
       const segments = item.workarea.split('/');
+      if (item.workspace) {
+        if (realpathSync(item.workspace) !== resolve(item.workspace)) return failure('invalid', 'Native workspaces cannot traverse symbolic links');
+        const workspace = lstatSync(item.workspace);
+        if (!workspace.isDirectory() || workspace.uid !== process.getuid!() || workspace.mode & 0o002) return failure('invalid', 'Native workspace must be owned and not writable by other users');
+      }
       for (let length = 1; length <= segments.length; length++) {
         const child = join(directory, ...segments.slice(0, length));
         if (existsSync(child) && realpathSync(child) !== child) return failure('invalid', 'Work areas cannot traverse symbolic links');

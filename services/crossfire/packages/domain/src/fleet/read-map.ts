@@ -1,5 +1,5 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { FLEET_MAP_LIMITS } from '@crossfire/kernel/fleet-map';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { FLEET_MAP_LIMITS } from '@ctlflow/crossfire-kernel/fleet-map';
 import type { Actor, Services } from '../port/services.js';
 import type { PrincipalSummary } from '../port/discovery.js';
 import type { AgentRecord } from '../port/directory.js';

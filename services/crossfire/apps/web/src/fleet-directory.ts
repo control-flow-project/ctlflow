@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import type { FleetView } from '@crossfire/contracts/schema/response';
-import type { Result } from '@crossfire/kernel/result';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import { readFleetDirectory } from './fleet-directory/read.js';
 export function useFleetDirectory(search: string) {
   const [result, setResult] = useState<Result<FleetView[]>>(), [revision, setRevision] = useState(0);

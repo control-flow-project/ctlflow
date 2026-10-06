@@ -1,7 +1,7 @@
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import type { FleetView } from '@crossfire/contracts/schema/response';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 export async function readFleetDirectory(client: ReturnType<typeof createClient>, search: string): Promise<Result<FleetView[]>> {
   const query = new URLSearchParams(search);

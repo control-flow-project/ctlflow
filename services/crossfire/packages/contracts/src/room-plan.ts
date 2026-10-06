@@ -1,7 +1,7 @@
 import { parse } from 'smol-toml';
 import * as check from './schema/validation.js';
 import { plan } from './schema/request.js';
-import { failure } from '@crossfire/kernel/result';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 const grant = check.object({ room: check.roomId, access: check.choice('read', 'reply', 'custom'), muted: check.boolean,
   level: check.optional(check.integer(Number.MIN_SAFE_INTEGER)) });

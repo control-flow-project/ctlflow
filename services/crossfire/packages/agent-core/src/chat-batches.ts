@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { MAX_INPUT_BYTES } from '@crossfire/contracts/runtime';
-import type { Settings } from '@crossfire/contracts/client';
-import type { PrincipalIdentity } from '@crossfire/contracts/schema/response';
+import { MAX_INPUT_BYTES } from '@ctlflow/crossfire-contracts/runtime';
+import type { Settings } from '@ctlflow/crossfire-contracts/client';
+import type { PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
 import { deliveryText, deliveryEnvelope, type ReceivedEvent } from './receive.js';
 import type { MessageArtifacts } from './message-artifacts.js';
 

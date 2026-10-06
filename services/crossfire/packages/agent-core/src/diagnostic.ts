@@ -1,9 +1,9 @@
 import type { Coordination } from './coordination.js';
 import type { RuntimeConnection } from './runtime.js';
 import type { Matrix } from './port.js';
-import { API } from '@crossfire/contracts/matrix';
-import type { WakePolicy } from '@crossfire/contracts/wake';
-import type { Result } from '@crossfire/kernel/result';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
+import type { WakePolicy } from '@ctlflow/crossfire-contracts/wake';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { RuntimeApproval } from './runtime.js';
 export type ListenerTest = { session: string; server: string; authenticated: true; rooms: number; joinedRooms: number;
   canReceiveRoomTasks: boolean; wakeMode: WakePolicy; busy: boolean; deliveryPaused: boolean; approval: RuntimeApproval; currentRelease: string; message: string };

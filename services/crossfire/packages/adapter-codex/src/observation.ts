@@ -1,4 +1,4 @@
-import type { RuntimeHooks } from '@crossfire/agent-core/runtime';
+import type { RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
 import type { NativeEvent } from './protocol.js';
 import { codexUsage } from './usage.js';
 import { createHash, type Hash } from 'node:crypto';

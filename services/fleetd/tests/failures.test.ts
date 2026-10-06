@@ -5,9 +5,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
-import { cleanup } from '@crossfire/test-support/cleanup';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import type { Binding } from '@fleetd/storage/binding';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import type { Binding } from '@ctlflow/fleetd-storage/binding';
 import { failureReporter } from '../apps/daemon/src/failures.js';
 
 async function until(predicate: () => boolean): Promise<void> {

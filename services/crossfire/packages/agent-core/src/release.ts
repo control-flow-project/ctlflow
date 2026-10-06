@@ -1,5 +1,5 @@
-import { updateNotice, type Manifest } from '@crossfire/contracts/release';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { updateNotice, type Manifest } from '@ctlflow/crossfire-contracts/release';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Coordination } from './coordination.js';
 
 export async function requireCurrentRelease(client: Coordination, installed: Manifest, signal?: AbortSignal): Promise<Result<Manifest>> {

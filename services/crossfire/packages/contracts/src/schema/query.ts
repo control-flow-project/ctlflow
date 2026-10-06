@@ -1,11 +1,18 @@
 import * as check from './validation.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { pagination, listQuery } from './request.js';
 export type PageQuery = { page: number; pageSize: number };
 function checked(input: unknown, allowed: readonly string[]): Result<URLSearchParams> { return listQuery(['page', 'pageSize', ...allowed])(input); }
 export function page(input: unknown) {
   const parsed = checked(input, []);
   return parsed.ok ? pagination(parsed.value) : parsed;
+}
+export function runtimeDecisions(input: unknown): Result<PageQuery & { status: 'pending' | null }> {
+  const parsed = checked(input, ['status']); if (!parsed.ok) return parsed;
+  const bounds = pagination(parsed.value); if (!bounds.ok) return bounds;
+  const status = parsed.value.get('status');
+  if (status === null) return success({ ...bounds.value, status: null });
+  return status === 'pending' ? success({ ...bounds.value, status: 'pending' as const }) : failure('invalid', 'Invalid native decision status filter');
 }
 export function roomGrants(input: unknown): Result<PageQuery & { roomIds?: string[] }> {
   const parsed = checked(input, ['roomIds']);

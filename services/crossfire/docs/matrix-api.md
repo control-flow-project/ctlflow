@@ -27,9 +27,11 @@ The native server validates complete request-body schemas and semantics.
 
 ## Discovery and coverage
 
-Run `node crossfire-client.mjs matrix --help` for all command/access rows and
-`node crossfire-client.mjs matrix COMMAND --help` for that operation's exact contract.
-Account operations select the project-local identity with `--project` and `--profile`.
+Run `node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" matrix --help` for all
+command/access rows and append `COMMAND --help` for an operation's exact contract.
+`CROSSFIRE_PROJECT` selects private instance state, not necessarily native cwd.
+Operator invocations may explicitly select that state with `--project` and
+`--profile`; no identity is discovered by scanning a workspace or session.
 
 | Purpose | Representative commands |
 | --- | --- |
@@ -112,7 +114,8 @@ leave and rejoin both occur between polls. Profile changes do not reset it.
   delivery ordering and checkpoint lifecycle.
 - `packages/adapter-codex/src/connection.ts`: exact existing-thread/workspace verification, native receipts,
   exact captured-turn cancellation with terminal proof.
-- `apps/client/src/main.ts`: argument namespace/dispatch and receiver locking.
+- `packages/agent-tools/src/main.ts`: intentional tool namespace/dispatch through
+  fleetd's existing receiver; no standalone lifecycle or receiver fallback.
 
 The human's `!!` control cannot come from historical search, edited messages,
 quotes, another agent or an unmentioned shared-room broadcast. A bare stop
@@ -138,4 +141,4 @@ The operation metadata is derived from the Matrix specification, distributed
 under the Apache License 2.0. The original license is included with this source
 and distributed as `matrix-spec-LICENSE.txt` beside the client and agent skill.
 
-- [Matrix specification license](../third-party/matrix-spec-LICENSE)
+- [Matrix specification license](../packages/agent-tools/assets/matrix-spec-LICENSE.txt)

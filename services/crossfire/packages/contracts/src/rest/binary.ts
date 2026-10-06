@@ -1,5 +1,5 @@
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { BinaryInput } from '@crossfire/kernel/bytes';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { BinaryInput } from '@ctlflow/crossfire-kernel/bytes';
 export function binaryInput(value: unknown): Result<BinaryInput> {
   if (!value || typeof value !== 'object' || !('byteLength' in value) || !('chunks' in value)
     || typeof value.byteLength !== 'number' || !Number.isSafeInteger(value.byteLength) || value.byteLength < 0

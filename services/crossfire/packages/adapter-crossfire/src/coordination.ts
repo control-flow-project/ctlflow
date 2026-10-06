@@ -1,8 +1,8 @@
 import { createClient, type ClientOptions } from './client.js';
-import { operations } from '@crossfire/contracts/rest/operations';
-import type { Coordination } from '@crossfire/agent-core/coordination';
-import { success, type Result } from '@crossfire/kernel/result';
-import type { Response } from '@crossfire/contracts/rest/envelope';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import type { Coordination } from '@ctlflow/crossfire-agent-core/coordination';
+import { success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { Response } from '@ctlflow/crossfire-contracts/rest/envelope';
 
 async function data<Value>(response: Promise<Result<Response<Value>>>): Promise<Result<Value>> {
   const result = await response;

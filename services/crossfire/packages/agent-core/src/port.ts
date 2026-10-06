@@ -1,4 +1,4 @@
-import type { JsonObject } from '@crossfire/contracts/json';
+import type { JsonObject } from '@ctlflow/crossfire-contracts/json';
 export type Clock = {
   now(): number;
   delay(milliseconds: number, signal: AbortSignal): Promise<void>;

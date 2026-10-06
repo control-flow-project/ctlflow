@@ -1,5 +1,5 @@
 import * as check from './schema/validation.js';
-import { failure, success } from '@crossfire/kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 
 export const STATISTICS_INTERVAL_MS = 5 * 60_000;
 export const STATISTICS_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;

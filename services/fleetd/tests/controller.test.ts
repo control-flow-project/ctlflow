@@ -1,4 +1,4 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -6,19 +6,24 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
-import { createController } from '@fleetd/domain/controller';
-import type { Execution, Running } from '@fleetd/domain/port';
-import type { RuntimeAttachment } from '@crossfire/agent-core/terminal';
-import type { Operation } from '@fleetd/domain/model';
-import type { NativeSessionState } from '@crossfire/agent-core/runtime';
-import { createRegistry } from '@fleetd/storage/registry';
-import { validateRoster, parseToml } from '@fleetd/contracts/configuration';
-import { fleetView, instanceView } from '@fleetd/contracts/api';
-import { success, failure, type Result } from '@crossfire/kernel/result';
-import { createListenerControl } from '@crossfire/agent-core/listener-control';
-import { listenerStop } from '@crossfire/kernel/lifecycle';
+import { createController } from '@ctlflow/fleetd-domain/controller';
+import type { Execution, Running } from '@ctlflow/fleetd-domain/port';
+import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
+import type { Operation } from '@ctlflow/fleetd-domain/model';
+import type { NativeSessionState } from '@ctlflow/crossfire-agent-core/runtime';
+import { createRegistry } from '@ctlflow/fleetd-storage/registry';
+import { validateRoster, parseToml } from '@ctlflow/fleetd-contracts/configuration';
+import { fleetView, instanceView } from '@ctlflow/fleetd-contracts/api';
+import { success, failure, type Result } from '@ctlflow/crossfire-kernel/result';
+import { createListenerControl as listenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import { listenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
+import { createDaemonClient, operations as daemonOperations } from '@ctlflow/fleet-daemon-client/client';
+import { startDaemon } from '../apps/daemon/src/main.js';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
+function createListenerControl(acknowledge: Parameters<typeof listenerControl>[0]) {
+  return listenerControl(acknowledge, () => ({ fleetId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222', credential: 'fixture-controller-lease' }));
+}
 function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control: Running['control']; pointer: RuntimeAttachment;
   close: Running['close']; nativeState?: Running['nativeState']; resume?: Running['resume'] }): Running {
   const nativeState: Running['nativeState'] = input.nativeState ?? (() => ({ phase: 'running', lastActivityAt: 1, historyAvailable: true }));
@@ -46,9 +51,10 @@ function fixture(execution?: Partial<Execution>) {
     }),
     execution: { connect: () => success(undefined), connection: () => ({ connected: true, deliveryEnabled: true, revision: 0, error: null }),
       delivery: async () => failure('unavailable', 'Not connected'), message: async () => failure('unavailable', 'Not connected'), disconnect: async () => {}, close: async () => {},
-      validate: () => success(undefined), prepare: async () => success({ failed: [] }), detach: async () => success(undefined),
+      validate: () => success(undefined), inspect: async () => success(undefined), test: async () => success(undefined), prepare: async () => success({ failed: [] }), remove: async () => success(undefined),
+      archive: async () => success(undefined), update: async () => success(undefined),
       reset: async () => success(undefined),
-      contexts: async () => success([]),
+      contexts: async () => success([]), confirmStopped: async () => success(undefined),
       start: async (_configuration, instance) => { started.push(instance.key); const stop = new AbortController(), sessionId = 'native-session-' + randomUUID(); return success(runtimeFixture({ sessionId, signal: stop.signal,
         pointer: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: '/fixture/private-token' } }, control: createListenerControl(async () => {}).connection,
         close: async () => { closed.push(instance.key); stop.abort(); } })); }, ...execution } satisfies Execution };
@@ -287,9 +293,9 @@ test('approval waiting is model-free and stop cancels a pending start', async sc
   assert.equal((await fixture.finish(start)).status, 'failed'); assert.deepEqual(fixture.started, []);
 });
 
-test('roster edits serialize native detachment and retain files when removing the last instance', async scope => {
+test('roster edits serialize registration retirement and retain files when removing the last instance', async scope => {
   let release!: () => void;
-  const fixture = fixtureController({ detach: async () => { await new Promise<void>(resolve => { release = resolve; }); return success(undefined); } });
+  const fixture = fixtureController({ remove: async () => { await new Promise<void>(resolve => { release = resolve; }); return success(undefined); } });
   cleanup(scope, () => fixture.controller.close());
   const pending = fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'remove', instanceKey: 'analyst' });
   assert.equal((await fixture.controller.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 })).ok, false);
@@ -620,4 +626,38 @@ test('startup restoration uses at most four concurrent starts and never reenroll
   await until(() => pending.length === 8); assert.equal(maximum, 4);
   for (const complete of pending.slice(4)) complete();
   await restarted.ready(); assert.equal(active, 0); assert.equal(value(restarted.view(fixture.record.fleetId)).instances.filter(item => item.desiredActive).length, 8);
+});
+
+test('private controller API stays responsive while bounded native restoration is queued and explicit stop cancels it without enrollment', { timeout: 5000 }, async scope => {
+  const current = fixtureController(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  for (let index = 1; index < 8; index++) {
+    const key = 'queued-' + index, revision = value(current.controller.view(current.record.fleetId)).revision;
+    value(await current.controller.editInstance(current.record.fleetId, revision, { kind: 'add', instance: { key, name: key, definition: 'analyst', workarea: 'agents/analyst/workarea/' + key } }));
+  }
+  await current.finish(await current.operation('start')); await current.controller.close();
+  let started = 0, released = false; const completions = new Set<() => void>();
+  current.services.execution.prepare = async () => assert.fail('Restoration cannot reenroll a fleet');
+  current.services.execution.start = async (_configuration, _instance, signal, reason) => {
+    assert.equal(reason, 'recovery'); started++;
+    await new Promise<void>(resolve => {
+      const complete = () => { completions.delete(complete); signal.removeEventListener('abort', complete); resolve(); };
+      if (released || signal.aborted) complete(); else { completions.add(complete); signal.addEventListener('abort', complete, { once: true }); }
+    });
+    return failure('unavailable', 'Controlled native restoration stopped');
+  };
+  const starting = startDaemon(join(current.directory, 'controller'), 'desktop', current.services.execution);
+  cleanup(scope, async () => { released = true; for (const complete of completions) complete(); await (await starting).close(); });
+  const daemon = await starting, client = createDaemonClient(daemon.socketPath);
+  await until(() => started === 4);
+  assert.equal(value(await client.call(daemonOperations.status, {}, {})).data.stopping, false);
+  const restoring = value(await client.call(daemonOperations.fleet, { fleetId: current.record.fleetId }, {})).data;
+  assert.equal(restoring.instances.filter(instance => instance.desiredActive && instance.phase === 'starting').length, 8);
+  assert.equal((await client.call(daemonOperations.readiness, { fleetId: current.record.fleetId }, {})).ok, false, 'API availability does not claim native listener readiness');
+  const stopping = value(await client.call(daemonOperations.operate, {}, { operationId: randomUUID(), action: 'stop',
+    target: { kind: 'fleet', fleetId: current.record.fleetId }, expectedRevision: restoring.revision })).data;
+  await until(() => value(daemon.controller.operation(stopping.operationId)).completedAt !== null);
+  assert.equal(value(daemon.controller.operation(stopping.operationId)).status, 'succeeded');
+  const stopped = value(await client.call(daemonOperations.fleet, { fleetId: current.record.fleetId }, {})).data;
+  assert.equal(stopped.instances.filter(instance => !instance.desiredActive && instance.phase === 'stopped').length, 8);
+  assert.deepEqual(value(current.registry.desiredIntent()), []); assert.equal(started, 4, 'Queued native generations never start after explicit stop');
 });

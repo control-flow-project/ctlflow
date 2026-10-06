@@ -3,8 +3,8 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapAgentWakeSender } from './map.js';
 import { stored } from '../stored.js';
-import { failure, success } from '@crossfire/kernel/result';
-import type { AgentWakeSenderRepository } from '@crossfire/domain/port/repositories';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { AgentWakeSenderRepository } from '@ctlflow/crossfire-domain/port/repositories';
 
 export function createAgentWakeSenderRepository(database: Database.Database): AgentWakeSenderRepository {
   return {

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { codexPermission, permissionDenial } from '@crossfire/adapter-codex/approval';
-import type { NativeRequest } from '@crossfire/adapter-codex/protocol';
-import { approvalRouting } from '@crossfire/adapter-codex/permission-policy';
-import { success } from '@crossfire/kernel/result';
+import { codexPermission, permissionDenial } from '@ctlflow/crossfire-adapter-codex/approval';
+import type { NativeRequest } from '@ctlflow/crossfire-adapter-codex/protocol';
+import { approvalRouting } from '@ctlflow/crossfire-adapter-codex/permission-policy';
+import { success } from '@ctlflow/crossfire-kernel/result';
 
 const request: NativeRequest = { id: 'request', method: 'item/commandExecution/requestApproval', params: {
   threadId: 'session', turnId: 'turn', itemId: 'item', command: 'npm install', cwd: '/work',

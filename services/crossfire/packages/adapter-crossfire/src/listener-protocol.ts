@@ -1,10 +1,10 @@
-import { fields } from '@crossfire/contracts/validation';
-import { releaseName } from '@crossfire/contracts/release';
-import { wakePolicy } from '@crossfire/contracts/wake';
-import { errorCode } from '@crossfire/contracts/rest/envelope';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { historyRequest, type HistoryRequest } from '@crossfire/agent-core/history-query';
-import type { ListenerTest } from '@crossfire/agent-core/diagnostic';
+import { fields } from '@ctlflow/crossfire-contracts/validation';
+import { releaseName } from '@ctlflow/crossfire-contracts/release';
+import { wakePolicy } from '@ctlflow/crossfire-contracts/wake';
+import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { historyRequest, type HistoryRequest } from '@ctlflow/crossfire-agent-core/history-query';
+import type { ListenerTest } from '@ctlflow/crossfire-agent-core/diagnostic';
 
 export type LocalListener = { release: string; binding: string; session: string; ready: boolean; test?: ListenerTest };
 export type ListenerRequest = { action: 'status' | 'stop' | 'test' }

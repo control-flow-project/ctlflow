@@ -1,5 +1,5 @@
 import { object, userId } from './validation.js';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { JsonObject } from './json.js';
 
 export type RoomStateEvent = { sender: string; type: string; state_key: string; content: JsonObject };

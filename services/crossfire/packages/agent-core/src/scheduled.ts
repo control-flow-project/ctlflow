@@ -1,7 +1,7 @@
-import { scheduledWake } from '@crossfire/contracts/wake-up';
-import type { ScheduledWake, WakeAttachment } from '@crossfire/contracts/wake-up';
-import * as check from '@crossfire/contracts/schema/validation';
-import type { Result } from '@crossfire/kernel/result';
+import { scheduledWake } from '@ctlflow/crossfire-contracts/wake-up';
+import type { ScheduledWake, WakeAttachment } from '@ctlflow/crossfire-contracts/wake-up';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { Coordination } from './coordination.js';
 import type { RuntimeConnection } from './runtime.js';
 import type { Clock, LocalState } from './port.js';

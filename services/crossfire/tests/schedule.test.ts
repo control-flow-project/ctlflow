@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createScheduleCalculator } from '@crossfire/adapter-schedule/create-calculator';
-import { wakeSchedule } from '@crossfire/contracts/wake-up';
+import { createScheduleCalculator } from '@ctlflow/crossfire-adapter-schedule/create-calculator';
+import { wakeSchedule } from '@ctlflow/crossfire-contracts/wake-up';
 import { value } from './support/application.js';
 
 test('one scheduling adapter calculates intervals and the requested weekly calendar schedules', () => {

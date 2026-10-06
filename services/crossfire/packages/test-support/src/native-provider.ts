@@ -4,7 +4,7 @@ import type { TestContext } from "node:test";
 import { createServer, type ServerResponse } from "node:http";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { collect } from '@crossfire/adapter-matrix/http';
+import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
 
 export async function nativeProvider(context: TestContext, home: string) {
   const requests: unknown[] = [];
@@ -48,7 +48,7 @@ wire_api = "responses"
 requires_openai_auth = false
 request_max_retries = 0
 stream_max_retries = 0
-`);
+`, { mode: 0o600 });
   return { requests, held: () => held,
     hold: () => { held = undefined; holdNext = true; },
     finish: () => { assert(held); finish(held); held = undefined; },

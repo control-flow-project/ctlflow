@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { createMemberInvitation, revokeMemberInvitation } from '@crossfire/domain/member/invitation';
-import { listInvitations, readInvitation } from '@crossfire/domain/member/read-member';
-import { changeInstancePolicy } from '@crossfire/domain/policy/change-policy';
+import { createMemberInvitation, revokeMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
+import { listInvitations, readInvitation } from '@ctlflow/crossfire-domain/member/read-member';
+import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
 import { registrationStage } from '../apps/server/src/http/registration.js';
-import { session as parseSession } from '@crossfire/contracts/schema/response';
-import { changeMember } from '@crossfire/domain/member/change-member';
+import { session as parseSession } from '@ctlflow/crossfire-contracts/schema/response';
+import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
 test('normal Element signup requires a link in invitation mode and never grants administrator authority through open signup', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture());
   const { services, origin, admin } = fixture;

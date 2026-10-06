@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Clock } from './port.js';
-import { HEARTBEAT_MS } from '@crossfire/contracts/activity';
-import type { Manifest } from '@crossfire/contracts/release';
+import { HEARTBEAT_MS } from '@ctlflow/crossfire-contracts/activity';
+import type { Manifest } from '@ctlflow/crossfire-contracts/release';
 import type { Coordination } from './coordination.js';
 import type { listenerStatistics } from './statistics.js';
-import { listenerStop } from '@crossfire/kernel/lifecycle';
+import { listenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
+import type { ControllerBinding } from './listener-control-port.js';
 
-export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controllerBound: boolean, clock: Clock, statistics: ReturnType<typeof listenerStatistics>, onUpdate?: (release: string) => void) {
+export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controller: ControllerBinding, clock: Clock, statistics: ReturnType<typeof listenerStatistics>, onUpdate?: (release: string) => void) {
   const run = randomUUID();
   const failed = new AbortController(), lifetime = new AbortController();
   const signal = AbortSignal.any([stop, failed.signal, lifetime.signal]);
@@ -14,7 +15,7 @@ export async function reportActivity(client: Coordination, agent: string, instal
   let warnedRelease: string | undefined;
   async function report(stopped: boolean, initial = false): Promise<void> {
     const batch = statistics.batch(stopped);
-    const response = await client.report(agent, run, { release: installed.release, messagesDelivered: messages, stopped, controllerBound, statistics: batch }, stopped ? undefined : signal);
+    const response = await client.report(agent, run, { release: installed.release, messagesDelivered: messages, stopped, controller, statistics: batch }, stopped ? undefined : signal);
     if (!response.ok) {
       if (initial) throw Object.assign(new Error(response.error.message), { code: response.error.code });
       if (!stopped && ['invalid', 'unauthorized', 'forbidden', 'missing', 'conflict'].includes(response.error.code)) failed.abort(Object.assign(new Error(response.error.message), { code: response.error.code }));
@@ -26,7 +27,7 @@ export async function reportActivity(client: Coordination, agent: string, instal
     if (!stopped) onUpdate?.(current);
     if (!stopped && current !== installed.release && current !== warnedRelease) {
       warnedRelease = current;
-      process.stderr.write('Crossfire release ' + current + ' is available. Reconnect to update the project client and skill; this listener remains running.\n');
+      process.stderr.write('Crossfire release ' + current + ' is available. Ask the owner to update the fleet controller and review changed skills; this listener remains running.\n');
     }
     unavailable = false;
     if (response.value.disconnect && !stopped) failed.abort(listenerStop('The owner requested this listener to disconnect'));

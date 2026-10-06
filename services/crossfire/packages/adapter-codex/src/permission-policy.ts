@@ -1,6 +1,6 @@
-import { fields } from '@crossfire/contracts/validation';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import type { RuntimeApproval } from '@crossfire/agent-core/runtime';
+import { fields } from '@ctlflow/crossfire-contracts/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import type { RuntimeApproval } from '@ctlflow/crossfire-agent-core/runtime';
 
 export function approvalRouting(policy: unknown): Result<RuntimeApproval> {
   if (policy === 'never') return success('none');

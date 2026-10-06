@@ -1,20 +1,20 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { testClock, withClock } from './test-support/clock.js';
-import { localState as storage } from '@crossfire/adapter-filesystem/state';
+import { localState as storage } from '@ctlflow/crossfire-adapter-filesystem/state';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { matrix as nativeMatrix } from '@crossfire/adapter-matrix/http';
-import { readJson } from '@crossfire/adapter-filesystem/index';
-import type { Event } from '@crossfire/contracts/client';
-import type { RuntimeAdapter } from '@crossfire/agent-core/runtime';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { connectCodex } from '@crossfire/adapter-codex/connection';
-import { isControl, loadControl, type ControlState } from '@crossfire/agent-core/control';
-import { eventView } from '@crossfire/agent-core/receive';
-import { isListenerNotice, LISTENER_NOTICE } from '@crossfire/contracts/notices';
+import { matrix as nativeMatrix } from '@ctlflow/crossfire-adapter-matrix/http';
+import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import type { Event } from '@ctlflow/crossfire-contracts/client';
+import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { isControl, loadControl, type ControlState } from '@ctlflow/crossfire-agent-core/control';
+import { eventView } from '@ctlflow/crossfire-agent-core/receive';
+import { isListenerNotice, LISTENER_NOTICE } from '@ctlflow/crossfire-contracts/notices';
 import { createHash } from 'node:crypto';
-import { API } from '@crossfire/contracts/matrix';
+import { API } from '@ctlflow/crossfire-contracts/matrix';
 import { fakeCodex, inputReceipt, matrixFixture, message, OBSERVER, ROOM, SELF, THREAD, temporary } from './test-support/listener.js';
 
 async function fixture(context: TestContext, clock: ReturnType<typeof testClock>) {

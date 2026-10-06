@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { constants, openSync, closeSync, fstatSync, lstatSync, readSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import * as check from '@crossfire/contracts/schema/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 export const fingerprintPlan = check.object({ files: check.list(check.object({ path: check.text(4096), private: check.boolean,
   sha256: check.optional(check.refine(check.text(64, 64), value => /^[a-f0-9]{64}$/u.test(value), 'Expected SHA-256')) }), 1000, 1) });

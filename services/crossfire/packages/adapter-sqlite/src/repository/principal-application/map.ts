@@ -1,4 +1,4 @@
-import type { PrincipalApplication } from '@crossfire/domain/identity/types';
+import type { PrincipalApplication } from '@ctlflow/crossfire-domain/identity/types';
 import type { Tables } from '../../schema/tables.js';
 export function mapPrincipalApplication(row: Tables['principal_application']): PrincipalApplication {
   return {

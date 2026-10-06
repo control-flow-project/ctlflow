@@ -2,10 +2,10 @@ import { lstat, opendir, open } from 'node:fs/promises';
 import { constants, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { failure, success } from '@crossfire/kernel/result';
-import type { BinaryInput } from '@crossfire/kernel/bytes';
-import { PUBLICATION_LIMITS, type PublicationFileInput } from '@crossfire/domain/publication/values';
-import { publicationPath, publicationMedia } from '@crossfire/domain/publication/validation';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { BinaryInput } from '@ctlflow/crossfire-kernel/bytes';
+import { PUBLICATION_LIMITS, type PublicationFileInput } from '@ctlflow/crossfire-domain/publication/values';
+import { publicationPath, publicationMedia } from '@ctlflow/crossfire-domain/publication/validation';
 
 export async function publicationSource(directory: string) {
   try {

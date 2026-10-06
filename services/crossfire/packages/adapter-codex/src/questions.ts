@@ -1,9 +1,9 @@
-import type { RuntimeDecision } from '@crossfire/agent-core/runtime';
+import type { RuntimeDecision } from '@ctlflow/crossfire-agent-core/runtime';
 import type { NativeRequest } from './protocol.js';
-import type { Json } from '@crossfire/contracts/json';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { object, text } from '@crossfire/contracts/validation';
-import { decisionQuestion } from '@crossfire/contracts/runtime';
+import type { Json } from '@ctlflow/crossfire-contracts/json';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { object, text } from '@ctlflow/crossfire-contracts/validation';
+import { decisionQuestion } from '@ctlflow/crossfire-contracts/runtime';
 
 export function codexQuestion(request: NativeRequest, session: string): Result<RuntimeDecision> {
   const params = request.params;

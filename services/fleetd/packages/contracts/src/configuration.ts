@@ -1,15 +1,18 @@
 import { parse } from 'smol-toml';
-import * as check from '@crossfire/contracts/schema/validation';
-import { failure, success, type Result } from '@crossfire/kernel/result';
-import { listenerOptions } from '@crossfire/contracts/runtime';
-import { coordinationPolicy } from '@crossfire/contracts/coordination-policy';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { listenerOptions } from '@ctlflow/crossfire-contracts/runtime';
+import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
-export const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024), listener_options: check.optional(listenerOptions) });
+export const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
+  workspace: check.optional(check.refine(check.text(4096), value => value.startsWith('/') && !value.includes('\\')
+    && value.split('/').slice(1).every(segment => segment && segment !== '.' && segment !== '..'), 'Workspace must be an absolute normalized directory')),
+  listener_options: check.optional(listenerOptions) });
 export const coordination = check.object({ adapter: check.choice('crossfire'), server: check.text(2048), owner: check.matrixUserId });
 export const roster = check.object({ fleet: check.name, coordination, instances: check.list(instance, 100) });
 const coordinationOptions = check.object({ wake_mode: check.wakeMode, sender_matrix_ids: check.optional(check.list(check.matrixUserId, 2000)),
   permissions: check.list(check.choice('room.agent.invite'), 1) });
-export const definition = check.object({ name: check.text(100), runtime: check.name, coordination_options: check.optional(input => {
+export const definition = check.object({ name: check.text(100), runtime: check.choice('codex'), coordination_options: check.optional(input => {
   const parsed = coordinationOptions(input);
   if (!parsed.ok) return parsed;
   const valid = coordinationPolicy({ wakeMode: parsed.value.wake_mode, senderMatrixIds: parsed.value.sender_matrix_ids ?? [], permissions: parsed.value.permissions });

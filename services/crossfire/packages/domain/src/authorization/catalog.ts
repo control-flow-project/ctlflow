@@ -20,8 +20,6 @@ export const permissionCatalog = [
   { code: 'agent.configure.any', grantScope: 'role', description: 'Configure every agent', roles: ['administrator'] },
   { code: 'agent.room-grant.manage.owned', grantScope: 'role', description: 'Manage owned agent room access', roles: ['member', 'administrator'] },
   { code: 'agent.room-grant.manage.any', grantScope: 'role', description: 'Manage every agent room access', roles: ['administrator'] },
-  { code: 'agent.listener.disconnect.owned', grantScope: 'role', description: 'Disconnect owned listeners', roles: ['member', 'administrator'] },
-  { code: 'agent.listener.disconnect.any', grantScope: 'role', description: 'Disconnect every listener', roles: ['administrator'] },
   { code: 'listener.report.self', grantScope: 'role', description: 'Report own listener activity', roles: ['agent'] },
   { code: 'room-invitation.accept.self', grantScope: 'role', description: 'Accept native invitations within the inviter’s room authority', roles: ['agent'] },
   { code: 'wake-notice.publish.self', grantScope: 'role', description: 'Request verified blocked-mention notices', roles: ['agent'] },

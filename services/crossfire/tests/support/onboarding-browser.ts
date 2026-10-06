@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
-import type { Services, Actor } from '@crossfire/domain/port/services';
-import { createMemberInvitation } from '@crossfire/domain/member/invitation';
+import type { Services, Actor } from '@ctlflow/crossfire-domain/port/services';
+import { createMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
 import { value } from './application.js';
 import { checkPaperLayout } from '../../tools/browser/layout.js';
 

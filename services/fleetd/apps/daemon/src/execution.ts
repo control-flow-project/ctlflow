@@ -1,33 +1,50 @@
 import { join } from 'node:path';
-import { readFileSync } from 'node:fs';
-import { failure, success } from '@crossfire/kernel/result';
-import type { OwnedRuntimeAdapter } from '@crossfire/agent-core/owned-runtime';
-import { createListenerHost, type ListenerHost } from '@crossfire/adapter-crossfire/listener-host';
-import { nativeClock } from '@crossfire/adapter-runtime/clock';
-import { createNativeLifecycle } from '@fleetd/domain/native-lifecycle';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { prepareProject, paths } from '@crossfire/adapter-filesystem/project';
-import { acquireProcessLock } from '@crossfire/adapter-filesystem/lock';
-import { privateDir, writeJson } from '@crossfire/adapter-filesystem/index';
-import { installSoftware, installedSoftware } from '@crossfire/adapter-crossfire/software';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { createClient } from '@crossfire/adapter-crossfire/client';
-import { createFleetControlConnection, type FleetControlConnection } from '@crossfire/adapter-crossfire/fleet-control';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { errorCode } from '@crossfire/contracts/rest/envelope';
-import { MAX_UPLOAD_BYTES } from '@crossfire/contracts/client';
-import { isListenerStop } from '@crossfire/kernel/lifecycle';
-import { loadBinding, saveBinding, protectFleet } from '@fleetd/storage/binding';
-import type { Execution } from '@fleetd/domain/port';
+import { randomUUID } from 'node:crypto';
+import { readFileSync, existsSync } from 'node:fs';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import { createListenerHost, type ListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
+import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
+import { createNativeLifecycle } from '@ctlflow/fleetd-domain/native-lifecycle';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
+import { prepareProject, paths } from '@ctlflow/crossfire-adapter-filesystem/project';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
+import { privateDir, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { installSoftware, installedSoftware } from '@ctlflow/crossfire-adapter-crossfire/software';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createFleetControlConnection, type FleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { MAX_UPLOAD_BYTES } from '@ctlflow/crossfire-contracts/client';
+import { isListenerStop } from '@ctlflow/crossfire-kernel/lifecycle';
+import { loadBinding, saveBinding, protectFleet } from '@ctlflow/fleetd-storage/binding';
+import type { Execution } from '@ctlflow/fleetd-domain/port';
 import { prepareEnrollment } from './enrollment.js';
 import { failureReporter } from './failures.js';
 import { resetInstance, resetInstructions } from './reset.js';
-import { canInitializeHistory, initializedHistory } from '@fleetd/storage/history';
+import { canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storage/history';
+import { createNativeStopReceipts, type NativeStopActivity } from './native-stops.js';
 
-export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): Execution {
+export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
+  const stops = new Map<string, ReturnType<typeof createNativeStopReceipts>>();
   let host: Promise<ListenerHost> | undefined;
+  const inspect: Execution['inspect'] = async (configuration, signal) => {
+    try {
+      for (const instance of configuration.roster.instances) {
+        signal.throwIfAborted();
+        const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
+        if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
+        const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
+        const inspected = await adapter.inspect({ stateDirectory, workspace: instance.workspace ?? stateDirectory, options: definition.options }, signal);
+        if (!inspected.ok) return inspected;
+      }
+      return success(undefined);
+    } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Cannot inspect the configured native runtime'); }
+  };
   function connect(configuration: Parameters<Execution['connect']>[0], signal: AbortSignal, control: Parameters<Execution['connect']>[2]) {
     try {
       const binding = loadBinding(configuration); if (!binding.ok) return binding;
@@ -45,7 +62,14 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
             if (command.agentId !== null && !identity) return failure('missing', 'The requested agent has no identity in this controller binding');
             return control.execute({ operationId: command.operationId, action: command.action, instanceKey: identity?.instanceKey ?? null });
           } });
-        reporters.set(configuration.directory, reporter); connections.set(configuration.directory, connection);
+        const receipts = createNativeStopReceipts({ signal, clock: nativeClock, id: randomUUID, connected: () => connection.status().connected,
+          send: async (receipt, scope) => {
+            const result = await createClient({ origin: binding.value.server, token: receipt.binding.credential, timeoutMs: 5000, signal: scope })
+              .call(operations.recordFleetNativeStop, { fleetId: receipt.binding.fleetId, agentId: receipt.agentId },
+                { connectionId: receipt.binding.connectionId, runId: receipt.runId, receiptId: receipt.receiptId });
+            return result.ok && result.value.data.recorded ? success(undefined) : result.ok ? failure('conflict', 'Crossfire did not accept the native stop receipt') : result;
+          } });
+        stops.set(configuration.directory, receipts); reporters.set(configuration.directory, reporter); connections.set(configuration.directory, connection);
       } catch (error) { void reporter.close(); throw error; }
       return success(undefined);
     } catch (error) { return failure('invalid', error instanceof Error ? error.message : 'Invalid fleet controller binding'); }
@@ -54,7 +78,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
     connect,
     connection(configuration) {
       const status = connections.get(configuration.directory)?.status() ?? { connected: false, deliveryEnabled: false, revision: null, error: 'Fleet has no approved controller binding' };
-      return { ...status, error: reporters.get(configuration.directory)?.error() ?? status.error };
+      return { ...status, error: stops.get(configuration.directory)?.error() ?? reporters.get(configuration.directory)?.error() ?? status.error };
     },
     async delivery(configuration, input) {
       const connection = connections.get(configuration.directory);
@@ -64,10 +88,12 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       const connection = connections.get(configuration.directory);
       return connection ? connection.message(input) : failure('conflict', 'Enroll this fleet before sending messages');
     },
-    async close() { await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear();
+    async close() { await Promise.all([...stops.values()].map(receipts => receipts.close())); stops.clear();
+      await Promise.all([...connections.values()].map(connection => connection.close())); connections.clear();
       await Promise.all([...reporters.values()].map(reporter => reporter.close())); reporters.clear();
       if (host) await (await host).close(); host = undefined; },
-    async disconnect(configuration) { const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close();
+    async disconnect(configuration) { const receipts = stops.get(configuration.directory); stops.delete(configuration.directory); await receipts?.close();
+      const connection = connections.get(configuration.directory); connections.delete(configuration.directory); await connection?.close();
       const reporter = reporters.get(configuration.directory); reporters.delete(configuration.directory); await reporter?.close(); },
     validate(configuration) {
       for (const definition of Object.values(configuration.definitions)) {
@@ -78,8 +104,28 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
       }
       return success(undefined);
     },
+    inspect,
+    async test(configuration, instance) {
+      try {
+        const binding = loadBinding(configuration); if (!binding.ok) return binding;
+        const identity = binding.value.identities.find(item => item.instanceKey === instance.key);
+        if (!identity) return failure('missing', 'Instance has no enrolled identity');
+        const local = paths(join(configuration.directory, instance.workarea), instance.name);
+        const tested = await listenerRequest(local.state, { action: 'test' });
+        if (!tested) return failure('unavailable', 'The owning listener is not connected');
+        if (!tested.ok) return tested;
+        const diagnosis = tested.value.test;
+        if (!tested.value.ready || tested.value.binding !== 'fleet-' + identity.agentId
+          || !diagnosis || diagnosis.session !== tested.value.session || diagnosis.server !== configuration.roster.coordination.server
+          || diagnosis.busy || diagnosis.deliveryPaused) return failure('conflict', 'Listener authentication, exact native session or idle delivery readiness is not confirmed');
+        return success(undefined);
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Cannot verify the owning listener'); }
+    },
     async prepare(configuration, controller, signal, approval) {
-      try { protectFleet(configuration.directory); return await prepareEnrollment(configuration, controller, signal, approval); }
+      try {
+        const inspected = await inspect(configuration, signal); if (!inspected.ok) return inspected;
+        protectFleet(configuration.directory); return await prepareEnrollment(configuration, controller, signal, approval);
+      }
       catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Fleet enrollment failed'); }
     },
     async reset(configuration, instance, resetId, signal) {
@@ -93,14 +139,21 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
     async contexts(configuration, instance) {
       const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
       if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
-      const contexts = await adapter.savedContexts({ workspace: join(configuration.directory, instance.workarea) });
+      const stateDirectory = join(configuration.directory, instance.workarea);
+      const contexts = await adapter.savedContexts({ stateDirectory, workspace: instance.workspace ?? stateDirectory });
       return contexts.ok ? success(contexts.value.map(({ context, runtime, sessionId }) => ({ context, runtime, sessionId }))) : contexts;
+    },
+    async confirmStopped(configuration, instance) {
+      const loaded = loadBinding(configuration); if (!loaded.ok) return loaded;
+      const identity = loaded.value.identities.find(item => item.instanceKey === instance.key);
+      return identity ? stops.get(configuration.directory)?.confirm(identity.agentId) ?? success(undefined) : success(undefined);
     },
     async start(configuration, instance, signal, reason) {
       let release: (() => Promise<void>) | undefined;
       let destination: Extract<Awaited<ReturnType<typeof createNativeLifecycle>>, { ok: true }>['value'] | undefined;
       let done: Promise<void> | undefined;
       let bindingControl: ReturnType<FleetControlConnection['listener']> | undefined;
+      let activity: NativeStopActivity | undefined;
       let enrolledId: string | undefined, reported = false;
       const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
       const report = (error: unknown) => {
@@ -119,20 +172,21 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         const definition = configuration.definitions[instance.definition]!;
         const adapter = adapters[definition.runtime];
         if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
-        const workspace = privateDir(join(configuration.directory, instance.workarea));
-        prepareProject(workspace);
-        const local = paths(workspace, instance.name);
+        const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
+        const workspace = instance.workspace ?? stateDirectory;
+        prepareProject(stateDirectory);
+        const local = paths(stateDirectory, instance.name);
         const listenerHost = await (host ??= createListenerHost());
         release = await acquireProcessLock(join(local.state, 'listener'));
-        const software = reason === 'recovery' ? installedSoftware(local.root) : await installSoftware(local.root, binding.server);
+        const software = reason === 'recovery' || existsSync(join(local.root, 'client.mjs')) ? installedSoftware(local.root) : await installSoftware(local.root, artifacts);
         const client = createClient({ origin: binding.server, token: identity.account.access_token, signal: lifetime });
         const health = await client.call(operations.health, {}, {});
         if (!health.ok) { report(new Error('Instance startup failed: ' + health.error.message)); await release(); return health; }
         const settings = { instance: health.value.data.instance, homeserver: binding.server, server_name: binding.owner.slice(binding.owner.indexOf(':') + 1), owner: binding.owner, max_upload_bytes: MAX_UPLOAD_BYTES };
-        writeJson(local.profile, { id: identity.agentId, workspace, account: identity.account, settings });
+        writeJson(local.profile, { id: identity.agentId, workspace: stateDirectory, account: identity.account, settings });
         software.activate();
         const instructions = [definition.instructions, 'Crossfire identity: ' + instance.name + '. This instance is already enrolled and its listener is managed by the fleet controller. Do not reconnect, enroll or start another listener.',
-          'Use node .crossfire/client.mjs --profile ' + instance.name + ' for intentional Matrix replies and attachments. Connection and telemetry require no model action.',
+          'Use the intentional Crossfire tools from CROSSFIRE_PROJECT: node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" --profile ' + instance.name + '. Connection and telemetry require no model action. Never disclose host paths or private machine configuration outside the owner DM.',
           resetInstructions(local.state), readFileSync(software.skill.path, 'utf8')].join('\n\n');
         let ready!: () => void, rejectReady!: (error: unknown) => void;
         bindingControl = connection.listener(identity.agentId);
@@ -142,6 +196,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
           historyMode: instance.listenerOptions?.historyMode ?? 'shared',
+          activity: (runId, generation) => { activity = stops.get(configuration.directory)!.activity(identity.agentId, runId, generation, () => bindingControl!.control.binding()); },
           ready,
           runtime: async (runtimeStop, _poll, hooks) => {
             const options = adapter.validate(definition.options);
@@ -152,13 +207,13 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
               initialSettings: publicSettings.filter(name => options.value.options[name] !== undefined)
                 .map(name => ({ name, configured: String(options.value.options[name]), effective: null })),
               initial: reason === 'operator' ? 'running' : 'sleeping',
-              saved: () => adapter.savedContexts({ workspace }),
+              saved: () => adapter.savedContexts({ workspace, stateDirectory }),
               failed: (sessionId, error) => reporters.get(configuration.directory)?.record(identity.agentId, sessionId, error),
               recovered: () => reporters.get(configuration.directory)?.recovered(identity.agentId),
               start: async (scope, observe) => {
                 const unlock = await listenerHost.budget.acquire('native-start', scope);
                 try {
-                  const opened = await adapter.start({ name: instance.name, workspace, instructions, options: definition.options, hooks: { ...hooks, observe },
+                  const opened = await adapter.start({ name: instance.name, workspace, stateDirectory, instructions, options: definition.options, hooks: { ...hooks, observe },
                     allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
                     ...(instance.listenerOptions ? { listenerOptions: instance.listenerOptions } : {}) }, scope);
                   if (opened.ok) initializedHistory(configuration.directory, identity.agentId);
@@ -179,31 +234,67 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>): 
         reporters.get(configuration.directory)?.recovered(identity.agentId);
         let closing: Promise<void> | undefined;
         const unlock = release;
-        const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; bindingControl?.close(); await destination?.close(); await unlock(); })();
+        const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; await destination?.close();
+          if (activity) stops.get(configuration.directory)?.closed(activity);
+          bindingControl?.close(); await unlock(); })();
         return success({ sessionId: destination.runtime.sessionId, signal: stop.signal, attachment: destination.attachment,
           attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, resume: destination.resume,
           control: bindingControl.control, close });
       } catch (error) {
-        report(error); stop.abort(error); await done; bindingControl?.close(); await destination?.close(); await release?.();
+        report(error); stop.abort(error); await done; await destination?.close();
+        if (activity) stops.get(configuration.directory)?.closed(activity);
+        bindingControl?.close(); await release?.();
         const parsed = errorCode(error && typeof error === 'object' && 'code' in error ? error.code : undefined);
         return failure(parsed.ok ? parsed.value : 'native', error instanceof Error ? error.message : 'Instance startup failed');
       }
     },
-    async detach(configuration, instance) {
+    async remove(configuration, instance) {
       try {
         const loaded = loadBinding(configuration);
         if (!loaded.ok) return loaded;
         const binding = loaded.value, identity = binding.identities.find(item => item.instanceKey === instance.key);
         if (!identity) return success(undefined);
+        const confirmed = await stops.get(configuration.directory)?.confirm(identity.agentId); if (confirmed && !confirmed.ok) return confirmed;
         if (!binding.fleetId || !binding.controllerCredential) return failure('forbidden', 'Fleet controller credential is missing');
         const client = createClient({ origin: binding.server, token: binding.controllerCredential });
         const current = await client.call(operations.fleet, { fleetId: binding.fleetId }, {});
         if (!current.ok) return current;
-        const removed = await client.call(operations.unbindFleetAgent, { fleetId: binding.fleetId, agentId: identity.agentId }, { expectedRevision: current.value.data.revision, instanceKey: instance.key });
+        const removed = await client.call(operations.removeFleetAgent, { fleetId: binding.fleetId, agentId: identity.agentId }, { expectedRevision: current.value.data.revision, instanceKey: instance.key });
         if (!removed.ok) return removed;
+        stops.get(configuration.directory)?.forget(identity.agentId);
         saveBinding(configuration.directory, { ...binding, request: null });
         return success(undefined);
-      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not detach instance'); }
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not retire instance registration'); }
+    },
+    async update(configuration, instance, releaseDirectory, signal) {
+      let listener: (() => Promise<void>) | undefined, receiver: (() => Promise<void>) | undefined;
+      try {
+        signal.throwIfAborted();
+        const stateDirectory = privateDir(join(configuration.directory, instance.workarea)), local = paths(stateDirectory, instance.name);
+        listener = await acquireProcessLock(join(local.state, 'listener'));
+        receiver = await acquireProcessLock(join(local.state, 'receiver'));
+        const software = await installSoftware(local.root, releaseDirectory);
+        signal.throwIfAborted(); software.activate();
+        return success(undefined);
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not install the explicitly requested agent software'); }
+      finally { await receiver?.(); await listener?.(); }
+    },
+    async archive(configuration) {
+      for (const instance of configuration.roster.instances) {
+        const loaded = loadBinding(configuration); if (!loaded.ok) return loaded;
+        const identity = loaded.value.identities.find(item => item.instanceKey === instance.key);
+        if (identity) { const confirmed = await stops.get(configuration.directory)?.confirm(identity.agentId); if (confirmed && !confirmed.ok) return confirmed; }
+      }
+      try {
+        const loaded = loadBinding(configuration); if (!loaded.ok) return loaded;
+        const binding = loaded.value;
+        if (!binding.fleetId) return success(undefined);
+        if (!binding.controllerCredential) return failure('forbidden', 'Fleet controller credential is missing');
+        const client = createClient({ origin: binding.server, token: binding.controllerCredential });
+        const current = await client.call(operations.fleet, { fleetId: binding.fleetId }, {}); if (!current.ok) return current;
+        const archived = await client.call(operations.archiveFleet, { fleetId: binding.fleetId }, { expectedRevision: current.value.data.revision });
+        return archived.ok ? success(undefined) : archived;
+      } catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Could not archive the stopped fleet registration'); }
     },
   };
 }

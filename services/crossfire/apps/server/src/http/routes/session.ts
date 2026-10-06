@@ -1,7 +1,7 @@
-import { operations } from '@crossfire/contracts/rest/operations';
-import { createSession } from '@crossfire/domain/session/create-session';
-import { endSession } from '@crossfire/domain/session/authenticate';
-import { success } from '@crossfire/kernel/result';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { createSession } from '@ctlflow/crossfire-domain/session/create-session';
+import { endSession } from '@ctlflow/crossfire-domain/session/authenticate';
+import { success } from '@ctlflow/crossfire-kernel/result';
 import { bind, missingSession } from '../bind.js';
 import { member } from '../representation/identity.js';
 export function sessionRoutes() {

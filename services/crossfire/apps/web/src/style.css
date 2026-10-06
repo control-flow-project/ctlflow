@@ -279,3 +279,8 @@ details pre { min-width: 180px; }
 .detail-list dt { color: var(--muted); }
 .detail-list dd { margin: 0; overflow-wrap: anywhere; }
 .native-review { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 32rem; overflow: auto; padding: 1rem 0; }
+.session-fresh, .session-operations { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.session-fresh > summary, .session-operations > summary { font-size: 12px; font-weight: 600; }
+.session-fresh > p { font-size: 12px; margin-top: 16px; max-width: 780px; }
+.session-operations > .table-wrap { margin-top: 16px; }
+.decision-attention { padding: 12px 16px; border-left: 3px solid var(--warn); background: var(--warn-soft); color: var(--warn); font-size: 12px; margin-bottom: 16px; }

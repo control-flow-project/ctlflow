@@ -1,16 +1,18 @@
-import { cleanup } from '@crossfire/test-support/cleanup';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { connectCodex } from '@crossfire/adapter-codex/connection';
-import { createCoordination } from '@crossfire/adapter-crossfire/coordination';
-import { listen } from '@crossfire/adapter-crossfire/listener';
-import { changeWakePolicy } from '@crossfire/domain/wake/change-policy';
-import { createWakeRule, changeWakeRule } from '@crossfire/domain/wake-up/manage';
-import { readWakeRule } from '@crossfire/domain/wake-up/read';
-import { nativeProvider } from '@crossfire/test-support/native-provider';
+import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
+import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
+import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
+import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
+import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
+import { createWakeRule, changeWakeRule } from '@ctlflow/crossfire-domain/wake-up/manage';
+import { readWakeRule } from '@ctlflow/crossfire-domain/wake-up/read';
+import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { testClock } from '../scripts/test-support/clock.js';
 import { nativeServer } from './support/native-server.js';
@@ -20,7 +22,10 @@ import { value } from './support/application.js';
 test('real Conduit and stock Codex deliver idle-only scheduled input without creating chats under Nobody authority', { timeout: 120000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
   const agent = await fixture.agent(admin.actor, 'scheduled'), ruleId = randomUUID();
-  value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: 0, mode: 'nobody', senderIds: [] }, randomUUID()));
+  const host = await createListenerHost(), controller = createListenerControl(async () => {}, () => agent.controller);
+  controller.update({ active: true, input: null }); cleanup(scope, () => host.close()); cleanup(scope, controller.close);
+  const principal = value(services.repositories.principal.find({ id: agent.id })); assert(principal);
+  value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: principal.revision, mode: 'nobody', senderIds: [] }, randomUUID()));
   const directory = mkdtempSync(join(process.cwd(), '.temp/wake-native-')), home = join(directory, 'home'), workspace = join(directory, 'project');
   mkdirSync(home, { mode: 0o700 }); mkdirSync(workspace, { mode: 0o700 });
   const provider = await nativeProvider(scope, home), engine = await nativeEngine(scope, home, workspace);
@@ -30,7 +35,7 @@ test('real Conduit and stock Codex deliver idle-only scheduled input without cre
   const configuration = { name: 'Fetch fixture data', message: 'Scheduled fixture task; no paid provider.', schedule: { kind: 'interval' as const, seconds: 1 }, enabled: true, agentIds: [agent.id] };
   value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID()));
   const stop = new AbortController(); let ended: unknown, ready = false;
-  const receiver = listen({ binding: 'fixture', clock, coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: admin.member.principal.matrixUserId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' }, id: agent.id,
     release: release.manifest,

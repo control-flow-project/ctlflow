@@ -1,4 +1,4 @@
 {
-  "name": "@fleet/cli", "version": "0.1.0", "private": true, "type": "module",
-  "dependencies": { "@fleet/daemon-client": "0.1.0", "@fleet/ssh-transport": "0.1.0", "@fleetd/service": "0.1.0", "@crossfire/contracts": "0.1.0", "@crossfire/kernel": "0.1.0", "@crossfire/adapter-filesystem": "0.1.0", "@crossfire/agent-core": "0.1.0", "@crossfire/adapter-codex": "0.1.0" }
+  "name": "@ctlflow/fleet-cli", "version": "0.1.0", "private": true, "type": "module",
+  "dependencies": { "@ctlflow/fleet-daemon-client": "0.1.0", "@ctlflow/fleet-ssh-transport": "0.1.0", "@ctlflow/fleetd": "0.1.0", "@ctlflow/fleetd-contracts": "0.1.0", "@ctlflow/fleetd-storage": "0.1.0", "@ctlflow/crossfire-contracts": "0.1.0", "@ctlflow/crossfire-domain": "0.1.0", "@ctlflow/crossfire-kernel": "0.1.0", "@ctlflow/crossfire-adapter-filesystem": "0.1.0", "@ctlflow/crossfire-agent-core": "0.1.0", "@ctlflow/crossfire-adapter-codex": "0.1.0" }
 }

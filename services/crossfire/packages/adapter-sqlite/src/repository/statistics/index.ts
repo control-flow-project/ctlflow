@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { StatisticsRepository } from '@crossfire/domain/statistics/types';
+import type { StatisticsRepository } from '@ctlflow/crossfire-domain/statistics/types';
 import { statisticsRecorder } from './record.js';
 import { statisticsReader } from './read.js';
 export function createStatisticsRepository(database: Database.Database): StatisticsRepository {

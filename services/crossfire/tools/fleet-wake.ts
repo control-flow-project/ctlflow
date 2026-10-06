@@ -1,8 +1,8 @@
-import * as check from '@crossfire/contracts/schema/validation';
-import { operations } from '@crossfire/contracts/rest/operations';
-import { wakePolicy } from '@crossfire/contracts/schema/response';
-import { collectPages } from '@crossfire/operator-support/collections';
-import { failure, success, type Result } from '@crossfire/kernel/result';
+import * as check from '@ctlflow/crossfire-contracts/schema/validation';
+import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { wakePolicy } from '@ctlflow/crossfire-contracts/schema/response';
+import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { withHuman, type Human, type Credentials } from './auth.js';
 
 const instancePolicy = check.refine(check.object({ instanceKey: check.name, name: check.name, mode: check.wakeMode,

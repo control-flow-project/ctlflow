@@ -1,4 +1,4 @@
-import { failure } from '@crossfire/kernel/result';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 import type { Actor } from '../port/services.js';
 import { recordEvent } from '../audit/record-event.js';
 import { publicationAuthority, type PublicationDependencies } from './authority.js';
