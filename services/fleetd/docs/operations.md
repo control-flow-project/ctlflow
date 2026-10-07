@@ -63,7 +63,9 @@ cleanup. Normal daemon shutdown preserves it. Start the same controller/root
 after a restart or power failure to restore desired bindings and exact histories,
 without re-enrollment or synthetic prompts for idle histories. Interrupted work
 receives a receipt-confirmed continuation in its exact saved context. It answers
-no question and approves no permission. Restoration may leave idle native processes
+no question and approves no permission. The inserted message asks the agent to
+re-read applicable AGENTS.md files and follow their current instructions before
+continuing authorized unfinished work. Restoration may leave idle native processes
 sleeping until input arrives. Manually stopped agents remain stopped.
 
 Fleet Stop first saves its enabled targets in `resume-selections.json`. Fleet

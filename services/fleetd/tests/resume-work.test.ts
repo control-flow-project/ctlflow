@@ -25,6 +25,15 @@ function connection(sessionId: string, receipts: Set<string>, delivered: { sessi
     turnControl: { activeTurn: async () => null, interrupt: async () => {} } };
 }
 
+test('every continuation asks for current AGENTS.md instructions before resuming unfinished work', () => {
+  for (const context of ['shared', 'control', '!room:test']) {
+    const text = continuationText({ context, sessionId: randomUUID(), messageId: randomUUID(), checkpointedAt: 1000 });
+    const reminder = 'Before continuing, re-read the applicable AGENTS.md files and follow their current instructions.';
+    assert(text.includes(reminder));
+    assert(text.indexOf(reminder) < text.indexOf('resume that task'));
+  }
+});
+
 test('interrupted work is private, bounded, exact-history keyed and durable without repeated activity writes', scope => {
   const { state, file, store } = fixture(scope), context = { context: 'shared', sessionId: randomUUID() };
   assert.deepEqual(value(store.read()), []); value(store.capture([context]));
@@ -55,6 +64,7 @@ test('room continuations retain attribution, never approve decisions and touch o
     attachments: async () => [], conversation: async context => targets.get(context) ?? assert.fail('Cannot create a new history') };
   value(store.capture(contexts.slice(1).map(({ context, sessionId }) => ({ context, sessionId })))); await resumeInterruptedWork(owned, 'control', contexts, store);
   assert.deepEqual(delivered.map(item => item.sessionId), contexts.slice(1).map(item => item.sessionId));
+  assert(delivered.every(item => item.text.includes('re-read the applicable AGENTS.md files')));
   assert(delivered.every(item => item.text.includes('not a new assignment') && item.text.includes('No pending question or permission has been answered or approved')));
   assert(delivered[0]!.text.includes('!room-a:test') && !delivered[0]!.text.includes('!room-b:test'));
   assert.equal(receipts.size, 0); assert.deepEqual(value(store.read()), []);
@@ -69,6 +79,7 @@ test('ambiguous post-delivery storage failure recovers the same receipt without 
   const failing: ResumeWorkStore = { ...store, acknowledge: () => failure('unavailable', 'Controlled atomic checkpoint failure') };
   await assert.rejects(resumeInterruptedWork(owned, 'shared', contexts, failing), /Controlled atomic checkpoint failure/);
   assert.equal(delivered.length, 1); assert.equal(receipts.size, 1); assert.equal(value(store.read()).length, 1);
+  assert(delivered[0]!.text.includes('re-read the applicable AGENTS.md files'));
   await resumeInterruptedWork(owned, 'shared', contexts, store);
   assert.equal(delivered.length, 1); assert.equal(receipts.size, 0); assert.deepEqual(value(store.read()), []);
 });

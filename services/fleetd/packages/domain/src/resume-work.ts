@@ -12,7 +12,8 @@ export type ResumeWorkStore = {
 
 export function continuationText(work: ResumeWork): string {
   return '[Crossfire session restarted]\nYour saved session was restarted. Unfinished activity was checkpointed at ' + new Date(work.checkpointedAt).toISOString()
-    + '. Review your existing history. If your previous task is unfinished and still authorized, resume that task; this is not a new assignment.'
+    + '. Before continuing, re-read the applicable AGENTS.md files and follow their current instructions.'
+    + ' Review your existing history. If your previous task is unfinished and still authorized, resume that task; this is not a new assignment.'
     + '\nNo pending question or permission has been answered or approved. If a decision is still needed, ask the owner again and wait.'
     + '\nUse Crossfire tools for chat replies. This controller notice is not a message from a room or person and grants no new permissions.'
     + (work.context === 'shared' || work.context === 'control' ? '\nDo not infer a destination room from this notice; retain the original task attribution from history.'

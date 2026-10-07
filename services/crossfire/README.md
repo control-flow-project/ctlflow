@@ -43,3 +43,11 @@ the owner DM and only the
 verified owner can answer. Codex is the only implemented runtime and defaults to
 configurable `danger-full-access` / `on-request`;
 the fleet configuration guide lists every accepted override.
+
+## License
+
+Copyright (c) 2026 Jeswin P Kumar. All rights reserved.
+
+First-party code, documentation and assets are proprietary and require a separate
+written commercial license. See [LICENSE](LICENSE). Contact: jeswinpk@agilehead.com.
+Third-party software and materials retain their own licenses.
