@@ -348,8 +348,11 @@ developer-instruction producer. Starting, enrollment,
 connection, release verification, filtering, approvals and heartbeats make zero
 model calls. An authorized task/message is what starts model work.
 
-Later start reuses private credentials, the same immutable identities, native
-sessions and delivery positions automatically. No resume flag or replacement
+Later start reuses private Crossfire credentials, the same immutable identities,
+native sessions and delivery positions automatically. Each native activation
+refreshes provider authentication from the current authorized host login through
+the runtime adapter; preflight does not rewrite a running engine's private login.
+No resume flag or replacement
 identity is invented. New agents need identity approval; changed/unapproved fleet
 coordination settings need exact owner policy approval, even for existing agents. Invalid
 credentials or failed native resume produces a concrete error, not a fresh session.
@@ -366,10 +369,23 @@ and applied by the runtime adapter. Only stock Codex 0.158.0 or newer is support
 Daemon orchestration contains no Codex-specific option translation. Native
 authentication stays private and uses the user's authorized provider login.
 The Codex adapter creates each instance state directory's private `.codex` home.
-On first use it copies the authorized user's native provider/model configuration,
-selected profile and private login into that home. It never imports native
+On first use it copies the authorized user's native provider/model configuration
+and selected profile into that home. It never imports native
 histories, workspace trust or approval bypasses from the coding session.
-Subsequent starts retain the managed home's authentication. Optional workspace
+Every actual native start, resume, automatic wake and recovery atomically
+refreshes the managed `auth.json` from the host's current private login in
+`CODEX_HOME`, or `~/.codex` when unset. The host's currently signed-in provider
+account is authoritative for that activation, including an intentional host
+account change. Login refresh does not change Matrix identity, saved native
+history, model/permission configuration or unread positions. The source is a
+bounded private owned regular JSON file; invalid/unsafe input fails before native
+startup without leaking credentials or retaining a stale-login fallback. An
+absent source file removes the old file login; configured native environment
+authentication remains native-owned. Preflight checks the current host login
+without changing a managed engine's credentials. Configuration preparation,
+history reset and read-only status/attachment do not recopy credentials. A
+running engine uses its activation-time snapshot until its next native resume;
+refresh is not a live account-switch operation. Optional workspace
 configuration changes native cwd, not private identity/state ownership.
 No controller credential enters model context.
 Native thread creation and resumption receive validated model, reasoning and

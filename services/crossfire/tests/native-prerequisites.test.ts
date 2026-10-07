@@ -8,6 +8,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { nativeConfiguration, prepareHome } from '@ctlflow/crossfire-adapter-codex/home';
 import { nativeEnvironment } from '@ctlflow/crossfire-adapter-codex/prerequisites';
+import { refreshAuthentication } from '@ctlflow/crossfire-adapter-codex/authentication';
 
 function fixture(scope: TestContext) {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-native-prerequisites-'));
@@ -20,7 +21,7 @@ function fixture(scope: TestContext) {
   return { directory, source, stateDirectory, workspace };
 }
 
-test('managed homes preserve native model/provider defaults and private login, not history, trust or approval settings', scope => {
+test('managed homes preserve native model/provider defaults and refresh private login, not history, trust or approval settings', scope => {
   const { source, stateDirectory, workspace } = fixture(scope);
   writeFileSync(join(source, 'auth.json'), '{"auth_mode":"apikey","OPENAI_API_KEY":"fixture-only"}', { mode: 0o600 });
   writeFileSync(join(source, 'config.toml'), `model = "configured-model"
@@ -40,6 +41,8 @@ trust_level = "trusted"
   mkdirSync(join(source, 'sessions')); writeFileSync(join(source, 'sessions', 'existing-history'), 'private existing terminal history');
   mkdirSync(join(workspace, '.codex')); writeFileSync(join(workspace, '.codex', 'keep'), 'Existing native project state');
   const home = prepareHome(stateDirectory), configuration = nativeConfiguration(home);
+  assert.equal(existsSync(join(home, 'auth.json')), false, 'Configuration preparation does not refresh credentials beneath a running engine');
+  assert.equal(refreshAuthentication(home).ok, true);
   assert.equal(home, join(stateDirectory, '.codex'));
   assert.equal(configuration.model, 'configured-model'); assert.equal(configuration.model_reasoning_effort, 'medium');
   assert.equal(configuration.model_provider, 'fixture');
@@ -79,8 +82,23 @@ test('unsafe configuration/login files cannot seed private managed runtime state
   assert.throws(() => prepareHome(stateDirectory), /bounded TOML/u);
   rmSync(config); writeFileSync(config, 'model = "safe"', { mode: 0o600 });
   writeFileSync(join(source, 'auth.json'), 'fixture-secret', { mode: 0o644 });
-  assert.throws(() => prepareHome(stateDirectory), /private/u);
+  assert.equal(refreshAuthentication(prepareHome(stateDirectory)).ok, false);
   assert.equal(existsSync(join(stateDirectory, '.codex', 'auth.json')), false);
+});
+
+test('prerequisite inspection checks the current host login without overwriting the managed login', async scope => {
+  const { source, stateDirectory, workspace } = fixture(scope);
+  const home = prepareHome(stateDirectory), old = '{"auth_mode":"apikey","OPENAI_API_KEY":"old-fixture-only"}';
+  writeFileSync(join(home, 'auth.json'), old, { mode: 0o600 });
+  writeFileSync(join(source, 'auth.json'), '{"auth_mode":"apikey","OPENAI_API_KEY":"new-fixture-only"}', { mode: 0o600 });
+  const adapter = codexRuntime(process.env.CROSSFIRE_TEST_CODEX ?? 'codex');
+  assert.deepEqual(await adapter.inspect({ workspace, stateDirectory, options: {} }, new AbortController().signal), { ok: true, value: undefined });
+  assert.equal(readFileSync(join(home, 'auth.json'), 'utf8'), old);
+  rmSync(join(source, 'auth.json'));
+  const result = await adapter.inspect({ workspace, stateDirectory, options: {} }, new AbortController().signal);
+  assert.equal(result.ok, false, 'An old managed login cannot pass host-login preflight');
+  if (!result.ok) { assert.equal(result.error.code, 'unauthorized'); assert.match(result.error.message, /host CODEX_HOME/u); }
+  assert.equal(readFileSync(join(home, 'auth.json'), 'utf8'), old);
 });
 
 test('native prerequisite inspection validates configured inert providers without sessions, adoption or model calls', async scope => {

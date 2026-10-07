@@ -68,6 +68,26 @@ global skills. Role instructions, administrator instructions and the pinned
 Crossfire skill are native developer instructions on first create and resume;
 the external cwd need not discover private workarea ancestor skills.
 
+### Provider login on resume
+
+The controller's host `CODEX_HOME` (default `~/.codex`) owns the authorized Codex
+provider login. Each actual native activation atomically refreshes its private
+`auth.json` from that source: initial startup, UI/CLI resume, automatic message
+wake, restored binding and failure recovery all use the same runtime adapter.
+Sign in on the controller host with `codex login`, then stop/resume any already
+running engines that need the new account. A running engine is not hot-switched
+by a status check or another agent's preflight.
+
+Only the bounded owned private login file is copied. Model/provider configuration
+is initialized once and retained; configured instance parameters still apply.
+Native histories, saved session UUIDs, Matrix identities, room access and unread
+positions are not replaced. The independent coding session is not adopted.
+An invalid, unreadable, oversized or unsafe source fails before native execution.
+There is no stale credential fallback. A missing source removes an old file copy;
+native environment/provider authentication remains native-owned. Provider-account
+and billing changes therefore follow the current host login on the next resume.
+Do not paste credentials into Matrix or management forms.
+
 The native runtime receives the immutable instance key as its required tool
 profile, separately from its human-readable name. CROSSFIRE_AGENT_NAME carries
 that key and CROSSFIRE_PROJECT carries private state. A display-name change never

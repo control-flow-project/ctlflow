@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
@@ -68,7 +68,9 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   managed.runtime.acknowledge([]);
   assert.equal(managed.nativeState().phase, 'sleeping'); assert.equal(starts, 1);
   assert.equal(provider.requests.length, 1, 'Checkpoint-only reconciliation does not wake a sleeping engine');
+  writeFileSync(join(provider.loginHome, 'auth.json'), '{"auth_mode":"apikey","OPENAI_API_KEY":"wake-fixture-only"}', { mode: 0o600 });
   value(await managed.resume()); assert.equal(starts, 2); assert.equal(provider.requests.length, 1, 'Explicit resume creates no model input');
+  assert.deepEqual(readFileSync(join(home, 'auth.json')), readFileSync(join(provider.loginHome, 'auth.json')), 'Sleep resume refreshes host credentials before reopening the same native history');
   assert.equal(value(await managed.attachment()).sessionId, history);
   await managed.runtime.deliver('Second retained native sleep proof', 'sleep-proof-two'); managed.runtime.acknowledge(['sleep-proof-two']);
   await until(() => provider.requests.length === 2); await until(async () => !(await managed.runtime.inspect()).busy);
@@ -79,9 +81,11 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 2); assert.equal(managed.nativeState().phase, 'sleeping');
   managed.runtime.acknowledge([]);
   assert.equal(starts, 2); assert.equal(provider.requests.length, 2, 'Sleeping restoration acknowledges checkpoints without starting native execution');
+  writeFileSync(join(provider.loginHome, 'auth.json'), '{"auth_mode":"apikey","OPENAI_API_KEY":"restored-fixture-only"}', { mode: 0o600 });
   await managed.runtime.deliver('Third retained native sleep proof', 'sleep-proof-three'); managed.runtime.acknowledge(['sleep-proof-three']);
   await until(() => provider.requests.length === 3); await until(async () => !(await managed.runtime.inspect()).busy);
   assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 3);
+  assert.deepEqual(readFileSync(join(home, 'auth.json')), readFileSync(join(provider.loginHome, 'auth.json')), 'Message-driven wake after controller restoration refreshes the same host source');
   assert(JSON.stringify(provider.requests[2]).includes('Second retained native sleep proof'), 'Controller binding restart preserves full native context');
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'sleeping'));
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'waking'));

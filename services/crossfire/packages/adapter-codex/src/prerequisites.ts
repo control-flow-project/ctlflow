@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
-import { effectiveProvider, nativeConfiguration, nativeDirectories, prepareHome } from './home.js';
+import { effectiveProvider, hostHome, nativeConfiguration, nativeDirectories, prepareHome } from './home.js';
 import { ownedOptions, ownedQuestionCapability, ownedVersion } from './owned-options.js';
 import { inspectInstructionCapability } from './capability.js';
 
@@ -43,8 +43,8 @@ export async function inspectCodex(binary: string, input: { workspace: string; s
       return failure('invalid', 'The configured native model provider requires its API-key environment variable; configure it privately before fleet setup');
     }
     if (provider.id === 'openai' || provider.settings.requires_openai_auth === true) {
-      try { await command(binary, ['login', 'status'], input.workspace, environment, stop); }
-      catch { stop.throwIfAborted(); return failure('unauthorized', 'Sign in using CODEX_HOME=' + JSON.stringify(home) + ' codex login, then repeat fleet setup. Never paste credentials into chat.'); }
+      try { await command(binary, ['login', 'status'], input.workspace, nativeEnvironment(hostHome(), input.stateDirectory), stop); }
+      catch { stop.throwIfAborted(); return failure('unauthorized', 'Sign in with codex login using the host CODEX_HOME, then repeat fleet setup or resume. Never paste credentials into chat.'); }
     }
     stop.throwIfAborted();
     return success(undefined);

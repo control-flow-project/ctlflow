@@ -61,11 +61,21 @@ cwd. It defaults to that instance's private workarea. It must be canonical, owne
 and not writable by other users; existing project modes are not tightened.
 Private state remains in the workarea, passed separately to the native adapter as
 `stateDirectory`. The adapter's private native home retains the managed histories
-and intended provider configuration/authentication, without overwriting or
+and intended provider configuration, without overwriting or
 importing the project's `.codex/config.toml`, history or coding session. Role
 instructions, administrator setup instructions and the pinned Crossfire skill
 are delivered via native developer instructions on both create and resume;
 external cwd does not rely on private workarea ancestor skill discovery.
+
+Every native start/resume, including automatic wake and recovery, atomically
+recopies the current host Codex `auth.json` from `CODEX_HOME` (default `~/.codex`).
+Sign in with `codex login` on the controller host before resuming. Changing that
+host login changes the provider account used on subsequent activations, not the
+agent's Matrix identity or saved conversation. Already-running engines retain
+their current login until stopped/resumed. Preflight checks the host login and
+does not rewrite running agents. Invalid or unsafe source files fail before
+startup; absence removes the stale file copy rather than reusing it. Native
+environment-only provider authentication does not require a file login.
 
 Default project setup generates this same roster with one `project` definition,
 the chosen project as `workspace` and a stable private workarea. Definitions

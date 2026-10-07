@@ -96,3 +96,27 @@ replace the fleet's credentials or billing authority. The owner must reauthentic
 the retained account or explicitly authorize a provider-account change before
 model responses can be certified. History restoration, controller connectivity
 and an available model catalog do not establish provider authentication.
+
+## Authorized resume-login correction
+
+The owner subsequently authorizes every resume to use the current host Codex
+login, including the new provider account. Authentication is no longer retained
+as immutable history state: one Codex-adapter activation path atomically copies
+the current private host login before native startup/resume/wake/recovery.
+Preflight checks that host login without changing an already-running engine.
+Invalid or unsafe input fails before startup; absent source files cannot retain
+a stale credential fallback. Native history, configuration, Matrix identity,
+room/wake authority and unread positions are unchanged. A running engine needs
+stop/resume to pick up a later host-account change; status reads never hot-switch
+its login. Native fixtures use isolated credentials, never production logins.
+
+Focused regression tests pass for repeated login refresh, private/atomic files,
+unsafe/malformed/missing sources, preflight isolation, exact retained history,
+explicit sleep resume and message-driven wake after binding restoration. The
+coordinated controller/CLI release is0.1.10; only those two packages are public.
+Typecheck/build,709tests across160isolated files on24parallel workers, all33
+architecture checks, four installation checks, container startup/Element/native
+routes/attachments/shutdown/persisted-room checks and audit with zero known
+vulnerabilities pass. The full test run takes81.746s including5.117s preparation.
+Preserving production activation and actual provider authentication are recorded
+after they finish, not inferred from source or an available model catalog.
