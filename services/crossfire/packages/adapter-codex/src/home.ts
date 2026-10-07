@@ -2,7 +2,7 @@ import { constants, openSync, fstatSync, closeSync, readSync, lstatSync, realpat
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { parse, stringify, type TomlTable } from 'smol-toml';
-import { privateDir, readPrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 const modelKeys = ['model', 'model_provider', 'model_reasoning_effort', 'model_reasoning_summary', 'model_verbosity',
   'model_context_window', 'model_auto_compact_token_limit', 'model_auto_compact_token_limit_scope', 'model_supports_reasoning_summaries',
@@ -71,9 +71,13 @@ export function effectiveProvider(configuration: TomlTable): { id: string; setti
   return { id, settings: table(settings) ? settings : {} };
 }
 
+export function hostHome(): string {
+  return process.env.CODEX_HOME ?? join(homedir(), '.codex');
+}
+
 export function prepareHome(stateDirectory: string): string {
   const home = privateDir(join(stateDirectory, '.codex'));
-  const source = process.env.CODEX_HOME ?? join(homedir(), '.codex');
+  const source = hostHome();
   if (!metadataExists(join(home, 'config.toml'))) {
     const configuration = nativeConfiguration(source), selected = modelDefaults(configuration);
     for (const key of ['model_providers', 'cli_auth_credentials_store']) if (configuration[key] !== undefined) selected[key] = configuration[key];
@@ -85,9 +89,6 @@ export function prepareHome(stateDirectory: string): string {
     }
     effectiveProvider(selected);
     writeFileSync(join(home, 'config.toml'), stringify(selected), { flag: 'wx', mode: 0o600 });
-  }
-  if (!metadataExists(join(home, 'auth.json')) && metadataExists(join(source, 'auth.json'))) {
-    writeFileSync(join(home, 'auth.json'), readPrivateBytes(join(source, 'auth.json'), 65536), { flag: 'wx', mode: 0o600 });
   }
   return home;
 }

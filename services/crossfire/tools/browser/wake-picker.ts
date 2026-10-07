@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { expect, type Page } from '@playwright/test';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { checkPaperLayout } from './layout.js';
 
 export async function verifyWakePicker(page: Page, agentId: string, viewport: { width: number; height: number }, screenshot: string): Promise<void> {
   const path = '/api/agents/' + agentId + '/wake-policy';
@@ -13,25 +14,19 @@ export async function verifyWakePicker(page: Page, agentId: string, viewport: { 
     return parsed.value.data;
   }
   const before = await read();
-  const open = page.getByRole('button', { name: 'Choose who can wake', exact: true });
+  const open = page.getByRole('link', { name: 'Choose who can wake', exact: true });
   await open.click();
-  const dialog = page.getByRole('dialog', { name: 'Who can wake this agent?', exact: true });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel('Audience')).toHaveValue(before.mode);
-  await expect(dialog.getByLabel('Audience').locator('option')).toHaveCount(3);
-  await expect(dialog.getByRole('button', { name: 'Save wake-up policy', exact: true })).toBeDisabled();
-  const bounds = await dialog.boundingBox();
-  assert(bounds, 'Wake picker has visible modal bounds');
-  assert(bounds.width <= viewport.width && bounds.height <= viewport.height, 'Wake picker fits the viewport');
-  if (viewport.width <= 640) {
-    assert.equal(Math.round(bounds.width), viewport.width, 'Mobile picker fills the viewport width');
-    assert.equal(Math.round(bounds.height), viewport.height, 'Mobile picker fills the viewport height');
-  }
-  await page.keyboard.press('Tab');
-  assert(await page.evaluate<boolean>('document.querySelector("dialog").contains(document.activeElement)'), 'Keyboard focus remains inside the modal');
+  await expect(page).toHaveURL(new URL('/manage/agents/' + agentId + '/wake', page.url()).href);
+  await page.reload();
+  const editor = page.locator('#wake-editor');
+  await expect(editor).toBeVisible(); await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(editor.getByLabel('Audience', { exact: true })).toHaveValue(before.mode);
+  await expect(editor.getByLabel('Audience', { exact: true }).locator('option')).toHaveCount(3);
+  await expect(editor.getByRole('button', { name: 'Save wake-up policy', exact: true })).toBeDisabled();
+  assert.equal((await page.evaluate<number>('innerWidth')), viewport.width, 'The intended wake-page viewport is in use');
+  await checkPaperLayout(page);
   await page.screenshot({ path: screenshot });
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(open).toBeFocused();
+  await editor.getByRole('link', { name: 'Cancel', exact: true }).click();
+  await expect(open).toBeVisible();
   assert.equal(JSON.stringify(await read()), JSON.stringify(before), 'Inspecting and cancelling the picker does not change authority');
 }

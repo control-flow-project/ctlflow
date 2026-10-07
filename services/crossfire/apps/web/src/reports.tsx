@@ -3,6 +3,7 @@ import { call, operations, useAction, useResource } from './api.js';
 import { OwnerFilter } from './agent-filters.js';
 import { filterQuery } from './form.js';
 import { useSession } from './session.js';
+import { useConfirmation } from './confirmation.js';
 import { Alert, CopyText, Empty, Field, Help, Loaded, Page, PageItems, Panel, Pagination, Status, SubjectHeading, ViewNavigation, timestamp } from './ui.js';
 
 const stateLabels = { staging: 'Preparing', published: 'Published', deleted: 'Deleted' } as const;
@@ -46,7 +47,7 @@ export function Reports() {
   </Page>;
 }
 function ReportOverview({ report, refresh }: { report: PublicationDetails; refresh(): void }) {
-  const viewer = useSession(), action = useAction();
+  const viewer = useSession(), action = useAction(), confirmation = useConfirmation();
   return <><Panel title="Public access" description="An unlisted link is not access control. Anyone who has it can view this report.">
     {report.state === 'published' && report.url ? <><a className="button" href={report.url} target="_blank" rel="noopener noreferrer">Open report ↗</a>
       <CopyText label="Public URL" value={report.url} rows={2} buttonLabel="Copy link" copiedMessage="Link copied. Anyone with it can view this report." failureMessage="Clipboard access was blocked. Select the URL above and copy it manually."/></>
@@ -59,11 +60,10 @@ function ReportOverview({ report, refresh }: { report: PublicationDetails; refre
     <dt>Files</dt><dd>{report.fileCount.toLocaleString()} · {reportSize(report.totalBytes)}</dd></dl>
   </Panel>{report.state !== 'deleted' && report.allowedActions.includes('delete') && <Panel title="Delete report" description="Remove its public link and report files. Saved copies cannot be recalled.">
     <button type="button" className="danger" disabled={action.pending} onClick={() => {
-      if (confirm('Delete report “' + report.title + '”? Its public link will stop working. Copies already saved by others cannot be removed.')) {
-        void action.run(() => call(operations.deletePublication, { publicationId: report.id }, { expectedRevision: report.revision }, viewer.csrfSecret), refresh);
-      }
+      confirmation.request({ title: 'Delete report?', description: 'Delete “' + report.title + '”. Its public link will stop working. Copies already saved by others cannot be removed.', label: 'Delete report', danger: true,
+        execute: () => action.run(() => call(operations.deletePublication, { publicationId: report.id }, { expectedRevision: report.revision }, viewer.csrfSecret), refresh) });
     }}>Delete report</button><Alert>{action.error}</Alert>
-  </Panel>}</>;
+  </Panel>}{confirmation.dialog}</>;
 }
 function ReportFiles({ report }: { report: PublicationDetails }) {
   return <Panel title="Files" description="The declared static files in this report. Paths are relative to the report directory.">

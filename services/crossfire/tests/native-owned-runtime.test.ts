@@ -96,8 +96,8 @@ test('external native workspaces retain private managed state, explicit role ski
   assert.equal((await instructionItems(runtime)).length, 1);
   assert.equal(runtime.attachment.workspace, workspace); assert.equal(runtime.attachment.connection.home, home);
   assert.equal(provider.requests.length, 0);
-  const source = 'require("node:fs").writeFileSync(' + JSON.stringify(marker)
-    + ',JSON.stringify({cwd:process.cwd(),home:process.env.CODEX_HOME,state:process.env.CROSSFIRE_PROJECT,name:process.env.CROSSFIRE_AGENT_NAME}));';
+  const source = 'const fs=require("node:fs"), marker=' + JSON.stringify(marker)
+    + ';fs.writeFileSync(marker+".tmp",JSON.stringify({cwd:process.cwd(),home:process.env.CODEX_HOME,state:process.env.CROSSFIRE_PROJECT,name:process.env.CROSSFIRE_AGENT_NAME}));fs.renameSync(marker+".tmp",marker);';
   provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 1000, max_output_tokens: 1024 });
   await runtime.deliver('Retain external native history: silver orchard 913.', 'external-environment-proof');
   await until(() => existsSync(marker), 'Native tools did not retain the explicit private state binding');

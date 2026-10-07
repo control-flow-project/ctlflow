@@ -7,7 +7,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
 import { createFleetRuntimeWorker } from '@ctlflow/crossfire-adapter-crossfire/fleet-runtime';
 import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
-import { success } from '@ctlflow/crossfire-kernel/result';
+import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { until } from '../scripts/test-support/listener.js';
 import type { FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
 
@@ -16,6 +16,24 @@ function command(): FleetRuntimeOperation {
     status: 'pending', createdAt: 1, completedAt: null, errorMessage: null };
 }
 function response(data: unknown): Response { return Response.json({ data, meta: { requestId: randomUUID() } }); }
+
+test('a final reclaimed outcome acknowledges the local pin without executing native work or sending another receipt', async () => {
+  for (const status of ['succeeded', 'failed'] as const) {
+    const operation = command(), failures: string[] = [];
+    let executions = 0, claims = 0, acknowledged = 0, failAcknowledgement = true;
+    const client = createClient({ origin: 'http://127.0.0.1', fetch: async url => {
+      assert(String(url).endsWith('/claim'), 'No second receipt is needed for a persisted final outcome'); claims++;
+      return response({ ...operation, status, completedAt: 2, errorMessage: status === 'failed' ? 'Native operation failed' : null });
+    } });
+    const worker = createFleetRuntimeWorker({ client, fleetId: operation.fleetId, connection: () => ({ connected: true, id: randomUUID() }),
+      fail: message => { failures.push(message); }, execute: async () => { executions++; return success({ status: 'succeeded', errorMessage: null }); },
+      acknowledged: () => { acknowledged++; return failAcknowledgement ? failure('unavailable', 'Cannot persist local acknowledgement') : success(undefined); } });
+    worker.receive(operation); await worker.close();
+    assert.deepEqual(failures, ['Cannot persist local acknowledgement']);
+    failAcknowledgement = false; worker.receive(operation); await worker.close();
+    assert.equal(executions, 0); assert.equal(claims, 2); assert.equal(acknowledged, 2);
+  }
+});
 
 test('uncertain receipts reclaim the same command identity after reconnect without a second destructive native operation', async () => {
   const operation = command(), generations: string[] = [], failures: string[] = [];

@@ -9,6 +9,7 @@ import { resetCodex } from './reset.js';
 import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { codexSavedContexts } from './context-state.js';
 import { profileName } from '@ctlflow/crossfire-contracts/client';
+import { refreshAuthentication } from './authentication.js';
 
 export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
   return { validate: ownedOptions, inspect: (input, stop) => inspectCodex(binary, input, stop), reset: resetCodex, savedContexts: codexSavedContexts, async start(input, stop) {
@@ -18,8 +19,11 @@ export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
     let process: Awaited<ReturnType<typeof startProcess>> | undefined;
     let histories: ReturnType<typeof codexHistories> | undefined;
     try {
+      stop.throwIfAborted();
       nativeDirectories(input);
       const home = prepareHome(input.stateDirectory);
+      const authentication = refreshAuthentication(home);
+      if (!authentication.ok) return authentication;
       process = await startProcess(home, input.workspace, input.stateDirectory, input.profile, stop, binary, parsed.value.options.features?.default_mode_request_user_input === true);
       const owner = process;
       const attachment = { runtime: 'codex', workspace: input.workspace,

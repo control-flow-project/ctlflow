@@ -63,7 +63,7 @@ export async function resetInstance(configuration: Configuration, instance: Inst
       if (verified.manifest !== state.manifest || JSON.stringify(verified.cursors) !== JSON.stringify(Object.fromEntries(state.cursors.map(entry => [entry.room, entry.cursor])))) return failure('conflict', 'Reset history boundaries changed; context was not replaced');
       const rotated = await adapter.reset({ workspace, stateDirectory, resetId: generation });
       if (!rotated.ok) return rotated;
-      archiveState(local.state, join(root, 'listener-archive'), name => name === 'cursors.json' || name.startsWith('cursors.json.'));
+      archiveState(local.state, join(root, 'listener-archive'), name => name === 'resume-work.json' || name === 'cursors.json' || name.startsWith('cursors.json.'));
       state = { ...state, phase: 'retired' }; writeJson(file, state);
     }
     writeJson(local.cursors, Object.fromEntries(state.cursors.map(entry => [entry.room, entry.cursor])));

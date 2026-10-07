@@ -2,12 +2,14 @@ import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 import type { ControllerState, ListenerControl } from '@ctlflow/crossfire-agent-core/listener-control-port';
 import type { NativeSessionState } from '@ctlflow/crossfire-agent-core/runtime';
-import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, RetainedContext, SetupInput, SetupConfiguration } from './model.js';
+import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, ResumeSelection, RetainedContext, SetupInput, SetupConfiguration } from './model.js';
 export type Registry = {
   registrations(): Result<Registration[]>;
   saveRegistrations(values: Registration[]): Result<void>;
   desiredIntent(): Result<DesiredIntent[]>;
   saveDesiredIntent(values: DesiredIntent[]): Result<void>;
+  resumeSelections(): Result<ResumeSelection[]>;
+  saveResumeSelections(values: ResumeSelection[]): Result<void>;
   operations(): Result<Operation[]>;
   saveOperations(values: Operation[]): Result<void>;
   load(directory: string): Result<Configuration>;
@@ -33,7 +35,7 @@ export type Execution = {
   validate(configuration: Configuration): Result<void>;
   inspect(configuration: Configuration, signal: AbortSignal): Promise<Result<void>>;
   test(configuration: Configuration, instance: Instance): Promise<Result<void>>;
-  prepare(configuration: Configuration, controller: Controller, signal: AbortSignal, approval: (approval: Approval) => void): Promise<Result<{ failed: { instanceKey: string; code: string; message: string }[] }>>;
+  prepare(configuration: Configuration, controller: Controller, intent: 'resume' | 'enroll', signal: AbortSignal, approval: (approval: Approval) => void): Promise<Result<{ failed: { instanceKey: string; code: string; message: string }[] }>>;
   start(configuration: Configuration, instance: Instance, signal: AbortSignal, reason: 'operator' | 'recovery'): Promise<Result<Running>>;
   contexts(configuration: Configuration, instance: Instance): Promise<Result<RetainedContext[]>>;
   confirmStopped(configuration: Configuration, instance: Instance): Promise<Result<void>>;

@@ -2,12 +2,13 @@ import { useState } from 'react';
 import type { AgentView, RoomView, RoomGrantView } from '@ctlflow/crossfire-contracts/schema/response';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
+import { useConfirmation } from './confirmation.js';
 import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Help, Loaded, Page, Panel, Pagination, PageItems, Status, SubjectHeading, timestamp } from './ui.js';
 
 const labels = { none: 'No access', read: 'Read only', reply: 'Read & reply', custom: 'Custom power level' } as const;
 function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; view?: RoomGrantView }) {
-  const viewer = useSession(), action = useAction();
+  const viewer = useSession(), action = useAction(), confirmation = useConfirmation();
   const edit = useEditable(agent.agentId + '/' + room.roomId, { revision: view?.revision ?? agent.revision, generation: view?.grant?.generation ?? null },
     { mode: view?.grant?.accessMode ?? 'none', muted: view?.grant?.muted ?? false, level: view?.grant?.powerLevel ?? 0 });
   const { mode, muted, level } = edit.value;
@@ -16,17 +17,19 @@ function GrantEditor({ agent, room, view }: { agent: AgentView; room: RoomView; 
   const nativeCreator = room.authority?.creatorIds.includes(agent.matrixUserId) ?? false;
   if (view?.ownerConversation) return <div><Status value="Read & reply"/><span className="subline">Owner DM · always available</span><span className="support">Private messages and native approvals. Access cannot be disabled.</span></div>;
   return <form onSubmit={event => { event.preventDefault();
-    if (edit.conflict || mode === 'none' && edit.version.generation && !confirm('Remove this agent’s access to ' + room.name + '?')) return;
+    if (edit.conflict) return;
     const params = { agentId: agent.agentId, roomId: room.roomId }, base = { expectedRevision: edit.version.revision, expectedGeneration: edit.version.generation };
-    void action.run(() => mode === 'none' ? call(operations.removeGrant, params, base, viewer.csrfSecret)
+    const execute = () => action.run(() => mode === 'none' ? call(operations.removeGrant, params, base, viewer.csrfSecret)
       : call(operations.setGrant, params, { ...base, accessMode: mode, powerLevel: mode === 'custom' ? level : null, muted }, viewer.csrfSecret));
+    if (mode === 'none' && edit.version.generation) confirmation.request({ title: 'Remove room access?', description: 'Remove ' + agent.displayName + '’s access to ' + room.name + '.', label: 'Remove access', danger: true, execute });
+    else void execute();
   }}><fieldset disabled={!editable || action.pending}><label className="sr-only" htmlFor={'access-' + room.roomId}>Access for {room.name}</label>
     <select id={'access-' + room.roomId} value={mode} onChange={event => { const value = event.target.value; if (value === 'none' || value === 'read' || value === 'reply' || value === 'custom') edit.setValue(previous => ({ ...previous, mode: value })); }}>
       <option value="none">No access</option><option value="read" disabled={!room.authority || nativeCreator}>Read only</option>
       <option value="reply" disabled={!canReply}>Read &amp; reply</option><option value="custom" disabled={!room.authority || nativeCreator}>Custom power level</option></select>
     {mode === 'custom' && <label>Power level<input type="number" required value={level} max={room.authority?.creator ? undefined : room.authority?.powerLevel ?? undefined} onChange={event => edit.setValue(previous => ({ ...previous, level: Number(event.target.value) }))}/></label>}
     <div className="room-actions"><label className="check"><input type="checkbox" disabled={mode === 'none'} checked={muted} onChange={event => edit.setValue(previous => ({ ...previous, muted: event.target.checked }))}/>Mute delivery</label><button className="room-save" disabled={edit.conflict}>Save access</button></div>
-    <EditConflict {...edit}/></fieldset>{nativeCreator && <p className="support">Matrix made this agent a room creator. Its native authority cannot be reduced; you can mute delivery or remove its membership.</p>}<Alert>{action.error}</Alert></form>;
+    <EditConflict {...edit}/></fieldset>{nativeCreator && <p className="support">Matrix made this agent a room creator. Its native authority cannot be reduced; you can mute delivery or remove its membership.</p>}<Alert>{action.error}</Alert>{confirmation.dialog}</form>;
 }
 function AppliedGrant({ view }: { view?: RoomGrantView }) {
   const grant = view?.grant, application = view?.application;

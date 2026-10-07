@@ -14,7 +14,11 @@ export function createFleetRuntimeWorker(options: { client: Client; fleetId: str
       const generation = options.connection().id;
       const claim = await options.client.call(operations.claimFleetRuntime, { fleetId: options.fleetId, operationId: operation.operationId }, { connectionId: generation });
       if (!claim.ok) throw new Error(claim.error.message);
-      if (claim.value.data.status !== 'running') return;
+      if (claim.value.data.status === 'succeeded' || claim.value.data.status === 'failed') {
+        const acknowledged = options.acknowledged(operation.operationId); if (!acknowledged.ok) throw new Error(acknowledged.error.message);
+        return;
+      }
+      if (claim.value.data.status !== 'running') throw new Error('Controller claim did not authorize native execution');
       const result = await options.execute(claim.value.data);
       const outcome = result.ok ? result.value : { status: 'failed' as const, errorMessage: result.error.message };
       const receipt = await options.client.call(operations.receiptFleetRuntime, { fleetId: options.fleetId, operationId: operation.operationId },

@@ -100,12 +100,14 @@ test('Reports browser inventory, durable files view and confirmed deletion use t
   await page.screenshot({ path: join(directory, 'report-files-mobile.png'), fullPage: true });
   await page.getByRole('navigation', { name: 'Report sections' }).getByRole('link', { name: 'Overview', exact: true }).click();
   await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'report-mobile.png'), fullPage: true });
-  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Delete report', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete report', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   assert.deepEqual(deletions, [], 'Cancelling confirmation does not make a destructive request');
   assert.equal(value(await client.call(operations.publication, { publicationId: report.id }, {})).data.state, 'published');
-  page.once('dialog', async dialog => { assert(dialog.message().includes('Copies already saved')); await dialog.accept(); });
   const deleted = page.waitForResponse(response => response.url().endsWith('/api/publications/' + report.id) && response.request().method() === 'DELETE');
-  await page.getByRole('button', { name: 'Delete report', exact: true }).click(); assert.equal((await deleted).status(), 200);
+  await page.getByRole('button', { name: 'Delete report', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Copies already saved');
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete report', exact: true }).click(); assert.equal((await deleted).status(), 200);
   await expect(page.getByRole('button', { name: 'Delete report', exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Public access', exact: true })).toContainText('Its public link is no longer available');
   await expect(page.getByRole('link', { name: 'Open report ↗', exact: true })).toHaveCount(0);

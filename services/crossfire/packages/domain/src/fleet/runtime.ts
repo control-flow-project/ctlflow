@@ -4,8 +4,6 @@ import { fleetRequesterAuthorized, type FleetActor } from './authority.js';
 import { authorizedFleet, connectionView, liveFleetConnection, type FleetControlServices } from './control.js';
 import { recordEvent } from '../audit/record-event.js';
 import { runtimeOperationView, type RuntimeOperation } from './runtime-types.js';
-import type { Services } from '../port/services.js';
-import { recordNativeStop } from './native-stop.js';
 
 export function requestFleetRuntime(services: FleetControlServices, actor: FleetActor, fleetId: string,
   input: { operationId: string; agentId: string | null; action: 'start' | 'stop' | 'reset'; expectedRevision: number; confirmFreshHistory: boolean }, requestId: string) {
@@ -59,7 +57,7 @@ export function claimFleetRuntime(services: FleetControlServices, actor: FleetAc
     return stored.ok ? success(runtimeOperationView(next)) : stored;
   });
 }
-export function receiptFleetRuntime(services: FleetControlServices & Pick<Services, 'runtime' | 'listenerRead'>, actor: FleetActor, fleetId: string, operationId: string,
+export function receiptFleetRuntime(services: FleetControlServices, actor: FleetActor, fleetId: string, operationId: string,
   input: { connectionId: string; status: 'succeeded' | 'failed'; errorMessage: string | null }) {
   if ((input.status === 'failed') !== (input.errorMessage !== null)) return failure('invalid', 'Invalid session receipt');
   return services.unitOfWork.run(() => {
@@ -72,17 +70,6 @@ export function receiptFleetRuntime(services: FleetControlServices & Pick<Servic
     const next: RuntimeOperation = { ...found.value, ...input, completedAt: services.clock.now() };
     const stored = services.repositories.fleetRuntimeOperation.update(next);
     if (!stored.ok) return stored;
-    if (next.action === 'stop' && next.status === 'succeeded') {
-      const instances = services.collection.fleetInstances(current.value.fleet); if (!instances.ok) return instances;
-      for (const instance of instances.value) {
-        if (next.agentId !== null && next.agentId !== instance.agentId) continue;
-        const runs = services.listenerRead.history(instance.agentId, { page: 1, pageSize: 1 }); if (!runs.ok) return runs;
-        const run = runs.value.items[0]; if (!run) continue;
-        const stopped = recordNativeStop(services, actor, fleetId, instance.agentId,
-          { connectionId: input.connectionId, runId: run.id, receiptId: operationId });
-        if (!stopped.ok) return stopped;
-      }
-    }
     return success(runtimeOperationView(next));
   });
 }

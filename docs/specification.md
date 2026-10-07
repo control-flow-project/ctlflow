@@ -348,8 +348,11 @@ developer-instruction producer. Starting, enrollment,
 connection, release verification, filtering, approvals and heartbeats make zero
 model calls. An authorized task/message is what starts model work.
 
-Later start reuses private credentials, the same immutable identities, native
-sessions and delivery positions automatically. No resume flag or replacement
+Later start reuses private Crossfire credentials, the same immutable identities,
+native sessions and delivery positions automatically. Each native activation
+refreshes provider authentication from the current authorized host login through
+the runtime adapter; preflight does not rewrite a running engine's private login.
+No resume flag or replacement
 identity is invented. New agents need identity approval; changed/unapproved fleet
 coordination settings need exact owner policy approval, even for existing agents. Invalid
 credentials or failed native resume produces a concrete error, not a fresh session.
@@ -366,10 +369,23 @@ and applied by the runtime adapter. Only stock Codex 0.158.0 or newer is support
 Daemon orchestration contains no Codex-specific option translation. Native
 authentication stays private and uses the user's authorized provider login.
 The Codex adapter creates each instance state directory's private `.codex` home.
-On first use it copies the authorized user's native provider/model configuration,
-selected profile and private login into that home. It never imports native
+On first use it copies the authorized user's native provider/model configuration
+and selected profile into that home. It never imports native
 histories, workspace trust or approval bypasses from the coding session.
-Subsequent starts retain the managed home's authentication. Optional workspace
+Every actual native start, resume, automatic wake and recovery atomically
+refreshes the managed `auth.json` from the host's current private login in
+`CODEX_HOME`, or `~/.codex` when unset. The host's currently signed-in provider
+account is authoritative for that activation, including an intentional host
+account change. Login refresh does not change Matrix identity, saved native
+history, model/permission configuration or unread positions. The source is a
+bounded private owned regular JSON file; invalid/unsafe input fails before native
+startup without leaking credentials or retaining a stale-login fallback. An
+absent source file removes the old file login; configured native environment
+authentication remains native-owned. Preflight checks the current host login
+without changing a managed engine's credentials. Configuration preparation,
+history reset and read-only status/attachment do not recopy credentials. A
+running engine uses its activation-time snapshot until its next native resume;
+refresh is not a live account-switch operation. Optional workspace
 configuration changes native cwd, not private identity/state ownership.
 No controller credential enters model context.
 Native thread creation and resumption receive validated model, reasoning and
@@ -401,6 +417,14 @@ authorize primary-history initialization. Per-room mode creates a new history
 when a room is first used; an explicitly configured history-mode change may open
 its other primary context while retaining existing histories. An established
 missing/broken binding fails rather than silently substituting a fresh session.
+
+Fleet Stop saves the exact enabled-instance selection before disabling intent.
+Fleet Resume restores that selection together with any currently enabled agents,
+not all enrolled agents. Individual Stop removes its member from that selection;
+an empty saved selection resumes nobody. Repeated Stop while already stopped
+retains its original selection. Initial explicit fleet startup without prior
+intent or a stopped selection starts the configured roster. Fresh-history reset
+continues to use its explicitly confirmed fleet/agent scope, not the stopped set.
 
 Fresh history requires explicit human confirmation in management and an explicit
 `--fresh-history` flag on CLI start at either scope. It calls the controller's
@@ -745,6 +769,10 @@ Only owned process handles may be signalled; no process-name scanning/killing.
 
 Transient listener/native failures close the exact failed process generation before
 bounded automatic recovery, with exponential delays from one to sixty seconds.
+Codex's owned launcher and native engine share one dedicated process group.
+Shutdown signals that exact group, not process names or the coordinating shell,
+and escalates after a three-second grace period while awaiting confirmed pipe/process
+closure. A launcher exit alone cannot prove its active native child stopped.
 Recovery retains the deployed configuration, account, native histories and receipts;
 it uses installed software, never installs a new release or discards uncertain input.
 Permanent authorization/configuration failures require operator action. Explicit
@@ -821,6 +849,31 @@ and exact native histories, initially without a native process where possible.
 Restoration is bounded to four concurrent attempts with 30-second startup
 observations. A late result is drained/closed, not allowed to overlap a retry.
 Permanent errors retain failed intent and require operator action.
+
+The controller's private `resume-selections.json` durably owns saved Stop targets,
+bounded to 100 fleets and 100 instance keys per fleet. Fleet views expose the
+nullable `resumeInstanceKeys`: null means no saved Stop selection, while an empty
+list is an intentional empty selection. Explicit operations retire queued startup
+restoration ownership before draining its already-started generations. Retired
+results cannot start a competing native owner or overwrite replacement state.
+
+Each agent's native lifecycle writes private, bounded `resume-work.json`
+checkpoints through a storage port when a saved context is working or waiting
+for an answer/approval. Idle completion removes its checkpoint. Repeated working
+observations do not rewrite it. Shutdown retains exact context/session IDs,
+checkpoint time and a stable message receipt; abrupt death retains the most
+recent unfinished checkpoint. The next activation validates every saved context,
+then delivers one restart/continue instruction to its exact native history,
+recovering ambiguous delivery by receipt before retrying. Continuation activation
+waits for authenticated delivery policy, reporting and local tool/query readiness;
+startup idle observations cannot erase a pending continuation. Initialization must
+finish before incoming messages use that generation. Idle/sleeping contexts
+receive no synthetic task. This owner-requested continuation is task steering,
+not lifecycle accounting or a Matrix message. It confers no new permissions,
+approves no pending decision, infers no room destination and never forwards
+per-room history elsewhere. Fresh-history reset archives these checkpoints with
+the superseded bindings. Receipt deduplication does not promise exactly-once
+external model/tool effects; the instruction prohibits repeating completed work.
 
 No host boot service is installed: after power failure the operator still starts
 fleetd with its original root. History, credentials, desired intent and unread
@@ -1623,10 +1676,10 @@ person entry includes that person; true also includes currently owned active
 agents, including agents enrolled later. Individual-agent entries require false.
 Two person groups admit both people and both ownership groups, not everyone.
 The Rooms view shows a compact policy summary and selected-entry table. Its
-picker is a native modal dialog with search, paginated people/individual-agent
-discovery and a per-person scope selector. On small screens it fills the screen
-but retains modal focus, Escape/Cancel, background isolation and focus return.
-Draft entries remain visible across searches/pages. Cancel discards them. Save
+picker is the durable `/manage/agents/{agentId}/wake` page with a back link,
+search, paginated people/individual-agent discovery and a per-person scope
+selector. Desktop and mobile use the same responsive page, not an overlay.
+Draft entries remain visible across searches/pages. Cancel or Back discards them. Save
 atomically replaces mode and all entries with an exact revision check. Conflicts
 retain the draft, load the current policy and require explicit discard before
 replacement. Empty selection wakes nobody. Owner is not implicit; self is excluded.
@@ -2833,12 +2886,30 @@ page controls, reading bounded 100-row REST pages. Counts and filters share API
 scope; failures never masquerade as an empty or complete partial result. Refresh
 does not imply an atomic multi-page snapshot.
 
-Fleet detail has exactly four durable sections: Agents at the base path,
-`/map`, `/activity` and `/settings`. Agents opens on the roster table with
-scope-labelled Stop sessions, Resume sessions and confirmed Start with fresh
-history controls. Ordinary resume uses exact saved histories. Requested,
+Fleet detail has exactly five durable sections: Agents at the base path,
+`/map`, `/sessions`, `/activity` and `/settings`. Agents opens on the roster
+table. Sessions opens on scope-labelled Stop sessions, Resume sessions and
+confirmed Start with fresh history controls. Ordinary resume uses exact saved histories. Requested,
 running, succeeded and failed controller operation outcomes remain distinct;
 no human HTTP acknowledgment is presented as native completion.
+Controls track the latest operation independently of the selected history page.
+The fleet controller's lease and delivery intent are labelled separately from
+agent listener readiness and native execution.
+
+A current, claimed controller lifecycle receipt records the final operation
+outcome independently of listener generations. Historical stopped runs cannot
+reject that outcome, keep Resume locked or force repeated native execution.
+Reclaimed final outcomes release the local operation pin without execution.
+Native-close retirement proofs retain their separate, exact current-run,
+current-connection and credential checks; lifecycle completion cannot fabricate
+those proofs or authorize retirement.
+
+Latest-run summaries project Stopped from a successful scoped stop completion
+after that run closed, or from a noninvalidated exact native-stop receipt. A
+later reporting generation supersedes that projection. Agents cannot report
+Stopped themselves. Offline observations without native-close evidence show
+Unknown with muted last-reported state/time, never a current Working or Sleeping
+badge. Saved-history availability remains separately reported, not inferred.
 
 Fleet Activity groups delivery intent and broadcasts at `/activity`, and traffic/
 usage at `/activity?view=traffic`. Pause delivery retains native processes and
@@ -2854,7 +2925,8 @@ Agent detail has exactly four durable sections: Rooms at the base path,
 `/session`, `/activity` and `/settings`. Rooms groups current room access,
 native enforcement and clearly separate wake eligibility; selected-author
 controls read the authorized directory only when needed and preserve choices
-across searches. `/rooms/{roomId}` preserves native permission details,
+across searches. The audience editor lives at `/wake`, with direct reload and
+explicit Back/Cancel navigation. `/rooms/{roomId}` preserves native permission details,
 generation-bound delegation and provenance-limited removal.
 
 Session owns native lifecycle controls, pending decisions, runtime observations,
@@ -2951,6 +3023,13 @@ TOML has a full diff/confirmation and revision validation. Native session stop,
 fresh-history reset, retirement and archive each state their different effects
 and require the appropriate explicit confirmation. Retirement/archive cannot
 bypass receipt-confirmed native stop or the server's current eligibility checks.
+Every management confirmation uses one themed accessible modal, never browser
+confirm/alert/prompt. Cancel initially owns focus; Escape/cancel restores the
+trigger without a write. Background content is inert. A pending request cannot
+be dismissed or duplicated; failures stay visible in the modal and retain the
+same request identity/concurrency fences for a deliberate retry. Modals fit
+desktop/mobile viewports with scrollable content. Complex pickers are durable
+pages, not confirmation overlays. Element's native dialogs are unchanged.
 
 The Connect page presents one universal setup flow: paste the minimal personalized
 guide URL into an existing coding assistant, approve the exact roster once, then
@@ -2962,6 +3041,12 @@ Requirements, prerequisite/provider installation and optional TOML/root details
 are concise progressive disclosure behind the guide, not another installer.
 Fleet approvals show exact names, failures, owner, controller, wake authors and
 invitation defaults. Unchanged setup/resumption is not described as re-enrollment.
+Resume validates the complete approved fleet, owner, immutable instance/account
+bindings and active accounts with the saved scoped controller credential. It
+performs no enrollment, coordination-policy, metadata or credential write. Owner
+UI changes remain authoritative; TOML coordination defaults apply during initial,
+new or renamed identity enrollment, or explicit `fleet enroll`. Invalid authority
+fails visibly and never falls back to requesting enrollment.
 
 All data lists use one first/previous/page/next/last pagination treatment. Server
 queries are bounded and stably ordered with matching scoped counts. URL navigation

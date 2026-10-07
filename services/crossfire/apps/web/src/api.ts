@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
 import type { Operation } from '@ctlflow/crossfire-contracts/rest/operation';
 import type { Response } from '@ctlflow/crossfire-contracts/rest/envelope';
-import { success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 export { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 
 export async function call<Params extends Record<string, string>, Query, Input, Output>(operation: Operation<Params, Query, Input, Output>,
@@ -35,10 +35,10 @@ export function useAction() {
   const [pending, setPending] = useState(false);
   const locked = useRef(false);
   async function run<Value>(action: () => Promise<Result<Value>>, complete: (value: Value) => void = () => location.reload()) {
-    if (locked.current) return;
+    if (locked.current) return failure('conflict', 'This action is already pending');
     locked.current = true; setPending(true); setError('');
-    try { const result = await action(); if (result.ok) complete(result.value); else setError(result.error.message); }
-    catch { setError('The request failed. Refresh to check its status before trying again.'); }
+    try { const result = await action(); if (result.ok) complete(result.value); else setError(result.error.message); return result; }
+    catch { const message = 'The request failed. Refresh to check its status before trying again.'; setError(message); return failure('unavailable', message); }
     finally { locked.current = false; setPending(false); }
   }
   return { error, pending, run };

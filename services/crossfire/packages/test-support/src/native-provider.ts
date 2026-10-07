@@ -2,11 +2,19 @@ import { cleanup } from './cleanup.js';
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
 import { createServer, type ServerResponse } from "node:http";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from 'node:os';
 import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
 
 export async function nativeProvider(context: TestContext, home: string) {
+  const loginHome = mkdtempSync(join(tmpdir(), 'crossfire-fixture-login-')), previous = process.env.CODEX_HOME;
+  writeFileSync(join(loginHome, 'auth.json'), '{}', { mode: 0o600 });
+  process.env.CODEX_HOME = loginHome;
+  cleanup(context, () => {
+    if (previous === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = previous;
+    rmSync(loginHome, { recursive: true, force: true });
+  });
   const requests: unknown[] = [];
   let held: ServerResponse | undefined;
   let holdNext = true;
@@ -49,7 +57,7 @@ requires_openai_auth = false
 request_max_retries = 0
 stream_max_retries = 0
 `, { mode: 0o600 });
-  return { requests, held: () => held,
+  return { requests, loginHome, held: () => held,
     hold: () => { held = undefined; holdNext = true; },
     finish: () => { assert(held); finish(held); held = undefined; },
     tool: (name = 'fixture_probe', arguments_: unknown = {}) => {

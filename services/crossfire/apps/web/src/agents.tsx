@@ -11,6 +11,7 @@ import { ListenerVersions } from './listener-versions.js';
 import { AgentNavigation, type AgentSection } from './agent-navigation.js';
 import { AgentSessions } from './fleet-sessions.js';
 import { NativeRuntimeStatus } from './runtime-status.js';
+import { useConfirmation } from './confirmation.js';
 import { Runtime } from './runtime.js';
 import { Decisions } from './decisions.js';
 import { AgentRetirement } from './retirement.js';
@@ -37,7 +38,7 @@ function Activity({ agent }: { agent: AgentView }) {
     <div className="actions"><a className="button" href={'/manage/agents/' + agent.agentId + '/session'}>Manage session →</a><a href={'/manage/fleets/' + agent.deployment.fleetId + '/activity'}>Fleet delivery and traffic →</a></div></Panel></>;
 }
 function Lifecycle({ agent }: { agent: AgentView }) {
-  const viewer = useSession(), action = useAction();
+  const viewer = useSession(), action = useAction(), confirmation = useConfirmation();
   const edit = useEditable(agent.agentId + '/name', agent.revision, agent.displayName);
   const changeName = (displayName: string | null) => call(operations.changeAgent, { agentId: agent.agentId }, { expectedRevision: edit.version, displayName }, viewer.csrfSecret);
   const changeStatus = (status: 'active' | 'suspended' | 'revoked') => call(operations.changeAgent, { agentId: agent.agentId }, { expectedRevision: agent.revision, status }, viewer.csrfSecret);
@@ -47,10 +48,11 @@ function Lifecycle({ agent }: { agent: AgentView }) {
         <div className="actions"><button disabled={edit.conflict}>Save name</button><button type="button" disabled={edit.conflict} onClick={() => { void action.run(() => changeName(null)); }}>Use owner-qualified name</button></div><EditConflict {...edit}/></fieldset></form>
     <Alert>{action.error}</Alert></Panel><Panel title="Account access" description="Suspension is reversible. Revocation permanently disables this identity."><dl><dt>Account</dt><dd><Status value={agent.status}/></dd><dt>Native application</dt><dd><Status value={applied(agent)}/></dd><dt>Last applied</dt><dd>{timestamp(agent.application.lastSuccessAt)}</dd></dl><Alert>{agent.application.errorMessage}</Alert>
     <div className="actions">{mutable && <><button disabled={action.pending} onClick={() => {
-      if (confirm(agent.status === 'active' ? 'Suspend this agent’s account access?' : 'Reactivate this agent?')) void action.run(() => changeStatus(agent.status === 'active' ? 'suspended' : 'active'));
+      confirmation.request({ title: agent.status === 'active' ? 'Suspend agent?' : 'Reactivate agent?', description: 'Change account access for ' + agent.displayName + '.', label: agent.status === 'active' ? 'Suspend agent' : 'Activate agent', danger: agent.status === 'active',
+        execute: () => action.run(() => changeStatus(agent.status === 'active' ? 'suspended' : 'active')) });
     }}>{agent.status === 'active' ? 'Suspend agent' : 'Activate agent'}</button><button className="danger" disabled={action.pending} onClick={() => {
-      if (confirm('Permanently revoke this agent? This cannot be undone.')) void action.run(() => changeStatus('revoked'));
-    }}>Revoke account</button></>}</div><Alert>{action.error}</Alert><p className="support">Pending or failed changes are not yet fully enforced by Matrix.</p>
+      confirmation.request({ title: 'Revoke agent account?', description: 'Permanently revoke ' + agent.displayName + '. This cannot be undone.', label: 'Revoke account', danger: true, execute: () => action.run(() => changeStatus('revoked')) });
+    }}>Revoke account</button></>}</div><Alert>{action.error}</Alert>{confirmation.dialog}<p className="support">Pending or failed changes are not yet fully enforced by Matrix.</p>
   </Panel><Panel title="Identity"><dl><dt>Verified owner</dt><dd>{agent.owner.displayName}<span className="subline">{agent.owner.matrixUserId}</span></dd><dt>Matrix identity</dt><dd className="mono">{agent.matrixUserId}</dd></dl>
     <Help title="Fleet deployment details"><dl><dt>Fleet</dt><dd><a href={'/manage/fleets/' + agent.deployment.fleetId}>{agent.deployment.label}</a></dd><dt>Instance</dt><dd>{agent.deployment.instanceKey}</dd><dt>Controller</dt><dd>{agent.deployment.controllerName}</dd><dt>Last reported</dt><dd>{timestamp(agent.deployment.reportedAt)}</dd></dl><p>Controller details identify the deployment. Listener heartbeats determine whether this agent is online.</p></Help></Panel><AgentRetirement agent={agent}/></>;
 }

@@ -26,16 +26,23 @@ export async function startProcess(home: string, workspace: string, stateDirecto
   if (!path || path.length > 4096 || /[\x00-\x1f\x7f]/u.test(path)) throw new Error('Codex requires a bounded native executable search path');
   const token = randomBytes(32).toString('hex'), tokenFile = join(privateDir(home), '.crossfire-token-' + randomBytes(12).toString('hex'));
   writeFileSync(tokenFile, token, { flag: 'wx', mode: 0o600 });
-  const child = spawn(binary, ['app-server', '--listen', 'ws://127.0.0.1:0', '--ws-auth', 'capability-token', '--ws-token-file', tokenFile], { cwd: workspace, env: environment, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(binary, ['app-server', '--listen', 'ws://127.0.0.1:0', '--ws-auth', 'capability-token', '--ws-token-file', tokenFile], { cwd: workspace, env: environment, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   const lifetime = new AbortController();
   const ended = once(child, 'close').then(() => { lifetime.abort(new Error('Owned Codex process exited')); }, () => { lifetime.abort(new Error('Owned Codex process could not start')); });
   let closing: Promise<void> | undefined;
   function close(): Promise<void> {
     closing ??= (async () => {
       stop.removeEventListener('abort', onAbort);
-      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
-      const timer = setTimeout(() => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }, 3000);
-      try { await ended; } finally { clearTimeout(timer); unlinkSync(tokenFile); }
+      function terminate(signal: NodeJS.Signals): void {
+        if (child.pid === undefined) return;
+        try { process.kill(-child.pid, signal); }
+        catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; }
+      }
+      let rejectEscalation!: (error: unknown) => void;
+      const escalation = new Promise<never>((_resolve, reject) => { rejectEscalation = reject; });
+      const timer = setTimeout(() => { try { terminate('SIGKILL'); } catch (error) { rejectEscalation(error); } }, 3000);
+      try { terminate('SIGTERM'); await Promise.race([ended, escalation]); unlinkSync(tokenFile); }
+      finally { clearTimeout(timer); }
     })();
     return closing;
   }

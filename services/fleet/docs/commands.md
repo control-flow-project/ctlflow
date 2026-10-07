@@ -42,6 +42,9 @@ fleet remove research
 Add registers an explicit directory or instance. New identities need owner
 approval. Start automatically resumes the full saved native histories. Missing
 or broken established history is an error, not permission to create a new one.
+An already approved roster resumes using its saved controller authority, without
+enrollment or overwriting owner-edited wake rules. Use explicit `fleet enroll`
+while stopped to propose changed coordination defaults for owner review.
 Local start starts or reuses the configured controller. Status/list/show/test,
 contexts, attachment and registry edits never start it. Stop ends addressed
 listeners and owned Codex processes. Instance removal retires its fleet registration;

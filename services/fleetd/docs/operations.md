@@ -61,12 +61,33 @@ The independent coding session performing setup is not owned by fleetd.
 intent. Start persists it before activation; explicit Stop removes it before
 cleanup. Normal daemon shutdown preserves it. Start the same controller/root
 after a restart or power failure to restore desired bindings and exact histories,
-without re-enrollment or model prompts. Restoration may leave native processes
+without re-enrollment or synthetic prompts for idle histories. Interrupted work
+receives a receipt-confirmed continuation in its exact saved context. It answers
+no question and approves no permission. Restoration may leave idle native processes
 sleeping until input arrives. Manually stopped agents remain stopped.
+
+Fleet Stop first saves its enabled targets in `resume-selections.json`. Fleet
+Resume restores those targets plus current active intent. Individual Stop removes
+its target from the saved selection; an empty saved set remains empty, and a
+repeated fleet Stop does not erase the previous stopped selection. Initial explicit
+startup without any saved selection or active intent uses the configured roster.
+Fresh-history reset keeps its explicitly confirmed whole-fleet or agent scope.
+
+Per-agent `resume-work.json` stores only unfinished context/session IDs, checkpoint
+times and delivery receipts. Working/waiting observations create it, unchanged
+observations do not rewrite it, and idle completion clears it. Close and abrupt
+death retain unfinished work for the next exact-history activation. Resumed work
+waits for listener policy, reporting and tool readiness. It cannot auto-approve
+questions, invent a chat destination or cross room histories.
+Fresh reset archives these checkpoints. Native receipt recovery prevents duplicate
+continuation notices; it cannot certify exactly-once external task effects.
 
 Startup restoration is bounded and generation-fenced. Missing histories,
 unreviewed configuration, invalid intent or failed process cleanup remain
 visible errors; they never authorize a new history or overlapping native owner.
+Explicit lifecycle operations retire the same instances' queued restoration
+ownership and drain started generations before replacement. Late restore results
+cannot overwrite the new generation or start a competing owner.
 The private controller API opens independently of native restoration. Queued
 desired agents show `starting`; status and explicit stop remain available even
 when a large fleet's native starts are delayed. Controller API availability does
@@ -77,7 +98,10 @@ No automatic host boot service is installed.
 
 ### Abrupt controller death
 
-Orderly controller shutdown awaits the owned Codex engine's close. A full machine
+Orderly controller shutdown terminates the dedicated group containing its owned
+Codex launcher/native engine and awaits closure, with a three-second kill escalation.
+Launcher exit alone does not prove its working child stopped. No process-name
+scanning or unrelated processes are involved. A full machine
 restart or power failure ends that engine; the same private root and workareas
 retain desired activation and saved histories for normal restoration.
 
@@ -168,9 +192,13 @@ receipts are confirmed. Neither operation detaches an agent or deletes history.
 - [UI/CLI session controls and confirmation](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/sessions.md)
 
 Role `coordination_options` requests exact Crossfire wake rules and invitation
-defaults with enrollment. Owner review is required for new/changed settings;
+defaults with initial or explicit enrollment. Owner review is required for new/changed settings;
 the controller credential cannot approve them. Approved settings apply through
 Crossfire's normal wake and room-access domains, not controller-side permissions.
+Ordinary resume validates the existing approved roster and accounts without
+requesting enrollment or writing policies. UI-edited wake rules and permissions
+remain intact. Invalid credentials, inactive accounts or mismatched saved
+identities fail rather than requesting replacement authority.
 - [Configuration, approval, admission and removal](coordination.md)
 
 ## Source ownership

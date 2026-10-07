@@ -4,7 +4,9 @@
 
 `fleet enroll FLEET` reviews the complete roster of an already registered,
 stopped fleet. It uses the same enrollment and owner-approval flow as start,
-but never starts/resets native sessions or enables message delivery. An active
+when start introduces new or renamed identities. Ordinary resume of an approved
+roster does not request enrollment or overwrite owner-edited coordination policy.
+Enroll never starts/resets native sessions or enables message delivery. An active
 fleet or per-agent enrollment target is rejected. Inspect `fleet show FLEET`
 after completion; starting later remains a separate explicit resume.
 

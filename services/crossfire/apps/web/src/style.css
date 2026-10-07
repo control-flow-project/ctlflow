@@ -13,17 +13,17 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; }
-.management-dialog { width: min(960px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px #0004; }
+.management-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px #0004; }
 .management-dialog::backdrop { background: #11182799; }
-.dialog-frame { display: flex; flex-direction: column; max-height: calc(100dvh - 50px); }
-.dialog-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; padding: 24px; border-bottom: 1px solid var(--line); background: var(--hover); }
+.dialog-frame { display: flex; flex-direction: column; max-height: calc(100dvh - 34px); }
+.dialog-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; padding: 24px; overflow: auto; border-bottom: 1px solid var(--line); background: var(--hover); }
 .dialog-heading p { font-size: 12px; margin-top: 8px; max-width: 680px; }
 .dialog-heading > button { flex-shrink: 0; font-size: 22px; padding: 0 12px; }
-.dialog-body { padding: 24px; overflow: auto; min-height: 0; overscroll-behavior: contain; }
+.dialog-body { padding: 0 24px; overflow: auto; min-height: 0; overscroll-behavior: contain; }
 .dialog-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--raised); }
 .dialog-footer .actions { margin: 0; }
 .wake-policy-summary, .picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-.wake-policy-summary > button { flex-shrink: 0; }
+.wake-policy-summary > .button { flex-shrink: 0; }
 .wake-policy-summary p { margin: 4px 0 0; }
 .wake-picker > section { margin: 24px 0; }
 .wake-picker > section + section { padding-top: 24px; border-top: 1px solid var(--line); }
@@ -32,10 +32,8 @@ body { margin: 0; }
 .wake-picker .filter-bar { margin: 16px 0; }
 .picker-count { display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 16px; background: var(--accent-soft); color: var(--accent); font-size: 12px; }
 @media (max-width: 640px) {
-  .management-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; }
-  .dialog-frame { height: 100dvh; max-height: none; }
-  .dialog-heading, .dialog-body { padding: 20px 16px; }
-  .dialog-body { flex: 1; }
+  .dialog-heading { padding: 20px 16px; }
+  .dialog-body { padding: 0 16px; }
   .dialog-footer { padding: 12px 16px max(12px, env(safe-area-inset-bottom)); }
   .wake-policy-summary { flex-wrap: wrap; }
 }

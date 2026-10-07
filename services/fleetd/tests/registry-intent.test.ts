@@ -38,6 +38,20 @@ test('desired-intent readers refuse symlink, nonprivate and oversized state inst
   const registry = createRegistry(directory), file = join(directory, 'desired-intent.json'), outside = join(directory, 'outside.json');
   writeFileSync(outside, '[]', { mode: 0o600 }); symlinkSync(outside, file);
   assert.equal(registry.desiredIntent().ok, false); rmSync(file);
+  symlinkSync(join(directory, 'missing.json'), file);
+  assert.equal(registry.desiredIntent().ok, false); rmSync(file);
   writeFileSync(file, '[]', { mode: 0o600 }); chmodSync(file, 0o644); assert.equal(registry.desiredIntent().ok, false); chmodSync(file, 0o600);
   writeFileSync(file, ' '.repeat(2 * 1024 * 1024 + 1)); assert.equal(registry.desiredIntent().ok, false);
+});
+
+test('saved resume selections are private, durable, unique and fail closed for dangling state', scope => {
+  const directory = mkdtempSync(join(tmpdir(), 'fleet-resume-selection-')); cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  const registry = createRegistry(directory), fleetId = randomUUID();
+  assert.deepEqual(registry.resumeSelections(), { ok: true, value: [] });
+  assert(registry.saveResumeSelections([{ fleetId, instanceKeys: ['zulu', 'alpha'] }]).ok);
+  assert.deepEqual(createRegistry(directory).resumeSelections(), { ok: true, value: [{ fleetId, instanceKeys: ['alpha', 'zulu'] }] });
+  assert.equal(registry.saveResumeSelections([{ fleetId, instanceKeys: ['alpha', 'alpha'] }]).ok, false);
+  assert.equal(registry.saveResumeSelections([{ fleetId, instanceKeys: [] }, { fleetId, instanceKeys: [] }]).ok, false);
+  const file = join(directory, 'resume-selections.json'); rmSync(file); symlinkSync(join(directory, 'missing.json'), file);
+  assert.equal(registry.resumeSelections().ok, false);
 });

@@ -77,10 +77,11 @@ test('Wake-ups browser CRUD, calendar selection, assignments, pagination and rol
   await page.screenshot({ path: join(directory, 'list-mobile.png'), fullPage: true });
   await page.getByRole('link', { name: 'Weekly reports', exact: true }).click();
   await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'detail-mobile.png'), fullPage: true });
-  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: 'Delete Wake-up', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete Wake-up', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   assert.equal(value(readWakeRule(services, admin.actor, id)).id, id);
-  page.once('dialog', dialog => dialog.accept());
-  await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: 'Delete Wake-up', exact: true }).click()]);
+  await page.getByRole('button', { name: 'Delete Wake-up', exact: true }).click();
+  await Promise.all([page.waitForEvent('load'), page.getByRole('dialog').getByRole('button', { name: 'Delete Wake-up', exact: true }).click()]);
   assert.equal(readWakeRule(services, admin.actor, id).ok, false);
   await page.goto(origin + '/manage/audit?pageSize=100');
   const audit = page.getByRole('table', { name: 'Management activity', exact: true });

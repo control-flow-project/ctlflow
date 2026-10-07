@@ -14,10 +14,12 @@ export type Definition = { name: string; runtime: string; options: Record<string
 export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
 export type DesiredIntent = { fleetId: string; instanceKey: string };
+export type ResumeSelection = { fleetId: string; instanceKeys: string[] };
 export type RetainedContext = Omit<SavedRuntimeContext, 'workspace'>;
 export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'sleeping' | 'waking' | 'stopping' | 'failed';
 export type InstanceState = { instance: Instance; phase: Phase; sessionId: string | null; error: string | null; startedAt: number | null };
 export type FleetState = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; controller: Controller; phase: Phase;
+  resumeInstanceKeys: string[] | null;
   connection: ControllerState; instances: (InstanceState & { listenerActive: boolean; desiredActive: boolean; lastActivityAt: number | null; historyAvailable: boolean | null })[]; error: string | null };
 export type Target = { kind: 'fleet' | 'agent' | 'daemon'; fleetId?: string; instanceKey?: string };
 export type OperationInput = { operationId: string; target: Target; action: 'enroll' | 'start' | 'stop' | 'reset' | 'update'; expectedRevision: number; releaseDirectory?: string };

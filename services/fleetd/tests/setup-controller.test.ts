@@ -76,7 +76,7 @@ test('first setup starts one ordinary fleet; repeated setup reuses registry, ide
 
 test('setup waits for exact human approval, concurrent repeats share its operation and no native start occurs before approval', async scope => {
   let approve!: () => void, approvals = 0;
-  const current = fixture({ prepare: async (_configuration, _controller, signal, approval) => {
+  const current = fixture({ prepare: async (_configuration, _controller, _intent, signal, approval) => {
     approvals++; approval({ url: 'https://example.test/manage/enrollments/exact', code: 'ABCDEF123456' });
     await new Promise<void>(resolve => { approve = resolve; signal.addEventListener('abort', () => resolve(), { once: true }); });
     return signal.aborted ? failure('unavailable', 'Approval cancelled') : success({ failed: [] });
@@ -242,7 +242,7 @@ test('failed setup can retry its initial operation without another identity; exp
 });
 
 test('explicit stop while initial approval is pending prevents subsequent setup from activating it', async scope => {
-  const current = fixture({ prepare: async (_configuration, _controller, signal, approval) => {
+  const current = fixture({ prepare: async (_configuration, _controller, _intent, signal, approval) => {
     approval({ url: 'https://example.test/manage/enrollments/pending', code: 'ABCDEF123456' });
     await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }));
     return failure('unavailable', 'Explicit stop cancelled enrollment');

@@ -58,7 +58,7 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   saveBinding(fleetDirectory, { server: 'https://example.test', owner: '@owner:test', fleetKey: 'research', fleetId, controllerCredential: 'private-controller', request: null,
     identities: [{ instanceKey: 'helper', name: 'helper', agentId, account: { user_id: '@helper:test', access_token: 'private-agent', device_id: 'fixture' } }] });
   const instance = { key: 'helper', name: 'helper', definition: 'analyst', workarea: 'agents/analyst/workarea/helper' };
-  const view: FleetView = { fleetId, fleetKey: 'research', label: 'Research', directory: fleetDirectory, revision: 0, controller: { name: 'laptop' }, phase: 'running', error: null,
+  const view: FleetView = { fleetId, fleetKey: 'research', label: 'Research', directory: fleetDirectory, revision: 0, controller: { name: 'laptop' }, phase: 'running', error: null, resumeInstanceKeys: null,
     connection: { connected: true, deliveryEnabled: true, revision: 0, error: null },
     instances: [{ instance, phase: 'running', listenerActive: true, desiredActive: true, lastActivityAt: 1, historyAvailable: true,
       sessionId, error: null, startedAt: 1 }] };

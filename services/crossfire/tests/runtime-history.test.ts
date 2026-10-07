@@ -59,7 +59,9 @@ test('default native start resumes complete history and refuses absent or broken
   await runtime.deliver('Retain this exact historical fact: blue orchard 729.', 'retained-fact');
   await until(() => provider.held() !== undefined); provider.finish(); runtime.acknowledge(['retained-fact']);
   await until(async () => !(await runtime.inspect()).busy); await runtime.close();
+  writeFileSync(join(provider.loginHome, 'auth.json'), '{"auth_mode":"apikey","OPENAI_API_KEY":"resume-fixture-only"}', { mode: 0o600 });
   runtime = value(await adapter.start(input, new AbortController().signal)); assert.equal(runtime.sessionId, sessionId);
+  assert.deepEqual(readFileSync(join(workspace, '.codex/auth.json')), readFileSync(join(provider.loginHome, 'auth.json')), 'Stop/start refreshes authentication while preserving full native history');
   provider.hold();
   await runtime.deliver('Use the earlier historical fact.', 'resumed-followup');
   await until(() => provider.held() !== undefined);

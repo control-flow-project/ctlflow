@@ -4,7 +4,7 @@ import type { DecisionCreation, DecisionView, DecisionSummary, DecisionAnswer, R
 export { INPUT_BYTES, MAX_INPUT_BYTES, MAX_REVIEW_BYTES } from '@ctlflow/crossfire-domain/runtime/values';
 export type { DecisionCreation, DecisionView, DecisionSummary, DecisionAnswer, RuntimeObservation, RuntimeObservationView } from '@ctlflow/crossfire-domain/runtime/values';
 export const runtimeState = check.choice('idle', 'working', 'waiting-approval', 'waiting-answer', 'failed', 'unavailable', 'sleeping', 'waking');
-export const nativeRuntimeSummary = check.object({ state: runtimeState, observedAt: check.integer(),
+export const nativeRuntimeSummary = check.object({ state: check.choice('idle', 'working', 'waiting-approval', 'waiting-answer', 'failed', 'unavailable', 'sleeping', 'waking', 'stopped'), observedAt: check.integer(),
   lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean) });
 export const listenerOptions = check.object({ history_mode: check.optional(check.choice('shared', 'per-room')) });
 const option = check.object({ id: check.text(255), label: check.text(1000), description: check.plainText(4000) });
