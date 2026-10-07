@@ -19,7 +19,7 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
   const fleetId = randomUUID(), inputs: { operationId: string; action: string; target: { kind: string; instanceKey?: string } }[] = [];
   let loseResponse = false, rejectOperation = false;
   const fleet = { fleetId, fleetKey: 'test', directory: '/private/fixture', label: 'Test', revision: 0, controller: { name: 'test' }, phase: 'stopped',
-    connection: { connected: true, deliveryEnabled: false, revision: 0, error: null }, error: null as string | null,
+    connection: { connected: true, deliveryEnabled: false, revision: 0, error: null }, resumeInstanceKeys: null, error: null as string | null,
     instances: [{ instance: { key: 'one', name: 'one', definition: 'analyst', workarea: 'agents/analyst/workarea/one' }, phase: 'stopped',
       listenerActive: false, desiredActive: false, lastActivityAt: null, historyAvailable: null,
       sessionId: null, error: null, startedAt: null }] };

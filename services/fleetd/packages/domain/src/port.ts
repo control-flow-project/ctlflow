@@ -2,12 +2,14 @@ import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 import type { ControllerState, ListenerControl } from '@ctlflow/crossfire-agent-core/listener-control-port';
 import type { NativeSessionState } from '@ctlflow/crossfire-agent-core/runtime';
-import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, RetainedContext, SetupInput, SetupConfiguration } from './model.js';
+import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, ResumeSelection, RetainedContext, SetupInput, SetupConfiguration } from './model.js';
 export type Registry = {
   registrations(): Result<Registration[]>;
   saveRegistrations(values: Registration[]): Result<void>;
   desiredIntent(): Result<DesiredIntent[]>;
   saveDesiredIntent(values: DesiredIntent[]): Result<void>;
+  resumeSelections(): Result<ResumeSelection[]>;
+  saveResumeSelections(values: ResumeSelection[]): Result<void>;
   operations(): Result<Operation[]>;
   saveOperations(values: Operation[]): Result<void>;
   load(directory: string): Result<Configuration>;

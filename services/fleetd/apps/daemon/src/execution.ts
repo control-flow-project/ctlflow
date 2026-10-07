@@ -26,6 +26,7 @@ import { failureReporter } from './failures.js';
 import { resetInstance, resetInstructions } from './reset.js';
 import { canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storage/history';
 import { createNativeStopReceipts, type NativeStopActivity } from './native-stops.js';
+import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string): Execution {
   const connections = new Map<string, FleetControlConnection>();
@@ -197,12 +198,16 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
           historyMode: instance.listenerOptions?.historyMode ?? 'shared',
           activity: (runId, generation) => { activity = stops.get(configuration.directory)!.activity(identity.agentId, runId, generation, () => bindingControl!.control.binding()); },
-          ready,
+          ready: () => {
+            if (!destination) { rejectReady(new Error('Runtime did not report its session')); return; }
+            void destination.activate().then(ready, error => { rejectReady(error); stop.abort(error); });
+          },
           runtime: async (runtimeStop, _poll, hooks) => {
             const options = adapter.validate(definition.options);
             if (!options.ok) throw Object.assign(new Error(options.error.message), { code: options.error.code });
             const publicSettings = ['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'dangerously_bypass_approvals_and_sandbox'];
             const started = await createNativeLifecycle({ clock: nativeClock, hooks, runtime: definition.runtime, approval: options.value.approval,
+              work: createResumeWork(local.state),
               primary: instance.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared',
               initialSettings: publicSettings.filter(name => options.value.options[name] !== undefined)
                 .map(name => ({ name, configured: String(options.value.options[name]), effective: null })),

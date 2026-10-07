@@ -6,13 +6,20 @@ import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
 import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
+import type { ResumeWork } from '@ctlflow/fleetd-domain/resume-work';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
+async function initializedLifecycle(...input: Parameters<typeof createNativeLifecycle>): Promise<Awaited<ReturnType<typeof createNativeLifecycle>>> {
+  const started = await createNativeLifecycle(...input);
+  if (started.ok) await started.value.activate();
+  return started;
+}
 async function until(predicate: () => boolean): Promise<void> {
   const deadline = performance.now() + 3000;
   while (!predicate()) { assert(performance.now() < deadline, 'Native lifecycle observation deadline'); await yieldLoop(); }
 }
 function fixture() {
+  let work: ResumeWork[] = [], sequence = 0;
   let now = 1000, timerId = 0, busy = false, unknown = false, pending = false, decisions = false;
   const timers = new Map<number, { at: number; callback: () => void }>();
   const clock: Clock = { now: () => now, deadline: () => new AbortController().signal,
@@ -24,6 +31,10 @@ function fixture() {
   const nativeObservers: NonNullable<NativeLifecycleServices['hooks']['observe']>[] = [];
   let recovered = 0, inspect: (() => Promise<{ busy: boolean }>) | undefined;
   const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'fixture', approval: 'none', initialSettings: [], initial: 'running',
+    work: { read: () => success(work.map(item => ({ ...item }))),
+      capture: contexts => { for (const context of contexts) if (!work.some(item => item.context === context.context)) work.push({ ...context,
+        messageId: '00000000-0000-4000-8000-' + String(++sequence).padStart(12, '0'), checkpointedAt: now }); return success(undefined); },
+      acknowledge: messageId => { work = work.filter(item => item.messageId !== messageId); return success(undefined); } },
     hooks: { requestDecision: async () => failure('forbidden', 'Unexpected decision'), pendingInput: () => pending,
       pendingDecisions: () => decisions, observe: event => observed.push(event) },
     saved: async () => success(saved), failed: (_session, error) => failures.push(error), recovered: () => { recovered++; },
@@ -56,7 +67,7 @@ function fixture() {
 
 test('30 minute sleep closes native processes, not the listener; input resumes the exact saved history', async scope => {
   const fixture_ = fixture(), stop = new AbortController();
-  const managed = value(await createNativeLifecycle(fixture_.services, stop.signal));
+  const managed = value(await initializedLifecycle(fixture_.services, stop.signal));
   scope.after(() => managed.close());
   assert.equal(managed.nativeState().phase, 'running');
   await fixture_.advance(1799999); assert.equal(fixture_.closed.length, 0);
@@ -71,9 +82,81 @@ test('30 minute sleep closes native processes, not the listener; input resumes t
   assert.equal(managed.nativeState().phase, 'running');
 });
 
+test('continuation waits for listener readiness and concurrent input cannot overtake activation', async scope => {
+  const current = fixture();
+  value(current.services.work.capture([{ context: 'shared', sessionId: 'exact-history' }]));
+  const checkpoint = value(current.services.work.read()), start = current.services.start;
+  let finish!: () => void, continuing = false;
+  current.services.start = async (...input) => {
+    const started = await start(...input); if (!started.ok) return started;
+    const deliver = started.value.deliver;
+    started.value.deliver = async (...input) => {
+      if (input[0].startsWith('[Crossfire session restarted]')) { continuing = true; await new Promise<void>(resolve => { finish = resolve; }); }
+      return deliver(...input);
+    };
+    return started;
+  };
+  const managed = value(await createNativeLifecycle(current.services, new AbortController().signal)); scope.after(() => managed.close());
+  assert.deepEqual(current.delivered, []); assert.deepEqual(value(current.services.work.read()), checkpoint, 'Startup idle cannot erase pending continuation');
+  const activating = managed.activate(); await until(() => continuing);
+  const message = managed.runtime.deliver('New authorized input', 'after-readiness'); await yieldLoop();
+  assert.deepEqual(current.delivered, [], 'Input waits for the one activation initialization'); finish();
+  await activating; await message; managed.runtime.acknowledge(['after-readiness']); await managed.activate();
+  assert.deepEqual(current.delivered, [checkpoint[0]!.messageId, 'after-readiness']); assert.equal(current.started.length, 1);
+});
+
+test('interrupted work and pending decisions survive stop and receive one continuation in the exact saved history', async scope => {
+  for (const state of ['working', 'waiting-answer', 'waiting-approval'] as const) {
+    const current = fixture();
+    let managed = value(await initializedLifecycle(current.services, new AbortController().signal)); scope.after(() => managed.close());
+    const observation = { runtime: 'fixture', sessionId: 'exact-history', roomId: null, state, observedAt: 1000, settings: [], errorMessage: null };
+    current.nativeObservers[0]!({ kind: 'state', observation });
+    const checkpoint = value(current.services.work.read()); assert.equal(checkpoint.length, 1);
+    current.nativeObservers[0]!({ kind: 'state', observation }); assert.deepEqual(value(current.services.work.read()), checkpoint);
+    await managed.close(); current.services.initial = 'sleeping';
+    assert.deepEqual(value(current.services.work.read()), checkpoint, 'A shutdown retains its interrupted native task');
+    managed = value(await initializedLifecycle(current.services, new AbortController().signal));
+    assert.equal(managed.runtime.sessionId, 'exact-history'); assert.equal(managed.nativeState().phase, 'running');
+    assert.deepEqual(current.delivered, [checkpoint[0]!.messageId]); assert.deepEqual(value(current.services.work.read()), []);
+    value(await managed.resume()); assert.equal(current.delivered.length, 1, 'Repeated resume does not send another task instruction');
+    assert.equal(current.started.length, 2);
+  }
+});
+
+test('completed work clears its checkpoint and sleeping restoration has no synthetic model input', async scope => {
+  const current = fixture(); let managed = value(await initializedLifecycle(current.services, new AbortController().signal)); scope.after(() => managed.close());
+  const observation = { runtime: 'fixture', sessionId: 'exact-history', roomId: null, observedAt: 1000, settings: [], errorMessage: null };
+  current.nativeObservers[0]!({ kind: 'state', observation: { ...observation, state: 'working' } }); assert.equal(value(current.services.work.read()).length, 1);
+  current.nativeObservers[0]!({ kind: 'state', observation: { ...observation, state: 'idle' } }); assert.deepEqual(value(current.services.work.read()), []);
+  await managed.close(); current.services.initial = 'sleeping'; managed = value(await initializedLifecycle(current.services, new AbortController().signal));
+  assert.equal(current.started.length, 1); assert.equal(managed.nativeState().phase, 'sleeping'); assert.deepEqual(current.delivered, []);
+});
+
+test('incoming messages wait for restored continuation initialization instead of overtaking it', async scope => {
+  const current = fixture(); current.services.initial = 'sleeping';
+  const managed = value(await initializedLifecycle(current.services, new AbortController().signal)); scope.after(() => managed.close());
+  value(current.services.work.capture([{ context: 'shared', sessionId: 'exact-history' }]));
+  let release!: () => void, continuing = false;
+  const start = current.services.start;
+  current.services.start = async (...input) => {
+    const started = await start(...input); if (!started.ok) return started;
+    const deliver = started.value.deliver;
+    started.value.deliver = async (...input) => {
+      if (input[0].startsWith('[Crossfire session restarted]')) { continuing = true; await new Promise<void>(resolve => { release = resolve; }); }
+      return deliver(...input);
+    };
+    return started;
+  };
+  const resuming = managed.resume(); await until(() => continuing);
+  const message = managed.runtime.deliver('New authorized input', 'new-input'); await yieldLoop();
+  assert.deepEqual(current.delivered, [], 'No input can use a half-initialized generation'); release();
+  value(await resuming); await message; managed.runtime.acknowledge(['new-input']);
+  assert.equal(current.delivered.length, 2); assert.equal(current.delivered[1], 'new-input');
+});
+
 test('retired native generations cannot overwrite current activity or mirror late output', async scope => {
   const fixture_ = fixture();
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   await fixture_.advance(1800000); await until(() => managed.nativeState().phase === 'sleeping');
   const sleepingEvents = fixture_.observed.length;
   fixture_.nativeObservers[0]!({ kind: 'output', sessionId: 'exact-history', id: 'late-output', streamId: null, text: 'Old generation' });
@@ -88,7 +171,7 @@ test('retired native generations cannot overwrite current activity or mirror lat
 
 test('explicit resume wakes saved history for a terminal without model input and remains idempotent', async scope => {
   const fixture_ = fixture(); fixture_.services.initial = 'sleeping';
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   value(await managed.resume()); value(await managed.resume());
   assert.equal(fixture_.started.length, 1); assert.deepEqual(fixture_.delivered, []);
   assert.equal(value(await managed.attachment()).sessionId, 'exact-history');
@@ -97,7 +180,7 @@ test('explicit resume wakes saved history for a terminal without model input and
 
 test('recovery binds sleeping histories without a process and concurrent inputs share one native generation', async scope => {
   const fixture_ = fixture(); fixture_.services.initial = 'sleeping';
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal));
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal));
   scope.after(() => managed.close());
   assert.equal(fixture_.started.length, 0); assert.equal(managed.nativeState().historyAvailable, true);
   assert.equal(managed.runtime.approval, 'none');
@@ -109,7 +192,7 @@ test('recovery binds sleeping histories without a process and concurrent inputs 
 test('empty receipt checkpoints settle while sleeping without waking native history; real receipts remain fenced', async scope => {
   for (const initial of ['running', 'sleeping'] as const) {
     const fixture_ = fixture(); fixture_.services.initial = initial;
-    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
     if (initial === 'running') { await fixture_.advance(1800000); await until(() => managed.nativeState().phase === 'sleeping'); }
     const starts = fixture_.started.length;
     assert.doesNotThrow(() => managed.runtime.acknowledge([]), initial);
@@ -127,7 +210,7 @@ test('native recovery retries transport cancellation during resume without repla
       if (++attempts === 2) throw reason;
       return start(...input);
     };
-    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
     fixture_.started[0]!.abort(new Error('Native transport disconnected'));
     await until(() => managed.nativeState().phase === 'running' && attempts === 3);
     assert.equal(fixture_.started.length, 2); assert.equal(managed.runtime.sessionId, 'exact-history');
@@ -139,7 +222,7 @@ test('a permanent native disconnect closes its exact generation without an autom
   for (const reason of [Object.assign(new Error('Native authorization denied'), { code: 'forbidden' }),
     new DOMException('Native transport policy denied', 'SecurityError')]) {
     const fixture_ = fixture();
-    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
     fixture_.started[0]!.abort(reason); await until(() => fixture_.closed.length === 1); await yieldLoop();
     assert.equal(fixture_.started.length, 1); assert.equal(managed.nativeState().phase, 'failed');
     assert.equal(managed.runtime.sessionId, 'exact-history'); assert.deepEqual(fixture_.failures, [reason]);
@@ -150,7 +233,7 @@ test('a permanent native disconnect closes its exact generation without an autom
 test('all native activity, unresolved decisions, pending listener work and unknown inspection veto sleep', async scope => {
   for (const condition of ['busy', 'decisions', 'pending', 'unknown'] as const) {
     const fixture_ = fixture();
-    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
     fixture_.setBusy(condition === 'busy'); fixture_.setDecisions(condition === 'decisions'); fixture_.setPending(condition === 'pending'); fixture_.setUnknown(condition === 'unknown');
     await fixture_.advance(1800000);
     assert.equal(fixture_.closed.length, 0, condition); assert.equal(managed.nativeState().phase, 'running', condition);
@@ -166,7 +249,7 @@ test('all native activity, unresolved decisions, pending listener work and unkno
 
 test('unacknowledged publication vetoes sleep; canceled unreceived input does not leave a false permanent busy flag', async scope => {
   const fixture_ = fixture();
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   await managed.runtime.deliver('One', 'one'); await fixture_.advance(1800000);
   assert.equal(fixture_.closed.length, 0); managed.runtime.acknowledge(['one']);
   assert.equal(await managed.runtime.recover('Not received', 'unreceived'), false);
@@ -175,7 +258,7 @@ test('unacknowledged publication vetoes sleep; canceled unreceived input does no
 
 test('native crash is reported and recovered without disconnecting the listener or changing history', async scope => {
   const fixture_ = fixture();
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   fixture_.started[0]!.abort(new Error('Native crash'));
   await until(() => fixture_.started.length === 2 && managed.nativeState().phase === 'running');
   assert.equal(managed.runtime.signal.aborted, false); assert.equal(managed.runtime.sessionId, 'exact-history');
@@ -184,7 +267,7 @@ test('native crash is reported and recovered without disconnecting the listener 
 
 test('idle inspection cannot close a generation after new input arrives; zero disables idle sleep', async scope => {
   const fixture_ = fixture();
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   let release!: (value: { busy: boolean }) => void;
   fixture_.setInspect(() => new Promise(resolve => { release = resolve; }));
   await fixture_.advance(1800000); assert.equal(typeof release, 'function');
@@ -197,7 +280,7 @@ test('idle inspection cannot close a generation after new input arrives; zero di
 test('input and timeout changes during saved-context inspection veto native shutdown', async scope => {
   for (const action of ['input', 'disable'] as const) {
     const fixture_ = fixture();
-    const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+    const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
     let finish!: () => void, inspecting = false;
     fixture_.services.saved = async () => {
       inspecting = true; await new Promise<void>(resolve => { finish = resolve; }); return success(fixture_.saved);
@@ -212,7 +295,7 @@ test('input and timeout changes during saved-context inspection veto native shut
 
 test('an idle inspection canceled by intentional shutdown produces no owner failure incident', async () => {
   const fixture_ = fixture();
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal));
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal));
   let reject!: (error: Error) => void, inspecting = false;
   fixture_.setInspect(async () => { inspecting = true; return new Promise((_, fail) => { reject = fail; }); });
   await fixture_.advance(1800000); await until(() => inspecting);
@@ -222,12 +305,12 @@ test('an idle inspection canceled by intentional shutdown produces no owner fail
 
 test('missing history and a resume with a different identity fail closed without implicit fresh context', async () => {
   const fixture_ = fixture(); fixture_.services.initial = 'sleeping'; fixture_.saved.length = 0;
-  const missing = await createNativeLifecycle(fixture_.services, new AbortController().signal);
+  const missing = await initializedLifecycle(fixture_.services, new AbortController().signal);
   assert.equal(missing.ok, false); assert.equal(fixture_.started.length, 0);
   const changed = fixture();
   const start = changed.services.start;
   changed.services.start = async (...input) => { const result = await start(...input); return result.ok ? success({ ...result.value, sessionId: 'different-history' }) : result; };
-  const result = await createNativeLifecycle(changed.services, new AbortController().signal);
+  const result = await initializedLifecycle(changed.services, new AbortController().signal);
   assert.equal(result.ok, false); assert.equal(result.ok ? null : result.error.code, 'conflict'); assert.equal(changed.closed.length, 1);
 });
 
@@ -242,7 +325,7 @@ test('a crashed generation remains retryable even when recovery has already deta
       throw new Error('Original native request failed');
     } });
   };
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   await assert.rejects(managed.runtime.deliver('One', 'one'), error => error instanceof Error && 'code' in error && error.code === 'unavailable');
   await until(() => managed.nativeState().phase === 'running' && fixture_.started.length === 2);
   assert.equal(await managed.runtime.recover('One', 'one'), false);
@@ -262,7 +345,7 @@ test('input racing with native cleanup observes sleeping before waking and resum
       await result.value.close();
     } });
   };
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   await fixture_.advance(1800000); await until(() => closing);
   const delivered = managed.runtime.deliver('Raced input', 'race');
   await yieldLoop(); assert.equal(fixture_.started.length, 1);
@@ -278,7 +361,7 @@ test('unverified process cleanup blocks replacement rather than risking duplicat
     const result = await start(...input);
     return result.ok ? success({ ...result.value, close: async () => { throw new Error('Could not terminate native process'); } }) : result;
   };
-  const managed = value(await createNativeLifecycle(fixture_.services, new AbortController().signal));
+  const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal));
   await fixture_.advance(1800000); await until(() => managed.nativeState().phase === 'failed');
   await assert.rejects(managed.runtime.deliver('One', 'one'), error => error instanceof Error && 'code' in error && error.code === 'conflict');
   assert.equal(fixture_.started.length, 1); assert.equal(fixture_.failures.length, 1);

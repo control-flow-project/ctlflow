@@ -717,6 +717,76 @@ test('startup restoration uses at most four concurrent starts and never reenroll
   await restarted.ready(); assert.equal(active, 0); assert.equal(value(restarted.view(fixture.record.fleetId)).instances.filter(item => item.desiredActive).length, 8);
 });
 
+test('explicit update owns queued restoration and cannot start duplicate generations or publish stale lock errors', { timeout: 5000 }, async scope => {
+  const current = fixtureController(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
+  for (let index = 1; index < 8; index++) {
+    const instanceKey = 'queued-' + index, revision = value(current.controller.view(current.record.fleetId)).revision;
+    value(await current.controller.editInstance(current.record.fleetId, revision, { kind: 'add', instance: { key: instanceKey, name: instanceKey,
+      definition: 'analyst', workarea: 'agents/analyst/workarea/' + instanceKey } }));
+  }
+  await current.finish(await current.operation('start')); await current.controller.close();
+  const start = current.services.execution.start;
+  let restorations = 0, updates = 0;
+  current.services.execution.start = async (...input) => {
+    if (input[3] === 'recovery') {
+      restorations++;
+      await new Promise<void>(resolve => { if (input[2].aborted) resolve(); else input[2].addEventListener('abort', () => resolve(), { once: true }); });
+      return failure('conflict', 'Cancelled restoration must not overwrite its replacement');
+    }
+    return start(...input);
+  };
+  current.services.execution.update = async () => { updates++; return success(undefined); };
+  const restarted = value(createController(current.services)); cleanup(scope, () => restarted.close());
+  await until(() => restorations === 4);
+  const operation = value(await restarted.operate({ operationId: randomUUID(), action: 'update', releaseDirectory: '/owned/release',
+    target: { kind: 'fleet', fleetId: current.record.fleetId }, expectedRevision: current.record.revision + 7 }));
+  await until(() => value(restarted.operation(operation.operationId)).completedAt !== null);
+  await restarted.ready();
+  assert.equal(value(restarted.operation(operation.operationId)).status, 'succeeded');
+  assert.equal(restorations, 4, 'Retired queued restoration cannot compete after update resumes its native generation');
+  assert.equal(updates, 8);
+  const instances = value(restarted.view(current.record.fleetId)).instances;
+  assert.equal(instances.every(instance => instance.phase === 'running' && instance.error === null && instance.desiredActive), true);
+});
+
+test('fleet stop remembers only enabled agents across daemon restart, repeated stop and partial manual resumes', async scope => {
+  const current = fixtureController(); cleanup(scope, () => current.controller.close());
+  for (const instanceKey of ['peer', 'deliberately-off']) value(await current.controller.editInstance(current.record.fleetId,
+    value(current.controller.view(current.record.fleetId)).revision, { kind: 'add', instance: { key: instanceKey, name: instanceKey,
+      definition: 'analyst', workarea: 'agents/analyst/workarea/' + instanceKey } }));
+  await current.finish(await current.operation('start', 'analyst')); await current.finish(await current.operation('start', 'peer'));
+  await current.finish(await current.operation('stop'));
+  assert.deepEqual(value(current.controller.view(current.record.fleetId)).resumeInstanceKeys, ['analyst', 'peer']);
+  await current.finish(await current.operation('stop')); await current.controller.close();
+  const restarted = value(createController(current.services)); cleanup(scope, () => restarted.close()); await restarted.ready();
+  async function operate(action: 'start' | 'stop', instanceKey?: string) {
+    const operation = value(await restarted.operate({ operationId: randomUUID(), action, target: instanceKey
+      ? { kind: 'agent', fleetId: current.record.fleetId, instanceKey } : { kind: 'fleet', fleetId: current.record.fleetId },
+      expectedRevision: value(restarted.view(current.record.fleetId)).revision }));
+    await until(() => value(restarted.operation(operation.operationId)).completedAt !== null);
+    assert.equal(value(restarted.operation(operation.operationId)).status, 'succeeded');
+  }
+  await operate('start', 'analyst'); await operate('start');
+  assert.deepEqual(value(restarted.view(current.record.fleetId)).instances.filter(item => item.desiredActive).map(item => item.instance.key), ['analyst', 'peer']);
+  await operate('stop', 'peer'); await operate('start');
+  assert.deepEqual(value(restarted.view(current.record.fleetId)).instances.filter(item => item.desiredActive).map(item => item.instance.key), ['analyst']);
+  assert.equal(current.started.includes('deliberately-off'), false);
+});
+
+test('empty saved selection cannot silently start manually stopped agents and save failures leave intent unchanged', async scope => {
+  const current = fixtureController(); cleanup(scope, () => current.controller.close());
+  await current.finish(await current.operation('start')); await current.finish(await current.operation('stop', 'analyst'));
+  assert.deepEqual(value(current.controller.view(current.record.fleetId)).resumeInstanceKeys, []);
+  const starts = current.started.length; await current.finish(await current.operation('start'));
+  assert.equal(current.started.length, starts); assert.deepEqual(value(current.registry.desiredIntent()), []);
+  await current.finish(await current.operation('start', 'analyst'));
+  current.services.registry.saveResumeSelections = () => failure('unavailable', 'Controlled selection persistence failure');
+  const attempted = await current.controller.operate({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: current.record.fleetId },
+    expectedRevision: value(current.controller.view(current.record.fleetId)).revision });
+  assert.equal(attempted.ok, false); assert.equal(value(current.controller.view(current.record.fleetId)).instances[0]!.desiredActive, true);
+  assert.equal(value(current.controller.view(current.record.fleetId)).instances[0]!.phase, 'running');
+});
+
 test('private controller API stays responsive while bounded native restoration is queued and explicit stop cancels it without enrollment', { timeout: 5000 }, async scope => {
   const current = fixtureController(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
   for (let index = 1; index < 8; index++) {

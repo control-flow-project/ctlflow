@@ -50,7 +50,7 @@ later reporting generations, current-operation controls on historical pages,
 themed confirmation focus/cancel/pending/failure handling, and wake-page drafts,
 direct URLs, mobile layout and revision conflicts.
 
-## Integrated source results
+## Initial 0.1.9 verification
 
 - Typecheck and all service builds passed.
 - All 702 tests passed across 159 isolated files on 24 parallel workers; no
@@ -68,7 +68,7 @@ real model task or production failure mode has been certified. The production
 rollout separately verifies backups, release identity, operation settlement,
 preserved accounts/rooms/native histories and real management browser flows.
 
-## Production results and remaining dependency
+## Initial 0.1.9 production results
 
 - The website runs image `gaap-runtime:3c071fd92bd76ffa1515`, with runtime source
   `00852e08b9c5cc3c1d8eb80c61c26679d5add018` and the exact listener release above.
@@ -89,13 +89,12 @@ preserved accounts/rooms/native histories and real management browser flows.
   viewport fit and zero mutation on cancellation. No native browser popup or
   page error occurs. Actual screenshots were inspected. No model task was sent.
 
-Production model readiness is **not verified**. The retained fleet Codex login
-fails native provider workspace authentication with HTTP 401. Turbine's current
-login has a different subject, email and provider account. It must not silently
-replace the fleet's credentials or billing authority. The owner must reauthenticate
-the retained account or explicitly authorize a provider-account change before
-model responses can be certified. History restoration, controller connectivity
-and an available model catalog do not establish provider authentication.
+That rollout exposed a provider authentication dependency: the retained fleet
+Codex login failed native provider workspace authentication with HTTP 401, while
+Turbine's current login belonged to a different provider account. The owner
+subsequently authorized that account change and activation-time refresh, described
+below. History restoration or an available model catalog alone does not establish
+provider authentication.
 
 ## Authorized resume-login correction
 
@@ -113,10 +112,52 @@ its login. Native fixtures use isolated credentials, never production logins.
 Focused regression tests pass for repeated login refresh, private/atomic files,
 unsafe/malformed/missing sources, preflight isolation, exact retained history,
 explicit sleep resume and message-driven wake after binding restoration. The
-coordinated controller/CLI release is0.1.10; only those two packages are public.
-Typecheck/build,709tests across160isolated files on24parallel workers, all33
-architecture checks, four installation checks, container startup/Element/native
-routes/attachments/shutdown/persisted-room checks and audit with zero known
-vulnerabilities pass. The full test run takes81.746s including5.117s preparation.
-Preserving production activation and actual provider authentication are recorded
-after they finish, not inferred from source or an available model catalog.
+coordinated controller/CLI release is `0.1.10`; only those two packages are public.
+Typecheck/build, 709 tests across 160 isolated files on 24 parallel workers, all
+33 architecture checks, four installation checks, container checks and audit
+with zero known vulnerabilities pass. The full run takes 81.746 seconds including
+5.117 seconds of preparation.
+
+Both public archives were downloaded, integrity-checked and installed through
+normal npm before website activation. The verified quiescent backup preceded
+image `gaap-runtime:dee467eac8c2f8ef2ccb` from `e4eac68`. Native read-only checks
+confirmed actual provider authentication, retained histories and configured
+model/effort for the 15 resumed engines. A subsequent startup/update restoration
+race exposed stale state-lock errors. Normal controller restart restored those
+15 receivers without enabling the 13 deliberate stops; the permanent owner-layer
+correction is included in `0.1.11`.
+
+## Saved selection and interrupted work
+
+Fleet Stop stores its enabled-agent selection separately from current intent.
+Fleet Resume restores that selection and leaves deliberately stopped agents off.
+Individual Stop removes its target; repeated Stop and intentionally empty
+selections remain durable across controller restarts. Confirmed fresh-history
+reset retains its explicit full-fleet or individual scope.
+
+Working or decision-waiting contexts retain a bounded private checkpoint with
+exact native context/session IDs and a stable continuation receipt. Resume
+validates every saved history and sends its restart instruction only after
+listener policy, reporting and local tools are ready. Input cannot overtake
+initialization. Idle histories receive no synthetic task; questions and
+permissions remain unanswered. A room-scoped instruction stays in that exact
+history, and a shared instruction invents no destination room. Receipt recovery
+does not certify exactly-once external task effects.
+
+The Codex adapter terminates its dedicated owned process group, not just its
+launcher, and waits for shutdown before replacement. Queued controller restoration
+loses ownership before an explicit update can start replacements. A completed
+operation releases its active-operation fence before reporting success.
+
+Focused 70-test verification passes, including actual stock Codex against an
+inert provider, interrupted native shutdown, exact retained history, readiness,
+decision safety, storage boundaries, selection and CLI behavior. Full-suite
+parallel execution exposed a fixture publishing JSON before its write completed;
+the fixture now publishes its complete evidence atomically without weakening
+assertions. Final integrated verification passes typecheck/build, all 722 tests
+across 161 isolated files on 24 parallel workers (80.532 seconds, 2.714 seconds
+shared preparation), all 33 architecture checks and four installation checks.
+Container checks pass for startup, Element room creation and authenticated
+attachment downloads, React/native routes, artifacts, shutdown and persisted
+rooms. Audit reports zero known vulnerabilities. Preserving production results
+follow after completion.

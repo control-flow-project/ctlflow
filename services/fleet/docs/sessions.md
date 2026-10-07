@@ -2,8 +2,8 @@
 
 ## Management
 
-Open a fleet's **Agents** tab: the agents table comes first, followed by the
-fleet-wide **Native sessions** controls. For one agent, open its **Session** tab.
+Open a fleet's **Sessions** tab for fleet-wide controls. Its **Agents** tab keeps
+the agent list separate. For one agent, open its **Session** tab.
 The fleet owner and administrators can request:
 
 | Action | Native execution | History and delivery |
@@ -12,8 +12,13 @@ The fleet owner and administrators can request:
 | Stop session(s) | Close the selected listeners and owned engines. | Retain native histories, accounts, permissions and unread positions. The controller remains connected. |
 | Start with fresh history | Stop selected agents, prepare private exports and restart with fresh model contexts. | Archive old bindings; retain identity, credentials, permissions, Matrix messages and configured parameters. Confirmation is required. |
 
-Fleet scope means all enrolled agents in that fleet; agent scope means only the
-selected agent. Fresh-history confirmation names the scope and explains that model
+Fleet Stop remembers the enabled agents. Fleet Resume restores that selection and
+any already enabled agents, leaving deliberately stopped agents off. Repeated Stop
+while stopped retains the selection; individual Stop removes its member. An empty
+saved selection resumes nobody. Initial fleet startup without a saved selection
+or active intent starts its configured roster. Fresh history still targets every
+agent in the confirmed fleet scope; agent scope means only the selected agent.
+Fresh-history confirmation names the scope and explains that model
 context is being replaced. Cancelling confirmation submits nothing. Stopping also
 confirms that running operating-system commands are not frozen for later continuation.
 
@@ -40,7 +45,8 @@ listener activity and history availability separately. `fleet agent contexts`
 reads saved context IDs while sleeping or stopped without waking a process.
 Attachment requires a live native endpoint; GET never launches one. Use Resume
 sessions or `fleet agent start` to wake a sleeping native engine for a terminal
-without changing its binding or sending a model prompt.
+without changing its binding. Idle histories receive no model prompt; interrupted
+work receives the continuation instruction described below.
 
 Orderly daemon shutdown preserves desired activation. Starting the same daemon
 root after a reboot restores active bindings with retained histories; explicitly
@@ -60,6 +66,16 @@ Start defaults to full saved native history. No resume flag or transcript replay
 needed. The runtime retains its full conversation context even though controller
 RPC responses omit old turn payloads. Missing or broken established bindings cause
 a visible failure; they never silently fall back to new history.
+
+Working histories and unanswered questions/approvals have a private unfinished-work
+checkpoint. After Stop, daemon restart or native recovery, their exact saved history
+receives: "Your saved session was restarted... If your previous task is unfinished
+and still authorized, resume that task." The notice is not a new assignment and
+does not approve a pending decision. It retains the task's original reply
+destination; room-isolated histories stay isolated. Idle/sleeping contexts receive
+no synthetic prompt. Native delivery receipts prevent duplicate notices on retries,
+but an interrupted operating-system command is terminated, not frozen, and external
+effects are not guaranteed exactly once. The agent must check completed work first.
 
 Only an explicit flag selects fresh history:
 

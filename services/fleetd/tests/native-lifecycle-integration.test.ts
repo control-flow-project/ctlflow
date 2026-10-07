@@ -12,6 +12,7 @@ import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
 import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
+import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.code + ': ' + result.error.message); return result.value; }
 async function until(predicate: () => boolean | Promise<boolean>): Promise<void> {
@@ -40,6 +41,7 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   }
   const options = { sandbox_mode: 'read-only', approval_policy: 'never' };
   const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'codex', approval: value(adapter.validate(options)).approval,
+    work: createResumeWork(join(workspace, '.crossfire', 'state', 'native-sleep-proof'), () => now),
     initial: 'running', initialSettings: [], saved: () => adapter.savedContexts({ workspace, stateDirectory: workspace }),
     hooks: { observe: event => observations.push(event), pendingInput: () => false, pendingDecisions: () => false,
       requestDecision: async () => success(null) },
@@ -53,6 +55,7 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
     },
   };
   let managed = value(await createNativeLifecycle(services, stop.signal)); cleanup(scope, () => managed.close());
+  await managed.activate();
   const history = managed.runtime.sessionId, firstPointer = value(await managed.attachment());
   assert.equal(provider.requests.length, 0, 'Startup does not call a model');
   managed.runtime.acknowledge([]);
@@ -78,6 +81,7 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   assert(JSON.stringify(provider.requests[1]).includes('First retained native sleep proof'), 'Wake retains earlier native context');
   await managed.close(); services.initial = 'sleeping';
   managed = value(await createNativeLifecycle(services, new AbortController().signal));
+  await managed.activate();
   assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 2); assert.equal(managed.nativeState().phase, 'sleeping');
   managed.runtime.acknowledge([]);
   assert.equal(starts, 2); assert.equal(provider.requests.length, 2, 'Sleeping restoration acknowledges checkpoints without starting native execution');
@@ -87,6 +91,22 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 3);
   assert.deepEqual(readFileSync(join(home, 'auth.json')), readFileSync(join(provider.loginHome, 'auth.json')), 'Message-driven wake after controller restoration refreshes the same host source');
   assert(JSON.stringify(provider.requests[2]).includes('Second retained native sleep proof'), 'Controller binding restart preserves full native context');
+  provider.hold();
+  await managed.runtime.deliver('Unfinished task awaiting shutdown; retain its authorized destination', 'sleep-proof-interrupted');
+  managed.runtime.acknowledge(['sleep-proof-interrupted']); await until(() => provider.held() !== undefined);
+  await until(() => value(services.work.read()).length === 1);
+  const interrupted = value(services.work.read())[0]!; assert.equal(interrupted.sessionId, history);
+  await managed.close(); services.initial = 'sleeping';
+  managed = value(await createNativeLifecycle(services, new AbortController().signal));
+  assert.equal(provider.requests.length, 4, 'No continuation model turn starts before listener readiness');
+  await managed.activate();
+  await until(() => provider.requests.length === 5); await until(async () => !(await managed.runtime.inspect()).busy);
+  assert.equal(managed.runtime.sessionId, history); assert.equal(starts, 4);
+  const continued = JSON.stringify(provider.requests[4]);
+  assert(continued.includes('[Crossfire session restarted]') && continued.includes('Unfinished task awaiting shutdown'));
+  assert(continued.includes('No pending question or permission has been answered or approved'));
+  assert.deepEqual(value(services.work.read()), []); value(await managed.resume());
+  assert.equal(provider.requests.length, 5, 'Repeated resume does not repeat continuation or the interrupted task');
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'sleeping'));
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'waking'));
   assert.equal(failures.length, 0, failures.join('; '));

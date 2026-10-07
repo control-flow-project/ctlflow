@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync, fsyncSync } from 'node:fs';
+import { existsSync, lstatSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync, fsyncSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { stringify } from 'smol-toml';
@@ -11,6 +11,7 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { MAX_JSON_BYTES } from '@ctlflow/crossfire-contracts/limits';
 import { loadConfiguration } from './configuration.js';
 import { createSetupStorage } from './setup.js';
+import { resumeSelections } from './resume-selection.js';
 
 const registrations = check.list(check.object({ fleetId: check.identifier, fleetKey: check.name, directory: check.text(4096), label: check.text(100), revision: check.integer(), digest: check.text(64, 64) }), 100);
 const operations = check.list(operationView, 700);
@@ -36,7 +37,7 @@ export function createRegistry(root: string): Registry {
   privateDir(root);
   const setup = createSetupStorage(root);
   function read<Value>(name: string, parser: check.Parser<Value>, initial: Value, maximum = MAX_JSON_BYTES): Result<Value> {
-    return attempt(() => existsSync(join(root, name)) ? parser(readJson<unknown>(join(root, name), maximum)) : success(initial));
+    return attempt(() => lstatSync(join(root, name), { throwIfNoEntry: false }) ? parser(readJson<unknown>(join(root, name), maximum)) : success(initial));
   }
   function save<Value>(name: string, parser: check.Parser<Value>, values: Value, maximum = MAX_JSON_BYTES): Result<void> {
     return attempt(() => { const valid = parser(values); if (!valid.ok) return valid; writeJson(join(root, name), valid.value, maximum); return success(undefined); });
@@ -45,6 +46,7 @@ export function createRegistry(root: string): Registry {
     setup: setup.setup, completeSetup: setup.complete, retrySetup: setup.retry,
     registrations: () => read('fleets.json', registrations, []), saveRegistrations: values => save('fleets.json', registrations, values),
     desiredIntent: () => read('desired-intent.json', desiredIntent, [], DESIRED_INTENT_BYTES), saveDesiredIntent: values => save('desired-intent.json', desiredIntent, values, DESIRED_INTENT_BYTES),
+    resumeSelections: () => read('resume-selections.json', resumeSelections, []), saveResumeSelections: values => save('resume-selections.json', resumeSelections, values),
     operations: () => read('operations.json', operations, []), saveOperations: values => save('operations.json', operations, values),
     load: loadConfiguration,
     writeRoster(configuration, roster) {

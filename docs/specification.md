@@ -418,6 +418,14 @@ when a room is first used; an explicitly configured history-mode change may open
 its other primary context while retaining existing histories. An established
 missing/broken binding fails rather than silently substituting a fresh session.
 
+Fleet Stop saves the exact enabled-instance selection before disabling intent.
+Fleet Resume restores that selection together with any currently enabled agents,
+not all enrolled agents. Individual Stop removes its member from that selection;
+an empty saved selection resumes nobody. Repeated Stop while already stopped
+retains its original selection. Initial explicit fleet startup without prior
+intent or a stopped selection starts the configured roster. Fresh-history reset
+continues to use its explicitly confirmed fleet/agent scope, not the stopped set.
+
 Fresh history requires explicit human confirmation in management and an explicit
 `--fresh-history` flag on CLI start at either scope. It calls the controller's
 single reset implementation and retains identity, permissions and Matrix data.
@@ -761,6 +769,10 @@ Only owned process handles may be signalled; no process-name scanning/killing.
 
 Transient listener/native failures close the exact failed process generation before
 bounded automatic recovery, with exponential delays from one to sixty seconds.
+Codex's owned launcher and native engine share one dedicated process group.
+Shutdown signals that exact group, not process names or the coordinating shell,
+and escalates after a three-second grace period while awaiting confirmed pipe/process
+closure. A launcher exit alone cannot prove its active native child stopped.
 Recovery retains the deployed configuration, account, native histories and receipts;
 it uses installed software, never installs a new release or discards uncertain input.
 Permanent authorization/configuration failures require operator action. Explicit
@@ -837,6 +849,31 @@ and exact native histories, initially without a native process where possible.
 Restoration is bounded to four concurrent attempts with 30-second startup
 observations. A late result is drained/closed, not allowed to overlap a retry.
 Permanent errors retain failed intent and require operator action.
+
+The controller's private `resume-selections.json` durably owns saved Stop targets,
+bounded to 100 fleets and 100 instance keys per fleet. Fleet views expose the
+nullable `resumeInstanceKeys`: null means no saved Stop selection, while an empty
+list is an intentional empty selection. Explicit operations retire queued startup
+restoration ownership before draining its already-started generations. Retired
+results cannot start a competing native owner or overwrite replacement state.
+
+Each agent's native lifecycle writes private, bounded `resume-work.json`
+checkpoints through a storage port when a saved context is working or waiting
+for an answer/approval. Idle completion removes its checkpoint. Repeated working
+observations do not rewrite it. Shutdown retains exact context/session IDs,
+checkpoint time and a stable message receipt; abrupt death retains the most
+recent unfinished checkpoint. The next activation validates every saved context,
+then delivers one restart/continue instruction to its exact native history,
+recovering ambiguous delivery by receipt before retrying. Continuation activation
+waits for authenticated delivery policy, reporting and local tool/query readiness;
+startup idle observations cannot erase a pending continuation. Initialization must
+finish before incoming messages use that generation. Idle/sleeping contexts
+receive no synthetic task. This owner-requested continuation is task steering,
+not lifecycle accounting or a Matrix message. It confers no new permissions,
+approves no pending decision, infers no room destination and never forwards
+per-room history elsewhere. Fresh-history reset archives these checkpoints with
+the superseded bindings. Receipt deduplication does not promise exactly-once
+external model/tool effects; the instruction prohibits repeating completed work.
 
 No host boot service is installed: after power failure the operator still starts
 fleetd with its original root. History, credentials, desired intent and unread

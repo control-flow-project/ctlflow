@@ -1,9 +1,9 @@
 {
   "name": "@ctlflow/crossfire-adapter-schedule",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "type": "module",
   "engines": { "node": ">=26.0.0", "npm": ">=11.17.0" },
-  "dependencies": { "@ctlflow/crossfire-domain": "0.1.10", "@ctlflow/crossfire-kernel": "0.1.10", "cron-parser": "5.10.1" },
+  "dependencies": { "@ctlflow/crossfire-domain": "0.1.11", "@ctlflow/crossfire-kernel": "0.1.11", "cron-parser": "5.10.1" },
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } }
 }

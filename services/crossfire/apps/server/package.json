@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-server",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,12 +8,12 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
-    "@ctlflow/crossfire-contracts": "0.1.10",
-    "@ctlflow/crossfire-kernel": "0.1.10",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.10",
-    "@ctlflow/crossfire-adapter-matrix": "0.1.10",
-    "@ctlflow/crossfire-adapter-sqlite": "0.1.10",
-    "@ctlflow/crossfire-adapter-schedule": "0.1.10",
-    "@ctlflow/crossfire-domain": "0.1.10"
+    "@ctlflow/crossfire-contracts": "0.1.11",
+    "@ctlflow/crossfire-kernel": "0.1.11",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.11",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.11",
+    "@ctlflow/crossfire-adapter-sqlite": "0.1.11",
+    "@ctlflow/crossfire-adapter-schedule": "0.1.11",
+    "@ctlflow/crossfire-domain": "0.1.11"
   }
 }

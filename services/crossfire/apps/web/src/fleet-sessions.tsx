@@ -48,14 +48,14 @@ export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; age
     if (kind === 'start') { void submit(input); return; }
     confirmation.request({ title: kind === 'reset' ? 'Start with fresh history?' : 'Stop sessions?',
       description: kind === 'reset' ? 'Start ' + subject + ' with fresh history. This stops the current sessions and replaces their model contexts. Old histories are archived; Matrix messages, identity, room access and configured parameters are retained.'
-        : 'Stop the sessions for ' + subject + '. Saved histories are retained. Running commands are not suspended for later continuation. The fleet controller stays connected.',
+        : 'Stop the sessions for ' + subject + '. Saved histories and the enabled-agent selection are retained. Resume sends interrupted work a continuation instruction; running commands themselves are terminated, not suspended. The fleet controller stays connected.',
       label: kind === 'reset' ? 'Start with fresh history' : agent ? 'Stop session' : 'Stop sessions', danger: true, execute: () => submit(input) });
   }
-  return <Panel title={agent ? 'Agent session' : 'Fleet sessions'} description={agent ? 'Stop or resume this agent through its controller.' : 'Stop or resume every agent in this fleet. The controller stays connected.'}>
+  return <Panel title={agent ? 'Agent session' : 'Fleet sessions'} description={agent ? 'Stop or resume this agent through its controller.' : 'Stop enabled agents, then resume the saved selection. The controller stays connected.'}>
     {agent && <NativeRuntimeDetails agent={agent}/>}
     <div className="actions"><button disabled={disabled} onClick={() => operate('start')}>{agent ? 'Resume session' : 'Resume sessions'}</button>
       <button disabled={disabled} onClick={() => operate('stop')}>{agent ? 'Stop session' : 'Stop sessions'}</button></div>
-    <p className="support">Resume reopens the saved native histories with the same identity and configured parameters. If a saved history cannot be resumed, the operation fails instead of creating another one.</p>
+    <p className="support">Resume reopens the saved native histories with the same identity and configured parameters.{!agent && ' Fleet Stop remembers which agents were enabled; Resume leaves deliberately stopped agents off.'} Interrupted work receives a continuation instruction, without answering pending decisions. If a saved history cannot be resumed, the operation fails instead of creating another one.</p>
     {agent && agent.activity.status !== 'online' && <p className="support">A confirmed stop is shown as Stopped. Other offline activity is historical, not a live native state. Resume availability depends on the saved history, not a heartbeat.</p>}
     <p className="support">Controller online and Delivery enabled do not mean sessions are running. Explicitly stopped agents cannot receive work until resumed.</p>
     {busy && <p className="support" role="status">A session operation is awaiting the controller’s completion. Controls become available when its outcome is acknowledged.</p>}
