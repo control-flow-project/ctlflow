@@ -50,3 +50,12 @@ permissions/questions are unchanged. No new activation mechanism is introduced.
 Sibling edits use isolated feature worktrees based on current origin/main.
 Existing shared uncommitted work remains outside those changes. No production
 data, native session, server, fleet, package publication or deployment is changed.
+
+## Git delivery
+
+Crossfire, GAAP site/agents and Bad Bets site/agents feature branches are pushed
+and their remote commit IDs are verified. PR creation remains manual.
+CtlFlow, Pacta and UI SDK licensing commits are retained on their local isolated
+`chore/proprietary-license` branches. GitHub rejects writes because those three
+repositories are archived/read-only. They are not unarchived or remotely updated;
+operator approval/unarchiving is required before their branches can be pushed.
