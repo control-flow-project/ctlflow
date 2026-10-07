@@ -1,6 +1,8 @@
 {
   "name": "@ctlflow/crossfire-operator-support",
   "version": "0.1.11",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },

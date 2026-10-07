@@ -79,6 +79,14 @@ The lock contains exactly the current owned workspace manifests and one link per
 owner, with coordinated versions and matching dependency/engine maps. Removed
 modules cannot remain as extraneous entries or alternate workspace owners.
 
+First-party code, documentation and assets are proprietary under the root
+LICENSE, copyright 2026 Jeswin P Kumar (jeswinpk@agilehead.com). Every workspace
+declares the same author and `SEE LICENSE IN LICENSE` metadata and includes an
+identical LICENSE. Public product archives include that license; standalone agent
+tool documentation carries its complete text. Public npm availability grants no
+open-source rights. Third-party licenses and notices remain unchanged, and
+previously granted licenses for earlier versions are not retroactively revoked.
+
 All four TOML dependency owners pin the same patched `smol-toml` 1.9.0 parser.
 Dot-free key parsing must not repeatedly scan the remaining document. Existing
 document-size bounds, strict schemas and native installation admission remain
@@ -864,7 +872,9 @@ observations do not rewrite it. Shutdown retains exact context/session IDs,
 checkpoint time and a stable message receipt; abrupt death retains the most
 recent unfinished checkpoint. The next activation validates every saved context,
 then delivers one restart/continue instruction to its exact native history,
-recovering ambiguous delivery by receipt before retrying. Continuation activation
+recovering ambiguous delivery by receipt before retrying. The inserted continuation
+message asks the agent to re-read applicable AGENTS.md files and follow their current
+instructions before continuing authorized unfinished work. Continuation activation
 waits for authenticated delivery policy, reporting and local tool/query readiness;
 startup idle observations cannot erase a pending continuation. Initialization must
 finish before incoming messages use that generation. Idle/sleeping contexts

@@ -1,6 +1,8 @@
 {
   "name": "@ctlflow/crossfire",
   "version": "0.1.11",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "bin": {
     "crossfire": "./crossfire"

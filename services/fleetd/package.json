@@ -1,12 +1,14 @@
 {
   "name": "@ctlflow/fleetd",
   "version": "0.1.11",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": false,
   "publishConfig": { "access": "public" },
   "type": "module",
   "devDependencies": { "@ctlflow/crossfire-test-support": "0.1.11", "@ctlflow/crossfire-operator-support": "0.1.11", "@ctlflow/crossfire-agent-core": "0.1.11", "@ctlflow/fleetd-domain": "0.1.11", "@ctlflow/fleet-daemon-client": "0.1.11", "@ctlflow/fleetd-storage": "0.1.11", "@ctlflow/fleetd-contracts": "0.1.11", "@ctlflow/crossfire-adapter-codex": "0.1.11", "@ctlflow/crossfire-adapter-matrix": "0.1.11", "@ctlflow/crossfire-adapter-filesystem": "0.1.11", "@ctlflow/crossfire-contracts": "0.1.11", "@ctlflow/crossfire-kernel": "0.1.11", "ws": "8.21.3" },
   "bin": { "fleetd": "./dist/bin/fleetd.mjs" },
-  "files": ["dist/bin", "dist/assets", "docs", "README.md"],
+  "files": ["LICENSE", "dist/bin", "dist/assets", "docs", "README.md"],
   "exports": { "./executable": "./dist/bin/fleetd.mjs", "./artifacts": "./dist/assets/manifest.json", "./package.json": "./package.json" },
   "engines": {
     "node": ">=26.0.0",

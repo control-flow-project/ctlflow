@@ -10,7 +10,7 @@ export async function buildAgentClient(destination: string): Promise<void> {
   await build({ absWorkingDir: join(dirname(fileURLToPath(import.meta.url)), '..'),
     entryPoints: [fileURLToPath(import.meta.resolve('@ctlflow/crossfire-agent-tools/entry'))], outfile: destination,
     bundle: true, platform: 'node', format: 'esm', target: 'node26',
-    banner: { js: "import { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" } });
+    banner: { js: "/*! Copyright (c) 2026 Jeswin P Kumar. All rights reserved. Proprietary; see README.md. Contact: jeswinpk@agilehead.com. */\nimport { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" } });
 }
 
 export async function buildAgentArtifacts(outputDirectory: string, version: string): Promise<Release> {
@@ -20,7 +20,7 @@ export async function buildAgentArtifacts(outputDirectory: string, version: stri
   await buildAgentClient(join(outputDirectory, 'crossfire-client.mjs'));
   const assets = join(dirname(fileURLToPath(import.meta.url)), '../assets');
   const files: Record<ArtifactName, Buffer> = {
-    'README.md': readFileSync(join(assets, 'README.md')),
+    'README.md': Buffer.from(readFileSync(join(assets, 'README.md'), 'utf8') + '\n## License\n\n' + readFileSync(join(assets, '..', 'LICENSE'), 'utf8')),
     'SKILL.md': readFileSync(join(assets, 'SKILL.md')),
     'crossfire-client.mjs': readFileSync(join(outputDirectory, 'crossfire-client.mjs')),
     'matrix-spec-LICENSE.txt': readFileSync(join(assets, 'matrix-spec-LICENSE.txt')),

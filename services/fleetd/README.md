@@ -85,3 +85,11 @@ global skill, host package installer or shell supervisor is installed.
 
 - [CLI and first-run workflow](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/README.md)
 - [Canonical API, data and lifecycle specification](https://github.com/control-flow-project/crossfire/blob/main/docs/specification.md)
+
+## License
+
+Copyright (c) 2026 Jeswin P Kumar. All rights reserved.
+
+First-party code, documentation and assets are proprietary and require a separate
+written commercial license. See [LICENSE](LICENSE). Contact: jeswinpk@agilehead.com.
+Third-party software and materials retain their own licenses.

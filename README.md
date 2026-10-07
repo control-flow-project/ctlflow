@@ -47,3 +47,11 @@ compilation is required only on platforms without a usable bundled binary.
 Tests use disposable private state, Conduit and inert providers, not production
 credentials or paid models.
 - [Test selection, prerequisites and evidence](docs/development.md)
+
+## License
+
+Copyright (c) 2026 Jeswin P Kumar. All rights reserved.
+
+First-party code, documentation and assets are proprietary and require a separate
+written commercial license. See [LICENSE](LICENSE). Contact: jeswinpk@agilehead.com.
+Third-party software and materials retain their own licenses.
