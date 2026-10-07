@@ -7,6 +7,9 @@ first-party proprietary licensing. The version changes atomically across the
 root, 27 workspaces, owned dependency edges and lockfile. Third-party dependency
 entries are unchanged. Only @ctlflow/fleet and @ctlflow/fleetd are public;
 Crossfire and all internal packages remain private and bundled as appropriate.
+The runtime image also includes its root LICENSE; license bytes participate in
+the operator's immutable image fingerprint. Native container verification checks
+the exact shipped text, rather than inferring it from source/package metadata.
 
 GAAP's domain-expert procedures and progressive reference library belong in its
 agents repository, not Crossfire. No runtime, Matrix, storage, permission or UI

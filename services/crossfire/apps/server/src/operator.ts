@@ -20,7 +20,7 @@ export function imageName(source: string): string {
       else throw new Error('Build input cannot be a symlink');
     }
   }
-  for (const file of ['.dockerignore', '.npmrc', 'package.json', 'package-lock.json', 'tsconfig.base.json']) hash.update(file).update(readFileSync(join(source, file)));
+  for (const file of ['.dockerignore', '.npmrc', 'LICENSE', 'package.json', 'package-lock.json', 'tsconfig.base.json']) hash.update(file).update(readFileSync(join(source, file)));
   for (const directory of ['services', 'scripts']) add(join(source, directory));
   return 'crossfire-runtime:' + hash.digest('hex').slice(0, 20);
 }
