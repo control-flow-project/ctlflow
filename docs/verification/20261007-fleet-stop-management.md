@@ -159,5 +159,52 @@ across 161 isolated files on 24 parallel workers (80.532 seconds, 2.714 seconds
 shared preparation), all 33 architecture checks and four installation checks.
 Container checks pass for startup, Element room creation and authenticated
 attachment downloads, React/native routes, artifacts, shutdown and persisted
-rooms. Audit reports zero known vulnerabilities. Preserving production results
-follow after completion.
+rooms. Audit reports zero known vulnerabilities.
+
+## Final 0.1.11 production results
+
+- Both public packages are `0.1.11`. Canonical registry downloads match the
+  locally verified archives; normal exact npm installation on Turbine and
+  installed lockfile-integrity checks pass before website activation. Only
+  `@ctlflow/fleet` and `@ctlflow/fleetd` are published.
+- The website runs `gaap-runtime:55c1d627888a63537197` from runtime source
+  `83229bddd31592933b1f83f475a2890550d1285b`, advertising
+  `0.1.11-2fa06475ac6a316a2511f041`. Exact release/web bytes, image provenance,
+  health, rootless execution, read-only root, dropped capabilities,
+  no-new-privileges and loopback-only main/content ports pass inspection.
+- Verified quiescent website and controller/fleet/provider backups precede
+  replacement. The daemon retains the exact desired-intent bytes. The canonical
+  update succeeds for all 28 installations, restoring only the 15 enabled
+  receivers and leaving 13 deliberately stopped agents off.
+- Read-only native checks before and after the UI lifecycle exercise verify
+  actual login, configured model/effort, project skills and exact saved histories
+  for all 15 running engines. All 28 identities/history scopes and provider-file
+  fingerprints remain retained. Each resumed agent's private login is recopied
+  during the actual UI Resume and matches the current host login.
+- Postdeployment Chrome verification passes 44 management route/viewport
+  combinations and both wake-picker viewports. Actual desktop/mobile
+  confirmation checks pass viewport fit, Cancel focus/restoration and zero
+  requests on cancellation, with no native popup or page error. Screenshots
+  are inspected.
+- An actual UI Stop succeeds in 3.619 seconds. The controller and table confirm
+  all 28 receivers stopped; stale Working/Idle/Sleeping badges are absent.
+  A controller restart while stopped starts no agent and retains the exact
+  15-agent resume selection. UI Resume succeeds in 27.321 seconds, restores
+  exactly those 15 with the original history IDs, and leaves all controls usable.
+  No fresh history, permission decision, room change or test assignment is sent.
+- Consistent SQLite inspection passes schema 14, integrity and foreign keys.
+  The direct immutable-before comparison correctly flags the two authorized
+  UI operations' fleet revision and request timestamp changes. Both successful
+  owner-authored receipts prove the exact consecutive revisions 25 → 26 → 27.
+  All other fleet fields remain identical. All 37 protected relations (1,330
+  original records) pass the unchanged strict verifier against those explicitly
+  authorized post-lifecycle expectations; no field is ignored. The original
+  backup and production data are not modified by verification. All 28 accounts,
+  33 room grants, 29 wake entries, three members, nine owner conversations and
+  two publications are retained.
+
+Private evidence is under `.temp/fleet-stop-release/`, including native, browser,
+release, isolation, backup and exact preservation reports. The interrupted-turn
+proof uses stock Codex with an inert provider; production inspection is read-only
+and sends no model task. These results do not certify every paid model task,
+external side effect, abrupt controller kill or operating system.
