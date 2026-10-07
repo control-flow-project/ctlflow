@@ -134,5 +134,11 @@ Use the actual coordinated version's verified filenames when releasing another
 version. Never publish all workspaces or an internal package. An authentication
 failure is a publication dependency, not permission to bypass registry controls
 or use another installation path. Publish both exact artifacts before deploying
-Crossfire's matching npm setup descriptor. Registry authentication may require a
-human; this is separate from zero-question product setup and enrollment approval.
+Crossfire's matching npm setup descriptor. Publication acceptance and visible
+version metadata are not sufficient: wait until both canonical public tarball
+URLs return the complete archives with the verified pack integrity, and verify
+a normal pinned npm install of the public pair before activating that descriptor.
+Registry processing can expose metadata before its tarball is downloadable; hold
+activation instead of adding another installer or bypassing registry controls.
+Registry authentication may require a human; this is separate from zero-question
+product setup and enrollment approval.
