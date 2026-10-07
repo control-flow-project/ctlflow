@@ -99,7 +99,7 @@ test("an actual pre-exemption npm is rejected before installation even with scri
 
 test("changing only policy bytes invalidates the real runtime image fingerprint", async () => {
   const { directory } = fixture();
-  for (const file of [".dockerignore", ".npmrc", "package.json", "package-lock.json", "tsconfig.base.json"]) {
+  for (const file of [".dockerignore", ".npmrc", "LICENSE", "package.json", "package-lock.json", "tsconfig.base.json"]) {
     copyFileSync(join(root, file), join(directory, file));
   }
   for (const folder of ["scripts", "services"]) cpSync(join(root, folder), join(directory, folder), { recursive: true,
@@ -111,6 +111,9 @@ test("changing only policy bytes invalidates the real runtime image fingerprint"
   const changedPolicy = imageName(directory);
   writeFileSync(join(directory, "tsconfig.base.json"), readFileSync(join(directory, "tsconfig.base.json"), 'utf8') + '\n');
   assert.notEqual(imageName(directory), changedPolicy);
+  const changedCompiler = imageName(directory);
+  writeFileSync(join(directory, "LICENSE"), readFileSync(join(directory, "LICENSE"), 'utf8') + '\n');
+  assert.notEqual(imageName(directory), changedCompiler, 'License bytes are real image inputs');
 });
 
 test("native age policy admits aged third parties and only the named owned exemptions", { timeout: 90_000 }, async context => {

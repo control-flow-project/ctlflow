@@ -4,6 +4,7 @@ FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2ee
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 COPY .npmrc package.json package-lock.json tsconfig.base.json ./
+COPY LICENSE ./LICENSE
 COPY scripts ./scripts
 COPY services ./services
 RUN npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source
@@ -18,7 +19,7 @@ RUN set -eu; for binary in /nix/store/*/bin/conduit; do cp "$binary" /usr/local/
 WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/services/crossfire ./services/crossfire
-COPY --from=build /app/package.json /app/.npmrc ./
+COPY --from=build /app/package.json /app/.npmrc /app/LICENSE ./
 COPY --from=element /app ./element
 STOPSIGNAL SIGTERM
 EXPOSE 8080
