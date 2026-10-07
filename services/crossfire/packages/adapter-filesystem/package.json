@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-adapter-filesystem",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -10,10 +10,10 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
-    "@ctlflow/crossfire-domain": "0.1.11",
-    "@ctlflow/crossfire-kernel": "0.1.11",
-    "@ctlflow/crossfire-agent-core": "0.1.11",
-    "@ctlflow/crossfire-contracts": "0.1.11"
+    "@ctlflow/crossfire-domain": "0.1.12",
+    "@ctlflow/crossfire-kernel": "0.1.12",
+    "@ctlflow/crossfire-agent-core": "0.1.12",
+    "@ctlflow/crossfire-contracts": "0.1.12"
   },
   "exports": {
     "./*": {
