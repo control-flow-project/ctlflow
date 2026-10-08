@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-agent-core",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -10,8 +10,8 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
-    "@ctlflow/crossfire-contracts": "0.1.12",
-    "@ctlflow/crossfire-kernel": "0.1.12"
+    "@ctlflow/crossfire-contracts": "0.1.13",
+    "@ctlflow/crossfire-kernel": "0.1.13"
   },
   "exports": {
     "./*": {
