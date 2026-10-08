@@ -109,7 +109,7 @@ test('an incoming message wakes a ten-second long poll without waiting for its t
   const result = listen({ ...matrix, reconcileMs: 120_000, limit: 50, pollMs: 10_000, debounceMs: 100, runtime: native.runtime }, controller.signal).catch(error => error);
   cleanup(t, async () => { controller.abort(new Error('test complete')); await result; });
   await until(() => matrix.waiting() === 1);
-  assert.equal(matrix.requests.filter(request => request.path === API + '/sync').at(-1)!.query.get('timeout'), '10000');
+  assert.equal(matrix.requests.filter(request => request.path === API + '/sync' && Number(request.query.get('timeout')) > 0).at(-1)!.query.get('timeout'), '10000');
   matrix.add(ROOM, message('$wake'));
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);

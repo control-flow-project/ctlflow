@@ -9,16 +9,21 @@ import { codexProtocol, type NativeRequest } from '@ctlflow/crossfire-adapter-co
 async function fixture(scope: TestContext, mode: string, approval = async (_request: NativeRequest, _signal: AbortSignal): Promise<unknown> => {
   throw new Error('Unexpected approval request');
 }) {
+  const methods: string[] = [];
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0, verifyClient: (info: { req: import('node:http').IncomingMessage }) => info.req.headers.authorization === 'Bearer fixture' });
   await once(server, 'listening');
   cleanup(scope, () => new Promise<void>(resolve => { for (const client of server.clients) client.terminate(); server.close(() => resolve()); }));
   const address = server.address(); assert(address && typeof address === 'object');
   server.on('connection', socket => {
     let pending: unknown;
+    let held: string | undefined;
     socket.on('message', data => {
       const input = JSON.parse(data.toString()) as { id: number | string; method?: string; result?: unknown };
       if (!input.method) { socket.send(JSON.stringify({ id: pending, result: input.result })); return; }
+      methods.push(input.method);
       const response = JSON.stringify({ id: input.id, result: { text: 'é🐝', method: input.method } });
+      if (mode === 'held' && input.method === 'held') { held = response; return; }
+      if (held) { socket.send(held); held = undefined; }
       if (mode === 'overflow') socket.send('x'.repeat(8 * 1024 * 1024 + 1));
       else if (mode === 'utf8') socket.send(Buffer.from([255]), { binary: false });
       else if (mode === 'binary') socket.send(Buffer.from(response));
@@ -33,8 +38,32 @@ async function fixture(scope: TestContext, mode: string, approval = async (_requ
   const stop = new AbortController();
   const engine = codexProtocol({ endpoint: 'ws://127.0.0.1:' + address.port, token: 'fixture', timeoutMs: 1000, event: () => {}, approval }, stop.signal);
   cleanup(scope, async () => { stop.abort(); await engine.closed; });
-  return engine;
+  return { ...engine, methods: () => methods };
 }
+
+test('cancelled native reads stop their caller immediately and a late response retains exact protocol identity without killing the engine', async scope => {
+  const engine = await fixture(scope, 'held'), cancelled = new AbortController();
+  const reason = new Error('Steering deadline reached');
+  const pending = engine.request('held', {}, cancelled.signal);
+  const deadline = performance.now() + 5000;
+  while (!engine.methods().includes('held')) { assert(performance.now() < deadline); await delay(5); }
+  cancelled.abort(reason);
+  await assert.rejects(pending, error => error === reason);
+  assert.equal(engine.signal.aborted, false);
+  assert.deepEqual(await engine.request('after', {}), { text: 'é🐝', method: 'after' });
+  assert.deepEqual(await engine.request('final', {}), { text: 'é🐝', method: 'final' });
+  assert.equal(engine.signal.aborted, false);
+});
+
+test('native requests cancelled before transmission never send a command or leave a pending protocol identity', async scope => {
+  const engine = await fixture(scope, 'normal'), cancelled = new AbortController();
+  const reason = new Error('Superseded before transmission');
+  const pending = engine.request('not-sent', {}, cancelled.signal);
+  cancelled.abort(reason);
+  await assert.rejects(pending, error => error === reason);
+  assert.deepEqual(await engine.request('after', {}), { text: 'é🐝', method: 'after' });
+  assert.deepEqual(engine.methods(), ['after']); assert.equal(engine.signal.aborted, false);
+});
 
 test('native WS framing preserves fragmented UTF-8 and exact responses', async scope => {
   for (const mode of ['normal', 'split']) {

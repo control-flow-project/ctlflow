@@ -804,13 +804,30 @@ this is not a promise about unrelated host/container/tool processes.
 
 Agent credentials, Matrix cursors, permissions and receipts remain independent.
 Consolidation never introduces a service-account inbox or shared authorization.
-One host budget fairly limits acquisition to 16 concurrent operations,
-publication to eight and native startup to four; each queue is bounded to 10,000
-waiters and is abortable. An acquisition deadline starts after its permit is
-granted. Capacity or cancellation never acknowledges unread input.
+Every enabled binding independently watches Matrix. Idle long polls never occupy
+ordinary work permits. One host budget fairly limits ordinary acquisition to 16
+concurrent operations, ordinary publication to eight and native startup to four;
+each queue is bounded to 10,000 waiters and is abortable. Ordinary acquisition
+deadlines include queue admission. Accepted mention steering preempts ordinary
+work and bypasses its permits and collection window. Cold native wake requests
+use immediate bounded startup admission: unavailable capacity fails visibly,
+without joining the ordinary queue, exceeding its limit or losing unread input.
+An existing resume or native shutdown likewise reports immediate non-acceptance
+instead of admitting a competing owner or waiting behind that lifecycle operation.
+Empty recovery/housekeeping does not acquire work permits.
+Invitation reconciliation and blocked-mention publication run as preemptible
+ordinary maintenance, never inside the live Matrix watch. Blocked notices retain
+only exact room/event identities in a validated durable journal, bounded to
+10,000 entries and 24 MiB. Native history queries, partial marker recovery and
+controller message receipts honor the same operation cancellation scope.
+Capacity or cancellation never acknowledges unread input.
 Controller-generation cancellation also covers queued publication permits. Cancelled
 work releases its permit, preserves its checkpoint and leaves the logical receiver
 available for the next authorized generation.
+Verified ordinary receipts may checkpoint while an empty watch reconciles
+membership. Accepted steering closes ordinary admission until its captured-turn
+control is settled, preventing a new ordinary wait from blocking replacement
+input. Only completed or superseded controls are retired by ordinary checkpoints.
 
 Instance policy `fleetIdleTimeoutSeconds` defaults to 1800 (30 minutes), permits
 integer values 0–604800, and zero disables automatic sleep. Management presents
@@ -1826,19 +1843,32 @@ authentication and exact native binding, including observed busy state. It
 neither starts an engine nor treats saved credentials as readiness. Native turn
 interruption is a typed capability, not assumed from a runtime name. Codex
 supports captured-turn interruption. A fresh native Matrix mention by an eligible
-verified human acts like Esc followed by new input: capture the exact active
+verified human or agent acts like Esc followed by new input: capture the exact active
 turn, confirm native interruption, then deliver the full attributed instruction
 through the same receipt path and history ahead of unread backlog. Current wake
 authors, native sender/agent membership, unmuted room access and controller
-admission remain authoritative, including an empty selected audience. Agent-to-agent mentions,
-display names, historical snapshots, edits and automated notices cannot interrupt;
+admission remain authoritative, including an empty selected audience. Human and
+agent sources have identical steering authority when accepted by that binding.
+Unknown/unaccepted sources, self-messages, display names, historical snapshots,
+edits and automated notices cannot interrupt;
 fresh explicitly mentioned replies can. Shared mode steers the shared history;
 per-room mode targets only that room history. Idle/sleeping agents reuse their
 saved history without an interruption or dummy turn. Revocation during capture
 or before delivery prevents new admission. Steering never answers a native
 question or permission request. No `!!`-prefixed redirect alias is retained.
-The separate addressed owner `!!` pauses/interrupts until later owner input.
+The separate addressed owner `!!` pauses/interrupts until later owner input;
+this administrative stop remains available independently of the wake audience.
 Cancellation is not rollback. Stale control cannot cancel a replacement turn.
+The protected owner DM receives attributed mention receipt, verified captured-turn
+interruption or already-idle status, and exact native input acceptance, including
+source room/event/sender, sent/received/stage timestamps and elapsed timings.
+After restart, a stage without its original in-memory receipt time reports that
+time and derived receipt latency as unknown, not a fabricated current timestamp.
+Failures and superseded steering are explicit, not successful-delivery claims.
+These notices use the durable owner outbox with deterministic event/stage
+transactions. Recovery preserves original input identity/content and resolves
+uncertain native receipts before admitting replacement input. It never cancels
+a replacement turn, replays confirmed input or advances unread gaps.
 Generated control, approval and blocked-wake notices use one explicit marker
 and are excluded from wake evaluation and later model context. Ordinary unmarked
 messages remain eligible.

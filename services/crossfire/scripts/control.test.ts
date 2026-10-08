@@ -77,8 +77,10 @@ test('a runtime without native interruption pauses delivery and reports the limi
   await clock.until(() => matrix.waiting() === 1);
   const controls = () => readJson<ControlState>(matrix.cursorFile + '.control');
   matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
-  await clock.until(() => controls().paused && matrix.requests.some(request => request.path.includes('/send/m.room.message/')));
-  const notice = matrix.requests.find(request => request.path.includes('/send/m.room.message/'))!.body as { msgtype: string; body: string };
+  const limitation = () => matrix.requests.find(request => request.path.includes('/send/m.room.message/')
+    && String((request.body as { body?: string }).body).includes('cannot interrupt the current turn'));
+  await clock.until(() => controls().paused && limitation() !== undefined);
+  const notice = limitation()!.body as { msgtype: string; body: string };
   assert.equal(notice.msgtype, 'm.notice');
   assert(isListenerNotice({ type: 'm.room.message', content: notice }));
   assert.match(notice.body, /cannot interrupt the current turn/);
@@ -114,11 +116,11 @@ for (const kind of ['read-only', 'native-denial'] as const) {
       && matrix.waiting() === 1, 'The initial unread boundary must be durable before live control input');
     const controls = () => readJson<ControlState>(matrix.cursorFile + '.control');
     matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
-    await clock.until(() => controls().paused && readJson<string>(matrix.cursorFile + '.sync') === 'sync-1');
+    await clock.until(() => controls().paused && Number(readJson<string>(matrix.cursorFile + '.sync')?.slice(5)) >= 1);
     if (kind === 'read-only') assert.equal(matrix.requests.filter(request => request.path === noticePath).length, 0);
     else assert.equal(matrix.requests.filter(request => request.path === noticePath).length, 1);
     matrix.add(ROOM, message('$buffered'));
-    await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-2');
+    await clock.until(() => matrix.waiting() === 1 && matrix.requests.filter(request => request.path === API + '/sync').length >= 3);
     assert.equal(ended, false);
     assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
     assert(!matrix.requests.some(request => request.path.endsWith('/read_markers')));
@@ -219,7 +221,7 @@ test('human control authority uses exact identity and shared-room native mention
   assert(await check({ ...message('$targeted', OBSERVER, '!! stop'), content: { msgtype: 'm.text', body: '!! stop', 'm.mentions': { user_ids: [SELF] } } }));
 });
 
-test('native human mentions use verified wake identity and membership, including replies but never edits or text names', async context => {
+test('native human and agent mentions use identical verified wake identity and membership, including replies but never edits or text names', async context => {
   const matrix = await matrixFixture(context, temporary(context));
   const client = nativeMatrix({ base: matrix.settings.homeserver, token: matrix.account.access_token });
   const human = '@permitted:test.localhost', peer = '@agent-holmes:test.localhost';
@@ -230,9 +232,11 @@ test('native human mentions use verified wake identity and membership, including
     matrix.coordination, senders, new AbortController().signal);
   assert(await check(mention('$owner')));
   assert(await check(mention('$human', human)));
+  matrix.extraMembers.add(peer);
+  assert(await check(mention('$agent', peer)));
   assert(await check({ ...mention('$reply', human), content: { ...mention('$reply', human).content,
     'm.relates_to': { 'm.in_reply_to': { event_id: '$previous' } } } }));
-  for (const sender of [peer, SELF, '@unknown:test.localhost']) assert.equal(await check(mention('$rejected', sender)), false);
+  for (const sender of [SELF, '@unknown:test.localhost']) assert.equal(await check(mention('$rejected', sender)), false);
   assert.equal(await check(message('$plain', human, 'Inspect configuration instead.')), false);
   assert.equal(await check(message('$name', human, '@' + SELF + ' Inspect configuration instead.')), false);
   assert.equal(await check(mention('$other-target', human, 'Inspect configuration instead.', peer)), false);
@@ -244,6 +248,8 @@ test('native human mentions use verified wake identity and membership, including
   senders.delete(human); assert.equal(await check(mention('$not-allowed', human)), false);
   senders.add(human); matrix.extraMembers.delete(human);
   assert.equal(await check(mention('$left', human)), false);
+  senders.delete(peer); assert.equal(await check(mention('$agent-denied', peer)), false);
+  senders.add(peer); matrix.extraMembers.delete(peer); assert.equal(await check(mention('$agent-left', peer)), false);
   senders.clear(); assert.equal(await check(mention('$nobody')), false);
 });
 
@@ -266,14 +272,20 @@ test('a permitted non-owner human mention interrupts and delivers exact attribut
   assert.equal(readJson<Record<string, string>>(matrix.cursorFile)[ROOM], 'sync-0');
 }));
 
-test('an allowed agent mention is ordinary context and cannot cancel a human-controlled native turn', withClock(async (context, clock) => {
+test('an accepted agent mention interrupts a native turn and gets the same attributed priority input as a human', withClock(async (context, clock) => {
   const { native, matrix, starts, controls } = await fixture(context, clock);
+  matrix.extraMembers.add('@agent-holmes:test.localhost');
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
   matrix.add(ROOM, mention('$peer-steer', '@agent-holmes:test.localhost'));
-  await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-2');
-  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 0);
-  assert.equal(starts().length, 1); assert.equal(controls().controls.length, 0);
+  await clock.until(() => starts().length === 2);
+  assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
+  assert(JSON.stringify(starts()[1]!.params!.input).includes('$peer-steer'));
+  const text = (starts()[1]!.params!.input as { text: string }[])[0]!.text;
+  const envelope = JSON.parse(text.slice(text.indexOf('\n') + 1)) as { senders: Record<string, { kind: string }> };
+  assert.equal(envelope.senders['@agent-holmes:test.localhost']?.kind, 'agent');
+  assert(!JSON.stringify(starts()[1]!.params!.input).includes('$ordinary'));
+  assert.equal(controls().controls.at(-1)?.status, 'interrupted');
 }));
 
 test('a newly permitted human mention in limited sync uses current policy rather than cached sender filtering', withClock(async (context, clock) => {

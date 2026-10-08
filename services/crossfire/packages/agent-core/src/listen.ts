@@ -8,7 +8,7 @@ import { synchronize, loadSyncCursor, loadCursors, checkpointSync, membershipRes
 import { captureWake, collectBatch, pendingBatch, wakeEvent, loadWake, saveWake, retireSnapshot, snapshotContentFiles } from './delivery.js';
 import { eventOrigins } from './origins.js';
 import type { RuntimeAdapter } from './runtime.js';
-import { loadControl, saveControl, humanEvents, humanText, isControl, publishControlNotice } from './control.js';
+import { loadControl, saveControl, sourceEvents, sourceText, isControl, publishControlNotice } from './control.js';
 import { decisions } from './decisions.js';
 import { ownerObservation } from './owner-observation.js';
 import { INPUT_BYTES } from '@ctlflow/crossfire-contracts/runtime';
@@ -16,7 +16,6 @@ import { createListenerActivity } from './listener-activity.js';
 import { requireCurrentRelease } from './release.js';
 import type { Manifest } from '@ctlflow/crossfire-contracts/release';
 import { isListenerNotice, mentionsAgent } from '@ctlflow/crossfire-contracts/notices';
-import { incrementalEvents } from './receive.js';
 import { deliveryEvents, resolveSenders } from './senders.js';
 import { testListener, type ListenerTest } from './diagnostic.js';
 import { releaseUpdates } from './updates.js';
@@ -25,11 +24,18 @@ import type { ControllerBinding, ListenerControl } from './listener-control-port
 import type { ReadBatch } from './receive.js';
 import { scheduledPublisher } from './scheduled.js';
 import { chatPublication } from './chat-publication.js';
-import { chatBatches } from './chat-batches.js';
 import { listenerStatistics } from './statistics.js';
 import { messageArtifacts } from './message-artifacts.js';
 import { historyQueries, type HistoryQueries } from './history-query.js';
 import { createListenerBudget, type ListenerBudget } from './budget.js';
+import { steeringReceipts } from './steering-receipts.js';
+import { listenerMaintenance } from './listener-maintenance.js';
+
+const steeringPreemptionCause = Symbol('steering-preemption');
+
+function steeringPreempted(error: unknown): boolean {
+  return error instanceof Error && error.cause === steeringPreemptionCause;
+}
 
 export type ListenerOptions = {
   clock: Clock;
@@ -114,11 +120,14 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     started: (runId, binding) => { reportingRun = runId; runReady(); approval.start(); observer.start(runId); options.activity?.(runId, binding); } }, signal);
   const client = options.transport(signal, 45_000);
   const artifacts = messageArtifacts(storage, options.cursorFile + '.messages', options.clock.now, observer.busy,
-    () => new Set([...snapshotContentFiles(storage, options.cursorFile), ...chat.contentFiles(), ...queries.contentFiles()]));
+    () => new Set([...snapshotContentFiles(storage, options.cursorFile), ...chat.contentFiles(), ...priorityChat.contentFiles(), ...queries.contentFiles()]));
   const controlled = controlledPublisher({ storage, file: options.cursorFile + '.controller-input', control: options.control, runtime: destination,
     artifacts, get maximum() { return maximum; } });
   const controlFile = options.cursorFile + '.control';
   const state = loadControl(storage, controlFile, destination.sessionId);
+  const receipts = steeringReceipts(options.clock.now, observer.notice);
+  const receipt = receipts.publish;
+  let ordinary = new AbortController();
   let since = loadSyncCursor(storage, options.cursorFile);
   let synchronized = false;
   let allowed = new Set<string>();
@@ -131,7 +140,6 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let revision = 0;
   let controlling = false;
   let acquiring = false;
-  let waitingForControl = false;
   let membershipRevision = 0;
   const retiredRooms = new Set<string>();
   let sending: { cancel: AbortController; done: Promise<boolean> } | undefined;
@@ -143,18 +151,31 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     } });
   let completed: { batch: ReadBatch; messageIds: string[]; membership: number } | undefined;
   const chat = chatPublication({ storage, file: options.cursorFile + '.chat-publication', settings: options.settings, runtime: destination,
-    mode: options.historyMode ?? 'shared', get maximum() { return maximum; }, artifacts, delivered: observer.delivered, count: messages => activity?.delivered(messages), traffic: statistics.delivered });
-  const queries = historyQueries({ storage, file: options.cursorFile, matrix: client, coordination: options.coordination,
+    mode: options.historyMode ?? 'shared', get maximum() { return maximum; }, artifacts,
+    admit: event => !state.controls.some(control => control.room === event.room_id && control.event === event.event_id && control.status === 'delivered'),
+    delivered: async (room, session) => { void observer.delivered(room, session); }, count: messages => activity?.delivered(messages), traffic: statistics.delivered });
+  function acceptedSteering(events: readonly ReceivedEvent[]): void {
+    for (const event of events) {
+      const control = state.controls.find(control => control.room === event.room_id && control.event === event.event_id);
+      if (control?.status !== 'delivered') receipt(event, 'accepted');
+      if (control) control.status = 'delivered';
+    }
+    saveControl(storage, controlFile, state);
+  }
+  const priorityChat = chatPublication({ storage, file: options.cursorFile + '.steering-publication', settings: options.settings, runtime: destination,
+    mode: options.historyMode ?? 'shared', priority: 'steering', get maximum() { return maximum; }, artifacts,
+    delivered: async (room, session) => { void observer.delivered(room, session); },
+    count: messages => activity?.delivered(messages), traffic: events => { statistics.delivered(events); acceptedSteering(events); } });
+  const queries = historyQueries({ storage, file: options.cursorFile, transport: options.transport, signal, coordination: options.coordination,
     account: options.account, settings: options.settings, agentId: options.id, now: options.clock.now, artifacts,
-    publishing: () => acquiring || chat.pending() || completed !== undefined,
+    publishing: () => acquiring || controlling || chat.pending() || priorityChat.pending() || urgentControl() !== undefined || completed !== undefined,
     observed: statistics.observed, delivered: events => { statistics.delivered(events); activity?.delivered(events.filter(event => event.type === 'm.room.message').length); },
     acknowledged: () => { cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0; changed(); } });
-  let pendingMessages = 0;
-  const invitations = new Map<string, number>();
-  let lastInvitationCheck = -Infinity;
+  const maintenance = listenerMaintenance({ clock: options.clock, interval: options.reconcileMs, agentId: options.id,
+    storage, file: options.cursorFile + '.maintenance', coordination: options.coordination, invitationRooms: options.invitationRooms });
   const changed = () => { revision++; wake?.(); };
   pendingInput = () => acquiring || controlling || sending !== undefined || completed !== undefined || chat.pending()
-    || controlled.pending() || scheduled.pending() || queries.pending() || cycle !== undefined
+    || priorityChat.pending() || controlled.pending() || scheduled.pending() || queries.pending() || cycle !== undefined
     || state.controls.some(control => control.status === 'interrupting' || control.status === 'interrupted');
   async function retry<Result>(operation: () => Promise<Result>, scope = signal): Promise<Result> {
     for (let failures = 0; ; failures++) {
@@ -167,84 +188,67 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     }
   }
   async function work<Result>(operation: (client: Matrix, scope: AbortSignal) => Promise<Result>): Promise<Result> {
-    const base = AbortSignal.any([signal, options.control.current().signal]);
-    const release = await budget.acquire('acquisition', base);
     const deadline = options.clock.deadline(options.reconcileMs);
-    const scope = AbortSignal.any([base, deadline]);
+    const preempted = ordinary.signal;
+    const scope = AbortSignal.any([signal, options.control.current().signal, preempted, deadline]);
+    let release: (() => void) | undefined;
     try {
+      release = await budget.acquire('acquisition', scope);
       return await operation(options.transport(scope, Math.min(45_000, options.reconcileMs)), scope);
     } catch (error) {
+      if (preempted.aborted) throw preempted.reason;
       if (deadline.aborted && !signal.aborted) throw Object.assign(new Error('Listener acquisition exceeded its reconciliation deadline'), { code: 'unavailable' });
       throw error;
-    } finally { release(); }
+    } finally { release?.(); }
   }
   async function wait(previous: number, milliseconds = options.reconcileMs, control = false): Promise<void> {
     acquiring = false;
     signal.throwIfAborted();
     if (previous !== revision) return;
     await new Promise<void>(resolve => {
-      const finish = () => { cancelTimer(); signal.removeEventListener('abort', finish); wake = undefined; waitingForControl = false; resolve(); };
+      const finish = () => { cancelTimer(); signal.removeEventListener('abort', finish); wake = undefined; resolve(); };
       const cancelTimer = options.clock.schedule(finish, !control && activity && synchronized && !state.paused
         && options.control.current().active ? Math.min(milliseconds, scheduled.waitMs()) : milliseconds);
       wake = finish;
-      waitingForControl = control;
       signal.addEventListener('abort', finish, { once: true });
     });
     signal.throwIfAborted();
   }
-  async function send(operation: (scope: AbortSignal) => Promise<void>): Promise<boolean> {
+  async function send(operation: (scope: AbortSignal) => Promise<void>, priority = false, parent = signal): Promise<boolean> {
     if (!options.control.current().active) return false;
     const generation = options.control.current().signal;
     const cancel = new AbortController();
+    const preempted = ordinary.signal;
     const done = (async () => {
-      const scope = AbortSignal.any([cancel.signal, signal, generation]);
+      const scope = AbortSignal.any([cancel.signal, signal, generation, parent,
+        ...(priority ? [options.clock.deadline(options.reconcileMs)] : [preempted])]);
       let release: (() => void) | undefined;
       try {
-        release = await budget.acquire('publication', scope);
+        if (!priority) release = await budget.acquire('publication', scope);
         await operation(scope);
         return true;
       } catch (error) {
         signal.throwIfAborted();
-        if (cancel.signal.aborted || generation.aborted) return false;
+        if (cancel.signal.aborted || generation.aborted || steeringPreempted(scope.reason)) return false;
         throw error;
       } finally { release?.(); }
     })();
     sending = { cancel, done };
-    try { return await done; }
+    try {
+      const delivered = await done;
+      if (preempted.aborted && steeringPreempted(preempted.reason)) throw preempted.reason;
+      return delivered;
+    }
     finally { sending = undefined; }
-  }
-  async function deliver(events: readonly ReceivedEvent[]): Promise<{ accepted: boolean; messageIds: string[] }> {
-    if (!senders.size) return { accepted: false, messageIds: [] };
-    let messageIds: string[] = [];
-    const accepted = await send(async scope => {
-      const emitted = await eventOrigins(options.transport(scope, 30000), options.account.user_id, deliveryEvents(events, options.account.user_id));
-      const identities = await resolveSenders(options.coordination, emitted, scope);
-      const batches = chatBatches(emitted, options.settings, identities, maximum, options.historyMode ?? 'shared', artifacts);
-      messageIds = batches.map(batch => batch.messageId);
-      for (const batch of batches) {
-        pendingMessages = batch.messages;
-        const target = batch.room && destination.conversation ? await destination.conversation(batch.room) : destination;
-        if (batch.room && !destination.conversation) throw new Error('The selected native runtime does not support room histories');
-        await target.deliver(batch.text, batch.messageId, scope);
-        statistics.delivered(batch.events);
-        const lastRoom = batch.events.findLast(event => event.type === 'm.room.message')?.room_id;
-        if (lastRoom) await observer.delivered(lastRoom, target.sessionId);
-        activity?.delivered(pendingMessages);
-        pendingMessages = 0;
-      }
-    });
-    return { accepted, messageIds };
   }
   async function cancelDelivery(): Promise<void> {
     if (!sending) return;
-    sending.cancel.abort(new Error('Delivery superseded by human control or membership change'));
+    sending.cancel.abort(new Error('Delivery superseded by source control or membership change'));
     await sending.done;
   }
-  async function settle(): Promise<boolean> {
-    const confirmed = await destination.settle();
-    if (confirmed) activity?.delivered(pendingMessages);
-    pendingMessages = 0;
-    return confirmed;
+  async function preempt(): Promise<void> {
+    ordinary.abort(new Error('Ordinary listener work preempted by accepted steering', { cause: steeringPreemptionCause }));
+    await cancelDelivery();
   }
   let acquisition: Promise<void> | undefined;
   const cancelBackstop = options.clock.schedule(changed, options.reconcileMs, true);
@@ -309,36 +313,15 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         signal.throwIfAborted();
         await waitForActivation(options.control, signal);
         const generation = options.control.current().signal;
+        const deadline = options.clock.deadline(options.reconcileMs);
+        const scope = AbortSignal.any([signal, generation, deadline]);
         try {
-        await work(async (client, scope) => {
+        const client = options.transport(scope, Math.min(45_000, options.reconcileMs));
         const synced = await retry(() => synchronize(client, since, Math.min(options.pollMs, Math.floor(options.reconcileMs / 2))), scope);
         controlling = true;
-        if (options.clock.now() - lastInvitationCheck >= options.reconcileMs
-          || Object.keys(synced.rooms?.invite ?? {}).length > 0 || Object.keys(synced.rooms?.leave ?? {}).length > 0) {
-          const pending = new Set(await retry(() => options.invitationRooms(scope), scope));
-          for (const room of invitations.keys()) if (!pending.has(room)) invitations.delete(room);
-          for (const room of pending) if (!invitations.has(room)) invitations.set(room, -Infinity);
-          lastInvitationCheck = options.clock.now();
-        }
-        let invitationAccepted = false;
-        if (invitations.size) {
-          let attempted = 0;
-          for (const [room, previousAttempt] of invitations) {
-            if (options.clock.now() - previousAttempt < options.reconcileMs) continue;
-            if (attempted++ >= 10) break;
-            invitations.set(room, options.clock.now());
-            const accepted = await options.coordination.acceptInvitation(options.id, room, scope);
-            if (!accepted.ok) {
-              if (['forbidden', 'missing', 'conflict', 'limit'].includes(accepted.error.code)) continue;
-              throw Object.assign(new Error(accepted.error.message), { code: accepted.error.code });
-            }
-            if (accepted.value.accepted) { invitations.delete(room); invitationAccepted = true; }
-          }
-        }
         const membership = new Set(await joinedRooms(client));
         const membershipChanged = membership.size !== joined.size || [...joined].some(room => !membership.has(room));
-        const accessChanged = invitationAccepted || membershipChanged || options.clock.now() - lastAccess >= options.reconcileMs ? await retry(() => access(scope), scope) : false;
-        let humanCount = 0;
+        if (membershipChanged || options.clock.now() - lastAccess >= options.reconcileMs) await retry(() => access(scope), scope);
         const reset = await retry(() => membershipResets(client, synced, options.account, since), scope);
         for (const room of joined) if (!membership.has(room)) reset.add(room);
         if (reset.size) {
@@ -350,38 +333,56 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           retainJoinedCursors(storage, options.cursorFile, new Set([...membership].filter(room => !reset.has(room))));
           state.controls = state.controls.filter(control => !reset.has(control.room));
         }
-        for await (const event of humanEvents(client, synced, since, selected)) {
+        for await (const event of sourceEvents(client, synced, since, selected)) {
           if (!joined.has(event.room_id) || !membership.has(event.room_id) || reset.has(event.room_id)) continue;
+          statistics.observed([event]);
           if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id)) continue;
           const candidate = mentionsAgent(event, options.account.user_id)
             || event.sender === options.settings.owner && String(event.content.body).trim() === '!!';
           if (candidate) await retry(() => access(scope), scope);
           if (!allowed.has(event.room_id)) continue;
-          humanCount++;
+          if (!senders.has(event.sender) && mentionsAgent(event, options.account.user_id)) maintenance.notice(event);
           if (!await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) {
-            if (state.paused && humanText(event, options.settings.owner)) { state.paused = false; changed(); }
+            if (state.paused && sourceText(event, options.settings.owner)) { state.paused = false; changed(); }
             continue;
           }
           {
-            await cancelDelivery();
+            const [attributed] = await eventOrigins(client, options.account.user_id, [event]);
+            const source = attributed!;
+            receipt(source, 'received');
+            const previousPublication = preempt();
+            void previousPublication.catch(error => failed.abort(error));
             if (!destination.turnControl) {
+              await previousPublication;
+              receipt(source, 'failed', 'This runtime has no captured-turn interruption capability');
               state.paused = true;
               state.controls.push({ room: event.room_id, event: event.event_id, turn: null, stop: true, status: 'delivered' });
               saveControl(storage, controlFile, state);
               await publishControlNotice(client, options.coordination, options.id, options.settings, options.account, event, scope);
               continue;
             }
-            const turn = await destination.turnControl.activeTurn(options.historyMode === 'per-room' ? event.room_id : undefined);
+            let turn: string | null;
+            try { turn = await destination.turnControl.activeTurn(options.historyMode === 'per-room' ? event.room_id : undefined,
+              { priority: 'steering', signal: scope }); }
+            catch (error) { receipt(source, 'failed', error instanceof Error ? error.message : 'Native turn capture failed'); throw error; }
             await retry(() => access(scope), scope);
-            if (!allowed.has(event.room_id) || !await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) continue;
+            if (!allowed.has(event.room_id) || !await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) {
+              receipt(source, 'failed', 'Source or room authority changed before cancellation'); continue;
+            }
             scope.throwIfAborted();
             for (const earlier of state.controls) if (earlier.status === 'interrupted'
-              && (options.historyMode !== 'per-room' || earlier.room === event.room_id)) earlier.status = 'superseded';
+              && (options.historyMode !== 'per-room' || earlier.room === event.room_id)) {
+              earlier.status = 'superseded'; receipts.superseded(earlier.room, earlier.event, source);
+            }
             const control = { room: event.room_id, event: event.event_id, stop: event.sender === options.settings.owner && String(event.content.body).trim() === '!!',
               turn, status: 'interrupting' as const };
             state.controls.push(control);
             saveControl(storage, controlFile, state);
-            if (turn) await destination.turnControl.interrupt(turn);
+            try {
+              const outcome = turn ? await destination.turnControl.interrupt(turn, false, { priority: 'steering', signal: scope }) : 'inactive';
+              receipt(source, outcome === 'interrupted' ? 'interrupted' : 'already-idle');
+            } catch (error) { receipt(source, 'failed', error instanceof Error ? error.message : 'Native interruption failed'); throw error; }
+            await previousPublication;
             const saved = state.controls.at(-1)!;
             saved.status = saved.stop ? 'delivered' : 'interrupted';
             state.paused = saved.stop;
@@ -389,29 +390,21 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           }
         }
         joined = membership;
-        if (since) for (const room of membership) {
-          if (!allowed.has(room) || reset.has(room) || selected && selected !== room) continue;
-          for await (const event of incrementalEvents(client, synced, since, room, { types: ['m.room.message'] })) {
-          statistics.observed([eventView(event, room)]);
-          if (!senders.has(event.sender) && mentionsAgent(event, options.account.user_id)) {
-            const notice = await options.coordination.notice(options.id, room, event.event_id, scope);
-            if (!notice.ok) throw Object.assign(new Error(notice.error.message), { code: notice.error.code });
-          }
-          }
-        }
+        controlling = false;
+        maintenance.observe(synced);
         saveControl(storage, controlFile, state);
         checkpointSync(storage, options.cursorFile, synced.next_batch);
         since = synced.next_batch;
-        const initial = !synchronized;
         synchronized = true;
-        controlling = false;
-        if (initial || waitingForControl || accessChanged || reset.size || humanCount
-          || Object.values(synced.rooms?.join ?? {}).some(room => (room.timeline?.events.length ?? 0) > 0)) changed();
-        });
+        if (ordinary.signal.aborted) ordinary = new AbortController();
+        changed();
         } catch (error) {
           controlling = false;
+          if (ordinary.signal.aborted) ordinary = new AbortController();
+          changed();
           if (generation.aborted && !signal.aborted) continue;
-          if (retryable(error) && !signal.aborted) { await options.clock.delay(Math.min(options.pollMs, 5000), signal); continue; }
+          if (state.controls.some(control => control.status === 'interrupting')) throw error;
+          if ((deadline.aborted || retryable(error)) && !signal.aborted) { await options.clock.delay(Math.min(options.pollMs, 5000), signal); continue; }
           throw error;
         }
       }
@@ -427,7 +420,52 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       }
       if (!await activity.activate() || generation.aborted) continue;
       if (!synchronized) { await wait(previous); continue; }
-      await work((_client, scope) => retry(() => queries.recover(), scope));
+      if (controlling && (!completed || ordinary.signal.aborted)) { await wait(previous, options.reconcileMs, true); continue; }
+      if (!controlling && priorityChat.pending()) {
+        let recovered: Awaited<ReturnType<typeof priorityChat.recover>>;
+        await send(async scope => { recovered = await priorityChat.recover(new Set([...allowed].filter(room => joined.has(room))), scope); }, true);
+        if (recovered) {
+          acceptedSteering(recovered.batch.events);
+          destination.acknowledge(recovered.messageIds); priorityChat.acknowledge(); continue;
+        }
+        if (priorityChat.recovering()) continue;
+        const current = urgentControl();
+        if (!current || !priorityChat.events().some(event => event.room_id === current.room && event.event_id === current.event)) {
+          priorityChat.discardUnpublished(); continue;
+        }
+      }
+      const urgent = !controlling && !state.paused && urgentControl();
+      if (urgent) {
+        const scope = AbortSignal.any([signal, generation, ordinary.signal, options.clock.deadline(options.reconcileMs)]);
+        const urgentClient = options.transport(scope, Math.min(30_000, options.reconcileMs));
+        let source: ReceivedEvent | undefined;
+        try {
+          const event = await urgentClient.get<Event>(`${API}/rooms/${segment(urgent.room)}/event/${segment(urgent.event)}`);
+          if (event.event_id !== urgent.event) throw new Error('Urgent event identity changed');
+          source = eventView(event, urgent.room);
+          await access(scope);
+          if (!joined.has(urgent.room) || !allowed.has(urgent.room)
+            || !await isControl(urgentClient, options.settings, options.account, source, options.coordination, senders, scope)) {
+            receipt(source, 'failed', 'Source or room authority changed before native input');
+            urgent.status = 'superseded'; saveControl(storage, controlFile, state); continue;
+          }
+          if (controlling || state.paused || urgent.status !== 'interrupted' || urgentControl() !== urgent) continue;
+          if (!priorityChat.pending()) {
+            const events = await eventOrigins(urgentClient, options.account.user_id, [source]);
+            const identities = await resolveSenders(options.coordination, events, scope);
+            scope.throwIfAborted();
+            priorityChat.prepare({ events, cursors: {}, latest: {}, more_rooms: [] }, events, identities);
+          }
+          let published: Awaited<ReturnType<typeof priorityChat.publish>>;
+          await send(async scope => { published = await priorityChat.publish(new Set([...allowed].filter(room => joined.has(room))), scope); }, true, scope);
+          if (published) { destination.acknowledge(published.messageIds); priorityChat.acknowledge(); }
+        } catch (error) {
+          if (steeringPreempted(scope.reason)) throw scope.reason;
+          if (source) receipt(source, 'failed', error instanceof Error ? error.message : 'Native input acceptance failed'); throw error;
+        }
+        continue;
+      }
+      if (queries.recovering()) await work((_client, scope) => retry(() => queries.recover(scope), scope));
       if (queries.pending()) { await wait(previous, 1000); continue; }
       if (completed) {
         const value = completed;
@@ -436,41 +474,22 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           latest: Object.fromEntries(Object.entries(value.batch.latest).filter(([room]) => !retiredRooms.has(room))) }), scope));
         destination.acknowledge(value.messageIds); chat.acknowledge(); completed = undefined;
         if (value.membership !== membershipRevision) continue;
-        state.controls = state.controls.filter(control => !value.batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
+        state.controls = state.controls.filter(control => !['delivered', 'superseded'].includes(control.status)
+          || !value.batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
         saveControl(storage, controlFile, state);
         if (!value.batch.more_rooms.length) { cycle = undefined; saveWake(storage, options.cursorFile); }
         if (!value.batch.more_rooms.length) await wait(previous);
         continue;
       }
       let recoveredWake = false;
-      await send(async scope => { recoveredWake = await scheduled.recover(scope); });
+      if (scheduled.pending()) await send(async scope => { recoveredWake = await scheduled.recover(scope); });
       if (recoveredWake) continue;
-      if (chat.pending()) {
-        const recovered = await chat.recover(new Set([...allowed].filter(room => joined.has(room))));
+      if (chat.recovering()) {
+        let recovered: Awaited<ReturnType<typeof chat.recover>>;
+        await send(async scope => { recovered = await chat.recover(new Set([...allowed].filter(room => joined.has(room))), scope); });
         if (recovered) { completed = { ...recovered, membership: membershipRevision }; continue; }
       }
       if (state.paused) { await wait(previous); continue; }
-      if (controlling) { await wait(previous, options.reconcileMs, true); continue; }
-      const urgent = urgentControl();
-      if (urgent) {
-        if (!joined.has(urgent.room) || !allowed.has(urgent.room)) { urgent.status = 'superseded'; saveControl(storage, controlFile, state); continue; }
-        const event = await client.get<Event>(`${API}/rooms/${segment(urgent.room)}/event/${segment(urgent.event)}`);
-        if (event.event_id !== urgent.event) throw new Error('Urgent event identity changed');
-        await access();
-        if (!joined.has(urgent.room) || !allowed.has(urgent.room)
-          || !await isControl(client, options.settings, options.account, eventView(event, urgent.room), options.coordination, senders, signal)) {
-          urgent.status = 'superseded'; saveControl(storage, controlFile, state); continue;
-        }
-        if (controlling || state.paused || urgent.status !== 'interrupted' || urgentControl() !== urgent) continue;
-        const attempt = await deliver([eventView(event, urgent.room)]);
-        if (attempt.accepted || await settle()) {
-          urgent.status = 'delivered';
-          saveControl(storage, controlFile, state);
-          destination.acknowledge(attempt.messageIds);
-          artifacts.release(attempt.messageIds);
-        }
-        continue;
-      }
       retiredRooms.clear();
       if (chat.pending()) {
         let published: Awaited<ReturnType<typeof chat.publish>>;
@@ -481,8 +500,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (controlled.pending()) { await send(scope => controlled.publish(scope)); continue; }
       if (updates.pending() && (!destination.lifecycle || destination.lifecycle.current().phase === 'running')) { await send(scope => updates.publish(destination, scope)); continue; }
       let scheduledHandled = false;
-      await send(async scope => { scheduledHandled = await scheduled.publish(scope); });
+      if (scheduled.due()) await send(async scope => { scheduledHandled = await scheduled.publish(scope); });
       if (scheduledHandled) continue;
+      if (maintenance.pending()) {
+        const accepted = await work((_client, scope) => retry(() => maintenance.publish(scope), scope));
+        if (accepted) { lastAccess = -Infinity; changed(); }
+      }
       if (cycle && (!allowed.has(cycle.room) || !joined.has(cycle.room) || !senders.has(cycle.sender))) {
         cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0;
       }
@@ -525,13 +548,16 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       const events: ReceivedEvent[] = [];
       for (const event of batch.events) if (await accept(event)) events.push(event);
-      const emitted = await eventOrigins(client, options.account.user_id, deliveryEvents(events, options.account.user_id));
-      const identities = await resolveSenders(options.coordination, emitted, signal);
+      const { emitted, identities } = await work(async (client, scope) => {
+        const emitted = await eventOrigins(client, options.account.user_id, deliveryEvents(events, options.account.user_id));
+        return { emitted, identities: await resolveSenders(options.coordination, emitted, scope) };
+      });
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl() || queries.pending()
         || cursorsAtRead !== JSON.stringify(loadCursors(storage, options.cursorFile))) continue;
       chat.prepare(batch, emitted, identities);
       } finally { acquiring = false; }
       } catch (error) {
+        if (steeringPreempted(error)) continue;
         if ((generation.aborted || !options.control.current().active) && !signal.aborted) continue;
         if (retryable(error) && !signal.aborted) { await options.clock.delay(Math.min(options.pollMs, 5000), signal); continue; }
         throw error;

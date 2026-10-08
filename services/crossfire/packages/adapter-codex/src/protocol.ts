@@ -4,7 +4,7 @@ import { dirname, isAbsolute } from 'node:path';
 
 export type NativeRequest = { id: number | string; method: string; params: Record<string, unknown> };
 export type NativeEvent = { method: string; params: Record<string, unknown> };
-type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout };
+type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout; dispose(): void };
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
 function object(value: unknown): Record<string, unknown> {
@@ -57,7 +57,7 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
   }));
   function fail(error: Error): void {
     if (!failure.signal.aborted) failure.abort(error);
-    for (const request of pending.values()) { clearTimeout(request.timer); request.reject(error); }
+    for (const request of pending.values()) { clearTimeout(request.timer); request.dispose(); request.reject(error); }
     pending.clear();
     for (const request of approvals.values()) request.cancel.abort(error);
     if (closing) return;
@@ -111,10 +111,10 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
     if ('error' in message) {
       const error = object(message.error);
       if (!Number.isInteger(error.code) || typeof error.message !== 'string') throw new Error('Invalid Codex protocol error');
-      pending.delete(message.id as number); clearTimeout(request.timer);
+      pending.delete(message.id as number); clearTimeout(request.timer); request.dispose();
       request.reject(Object.assign(new Error('Codex request failed: ' + error.message), { code: error.code, detail: error.message }));
     } else if ('result' in message) {
-      pending.delete(message.id as number); clearTimeout(request.timer); request.resolve(message.result);
+      pending.delete(message.id as number); clearTimeout(request.timer); request.dispose(); request.resolve(message.result);
     } else throw new Error('Codex response has neither result nor error');
   }
   socket.on('message', (data, binary) => {
@@ -123,14 +123,24 @@ export function codexProtocol(options: { endpoint: string; token: string; timeou
       receive(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(data as Buffer)));
     } catch (error) { fail(error instanceof Error ? error : new Error('Invalid Codex WebSocket frame')); }
   });
-  function request(method: string, params: unknown): Promise<unknown> {
+  function request(method: string, params: unknown, scope?: AbortSignal): Promise<unknown> {
+    if (scope?.aborted) return Promise.reject(scope.reason);
     if (failure.signal.aborted) return Promise.reject(failure.signal.reason);
     if (pending.size >= 64) return Promise.reject(new Error('Too many pending native Codex requests'));
     const id = ++sequence;
     return new Promise((resolve, reject) => {
+      let sent = false;
       const timer = setTimeout(() => fail(new Error('Codex ' + method + ' timed out; delivery may be uncertain. Read positions were not advanced.')), options.timeoutMs);
-      pending.set(id, { resolve, reject, timer });
-      void ready.then(() => write({ id, method, params })).catch(error => fail(error instanceof Error ? error : new Error('Native request failed')));
+      const cancelled = () => {
+        if (!sent) { pending.delete(id); clearTimeout(timer); scope?.removeEventListener('abort', cancelled); }
+        reject(scope?.reason);
+      };
+      pending.set(id, { resolve, reject, timer, dispose: () => scope?.removeEventListener('abort', cancelled) });
+      scope?.addEventListener('abort', cancelled, { once: true });
+      void ready.then(async () => {
+        if (!pending.has(id)) return;
+        sent = true; await write({ id, method, params });
+      }).catch(error => fail(error instanceof Error ? error : new Error('Native request failed')));
     });
   }
   return { signal: failure.signal, request, notify: (method: string) => { void write({ method }).catch(fail); },

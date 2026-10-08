@@ -49,8 +49,9 @@ export function createFleetControlConnection(options: { origin: string; credenti
     refresh();
     for (const operation of value.runtimeOperations) runtimeWorker.receive(operation);
   }
-  async function receipt(messageId: string, agentId: string, status: 'delivered' | 'failed' | 'skipped', errorMessage: string | null): Promise<void> {
-    const result = await client.call(operations.acknowledgeFleetMessage, { fleetId: options.fleetId, messageId, agentId }, { status, errorMessage });
+  async function receipt(messageId: string, agentId: string, status: 'delivered' | 'failed' | 'skipped', errorMessage: string | null, signal?: AbortSignal): Promise<void> {
+    const result = await client.call(operations.acknowledgeFleetMessage, { fleetId: options.fleetId, messageId, agentId }, { status, errorMessage }, undefined, signal);
+    signal?.throwIfAborted();
     if (!result.ok) { disconnect(result.error.message); throw Object.assign(new Error(result.error.message), { code: result.error.code }); }
     completed.add(messageId + ':' + agentId); refresh();
   }
@@ -96,10 +97,10 @@ export function createFleetControlConnection(options: { origin: string; credenti
     status: () => ({ ...state }),
     listener(agentId: string) {
       if (listeners.has(agentId)) throw new Error('This agent already has a controller-bound listener');
-      const listener = createListenerControl(async (inputId, status, errorMessage) => {
+      const listener = createListenerControl(async (inputId, status, errorMessage, signal) => {
         const messageId = inputId.slice(6, 42);
         if (inputId !== 'fleet-' + messageId + '-' + agentId) throw new Error('Controller receipt identity mismatch');
-        await receipt(messageId, agentId, status, errorMessage);
+        await receipt(messageId, agentId, status, errorMessage, signal);
       }, () => ({ fleetId: options.fleetId, connectionId, credential: options.credential }), disconnect);
       listeners.set(agentId, listener); refresh();
       return { control: listener.connection, close: () => { listener.close(); listeners.delete(agentId); } };

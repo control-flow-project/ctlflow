@@ -24,26 +24,49 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
   let lastActivityAt = Math.max(0, ...journal.observations.map(value => value.lastActivityAt ?? 0)) || null;
   let deliveredSession: string | undefined;
   let typingRoom: string | undefined;
+  let typingGeneration = 0;
+  let typingWork = Promise.resolve();
   let cancelTyping: (() => void) | undefined;
   let running: Promise<void> | undefined;
+  let wakeFlusher: (() => void) | undefined;
   let publishing: RuntimeObservation | undefined;
   const pendingSources = new Set(journal.output.flatMap(item => item.sources));
   function save(): void { options.storage.write(options.file, journal, journalBytes); }
+  function notice(identity: string, text: string): void {
+    let position = 0;
+    for (const part of ownerNoticeChunks(text)) {
+      const id = createHash('sha256').update(JSON.stringify(['listener-notice', identity, position++])).digest('hex');
+      if (pendingSources.has(id)) continue;
+      journal.output.push({ id, text: part, sources: [id], streamId: null, sealed: true });
+      pendingSources.add(id);
+    }
+    save();
+    wakeFlusher?.();
+  }
   async function typing(room: string, enabled: boolean): Promise<void> {
     await options.transport(AbortSignal.timeout(10000), 10000).put(API + '/rooms/' + segment(room) + '/typing/' + segment(options.userId), { typing: enabled, ...(enabled ? { timeout: 30000 } : {}) });
   }
   async function clearTyping(): Promise<void> {
+    typingGeneration++;
     cancelTyping?.(); cancelTyping = undefined;
     const room = typingRoom; typingRoom = undefined;
-    if (room) await typing(room, false).catch(() => undefined);
+    typingWork = typingWork.then(async () => { if (room) await typing(room, false).catch(() => undefined); });
+    await typingWork;
   }
   async function delivered(room: string, sessionId: string): Promise<void> {
-    await clearTyping();
+    const generation = ++typingGeneration;
+    cancelTyping?.(); cancelTyping = undefined;
+    const previous = typingRoom;
     deliveredSession = sessionId;
-    if (!active.get(sessionId) || stop.aborted) return;
-    typingRoom = room;
-    await typing(room, true).catch(() => undefined);
-    cancelTyping = options.clock.schedule(() => { typingRoom = undefined; cancelTyping = undefined; }, 30000);
+    typingRoom = !stop.aborted && active.get(sessionId) ? room : undefined;
+    typingWork = typingWork.then(async () => {
+      if (previous) await typing(previous, false).catch(() => undefined);
+      if (generation !== typingGeneration || stop.aborted || !active.get(sessionId)) return;
+      await typing(room, true).catch(() => undefined);
+      if (generation !== typingGeneration) return;
+      cancelTyping = options.clock.schedule(() => { typingRoom = undefined; cancelTyping = undefined; }, 30000);
+    });
+    await typingWork;
   }
   function observe(event: RuntimeObservationEvent): void {
     if (event.kind === 'state') {
@@ -74,7 +97,7 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
     }
     save();
   }
-  async function flush(scope = AbortSignal.any([stop, AbortSignal.timeout(15000)])): Promise<void> {
+  async function flushObservations(scope = AbortSignal.any([stop, AbortSignal.timeout(15000)])): Promise<void> {
     if (!runId) return;
     while (journal.observations.length) {
       const pending = journal.observations[0]!;
@@ -85,11 +108,14 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
         journal.observations.shift(); save();
       } finally { publishing = undefined; }
     }
+  }
+  async function flushOutput(scope = AbortSignal.any([stop, AbortSignal.timeout(15000)])): Promise<boolean> {
+    if (!runId) return false;
     while (journal.output.length) {
       const output = journal.output[0]!;
       if (!output.sealed) { output.sealed = true; save(); }
       const conversation = await options.coordination.ownerConversation(options.agentId, scope);
-      if (!conversation.ok) return;
+      if (!conversation.ok) return false;
       const client = options.transport(scope, 15000);
       await client.put(API + '/rooms/' + segment(conversation.value.roomId) + '/send/m.room.message/observation-' + output.id,
         ownerNotice(output.text));
@@ -97,10 +123,11 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
       for (const source of output.sources) pendingSources.delete(source);
       save();
     }
+    return true;
   }
   const stopped = () => { void clearTyping(); };
   stop.addEventListener('abort', stopped, { once: true });
-  return { observe, delivered, busy: () => [...active.values()].some(value => value),
+  return { observe, delivered, notice, busy: () => [...active.values()].some(value => value),
     start(id: string): void {
       if (runId !== id) {
         for (const value of latest.values()) if (!journal.observations.some(pending => pending !== publishing
@@ -108,11 +135,26 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
         save();
       }
       runId = id;
-      running ??= (async () => { while (!stop.aborted) {
-        try { await flush(); } catch { if (stop.aborted) break; }
+      const outputs = async () => { while (!stop.aborted) {
+        let flushed = false;
+        try { flushed = await flushOutput(); } catch { if (stop.aborted) break; }
+        if (flushed && journal.output.length) continue;
+        await new Promise<void>(resolve => {
+          const finish = () => { cancel(); stop.removeEventListener('abort', finish); wakeFlusher = undefined; resolve(); };
+          const cancel = options.clock.schedule(finish, 1000);
+          wakeFlusher = finish;
+          stop.addEventListener('abort', finish, { once: true });
+          if (stop.aborted) finish();
+        });
+      } };
+      const observations = async () => { while (!stop.aborted) {
+        try { await flushObservations(); } catch { if (stop.aborted) break; }
         await options.clock.delay(1000, stop);
-      } })().catch(() => undefined);
+      } };
+      running ??= Promise.all([outputs(), observations()]).then(() => undefined).catch(() => undefined);
     },
-    async close(): Promise<void> { stop.removeEventListener('abort', stopped); await clearTyping(); await running; await flush(options.clock.deadline(15000)).catch(() => undefined); },
+    async close(): Promise<void> { stop.removeEventListener('abort', stopped); await clearTyping(); await running;
+      const scope = options.clock.deadline(15000);
+      await flushOutput(scope).catch(() => undefined); await flushObservations(scope).catch(() => undefined); },
   };
 }

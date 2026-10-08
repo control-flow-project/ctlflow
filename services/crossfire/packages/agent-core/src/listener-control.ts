@@ -55,11 +55,11 @@ export function controlledPublisher(options: { storage: LocalState; file: string
       }
       if (saved.stage === 'publishing') {
         signal.throwIfAborted();
-        saved.stage = await runtime.recover(saved.text, saved.input.messageId) ? 'delivered' : 'queued';
+        saved.stage = await runtime.recover(saved.text, saved.input.messageId, signal) ? 'delivered' : 'queued';
         storage.write(file, saved);
       }
       if (saved.stage !== 'delivered' && saved.input.expiresAt <= Date.now()) {
-        await control.acknowledge(saved.input.messageId, 'skipped', 'Message expired before publication');
+        await control.acknowledge(saved.input.messageId, 'skipped', 'Message expired before publication', signal);
         artifacts.release([saved.input.messageId]);
         storage.remove(file); return;
       }
@@ -70,7 +70,7 @@ export function controlledPublisher(options: { storage: LocalState; file: string
         await runtime.deliver(saved.text, saved.input.messageId, signal);
         saved.stage = 'delivered'; storage.write(file, saved);
       }
-      await control.acknowledge(saved.input.messageId, 'delivered', null);
+      await control.acknowledge(saved.input.messageId, 'delivered', null, signal);
       runtime.acknowledge([saved.input.messageId]);
       artifacts.release([saved.input.messageId]);
       storage.remove(file);

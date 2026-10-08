@@ -174,6 +174,34 @@ test('expired controller input recovers its exact accepted receipt rather than d
   assert.deepEqual(recovered, ['accepted']); assert.deepEqual(receipts, ['accepted:delivered']); assert(!storage.exists('checkpoint'));
 });
 
+test('steering preempts controller receipt waits without replaying accepted native input or dropping its checkpoint', async () => {
+  const values = new Map<string, unknown>(), submitted: string[] = [], acknowledged: string[] = [];
+  const storage: LocalState = { exists: file => values.has(file), read: <Value>(file: string) => structuredClone(values.get(file)) as Value,
+    write: (file, value) => { values.set(file, structuredClone(value)); }, remove: file => { values.delete(file); } };
+  const preemption = new AbortController(); let blocked = true, attempted!: () => void;
+  const waiting = new Promise<void>(resolve => { attempted = resolve; });
+  const binding = createListenerControl(async (_id, _status, _error, signal) => {
+    if (blocked) {
+      assert(signal); attempted();
+      await new Promise<void>((_resolve, reject) => {
+        if (signal.aborted) { reject(signal.reason); return; }
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    }
+    binding.update({ active: true, input: null });
+  }, () => CONTROLLER);
+  binding.update({ active: true, input: { messageId: 'preempted', text: 'Retain native receipt', expiresAt: Date.now() + 10000 } });
+  const runtime: RuntimeConnection = { sessionId: 'native-session', approval: 'none', signal: new AbortController().signal,
+    deliver: async (_text, id) => { submitted.push(id); }, recover: async () => false, acknowledge: ids => { acknowledged.push(...ids); },
+    inspect: async () => ({ busy: false }), settle: async () => false, close: () => {} };
+  const publisher = controlledPublisher({ storage, file: 'checkpoint', control: binding.connection, runtime, artifacts: messageArtifacts(storage, 'messages', Date.now), maximum: 4096 });
+  const publishing = publisher.publish(preemption.signal), rejected = assert.rejects(publishing, /Steering preemption/u);
+  await waiting; preemption.abort(new Error('Steering preemption')); await rejected;
+  assert.equal(storage.read<{ stage: string }>('checkpoint').stage, 'delivered'); assert.deepEqual(acknowledged, []);
+  blocked = false; await publisher.publish(runtime.signal);
+  assert.deepEqual(submitted, ['preempted']); assert.deepEqual(acknowledged, ['preempted']); assert(!publisher.pending());
+});
+
 test('every listener waits for its owning controller and no direct receiver can bypass its disabled delivery', withClock(async (scope, clock) => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
   const binding = createListenerControl(async () => {}, () => CONTROLLER);

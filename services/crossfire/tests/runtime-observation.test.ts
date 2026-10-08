@@ -6,11 +6,12 @@ import { nativeObservation } from '@ctlflow/crossfire-adapter-codex/observation'
 import { observedEvent } from '@ctlflow/crossfire-adapter-codex/observed-event';
 import { ownerObservation } from '@ctlflow/crossfire-agent-core/owner-observation';
 import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
-import { fakeCodex, matrixFixture, OWNER_DM, ROOM, SELF, until } from '../scripts/test-support/listener.js';
+import { fakeCodex, matrixFixture, OWNER_DM, ROOM, SELF, temporary, until } from '../scripts/test-support/listener.js';
 import { testClock } from '../scripts/test-support/clock.js';
 import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
 import { matrix as matrixClient } from '@ctlflow/crossfire-adapter-matrix/http';
 import type { Transport } from '@ctlflow/crossfire-agent-core/port';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 
 test('current native observations use exact discriminants and never guess alternative output fields', () => {
   const events: RuntimeObservationEvent[] = [], observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => events.push(event) }, () => 'original');
@@ -99,6 +100,55 @@ test('owner output is lazy and durable; one latest-room typing lease expires wit
   assert.deepEqual(typing().slice(-3).map(request => request.body), [{ typing: true, timeout: 30000 }, { typing: false }, { typing: true, timeout: 30000 }]);
   state('idle'); await until(() => !!typing().at(-1)?.body && (typing().at(-1)!.body as { typing: boolean }).typing === false);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
+});
+
+test('steering receipts flush without waiting for blocked runtime telemetry and survive an outbox restart', async scope => {
+  const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock);
+  const stop = new AbortController();
+  let entered = false, release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const options = { agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
+    transport: (signal: AbortSignal, timeoutMs: number) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    coordination: { ...matrix.coordination, runtime: async (...args: Parameters<typeof matrix.coordination.runtime>) => {
+      entered = true; await gate; return matrix.coordination.runtime(...args);
+    } }, historyMode: 'shared' as const, maximum: 65536 };
+  let observer = ownerObservation(options, stop.signal);
+  observer.observe({ kind: 'state', observation: { runtime: 'codex', sessionId: 'original', roomId: null, state: 'idle',
+    observedAt: 0, settings: [], errorMessage: null } });
+  observer.notice('steering-received', 'Mention received');
+  await observer.close();
+  observer = ownerObservation(options, stop.signal);
+  observer.start(randomUUID());
+  cleanup(scope, async () => { release(); stop.abort(); await clock.complete(observer.close()); });
+  await until(() => entered);
+  await until(() => matrix.requests.some(request => request.path.includes('/send/') && request.path.includes(OWNER_DM)));
+  assert.equal(clock.now(), 0); assert.equal(observer.busy(), false);
+  const sent = matrix.requests.find(request => request.path.includes('/send/') && request.path.includes(OWNER_DM))!;
+  assert.equal((sent.body as { body: string }).body, 'Mention received');
+  observer.notice('steering-accepted', 'Native input accepted');
+  await until(() => matrix.requests.filter(request => request.path.includes('/send/')).length === 2);
+  assert.equal(clock.now(), 0, 'Receipt flushing must not depend on the telemetry request or periodic clock');
+});
+
+test('an unavailable owner conversation retains receipts and retries on its bounded clock without spinning', async scope => {
+  const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock), stop = new AbortController();
+  let ready = false, attempts = 0;
+  const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
+    transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    coordination: { ...matrix.coordination, ownerConversation: async (...args) => {
+      attempts++;
+      return ready ? matrix.coordination.ownerConversation(...args) : failure('unavailable', 'Owner conversation is temporarily unavailable');
+    } }, historyMode: 'shared', maximum: 65536 }, stop.signal);
+  cleanup(scope, async () => { stop.abort(); await clock.complete(observer.close()); });
+  observer.notice('steering-received', 'Mention received'); observer.start(randomUUID());
+  const sent = () => matrix.requests.filter(request => request.path.includes('/send/') && request.path.includes(OWNER_DM));
+  await until(() => attempts > 0);
+  await clock.advance(999);
+  assert.equal(attempts, 1); assert.equal(sent().length, 0);
+  ready = true; await clock.advance(1);
+  await until(() => sent().length === 1);
+  assert.equal(attempts, 2); assert.equal(observer.busy(), false);
+  assert.equal((sent()[0]!.body as { body: string }).body, 'Mention received');
 });
 
 test('owner streams coalesce before publication and uncertain delivery retries an immutable body', async scope => {

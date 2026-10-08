@@ -35,7 +35,7 @@ export function scheduledPublisher(options: { clock: Clock; storage: LocalState;
   async function recover(signal: AbortSignal): Promise<boolean> {
     const saved = load();
     if (saved?.stage === 'publishing') {
-      saved.stage = await runtime.recover(saved.text, 'crossfire-wake-' + saved.command.deliveryId) ? 'delivered' : 'queued';
+      saved.stage = await runtime.recover(saved.text, 'crossfire-wake-' + saved.command.deliveryId, signal) ? 'delivered' : 'queued';
       storage.write(file, saved);
     }
     if (saved?.stage !== 'delivered') return false;
@@ -46,6 +46,7 @@ export function scheduledPublisher(options: { clock: Clock; storage: LocalState;
   }
   return {
     pending: () => storage.exists(file),
+    due: () => storage.exists(file) || options.clock.now() - refreshedAt >= 30_000 || options.clock.now() >= nextAt,
     recover,
     waitMs: () => Math.max(1, Math.ceil(Math.min(nextAt - options.clock.now(), 30_000 - (options.clock.now() - refreshedAt)))),
     async publish(signal: AbortSignal): Promise<boolean> {

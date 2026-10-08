@@ -80,8 +80,8 @@ test('staged acquisition files remain pinned only by live owners and reject chan
 
 test('authorized history browsing does not change unread positions, and catch-up requires its exact acknowledgment', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope)); fixture.subscribe(ROOM); fixture.add(ROOM, message('$one'), message('$two'));
-  const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token });
-  const queries = historyQueries({ storage: localState, file: fixture.cursorFile, matrix: client, coordination: fixture.coordination,
+  const queries = historyQueries({ storage: localState, file: fixture.cursorFile,
+    transport: signal => matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token, signal }), signal: new AbortController().signal, coordination: fixture.coordination,
     account: fixture.account, settings: fixture.settings, agentId: fixture.id, now: Date.now, publishing: () => false,
     artifacts: messageArtifacts(localState, fixture.cursorFile + '.messages', Date.now) });
   const request = { kind: 'history' as const, limit: 100, direction: 'b' as const, outputBytes: 65536, cursors: { entries: [] } };
@@ -101,7 +101,7 @@ test('history continuations page each authorized room independently and expired 
   fixture.add(ROOM, ...Array.from({ length: 8 }, (_, index) => message('$page-' + index)));
   let now = Date.now(), observed = 0, delivered = 0;
   const queries = historyQueries({ storage: localState, file: fixture.cursorFile,
-    matrix: matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token }), coordination: fixture.coordination,
+    transport: signal => matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token, signal }), signal: new AbortController().signal, coordination: fixture.coordination,
     account: fixture.account, settings: fixture.settings, agentId: fixture.id, now: () => now, publishing: () => false,
     observed: events => { observed += events.length; }, delivered: events => { delivered += events.length; },
     artifacts: messageArtifacts(localState, fixture.cursorFile + '.messages', () => now) });
@@ -129,7 +129,7 @@ test('catch-up acknowledgment retries its own partially committed native markers
     if (rejected && path.endsWith('/read_markers')) throw new Error('Native marker unavailable');
     return client.post<Value>(path, body);
   } };
-  const queries = historyQueries({ storage: localState, file: fixture.cursorFile, matrix: transport, coordination: fixture.coordination,
+  const queries = historyQueries({ storage: localState, file: fixture.cursorFile, transport: () => transport, signal: new AbortController().signal, coordination: fixture.coordination,
     account: fixture.account, settings: fixture.settings, agentId: fixture.id, now: Date.now, publishing: () => false,
     artifacts: messageArtifacts(localState, fixture.cursorFile + '.messages', Date.now) });
   const result = await queries.read({ kind: 'unread', limit: 100, direction: 'b', outputBytes: 65536, cursors: { entries: [] } });
@@ -139,6 +139,37 @@ test('catch-up acknowledgment retries its own partially committed native markers
   rejected = false;
   assert((await queries.recover()).ok); assert(!queries.pending());
   assert.equal((await readUnread(localState, client, fixture.settings, fixture.cursorFile, 100)).events.length, 0);
+});
+
+test('preempted query marker recovery retains its exact checkpoint and retries without reading or replaying input', async scope => {
+  const fixture = await matrixFixture(scope, temporary(scope)); fixture.subscribe(ROOM); fixture.add(ROOM, message('$preempted-marker'));
+  const stop = new AbortController(), preemption = new AbortController();
+  let hold = true, attempted!: () => void;
+  const blocked = new Promise<void>(resolve => { attempted = resolve; });
+  const queries = historyQueries({ storage: localState, file: fixture.cursorFile, signal: stop.signal, coordination: fixture.coordination,
+    transport: signal => {
+      const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token, signal });
+      return { ...client, post: async <Value>(path: string, body: unknown): Promise<Value> => {
+        if (hold && path.endsWith('/read_markers')) {
+          attempted();
+          await new Promise<void>((_resolve, reject) => {
+            if (signal.aborted) { reject(signal.reason); return; }
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          });
+        }
+        return client.post<Value>(path, body);
+      } };
+    }, account: fixture.account, settings: fixture.settings, agentId: fixture.id, now: Date.now, publishing: () => false,
+    artifacts: messageArtifacts(localState, fixture.cursorFile + '.messages', Date.now) });
+  const result = await queries.read({ kind: 'unread', limit: 100, direction: 'b', outputBytes: 65536, cursors: { entries: [] } });
+  assert(result.ok && result.value.queryId);
+  const acknowledging = queries.acknowledge(result.value.queryId, preemption.signal);
+  const rejected = assert.rejects(acknowledging, /Steering preemption/u);
+  await blocked; preemption.abort(new Error('Steering preemption')); await rejected;
+  assert(queries.recovering()); assert.equal(loadCursors(localState, fixture.cursorFile)[ROOM], '1');
+  const pages = fixture.requests.filter(request => request.path.endsWith('/messages')).length;
+  hold = false; assert((await queries.recover()).ok); assert(!queries.pending());
+  assert.equal(fixture.requests.filter(request => request.path.endsWith('/messages')).length, pages);
 });
 
 test('reset exports capture complete authorized history before committing a fresh-context high-water boundary', async scope => {

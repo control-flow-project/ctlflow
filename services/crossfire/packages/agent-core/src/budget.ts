@@ -1,5 +1,5 @@
 export type ListenerWork = 'acquisition' | 'publication' | 'native-start';
-export type ListenerBudget = { acquire(kind: ListenerWork, signal: AbortSignal): Promise<() => void> };
+export type ListenerBudget = { acquire(kind: ListenerWork, signal: AbortSignal, admission?: 'immediate'): Promise<() => void> };
 type Pending = { signal: AbortSignal; resolve(release: () => void): void; reject(reason: unknown): void; cancelled(): void };
 
 export function createListenerBudget(): ListenerBudget {
@@ -16,8 +16,11 @@ export function createListenerBudget(): ListenerBudget {
       pending.resolve(() => { if (released) return; released = true; active[kind]--; drain(kind); });
     }
   }
-  return { acquire(kind, signal) {
+  return { acquire(kind, signal, admission) {
     signal.throwIfAborted();
+    if (admission === 'immediate' && active[kind] >= limits[kind]) {
+      return Promise.reject(Object.assign(new Error('Immediate ' + kind + ' admission is unavailable; input has not been accepted'), { code: 'unavailable' }));
+    }
     if (queues[kind].length >= 10000) return Promise.reject(new Error('Listener host work queue capacity reached'));
     return new Promise<() => void>((resolve, reject) => {
       const pending: Pending = { signal, resolve, reject, cancelled: () => {
@@ -26,7 +29,9 @@ export function createListenerBudget(): ListenerBudget {
         signal.removeEventListener('abort', pending.cancelled);
         reject(signal.reason);
       } };
-      queues[kind].push(pending); signal.addEventListener('abort', pending.cancelled, { once: true }); drain(kind);
+      if (admission === 'immediate') queues[kind].unshift(pending);
+      else queues[kind].push(pending);
+      signal.addEventListener('abort', pending.cancelled, { once: true }); drain(kind);
     });
   } };
 }
