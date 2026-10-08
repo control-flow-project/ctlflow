@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-web",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -12,10 +12,10 @@
   "dependencies": {
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "@ctlflow/crossfire-contracts": "0.1.12",
-    "@ctlflow/crossfire-adapter-crossfire": "0.1.12",
-    "@ctlflow/crossfire-kernel": "0.1.12",
-    "@ctlflow/crossfire-adapter-matrix": "0.1.12"
+    "@ctlflow/crossfire-contracts": "0.1.13",
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.13",
+    "@ctlflow/crossfire-kernel": "0.1.13",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.13"
   },
   "devDependencies": {
     "@types/react": "19.2.17",

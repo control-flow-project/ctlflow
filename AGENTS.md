@@ -68,6 +68,14 @@ resets or unrequested deployment. Preserve credentials and shared source work.
 Do not delegate or start subagents without explicit authorization.
 
 ## Work discipline
+A user request to deploy authorizes completing the in-scope release end to end,
+including necessary coordinated version updates, verified non-main release
+commits/pushes, authorized public package publication, backups, activation and
+postdeployment verification. Do not stop for another routine confirmation.
+Preserve excluded projects, shared work, production data and histories, deliberate
+stopped selections and all quality gates. Report genuinely unavailable external
+dependencies; provide manual PR links and never create PRs automatically.
+
 For isolated changes with confidently local impact, run the affected tests and
 necessary targeted checks. Run the full quality gates for cross-layer changes
 or whenever the impact is uncertain. Never weaken a gate or claim verification
