@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { deliveryJournalExists, readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
-import type { RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
+import type { RuntimeHooks, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 import { openSession } from './session.js';
 import { codexDelivery, type CodexConnection } from './connection.js';
@@ -40,16 +40,23 @@ export function codexHistories(options: { home: string; workspace: string; name:
       if (unacknowledged(context)) throw new Error('Resolve and acknowledge native publication before changing history mode');
     }
   }
-  async function open(context: string): Promise<CodexConnection> {
+  async function open(context: string, admission?: InputAdmission): Promise<CodexConnection> {
+    admission?.signal.throwIfAborted();
     if (opened.has(context)) return opened.get(context)!;
-    if (initializing.has(context)) return initializing.get(context)!;
+    if (initializing.has(context)) {
+      if (admission) throw Object.assign(new Error('Exact room history is opening; immediate input has not been accepted'), { code: 'unavailable' });
+      return initializing.get(context)!;
+    }
+    const starting = new AbortController();
+    const cancelled = () => starting.abort(admission?.signal.reason);
+    admission?.signal.addEventListener('abort', cancelled, { once: true });
     const pending = (async () => {
       const previous = context === 'shared' ? sharedSessionId : context === 'control' ? state.control : state.rooms.find(room => room.room === context)?.sessionId;
       if (!previous && context !== 'shared' && context !== 'control' && state.rooms.length >= 2000) throw new Error('Native room history budget is exhausted');
       let connection: CodexConnection | undefined;
       const session = await openSession({ workspace: options.workspace, endpoint: options.endpoint, token: options.token }, previous
         ? { kind: 'resume', id: previous, config: options.config }
-        : { kind: 'create', name: options.name + (context === 'shared' ? '' : ' · ' + context), config: options.config }, lifetime,
+        : { kind: 'create', name: options.name + (context === 'shared' ? '' : ' · ' + context), config: options.config }, AbortSignal.any([lifetime, starting.signal]),
         { ...options.hooks, observe: event => options.hooks.observe?.(event.kind === 'state'
           ? { ...event, observation: { ...event.observation, roomId: context === 'shared' || context === 'control' ? null : context } } : event) },
         event => connection?.event(event));
@@ -70,7 +77,7 @@ export function codexHistories(options: { home: string; workspace: string; name:
       } catch (error) { if (connection) await connection.close(); else await session.close(); throw error; }
     })();
     initializing.set(context, pending);
-    try { return await pending; } finally { initializing.delete(context); }
+    try { return await pending; } finally { initializing.delete(context); admission?.signal.removeEventListener('abort', cancelled); }
   }
   return { open, signal: lifetime,
     async inspect() {
@@ -98,30 +105,32 @@ export function codexHistories(options: { home: string; workspace: string; name:
       const errors = results.filter(result => result.status === 'rejected').map(result => result.reason as unknown);
       if (errors.length) throw new AggregateError(errors, 'Native history cleanup did not complete');
     },
-    async settle() {
+    async settle(cancelled?: AbortSignal) {
       for (const context of ['shared', 'control', ...state.rooms.map(room => room.room)]) {
         if (!opened.has(context) && unacknowledged(context)) await open(context);
       }
-      let received = false; for (const connection of opened.values()) received = await connection.settle() || received; return received;
+      let received = false; for (const connection of opened.values()) received = await connection.settle(cancelled) || received; return received;
     },
     acknowledge(ids: readonly string[]) { for (const connection of opened.values()) connection.acknowledge(ids); },
     async attachments() { return ['shared', 'control', ...state.rooms.map(room => room.room)].flatMap(context => {
       const sessionId = context === 'shared' ? opened.get(context)?.sessionId ?? sharedSessionId : context === 'control' ? state.control : state.rooms.find(room => room.room === context)?.sessionId;
       return sessionId ? [{ context, attachment: { ...options.attachment, sessionId } }] : [];
     }); },
-    async activeTurn(room?: string) {
+    async activeTurn(room?: string, admission?: InputAdmission) {
       const context = options.mode === 'shared' ? 'shared' : room ?? 'control';
-      const connection = opened.get(context);
-      const turn = connection ? await connection.turnControl.activeTurn() : null;
+      const connection = admission ? await open(context, admission) : opened.get(context);
+      admission?.signal.throwIfAborted();
+      const turn = connection ? await connection.turnControl.activeTurn(undefined, admission) : null;
       return turn ? JSON.stringify([context, turn]) : null;
     },
-    async interrupt(turn: string, recovery?: boolean) {
+    async interrupt(turn: string, recovery?: boolean, admission?: InputAdmission) {
+      admission?.signal.throwIfAborted();
       const parsed: unknown = JSON.parse(turn);
       if (!Array.isArray(parsed) || parsed.length !== 2 || !parsed.every(value => typeof value === 'string')) throw new Error('Invalid captured history and turn');
       if (!(parsed[0] === 'shared' && sharedSessionId || parsed[0] === 'control' && state.control || state.rooms.some(room => room.room === parsed[0]))
         && !opened.has(parsed[0] as string)) throw new Error('Captured native history does not exist');
-      const connection = await open(parsed[0] as string);
-      await connection.turnControl.interrupt(parsed[1] as string, recovery);
+      const connection = await open(parsed[0] as string, admission);
+      return connection.turnControl.interrupt(parsed[1] as string, recovery, admission);
     },
   };
 }

@@ -49,7 +49,7 @@ test('partial room publication retains full-batch cursors and recovers exact rec
   assert.equal(publisher.pending(), true);
   assert.throws(() => publisher.acknowledge(), /unconfirmed/);
   publisher = proof.create();
-  const recovered = await publisher.recover(allowed);
+  const recovered = await publisher.recover(allowed, proof.signal);
   assert(recovered); assert.deepEqual(recovered.batch.cursors, proof.batch.cursors);
   assert.equal(proof.inputs.length, 2, 'Recovery is receipt-only, never a replacement input');
   assert.equal(proof.messages(), 2);
@@ -75,7 +75,7 @@ test('uncertain publication cannot move to another room history', async () => {
   publisher.prepare(proof.batch, proof.batch.events, proof.identities);
   proof.fail(); await assert.rejects(publisher.publish(allowed, proof.signal));
   proof.targets.set('!beta:test', { ...proof.targets.get('!beta:test')!, sessionId: 'replacement' });
-  await assert.rejects(proof.create().recover(allowed), /Original pending history/);
+  await assert.rejects(proof.create().recover(allowed, proof.signal), /Original pending history/);
   assert.equal(proof.inputs.length, 2);
 });
 
@@ -101,5 +101,19 @@ test('shared history keeps a single bounded input and file-backs complete oversi
   publisher.prepare(proof.batch, proof.batch.events, proof.identities);
   await publisher.publish(allowed, proof.signal);
   assert.equal(proof.inputs.length, 3); assert(Buffer.byteLength(proof.inputs[2]!.text) <= 65536);
+  publisher.acknowledge();
+});
+
+test('steering-confirmed events are removed from prepared ordinary input without skipping its acquisition checkpoint', async () => {
+  const proof = fixture('shared');
+  const accepted = new Set<string>();
+  const publisher = chatPublication({ ...proof.options, admit: event => !accepted.has(event.event_id) });
+  publisher.prepare(proof.batch, proof.batch.events, proof.identities);
+  accepted.add('$alpha');
+  const completed = await publisher.publish(new Set(Object.keys(proof.batch.cursors)), proof.signal);
+  assert(completed); assert.deepEqual(completed.batch.cursors, proof.batch.cursors);
+  assert.equal(proof.inputs.length, 1);
+  assert(!proof.inputs[0]!.text.includes('$alpha')); assert(proof.inputs[0]!.text.includes('$beta'));
+  assert.equal(proof.messages(), 1);
   publisher.acknowledge();
 });

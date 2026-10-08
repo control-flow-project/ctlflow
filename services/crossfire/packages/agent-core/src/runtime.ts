@@ -4,10 +4,12 @@ import type { DecisionCreation, RuntimeObservation } from '@ctlflow/crossfire-co
 import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 
 export type RuntimeApproval = 'none' | 'runtime' | 'listener';
+export type InputPriority = 'steering';
+export type InputAdmission = { priority: InputPriority; signal: AbortSignal };
 
 export type TurnControl = {
-  activeTurn: (room?: string) => Promise<string | null>;
-  interrupt: (turnId: string, recovery?: boolean) => Promise<void>;
+  activeTurn: (room?: string, admission?: InputAdmission) => Promise<string | null>;
+  interrupt: (turnId: string, recovery?: boolean, admission?: InputAdmission) => Promise<'interrupted' | 'inactive'>;
 };
 export type NativeSessionState = { phase: 'running' | 'sleeping' | 'waking' | 'failed'; lastActivityAt: number | null; historyAvailable: boolean };
 export type RuntimeLifecycle = { current: () => NativeSessionState; configureIdle: (seconds: number) => void };
@@ -17,13 +19,13 @@ export type RuntimeConnection = {
   approval: RuntimeApproval;
   signal: AbortSignal;
   inspect: () => Promise<{ busy: boolean }>;
-  deliver: (text: string, messageId: string, cancelled?: AbortSignal) => Promise<void>;
-  settle: () => Promise<boolean>;
-  recover: (text: string, messageId: string) => Promise<boolean>;
+  deliver: (text: string, messageId: string, cancelled?: AbortSignal, priority?: InputPriority) => Promise<void>;
+  settle: (cancelled?: AbortSignal) => Promise<boolean>;
+  recover: (text: string, messageId: string, cancelled?: AbortSignal) => Promise<boolean>;
   acknowledge: (messageIds: readonly string[]) => void;
   turnControl?: TurnControl;
   lifecycle?: RuntimeLifecycle;
-  conversation?: (room: string) => Promise<RuntimeConnection>;
+  conversation?: (room: string, admission?: InputAdmission) => Promise<RuntimeConnection>;
   close: () => void | Promise<void>;
 };
 

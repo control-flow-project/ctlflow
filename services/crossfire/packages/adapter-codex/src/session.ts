@@ -15,7 +15,7 @@ export type CodexOptions = {
 export type CodexSession = {
   sessionId: string; workspace: string; signal: AbortSignal;
   approval: RuntimeApproval;
-  request: (method: string, params: unknown) => Promise<unknown>;
+  request: (method: string, params: unknown, scope?: AbortSignal) => Promise<unknown>;
   close: () => Promise<void>;
 };
 

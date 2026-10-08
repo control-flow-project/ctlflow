@@ -108,7 +108,7 @@ leave and rejoin both occur between polls. Profile changes do not reset it.
 
 - `packages/agent-core/src/receive.ts`: native history/cursors, projections, bounded snapshot/read and
   acknowledgement publication; no Codex dependency.
-- `packages/agent-core/src/control.ts`: authenticated human intent and bounded native catch-up, minimal
+- `packages/agent-core/src/control.ts`: authenticated source intent and bounded native catch-up, minimal
   durable event/target-turn evidence; no message database.
 - `packages/agent-core/src/listen.ts`: one acquisition loop independent of receipt waiting, batching,
   delivery ordering and checkpoint lifecycle.
@@ -117,15 +117,16 @@ leave and rejoin both occur between polls. Profile changes do not reset it.
 - `packages/agent-tools/src/main.ts`: intentional tool namespace/dispatch through
   fleetd's existing receiver; no standalone lifecycle or receiver fallback.
 
-An eligible human's fresh native `m.mentions.user_ids` mention steers the
+An eligible human or agent's fresh native `m.mentions.user_ids` mention steers the
 selected agent like Esc followed by a new terminal instruction. Wake policy,
-verified human identity, current native membership, room access/mute and active
+verified source identity, current native membership, room access/mute and active
 controller delivery are checked before exact-turn interruption and replacement
 input. Shared histories retain all room context; per-room histories interrupt
 only that room's turn. An idle/sleeping agent receives the instruction normally
 in the same saved history. No new session or receiver is created.
 
-Display-name text, agents, notices, edited or historical mentions cannot steer.
+Accepted human and agent sources have identical authority. Display-name text,
+unaccepted/unknown sources, self-messages, notices, edited or historical mentions cannot steer.
 An explicitly mentioned fresh reply can steer. A mention is not an approval or
 answer to a native question. There is no `!!`-prefixed redirect alias.
 The distinct bare owner `!!` stop holds unread messages until later owner input;
@@ -133,6 +134,13 @@ shared-room stops require a native mention. An authorized redirect is delivered
 before the old backlog. Urgent skip-ahead does not advance contiguous read markers.
 Cancellation is not rollback. Interrupted native input is not blindly replayed,
 and uncertain cancellation is never retargeted to a later turn.
+Every enabled binding watches independently of ordinary work permits. Steering
+preempts ordinary operations and bypasses their queues and collection window.
+Cold starts use bounded immediate native admission, with visible non-acceptance
+on overload. Protected owner-DM receipts distinguish received, verified
+interrupted/already-idle and exact native accepted stages, plus failures and
+supersession. Each receipt preserves room/event/sender and timestamps. Runtime
+telemetry cannot hold owner notices; notices cannot create model feedback.
 A cancelled receipt wait retains its exact native verification boundary. The
 same receipt checker settles that input before any replacement submission: an
 input recorded during interruption is acknowledged, not submitted a second time.

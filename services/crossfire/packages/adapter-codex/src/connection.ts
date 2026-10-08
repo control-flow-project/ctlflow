@@ -1,6 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeConnection, RuntimeHooks, TurnControl } from '@ctlflow/crossfire-agent-core/runtime';
+import type { RuntimeConnection, RuntimeHooks, TurnControl, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
 import { connectSession, type CodexOptions, type CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
 import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
@@ -26,8 +26,9 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
   const failure = { signal: session.signal };
   let revision = 0, checkedRevision = 0, unavailable = 0;
   let wake: (() => void) | undefined;
-  async function nativeState(threadId: string): Promise<'idle' | 'active' | 'notLoaded'> {
-    const response = object(await request('thread/read', { threadId, includeTurns: false }));
+  async function nativeState(threadId: string, scope?: AbortSignal): Promise<'idle' | 'active' | 'notLoaded'> {
+    scope?.throwIfAborted();
+    const response = object(await request('thread/read', { threadId, includeTurns: false }, scope));
     const thread = object(response.thread);
     const status = object(thread.status);
     if (thread.id !== threadId || !['idle', 'active', 'notLoaded'].includes(String(status.type))
@@ -40,14 +41,14 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     return status.type as 'idle' | 'active' | 'notLoaded';
   }
 
-  async function verify(): Promise<void> {
-    if (await nativeState(sessionId) === 'notLoaded') throw new Error('The selected native session is not loaded for direct input; delivery stopped.');
+  async function verify(scope?: AbortSignal): Promise<void> {
+    if (await nativeState(sessionId, scope) === 'notLoaded') throw new Error('The selected native session is not loaded for direct input; delivery stopped.');
   }
 
-  async function latestTurn() {
+  async function latestTurn(scope?: AbortSignal) {
     const result = object(await request('thread/turns/list', {
       threadId: sessionId, limit: 1, sortDirection: 'desc', itemsView: 'notLoaded',
-    }));
+    }, scope));
     if (!Array.isArray(result.data) || result.data.length > 1) throw new Error('Invalid Codex turn page');
     if (!result.data.length) return null;
     const turn = object(result.data[0]);
@@ -57,24 +58,25 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     return { id: turn.id, status: String(turn.status) };
   }
 
-  async function activeTurn(): Promise<string | null> {
-    await verify();
+  async function activeTurn(_room?: string, admission?: InputAdmission): Promise<string | null> {
+    const scope = admission?.signal;
+    await verify(scope);
     let turn: Awaited<ReturnType<typeof latestTurn>>;
-    try { turn = await latestTurn(); }
+    try { turn = await latestTurn(scope); }
     catch (error) {
-      if (unmaterialized(error) && await nativeState(sessionId) === 'idle') return null;
+      if (unmaterialized(error) && await nativeState(sessionId, scope) === 'idle') return null;
       throw error;
     }
     return turn?.status === 'inProgress' ? turn.id : null;
   }
 
-  async function turnStatus(turnId: string): Promise<string> {
+  async function turnStatus(turnId: string, scope?: AbortSignal): Promise<string> {
     let cursor: string | undefined;
     const visited = new Set<string>();
     for (let page = 0; page < 100; page++) {
       const result = object(await request('thread/turns/list', {
         threadId: sessionId, limit: 100, sortDirection: 'desc', itemsView: 'notLoaded', ...(cursor ? { cursor } : {}),
-      }));
+      }, scope));
       if (!Array.isArray(result.data) || result.data.length > 100) throw new Error('Invalid Codex turn page');
       for (const value of result.data) {
         const turn = object(value);
@@ -90,17 +92,20 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     throw new Error('Cannot prove the captured Codex turn status; refusing replacement input');
   }
 
-  async function interrupt(turnId: string, recovery = false): Promise<void> {
-    await verify();
-    if (await turnStatus(turnId) !== 'inProgress') return;
+  async function interrupt(turnId: string, recovery = false, admission?: InputAdmission): Promise<'interrupted' | 'inactive'> {
+    const scope = admission ? AbortSignal.any([failure.signal, admission.signal]) : failure.signal;
+    await verify(scope);
+    const status = await turnStatus(turnId, scope);
+    if (status !== 'inProgress') return status === 'interrupted' ? 'interrupted' : 'inactive';
     if (recovery) throw new Error('Previous cancellation is uncertain and the captured turn is still active; inspect it before restarting the listener');
-    try { await request('turn/interrupt', { threadId: sessionId, turnId }); }
-    catch (error) { if (await turnStatus(turnId) === 'inProgress') throw error; }
+    try { await request('turn/interrupt', { threadId: sessionId, turnId }, scope); }
+    catch (error) { scope.throwIfAborted(); if (await turnStatus(turnId, scope) === 'inProgress') throw error; }
     const deadline = performance.now() + timeoutMs;
     for (;;) {
-      if (await turnStatus(turnId) !== 'inProgress') return;
+      const status = await turnStatus(turnId, scope);
+      if (status !== 'inProgress') return status === 'interrupted' ? 'interrupted' : 'inactive';
       if (performance.now() >= deadline) throw new Error('Codex cancellation remains uncertain; refusing replacement input');
-      await delay(Math.min(pollMs, 100), undefined, { signal: failure.signal });
+      await delay(Math.min(pollMs, 100), undefined, { signal: scope });
     }
   }
 
@@ -116,10 +121,10 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     return true;
   }
 
-  async function historyPage(limit: number, cursor?: string) {
+  async function historyPage(limit: number, cursor?: string, scope?: AbortSignal) {
     const result = object(await request('thread/timeline/list', {
       threadId: sessionId, limit, ...(cursor ? { cursor } : {}),
-    }));
+    }, scope));
     if (!Array.isArray(result.data) || result.data.length > limit) throw new Error('Invalid Codex input history page');
     if (result.nextCursor !== null && (typeof result.nextCursor !== 'string' || !result.nextCursor || !result.data.length)) {
       throw new Error('Invalid Codex input history cursor');
@@ -158,11 +163,11 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     return protocolError(error, -32600) && error.detail === `thread ${sessionId} is not materialized yet; thread/turns/list is unavailable before first user message`;
   }
 
-  async function historyBoundary(): Promise<{ boundary: HistoryBoundary | null; initializing: boolean }> {
-    try { return { boundary: (await historyPage(1)).entries[0]?.boundary ?? null, initializing: false }; }
+  async function historyBoundary(scope?: AbortSignal): Promise<{ boundary: HistoryBoundary | null; initializing: boolean }> {
+    try { return { boundary: (await historyPage(1, undefined, scope)).entries[0]?.boundary ?? null, initializing: false }; }
     catch (error) {
       if (!protocolError(error, -32601)) throw error;
-      try { await latestTurn(); }
+      try { await latestTurn(scope); }
       catch (state) {
         if (unmaterialized(state)) {
           return { boundary: null, initializing: true };
@@ -173,7 +178,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     }
   }
 
-  async function receipt(turnId: string | null, text: string, messageId: string, boundary: HistoryBoundary | null): Promise<{
+  async function receipt(turnId: string | null, text: string, messageId: string, boundary: HistoryBoundary | null, scope: AbortSignal): Promise<{
     status: 'received' | 'pending' | 'interrupted' | 'missing' | 'unavailable'; boundary: HistoryBoundary | null;
   }> {
     let cursor: string | undefined;
@@ -184,7 +189,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     let newest = boundary;
     let position = Infinity;
     for (let page = 0; page < 100; page++) {
-      const result = await historyPage(100, cursor);
+      const result = await historyPage(100, cursor, scope);
       if (page === 0) newest = result.entries[0]?.boundary ?? null;
       for (const value of result.entries) {
         if (value.boundary.position > position || seen.has(value.boundary.key)) {
@@ -235,9 +240,9 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
 
   const delivery = nativeDelivery<CodexInput>({ sessionId, approval: session.approval, signal: session.signal, verify,
     inspect: async () => ({ busy: await activeTurn() !== null || await nativeState(sessionId) === 'active' }), wait,
-    prepare: async (text, messageId) => {
+    prepare: async (text, messageId, scope) => {
       unavailable = 0;
-      return { turn: null, text, messageId, ...await historyBoundary() };
+      return { turn: null, text, messageId, ...await historyBoundary(scope) };
     },
     publish: async (input, retain) => {
       const result = object(await request('turn/start', {
@@ -248,10 +253,10 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
       if (typeof turn.id !== 'string' || !turn.id) throw new Error('Codex did not acknowledge a turn; delivery may be uncertain');
       retain({ ...input, turn: turn.id });
     },
-    received: async (input, retain) => {
+    received: async (input, retain, scope) => {
       checkedRevision = revision;
       let checked: Awaited<ReturnType<typeof receipt>>;
-      try { checked = await receipt(input.turn, input.text, input.messageId, input.boundary); }
+      try { checked = await receipt(input.turn, input.text, input.messageId, input.boundary, scope); }
       catch (error) {
         if (!input.initializing || !protocolError(error, -32601) || ++unavailable >= 3) throw error;
         return false;

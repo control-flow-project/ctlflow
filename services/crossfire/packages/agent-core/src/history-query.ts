@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
-import type { LocalState, Matrix } from './port.js';
+import type { LocalState, Transport } from './port.js';
 import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
 import type { Coordination } from './coordination.js';
 import { readUnread, loadCursors, acknowledge, acquisitionBytes, eventView, validatePage, joinedRooms, validReadBatch, validCursors, roomQuota, type ReadBatch } from './receive.js';
@@ -26,29 +26,36 @@ function readPending(storage: LocalState, file: string): Pending {
     || !check.choice('prepared', 'acknowledging')(pending.stage).ok) throw new Error('Invalid pending unread query');
   return pending as Pending;
 }
-export function historyQueries(options: { storage: LocalState; file: string; matrix: Matrix; coordination: Coordination;
+export function historyQueries(options: { storage: LocalState; file: string; transport: Transport; signal: AbortSignal; coordination: Coordination;
   account: Account; settings: Settings; agentId: string; now: () => number; publishing: () => boolean; artifacts: MessageArtifacts;
   observed?: (events: readonly ReadBatch['events'][number][]) => void; delivered?: (events: readonly ReadBatch['events'][number][]) => void; acknowledged?: () => void }) {
   const pendingFile = options.file + '.query', artifacts = options.artifacts;
   let reading = false;
+  function operationSignal(cancelled?: AbortSignal): AbortSignal {
+    const signal = AbortSignal.any([options.signal, AbortSignal.timeout(30000), ...(cancelled ? [cancelled] : [])]);
+    signal.throwIfAborted();
+    return signal;
+  }
   function expire() {
     if (!options.storage.exists(pendingFile)) return;
     const pending = readPending(options.storage, pendingFile);
     if (pending.stage === 'prepared' && pending.expiresAt <= options.now()) { options.storage.remove(pendingFile); artifacts.release([pending.messageId]); }
   }
-  async function acknowledgeQuery(id: string): Promise<Result<{ accepted: true }>> {
+  async function acknowledgeQuery(id: string, cancelled?: AbortSignal): Promise<Result<{ accepted: true }>> {
     if (reading) return failure('conflict', 'Another receiver query is in progress');
+    const signal = operationSignal(cancelled), client = options.transport(signal, 30000);
     reading = true;
     try {
       expire();
       if (!options.storage.exists(pendingFile)) return failure('missing', 'Unread query not found');
       const pending = readPending(options.storage, pendingFile);
       if (pending.id !== id) return failure('conflict', 'Unread query identity changed');
-      const policy = await options.coordination.delivery(options.agentId);
+      const policy = await options.coordination.delivery(options.agentId, signal);
+      signal.throwIfAborted();
       if (!policy.ok) return policy;
       if (policy.value.matrixUserId !== options.account.user_id || policy.value.ownerMatrixId !== options.settings.owner
         || policy.value.status !== 'active' || policy.value.ownerStatus !== 'active') return failure('forbidden', 'Agent access is no longer active');
-      const joined = new Set(await joinedRooms(options.matrix));
+      const joined = new Set(await joinedRooms(client));
       const allowed = new Set(policy.value.roomGrants.filter(grant => joined.has(grant.roomId)).map(grant => grant.roomId));
       if (pending.batch.events.some(event => !allowed.has(event.room_id))) {
         options.storage.remove(pendingFile); artifacts.release([pending.messageId]);
@@ -57,8 +64,9 @@ export function historyQueries(options: { storage: LocalState; file: string; mat
       const current = JSON.stringify(loadCursors(options.storage, options.file));
       if (options.publishing() || current !== JSON.stringify(pending.base)
         && (pending.stage !== 'acknowledging' || current !== JSON.stringify(pending.batch.cursors))) return failure('conflict', 'Delivery checkpoints changed; the unread query was not acknowledged');
+      signal.throwIfAborted();
       pending.stage = 'acknowledging'; options.storage.write(pendingFile, pending, HISTORY_RESOURCE_BYTES);
-      await acknowledge(options.storage, options.matrix, options.file, pending.batch);
+      await acknowledge(options.storage, client, options.file, pending.batch);
       options.delivered?.(pending.batch.events);
       options.storage.remove(pendingFile); artifacts.release([pending.messageId]);
       options.acknowledged?.();
@@ -67,29 +75,31 @@ export function historyQueries(options: { storage: LocalState; file: string; mat
   }
   return {
     contentFiles: () => options.storage.exists(pendingFile) ? readPending(options.storage, pendingFile).batch.events.flatMap(event => event.content_file ? [event.content_file.file] : []) : [],
-    async read(input: HistoryRequest) {
+    async read(input: HistoryRequest, cancelled?: AbortSignal) {
       expire();
       if (reading || input.kind === 'unread' && options.publishing()) return failure('conflict', 'The receiver is settling another publication; use history browsing or retry catch-up after settlement');
+      const signal = operationSignal(cancelled), client = options.transport(signal, 30000);
       reading = true;
       try {
-        const policy = await options.coordination.delivery(options.agentId);
+        const policy = await options.coordination.delivery(options.agentId, signal);
+        signal.throwIfAborted();
         if (!policy.ok) return policy;
         if (policy.value.matrixUserId !== options.account.user_id || policy.value.ownerMatrixId !== options.settings.owner
           || policy.value.status !== 'active' || policy.value.ownerStatus !== 'active') return failure('forbidden', 'Agent access is not active');
-        const joined = new Set(await joinedRooms(options.matrix));
+        const joined = new Set(await joinedRooms(client));
         const allowed = new Set(policy.value.roomGrants.filter(grant => joined.has(grant.roomId)).map(grant => grant.roomId));
         if (input.room && !allowed.has(input.room) || input.cursors.entries.some(entry => !allowed.has(entry.room))) return failure('forbidden', 'Requested room is outside current agent access');
         let batch: ReadBatch;
         if (input.kind === 'unread') {
           if (options.storage.exists(pendingFile)) return failure('conflict', 'A previous unread query needs its acknowledgment before another catch-up');
           if (input.cursors.entries.length) return failure('invalid', 'Unread queries use saved delivery checkpoints, not supplied history cursors');
-          batch = await readUnread(options.storage, options.matrix, options.settings, options.file, input.limit, input.room, policy.value.maxMessageBytes, undefined, allowed, undefined, artifacts.stage);
+          batch = await readUnread(options.storage, client, options.settings, options.file, input.limit, input.room, policy.value.maxMessageBytes, undefined, allowed, undefined, artifacts.stage);
         } else {
           const rooms = input.room ? [input.room] : [...allowed].sort(), cursors = Object.fromEntries(input.cursors.entries.map(entry => [entry.room, entry.cursor]));
           let events: ReadBatch['events'] = [], fileMode = false;
           const more_rooms: string[] = [], next: Record<string, string> = {};
           for (const [position, room] of rooms.entries()) {
-            const page = await historyPage(options.matrix, room, { dir: input.direction, limit: roomQuota(input.limit, rooms.length, position),
+            const page = await historyPage(client, room, { dir: input.direction, limit: roomQuota(input.limit, rooms.length, position),
               ...(cursors[room] ? { from: cursors[room]! } : {}) });
             validatePage(page, page.requestedLimit, cursors[room]);
             let messages = page.chunk.map(event => eventView(event, room));
@@ -102,9 +112,10 @@ export function historyQueries(options: { storage: LocalState; file: string; mat
           }
           batch = { events, cursors: next, more_rooms, latest: {} };
         }
-        const events = await eventOrigins(options.matrix, options.account.user_id, batch.events);
+        const events = await eventOrigins(client, options.account.user_id, batch.events);
         if (input.kind === 'unread') options.observed?.(events);
-        const identities = await resolveSenders(options.coordination, events, AbortSignal.timeout(30000));
+        const identities = await resolveSenders(options.coordination, events, signal);
+        signal.throwIfAborted();
         const envelope = { ...deliveryEnvelope(events, options.settings, identities), more_rooms: batch.more_rooms,
           continuation: { entries: Object.entries(batch.cursors).filter(([room]) => allowed.has(room)).map(([room, cursor]) => ({ room, cursor })) } };
         const id = randomUUID(), messageId = 'query-' + id;
@@ -117,11 +128,12 @@ export function historyQueries(options: { storage: LocalState; file: string; mat
       } finally { reading = false; }
     },
     acknowledge: acknowledgeQuery,
-    async recover() {
+    recovering: () => !reading && options.storage.exists(pendingFile) && readPending(options.storage, pendingFile).stage === 'acknowledging',
+    async recover(cancelled?: AbortSignal) {
       if (reading || !options.storage.exists(pendingFile)) return success(undefined);
       const pending = readPending(options.storage, pendingFile);
       if (pending.stage !== 'acknowledging') return success(undefined);
-      const result = await acknowledgeQuery(pending.id);
+      const result = await acknowledgeQuery(pending.id, cancelled);
       return result.ok ? success(undefined) : result;
     },
     pending() {

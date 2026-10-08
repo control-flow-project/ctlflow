@@ -4,7 +4,7 @@ import type { Matrix } from './port.js';
 import type { Settings, Account, Event } from '@ctlflow/crossfire-contracts/client';
 import { eventView, incrementalEvents, type ReceivedEvent, type Sync } from './receive.js';
 import { createHash } from 'node:crypto';
-import { LISTENER_NOTICE, mentionsAgent } from '@ctlflow/crossfire-contracts/notices';
+import { LISTENER_NOTICE, isListenerNotice, mentionsAgent } from '@ctlflow/crossfire-contracts/notices';
 import type { Coordination } from './coordination.js';
 import { resolveSenders } from './senders.js';
 
@@ -17,8 +17,9 @@ export type Control = {
 };
 export type ControlState = { thread: string; paused: boolean; controls: Control[] };
 
-export function humanText(event: Event | ReceivedEvent, observer: string): boolean {
+export function sourceText(event: Event | ReceivedEvent, observer: string): boolean {
   return event.type === 'm.room.message' && event.sender === observer && event.content.msgtype === 'm.text'
+    && !isListenerNotice(event)
     && typeof event.content.body === 'string' && !event.content['m.new_content']
     && !(event.content['m.relates_to'] && typeof event.content['m.relates_to'] === 'object'
       && !Array.isArray(event.content['m.relates_to']) && event.content['m.relates_to'].rel_type === 'm.replace');
@@ -35,7 +36,7 @@ export function loadControl(storage: LocalState, path: string, thread: string): 
   return state;
 }
 
-export async function* humanEvents(client: Matrix, sync: Sync,
+export async function* sourceEvents(client: Matrix, sync: Sync,
   since: string | undefined, selector?: string): AsyncGenerator<ReceivedEvent> {
   if (!since) return;
   for (const [room, data] of Object.entries(sync.rooms?.join ?? {})) {
@@ -44,7 +45,7 @@ export async function* humanEvents(client: Matrix, sync: Sync,
     if (!timeline) continue;
     for await (const event of incrementalEvents(client, sync, since, room,
       { types: ['m.room.message'] })) {
-      if (!humanText(event, event.sender)) continue;
+      if (event.type !== 'm.room.message') continue;
       yield eventView(event, room);
     }
   }
@@ -52,12 +53,12 @@ export async function* humanEvents(client: Matrix, sync: Sync,
 
 export async function isControl(client: Matrix, settings: Settings, account: Account, event: ReceivedEvent,
   coordination: Coordination, senders: ReadonlySet<string>, signal: AbortSignal): Promise<boolean> {
-  if (!humanText(event, event.sender) || event.sender === account.user_id) return false;
+  if (!sourceText(event, event.sender) || event.sender === account.user_id) return false;
   const mentioned = mentionsAgent(event, account.user_id);
   const pause = event.sender === settings.owner && String(event.content.body).trim() === '!!';
-  if (!pause && !(mentioned && senders.has(event.sender))) return false;
+  if (!pause && (!senders.has(event.sender) || !mentioned)) return false;
   const identity = (await resolveSenders(coordination, [event], signal)).get(event.sender);
-  if (identity?.kind !== 'human') return false;
+  if (!identity || identity.kind === 'unknown') return false;
   const joined = (await client.get<{ joined: Record<string, unknown> }>(`${API}/rooms/${segment(event.room_id)}/joined_members`)).joined;
   const members = Object.keys(joined);
   signal.throwIfAborted();
@@ -65,7 +66,7 @@ export async function isControl(client: Matrix, settings: Settings, account: Acc
 }
 
 export function saveControl(storage: LocalState, file: string, state: ControlState): void {
-  if (state.controls.length > 1000) throw new Error('Uncheckpointed human controls exceed 1000; drain acknowledged history before continuing');
+  if (state.controls.length > 1000) throw new Error('Uncheckpointed source controls exceed 1000; drain acknowledged history before continuing');
   if (storage.exists(file) && JSON.stringify(storage.read<unknown>(file)) === JSON.stringify(state)) return;
   storage.write(file, state);
 }

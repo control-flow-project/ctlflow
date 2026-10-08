@@ -10,11 +10,11 @@ export type Publication<Input extends NativeMessage> = {
   sessionId: string;
   approval: RuntimeApproval;
   signal: AbortSignal;
-  verify: () => void | Promise<void>;
+  verify: (signal: AbortSignal) => void | Promise<void>;
   inspect: () => Promise<{ busy: boolean }>;
-  prepare: (text: string, messageId: string) => Input | Promise<Input>;
+  prepare: (text: string, messageId: string, signal: AbortSignal) => Input | Promise<Input>;
   publish: (input: Input, retain: (input: Input) => void) => void | Promise<void>;
-  received: (input: Input, retain: (input: Input) => void) => NativeReceipt | Promise<NativeReceipt>;
+  received: (input: Input, retain: (input: Input) => void, signal: AbortSignal) => NativeReceipt | Promise<NativeReceipt>;
   cancel?: (input: Input) => boolean | Promise<boolean>;
   wait?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
   close: () => void | Promise<void>;
@@ -38,10 +38,10 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
     let deadline = now() + timeoutMs;
     for (;;) {
       scope.throwIfAborted();
-      await native.verify();
+      await native.verify(scope);
       const input = journal.pending();
       if (!input) throw new Error('Native publication evidence disappeared before settlement');
-      const receipt = await native.received(input, retain);
+      const receipt = await native.received(input, retain, scope);
       if (receipt === true || receipt === 'cancelled' || receipt === 'interrupted') {
         journal.complete(input, receipt === true); return receipt;
       }
@@ -62,12 +62,12 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
     inspect: async () => { native.signal.throwIfAborted(); return native.inspect(); },
     close: async () => { try { await native.close(); } finally { journal.close(); } },
     acknowledge: journal.acknowledge, unsettled: () => operating || journal.unsettled(),
-    settle: () => exclusive(async () => await settle() === true),
-    recover: (text, messageId) => exclusive(async () => {
+    settle: cancelled => exclusive(async () => await settle(cancelled ? AbortSignal.any([native.signal, cancelled]) : native.signal) === true),
+    recover: (text, messageId, cancelled) => exclusive(async () => {
       const pending = journal.pending();
       if (pending) {
         if (pending.messageId !== messageId || pending.text !== text) throw new Error('Receipt recovery does not match the pending native input');
-        return await settle() === true;
+        return await settle(cancelled ? AbortSignal.any([native.signal, cancelled]) : native.signal) === true;
       }
       return journal.confirmed(text, messageId);
     }),
@@ -81,8 +81,8 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
         if (journal.confirmed(text, messageId)) return;
         let input = journal.pending();
         if (!input) {
-          await native.verify();
-          input = await native.prepare(text, messageId);
+          await native.verify(scope);
+          input = await native.prepare(text, messageId, scope);
           if (input.messageId !== messageId || input.text !== text) throw new Error('Native input preparation changed its identity or content');
           scope.throwIfAborted();
           journal.prepare(input);

@@ -37,7 +37,7 @@ export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
       const primary = await contexts.open(input.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared');
       return success({ ...primary, signal: contexts.signal, attachment: { ...attachment, sessionId: primary.sessionId },
         attachments: contexts.attachments, inspect: contexts.inspect,
-        ...(input.listenerOptions?.historyMode === 'per-room' ? { conversation: (room: string) => contexts.open(room) } : {}),
+        ...(input.listenerOptions?.historyMode === 'per-room' ? { conversation: contexts.open } : {}),
         settle: contexts.settle, acknowledge: contexts.acknowledge, turnControl: { activeTurn: contexts.activeTurn, interrupt: contexts.interrupt },
         close: async () => { try { await contexts.close(); } finally { await owner.close(); } } });
     } catch (error) { try { await histories?.close(); } finally { await process?.close(); }

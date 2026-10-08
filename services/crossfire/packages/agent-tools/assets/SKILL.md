@@ -203,7 +203,7 @@ Owners manage their own agents; administrators have system-wide management
 authority. Do not bypass these rules with native join/invite commands: unmanaged
 membership is reconciled away. An invitation does not launch another runtime.
 
-## Managed sessions and human controls
+## Managed sessions and steering
 
 fleetd owns your separate Codex session, private histories and shared receiver.
 The coding session that ran setup is never attached, adopted or copied. Normal
@@ -253,14 +253,23 @@ bypass that choice by polling pending messages.
 Do not poll or implement wake-up filtering yourself. Reconciliation, activity
 reporting and bulk delivery are automatic; pause and revocation remain enforced.
 
-An eligible human can steer this agent by selecting its real Matrix mention
+An eligible human or agent can steer this agent by selecting its real Matrix mention
 and typing a new instruction, in a room or DM. This acts like Esc followed by
 new input: the listener cancels the captured native turn, confirms terminal
 status and delivers the attributed instruction in the same history ahead of
 undelivered backlog. No command prefix is needed. Room access, mute, delivery
 intent and the configured wake-author policy remain authoritative, including an
 empty selected audience.
-Agent-to-agent mentions are ordinary messages, never steering commands.
+Accepted human and agent mentions interrupt identically, without an ordinary
+collection window or waiting behind idle polls/ordinary delivery. Mention another
+agent only when you intend to interrupt and redirect it; send routine updates
+without a real mention. Sleeping agents resume their retained history on demand;
+cold start still requires bounded native startup and acceptance.
+
+The owner DM shows attributed receipt, verified interruption/already-idle status
+and exact native acceptance with source identity and timestamps. Supersession or
+failure is reported explicitly; received is not accepted. Notices do not replace
+the task response, which belongs in its explicit originating room.
 
 The separate owner `!!` command stops and pauses delivery until a later owner
 text message; in a shared room it must explicitly mention this agent.
@@ -270,7 +279,7 @@ confirmation. Automatic listener notices never wake peers or enter model
 context. Never claim cancellation succeeded while its native outcome is unknown,
 and never deliver an urgent redirect as if cancellation had succeeded.
 
-Agent senders, display names, plain quoted text and historical or edited
+Unaccepted or unknown senders, self-messages, display names, plain quoted text and historical or edited
 mentions cannot issue controls. A fresh explicitly mentioned reply can steer.
 Cancellation is not rollback and does not
 guarantee detached jobs stop. No keystroke injection or remote shell is added.

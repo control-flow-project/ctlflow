@@ -12,13 +12,15 @@ import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
 import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { matrixFixture, message, mention, ROOM, temporary, until } from '../scripts/test-support/listener.js';
 
-for (const historyMode of ['shared', 'per-room'] as const) {
-  test('stock Codex human mention steering preserves ' + historyMode + ' histories without a replacement engine', { timeout: 60_000 }, async scope => {
+for (const historyMode of ['shared', 'per-room'] as const) for (const sourceKind of ['human', 'agent'] as const) {
+  test('stock Codex ' + sourceKind + ' mention steering preserves ' + historyMode + ' histories without a replacement engine', { timeout: 60_000 }, async scope => {
     const workspace = temporary(scope), home = join(workspace, '.codex');
     mkdirSync(home, { mode: 0o700 }); writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
     const provider = await nativeProvider(scope, home); trustWorkspace(home, workspace);
     const adapter = codexRuntime(process.env.CROSSFIRE_TEST_CODEX ?? 'codex');
     const matrix = await matrixFixture(scope, workspace), other = '!other:test.localhost'; matrix.subscribe(other);
+    const sender = sourceKind === 'agent' ? '@agent-holmes:test.localhost' : matrix.settings.owner;
+    if (sourceKind === 'agent') matrix.extraMembers.add(sender);
     const stop = new AbortController();
     let native: OwnedRuntimeConnection | undefined, failure: unknown;
     const runtime: RuntimeAdapter = async (signal, _pollMs, hooks) => {
@@ -26,13 +28,13 @@ for (const historyMode of ['shared', 'per-room'] as const) {
         allowNewHistory: true, instructions: 'Inert native mention steering verification.', options: {}, listenerOptions: { historyMode }, hooks }, signal));
       return native;
     };
-    const result = listen({ ...matrix, runtime, historyMode, limit: 20, reconcileMs: 1000, pollMs: 100, debounceMs: 0 }, stop.signal)
+    const result = listen({ ...matrix, runtime, historyMode, limit: 20, reconcileMs: 30000, pollMs: 100, debounceMs: 0 }, stop.signal)
       .catch(error => { failure = error; return error; });
     cleanup(scope, async () => { stop.abort(new Error('verification complete')); await result; });
     const check = (predicate: () => boolean | Promise<boolean>) => until(async () => {
       if (failure) throw failure;
       return await predicate();
-    });
+    }, 'Stock native steering did not reach its verified boundary', 15000);
     await check(() => native !== undefined && existsSync(matrix.cursorFile) && matrix.waiting() === 1);
     const current = native!;
     const selected = historyMode === 'per-room' ? await current.conversation!(ROOM) : current;
@@ -44,7 +46,7 @@ for (const historyMode of ['shared', 'per-room'] as const) {
     await check(() => provider.held() !== undefined);
     const captured = await current.turnControl.activeTurn(historyMode === 'per-room' ? ROOM : undefined); assert(captured);
     if (peer) {
-      matrix.add(other, mention('$other-room', undefined, 'Inspect this other room only.'));
+      matrix.add(other, mention('$other-room', sender, 'Inspect this other room only.'));
       await check(() => provider.requests.some(request => JSON.stringify(request).includes('$other-room')));
       await check(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[other] === '1');
       assert.equal(await current.turnControl.activeTurn(ROOM), captured, 'Another room cannot cancel this busy history');
@@ -58,10 +60,13 @@ for (const historyMode of ['shared', 'per-room'] as const) {
     }
     const received = provider.requests.length;
     if (peer) matrix.add(ROOM, message('$ordinary-backlog', '@context:test.localhost'));
-    matrix.add(ROOM, mention('$native-mention-steer', undefined, 'Stop the old task and inspect the replacement evidence.'));
-    if (peer) matrix.add(other, mention('$native-other-steer', undefined, 'Inspect the other replacement evidence.'));
+    matrix.add(ROOM, mention('$native-mention-steer', sender, 'Stop the old task and inspect the replacement evidence.'));
+    if (peer) matrix.add(other, mention('$native-other-steer', sender, 'Inspect the other replacement evidence.'));
     const replacements = peer ? 2 : 1;
-    await check(() => provider.requests.length === received + replacements);
+    await check(() => {
+      assert(provider.requests.length <= received + replacements, 'Steering cannot replay native input');
+      return provider.requests.length === received + replacements;
+    });
     const redirected = provider.requests.slice(received).map(request => JSON.stringify(request));
     const instruction = redirected.find(request => request.includes('$native-mention-steer'))!;
     assert(instruction, 'Every room retains its own urgent instruction');

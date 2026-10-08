@@ -48,3 +48,14 @@ test('shared native startup queue is FIFO, cancellable, bounded and release is i
   releaseFirst(); const releaseSecond = await second; assert.deepEqual(order, [1, 2]);
   releaseSecond(); releases.slice(1).forEach(release => release());
 });
+
+test('immediate admission never joins an ordinary queue or exceeds the native startup resource bound', async () => {
+  const budget = createListenerBudget(), signal = new AbortController().signal;
+  const releases = await Promise.all(Array.from({ length: 4 }, () => budget.acquire('native-start', signal)));
+  let ordinaryAdmitted = false;
+  const ordinary = budget.acquire('native-start', signal).then(release => { ordinaryAdmitted = true; return release; });
+  await assert.rejects(budget.acquire('native-start', signal, 'immediate'), /Immediate native-start admission is unavailable/u);
+  assert.equal(ordinaryAdmitted, false);
+  releases[0]!(); const release = await ordinary; release(); releases.slice(1).forEach(unlock => unlock());
+  const immediate = await budget.acquire('native-start', signal, 'immediate'); immediate();
+});

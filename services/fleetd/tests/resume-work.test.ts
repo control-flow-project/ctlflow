@@ -22,7 +22,7 @@ function connection(sessionId: string, receipts: Set<string>, delivered: { sessi
     deliver: async (text, messageId) => { receipts.add(messageId); delivered.push({ sessionId, messageId, text }); },
     recover: async (_text, messageId) => receipts.has(messageId), acknowledge: ids => { for (const id of ids) receipts.delete(id); },
     settle: async () => false, inspect: async () => ({ busy: false }), close: async () => {},
-    turnControl: { activeTurn: async () => null, interrupt: async () => {} } };
+    turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' } };
 }
 
 test('every continuation asks for current AGENTS.md instructions before resuming unfinished work', () => {

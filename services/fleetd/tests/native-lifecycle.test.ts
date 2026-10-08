@@ -7,6 +7,7 @@ import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/cross
 import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
 import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
 import type { ResumeWork } from '@ctlflow/fleetd-domain/resume-work';
+import type { InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 async function initializedLifecycle(...input: Parameters<typeof createNativeLifecycle>): Promise<Awaited<ReturnType<typeof createNativeLifecycle>>> {
@@ -48,7 +49,7 @@ function fixture() {
         attachments: async () => saved.map(context => ({ context: context.context, attachment: { runtime: 'fixture', sessionId: context.sessionId, workspace: '/fixture', connection: {} } })),
         inspect: () => inspect ? inspect() : unknown ? Promise.reject(new Error('Unknown native status')) : Promise.resolve({ busy }),
         deliver: async (_text, messageId) => { delivered.push(messageId); }, recover: async (_text, messageId) => delivered.includes(messageId),
-        acknowledge: () => {}, settle: async () => false, turnControl: { activeTurn: async () => null, interrupt: async () => {} },
+        acknowledge: () => {}, settle: async () => false, turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' },
         close: async () => { closed.push(context.sessionId); stop.abort(new Error('Closed native fixture')); },
       };
       return success(connection);
@@ -64,6 +65,57 @@ function fixture() {
     setPending: (value: boolean) => { pending = value; }, setDecisions: (value: boolean) => { decisions = value; },
     setInspect: (value: typeof inspect) => { inspect = value; }, recovered: () => recovered, timers: () => timers.size };
 }
+
+test('sleeping mention capture uses immediate admission and retained history without a dummy model input', async scope => {
+  const current = fixture(), stop = new AbortController(), deadline = new AbortController();
+  const admission: InputAdmission = { priority: 'steering', signal: deadline.signal };
+  let received: InputAdmission | undefined;
+  const start = current.services.start;
+  const managed = value(await initializedLifecycle({ ...current.services, initial: 'sleeping', start: async (signal, observe, requested) => {
+    received = requested; return start(signal, observe, requested);
+  } }, stop.signal));
+  scope.after(() => managed.close());
+  assert.equal(current.started.length, 0);
+  assert.equal(await managed.runtime.turnControl!.activeTurn(undefined, admission), null);
+  assert.equal(received, admission); assert.equal(current.started.length, 1); assert.deepEqual(current.delivered, []);
+  await managed.runtime.deliver('Attributed steering', 'steering-1', deadline.signal, 'steering');
+  managed.runtime.acknowledge(['steering-1']);
+  deadline.abort(new Error('Input deadline no longer owns the native lifetime'));
+  assert.equal(managed.runtime.sessionId, 'exact-history'); assert.equal(managed.runtime.signal.aborted, false);
+  assert.equal(current.started[0]!.signal.aborted, false); assert.deepEqual(current.delivered, ['steering-1']);
+});
+
+test('a priority mention never waits behind an ordinary in-progress native resume or creates a competing engine', async scope => {
+  const current = fixture(), stop = new AbortController();
+  let release!: () => void, entered = false;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const start = current.services.start;
+  const managed = value(await initializedLifecycle({ ...current.services, initial: 'sleeping', start: async (signal, observe, requested) => {
+    entered = true; await gate; return start(signal, observe, requested);
+  } }, stop.signal));
+  scope.after(async () => { release(); await managed.close(); });
+  const ordinary = managed.resume();
+  await until(() => entered);
+  await assert.rejects(managed.runtime.turnControl!.activeTurn(undefined, { priority: 'steering', signal: stop.signal }), /already in progress/u);
+  assert.equal(current.started.length, 0);
+  release(); assert((await ordinary).ok);
+  assert.equal(await managed.runtime.turnControl!.activeTurn(undefined, { priority: 'steering', signal: stop.signal }), null);
+  assert.equal(current.started.length, 1); assert.deepEqual(current.delivered, []);
+});
+
+test('immediate startup overload reports non-acceptance and a later mention resumes the same saved history', async scope => {
+  const current = fixture(), stop = new AbortController();
+  const start = current.services.start;
+  let overloaded = true;
+  const managed = value(await initializedLifecycle({ ...current.services, initial: 'sleeping', start: async (signal, observe, requested) =>
+    overloaded ? failure('unavailable', 'Immediate native-start admission unavailable') : start(signal, observe, requested) }, stop.signal));
+  scope.after(() => managed.close());
+  await assert.rejects(managed.runtime.turnControl!.activeTurn(undefined, { priority: 'steering', signal: stop.signal }), /admission unavailable/u);
+  assert.equal(current.failures.length, 1); assert.deepEqual(current.delivered, []); assert.equal(current.started.length, 0);
+  overloaded = false;
+  assert.equal(await managed.runtime.turnControl!.activeTurn(undefined, { priority: 'steering', signal: stop.signal }), null);
+  assert.equal(current.started.length, 1); assert.equal(managed.runtime.sessionId, 'exact-history');
+});
 
 test('30 minute sleep closes native processes, not the listener; input resumes the exact saved history', async scope => {
   const fixture_ = fixture(), stop = new AbortController();
@@ -347,6 +399,9 @@ test('input racing with native cleanup observes sleeping before waking and resum
   };
   const managed = value(await initializedLifecycle(fixture_.services, new AbortController().signal)); scope.after(() => managed.close());
   await fixture_.advance(1800000); await until(() => closing);
+  await assert.rejects(managed.runtime.turnControl!.activeTurn(undefined, { priority: 'steering', signal: new AbortController().signal }),
+    error => error instanceof Error && 'code' in error && error.code === 'unavailable');
+  assert.equal(fixture_.started.length, 1, 'Immediate admission cannot wait behind cleanup or create a competing native owner');
   const delivered = managed.runtime.deliver('Raced input', 'race');
   await yieldLoop(); assert.equal(fixture_.started.length, 1);
   finish(); await delivered; managed.runtime.acknowledge(['race']);

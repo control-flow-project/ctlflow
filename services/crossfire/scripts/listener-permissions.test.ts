@@ -27,7 +27,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
       return { sessionId: THREAD, approval: 'listener', signal, inspect: async () => ({ busy: false }), deliver: async text => { delivered.push(text); }, settle: async () => false, recover: async () => false, acknowledge: () => {},
-        turnControl: { activeTurn: async () => null, interrupt: async () => {} }, close: () => { closed = true; } };
+        turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' }, close: () => { closed = true; } };
     },
   }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(receiving); });
@@ -73,7 +73,7 @@ test('an unavailable first-use owner DM denies only that permission request, not
     runtime: async (signal, _pollMs, callbacks) => {
       hooks = callbacks;
       return { sessionId: THREAD, approval: 'listener', signal, inspect: async () => ({ busy: false }), deliver: async () => {}, settle: async () => false, recover: async () => false, acknowledge: () => {},
-        turnControl: { activeTurn: async () => null, interrupt: async () => {} }, close: () => { closed = true; } };
+        turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' }, close: () => { closed = true; } };
     },
   }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(receiving); });

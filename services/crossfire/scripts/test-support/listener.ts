@@ -194,6 +194,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   const failures = new Map<string, number[]>();
   const gates = new Map<string, { wait: Promise<void>; entered: () => void }>();
   const requests: { path: string; query: URLSearchParams; method?: string; body?: unknown }[] = [];
+  const transactions = new Map<string, string>();
   const eventPositions = new Map<string, number>();
   const extraMembers = new Set<string>();
   const muted = new Set<string>();
@@ -256,7 +257,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
         senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
         roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', powerLevel: null, muted: muted.has(room) })) });
     } else if (path === '/api/agents/' + AGENT_ID + '/owner-conversation' && request.method === 'POST') {
-      joined.add(OWNER_DM); wake();
+      if (!joined.has(OWNER_DM)) { joined.add(OWNER_DM); wake(); }
       api(response, { roomId: OWNER_DM });
     } else if (path === '/api/agents/' + AGENT_ID) {
       api(response, { agentId: AGENT_ID, matrixUserId: SELF, name: 'watson', displayName: 'Watson (Human)',
@@ -341,8 +342,11 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     } else if (path.includes('/typing/')) {
       send(response, {});
     } else if (path.includes('/send/m.room.message/')) {
+      const previous = transactions.get(path);
+      if (previous) { send(response, { event_id: previous }); return; }
       const room = path.slice((API + '/rooms/').length, path.indexOf('/send/'));
       const event = { ...message('$sent-' + revision, SELF), content: body as Event['content'] };
+      transactions.set(path, event.event_id);
       const events = rooms.get(room) ?? [];
       events.push(event); rooms.set(room, events);
       eventPositions.set(event.event_id, revision + 1); wake(); send(response, { event_id: event.event_id });

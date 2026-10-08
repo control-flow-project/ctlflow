@@ -1,6 +1,6 @@
 import { failure, success, type Result, type Failure } from '@ctlflow/crossfire-kernel/result';
 import type { Clock } from '@ctlflow/crossfire-agent-core/port';
-import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval } from '@ctlflow/crossfire-agent-core/runtime';
+import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
 import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 import { canRecoverFailure } from '@ctlflow/crossfire-kernel/lifecycle';
@@ -18,7 +18,7 @@ export type NativeLifecycleServices = {
   initial: 'running' | 'sleeping';
   work: ResumeWorkStore;
   saved(): Promise<Result<SavedRuntimeContext[]>>;
-  start(signal: AbortSignal, observe: NonNullable<RuntimeHooks['observe']>): Promise<Result<OwnedRuntimeConnection>>;
+  start(signal: AbortSignal, observe: NonNullable<RuntimeHooks['observe']>, admission?: InputAdmission): Promise<Result<OwnedRuntimeConnection>>;
   failed(sessionId: string | null, error: unknown): void;
   recovered(): void;
 };
@@ -118,11 +118,18 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     await cleanup;
     if (closingNative === cleanup) closingNative = undefined;
   }
-  async function ensure(): Promise<OwnedRuntimeConnection> {
+  async function ensure(admission?: InputAdmission): Promise<OwnedRuntimeConnection> {
     lifetime.throwIfAborted();
-    if (closingNative) await closingNative;
+    admission?.signal.throwIfAborted();
+    if (closingNative) {
+      if (admission) throw nativeError('unavailable', 'Exact-history shutdown is still in progress; immediate input has not been accepted');
+      await closingNative;
+    }
     lifetime.throwIfAborted();
-    if (opening) return opening;
+    if (opening) {
+      if (admission) throw nativeError('unavailable', 'Exact-history resume is already in progress; immediate input has not been accepted');
+      return opening;
+    }
     if (native && !native.signal.aborted && (!activated || continuationReady)) return native;
     const pending = (async () => {
       recordingWork = false;
@@ -134,7 +141,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         emit('waking', contexts.filter(context => context.context === services.primary));
         const started = await services.start(lifetime, event => {
           if (generation === observationGeneration && !lifetime.aborted) observe(event);
-        });
+        }, admission);
         if (!started.ok) { initializationFailure = started.error; throw nativeError(started.error.code, started.error.message); }
         connection = started.value;
         if (lifetime.aborted) { await connection.close(); lifetime.throwIfAborted(); }
@@ -188,11 +195,11 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       report(error); throw error;
     } finally { if (opening === pending) opening = undefined; }
   }
-  async function call<Value>(operation: (connection: OwnedRuntimeConnection) => Promise<Value>, activity = false): Promise<Value> {
+  async function call<Value>(operation: (connection: OwnedRuntimeConnection) => Promise<Value>, activity = false, admission?: InputAdmission): Promise<Value> {
     activeCalls++;
     if (activity) touch();
     let connection: OwnedRuntimeConnection | undefined;
-    try { connection = await ensure(); return await operation(connection); }
+    try { connection = await ensure(admission); admission?.signal.throwIfAborted(); return await operation(connection); }
     catch (error) {
       if (!lifetime.aborted && connection?.signal.aborted) throw nativeError('unavailable', 'Native input is waiting for exact-history recovery');
       throw error;
@@ -232,8 +239,8 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     await discard(connection, () => { phase = 'sleeping'; emit('sleeping'); });
   }
   function logical(context: string, expectedSession: string): RuntimeConnection {
-    async function selected(connection: OwnedRuntimeConnection): Promise<RuntimeConnection> {
-      const target = context === services.primary ? connection : connection.conversation ? await connection.conversation(context) : undefined;
+    async function selected(connection: OwnedRuntimeConnection, admission?: InputAdmission): Promise<RuntimeConnection> {
+      const target = context === services.primary ? connection : connection.conversation ? await connection.conversation(context, admission) : undefined;
       if (!target || target.sessionId !== expectedSession) throw nativeError('conflict', 'The captured room history is not the resumed native history');
       return target;
     }
@@ -248,20 +255,21 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         if (!native || native.signal.aborted) return { busy: phase === 'waking' || phase === 'failed' || !!opening || activeCalls > 0 };
         return { busy: activeCalls > 0 || unsettled.size > 0 || (await native.inspect()).busy };
       },
-      deliver: async (text, messageId, cancelled) => {
+      deliver: async (text, messageId, cancelled, priority) => {
         cancelled?.throwIfAborted();
         unsettled.add(messageId);
-        await call(async connection => { cancelled?.throwIfAborted(); await (await selected(connection)).deliver(text, messageId, cancelled); }, true);
+        await call(async connection => { cancelled?.throwIfAborted(); await (await selected(connection, priority ? { priority, signal: cancelled ?? lifetime } : undefined)).deliver(text, messageId, cancelled, priority); }, true,
+          priority ? { priority, signal: cancelled ?? lifetime } : undefined);
       },
-      recover: async (text, messageId) => {
+      recover: async (text, messageId, cancelled) => {
         unsettled.add(messageId);
-        const received = await call(async connection => (await selected(connection)).recover(text, messageId), true);
+        const received = await call(async connection => (await selected(connection)).recover(text, messageId, cancelled), true);
         if (!received) { unsettled.delete(messageId); schedule(); }
         return received;
       },
-      settle: async () => {
+      settle: async cancelled => {
         if (!native && !services.hooks.pendingInput?.() && !services.hooks.pendingDecisions?.()) return false;
-        return call(connection => connection.settle());
+        return call(async connection => (await selected(connection)).settle(cancelled));
       },
       acknowledge: ids => {
         if (!ids.length) return;
@@ -271,15 +279,17 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         schedule();
       },
       turnControl: {
-        activeTurn: async room => native && !native.signal.aborted ? native.turnControl.activeTurn(room) : null,
-        interrupt: async (turn, recovery) => { await call(connection => connection.turnControl.interrupt(turn, recovery), true); },
+        activeTurn: async (room, admission) => admission
+          ? call(connection => connection.turnControl.activeTurn(room, admission), false, admission)
+          : native && !native.signal.aborted ? native.turnControl.activeTurn(room) : null,
+        interrupt: async (turn, recovery, admission) => call(connection => connection.turnControl.interrupt(turn, recovery, admission), true, admission),
       },
-      conversation: async room => call(async connection => {
+      conversation: async (room, admission) => call(async connection => {
         if (!connection.conversation) throw nativeError('invalid', 'This native runtime does not support room histories');
-        const target = await connection.conversation(room);
+        const target = await connection.conversation(room, admission);
         await refreshContexts();
         return logical(room, target.sessionId);
-      }),
+      }, false, admission),
       close,
     };
   }

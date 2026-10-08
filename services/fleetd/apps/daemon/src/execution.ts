@@ -215,15 +215,24 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
               saved: () => adapter.savedContexts({ workspace, stateDirectory }),
               failed: (sessionId, error) => reporters.get(configuration.directory)?.record(identity.agentId, sessionId, error),
               recovered: () => reporters.get(configuration.directory)?.recovered(identity.agentId),
-              start: async (scope, observe) => {
-                const unlock = await listenerHost.budget.acquire('native-start', scope);
+              start: async (scope, observe, admission) => {
+                const unlock = await listenerHost.budget.acquire('native-start', admission ? AbortSignal.any([scope, admission.signal]) : scope,
+                  admission ? 'immediate' : undefined);
+                const starting = new AbortController();
+                const cancelled = () => starting.abort(admission?.signal.reason);
+                admission?.signal.addEventListener('abort', cancelled, { once: true });
                 try {
+                  admission?.signal.throwIfAborted();
                   const opened = await adapter.start({ profile: instance.key, name: instance.name, workspace, stateDirectory, instructions, options: definition.options, hooks: { ...hooks, observe },
                     allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
-                    ...(instance.listenerOptions ? { listenerOptions: instance.listenerOptions } : {}) }, scope);
+                    ...(instance.listenerOptions ? { listenerOptions: instance.listenerOptions } : {}) }, AbortSignal.any([scope, starting.signal]));
+                  if (admission?.signal.aborted) {
+                    if (opened.ok) await opened.value.close();
+                    admission.signal.throwIfAborted();
+                  }
                   if (opened.ok) initializedHistory(configuration.directory, identity.agentId);
                   return opened;
-                } finally { unlock(); }
+                } finally { admission?.signal.removeEventListener('abort', cancelled); unlock(); }
               },
             }, runtimeStop);
             if (!started.ok) throw Object.assign(new Error(started.error.message), { code: started.error.code });
