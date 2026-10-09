@@ -28,6 +28,7 @@ project or Bad Bets source belongs to this change.
 | Receipt verification can wait for polling despite a native input notification | Native user-item notifications wake exact timeline verification; they never substitute for retained receipt evidence | Codex runtime adapter |
 | Element sends ambient host cookies on native profile writes | Ignore cookies at the Matrix bearer-only profile boundary; reject cookie-only authentication and foreign origins | Matrix HTTP boundary |
 | Native initialization reports an obsolete client version | Version comes from coordinated owned package metadata | Native protocol composition |
+| Acquiring a receipt lock creates a disk journal mistaken for context metadata | Private lock-only SQLite transactions use a verified in-memory journal; native exclusive ownership remains authoritative | Filesystem lock owner |
 
 ## Preservation and removed paths
 
@@ -56,6 +57,31 @@ Code paths for individual non-fleet agents, unsupported Claude/Pi implementation
 native conversation adoption and private npm publication remain absent. Only
 `@ctlflow/fleet` and `@ctlflow/fleetd` can be published. External dependency records
 are not changed by the coordinated 0.1.14 metadata update.
+
+The 0.1.14 packages were published and anonymously installed with byte-exact
+executable verification. Real fleet rollout then refused unknown metadata before
+converting any contexts: SQLite creates a temporary disk rollback journal while
+acquiring an exclusive receipt lock. This was reproduced with the native lock
+implementation. The correct owning fix uses a verified in-memory journal for
+lock-only databases; it does not add an ignore rule to the converter. Retained
+receipt locks are now present in migration fixtures, and the process-lock test
+checks absence of disk sidecars alongside suspension, death and inode ownership.
+Prepared conversion manifests must also enumerate every retained obsolete record
+before publishing or retiring anything; interrupted conversion tests use the
+complete finite file set, including locks. A manifest omitting a retained record
+is rejected without publishing a registry.
+Published versions are immutable; the corrected coordinated release is 0.1.15.
+All external dependency records remain unchanged. Final gates and deployment
+evidence follow only after they complete.
+
+The corrected 0.1.15 source passes all seven focused lock/conversion cases, then
+the full typecheck/build, 767 Codex tests in 170 files on 24 workers, 33
+architecture checks, four installation checks and complete container acceptance.
+The same 24 GiB/zero-swap/8,192-task aggregate limits apply. The native lock test
+retains suspension, death, ownership and inode assertions; migration rejects an
+incomplete manifest before publishing anything. All 97 external dependency
+records are byte-for-byte unchanged and all 27 owned manifests use 0.1.15.
+The runtime container is `crossfire-runtime:a8972b07e32d76409519`.
 
 ## Verification boundaries
 

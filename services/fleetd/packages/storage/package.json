@@ -1,7 +1,7 @@
 {
-  "name": "@ctlflow/fleetd-storage", "version": "0.1.14", "private": true, "type": "module",
+  "name": "@ctlflow/fleetd-storage", "version": "0.1.15", "private": true, "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.14", "@ctlflow/fleetd-domain": "0.1.14", "@ctlflow/crossfire-contracts": "0.1.14", "@ctlflow/crossfire-kernel": "0.1.14", "@ctlflow/crossfire-adapter-filesystem": "0.1.14", "smol-toml": "1.9.0" }
+  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.15", "@ctlflow/fleetd-domain": "0.1.15", "@ctlflow/crossfire-contracts": "0.1.15", "@ctlflow/crossfire-kernel": "0.1.15", "@ctlflow/crossfire-adapter-filesystem": "0.1.15", "smol-toml": "1.9.0" }
 }

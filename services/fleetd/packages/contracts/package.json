@@ -1,7 +1,7 @@
 {
-  "name": "@ctlflow/fleetd-contracts", "version": "0.1.14", "private": true, "type": "module",
+  "name": "@ctlflow/fleetd-contracts", "version": "0.1.15", "private": true, "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/crossfire-contracts": "0.1.14", "@ctlflow/crossfire-kernel": "0.1.14", "smol-toml": "1.9.0" }
+  "dependencies": { "@ctlflow/crossfire-contracts": "0.1.15", "@ctlflow/crossfire-kernel": "0.1.15", "smol-toml": "1.9.0" }
 }

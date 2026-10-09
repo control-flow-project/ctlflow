@@ -8,7 +8,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { acquireFileLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { migrateCodexContexts } from '@ctlflow/crossfire-adapter-codex/context-migration';
-import { CONTEXT_MIGRATION, CONTEXT_REGISTRY, contextReceipt, contextState } from '@ctlflow/crossfire-adapter-codex/context-state';
+import { CONTEXT_MIGRATION, CONTEXT_REGISTRY, contextReceipt, contextState, migrationFiles, obsoleteContextFile } from '@ctlflow/crossfire-adapter-codex/context-state';
 import { value } from '@ctlflow/crossfire-test-support/result';
 
 function fixture(scope: TestContext) {
@@ -22,6 +22,9 @@ function fixture(scope: TestContext) {
   writeJson(join(home, 'crossfire-contexts.json'), { mode: registry.mode, control, rooms: [{ room: '!alpha:test', sessionId: room }] });
   writeJson(join(home, 'crossfire-session.json.receipt'), { sessionId: shared, pending: null,
     confirmed: [{ messageId: 'received', digest: 'a'.repeat(64) }] });
+  for (const name of ['crossfire-session.json.receipt', 'crossfire-session.json.receipt.instructions',
+    'crossfire-contexts.json.' + createHash('sha256').update('control').digest('hex') + '.receipt',
+    'crossfire-contexts.json.' + createHash('sha256').update('!alpha:test').digest('hex') + '.receipt']) acquireFileLock(join(home, name))();
   writeFileSync(join(home, 'auth.json'), '{"private":"unchanged"}', { mode: 0o600 });
   mkdirSync(join(home, 'sessions'), { mode: 0o700 }); writeFileSync(join(home, 'sessions', 'native.jsonl'), 'native conversation bytes', { mode: 0o600 });
   return { home, registry, input: { workspace: directory, stateDirectory: directory } };
@@ -42,9 +45,10 @@ test('explicit context conversion preserves exact histories, receipt bytes and l
 
 test('interrupted explicit conversion resumes from verified archives and refuses contradictory state', async scope => {
   const { home, registry, input } = fixture(scope);
-  const files = ['crossfire-session.json', 'crossfire-contexts.json', 'crossfire-session.json.receipt'].map(name => ({ name,
+  const expected = migrationFiles(registry);
+  const files = readdirSync(home).filter(obsoleteContextFile).map(name => ({ name,
     digest: createHash('sha256').update(readFileSync(join(home, name))).digest('hex'),
-    target: name.endsWith('.receipt') ? CONTEXT_REGISTRY + '.' + createHash('sha256').update('shared').digest('hex') + '.receipt' : null }));
+    target: expected.get(name)!.target }));
   writeJson(join(home, CONTEXT_MIGRATION), { phase: 'prepared', registry, files });
   const archive = join(home, 'crossfire-migrations/context-registry/originals'); mkdirSync(archive, { mode: 0o700 });
   writeFileSync(join(archive, files[0]!.name), readFileSync(join(home, files[0]!.name)), { mode: 0o600 }); unlinkSync(join(home, files[0]!.name));
@@ -56,6 +60,19 @@ test('interrupted explicit conversion resumes from verified archives and refuses
   unlinkSync(contextReceipt(home, 'shared'));
   assert.equal(value(await migrateCodexContexts(input)).migrated, true);
   assert.deepEqual(contextState(home).state, registry);
+});
+
+test('an interrupted manifest cannot omit retained metadata or partially publish a registry', async scope => {
+  const { home, registry, input } = fixture(scope), expected = migrationFiles(registry);
+  const files = readdirSync(home).filter(obsoleteContextFile).filter(name => name !== 'crossfire-session.json.receipt.instructions.lock').map(name => ({ name,
+    digest: createHash('sha256').update(readFileSync(join(home, name))).digest('hex'), target: expected.get(name)!.target }));
+  const receipt = readFileSync(join(home, 'crossfire-session.json.receipt'));
+  writeJson(join(home, CONTEXT_MIGRATION), { phase: 'prepared', registry, files });
+  const refused = await migrateCodexContexts(input);
+  assert.equal(refused.ok, false);
+  if (!refused.ok) assert.match(refused.error.message, /manifest omits retained native metadata/u);
+  assert.deepEqual(readFileSync(join(home, 'crossfire-session.json.receipt')), receipt);
+  assert.equal(readdirSync(home).includes(CONTEXT_REGISTRY), false);
 });
 
 test('active receipt ownership and corrupt or unsafe metadata prevent conversion without deleting original state', async scope => {

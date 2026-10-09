@@ -14,9 +14,9 @@ decision state fails permanently with retained evidence for owner inspection.
 Transient transport errors retain bounded recovery. Never delete state or invent
 a fresh conversation to bypass an invalid binding or active native writer.
 
-## Explicit 0.1.14 conversion
+## Explicit 0.1.15 conversion
 
-0.1.14 replaces split shared/control/room metadata. This is a forward storage
+0.1.15 replaces split shared/control/room metadata. This is a forward storage
 migration, not a second runtime path. Ordinary readers reject obsolete metadata
 and incomplete conversion with an actionable message.
 
@@ -45,6 +45,12 @@ archives every original byte, publishes canonical receipts/registry, retires onl
 the listed verified metadata, then fsyncs completion. Authentication, native
 conversation files and unrelated state are not migration inputs and are never
 retired. Unknown metadata and contradictory existing destinations fail closed.
+
+Private SQLite lock files contain no application records. Their exclusive
+transactions use a verified in-memory rollback journal, not disk sidecars that
+could be mistaken for context metadata. Exclusion still uses native file locks
+and survives process suspension; process death releases ownership. Conversion
+does not ignore unknown metadata or bypass a live receipt owner.
 
 Originals and the interruption-recoverable manifest remain privately under
 `.codex/crossfire-migrations/context-registry`. A stopped partial conversion can

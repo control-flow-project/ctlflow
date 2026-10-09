@@ -72,7 +72,7 @@ the update. Sleeping agents are not woken solely for maintenance.
 
 After consent:
 1. Install the exact version-pinned `@ctlflow/fleet`/`@ctlflow/fleetd` release.
-   For the 0.1.14 context-registry conversion, first orderly-stop the controller,
+   For the 0.1.15 context-registry conversion, first orderly-stop the controller,
    verify its complete private backup and run the new `fleetd --migrate-contexts`
    against that root before restarting. This is an explicit forward migration,
    not automatic old-format support.

@@ -1,7 +1,7 @@
 {
-  "name": "@ctlflow/fleetd-domain", "version": "0.1.14", "private": true, "type": "module",
+  "name": "@ctlflow/fleetd-domain", "version": "0.1.15", "private": true, "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/crossfire-kernel": "0.1.14", "@ctlflow/crossfire-agent-core": "0.1.14", "@ctlflow/crossfire-domain": "0.1.14" }
+  "dependencies": { "@ctlflow/crossfire-kernel": "0.1.15", "@ctlflow/crossfire-agent-core": "0.1.15", "@ctlflow/crossfire-domain": "0.1.15" }
 }

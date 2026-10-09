@@ -60,6 +60,8 @@ export async function migrateCodexContexts(input: { workspace: string; stateDire
     if (!plan) { const current = contextState(home); return success({ migrated: false, contexts: current.state.bindings.length }); }
     if (plan.phase === 'complete') { const current = contextState(home); return success({ migrated: false, contexts: current.state.bindings.length }); }
     plan = parsed(contextMigration(plan));
+    const listed = new Set(plan.files.map(file => file.name));
+    if (readdirSync(home).some(name => obsoleteContextFile(name) && !listed.has(name))) throw new Error('Context migration manifest omits retained native metadata');
     const archive = privateDir(join(dirname(manifest), 'originals'));
     if (!metadataExists(manifest)) writeJson(manifest, plan);
     for (const file of plan.files) {

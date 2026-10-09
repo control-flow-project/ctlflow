@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-adapter-codex",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -12,11 +12,11 @@
   "dependencies": {
     "smol-toml": "1.9.0",
     "ws": "8.21.3",
-    "@ctlflow/crossfire-contracts": "0.1.14",
-    "@ctlflow/crossfire-kernel": "0.1.14",
-    "@ctlflow/crossfire-agent-core": "0.1.14",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.14",
-    "@ctlflow/crossfire-adapter-runtime": "0.1.14"
+    "@ctlflow/crossfire-contracts": "0.1.15",
+    "@ctlflow/crossfire-kernel": "0.1.15",
+    "@ctlflow/crossfire-agent-core": "0.1.15",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.15",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.15"
   },
   "exports": {
     "./*": {
