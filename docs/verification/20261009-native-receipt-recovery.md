@@ -105,7 +105,7 @@ as context in a new turn. The test uses an isolated inert provider.
 | Current-source gate | Result |
 | --- | --- |
 | Typecheck and build | Pass. |
-| Focused native/control regression selection | 62 tests pass across seven files; subsequent full run includes the additional interrupted-restart case. |
+| Focused native/control regressions | Initial 62-test selection, 75 controller/lifecycle tests and final 15 restart-durability tests pass; the complete current-source run includes all regressions. |
 | Full product tests | 796 tests pass across 175 files, 24 workers, 87,006 ms execution on coordinated 0.1.19. |
 | Architecture verification | 33 tests pass; native limitations remain explicitly characterized. |
 | Installation verification | Four tests pass. |
@@ -186,8 +186,50 @@ Its typecheck/build, all 796 product tests, 33 architecture checks, four
 installation checks and full container acceptance pass. All 27 owned manifests
 and lock entries agree on 0.1.19; all 97 external records are unchanged. Public
 package file inventories contain only their approved executables, integration
-assets, licenses and documentation, with no private runtime dependency. Final
-publication and preserving deployment evidence follow before handoff.
+assets, licenses and documentation, with no private runtime dependency.
+
+### Completed 0.1.19 deployment
+
+Both `@ctlflow/fleet@0.1.19` and `@ctlflow/fleetd@0.1.19` are published. Anonymous
+registry metadata, exact tarball bytes and fresh local/Turbine installations
+are verified against the built executable hashes. No internal package is
+published. GAAP runs Crossfire source
+`5212b0b04c7368439e88b6f499b07536b2c671d2`, release
+`0.1.19-3aa5b9dd532ee8f1d46edf3a`, image
+`gaap-runtime:58533952f2ec14666232`. Turbine runs the installed 0.1.19 controller
+and CLI. Both activations followed fresh verified preserving backups:
+
+- Controller/fleet archive: 2,258,928,810 bytes, 42,904 safe entries, acquired
+  under 85 exact ownership locks; SHA-256
+  `20a9170bdbf16c6de2df78ec6c0b2bb1deb0e0787a1c25de0a0adc1bf160c18b`.
+- GAAP server archive: `20261009T202936Z-58533952f2ec.tar.gz`, 706,733,009 bytes;
+  private mode, checksum, gzip and archive-readability checks pass.
+
+Fleet update `75d60a5a-d3b9-4f71-b615-6f202cf8c4e3` succeeded with no errors and
+revision 11 retained. All 42 identities, exact saved native histories and provider
+file fingerprints are unchanged. All 29 enabled listeners are connected and
+sleeping normally with on-demand resume available; all 13 deliberate stops
+remain stopped. Nell completed the recovered turn on her original history and
+has no retained unfinished-work reminder. No new business assignment, question
+answer, history reset or Bad Bets change was made.
+
+Current-source release/assets, authenticated server and actual container-host
+checks pass. The container is healthy, rootless and read-only, drops all
+capabilities, retains no-new-privileges and loopback-only bindings, and matches
+all three expected provenance labels. Schema 15 integrity and foreign keys pass.
+The unchanged canonical preservation verifier confirms all 40 protected relations,
+53 accounts/credentials and 64 room grants without an exception. Actual browser
+verification passes all 56 authenticated management routes and two picker
+viewports, with zero model calls. The first browser run exceeded the unchanged
+five-second sign-in readiness assertion; its failure evidence is retained. The
+unchanged complete browser rerun passes; no deadline or assertion was relaxed.
+
+Private deployment evidence is in `.temp/native-recovery-rollout19/`, including
+`publication.json`, `registry-install-proof.json`, `controller-backup19.json`,
+`assets-update19.json`, `native-after.json`, `release-after.json`, `host-after.json`,
+`server-after.json`, `database-after.json`, `preservation-after.json` and
+`browser-after-retry.json`. The owned inspection tunnel is closed. Only the
+authorized feature branch is pushed; the owner creates the PR manually.
 
 ## Recovery cases
 
