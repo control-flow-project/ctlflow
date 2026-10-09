@@ -207,7 +207,10 @@ the notice asks it to review history and existing work, avoid repeating complete
 actions and continue unfinished authorized work. The new notice has its own
 durable correlation and exact native receipt; the original receipt remains
 unknown, which is reported in the owner DM. Another restart verifies that notice
-before submitting anything else. Large original inputs stay in the file rather
+only after restoring and validating its exact private input file. The file and
+its directory references are flushed before publication; missing context is rebuilt
+from the retained original input, while changed or unsafe files are rejected.
+It checks the exact receipt before submitting anything else. Large original inputs stay in the file rather
 than inflating the restart turn. No question or permission is approved.
 One failed agent does not stop healthy peers. Avoidable protocol failures
 are fixed at their native adapter owner.

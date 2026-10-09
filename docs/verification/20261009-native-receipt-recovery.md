@@ -3,7 +3,7 @@
 Scope: Crossfire and fleetd, from merged main `a00817f`, on
 `fix/native-receipt-recovery-order-20261009`. Bad Bets is excluded. Production
 inspection was initially read-only. The owner subsequently authorized completing
-the corrections, coordinated 0.1.18 publication and GAAP deployment. Preserve
+the corrections, coordinated publication and GAAP deployment. Preserve
 verified production backups, identities, histories and stopped selections. No
 reset, new business assignment or decision answer is authorized.
 
@@ -63,6 +63,15 @@ input is not resubmitted on a timeout. Historical inProgress is not live activit
 and no old turn is interrupted after process death. Opening and readiness are
 separate phases of one lifecycle owner, keeping live controls accessible.
 
+Final review reproduced a power-loss gap: a recorded restart receipt could
+clear the original journal even if the private file containing the original
+input was missing. Release 0.1.19 uses the existing filesystem adapter to
+atomically write and flush the file and its directory entries before publication.
+Reopening a recorded attempt rebuilds missing context from the retained original
+input before checking its receipt. Changed, symbolic-link and nonprivate files
+are rejected without replacing evidence. File-flush failure cannot expose a
+partial published file. This is producer durability, not a second receipt owner.
+
 One current implementation remains. No alternate cursor owner, native adoption,
 history reset or timeout increase is introduced. Models, saved histories, access
 policy and deliberate stopped selections are unchanged. The only dependency
@@ -85,7 +94,11 @@ incident behavior.
 Additional regressions cover live interruption while recovery is preparing,
 historical inProgress after process death, lost restart responses with and without
 a retained receipt, interruption of the new restart notice, and large attributed
-inputs passed through a private file. A real Codex process is killed while input
+inputs passed through a private file. Final durability regressions cover exact
+file/parent flush ordering, interrupted flush cleanup, missing context with a
+recorded restart receipt, and rejection of altered/symbolic-link/nonprivate files.
+The missing-file/recorded-receipt regression fails against 0.1.18; all 15 focused
+restart tests pass after correction. A real Codex process is killed while input
 is queued, then the exact history is reopened and the last message is supplied
 as context in a new turn. The test uses an isolated inert provider.
 
@@ -93,17 +106,17 @@ as context in a new turn. The test uses an isolated inert provider.
 | --- | --- |
 | Typecheck and build | Pass. |
 | Focused native/control regression selection | 62 tests pass across seven files; subsequent full run includes the additional interrupted-restart case. |
-| Full product tests | 789 tests pass across 174 files, 24 workers, 83,508 ms execution on coordinated 0.1.18. |
+| Full product tests | 796 tests pass across 175 files, 24 workers, 87,006 ms execution on coordinated 0.1.19. |
 | Architecture verification | 33 tests pass; native limitations remain explicitly characterized. |
 | Installation verification | Four tests pass. |
 | Container acceptance | Startup, Element room creation and authenticated attachment download, React/native routes, artifacts, shutdown and persisted rooms pass. |
 | Dependency comparison with merged main | All 97 external dependency records unchanged. |
 
 Full product evidence:
-`.temp/test-runs/2026-10-09T19-39-17.620Z-1064079/summary.json`.
+`.temp/test-runs/2026-10-09T20-11-44.812Z-1140004/summary.json`.
 Container evidence:
-`services/crossfire/.temp/container-verification-bQtT8K`, image
-`crossfire-runtime:33874131093a60d59b62`. Aggregate resource limits are
+`services/crossfire/.temp/container-verification-SHmKh8`, image
+`crossfire-runtime:a74dfb03b75a5fe383dd`. Aggregate resource limits are
 24 GiB memory, no swap and 8,192 tasks; all runtime verification is Codex-only.
 Source is unchanged during container build and acceptance.
 
@@ -130,9 +143,9 @@ the original slow native input materialization remains unproved.
 
 ## Production status
 
-Predeployment inspection retains all 42 identities and exact native histories,
+Initial predeployment inspection retained all 42 identities and exact native histories,
 42 provider-file fingerprints, 29 desired-active bindings and 13 deliberate
-stops. Nell remains failed on deployed 0.1.16, with shared history
+stops. Nell was failed on deployed 0.1.16, with shared history
 `01a100ae-c94f-7a50-9eb7-1011fc52198f`. The management database snapshot is
 schema 15, with 48 agent accounts/credentials and 64 room grants.
 
@@ -157,9 +170,24 @@ The original controller fails the controlled-clock slow-confirmation regression;
 the corrected source passes 75 focused controller/lifecycle/recovery tests.
 Explicitly cancelled late cleanup, slow permanent failures and shutdown draining
 remain covered without weakening their assertions. Coordinated 0.1.18 source,
-packaging, architecture, installation and actual container gates pass. Publication,
-fresh preserving backups and final production evidence follow this checkpoint
-and will be recorded before the final handoff.
+packaging, architecture, installation and actual container gates pass. Both public
+packages are published and anonymous registry bytes/installations were verified.
+GAAP server and turbine-gaap were activated after fresh verified preserving
+backups. All 29 enabled listeners were online, all 13 deliberate stops and all
+42 exact identities/histories/provider-file fingerprints retained. Nell completed
+the recovered turn on her original history, then slept normally. Actual browser
+checks covered 56 authenticated management routes and two picker viewports.
+Canonical database preservation passed all 40 protected relations without an
+exception; all 53 current accounts/credentials and 64 room grants remained.
+The increase from 48 to 53 accounts was a concurrent human-created fleet, not
+a deployment reset. Rootless container health and all security/provenance checks
+passed. Release 0.1.19 closes the final-review durability gap described above.
+Its typecheck/build, all 796 product tests, 33 architecture checks, four
+installation checks and full container acceptance pass. All 27 owned manifests
+and lock entries agree on 0.1.19; all 97 external records are unchanged. Public
+package file inventories contain only their approved executables, integration
+assets, licenses and documentation, with no private runtime dependency. Final
+publication and preserving deployment evidence follow before handoff.
 
 ## Recovery cases
 

@@ -1,7 +1,7 @@
 {
-  "name": "@ctlflow/fleet-daemon-client", "version": "0.1.18", "private": true, "type": "module",
+  "name": "@ctlflow/fleet-daemon-client", "version": "0.1.19", "private": true, "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.18", "@ctlflow/crossfire-contracts": "0.1.18", "@ctlflow/crossfire-kernel": "0.1.18" }
+  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.19", "@ctlflow/crossfire-contracts": "0.1.19", "@ctlflow/crossfire-kernel": "0.1.19" }
 }

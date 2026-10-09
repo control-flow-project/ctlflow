@@ -915,7 +915,12 @@ callbacks are published. Original confirmed input remains available for its own
 producer's acknowledgment; the continuation cannot discard or replay it. Unknown
 settlement on a restarted idle Codex process supplies the exact original input
 through a private file in a new restart turn. The notice says earlier delivery
-is unknown and directs the model to review history/effects, avoid repeating
+is unknown. The exact input file is atomically written and flushed, including
+its directory entries, before its reference is journaled or submitted. Reopening
+a recorded restart attempt restores and validates that file from the retained
+original input before acknowledging the attempt's receipt. Changed or unsafe
+files are rejected without replacing evidence. The notice
+directs the model to review history/effects, avoid repeating
 completed actions and continue unfinished authorized work. Original identity/text
 remain immutable; the new native correlation, text, turn and boundary are journaled
 before submission and verified before acknowledging the original producer. A

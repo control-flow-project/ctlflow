@@ -6,7 +6,7 @@ import type { CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
 import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
 import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
-import { resumptionText } from './resumption.js';
+import { resumptionText, retainResumptionInput } from './resumption.js';
 
 export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>;
   inspectSession: (sessionId: string) => Promise<{ busy: boolean }>; unsettled: () => boolean; event: (event: NativeEvent) => void };
@@ -27,6 +27,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
   const failure = { signal: session.signal };
   let revision = 0, checkedRevision = 0, unavailable = 0;
   let resumed = false;
+  let retainedResumption: string | undefined;
   let wake: (() => void) | undefined;
   async function nativeState(threadId: string, scope?: AbortSignal): Promise<'idle' | 'active' | 'notLoaded'> {
     scope?.throwIfAborted();
@@ -261,6 +262,10 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     },
     received: async (input, retain, scope, restored) => {
       checkedRevision = revision;
+      if (input.resumption && retainedResumption !== input.messageId) {
+        retainResumptionInput(input, options.receiptFile);
+        retainedResumption = input.messageId;
+      }
       const published = input.resumption ?? input;
       let checked: Awaited<ReturnType<typeof receipt>>;
       try { checked = await receipt(published.turn, published.text, published.messageId, published.boundary, scope); }
@@ -278,6 +283,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
         resumed = true;
         const resumption = { turn: null as string | null, text: resumptionText(input, options.receiptFile, session.workspace),
           messageId: 'crossfire-resume-' + randomUUID(), ...await historyBoundary(scope) };
+        retainedResumption = input.messageId;
         retain({ ...input, resumption });
         const result = object(await request('turn/start', { threadId: sessionId, clientUserMessageId: resumption.messageId,
           input: [{ type: 'text', text: resumption.text, text_elements: [] }] }, scope));
