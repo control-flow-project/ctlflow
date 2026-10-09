@@ -146,6 +146,11 @@ on overload. Protected owner-DM receipts distinguish received, verified
 interrupted/already-idle and exact native accepted stages, plus failures and
 supersession. Each receipt preserves room/event/sender and timestamps. Runtime
 telemetry cannot hold owner notices; notices cannot create model feedback.
+Admission deadlines bound source checks and interruption, not the subsequent
+native publication receipt wait. Pending input remains unaccepted until native
+evidence confirms it, even after that admission interval. Stop, supersession,
+membership/control generation changes and native shutdown still cancel delivery;
+individual transport requests retain their bounds.
 A cancelled receipt wait retains its exact native verification boundary. The
 same receipt checker settles that input before any replacement submission: an
 input recorded during interruption is acknowledged, not submitted a second time.

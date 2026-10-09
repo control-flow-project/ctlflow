@@ -79,6 +79,12 @@ test('execution state is per native history, incidents are deduplicated and lazy
   value(await reconcileRuntime(services, () => false));
   assert.equal(native.notices.size, 1);
   const conversation = value(services.runtime.conversation(fixture_.owner.actor.principalId)); assert(conversation);
+  for (const state of ['waking', 'sleeping', 'unavailable'] as const) {
+    value(reportRuntime(services, agent.actor, agent.id, runId, { ...base, state }));
+    assert.equal(value(services.runtime.activeIncidents()).length, 1, state + ' does not prove recovery');
+    value(await reconcileRuntime(services, () => false));
+    assert.equal(native.notices.size, 1, 'No premature recovery notification');
+  }
   value(reportRuntime(services, agent.actor, agent.id, runId, { ...base, state: 'idle' }));
   value(await reconcileRuntime(services, () => false));
   assert.equal(native.notices.size, 2);

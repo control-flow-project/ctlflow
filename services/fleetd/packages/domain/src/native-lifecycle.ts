@@ -40,6 +40,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   let phase: NativeSessionState['phase'] = 'sleeping';
   let native: OwnedRuntimeConnection | undefined, opening: Promise<OwnedRuntimeConnection> | undefined, closingNative: Promise<void> | undefined;
   let recovery: Promise<void> | undefined, closing: Promise<void> | undefined;
+  let preparing: Promise<OwnedRuntimeConnection> | undefined;
   let activeCalls = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
   let observationGeneration = 0;
   let cancelIdle: (() => void) | undefined;
@@ -77,6 +78,9 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       Math.max(1, lastActivityAt + idleSeconds * 1000 - services.clock.now()));
   }
   function touch(): void { lastActivityAt = services.clock.now(); schedule(); }
+  function publishObservation(observation: Observation): void {
+    if (continuationReady || ['failed', 'unavailable', 'sleeping', 'waking'].includes(observation.state)) services.hooks.observe?.({ kind: 'state', observation });
+  }
   function observe(event: RuntimeObservationEvent): void {
     if (event.kind === 'output') touch();
     else {
@@ -95,7 +99,8 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       if (['working', 'waiting-answer', 'waiting-approval'].includes(event.observation.state)
         || event.observation.state === 'idle' && previous && ['working', 'waiting-answer', 'waiting-approval'].includes(previous.state)) touch();
     }
-    services.hooks.observe?.(event);
+    if (event.kind === 'state') publishObservation(event.observation);
+    else services.hooks.observe?.(event);
   }
   async function refreshContexts(): Promise<void> {
     const saved = await services.saved();
@@ -118,7 +123,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     await cleanup;
     if (closingNative === cleanup) closingNative = undefined;
   }
-  async function ensure(admission?: InputAdmission): Promise<OwnedRuntimeConnection> {
+  async function openNative(admission?: InputAdmission): Promise<OwnedRuntimeConnection> {
     lifetime.throwIfAborted();
     admission?.signal.throwIfAborted();
     if (closingNative) {
@@ -130,13 +135,14 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       if (admission) throw nativeError('unavailable', 'Exact-history resume is already in progress; immediate input has not been accepted');
       return opening;
     }
-    if (native && !native.signal.aborted && (!activated || continuationReady)) return native;
+    if (native && !native.signal.aborted) return native;
     const pending = (async () => {
       recordingWork = false;
       let connection = native;
       let opened = false;
       if (!connection || connection.signal.aborted) {
         const generation = ++observationGeneration;
+        continuationReady = false;
         phase = 'waking';
         emit('waking', contexts.filter(context => context.context === services.primary));
         const started = await services.start(lifetime, event => {
@@ -152,18 +158,10 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         sessionId = connection.sessionId;
         native = connection;
         opened = true;
-        continuationReady = false;
         await refreshContexts();
       }
       if (connection.signal.aborted) { await discard(connection); throw connection.signal.reason ?? nativeError('native', 'Native session ended during resume'); }
-      if (activated) {
-        await resumeInterruptedWork(connection, services.primary, contexts, services.work);
-        checkpoint(services.work.capture(contexts.filter(context => working.has(context.sessionId)).map(({ context, sessionId }) => ({ context, sessionId }))));
-        continuationReady = true;
-      }
       lifetime.throwIfAborted();
-      phase = 'running'; touch();
-      if (opened || failedEpisode) { failedEpisode = false; services.recovered(); }
       const ended = () => {
         if (native !== connection || lifetime.aborted) return;
         const error: unknown = connection.signal.reason ?? nativeError('native', 'Native session disconnected');
@@ -171,6 +169,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         emit('failed', contexts, (error instanceof Error ? error.message : 'Native execution failed').slice(0, 4096));
         recovery ??= (async () => {
           await discard(connection);
+          await preparing?.catch(() => undefined);
           emit('sleeping', contexts.filter(context => context.context !== services.primary));
           if (!canRecoverFailure(error)) return;
           for (let attempt = 0; !lifetime.aborted; attempt++) {
@@ -186,20 +185,54 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       };
       if (opened) connection.signal.addEventListener('abort', ended, { once: true });
       return connection;
-    })().finally(() => { recordingWork = activated; });
+    })();
     opening = pending;
     try { return await pending; }
     catch (error) {
       if (native) await discard(native);
       observationGeneration++;
-      report(error); throw error;
+      report(error);
+      if (!lifetime.aborted) emit('failed', contexts, (error instanceof Error ? error.message : 'Native execution failed').slice(0, 4096));
+      throw error;
     } finally { if (opening === pending) opening = undefined; }
   }
-  async function call<Value>(operation: (connection: OwnedRuntimeConnection) => Promise<Value>, activity = false, admission?: InputAdmission): Promise<Value> {
+  async function ensure(admission?: InputAdmission): Promise<OwnedRuntimeConnection> {
+    const connection = await openNative(admission);
+    if (!activated || continuationReady) return connection;
+    if (preparing) {
+      if (admission) throw nativeError('unavailable', 'Exact-history recovery is still in progress; immediate input has not been accepted');
+      return preparing;
+    }
+    const pending = (async () => {
+      recordingWork = false;
+      await connection.settle();
+      await resumeInterruptedWork(connection, services.primary, contexts, services.work);
+      checkpoint(services.work.capture(contexts.filter(context => working.has(context.sessionId)).map(({ context, sessionId }) => ({ context, sessionId }))));
+      connection.signal.throwIfAborted();
+      lifetime.throwIfAborted();
+      if (native !== connection) throw nativeError('conflict', 'Native generation changed during initialization');
+      continuationReady = true;
+      recordingWork = true;
+      phase = 'running'; touch();
+      failedEpisode = false; services.recovered();
+      for (const observation of observations.values()) publishObservation({ ...observation, observedAt: services.clock.now() });
+      return connection;
+    })();
+    preparing = pending;
+    try { return await pending; }
+    catch (error) {
+      if (native === connection) await discard(connection);
+      report(error);
+      if (!lifetime.aborted) emit('failed', contexts, (error instanceof Error ? error.message : 'Native execution failed').slice(0, 4096));
+      throw error;
+    } finally { if (preparing === pending) preparing = undefined; }
+  }
+  async function call<Value>(operation: (connection: OwnedRuntimeConnection) => Promise<Value>, activity = false, admission?: InputAdmission,
+    connect: typeof ensure = ensure): Promise<Value> {
     activeCalls++;
     if (activity) touch();
     let connection: OwnedRuntimeConnection | undefined;
-    try { connection = await ensure(admission); admission?.signal.throwIfAborted(); return await operation(connection); }
+    try { connection = await connect(admission); admission?.signal.throwIfAborted(); return await operation(connection); }
     catch (error) {
       if (!lifetime.aborted && connection?.signal.aborted) throw nativeError('unavailable', 'Native input is waiting for exact-history recovery');
       throw error;
@@ -210,7 +243,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     if (!activated || lifetime.aborted || !idleSeconds || phase !== 'running' || !native) return;
     if (services.clock.now() < lastActivityAt + idleSeconds * 1000) { schedule(); return; }
     const connection = native;
-    if (activeCalls || opening || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()) { touch(); return; }
+    if (activeCalls || opening || preparing || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()) { touch(); return; }
     let status: { busy: boolean };
     try { status = await connection.inspect(); await refreshContexts(); }
     catch (error) {
@@ -249,7 +282,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       lifecycle: { current: () => ({ phase, lastActivityAt, historyAvailable: !!sessionId }), configureIdle: seconds => {
         if (!Number.isSafeInteger(seconds) || seconds < 0 || seconds > 604800) throw new Error('Invalid native idle timeout');
         idleSeconds = seconds; schedule();
-        if (!configured) { configured = true; for (const observation of observations.values()) services.hooks.observe?.({ kind: 'state', observation }); }
+        if (!configured) { configured = true; for (const observation of observations.values()) publishObservation(observation); }
       } },
       inspect: async () => {
         if (!native || native.signal.aborted) return { busy: phase === 'waking' || phase === 'failed' || !!opening || activeCalls > 0 };
@@ -280,9 +313,9 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       },
       turnControl: {
         activeTurn: async (room, admission) => admission
-          ? call(connection => connection.turnControl.activeTurn(room, admission), false, admission)
+          ? call(connection => connection.turnControl.activeTurn(room, admission), false, admission, openNative)
           : native && !native.signal.aborted ? native.turnControl.activeTurn(room) : null,
-        interrupt: async (turn, recovery, admission) => call(connection => connection.turnControl.interrupt(turn, recovery, admission), true, admission),
+        interrupt: async (turn, recovery, admission) => call(connection => connection.turnControl.interrupt(turn, recovery, admission), true, admission, openNative),
       },
       conversation: async (room, admission) => call(async connection => {
         if (!connection.conversation) throw nativeError('invalid', 'This native runtime does not support room histories');
@@ -299,6 +332,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       stop.abort(new Error('Native listener binding stopped'));
       cancelIdle?.(); cancelIdle = undefined;
       await opening?.catch(() => undefined);
+      await preparing?.catch(() => undefined);
       if (native) await discard(native);
       await closingNative;
       await recovery;

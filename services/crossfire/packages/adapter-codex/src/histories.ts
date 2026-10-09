@@ -67,7 +67,7 @@ export function codexHistories(options: { home: string; workspace: string; name:
         if (!previous) state.bindings.push({ context, sessionId: session.sessionId });
         state.mode = options.mode; writeJson(file, state);
         await applyNativeInstructions(session, { home: options.home, journal: receiptFile(context) + '.instructions', text: options.instructions });
-        connection = codexDelivery(session, { pollMs: 1000, timeoutMs: 30000, receiptFile: receiptFile(context) });
+        connection = codexDelivery(session, { pollMs: 1000, timeoutMs: 30000, receiptFile: receiptFile(context), observe: options.hooks.observe });
         await connection.verify();
         const ended = () => failed.abort(session.signal.reason);
         session.signal.addEventListener('abort', ended, { once: true });

@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type { RuntimeApproval, RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
 import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
+import { failureError } from '@ctlflow/crossfire-kernel/result';
 import { deliveryJournal } from './journal.js';
 
 export type NativeMessage = { text: string; messageId: string };
@@ -14,7 +15,7 @@ export type Publication<Input extends NativeMessage> = {
   inspect: () => Promise<{ busy: boolean }>;
   prepare: (text: string, messageId: string, signal: AbortSignal) => Input | Promise<Input>;
   publish: (input: Input, retain: (input: Input) => void) => void | Promise<void>;
-  received: (input: Input, retain: (input: Input) => void, signal: AbortSignal) => NativeReceipt | Promise<NativeReceipt>;
+  received: (input: Input, retain: (input: Input) => void, signal: AbortSignal, restored: boolean) => NativeReceipt | Promise<NativeReceipt>;
   cancel?: (input: Input) => boolean | Promise<boolean>;
   wait?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
   close: () => void | Promise<void>;
@@ -26,6 +27,7 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
   const timeoutMs = options.timeoutMs ?? 30_000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 300_000) throw new Error('Invalid native receipt deadline');
   const journal = deliveryJournal(options.journal, native.sessionId, parse);
+  const restoredMessage = journal.pending()?.messageId;
   const now = options.now ?? (() => performance.now());
   let operating = false;
   function retain(input: Input): void {
@@ -41,7 +43,8 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
       await native.verify(scope);
       const input = journal.pending();
       if (!input) throw new Error('Native publication evidence disappeared before settlement');
-      const receipt = await native.received(input, retain, scope);
+      const receipt = await native.received(input, retain, scope, input.messageId === restoredMessage);
+      scope.throwIfAborted();
       if (receipt === true || receipt === 'cancelled' || receipt === 'interrupted') {
         journal.complete(input, receipt === true); return receipt;
       }
@@ -66,7 +69,7 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
     recover: (text, messageId, cancelled) => exclusive(async () => {
       const pending = journal.pending();
       if (pending) {
-        if (pending.messageId !== messageId || pending.text !== text) throw new Error('Receipt recovery does not match the pending native input');
+        if (pending.messageId !== messageId || pending.text !== text) throw failureError({ code: 'conflict', message: 'Receipt recovery does not match the pending native input' });
         return await settle(cancelled ? AbortSignal.any([native.signal, cancelled]) : native.signal) === true;
       }
       return journal.confirmed(text, messageId);
@@ -75,7 +78,7 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
       const scope = cancelled ? AbortSignal.any([native.signal, cancelled]) : native.signal;
       scope.throwIfAborted();
       const pending = journal.pending();
-      if (pending && (pending.messageId !== messageId || pending.text !== text)) throw new Error('Settle the preceding native delivery before submitting different input');
+      if (pending && (pending.messageId !== messageId || pending.text !== text)) throw failureError({ code: 'conflict', message: 'Settle the preceding native delivery before submitting different input' });
       for (;;) {
         scope.throwIfAborted();
         if (journal.confirmed(text, messageId)) return;
@@ -88,6 +91,7 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
           journal.prepare(input);
           try { await native.publish(input, retain); }
           catch (error) {
+            native.signal.throwIfAborted();
             const retained = journal.pending();
             if (scope.aborted && !native.signal.aborted && native.cancel && retained && await native.cancel(retained)) journal.complete(retained, false);
             throw error;
@@ -98,6 +102,7 @@ export function nativeDelivery<Input extends NativeMessage>(native: Publication<
           if (receipt === true) return;
           if (receipt !== 'interrupted') throw new Error('Native input was cancelled before publication; read positions are unchanged');
         } catch (error) {
+          native.signal.throwIfAborted();
           const retained = journal.pending();
           if (scope.aborted && !native.signal.aborted && native.cancel && retained && await native.cancel(retained)) journal.complete(retained, false);
           throw error;

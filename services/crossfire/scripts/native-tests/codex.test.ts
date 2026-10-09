@@ -32,7 +32,10 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
   const beforeTool = native.completed();
   native.tool('exec_command', { cmd: 'printf fixture-output', max_output_tokens: 100, yield_time_ms: 1000 });
   await adapter.deliver('tool routing fixture', 'fixture-tool');
-  await until(() => native.completed() > beforeTool);
+  await until(() => native.notifications.some(event => event.method === 'item/completed'
+    && (event.params.item as { type: string }).type === 'commandExecution'));
+  await until(() => native.requests.some(request => JSON.stringify(request).includes('fixture-output')));
+  await until(async () => native.completed() > beforeTool && !(await adapter.inspect()).busy);
   assert(native.notifications.some(event => event.method === 'item/completed' && (event.params.item as { type: string }).type === 'commandExecution'));
   assert(native.requests.some(request => JSON.stringify(request).includes('fixture-output')));
 

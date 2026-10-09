@@ -1,11 +1,11 @@
 {
   "name": "@ctlflow/crossfire-test-support",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",
   "engines": { "node": ">=26.0.0", "npm": ">=11.17.0" },
-  "dependencies": { "@ctlflow/crossfire-adapter-matrix": "0.1.16", "@ctlflow/crossfire-kernel": "0.1.16" },
+  "dependencies": { "@ctlflow/crossfire-adapter-matrix": "0.1.17", "@ctlflow/crossfire-kernel": "0.1.17" },
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } }
 }

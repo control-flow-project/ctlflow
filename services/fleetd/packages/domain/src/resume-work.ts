@@ -31,8 +31,9 @@ export async function resumeInterruptedWork(connection: OwnedRuntimeConnection, 
   for (const work of pending.value) {
     const target: RuntimeConnection | undefined = work.context === primary ? connection : await connection.conversation?.(work.context);
     if (!target || target.sessionId !== work.sessionId) throw Object.assign(new Error('Interrupted task cannot use a different room history'), { code: 'conflict' });
+    await target.settle();
     const text = continuationText(work);
-    if (!await target.recover(text, work.messageId)) await target.deliver(text, work.messageId);
+    if (!await target.turnControl?.activeTurn() && !await target.recover(text, work.messageId)) await target.deliver(text, work.messageId);
     const acknowledged = store.acknowledge(work.messageId);
     if (!acknowledged.ok) throw Object.assign(new Error(acknowledged.error.message), { code: acknowledged.error.code });
     target.acknowledge([work.messageId]);

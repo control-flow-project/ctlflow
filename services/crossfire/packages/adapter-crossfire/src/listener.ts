@@ -27,6 +27,6 @@ export async function listen(options: ListenerOptions, signal: AbortSignal): Pro
     return [...pending.value.keys()];
   }, transport: (scope, timeoutMs) =>
     matrix({ base: options.settings.homeserver, token: options.account.access_token, signal: scope, timeoutMs }) }, lifetime); }
-  catch (error) { throw stop.signal.aborted ? stop.signal.reason : error; }
+  catch (error) { lifetime.throwIfAborted(); throw error; }
   finally { try { endpoint?.close(); } finally { await release(); } }
 }

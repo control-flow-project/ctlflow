@@ -81,6 +81,17 @@ observations do not rewrite it, and idle completion clears it. Close and abrupt
 death retain unfinished work for the next exact-history activation. Resumed work
 waits for listener policy, reporting and tool readiness. It cannot auto-approve
 questions, invent a chat destination or cross room histories.
+Before inserting a continuation, the runtime settles any preceding publication
+in that exact history. Confirmed original input remains available for its own
+listener receipt acknowledgment; it is not replayed or discarded. Unverifiable
+input retains its exact original evidence. After a process restart, an unverified
+last message is supplied through a private file to a new turn in the same history,
+with instructions to review existing work and avoid repeating completed actions.
+Its separately recorded attempt must have an exact native receipt before readiness;
+the original receipt is not invented. An already running continuation needs no
+additional reminder. Native initialization stays waking until settlement and
+continuation initialization succeed. Startup
+idle/working observations cannot claim recovery or erase the checkpoint.
 Fresh reset archives these checkpoints. Native receipt recovery prevents duplicate
 continuation notices; it cannot certify exactly-once external task effects.
 
@@ -134,6 +145,17 @@ stable receiver. Deployed configuration and installed software remain unchanged;
 successful peers and saved native histories remain intact. Stop cancels pending
 recovery. Failed cleanup or permanent configuration/authorization failures prevent
 unsafe restart and remain visible.
+After process death, reopening the saved conversation does not resume an old
+running turn. If the exact previous input cannot be verified and the reopened
+process is idle, the Codex adapter supplies it as context in a new restart turn.
+The original message and attribution stay in a private file, with unchanged
+producer identity/text. The notice asks the agent to read that file, current
+AGENTS.md and saved history, then continue unfinished authorized work without
+repeating completed effects. The new notice is durably journaled and its exact
+receipt is verified; earlier delivery is reported as unknown. A live new turn
+already continuing work receives no redundant restart reminder. No question or
+permission is answered. Transport failure and invalid/private state remain
+visible, never a fabricated success or a fresh history.
 
 Transport cancellation is not an owner stop. Controller lease replacement pauses
 delivery and creates a new immutable reporting run on reactivation, retaining the
@@ -146,6 +168,12 @@ DOM AbortError/TimeoutError and Node transport cancellation/network failures ret
 while desired intent remains active. Explicit Stop cancels recovery; authorization,
 invalid saved state, missing histories and unknown coded failures remain visible
 and require correction. No failed cleanup permits an overlapping process.
+Receipt identity/content conflicts are permanent and retain their original
+evidence. Recovery notices require a ready native generation, not merely a
+connected listener or sleeping/waking metadata. Urgent message admission is
+bounded separately from native receipt settlement; an admission interval cannot
+kill a still-pending publication. Explicit stop, source/control supersession and
+native generation shutdown still cancel the appropriate work.
 
 Native-stop proofs belong to their original controller generation. A historical
 proof cannot authorize retirement after reconnect, but also cannot mark a healthy

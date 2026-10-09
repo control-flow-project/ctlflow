@@ -98,3 +98,30 @@ test('a confirmed ordinary receipt waiting for an acquisition permit cannot hold
   await observed(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '2');
   assert.equal(starts().length, 2);
 });
+
+test('urgent native receipt settlement outlives admission deadlines without failing, replaying or claiming acceptance', { timeout: 30000 }, async scope => {
+  const clock = testClock(scope), host = await createListenerHost(), stop = new AbortController();
+  cleanup(scope, () => host.close());
+  const native = await fakeCodex(scope, { mode: 'accepted' }), matrix = await matrixFixture(scope, native.directory, clock);
+  let receiverFailure: unknown;
+  const receiving = listen({ ...matrix, host, reconcileMs: 30000, pollMs: 10000, debounceMs: 0, limit: 100, runtime: native.runtime }, stop.signal)
+    .catch(error => { if (!stop.signal.aborted) receiverFailure = error; });
+  cleanup(scope, async () => { stop.abort(); await receiving; });
+  const starts = () => native.requests().filter(request => request.method === 'turn/start');
+  const observed = (predicate: () => boolean) => until(() => { if (receiverFailure) throw receiverFailure; return predicate(); });
+  const accepted = () => matrix.requests.some(request => request.path.includes(OWNER_DM) && request.path.includes('/send/')
+    && String((request.body as { body?: string }).body).startsWith('Native input accepted'));
+  await observed(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
+  matrix.add(ROOM, mention('$slow-native-receipt', undefined, 'Replace the previous task'));
+  await observed(() => starts().length === 1);
+  const original = starts()[0]!.params!;
+  assert.equal(accepted(), false);
+  await clock.advance(30001);
+  await observed(() => matrix.waiting() === 1);
+  assert.equal(receiverFailure, undefined); assert.equal(starts().length, 1); assert.equal(accepted(), false);
+  assert.equal(readJson<{ steps: { status: string }[] }>(matrix.cursorFile + '.steering-publication').steps[0]?.status, 'publishing');
+  native.update({ mode: 'normal' });
+  native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(original.clientUserMessageId), original.input) });
+  await observed(() => accepted() && !existsSync(matrix.cursorFile + '.steering-publication'));
+  assert.equal(starts().length, 1); assert.equal(receiverFailure, undefined);
+});
