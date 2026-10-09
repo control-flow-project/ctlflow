@@ -1,13 +1,13 @@
 {
   "name": "@ctlflow/crossfire-contracts",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "dependencies": {
-    "@ctlflow/crossfire-domain": "0.1.15",
+    "@ctlflow/crossfire-domain": "0.1.16",
     "smol-toml": "1.9.0",
-    "@ctlflow/crossfire-kernel": "0.1.15"
+    "@ctlflow/crossfire-kernel": "0.1.16"
   },
   "type": "module",
   "engines": {

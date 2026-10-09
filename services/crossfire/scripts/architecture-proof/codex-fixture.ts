@@ -88,17 +88,23 @@ trust_level = "trusted"
   cleanup(context, async () => {
     if (await tmux(["list-sessions"]).catch(() => undefined)) await tmux(["kill-server"]);
   });
-  if (hooks) {
-    await until(async () => (await tmux(["capture-pane", "-p", "-t", "fixture"])).stdout.includes("2. Trust all and continue"),
-      "Native hook trust dialog did not appear");
-    await tmux(["send-keys", "-t", "fixture", "2", "Enter"]);
+  let pane = '';
+  try {
+    if (hooks) {
+      await until(async () => (await tmux(["capture-pane", "-p", "-t", "fixture"])).stdout.includes("2. Trust all and continue"),
+        "Native hook trust dialog did not appear");
+      await tmux(["send-keys", "-t", "fixture", "2", "Enter"]);
+    }
+    await until(async () => {
+      if (observer.notifications.some(value => value.method === "thread/started")) return true;
+      pane = (await tmux(["capture-pane", "-p", "-t", "fixture"])).stdout;
+      if (/Press [Ee]nter/u.test(pane)) await tmux(["send-keys", "-t", "fixture", "Enter"]);
+      return false;
+    }, "Real TUI did not create a native thread");
+  } catch (error) {
+    context.diagnostic('Native TUI pane: ' + pane + '\nNative server errors: ' + errors);
+    throw error;
   }
-  await until(async () => {
-    if (observer.notifications.some(value => value.method === "thread/started")) return true;
-    const pane = await tmux(["capture-pane", "-p", "-t", "fixture"]);
-    if (/Press [Ee]nter/u.test(pane.stdout)) await tmux(["send-keys", "-t", "fixture", "Enter"]);
-    return false;
-  }, "Real TUI did not create a native thread");
   const started = observer.notifications.find(value => value.method === "thread/started");
   assert(started);
   const threadId = string(object(started.params.thread).id);

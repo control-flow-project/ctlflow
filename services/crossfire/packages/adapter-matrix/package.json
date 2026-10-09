@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-adapter-matrix",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -12,9 +12,9 @@
   "dependencies": {
     "marked": "18.0.13",
     "sanitize-html": "2.17.7",
-    "@ctlflow/crossfire-kernel": "0.1.15",
-    "@ctlflow/crossfire-contracts": "0.1.15",
-    "@ctlflow/crossfire-domain": "0.1.15"
+    "@ctlflow/crossfire-kernel": "0.1.16",
+    "@ctlflow/crossfire-contracts": "0.1.16",
+    "@ctlflow/crossfire-domain": "0.1.16"
   },
   "exports": {
     "./*": {

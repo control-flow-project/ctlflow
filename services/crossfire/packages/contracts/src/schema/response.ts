@@ -94,7 +94,7 @@ export const policy = check.object({ revision: check.integer(), maxOwnerAgents: 
   fleetIdleTimeoutSeconds: check.integer(0, 604800),
   maxPending: check.integer(1, 1000), enrollmentSeconds: check.integer(60, 3600), reconcileSeconds: check.integer(30, 3600), agentInstructions: check.multiline,
   signupMode: check.choice('invitation', 'open'), invitationIssuers: check.choice('administrators', 'members') });
-export const audit = check.object({ auditId: check.identifier, requestId: check.identifier, actorCredentialId: check.nullable(check.identifier), actorKind: check.choice('human', 'agent', 'controller', 'system', 'anonymous'),
+export const audit = check.object({ auditId: check.identifier, requestId: check.text(255), actorCredentialId: check.nullable(check.identifier), actorKind: check.choice('human', 'agent', 'controller', 'system', 'anonymous'),
   actor: check.nullable(principal), target: check.nullable(principal),
   actorPrincipalId: check.nullable(check.identifier), ownerId: check.nullable(check.identifier), targetKind: check.text(100), targetId: check.text(255),
   roomId: check.nullable(check.roomId), membershipGeneration: check.nullable(check.identifier), authorizerId: check.nullable(check.identifier),

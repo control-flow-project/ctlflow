@@ -104,7 +104,7 @@ or missing files are created. Current normalized tables are queried through
 Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
 
 ```json
-{"schemaVersion":14,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
+{"schemaVersion":15,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
 ```
 
 The schema version and table counts are optional exact expectations. `--schema`

@@ -9,6 +9,8 @@ import { readAuditEvents } from '@ctlflow/crossfire-domain/audit/read-events';
 import { recordEvent } from '@ctlflow/crossfire-domain/audit/record-event';
 import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
+import { audit } from '@ctlflow/crossfire-contracts/schema/response';
+import { identifier } from '@ctlflow/crossfire-contracts/schema/validation';
 import { auditActionLabel } from '../apps/web/src/audit-labels.js';
 import { applicationFixture, secret, value } from './support/application.js';
 import { httpFixture } from './support/http.js';
@@ -80,6 +82,27 @@ test('canonical enrollment and activity HTTP contracts expose identities without
   assert.equal(audit[0]?.target?.displayName, 'alice');
   const serialized = JSON.stringify({ introduced, listed, audit });
   for (const privateValue of [input.claimSecret, services.identity.hash(input.claimSecret), admin.secret, alice.secret, alice.token]) assert(!serialized.includes(privateValue));
+});
+
+test('activity preserves bounded HTTP and system-job correlations without changing UUID identity contracts', async scope => {
+  const fixture = await applicationFixture(scope), { services, admin } = fixture;
+  const { origin } = await httpFixture(scope, fixture.application);
+  const correlations = [randomUUID(), 'schema-15-agent-names'];
+  for (const requestId of correlations) value(recordEvent(services, null, requestId, {
+    targetKind: 'instance-policy', targetId: 'instance', action: 'agent.name.canonicalized', message: 'Retained system evidence',
+  }));
+  const client = createClient({ origin, fetch: (input, options) => fetch(input, {
+    ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + admin.secret },
+  }) });
+  const result = value(await client.call(operations.audit, {}, {}));
+  assert.deepEqual(result.data.map(item => item.requestId).sort(), correlations.sort());
+  assert.equal(identifier(result.meta.requestId).ok, true, 'HTTP response request identity remains an opaque UUID');
+  for (const item of result.data) assert.equal(identifier(item.auditId).ok, true, 'Audit entity identity remains an opaque UUID');
+  const item = result.data[0]!;
+  assert.equal(audit({ ...item, requestId: 'x'.repeat(255) }).ok, true);
+  for (const requestId of ['', 'x'.repeat(256), 'job\ninvalid', 'job\u0000invalid']) assert.equal(audit({ ...item, requestId }).ok, false);
+  assert.equal(audit({ ...item, auditId: 'system-job' }).ok, false);
+  assert.equal(identifier('schema-15-agent-names').ok, false);
 });
 
 test('activity action labels are readable while unknown recorded actions retain their identity', () => {

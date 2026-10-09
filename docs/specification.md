@@ -2835,6 +2835,12 @@ ownership. The management website remains under `/manage`.
 - Entity fields are camelCase with precise names: `agentId`, `ownerId`,
   `matrixUserId`, `roomId`, `createdAt`. Crossfire IDs are opaque UUIDs; Matrix
   IDs remain native opaque strings. Encode each path segment exactly once.
+- Audit `requestId` is a bounded opaque correlation value (1–255 characters,
+  no control characters), not an entity identity: it records an HTTP request
+  UUID or an internal system-job key unchanged. The audit entity's `auditId`
+  and the HTTP envelope's `meta.requestId` remain UUID-only. All audit actors
+  use one correlation parser; immutable records are never rewritten or hidden
+  to satisfy a representation constraint.
 - One operation declaration owns method/path, request/response schema and
   authentication requirement. Typed UI/CLI clients and API documentation derive
   from it. Domain entities and SQLite rows are not serialized automatically.
