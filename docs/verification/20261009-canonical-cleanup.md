@@ -129,6 +129,62 @@ as an unreproduced native observation, not a claimed root-cause fix or a guarant
 of arbitrary native availability. The installed managed runtime does not use
 the TUI startup path. Logs retain both failed and successful runs.
 
+## Final publication and deployment
+
+The completed release is 0.1.16. Both authorized public packages are published;
+anonymous registry metadata matches the tested archive digests. Fresh ordinary
+registry installs locally and on Turbine have byte-exact Fleet/Fleetd executables.
+No internal package is published or needed from npm at installation time.
+
+GAAP runs code revision `b90fb5eec219e1826467d735135729ef48dfcfd6`, image
+`gaap-runtime:9db4d6be53f8e75829de`, and client release
+`0.1.16-3aa5b9dd532ee8f1d46edf3a`. Rootless Docker inspection verifies exact
+provenance, health, a read-only root, all capabilities dropped,
+no-new-privileges and loopback-only application/content ports.
+
+Verified quiescent backups precede activation. The full server archive contains
+706,237,807 bytes and 710 safe members; its SHA-256 is
+`22a4d7946f3b8c75b500e4a51920259a236a096fd79864a306ebddb41c037176`.
+The full controller/fleet archive contains 2,236,714,171 bytes and 42,252 members;
+its SHA-256 is
+`1ee7b2c6f8404152faeb55596d7f97656b91aa4d3a432c001acdc793a56fe8da`.
+All 85 controller/listener/receiver ownership locks remain held during the latter
+backup. Strict schema-15 preservation verifies 40 protected relations, including
+all 48 accounts and credentials, 64 room grants and 280 prior audit events.
+There is no production reset or native-history replacement.
+
+All 42 GAAP enrolled identities, context UUIDs and provider-authentication
+fingerprints remain unchanged. All 168 installed artifacts match 0.1.16 manifests.
+The controller is connected, 29 selected agents run without errors and the 13
+deliberately stopped agents stay stopped. Native read-only inspection checks the
+29 running histories' authentication, exact model/effort and project skills;
+inspection performs zero model calls. No agents are joined to additional rooms,
+given proof assignments or answered decisions.
+
+Postdeployment verification passes authenticated server reads, anonymous denial,
+native invitation-directory names, fleet maps, public release/web artifacts and
+56 management browser routes at 1,440- and 390-pixel widths. Both wake-picker
+pages, map URL restoration, session/settings pages, Activity and the personalized
+setup guide pass. The branded Element welcome and sign-in views pass at both
+widths with no browser page errors. Content HTTPS rejects all four application
+endpoints with 404 and sets no cookies. Both retained reports are deleted; no
+currently published production report or paid-model behavior is certified.
+
+The supplementary public-browser probe initially used the unbranded welcome
+label instead of GAAP's exact `Sign in →` label. Its corrected exact-label probe
+passes without changing the application or observation deadline. The generic
+archive probe's 30-second tar budget times out on the large server backup;
+site-owned gzip/tar verification and separate byte-exact operator fingerprinting
+complete successfully. Neither failed probe is counted as passing evidence.
+
+Private evidence is under `.temp/canonical-cleanup-rollout/`: registry install
+proofs, `website-preservation16.json`, backup fingerprints/member counts,
+`controller-backup16.json`, `native-after16.json`, `software-after16.json`,
+`server-fleet16-proof.json`, `host-after16.json`, `release-after16.json`,
+`browser-after16.json` and `public-browser16-branded/report.json`. Preserve
+remote backups and the earlier failed observations. This report-only final
+checkpoint does not change the deployed production source.
+
 ## Verification boundaries
 
 Focused admission, histories, interruption-safe migration, profile ownership,
