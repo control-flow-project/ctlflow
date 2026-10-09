@@ -95,7 +95,11 @@ idle/working observations cannot claim recovery or erase the checkpoint.
 Fresh reset archives these checkpoints. Native receipt recovery prevents duplicate
 continuation notices; it cannot certify exactly-once external task effects.
 
-Startup restoration is bounded and generation-fenced. Missing histories,
+Startup restoration has four concurrent starts and is generation-fenced. Native
+requests retain their individual transport deadlines, but an overall startup
+deadline must not cancel waiting for native input confirmation. A slow binding
+stays `starting`; explicit stop cancels it and drains its exact generation before
+replacement. Missing histories,
 unreviewed configuration, invalid intent or failed process cleanup remain
 visible errors; they never authorize a new history or overlapping native owner.
 Explicit lifecycle operations retire the same instances' queued restoration

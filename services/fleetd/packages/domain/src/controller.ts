@@ -326,12 +326,10 @@ export function createController(services: Services) {
   }
   async function restoreOne(record: Registration, instance: Instance, configuration: Configuration): Promise<void> {
     const identity = key(record.fleetId, instance.key), stop = new AbortController();
-    const signal = AbortSignal.any([stop.signal, lifetime.signal]), timer = new AbortController();
-    let observed!: () => void;
-    const attempted = new Promise<void>(resolve => { observed = resolve; });
+    const signal = AbortSignal.any([stop.signal, lifetime.signal]);
     states.set(identity, { instance, phase: 'starting', sessionId: null, error: null, startedAt: null });
     const done = Promise.resolve().then(async () => {
-      const started = services.execution.start(configuration, instance, signal, 'recovery').then(async result => {
+      const result = await services.execution.start(configuration, instance, signal, 'recovery').then(async result => {
         if (!result.ok) return result;
         if (signal.aborted || stopping || !wanted.has(identity) || !restorationOwned.has(identity)) {
           try { await discardRuntime(record.fleetId, instance, result.value); }
@@ -340,28 +338,15 @@ export function createController(services: Services) {
         }
         return result;
       });
-      const timeout = services.delay(30000, AbortSignal.any([timer.signal, signal])).then(() => {
-        if (!timer.signal.aborted && !signal.aborted) stop.abort(new Error('Binding restoration exceeded its 30-second deadline'));
-        return failure('unavailable', signal.reason instanceof Error ? signal.reason.message : 'Binding restoration cancelled');
-      });
-      const result = await Promise.race([started, timeout]); timer.abort();
-      if (!result.ok && signal.aborted) {
-        if (restorationOwned.has(identity) && !stopping && wanted.has(identity)) states.set(identity, { ...states.get(identity)!, phase: 'failed', error: result.error.message });
-        observed();
-        const settled = await started;
-        if (!settled.ok && !canRecoverFailure(settled.error)) {
-          if (restorationOwned.has(identity)) states.set(identity, { ...states.get(identity)!, phase: 'failed', error: settled.error.message }); return;
-        }
-      }
       if (recovering.get(identity)?.stop === stop) recovering.delete(identity);
       if (stopping || !wanted.has(identity) || !restorationOwned.has(identity)) return;
       if (result.ok) launched(record.fleetId, configuration, instance, result.value);
       else recover(record.fleetId, configuration, instance, result.error);
     }).catch(error => {
       if (restorationOwned.has(identity) && !stopping && wanted.has(identity)) recover(record.fleetId, configuration, instance, error);
-    }).finally(() => { restorationOwned.delete(identity); timer.abort(); observed(); if (recovering.get(identity)?.stop === stop) recovering.delete(identity); });
+    }).finally(() => { restorationOwned.delete(identity); if (recovering.get(identity)?.stop === stop) recovering.delete(identity); });
     recovering.set(identity, { stop, done });
-    await attempted;
+    await done;
   }
   async function restore(): Promise<void> {
     const tasks: { record: Registration; instance: Instance; configuration: Configuration; observed(): void }[] = [];

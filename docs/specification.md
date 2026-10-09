@@ -882,8 +882,12 @@ removes the selected intent before cleanup and stays stopped after restart.
 Orderly daemon shutdown preserves intent while closing owned resources.
 Starting the same daemon/root restores desired bindings from saved configuration
 and exact native histories, initially without a native process where possible.
-Restoration is bounded to four concurrent attempts with 30-second startup
-observations. A late result is drained/closed, not allowed to overlap a retry.
+Restoration is resource-bounded to four concurrent attempts. Native transport
+requests retain their own deadlines; an overall startup deadline must not cancel
+waiting for a retained input's receipt or continuation readiness. Queued or
+initializing bindings remain `starting`, with the private API and explicit Stop
+available. An explicitly cancelled result is drained/closed before replacement,
+not allowed to overlap a retry or publish false readiness.
 Permanent errors retain failed intent and require operator action.
 
 The controller's private `resume-selections.json` durably owns saved Stop targets,

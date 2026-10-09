@@ -3,7 +3,7 @@
 Scope: Crossfire and fleetd, from merged main `a00817f`, on
 `fix/native-receipt-recovery-order-20261009`. Bad Bets is excluded. Production
 inspection was initially read-only. The owner subsequently authorized completing
-the corrections, coordinated 0.1.17 publication and GAAP deployment. Preserve
+the corrections, coordinated 0.1.18 publication and GAAP deployment. Preserve
 verified production backups, identities, histories and stopped selections. No
 reset, new business assignment or decision answer is authorized.
 
@@ -93,17 +93,17 @@ as context in a new turn. The test uses an isolated inert provider.
 | --- | --- |
 | Typecheck and build | Pass. |
 | Focused native/control regression selection | 62 tests pass across seven files; subsequent full run includes the additional interrupted-restart case. |
-| Full product tests | 789 tests pass across 174 files, 24 workers, 126,165 ms execution. |
+| Full product tests | 789 tests pass across 174 files, 24 workers, 83,508 ms execution on coordinated 0.1.18. |
 | Architecture verification | 33 tests pass; native limitations remain explicitly characterized. |
 | Installation verification | Four tests pass. |
 | Container acceptance | Startup, Element room creation and authenticated attachment download, React/native routes, artifacts, shutdown and persisted rooms pass. |
 | Dependency comparison with merged main | All 97 external dependency records unchanged. |
 
 Full product evidence:
-`.temp/test-runs/2026-10-09T18-54-15.138Z-723493/summary.json`.
+`.temp/test-runs/2026-10-09T19-39-17.620Z-1064079/summary.json`.
 Container evidence:
-`services/crossfire/.temp/container-verification-W2m5jL`, image
-`crossfire-runtime:50d2693f972fbc5bef57`. Aggregate resource limits are
+`services/crossfire/.temp/container-verification-bQtT8K`, image
+`crossfire-runtime:33874131093a60d59b62`. Aggregate resource limits are
 24 GiB memory, no swap and 8,192 tasks; all runtime verification is Codex-only.
 Source is unchanged during container build and acceptance.
 
@@ -116,6 +116,12 @@ error during shutdown. One test also exceeded its deliberately 100 ms native
 transport deadline under the full run; its deadlines and assertions remain
 unchanged and the complete subsequent run is green. These failures are retained
 in `.temp/test-runs/2026-10-09T18-47-26.315Z-620146/summary.json`.
+The first 0.1.18 run has 788 passes and one package-ownership failure: workspace
+development-dependency references in the lock still named 0.1.17. Those owned
+references now match all 27 manifests. All 97 external dependency records remain
+byte-for-byte equal as parsed records. The complete subsequent run and all gates
+pass; evidence for the failed run remains at
+`.temp/test-runs/2026-10-09T19-36-39.412Z-1018137/summary.json`.
 No assertion, deadline, resource bound or quality gate is weakened.
 
 Regression checks are deterministic/inert-provider; native/container checks do
@@ -130,7 +136,47 @@ stops. Nell remains failed on deployed 0.1.16, with shared history
 `01a100ae-c94f-7a50-9eb7-1011fc52198f`. The management database snapshot is
 schema 15, with 48 agent accounts/credentials and 64 room grants.
 
-Coordinated 0.1.17 packaging and all source gates are complete. Publication,
-verified fresh backups, production activation and postdeployment evidence follow
-this release checkpoint. Passing source tests is not yet a claim that production
-Nell recovered. Deployment results will be recorded here before the final handoff.
+Release 0.1.17 is deployed with verified backups. Nell recovered on her original
+history, and all 29 enabled listeners are connected with the 13 deliberate stops
+unchanged. Production exposed one further owning defect: the controller applied
+an inherited 30-second deadline to the whole restoration, including waiting for
+the restart input to appear in Codex's history. It unnecessarily cancelled the
+first generation. Automatic recovery then succeeded, with the exact restart
+input recorded approximately 166 seconds after its turn was accepted. These
+records do not establish the cause of that native delay.
+
+Release 0.1.18 removes the overall restoration deadline at the controller owner.
+Individual native requests remain bounded, at most four starts run concurrently,
+and explicit stop/update cancellation retains exact generation ownership and
+verified cleanup before replacement. The private controller API remains available
+while startup waits for Codex. Readiness and errors now follow actual results,
+not an arbitrary overall timer. No timeout increase or alternate runtime path is
+introduced.
+
+The original controller fails the controlled-clock slow-confirmation regression;
+the corrected source passes 75 focused controller/lifecycle/recovery tests.
+Explicitly cancelled late cleanup, slow permanent failures and shutdown draining
+remain covered without weakening their assertions. Coordinated 0.1.18 source,
+packaging, architecture, installation and actual container gates pass. Publication,
+fresh preserving backups and final production evidence follow this checkpoint
+and will be recorded before the final handoff.
+
+## Recovery cases
+
+| Observed case | Required behavior |
+| --- | --- |
+| Accepted mention while Codex is working | Interrupt the actual live turn, then submit the attributed message. Human and agent sources use the same authorized path. |
+| Codex restarted; original input is recorded | Load the same saved history, recognize the exact input and continue unfinished authorized work without blindly submitting it again. |
+| Codex restarted; original input is not recorded | Start a new turn on the same history with a private file containing the exact last attributed input. Say that its earlier receipt is unknown; review history and effects before continuing. |
+| Restart message is recorded but its response was lost | Recognize the exact recorded restart message, rather than inventing receipt of the original message or resubmitting another notice. |
+| Process dies again before the restart message is recorded | Retain original input and separate restart-attempt evidence; use the same history and the same uncertainty rule on reopening. |
+| Saved timeline says an old turn was in progress | Treat that as historical information, not a running turn in the new process. Never wait for that old process. |
+| Input appears more than 30 seconds after submission | Keep the exact generation and wait for the actual receipt; do not cancel it or claim recovery on an overall timer. |
+| Owner explicitly stops or updates during startup | Cancel and drain the exact generation before replacement. Preserve stopped intent and verified cleanup. |
+| Native process or transport fails | Report the actual failure, preserve original evidence/history and retry recoverable failures under the existing lifecycle owner. |
+| History, credentials, configuration or cleanup is invalid | Report the actual error. Do not invent a fresh history, approve a decision, accept a substitute identity or start a competing writer. |
+
+Restarting is not rollback. Neither receipt checks nor a recovery instruction can
+certify exactly-once external effects or provider availability. Recovery explicitly
+asks the agent to inspect completed work before acting; it never supplies an
+approval or fabricates knowledge that the original input was received.
