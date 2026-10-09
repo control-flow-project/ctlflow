@@ -63,29 +63,38 @@ test('a confirmed ordinary receipt waiting for an acquisition permit cannot hold
     if (saturated && kind === 'acquisition') blockedReads++;
     return host.budget.acquire(kind, signal, admission);
   } };
+  let receiverFailure: unknown;
   const receiving = listen({ ...matrix, host: { ...host, budget }, reconcileMs: 120000, pollMs: 10000, debounceMs: 0, limit: 100,
-    runtime: native.runtime }, stop.signal).catch(error => error);
+    runtime: native.runtime }, stop.signal).catch(error => { if (!stop.signal.aborted) receiverFailure = error; });
   let held: (() => void)[] = [];
   cleanup(scope, async () => { stop.abort(); held.forEach(release => release()); await receiving; });
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
-  await until(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
+  const observed = async (predicate: () => boolean) => {
+    try { await until(() => { if (receiverFailure) throw receiverFailure; return predicate(); }); }
+    catch (error) {
+      const control = existsSync(matrix.cursorFile + '.control') ? readJson(matrix.cursorFile + '.control') : null;
+      throw new Error(String(error) + ' Controls: ' + JSON.stringify(control) + ' Native methods: '
+        + JSON.stringify(native.requests().slice(-20).map(request => request.method)), { cause: error });
+    }
+  };
+  await observed(() => matrix.waiting() === 1 && existsSync(matrix.cursorFile));
   const before = readJson(matrix.cursorFile);
   matrix.add(ROOM, message('$ordinary-before-mention'));
-  await until(() => starts().length === 1 && matrix.waiting() === 1);
+  await observed(() => starts().length === 1 && matrix.waiting() === 1);
   held = await Promise.all(Array.from({ length: 16 }, () => host.budget.acquire('acquisition', stop.signal)));
   saturated = true;
   const first = starts()[0]!.params!;
   native.update({ mode: 'normal' });
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(first.clientUserMessageId), first.input) });
-  await until(() => blockedReads > 0 && readJson<{ steps: { status: string }[] }>(matrix.cursorFile + '.chat-publication').steps[0]?.status === 'delivered');
+  await observed(() => blockedReads > 0 && readJson<{ steps: { status: string }[] }>(matrix.cursorFile + '.chat-publication').steps[0]?.status === 'delivered');
   matrix.add(ROOM, mention('$mention-after-receipt', undefined, 'Stop and inspect this instead'));
-  await until(() => starts().length === 2 && readJson<{ controls: { event: string; status: string }[] }>(matrix.cursorFile + '.control')
+  await observed(() => starts().length === 2 && readJson<{ controls: { event: string; status: string }[] }>(matrix.cursorFile + '.control')
     .controls.some(control => control.event === '$mention-after-receipt' && control.status === 'delivered'));
   assert.equal(clock.now(), 0);
   assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
   assert.match(JSON.stringify(starts()[1]!.params!.input), /\$mention-after-receipt/);
   assert.deepEqual(readJson(matrix.cursorFile), before);
   saturated = false; held.forEach(release => release()); held = [];
-  await until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '2');
+  await observed(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '2');
   assert.equal(starts().length, 2);
 });

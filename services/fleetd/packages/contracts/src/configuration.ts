@@ -4,10 +4,12 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { listenerOptions } from '@ctlflow/crossfire-contracts/runtime';
 import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
+export const runtimeOptions = (input: unknown): Result<Record<string, unknown>> =>
+  input && typeof input === 'object' && !Array.isArray(input) ? success(input as Record<string, unknown>) : failure('invalid', 'Expected runtime options');
 export const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
   workspace: check.optional(check.refine(check.text(4096), value => value.startsWith('/') && !value.includes('\\')
     && value.split('/').slice(1).every(segment => segment && segment !== '.' && segment !== '..'), 'Workspace must be an absolute normalized directory')),
-  listener_options: check.optional(listenerOptions) });
+  listener_options: check.optional(listenerOptions), runtime_options: check.optional(runtimeOptions) });
 export const coordination = check.object({ adapter: check.choice('crossfire'), server: check.text(2048), owner: check.matrixUserId });
 export const roster = check.object({ fleet: check.name, coordination, instances: check.list(instance, 100) });
 const coordinationOptions = check.object({ wake_mode: check.wakeMode,
@@ -19,8 +21,7 @@ export const definition = check.object({ name: check.text(100), runtime: check.c
   const valid = coordinationPolicy({ wakeMode: parsed.value.wake_mode,
     senders: parsed.value.wake_senders.map(sender => ({ matrixUserId: sender.matrix_user_id, includeAgents: sender.include_agents })), permissions: parsed.value.permissions });
   return valid.ok ? parsed : valid;
-}), runtime_options: (input: unknown): Result<Record<string, unknown>> =>
-  input && typeof input === 'object' && !Array.isArray(input) ? success(input as Record<string, unknown>) : failure('invalid', 'Expected runtime options') });
+}), runtime_options: runtimeOptions });
 export type Instance = check.Parsed<typeof instance>;
 export type Roster = check.Parsed<typeof roster>;
 export type Definition = check.Parsed<typeof definition>;

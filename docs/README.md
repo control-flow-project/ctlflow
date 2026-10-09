@@ -14,6 +14,7 @@
 - [Native feasibility and verification boundaries](../services/crossfire/docs/architecture/feasibility.md)
 
 ## Architecture evidence
+- [WCBUBWHB cleanup and exact native settings review](verification/20261009-canonical-cleanup.md)
 - [Listener, sleep and report-publication review](proposals/20261005-listener-and-publication-architecture.md)
 - [Universal fleet controller verification](verification/20261005-universal-fleet-controller.md)
 - [Preserving GAAP rollout verification](verification/20261006-gaap-preserving-rollout.md)

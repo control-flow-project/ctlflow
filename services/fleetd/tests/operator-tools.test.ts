@@ -111,7 +111,8 @@ test('Codex operator inspection never opens turns, resumes histories or answers 
       if (message.id === undefined) return;
       const result = message.method === 'initialize' ? {} : message.method === 'account/read' ? { account: authenticated ? { type: 'fixture' } : null }
         : message.method === 'thread/read' ? { thread: { id: sessionId, cwd: wrongWorkspace ? '/wrong' : directory, canAcceptDirectInput: true, status: { type: busy ? 'active' : 'idle' }, turns: [] } }
-        : message.method === 'model/list' ? { data: [{ model: 'gpt-5.2', supportedReasoningEfforts: [{ reasoningEffort: 'high' }] }] }
+        : message.method === 'config/read' ? { config: {} }
+        : message.method === 'model/list' ? { data: [{ model: 'gpt-5.2', isDefault: true, defaultReasoningEffort: 'high', supportedReasoningEfforts: [{ reasoningEffort: 'high' }] }], nextCursor: null }
         : { data: [{ cwd: directory, skills: [{ scope: 'repo', name: 'search', path: join(directory, '.agents', 'skills', 'search', 'SKILL.md') }], errors: [] }] };
       if (question && message.method === 'model/list') socket.send(JSON.stringify({ id: 'human-choice', method: 'item/tool/requestUserInput', params: { threadId: sessionId } }));
       socket.send(JSON.stringify({ id: message.id, result }));
@@ -127,5 +128,5 @@ test('Codex operator inspection never opens turns, resumes histories or answers 
   authenticated = false; assert.equal((await inspectCodex(input, new AbortController().signal)).ok, false); authenticated = true;
   question = true; assert.equal((await inspectCodex(input, new AbortController().signal)).ok, false);
   assert.deepEqual(responses, [], 'An unsolicited approval closes only the inspection connection without answering');
-  assert(methods.every(method => ['initialize', 'initialized', 'account/read', 'thread/read', 'model/list', 'skills/list'].includes(method)));
+  assert(methods.every(method => ['initialize', 'initialized', 'account/read', 'thread/read', 'config/read', 'model/list', 'skills/list'].includes(method)));
 });

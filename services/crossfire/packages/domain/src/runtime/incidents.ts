@@ -59,7 +59,7 @@ export async function reconcileRuntime(services: Services, stopped: () => boolea
       if (!agent.ok) return agent;
       if (!agent.value || agent.value.principal.status !== 'active' || agent.value.owner.status !== 'active') continue;
       const created = openIncident(services, { ownerId: agent.value.agent.ownerId, agentId: run.agentId, fleetId: null, runId: run.id, sessionId: null, kind: 'contact',
-        message: agentDisplayName(agent.value.name, agent.value.ownerMember.displayName, agent.value.agent.displayNameOverride) + ': listener contact lost. Execution state is unknown; this is not proof of a crash.' });
+        message: agentDisplayName(agent.value.name, agent.value.ownerMember.displayName) + ': listener contact lost. Execution state is unknown; this is not proof of a crash.' });
       if (!created.ok) return created;
     }
     for (const fleet of fleets.value) {

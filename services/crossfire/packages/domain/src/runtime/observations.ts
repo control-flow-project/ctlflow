@@ -36,7 +36,7 @@ export function reportRuntime(services: Services, actor: Actor, agentId: string,
       if (!agent.ok) return agent;
       if (!agent.value) return failure('missing', 'Agent not found');
       const incident = openIncident(services, { ownerId: agent.value.agent.ownerId, agentId, fleetId: null, runId, sessionId: input.sessionId, kind: 'failure',
-        message: agentDisplayName(agent.value.name, agent.value.ownerMember.displayName, agent.value.agent.displayNameOverride) + ' failed: ' + (input.errorMessage ?? 'Native execution failed. Inspect the original session before resuming.') });
+        message: agentDisplayName(agent.value.name, agent.value.ownerMember.displayName) + ' failed: ' + (input.errorMessage ?? 'Native execution failed. Inspect the original session before resuming.') });
       if (!incident.ok) return incident;
     } else if (input.state !== 'unavailable') {
       const recovered = recoverIncidents(services, agentId, null, input.sessionId);

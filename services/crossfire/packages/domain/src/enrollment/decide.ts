@@ -44,7 +44,6 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
       const fleet = approveFleet(services, request); if (!fleet.ok) return fleet;
       const restoringIds = new Set<string>();
       for (const item of items.value) {
-        if (item.outcome === 'failed') continue;
         let agentId = item.agentId;
         if (item.outcome === 'existing' && agentId) {
           const principal = services.repositories.principal.find({ id: agentId }); if (!principal.ok) return principal;
@@ -61,7 +60,7 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
           const principal = registerPrincipal(services, { id: agentId, matrixUserId: '@agent-' + agentId + ':' + services.instance.serverName,
             kind: 'agent', status: 'active', revision: 0, createdAt: now }, 'agent', request.ownerId);
           if (!principal.ok) return principal;
-          const agent = services.repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId: request.ownerId, displayNameOverride: null, wakeMode: 'selected' });
+          const agent = services.repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId: request.ownerId, wakeMode: 'selected' });
           if (!agent.ok) return agent;
           const credentials = services.repositories.agentCredential.insert({ agentId, provisioningPassword: services.identity.secret(), accessToken: null, updatedAt: now });
           if (!credentials.ok) return credentials;
@@ -77,7 +76,7 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
         const requested = services.repositories.fleetPolicy.requested(enrollmentId); if (!requested.ok) return requested;
         const policies = new Map(requested.value.map(policy => [policy.instanceKey, policy]));
         for (const item of approved.value) {
-          if (item.outcome === 'failed' || !item.agentId) continue;
+          if (!item.agentId) return failure('conflict', 'Approved roster identity is missing');
           const policy = policies.get(item.instanceKey);
           if (!policy) return failure('conflict', 'Fleet coordination policy is missing; submit a new request');
           const principal = services.repositories.principal.find({ id: item.agentId }); if (!principal.ok) return principal;

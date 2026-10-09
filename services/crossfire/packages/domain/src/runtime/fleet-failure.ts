@@ -20,7 +20,7 @@ export function reportFleetFailure(services: Services, actor: FleetActor, fleetI
     if (!instances.ok) return instances;
     if (!agent.value || agent.value.agent.ownerId !== fleet.value.ownerId || !instances.value.some(instance => instance.agentId === input.agentId)) return failure('missing', 'Fleet instance not found');
     const saved = openIncident(services, { ownerId: fleet.value.ownerId, agentId: input.agentId, fleetId: null, runId: null, sessionId: input.sessionId, kind: 'failure',
-      message: agentDisplayName(agent.value.name, agent.value.ownerMember.displayName, agent.value.agent.displayNameOverride) + ' failed: ' + input.message }, input.episodeId);
+      message: agentDisplayName(agent.value.name, agent.value.ownerMember.displayName) + ' failed: ' + input.message }, input.episodeId);
     return saved.ok ? success({ accepted: true }) : saved;
   });
 }

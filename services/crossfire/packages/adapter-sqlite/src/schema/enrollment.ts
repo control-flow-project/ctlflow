@@ -33,12 +33,10 @@ CREATE TABLE enrollment_item (
   requested_name TEXT NOT NULL,
   outcome TEXT NOT NULL,
   agent_id TEXT,
-  failure_code TEXT,
   PRIMARY KEY (request_id, instance_key),
   FOREIGN KEY(request_id) REFERENCES enrollment_request(id),
   FOREIGN KEY(agent_id) REFERENCES agent(principal_id),
-  CHECK(outcome IN ('existing','claimed','failed')),
-  CHECK((outcome = 'failed') = (failure_code IS NOT NULL)),
+  CHECK(outcome IN ('existing','claimed')),
   CHECK(outcome != 'existing' OR agent_id IS NOT NULL)
 ) STRICT;
 CREATE INDEX ix_enrollment_item_agent ON enrollment_item(agent_id, request_id, instance_key);

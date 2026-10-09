@@ -7,6 +7,5 @@ export function mapEnrollmentItem(row: Tables['enrollment_item']): EnrollmentIte
     requestedName: row.requested_name,
     outcome: row.outcome,
     agentId: row.agent_id,
-    failureCode: row.failure_code,
   };
 }

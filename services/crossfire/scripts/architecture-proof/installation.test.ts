@@ -2,12 +2,12 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { once } from "node:events";
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, resolve, basename } from "node:path";
 import { promisify } from "node:util";
 import { imageName } from "../../apps/server/src/operator.js";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 
 const execute = promisify(execFile);
 const installer = process.env.npm_execpath;
@@ -18,9 +18,10 @@ const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as
   engines: { node: string; npm: string };
 };
 
-function fixture(): { directory: string; environment: NodeJS.ProcessEnv } {
+function fixture(scope: TestContext): { directory: string; environment: NodeJS.ProcessEnv } {
   mkdirSync(join(root, ".temp"), { recursive: true });
   const directory = mkdtempSync(join(root, ".temp/installation-"));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   writeFileSync(join(directory, ".npmrc"), policy);
   const userConfiguration = join(directory, "user.npmrc");
   const globalConfiguration = join(directory, "global.npmrc");
@@ -46,7 +47,7 @@ function writeProject(directory: string, dependencies: Readonly<Record<string, s
   }));
 }
 
-test("one native install policy governs host, Docker context and image identity", async () => {
+test("one native install policy governs host, Docker context and image identity", async context => {
   assert.equal(manifest.engines.npm, ">=11.17.0");
   const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")) as {
     packages: Record<string, { engines: { node: string; npm: string } }>;
@@ -63,7 +64,7 @@ test("one native install policy governs host, Docker context and image identity"
     /COPY \.npmrc package\.json package-lock\.json tsconfig\.base\.json \.\//);
   assert.match(readFileSync(join(service, "Dockerfile"), "utf8"), /RUN npm ci --ignore-scripts/);
   assert.match(readFileSync(join(service, "apps/server/src/operator.ts"), "utf8"), /\x27.npmrc\x27/);
-  const { directory, environment } = fixture();
+  const { directory, environment } = fixture(context);
   writeProject(directory);
   assert.equal((await npm(directory, environment, ["config", "get", "min-release-age"])).stdout.trim(), "7");
   assert.equal((await npm(directory, environment, ["config", "get", "engine-strict"])).stdout.trim(), "true");
@@ -71,8 +72,8 @@ test("one native install policy governs host, Docker context and image identity"
   await npm(directory, environment, ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]);
 });
 
-test("an actual pre-exemption npm is rejected before installation even with scripts disabled", { timeout: 90_000 }, async () => {
-  const { directory, environment } = fixture();
+test("an actual pre-exemption npm is rejected before installation even with scripts disabled", { timeout: 90_000 }, async context => {
+  const { directory, environment } = fixture(context);
   const tooling = join(directory, "tooling");
   mkdirSync(tooling);
   writeFileSync(join(tooling, ".npmrc"), policy);
@@ -97,8 +98,8 @@ test("an actual pre-exemption npm is rejected before installation even with scri
   assert.equal(readFileSync(sentinel, "utf8"), "preserve before admission");
 });
 
-test("changing only policy bytes invalidates the real runtime image fingerprint", async () => {
-  const { directory } = fixture();
+test("changing only policy bytes invalidates the real runtime image fingerprint", async context => {
+  const { directory } = fixture(context);
   for (const file of [".dockerignore", ".npmrc", "LICENSE", "package.json", "package-lock.json", "tsconfig.base.json"]) {
     copyFileSync(join(root, file), join(directory, file));
   }
@@ -146,7 +147,7 @@ test("native age policy admits aged third parties and only the named owned exemp
   const address = registry.address();
   assert(address && typeof address !== "string");
   origin = "http://127.0.0.1:" + address.port;
-  const positive = fixture();
+  const positive = fixture(context);
   writeProject(positive.directory, { "aged-fixture": "*" });
   await npm(positive.directory, positive.environment, ["install", "--package-lock-only", "--ignore-scripts",
     "--no-audit", "--no-fund", "--registry", origin]);
@@ -155,7 +156,7 @@ test("native age policy admits aged third parties and only the named owned exemp
   };
   assert.equal(lock.packages["node_modules/aged-fixture"]?.version, "1.0.0");
   for (const { range, code } of [{ range: "*", code: "ENOVERSIONS" }, { range: "2.0.0", code: "ETARGET" }]) {
-    const negative = fixture();
+    const negative = fixture(context);
     writeProject(negative.directory, { "fresh-fixture": range });
     await assert.rejects(npm(negative.directory, negative.environment, ["install", "--package-lock-only", "--ignore-scripts",
       "--no-audit", "--no-fund", "--registry", origin]), error => {
@@ -166,7 +167,7 @@ test("native age policy admits aged third parties and only the named owned exemp
     });
   }
   for (const name of exempt) {
-    const approved = fixture();
+    const approved = fixture(context);
     writeProject(approved.directory, { [name]: "2.0.0" });
     await npm(approved.directory, approved.environment, ["install", "--package-lock-only", "--ignore-scripts",
       "--no-audit", "--no-fund", "--registry", origin]);
@@ -177,7 +178,7 @@ test("native age policy admits aged third parties and only the named owned exemp
     assert.equal(approvedLock.packages["node_modules/aged-fixture"]?.version, "1.0.0");
   }
   for (const name of ["@tinqerjs/not-approved", "@ctlflow/crossfire-domain"]) {
-    const unapproved = fixture();
+    const unapproved = fixture(context);
     writeProject(unapproved.directory, { [name]: "2.0.0" });
     await assert.rejects(npm(unapproved.directory, unapproved.environment, ["install", "--package-lock-only", "--ignore-scripts",
       "--no-audit", "--no-fund", "--registry", origin]), error => {

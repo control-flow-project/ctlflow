@@ -2,7 +2,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { readdir, readFile, readlink } from 'node:fs/promises';
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -39,6 +39,7 @@ export async function conduitFixture(context: TestContext, options: { jwtSecret?
   const registrationToken = randomUUID();
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-conduit-"));
+  cleanup(context, () => rmSync(directory, { recursive: true, force: true }));
   const database = join(directory, "database");
   mkdirSync(database, { mode: 0o700 });
   const config = join(directory, "conduit.toml");

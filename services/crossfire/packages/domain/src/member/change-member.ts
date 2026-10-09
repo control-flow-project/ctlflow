@@ -1,14 +1,16 @@
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { Principal } from '../identity/types.js';
-import { authorize } from '../authorization/authorize.js';
+import { activeActor, authorize } from '../authorization/authorize.js';
 import { recordEvent } from '../audit/record-event.js';
 
 export function changeMember(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock'>,
   actor: Actor, memberId: string, input: { expectedRevision: number; status?: Principal['status']; displayName?: string; roleCode?: 'member' | 'administrator' }, requestId: string) {
   if (input.displayName !== undefined && (!input.displayName || input.displayName.length > 100 || /[\u0000-\u001f\u007f]/u.test(input.displayName))) return failure('invalid', 'Member names must contain 1–100 characters without control characters');
   return services.unitOfWork.run(() => {
-    const authority = authorize(services, actor, 'member.manage');
+    const selfName = actor.kind === 'human' && actor.authentication?.kind === 'native' && actor.principalId === memberId
+      && input.displayName !== undefined && input.status === undefined && input.roleCode === undefined;
+    const authority = selfName ? activeActor(services, actor) : authorize(services, actor, 'member.manage');
     if (!authority.ok) return authority;
     const found = services.directory.member(memberId);
     if (!found.ok) return found;
@@ -24,7 +26,8 @@ export function changeMember(services: Pick<Services, 'repositories' | 'director
     }
     const principal = services.repositories.principal.update({ ...current.principal, status, revision: input.expectedRevision + 1 });
     if (!principal.ok) return principal;
-    const role = services.repositories.principalRole.update({ ...current.role, roleCode, assignedByMemberId: actor.principalId, assignedAt: services.clock.now() });
+    const nextRole = selfName ? current.role : { ...current.role, roleCode, assignedByMemberId: actor.principalId, assignedAt: services.clock.now() };
+    const role = selfName ? success(undefined) : services.repositories.principalRole.update(nextRole);
     if (!role.ok) return role;
     const member = services.repositories.member.update({ ...current.member, displayName: input.displayName ?? current.member.displayName });
     if (!member.ok) return member;
@@ -52,7 +55,7 @@ export function changeMember(services: Pick<Services, 'repositories' | 'director
     const audit = recordEvent(services, actor, requestId, { targetKind: 'member', targetId: memberId, ownerId: memberId, action: 'member.configure' });
     return audit.ok ? success({ principal: { ...current.principal, status, revision: input.expectedRevision + 1 },
       member: { ...current.member, displayName: input.displayName ?? current.member.displayName },
-      role: { ...current.role, roleCode, assignedByMemberId: actor.principalId, assignedAt: services.clock.now() },
+      role: nextRole,
       application: { ...current.application, nextCheckAt: services.clock.now() } }) : audit;
   });
 }

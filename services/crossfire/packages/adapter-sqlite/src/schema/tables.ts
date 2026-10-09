@@ -89,7 +89,6 @@ export type Tables = {
     principal_id: string;
     principal_kind: 'agent';
     owner_id: string;
-    display_name_override: string | null;
     wake_mode: 'humans' | 'everyone' | 'selected';
   };
   agent_credential: {
@@ -152,9 +151,8 @@ export type Tables = {
     request_id: string;
     instance_key: string;
     requested_name: string;
-    outcome: 'existing' | 'claimed' | 'failed';
+    outcome: 'existing' | 'claimed';
     agent_id: string | null;
-    failure_code: string | null;
   };
   agent_name: {
     name: string;

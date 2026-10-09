@@ -12,7 +12,10 @@ export function acquireFileLock(path: string): () => void {
     const info = fstatSync(descriptor);
     if (!info.isFile() || info.uid !== process.getuid!() || info.mode & 0o077) throw new Error('Lock must be a private owned regular file');
     database = new DatabaseSync(path + '.lock', { timeout: 0 });
-    try { database.exec('BEGIN EXCLUSIVE'); }
+    try {
+      if (database.prepare('PRAGMA journal_mode = MEMORY').get()?.journal_mode !== 'memory') throw new Error('Private lock requires an in-memory rollback journal');
+      database.exec('BEGIN EXCLUSIVE');
+    }
     catch (error) {
       if (!error || typeof error !== 'object' || !('errcode' in error) || ![5, 6].includes(Number(error.errcode))) throw error;
       throw Object.assign(new Error('Another process already owns this private state'), { code: 'ELOCKED' });

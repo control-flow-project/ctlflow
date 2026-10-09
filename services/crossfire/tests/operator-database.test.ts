@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { executeInsert, executeUpdate, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
 import type { EnrollmentIntroduction } from '@ctlflow/crossfire-domain/enrollment/input';
@@ -16,6 +17,7 @@ import { recordNativeStop } from '@ctlflow/crossfire-domain/fleet/native-stop';
 import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
 import { applicationFixture, value, secret } from './support/application.js';
 import { inspectDatabase, verifyPreservation, databaseExpectations } from '../tools/database.js';
+import { restoreSchema14EnrollmentItems } from './support/schema14.js';
 
 test('operator database inspection is readonly, complete and proves protected records across upgrades', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-database-'));
@@ -35,7 +37,7 @@ test('operator database inspection is readonly, complete and proves protected re
   }, randomUUID()));
   copyFileSync(current, before);
   const bytes = readFileSync(current);
-  const report = value(inspectDatabase(current, { schemaVersion: 14, counts: { agent: 1, management_conversation: 0, fleet_instance_permission: 1 } }, true));
+  const report = value(inspectDatabase(current, { schemaVersion: SCHEMA_VERSION, counts: { agent: 1, management_conversation: 0, fleet_instance_permission: 1 } }, true));
   assert.equal(Object.keys(report.counts).length, 63);
   assert.equal(report.schema?.length, 63);
   assert.equal(report.integrity, 'ok');
@@ -99,7 +101,7 @@ test('operator preservation covers immutable archived children and exact native-
     const relationNames = ['enrollment_archive', 'enrollment_archive_item', 'enrollment_archive_policy', 'enrollment_archive_permission',
       'enrollment_archive_wake_sender', 'enrollment_archive_metadata', 'fleet_native_stop'] as const;
     const bytes = readFileSync(current), report = value(inspectDatabase(current, {
-      schemaVersion: 14, counts: Object.fromEntries(relationNames.map(name => [name, 1])),
+      schemaVersion: SCHEMA_VERSION, counts: Object.fromEntries(relationNames.map(name => [name, 1])),
     }, true));
     assert.equal(Object.keys(report.counts).length, 63); assert.deepEqual(readFileSync(current), bytes);
     for (const privateText of [agent.token, agent.controller.credential, record.claimHash, 'Archived private metadata'])
@@ -110,5 +112,26 @@ test('operator preservation covers immutable archived children and exact native-
       .where(row => row.agent_id === params.agentId && row.receipt_id === params.receiptId),
     { agentId: agent.id, receiptId, now: fixture.now() });
     assert.equal(verifyPreservation(before, current).ok, false, 'Changed native-stop authority must fail preservation');
+  } finally { database.close(); }
+});
+
+test('operator preservation proves schema 14 conversion including exact prior audit and retired labels', async scope => {
+  const directory = mkdtempSync(join(tmpdir(), 'crossfire-name-preservation-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  const current = join(directory, 'current.sqlite'), before = join(directory, 'before.sqlite');
+  const fixture = await applicationFixture(scope, current), agent = await fixture.agent(fixture.admin.actor, 'registered');
+  const database = new Database(current);
+  try {
+    database.exec('ALTER TABLE agent ADD COLUMN display_name_override TEXT');
+    restoreSchema14EnrollmentItems(database);
+    database.prepare('UPDATE agent SET display_name_override=? WHERE principal_id=?').run('Retired caption', agent.id);
+    database.pragma('user_version=14'); copyFileSync(current, before);
+    createSchema(database);
+    const report = value(verifyPreservation(before, current));
+    assert.equal(report.forwardMigration, true); assert.equal(report.preserved.agent, 1);
+    database.prepare("DELETE FROM audit_event WHERE action='agent.name.canonicalized'").run();
+    assert.equal(verifyPreservation(before, current).ok, false, 'Independent labels must be preserved in immutable migration evidence');
+    database.prepare("UPDATE audit_event SET message='changed' WHERE action<>'agent.name.canonicalized'").run();
+    assert.equal(verifyPreservation(before, current).ok, false, 'Every original audit record remains exactly protected');
   } finally { database.close(); }
 });

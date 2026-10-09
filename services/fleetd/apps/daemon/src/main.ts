@@ -17,6 +17,7 @@ import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
+import { migrateControllerContexts } from './context-migration.js';
 
 export async function startDaemon(root: string, name?: string, execution?: Execution) {
   if (!['linux', 'darwin'].includes(process.platform)) throw new Error('Fleet controller requires Linux or macOS');
@@ -69,9 +70,14 @@ export async function startDaemon(root: string, name?: string, execution?: Execu
 }
 const invoked = process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invoked) {
-  const { values } = parseArgs({ options: { root: { type: 'string' }, name: { type: 'string' } } });
+  const { values } = parseArgs({ options: { root: { type: 'string' }, name: { type: 'string' }, 'migrate-contexts': { type: 'boolean' } } });
   if (!values.root) throw new Error('fleetd --root ABSOLUTE_DIRECTORY [--name NAME]');
-  const daemon = await startDaemon(resolve(values.root), values.name);
-  console.log(JSON.stringify({ status: 'ready', controller: daemon.controller.status().controller, socket: daemon.socketPath }));
-  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => { void daemon.close(); });
+  if (values['migrate-contexts']) {
+    if (values.name !== undefined) throw new Error('Context migration retains the controller identity; do not supply --name');
+    console.log(JSON.stringify(await migrateControllerContexts(resolve(values.root))));
+  } else {
+    const daemon = await startDaemon(resolve(values.root), values.name);
+    console.log(JSON.stringify({ status: 'ready', controller: daemon.controller.status().controller, socket: daemon.socketPath }));
+    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => { void daemon.close(); });
+  }
 }

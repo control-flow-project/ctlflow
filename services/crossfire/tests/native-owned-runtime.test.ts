@@ -37,6 +37,7 @@ async function instructionItems(runtime: OwnedRuntimeConnection) {
 
 test('stock Codex default and native bypass execute synchronous subprocess IPC and resume the same session', { timeout: 60000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/owned-options-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const workspace = join(directory, 'workspace'), home = join(workspace, '.codex');
   mkdirSync(workspace, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
@@ -61,11 +62,11 @@ test('stock Codex default and native bypass execute synchronous subprocess IPC a
       assert.deepEqual(await instructionItems(runtime), initialInstructions, 'Permission changes do not append unchanged role instructions');
     }
     const marker = join(directory, 'ipc-' + bypass + '.txt');
-    const source = 'const {spawnSync}=require("node:child_process");const {writeFileSync}=require("node:fs");'
+    const source = 'const {spawnSync}=require("node:child_process");const {writeFileSync,renameSync}=require("node:fs");'
       + 'const child=spawnSync(process.execPath,["-e","process.stdin.pipe(process.stdout)"],{input:"captured-IPC",encoding:"utf8"});'
       + 'if(child.error||child.status!==0||child.stdout!=="captured-IPC")throw child.error||new Error(JSON.stringify(child));'
       + 'const git=spawnSync("git",["--version"],{encoding:"utf8"});if(git.error||git.status!==0)throw git.error||new Error("Git failed");'
-      + 'writeFileSync(' + JSON.stringify(marker) + ',child.stdout);';
+      + 'const marker=' + JSON.stringify(marker) + ';writeFileSync(marker+".tmp",child.stdout);renameSync(marker+".tmp",marker);';
     provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 1000, max_output_tokens: 1024 });
     await runtime.deliver('Run the inert synchronous IPC control', 'native-default-' + bypass, stop.signal);
     await until(() => existsSync(marker));
@@ -110,7 +111,7 @@ test('external native workspaces retain private managed state, explicit role ski
   await runtime.close();
   assert.deepEqual(readdirSync(existing), ['existing-history']);
   assert.equal(readFileSync(join(existing, 'existing-history'), 'utf8'), 'Existing coding session remains independent');
-  assert(existsSync(join(home, 'crossfire-session.json')));
+  assert(existsSync(join(home, 'crossfire-context-registry.json')));
   assert.deepEqual(value(await adapter.savedContexts({ workspace, stateDirectory })), [{ context: 'shared', runtime: 'codex', sessionId, workspace }]);
   input.instructions = 'Updated role instructions: resumed-external-workspace-proof.\n\n' + skill;
   input.name = 'private-managed-agent-high';
@@ -150,6 +151,7 @@ test('missing or invalid immutable profiles fail before touching private native 
 
 test('owned stock Codex has zero-model startup and resumes the same private native session', { timeout: 60000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/owned-codex-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const workspace = join(directory, 'workspace'), home = join(workspace, '.codex');
   mkdirSync(workspace, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });

@@ -1,12 +1,11 @@
 import { realpathSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeConnection, RuntimeHooks, TurnControl, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
-import { connectSession, type CodexOptions, type CodexSession } from './session.js';
+import type { RuntimeConnection, TurnControl, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
+import type { CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
 import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
 import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
 
-export type { CodexOptions } from './session.js';
 export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>;
   inspectSession: (sessionId: string) => Promise<{ busy: boolean }>; unsettled: () => boolean; event: (event: NativeEvent) => void };
 
@@ -285,17 +284,10 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
         }
         revision++; wake?.();
       }
+      const item = message.params.item;
+      if (['item/started', 'item/completed'].includes(message.method) && item && typeof item === 'object' && 'type' in item && item.type === 'userMessage') {
+        revision++; wake?.();
+      }
     },
   };
-}
-
-export async function connectCodex(options: CodexOptions & { hooks: RuntimeHooks }, stop: AbortSignal): Promise<CodexConnection> {
-  const pollMs = pollInterval(options.pollMs ?? 10_000);
-  let delivery: CodexConnection | undefined;
-  const session = await connectSession(options, stop, options.hooks, event => delivery?.event(event));
-  try {
-    delivery = codexDelivery(session, { pollMs, timeoutMs: options.timeoutMs ?? 30_000, receiptFile: options.receiptFile });
-    await delivery.verify();
-    return delivery;
-  } catch (error) { if (delivery) await delivery.close(); else await session.close(); throw error; }
 }

@@ -2,7 +2,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { createServer, type ServerResponse } from 'node:http';
-import { mkdtempSync, mkdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { once } from 'node:events';
@@ -10,7 +10,7 @@ import { WebSocketServer } from 'ws';
 import { API } from '@ctlflow/crossfire-contracts/matrix';
 import { writeJson, readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import type { Account, Event, Settings } from '@ctlflow/crossfire-contracts/client';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from './codex-runtime.js';
 import type { RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
 import { builtRelease } from './release.js';
 import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
@@ -32,9 +32,10 @@ export const OWNER_DM = '!owner-dm:test.localhost';
 export const CONTROLLER: ControllerBinding = { fleetId: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee',
   connectionId: 'cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee', credential: 'fixture-only-controller-capability' };
 
-export function temporary(_context: TestContext): string {
+export function temporary(context: TestContext): string {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), '.temp/crossfire-listener-'));
+  cleanup(context, () => rmSync(directory, { recursive: true, force: true }));
   return directory;
 }
 
@@ -80,8 +81,12 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       if (mode === 'unexpected-id') { send({ id: -1, result: {} }); return; }
       if (mode === 'oversized') { socket.send('x'.repeat(8 * 1024 * 1024 + 1)); return; }
       send({ id: request.id, result: { userAgent: 'protocol fixture' } });
+    } else if (request.method === 'config/read') {
+      send({ id: request.id, result: { config: { model: 'native-default-model', model_reasoning_effort: 'high' } } });
+    } else if (request.method === 'model/list') {
+      send({ id: request.id, result: { data: [{ model: 'native-default-model', isDefault: true, defaultReasoningEffort: 'high', supportedReasoningEfforts: [{ reasoningEffort: 'high' }] }], nextCursor: null } });
     } else if (['thread/start', 'thread/resume', 'thread/read'].includes(request.method)) {
-      send({ id: request.id, result: { ...(configuration.selection as Record<string, unknown> | undefined), approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
+      send({ id: request.id, result: { model: request.params?.config?.model ?? 'native-default-model', reasoningEffort: request.params?.config?.model_reasoning_effort ?? 'high', ...(configuration.selection as Record<string, unknown> | undefined), approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
         status: { type: configuration.status ?? 'idle' },
         canAcceptDirectInput: 'directInput' in configuration ? configuration.directInput : true } } });
     } else if (request.method === 'thread/name/set') {
@@ -145,7 +150,7 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
     disconnect: () => { for (const client of server.clients) client.terminate(); },
     options: { session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs: 2000, pollMs: 100,
       hooks: { requestDecision: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } },
-    runtime: (signal: AbortSignal, pollMs: number, hooks?: RuntimeHooks, timeoutMs = 2000) => connectCodex({ session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs, pollMs,
+    runtime: (signal: AbortSignal, pollMs: number, hooks?: RuntimeHooks, timeoutMs = 2000) => resumeFixture({ session: THREAD, workspace: directory, endpoint: `ws://127.0.0.1:${address.port}`, token: 'fixture-only', receiptFile: join(directory, 'receipt.json'), timeoutMs, pollMs,
       hooks: hooks ?? { requestDecision: async () => { throw new Error('Unexpected native permission in delivery fixture'); } } }, signal),
     requests: () => requests,
   };

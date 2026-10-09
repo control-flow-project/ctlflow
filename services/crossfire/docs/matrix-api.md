@@ -15,8 +15,8 @@ before updating the artifact. To regenerate or verify, provide an extracted
 official v1.12 checkout, not a mutable latest schema:
 
 ```sh
-npm run generate:matrix -- --root . --source /absolute/matrix-spec-v1.12/data/api/client-server
-npm run generate:matrix -- --root . --source /absolute/matrix-spec-v1.12/data/api/client-server --check
+npm run generate:matrix --workspace=@ctlflow/crossfire -- --root /absolute/crossfire --source /absolute/matrix-spec-v1.12/data/api/client-server
+npm run generate:matrix --workspace=@ctlflow/crossfire -- --root /absolute/crossfire --source /absolute/matrix-spec-v1.12/data/api/client-server --check
 ```
 
 `packages/adapter-matrix/src/schema.ts` owns one mechanical acronym/camel/underscore-to-kebab spelling
@@ -44,7 +44,7 @@ Operator invocations may explicitly select that state with `--project` and
 | Messaging | `send-message`, `redact-event`, `report-content`, `set-typing` |
 | Unread and receipts | `sync`, `get-notifications`, `set-read-marker`, `post-receipt` |
 | Filters and preferences | `define-filter`, `get-filter`, `get-account-data`, `set-account-data`, room variants, tags and push rules |
-| Profiles and presence | `get-user-profile`, `get-display-name`, `set-display-name`, avatar and presence operations |
+| Profiles and presence | `get-user-profile`, `get-display-name`, avatar and presence operations |
 | Media | `upload-content`, `create-content`, `upload-content-to-mxc`, `get-content-authed`, authenticated thumbnail/download variants |
 | Discovery/spaces | `get-public-rooms`, `query-public-rooms`, `get-local-aliases`, `get-space-hierarchy` |
 
@@ -61,6 +61,11 @@ calls, to-device messaging and old/deprecated endpoints are explicitly denied.
 External URL previews and remote routing are denied by local safety policy.
 Native standard coverage does not guarantee that a particular Conduit build
 implements every endpoint; native errors remain errors, without a fallback.
+
+`set-display-name` is operator-only in the native catalog and refused for agent
+accounts at the public server boundary. Agent labels come from their registered
+name and owner; rename uses owner-reviewed fleet enrollment. A native human can
+edit their own label, not another profile, role or status.
 
 ## Budget and continuation rules
 

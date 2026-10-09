@@ -25,6 +25,7 @@ const execute = promisify(execFile);
 
 test('public fleet setup starts a separate native history, reuses identity and preserves explicit stop intent', { timeout: 180_000 }, async scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/universal-setup-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const home = join(directory, 'home'), project = join(directory, 'project');
   const root = mkdtempSync(join(tmpdir(), 'crossfire-controller-'));
   cleanup(scope, () => rmSync(root, { recursive: true, force: true }));
@@ -61,8 +62,20 @@ test('public fleet setup starts a separate native history, reuses identity and p
   starter.stderr.on('data', bytes => { errors = (errors + String(bytes)).slice(-64_000); });
   const ended = once(starter, 'close');
   cleanup(scope, async () => { starter.kill('SIGTERM'); await ended; });
-  await until(() => output.includes('awaiting-approval') || starter.exitCode !== null);
+  const observation = new AbortController();
+  const signal = AbortSignal.any([scope.signal, observation.signal, AbortSignal.timeout(70_000)]);
+  const promptedAt = performance.now();
+  try {
+    while (!output.includes('awaiting-approval') && starter.exitCode === null && starter.signalCode === null) {
+      await Promise.race([once(starter.stdout, 'data', { signal }), ended]);
+    }
+  } catch (error) {
+    scope.diagnostic('Setup output: ' + output + '\nSetup errors: ' + errors);
+    throw error;
+  } finally { observation.abort(); }
+  scope.diagnostic('Enrollment prompt readiness: ' + Math.round(performance.now() - promptedAt) + 'ms');
   assert.equal(starter.exitCode, null, errors);
+  assert.equal(starter.signalCode, null, errors);
   assert.equal(provider.requests.length, 0, 'Prerequisites, controller startup and enrollment make no model calls');
   const requests = value(services.collection.enrollments({ ownerId: admin.actor.principalId, page: 1, pageSize: 100 })).items;
   assert.equal(requests.length, 1);
@@ -135,12 +148,12 @@ test('public fleet setup starts a separate native history, reuses identity and p
   assert.equal(provider.requests.length, 0);
   assert.equal(existing.child.exitCode, null);
   await cli('stop', first.fleetKey);
-  const preservedHistory = readFileSync(join(privateState, '.codex/crossfire-session.json'));
+  const preservedHistory = readFileSync(join(privateState, '.codex/crossfire-context-registry.json'));
   await cli('remove', first.fleetKey);
   const archived = value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: first.fleetKey }));
   assert(archived?.archivedAt !== null && archived?.archivedAt !== undefined, 'CLI removal archives through the same receipt-gated domain operation as management');
   assert.deepEqual(readFileSync(profilePath), profileBytes);
-  assert.deepEqual(readFileSync(join(privateState, '.codex/crossfire-session.json')), preservedHistory);
+  assert.deepEqual(readFileSync(join(privateState, '.codex/crossfire-context-registry.json')), preservedHistory);
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1, 'Archival retains the enrolled identity');
   await assert.rejects(cli('setup'), 'Repeated setup cannot reactivate an archived fleet');
   assert.equal(provider.requests.length, 0);

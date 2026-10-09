@@ -74,12 +74,12 @@ test('grant mutations recheck current authority, logout, target lifecycle and ex
   assert.equal(changeMember(services, admin.actor, admin.actor.principalId, { expectedRevision: 0, status: 'revoked' }, randomUUID()).ok, false);
 });
 
-test('name and mute edits retain the native grant revision and membership generation', async scope => {
+test('account revision and mute edits retain the native grant revision and membership generation', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, agent = await fixture.agent(admin.actor, 'rename');
   const revision = () => value(services.repositories.principal.find({ id: agent.id }))!.revision;
   const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Room')).roomId;
   const granted = value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: revision(), expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
-  value(changeAgent(services, admin.actor, agent.id, { expectedRevision: revision(), displayName: 'Renamed' }, randomUUID()));
+  value(changeAgent(services, admin.actor, agent.id, { expectedRevision: revision(), status: 'active' }, randomUUID()));
   value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: revision(), expectedGeneration: granted.generation, accessMode: 'reply', powerLevel: null, muted: true }, randomUUID()));
   const updated = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId }))!;
   assert.equal(updated.accessRevision, granted.accessRevision); assert.equal(updated.generation, granted.generation);

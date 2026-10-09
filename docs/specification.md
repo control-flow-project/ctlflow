@@ -338,7 +338,7 @@ controller evidence before the corresponding destructive coordination operation.
 First fleet start:
 1. Validate all definitions, native options, instructions, paths and unique names.
 2. Check every name before runtime launch. A known collision refuses the whole
-   start. A later atomic name-claim collision fails only its affected instance.
+   start. A later name-claim or capacity race rolls back the entire introduction.
 3. Submit the exact roster through shared enrollment. Display one approval URL
    and code for the human, and wait in code without model polling.
 4. The owner approves the displayed identities, fleet connection and exact role
@@ -827,7 +827,10 @@ available for the next authorized generation.
 Verified ordinary receipts may checkpoint while an empty watch reconciles
 membership. Accepted steering closes ordinary admission until its captured-turn
 control is settled, preventing a new ordinary wait from blocking replacement
-input. Only completed or superseded controls are retired by ordinary checkpoints.
+input. Ordinary receipt acknowledgment does not reopen admission while steering
+is settling. Acquisition and publication validate that fence when work enters,
+not only against a previous operation's cancellation signal. Only completed or
+superseded controls are retired by ordinary checkpoints.
 
 Instance policy `fleetIdleTimeoutSeconds` defaults to 1800 (30 minutes), permits
 integer values 0–604800, and zero disables automatic sleep. Management presents
@@ -1006,8 +1009,14 @@ history_mode = "per-room"
 - `definition` resolves to `agents/<definition>/agent.toml`.
 - The coordination block is supplied once for the fleet. It has no password,
   access token, runtime endpoint or thread ID.
-- Model, reasoning, sandbox and approval settings belong to the definition,
-  not to instance overrides in the roster.
+- The definition supplies native `runtime_options` defaults. An instance may
+  select an explicit `runtime_options` table while reusing the same definition,
+  instructions and skills. Each supplied top-level value replaces the definition
+  value; nested tables replace whole values, not recursive merge rules. The native
+  adapter validates every effective instance selection before startup. Inspection,
+  start/resume, recovery, history reset and operator verification use that same
+  resolution. No coordination-policy override is introduced. Changes apply only
+  at a stopped-to-running transition, not silently to a running engine.
 - Runtime-independent listener settings belong to each instance's optional
   `listener_options` table, not to native `runtime_options`. `history_mode` is
   `shared` by default or explicitly `per-room`. Instance-wide Crossfire policy owns
@@ -1102,9 +1111,11 @@ definition's current model, reasoning and permissions apply to the same saved
 session. No TUI resume permission flags or new identity are required. Editing
 definition files does not silently reconfigure an already running engine.
 
-Instances sharing a definition share native settings/instructions, not mutable
-history. Different native settings require a different definition; per-instance
-listener options do not. Secrets and
+Instances sharing a definition reuse instructions, skills and native defaults,
+not mutable history. Per-instance native options replace supplied top-level
+defaults; all callers use the same effective selection and exact advertised
+model/effort admission. Implicit native defaults are validated too. No unavailable
+selection is silently substituted. Listener options are runtime-independent. Secrets and
 shell command strings are not part of these tracked files. Runtime transport,
 authentication and process ownership remain controller-controlled.
 
@@ -1213,7 +1224,12 @@ The durable server mapping is:
 
 Registered agent names are unique across all owners on one Crossfire instance,
 including single-agent enrollment, fleet enrollment and authorized rename.
-Mutable native display names do not own identity or uniqueness.
+Every agent label derives solely from its claimed registered name and human
+owner label. There is no independent display-name override. The public native
+profile boundary refuses agent display-name mutations; a human may edit their
+own label using native bearer authentication without gaining role/status authority.
+Ambient browser cookies are ignored at this native Matrix profile boundary; only
+the bearer principal authorizes the change. Cookie-only requests remain rejected.
 
 Changing a registered name follows this same enrollment pipeline, not a second
 rename API. Private controller/native identity proof binds the immutable owner,
@@ -1255,19 +1271,22 @@ Preflight reports availability; it does not reserve names. Introduction performs
 an atomic claim for each new registered name against one server-side uniqueness
 constraint shared by all creation/rename entrypoints.
 
-If a name is taken between preflight and introduction, only that instance fails,
-with an explicit name-collision error; its runtime does not start. Successfully
-claimed peers can continue. There is no suffixing, automatic rename, takeover
-or creation under another identity.
+If any name is taken between preflight and introduction, the entire introduction
+fails with an explicit name-collision error listing conflicting names. Request,
+item, policy and name-claim changes roll back together; no hidden successful
+subset or runtime starts. Capacity races have the same whole-roster boundary.
+There is no suffixing, automatic rename, takeover or alternate identity.
 
 Pending claims are bounded by enrollment expiry and policy capacity. Rejected
 or expired claims cannot confer accounts or room access. An approved identity
 retains its binding through restart, upgrade, suspension and revocation; a
 revoked binding is not silently recycled into a new account.
 
-The approval page identifies claimed new entries, authenticated existing entries
-and collision failures separately. The one approval covers exactly the displayed
-complete successful roster and its exact fleet coordination settings, including
+The approval page identifies claimed new entries and authenticated existing entries.
+Current enrollment items and exchange responses have no per-item failure form.
+Enrollment preparation succeeds for the complete roster or returns one explicit
+failure; native startup failures after that admission remain independently reported.
+The one approval covers exactly the displayed complete roster and its exact fleet coordination settings, including
 authenticated existing identities. Changing the roster or policies invalidates
 its review; a concurrent
 collision is not permission to approve a different hidden subset.
@@ -1685,6 +1704,8 @@ Restarting the native engine cannot replay a confirmed input. A lost RPC respons
 is resolved only against the captured native history interval and exact receipt;
 an unprovable publication stops explicitly with unread positions unchanged.
 Native client IDs are correlation, not an assumed native deduplication guarantee.
+Native user-item notifications wake pending receipt verification immediately;
+the exact retained timeline remains the receipt authority, not the notification.
 The private per-session journal allows one pending publication and at most 128
 unacknowledged confirmations; it refuses excess rather than silently evicting
 unsettled evidence. This is runtime state, not a second Matrix cursor owner.
@@ -1802,6 +1823,28 @@ part of setup. Model, sandbox and approval use validated native configuration;
 role/skill/admin instruction text uses the single receipt-confirmed developer
 producer on creation, exact resumption and changed instruction revisions.
 
+One adapter-owned private `crossfire-context-registry.json` is the native context
+index for every instance. Its `mode` is `shared` or `per-room`; its unique
+`bindings` map `shared`, `control` or an exact room ID to distinct session UUIDs.
+Mode changes retain prior bindings rather than copying, merging or substituting
+histories. Delivery and instruction receipts use the same context-derived family.
+No attach-only initialization, split shared/room runtime reader or guessed native
+history import is supported. Ordinary readers reject obsolete metadata and
+incomplete migration. The explicit locked `fleetd --migrate-contexts` conversion
+archives verified original bytes before publishing the canonical registry,
+preserves credentials and native histories, and resumes safely after interrupted
+conversion. It does not make a model call or change desired activation.
+
+The Codex adapter owns exact capability admission through native `config/read`
+and bounded `model/list`, resolving explicit instance settings over role defaults
+and then native defaults. Every selected model/effort combination must be
+advertised by the selected engine. Creation, exact resume, recovery, inspection
+and reset use that same admission implementation. Reset inspects the selected
+instances before stopping or archiving them. Unavailable settings fail explicitly;
+no alternate model or effort is substituted. Corrupt registry, receipt, decision
+and observation state fails permanently with retained evidence rather than
+repeated transient recovery or an implicit fresh context.
+
 The Codex adapter's canonical `applyNativeInstructions` producer uses supported
 `thread/inject_items` with an actual native message `role: "developer"` and
 `content: [{type: "input_text", text}]`. It runs only against the exact idle owned
@@ -1842,8 +1885,16 @@ The model-free `agent test` checks fleetd's existing receiver, effective
 authentication and exact native binding, including observed busy state. It
 neither starts an engine nor treats saved credentials as readiness. Native turn
 interruption is a typed capability, not assumed from a runtime name. Codex
-supports captured-turn interruption. A fresh native Matrix mention by an eligible
-verified human or agent acts like Esc followed by new input: capture the exact active
+supports captured-turn interruption. The existing agent `matrix send-message` tool's
+repeatable `--mention-user MATRIX_USER_ID` flag writes exact native
+`m.mentions.user_ids`. It requires a fresh `m.text` event; explicit native JSON
+mentions remain available and cannot be combined with the flag. Markdown links,
+display names, quoted/code text and routine updates never imply mention targets.
+The command help lists native parameters and client convenience options. Target
+metadata remains subject to the receiver's exact origin/wake/permission controls.
+
+A fresh native Matrix mention by an eligible verified human or agent acts like
+Esc followed by new input: capture the exact active
 turn, confirm native interruption, then deliver the full attributed instruction
 through the same receipt path and history ahead of unread backlog. Current wake
 authors, native sender/agent membership, unmuted room access and controller
@@ -2299,7 +2350,7 @@ are in [Public static reports](../services/crossfire/docs/publications.md).
 ## 11. Normalized persistence and authorization
 
 One canonical schema and permission catalog own current state. Fresh stores
-initialize schema 14 directly. An inventoried deployed schema 13 advances to 14
+initialize schema 15 directly. Inventoried deployed schemas 13 and 14 advance to 15
 transactionally after a verified backup. Versions 1–12, foreign stores and future
 versions are refused without mutation; there is no historical migration ladder,
 historical runtime reader or reset-on-error behavior.
@@ -2317,6 +2368,22 @@ are recomputed from their exact converted review snapshots so the same canonical
 request resumes; other historical digests remain unchanged. All table replacement,
 archive-guard restoration, digest conversion and foreign-key checks are atomic.
 Failure restores the original schema, values and version.
+
+Schema 15 retires the independent agent display override. Each non-null prior
+label is retained in an `agent.name.canonicalized` audit before its column is
+removed. Agent native profile reconciliation becomes due without changing
+principal revisions, registered names or effective grants. Schema 13 receives
+the same conversion in its one atomic wake/name migration. Only the current
+schema is read at runtime. Preservation verifies every original audit record
+exactly and each retired label's migration evidence.
+
+Schema 15 also removes partial roster admission from current enrollment items,
+approval and exchange. A prior request containing failed items moves intact into
+the existing immutable archives, including its complete roster, review policies,
+permissions, senders and controller metadata. Its temporary unapproved name
+claims are released; approved identities, fleet credentials and effective grants
+are unchanged. Complete requests retain exact current claims and identifiers.
+Archived outcomes are evidence, never another runtime admission path.
 
 Retained archives and their normalized item/policy/permission/sender/metadata
 relations remain historical records, never operational approval authority.
@@ -2369,7 +2436,7 @@ boundaries, not as the management database's data model.
 | --- | --- |
 | `principal` | `id PK`, `matrix_user_id UQ`, `kind`, `status`, `revision`, `created_at`; `UQ(id, kind)`. |
 | `member` | `principal_id PK`, `principal_kind = human`, `display_name`; composite FK to `principal(id, kind)`. |
-| `agent` | `principal_id PK`, `principal_kind = agent`, `owner_id FK member`, `display_name_override?`, `wake_mode`; composite principal-kind FK; `UQ(principal_id, owner_id)`. |
+| `agent` | `principal_id PK`, `principal_kind = agent`, `owner_id FK member`, `wake_mode`; composite principal-kind FK; `UQ(principal_id, owner_id)`. |
 | `agent_credential` | `agent_id PK/FK agent`, `provisioning_password`, `access_token?`, `updated_at`. |
 | `principal_application` | `principal_id PK/FK principal`, `applied_revision?`, `applied_intent_hash?`, `applied_status?`, `native_display_name?`, `last_attempt_at?`, `last_success_at?`, `next_check_at`, `error_code?`, `error_message?`. |
 | `permission` | `code PK`, `grant_scope`, `description`; `UQ(code, grant_scope)`; grant scope is `role` or `agent_room`. |
@@ -2426,7 +2493,7 @@ repository methods serve issuance and native account operations only.
 | Table | Complete logical columns and keys |
 | --- | --- |
 | `enrollment_request` | `id PK`, `owner_id FK member`, `fleet_key`, `verification_code UQ`, `claim_hash`, `controller_name`, `controller_credential_hash`, `roster_digest`, `status`, `revision`, `created_at`, `expires_at`, `decided_by_member_id? FK member`, `decided_at?`. |
-| `enrollment_item` | `request_id FK enrollment_request`, `instance_key`, `requested_name`, `outcome`, `agent_id? FK agent`, `failure_code?`; `PK(request_id, instance_key)`. |
+| `enrollment_item` | `request_id FK enrollment_request`, `instance_key`, `requested_name`, `outcome = existing or claimed`, `agent_id? FK agent`; `PK(request_id, instance_key)`. |
 | `enrollment_item_policy` | `request_id`, `instance_key`, `wake_mode`, `expected_agent_revision?`; composite PK/FK to `enrollment_item ON DELETE CASCADE`. Exact review snapshot and stale-existing-agent guard. |
 | `enrollment_item_permission` | `request_id`, `instance_key`, `permission_code = room.agent.invite`, `grant_scope = agent_room`; composite PK; item-policy FK with cascade; catalog FK `(permission_code, grant_scope)`. |
 | `enrollment_item_wake_sender` | `request_id`, `instance_key`, `sender_principal_id FK principal`, `include_agents` checked 0/1; composite PK; item-policy FK with cascade. Exact selected-author review rows. |
@@ -2768,6 +2835,12 @@ ownership. The management website remains under `/manage`.
 - Entity fields are camelCase with precise names: `agentId`, `ownerId`,
   `matrixUserId`, `roomId`, `createdAt`. Crossfire IDs are opaque UUIDs; Matrix
   IDs remain native opaque strings. Encode each path segment exactly once.
+- Audit `requestId` is a bounded opaque correlation value (1–255 characters,
+  no control characters), not an entity identity: it records an HTTP request
+  UUID or an internal system-job key unchanged. The audit entity's `auditId`
+  and the HTTP envelope's `meta.requestId` remain UUID-only. All audit actors
+  use one correlation parser; immutable records are never rewritten or hidden
+  to satisfy a representation constraint.
 - One operation declaration owns method/path, request/response schema and
   authentication requirement. Typed UI/CLI clients and API documentation derive
   from it. Domain entities and SQLite rows are not serialized automatically.

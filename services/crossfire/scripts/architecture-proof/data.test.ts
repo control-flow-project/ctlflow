@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { join } from "node:path";
 import test from "node:test";
 import { defineSelect } from "@tinqerjs/tinqer";
@@ -77,8 +78,9 @@ test("revision-qualified UPDATE detects a stale mutation without overwriting the
   }
 });
 
-test("durability and writer exclusion use SQLite, not a JavaScript transaction emulation", () => {
+test("durability and writer exclusion use SQLite, not a JavaScript transaction emulation", scope => {
   const directory = mkdtempSync(join(process.cwd(), ".temp/architecture-data-"));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, "management.sqlite");
   const first = openDatabase(path);
   const second = openDatabase(path);

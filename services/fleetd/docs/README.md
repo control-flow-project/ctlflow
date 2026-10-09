@@ -2,6 +2,7 @@
 
 - [Noninteractive setup, persisted identity and private workspace/state](setup.md)
 - [Controller roots, lifecycle, execution and security](operations.md)
+- [Canonical context storage and explicit migration](storage.md)
 - [Role coordination settings, owner review and room invitations](coordination.md)
 - [Native fleet inspection and preservation](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
 - [CLI command and SSH guide](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/commands.md)

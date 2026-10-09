@@ -40,7 +40,7 @@ async function applyPrincipal(services: Dependencies, principalId: string): Prom
     ownerRevision = agent.value.owner.revision; ownerId = agent.value.owner.id;
     if (agent.value.owner.status === 'revoked') status = 'revoked';
     else if (agent.value.owner.status !== 'active' && status === 'active') status = 'suspended';
-    displayName = agentDisplayName(agent.value.name, agent.value.ownerMember.displayName, agent.value.agent.displayNameOverride);
+    displayName = agentDisplayName(agent.value.name, agent.value.ownerMember.displayName);
     const credentials = services.repositories.agentCredential.find({ agentId: principal.id });
     if (!credentials.ok) return credentials;
     if (!credentials.value) return failure('missing', 'Agent credentials are missing');

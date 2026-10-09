@@ -126,7 +126,7 @@ export function verifyPreservation(before: string, after: string) {
     original = new Database(before, { readonly: true, fileMustExist: true });
     current = new Database(after, { readonly: true, fileMustExist: true });
     if (first.value.schemaVersion !== second.value.schemaVersion) {
-      if (first.value.schemaVersion !== 13 || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
+      if (![13, 14].includes(Number(first.value.schemaVersion)) || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
       converted = new Database(original.serialize());
       converted.pragma('foreign_keys = ON');
       createSchema(converted);
@@ -135,7 +135,7 @@ export function verifyPreservation(before: string, after: string) {
     return firstDatabase.transaction(() => secondDatabase.transaction(() => {
       const previous = protectedRecords(firstDatabase), next = protectedRecords(secondDatabase), preserved: Record<string, number> = {};
       for (const name of Object.keys(previous) as (keyof typeof previous)[]) {
-        const existing = previous[name](), actual = next[name]();
+        const existing = name === 'audit_event' && converted ? protectedRecords(original!).audit_event() : previous[name](), actual = next[name]();
         if (existing.length > 100000 || actual.length > 100000) return failure('limit', 'Protected-record verification exceeds its 100000-row per-relation bound');
         const rowHash = (row: object) => createHash('sha256').update(JSON.stringify(Object.entries(row).sort(([left], [right]) => left.localeCompare(right)))).digest('hex');
         const available = new Map<string, number>();
@@ -147,6 +147,21 @@ export function verifyPreservation(before: string, after: string) {
         }
         preserved[name] = existing.length;
       }
+      if (converted) {
+        const archived = (database: Database.Database) => executeSelect(database, schema, query => query.from('audit_event')
+          .where(row => row.action === 'agent.name.canonicalized' && row.request_id === 'schema-15-agent-names')
+          .select(row => ({ owner_id: row.owner_id, target_kind: row.target_kind, target_id: row.target_id, actor_kind: row.actor_kind,
+            action: row.action, request_id: row.request_id, outcome: row.outcome, message: row.message })).take(100001));
+        const expected = archived(converted), actual = archived(secondDatabase);
+        if (expected.length > 100000 || actual.length > 100000) return failure('limit', 'Name-archive verification exceeds its finite record bound');
+        const available = new Map<string, number>();
+        for (const row of actual) { const key = JSON.stringify(row); available.set(key, (available.get(key) ?? 0) + 1); }
+        for (const row of expected) {
+          const key = JSON.stringify(row), count = available.get(key) ?? 0;
+          if (!count) return failure('conflict', 'A retired independent agent label is missing from its immutable migration audit');
+          available.set(key, count - 1);
+        }
+      }
       return success({ beforeSchema: first.value.schemaVersion, afterSchema: second.value.schemaVersion, forwardMigration: converted !== undefined, preserved,
         beforeCounts: first.value.counts, afterCounts: second.value.counts });
     })())();
@@ -156,6 +171,9 @@ export function verifyPreservation(before: string, after: string) {
 
 function protectedRecords(database: Database.Database) {
   return {
+    enrollment_request: () => executeSelect(database, schema, query => query.from('enrollment_request').take(100001)),
+    enrollment_item: () => executeSelect(database, schema, query => query.from('enrollment_item').take(100001)),
+    enrollment_controller_metadata: () => executeSelect(database, schema, query => query.from('enrollment_controller_metadata').take(100001)),
     enrollment_archive: () => executeSelect(database, schema, query => query.from('enrollment_archive').take(100001)),
     enrollment_archive_item: () => executeSelect(database, schema, query => query.from('enrollment_archive_item').take(100001)),
     enrollment_archive_policy: () => executeSelect(database, schema, query => query.from('enrollment_archive_policy').take(100001)),

@@ -1,16 +1,17 @@
 import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { stringify } from 'smol-toml';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
-import { effectiveProvider, hostHome, nativeConfiguration, nativeDirectories, prepareHome } from './home.js';
+import { effectiveProvider, hostHome, nativeConfiguration, nativeDirectories, nativeEnvironment, prepareHome } from './home.js';
 import { ownedOptions, ownedQuestionCapability, ownedVersion } from './owned-options.js';
 import { inspectInstructionCapability } from './capability.js';
-
-export function nativeEnvironment(home: string, stateDirectory: string, profile?: string): NodeJS.ProcessEnv {
-  const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home, CROSSFIRE_PROJECT: stateDirectory };
-  delete environment.CODEX_THREAD_ID;
-  delete environment.CROSSFIRE_AGENT_NAME;
-  if (profile !== undefined) environment.CROSSFIRE_AGENT_NAME = profile;
-  return environment;
-}
+import { startProcess } from './owned-process.js';
+import { codexProtocol } from './protocol.js';
+import { admitCodex } from './admission.js';
+import { codexClientVersion } from './version.js';
+import { refreshAuthentication } from './authentication.js';
+import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
 
 function command(binary: string, args: string[], workspace: string, environment: NodeJS.ProcessEnv, stop: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -47,6 +48,25 @@ export async function inspectCodex(binary: string, input: { workspace: string; s
       catch { stop.throwIfAborted(); return failure('unauthorized', 'Sign in with codex login using the host CODEX_HOME, then repeat fleet setup or resume. Never paste credentials into chat.'); }
     }
     stop.throwIfAborted();
-    return success(undefined);
-  } catch (error) { return failure('native', error instanceof Error ? error.message : 'Cannot inspect native Codex prerequisites'); }
+    const inspectionHome = mkdtempSync(join(input.stateDirectory, '.codex-inspection-'));
+    try {
+      writeFileSync(join(inspectionHome, 'config.toml'), stringify(nativeConfiguration(home)), { mode: 0o600 });
+      const authentication = refreshAuthentication(inspectionHome);
+      if (!authentication.ok) return authentication;
+      const native = await startProcess(inspectionHome, input.workspace, input.stateDirectory, 'crossfire-inspection', stop, binary,
+        parsed.value.options.features?.default_mode_request_user_input === true);
+      let protocol: ReturnType<typeof codexProtocol> | undefined;
+      try {
+        protocol = codexProtocol({ endpoint: native.endpoint, token: native.token, timeoutMs: 10000, event: () => {},
+          approval: async () => { throw new Error('Capability inspection cannot answer native requests'); } }, AbortSignal.any([stop, native.signal]));
+        await protocol.request('initialize', { clientInfo: { name: 'crossfire-inspection', version: codexClientVersion }, capabilities: { experimentalApi: true } });
+        protocol.notify('initialized');
+        const admitted = await admitCodex(protocol.request, parsed.value.options);
+        return admitted.ok ? success(undefined) : admitted;
+      } finally { try { if (protocol) { protocol.close(); await protocol.closed; } } finally { await native.close(); } }
+    } finally { rmSync(inspectionHome, { recursive: true, force: true }); }
+  } catch (error) {
+    const parsed = errorCode(error && typeof error === 'object' && 'code' in error ? error.code : undefined);
+    return failure(parsed.ok ? parsed.value : 'native', error instanceof Error ? error.message : 'Cannot inspect native Codex prerequisites');
+  }
 }

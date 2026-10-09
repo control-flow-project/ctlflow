@@ -33,7 +33,8 @@ An explicit block requires `wake_mode`, `permissions` and `wake_senders`. Use
 `wake_senders = []` for an empty list. `everyone` requires an empty list. Unknown
 fields, old preset/flat-ID inputs, capabilities, duplicate IDs and invalid flags
 fail validation. Different
-role policies require different definitions; there are no instance overrides.
+role coordination policies require different definitions; native runtime-option
+selections do not override this policy.
 Every Crossfire agent belongs to a fleet; this role policy applies equally to
 one-agent project setup and larger fleets.
 

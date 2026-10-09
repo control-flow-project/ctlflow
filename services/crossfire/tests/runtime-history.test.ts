@@ -2,7 +2,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, renameSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
@@ -13,9 +13,11 @@ import type { RuntimeDecision, RuntimeObservationEvent } from '@ctlflow/crossfir
 import { success } from '@ctlflow/crossfire-kernel/result';
 import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
 import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
+import { CONTEXT_REGISTRY } from '@ctlflow/crossfire-adapter-codex/context-state';
 
 async function environment(scope: Parameters<typeof nativeProvider>[0]) {
   const directory = mkdtempSync(join(process.cwd(), '.temp/native-histories-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const workspace = join(directory, 'workspace'), home = join(workspace, '.codex');
   mkdirSync(workspace, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
   writeFileSync(join(home, 'auth.json'), '{}', { mode: 0o600 });
@@ -37,7 +39,7 @@ test('controller-owned reset creates a fresh native context without changing ide
   runtime.acknowledge(['before-reset']); assert.equal((await runtime.inspect()).busy, false); await runtime.close();
   assert(usage.length > 0, 'Native app-server token counters reach the optional adapter hook');
   const resetId = randomUUID(); value(await adapter.reset({ workspace, stateDirectory: workspace, resetId }));
-  assert(existsSync(join(workspace, '.codex/crossfire-archive', resetId, 'crossfire-session.json')));
+  assert(existsSync(join(workspace, '.codex/crossfire-archive', resetId, CONTEXT_REGISTRY)));
   runtime = value(await adapter.start(input, new AbortController().signal)); assert.notEqual(runtime.sessionId, previous);
   const current = runtime.sessionId; assert.equal(provider.requests.length, 1, 'Reset and native startup make no model calls');
   assert.deepEqual(readFileSync(join(workspace, '.codex/auth.json')), authentication);
@@ -67,14 +69,14 @@ test('default native start resumes complete history and refuses absent or broken
   await until(() => provider.held() !== undefined);
   assert(JSON.stringify(provider.requests.at(-1)).includes('blue orchard 729'), 'Native resume retains full conversation history despite excludeTurns in the RPC response');
   provider.finish(); runtime.acknowledge(['resumed-followup']); await until(async () => !(await runtime.inspect()).busy); await runtime.close();
-  const binding = join(workspace, '.codex/crossfire-session.json'), contexts = join(workspace, '.codex/crossfire-contexts.json');
-  renameSync(binding, binding + '.saved'); renameSync(contexts, contexts + '.saved');
+  const binding = join(workspace, '.codex', CONTEXT_REGISTRY);
+  renameSync(binding, binding + '.saved');
   const lost = await adapter.start(input, new AbortController().signal); assert.equal(lost.ok, false);
-  assert.equal(existsSync(binding), false); assert.equal(existsSync(contexts), false); assert.equal(provider.requests.length, 2);
-  renameSync(binding + '.saved', binding); renameSync(contexts + '.saved', contexts);
-  writeFileSync(binding, JSON.stringify({ sessionId: randomUUID() }));
+  assert.equal(existsSync(binding), false); assert.equal(provider.requests.length, 2);
+  renameSync(binding + '.saved', binding);
+  writeFileSync(binding, JSON.stringify({ mode: 'shared', bindings: [{ context: 'shared', sessionId: randomUUID() }] }));
   const broken = await adapter.start(input, new AbortController().signal); assert.equal(broken.ok, false);
-  assert.equal(JSON.parse(readFileSync(binding, 'utf8')).sessionId === sessionId, false, 'A failed resume never overwrites the binding with a new history');
+  assert.equal(JSON.parse(readFileSync(binding, 'utf8')).bindings[0].sessionId === sessionId, false, 'A failed resume never overwrites the binding with a new history');
   assert.equal(provider.requests.length, 2);
 });
 
@@ -137,9 +139,9 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
   assert.equal(runtime.sessionId, sharedId); assert.equal(provider.requests.length, 2);
   assert.equal((await runtime.inspect()).busy, false, 'All positively unloaded retained histories are checked without waking them');
   await runtime.close();
-  const contexts = join(workspace, '.codex/crossfire-contexts.json');
-  const state = JSON.parse(readFileSync(contexts, 'utf8')) as { mode: string; control: string; rooms: { room: string; sessionId: string }[] };
-  state.rooms[0]!.sessionId = randomUUID(); writeFileSync(contexts, JSON.stringify(state), { mode: 0o600 });
+  const contexts = join(workspace, '.codex', CONTEXT_REGISTRY);
+  const state = JSON.parse(readFileSync(contexts, 'utf8')) as { mode: string; bindings: { context: string; sessionId: string }[] };
+  state.bindings.find(binding => binding.context === '!alpha:test')!.sessionId = randomUUID(); writeFileSync(contexts, JSON.stringify(state), { mode: 0o600 });
   runtime = value(await adapter.start(input, stop.signal));
   await assert.rejects(runtime.inspect(), /thread|history|session/iu, 'A missing secondary native history cannot be guessed idle');
   assert.equal(provider.requests.length, 2);
@@ -179,13 +181,13 @@ test('stock Codex structured questions preserve native attribution and exact res
 test('corrupt native history bindings cannot share a session or ambiguously select a room', { timeout: 60000 }, async scope => {
   const { workspace, provider, adapter } = await environment(scope);
   const shared = randomUUID(), other = randomUUID();
-  writeFileSync(join(workspace, '.codex', 'crossfire-session.json'), JSON.stringify({ sessionId: shared }), { mode: 0o600 });
   for (const rooms of [
     [{ room: '!alpha:test', sessionId: shared }],
     [{ room: '!alpha:test', sessionId: other }, { room: '!beta:test', sessionId: other }],
     [{ room: '!alpha:test', sessionId: other }, { room: '!alpha:test', sessionId: randomUUID() }],
   ]) {
-    writeFileSync(join(workspace, '.codex', 'crossfire-contexts.json'), JSON.stringify({ mode: 'per-room', control: null, rooms }), { mode: 0o600 });
+    writeFileSync(join(workspace, '.codex', CONTEXT_REGISTRY), JSON.stringify({ mode: 'per-room',
+      bindings: [{ context: 'shared', sessionId: shared }, ...rooms.map(room => ({ context: room.room, sessionId: room.sessionId }))] }), { mode: 0o600 });
     const started = await adapter.start({ profile: 'invalid-history', name: 'invalid-history', workspace, stateDirectory: workspace, instructions: 'No input.', options: {},
       listenerOptions: { historyMode: 'per-room' }, hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } }, new AbortController().signal);
     assert(!started.ok && started.error.message.includes('unique rooms and distinct session identities'));

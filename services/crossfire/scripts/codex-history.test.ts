@@ -2,7 +2,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from './test-support/codex-runtime.js';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, THREAD, until } from './test-support/listener.js';
 
@@ -17,7 +17,7 @@ function oldHistory(count: number, completed = true) {
 
 test('acknowledgement before publication never scans unrelated large history or submits twice', async context => {
   const native = await fakeCodex(context, { initialHistory: oldHistory(10_100), deferHistory: true });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   let delivered = false;
   const delivery = connection.deliver('input', 'delayed').then(() => { delivered = true; });
@@ -34,7 +34,7 @@ test('acknowledgement before publication never scans unrelated large history or 
 
 test('a long active turn needs only its post-submission interval to prove interruption', async context => {
   const native = await fakeCodex(context, { initialHistory: oldHistory(10_100, false), mode: 'accepted', turnId: 'old-turn' });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'interrupted-long');
   await until(() => native.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
@@ -49,7 +49,7 @@ test('a long active turn needs only its post-submission interval to prove interr
 
 test('completed intervals advance a bounded in-memory boundary instead of rescanning the active turn', async context => {
   const native = await fakeCodex(context, { initialHistory: oldHistory(10_100, false), mode: 'accepted', turnId: 'old-turn' });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'incremental');
   const reads = () => native.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100);
@@ -75,7 +75,7 @@ test('an exact receipt published after a page snapshot is found on the next poll
   const native = await fakeCodex(context, { initialHistory: history, historyPages: [
     { data: history.slice(-100), nextCursor: 'older-snapshot' },
   ] });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   await connection.deliver('input', 'snapshot');
   const reads = native.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100);
@@ -86,7 +86,7 @@ test('an exact receipt published after a page snapshot is found on the next poll
 
 test('unsupported history without native unmaterialized proof fails before input', async context => {
   const native = await fakeCodex(context, { boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601] });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   await assert.rejects(connection.deliver('input', 'fresh'), /not supported yet/);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
@@ -95,7 +95,7 @@ test('unsupported history without native unmaterialized proof fails before input
 
 test('native unmaterialized history permits one first input but never fabricates its receipt', async context => {
   const native = await fakeCodex(context, { unmaterialized: true, boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601], deferHistory: true });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   let delivered = false;
   const delivery = connection.deliver('input', 'fresh').then(() => { delivered = true; });
@@ -109,7 +109,7 @@ test('native unmaterialized history permits one first input but never fabricates
 
 test('unmaterialized initialization is bounded and unsupported receipts never replay', async context => {
   const native = await fakeCodex(context, { unmaterialized: true, boundaryUnavailable: [-32601], historyUnavailable: [-32601, -32601, -32601] });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   await assert.rejects(connection.deliver('input', 'fresh'), /not supported yet/);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
@@ -132,7 +132,7 @@ test('invalid submission boundaries fail before input and never search older his
   ];
   for (const page of badPages) {
     const native = await fakeCodex(context, { boundaryPages: [page] });
-    const connection = await connectCodex(native.options, new AbortController().signal);
+    const connection = await resumeFixture(native.options, new AbortController().signal);
     try {
       await assert.rejects(connection.deliver('input', 'invalid-boundary'), /Invalid Codex/);
       assert(!native.requests().some(request => request.method === 'turn/start'));
@@ -154,7 +154,7 @@ test('a missing, changed, truncated or regressing boundary cannot prove absence 
   ];
   for (const page of invalidPages) {
     const native = await fakeCodex(context, { initialHistory: history, turnId: 'current', mode: 'accepted', historyPages: [page] });
-    const connection = await connectCodex(native.options, new AbortController().signal);
+    const connection = await resumeFixture(native.options, new AbortController().signal);
     try {
       await assert.rejects(connection.deliver('input', 'input'), /boundary|history order/);
       assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1);
@@ -169,7 +169,7 @@ test('cursor cycles and excessive new intervals remain bounded and never authori
       item: { type: 'agentMessage', id: 'item-' + index, text: 'output' },
     }], nextCursor: cyclic ? 'cycle' : 'page-' + index }));
     const native = await fakeCodex(context, { mode: 'accepted', turnId: 'current', historyPages: pages });
-    const connection = await connectCodex(native.options, new AbortController().signal);
+    const connection = await resumeFixture(native.options, new AbortController().signal);
     try {
       await assert.rejects(connection.deliver('input', 'input'), cyclic ? /history cursor/ : /verification bound/);
       assert.equal(native.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length, cyclic ? 2 : 100);
@@ -187,7 +187,7 @@ test('realtime entries and coincident positions retain exact boundary identity',
     { type: 'realtime', position: 1, item: { type: 'realtimeSessionStarted', id: 'realtime', realtimeSessionId: 'session' } },
     { type: 'turnStarted', turnId: 'current', position: 1 },
   ], nextCursor: null }] });
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'realtime');
   await until(() => native.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));

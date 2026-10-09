@@ -18,7 +18,7 @@ export function createPublicationRepository(database: Database.Database): Public
           state: row.publication.state, revision: row.publication.revision, created_at: row.publication.created_at, expires_at: row.publication.expires_at,
           published_at: row.publication.published_at, deleted_at: row.publication.deleted_at, cleaned_at: row.publication.cleaned_at,
           total_bytes: row.publication.total_bytes, file_count: row.publication.file_count,
-          agentName: row.agent.display_name_override ?? row.name.name, ownerId: row.agent.owner_id, ownerName: row.owner.display_name,
+          agentName: row.name.name, ownerId: row.agent.owner_id, ownerName: row.owner.display_name,
         })).firstOrDefault(), { id });
       return success(record ? { publication: mapPublication(record), agentName: record.agentName, ownerId: record.ownerId, ownerName: record.ownerName } : null);
     }); },
@@ -83,7 +83,7 @@ export function createPublicationRepository(database: Database.Database): Public
           state: row.publication.state, revision: row.publication.revision, created_at: row.publication.created_at, expires_at: row.publication.expires_at,
           published_at: row.publication.published_at, deleted_at: row.publication.deleted_at, cleaned_at: row.publication.cleaned_at,
           total_bytes: row.publication.total_bytes, file_count: row.publication.file_count,
-          agentName: row.agent.display_name_override ?? row.name.name, ownerId: row.agent.owner_id, ownerName: row.owner.display_name })), params)
+          agentName: row.name.name, ownerId: row.agent.owner_id, ownerName: row.owner.display_name })), params)
         : executeSelect(database, schema, (query, params) => query.from('agent')
           .join(query.from('publication'), agent => agent.principal_id, publication => publication.agent_id, (agent, publication) => ({ agent, publication }))
           .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
@@ -95,7 +95,7 @@ export function createPublicationRepository(database: Database.Database): Public
             state: row.publication.state, revision: row.publication.revision, created_at: row.publication.created_at, expires_at: row.publication.expires_at,
             published_at: row.publication.published_at, deleted_at: row.publication.deleted_at, cleaned_at: row.publication.cleaned_at,
             total_bytes: row.publication.total_bytes, file_count: row.publication.file_count,
-            agentName: row.agent.display_name_override ?? row.name.name, ownerId: row.agent.owner_id, ownerName: row.owner.display_name })), params);
+            agentName: row.name.name, ownerId: row.agent.owner_id, ownerName: row.owner.display_name })), params);
       return success(page(records.map(record => ({ publication: mapPublication(record), agentName: record.agentName,
         ownerId: record.ownerId, ownerName: record.ownerName })), total, input));
     }); },

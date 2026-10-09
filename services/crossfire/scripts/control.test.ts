@@ -9,7 +9,7 @@ import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import type { Event } from '@ctlflow/crossfire-contracts/client';
 import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from './test-support/codex-runtime.js';
 import { isControl, loadControl, type ControlState } from '@ctlflow/crossfire-agent-core/control';
 import { eventView } from '@ctlflow/crossfire-agent-core/receive';
 import { isListenerNotice, LISTENER_NOTICE } from '@ctlflow/crossfire-contracts/notices';
@@ -478,7 +478,7 @@ test('historical initial snapshots and edited or quoted messages have no cancell
 
 test('native cancellation confirms the captured turn only and never retargets a later turn', async context => {
   const native = await fakeCodex(context);
-  const connection = await connectCodex(native.options, new AbortController().signal);
+  const connection = await resumeFixture(native.options, new AbortController().signal);
   cleanup(context, connection.close);
   assert.equal(await connection.turnControl.activeTurn(), null);
   await connection.deliver('first', 'first');
@@ -495,7 +495,7 @@ test('native cancellation confirms the captured turn only and never retargets a 
 
 test('an interruption acknowledgement without terminal proof cannot admit replacement input', async context => {
   const native = await fakeCodex(context, { delayInterrupt: true });
-  const connection = await connectCodex({ ...native.options, timeoutMs: 200 }, new AbortController().signal);
+  const connection = await resumeFixture({ ...native.options, timeoutMs: 200 }, new AbortController().signal);
   cleanup(context, connection.close);
   await connection.deliver('original', 'original');
   await assert.rejects(connection.turnControl.interrupt((await connection.turnControl.activeTurn())!), /uncertain/);

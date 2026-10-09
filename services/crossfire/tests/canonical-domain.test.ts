@@ -35,10 +35,11 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   assert.equal(value(services.collection.pendingEnrollmentCount()), 1);
   assert.equal(value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: 'research' })), null, 'An anonymous roster does not reserve a fleet');
   assert.equal((await preflightEnrollment(services, { ...input, ownerMatrixId: other.member.principal.matrixUserId })).ok, false);
-  const late = value(await introduceEnrollment(services, { ...input, enrollmentId: randomUUID(), claimSecret: secret(),
-    instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }, { instanceKey: 'third', name: 'third', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] }));
-  assert.equal(late.instances[0]?.failureCode, 'name_collision');
-  assert.equal(late.instances[1]?.outcome, 'claimed');
+  const late = await introduceEnrollment(services, { ...input, enrollmentId: randomUUID(), claimSecret: secret(),
+    instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }, { instanceKey: 'third', name: 'third', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] });
+  assert(!late.ok); assert.equal(late.error.code, 'name_collision'); assert.match(late.error.message, /first/u);
+  assert.equal(value(services.collection.pendingEnrollmentCount()), 1);
+  assert.equal(value(services.repositories.agentName.find({ name: 'third' })), null);
   assert.equal(decideEnrollment(services, other.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()).ok, false);
   value(decideEnrollment(services, admin.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
   const items = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }));
@@ -102,7 +103,7 @@ test('bulk room review is complete, revision-bound and atomic', async scope => {
   const plan = { fleetId, agents: instances.map(instance => ({ instanceKey: instance.instanceKey,
     grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
-  value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: value(services.directory.agent(agents[1]!.id))!.principal.revision, displayName: 'Beta' }, randomUUID()));
+  value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: value(services.directory.agent(agents[1]!.id))!.principal.revision, status: 'active' }, randomUUID()));
   assert.equal((await applyGrantPlan(services, admin.actor, { plan, digest: preview.digest, snapshots: preview.snapshots }, randomUUID())).ok, false);
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agents[0]!.id, roomId })), null);
   const revised = value(await previewGrantPlan(services, admin.actor, plan));

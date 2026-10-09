@@ -51,7 +51,7 @@ function fixture(execution?: Partial<Execution>) {
     }),
     execution: { connect: () => success(undefined), connection: () => ({ connected: true, deliveryEnabled: true, revision: 0, error: null }),
       delivery: async () => failure('unavailable', 'Not connected'), message: async () => failure('unavailable', 'Not connected'), disconnect: async () => {}, close: async () => {},
-      validate: () => success(undefined), inspect: async () => success(undefined), test: async () => success(undefined), prepare: async () => success({ failed: [] }), remove: async () => success(undefined),
+      validate: () => success(undefined), inspect: async () => success(undefined), test: async () => success(undefined), prepare: async () => success(undefined), remove: async () => success(undefined),
       archive: async () => success(undefined), update: async () => success(undefined),
       reset: async () => success(undefined),
       contexts: async () => success([]), confirmStopped: async () => success(undefined),
@@ -74,7 +74,7 @@ test('enrollment reviews a stopped fleet without starting, resetting or enabling
   const calls: string[] = [];
   const fixture = fixtureController({ prepare: async (_configuration, _controller, intent, _signal, approval) => {
     calls.push('prepare:' + intent); approval({ url: 'https://example.test/manage/enrollments/review', code: 'ABCDEF123456' });
-    return success({ failed: [] });
+    return success(undefined);
   }, reset: async () => { calls.push('reset'); return success(undefined); },
   delivery: async () => { calls.push('delivery'); return failure('conflict', 'Enrollment must never change delivery'); } });
   cleanup(scope, () => fixture.controller.close());
@@ -211,6 +211,28 @@ test('explicit context reset closes the owned process before reset and retains i
   assert.deepEqual(calls, ['start-analyst', 'close-analyst', 'reset-analyst', 'start-analyst']); assert.notEqual(sessions[0], sessions[1]);
   assert.equal((await fixture.finish(await fixture.operation('reset'))).status, 'succeeded');
   assert.deepEqual(calls.slice(-3), ['close-analyst', 'reset-analyst', 'start-analyst']);
+});
+
+test('reset inspects exactly the selected instances before stopping or archiving any native history', async scope => {
+  const inspected: string[][] = []; let reject = true;
+  const fixture = fixtureController({ inspect: async (_configuration, _signal, instances) => {
+    assert(instances); inspected.push(instances.map(instance => instance.key));
+    return reject ? failure('invalid', 'Selected model does not support max effort') : success(undefined);
+  } }); cleanup(scope, () => fixture.controller.close());
+  value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: {
+    key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
+  await fixture.finish(await fixture.operation('start'));
+  const before = value(fixture.controller.view(fixture.record.fleetId));
+  const rejected = await fixture.finish(await fixture.operation('reset', 'analyst'));
+  assert.equal(rejected.status, 'failed'); assert.equal(rejected.errors[0]!.code, 'invalid');
+  assert.deepEqual(fixture.closed, []); assert.equal(fixture.started.length, 2);
+  assert.deepEqual(value(fixture.controller.view(fixture.record.fleetId)).instances.map(instance => instance.sessionId),
+    before.instances.map(instance => instance.sessionId));
+  assert.deepEqual(inspected, [['analyst']]); reject = false;
+  assert.equal((await fixture.finish(await fixture.operation('reset', 'analyst'))).status, 'succeeded');
+  assert.deepEqual(inspected, [['analyst'], ['analyst']]); assert.deepEqual(fixture.closed, ['analyst']);
+  assert.equal(value(fixture.controller.view(fixture.record.fleetId)).instances.find(instance => instance.instance.key === 'peer')!.sessionId,
+    before.instances.find(instance => instance.instance.key === 'peer')!.sessionId);
 });
 
 test('fleet fresh history stops all targets before reset and reports partial failure without restarting failed peers', async scope => {
@@ -362,18 +384,32 @@ test('roster edits serialize registration retirement and retain files when remov
   assert.equal(value(rebooted.list()).length, 1); assert.deepEqual(value(rebooted.view(fixture.record.fleetId)).instances, []);
 });
 
-test('per-instance failure retains successful peers; startup history survives controller restart', async scope => {
-  const fixture = fixtureController({ prepare: async () => success({ failed: [{ instanceKey: 'analyst', code: 'name_collision', message: 'Name is taken' }] }) });
+test('an enrollment collision refuses the entire fleet without native startup or desired activation', async scope => {
+  const fixture = fixtureController({ prepare: async () => failure('name_collision', 'Name collision: analyst') });
+  cleanup(scope, () => fixture.controller.close());
+  value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
+  const operation = await fixture.finish(await fixture.operation('start'));
+  assert.equal(operation.status, 'failed');
+  assert.deepEqual(operation.errors, [{ instanceKey: null, code: 'name_collision', message: 'Name collision: analyst' }]);
+  assert.deepEqual(fixture.started, []);
+  assert.deepEqual(value(fixture.registry.desiredIntent()), []);
+  assert(value(fixture.controller.view(fixture.record.fleetId)).instances.every(instance => !instance.desiredActive));
+});
+
+test('native per-instance failure retains successful peers; startup history survives controller restart', async scope => {
+  const fixture = fixtureController();
+  const start = fixture.services.execution.start;
+  fixture.services.execution.start = async (...args) => args[1].key === 'analyst' ? failure('invalid', 'Native settings unavailable') : start(...args);
   cleanup(scope, () => fixture.controller.close());
   value(await fixture.controller.editInstance(fixture.record.fleetId, 0, { kind: 'add', instance: { key: 'peer', name: 'peer', definition: 'analyst', workarea: 'agents/analyst/workarea/peer' } }));
   const operation = await fixture.operation('start'); const result = await fixture.finish(operation);
-  assert.equal(result.status, 'failed'); assert.equal(result.errors[0]?.code, 'name_collision'); assert.deepEqual(fixture.started, ['peer']);
+  assert.equal(result.status, 'failed'); assert.equal(result.errors[0]?.code, 'invalid'); assert.deepEqual(fixture.started, ['peer']);
   await fixture.controller.close(); assert.deepEqual(fixture.closed, ['peer']);
   const reopened = value(createController(fixture.services)); cleanup(scope, () => reopened.close());
   assert.equal(value(reopened.operation(operation.operationId)).status, 'failed');
   await reopened.ready();
   const recovered = value(reopened.view(fixture.record.fleetId));
-  assert.equal(recovered.instances.find(instance => instance.instance.key === 'analyst')!.phase, 'stopped');
+  assert.equal(recovered.instances.find(instance => instance.instance.key === 'analyst')!.phase, 'failed');
   assert.equal(recovered.instances.find(instance => instance.instance.key === 'peer')!.phase, 'running');
 });
 
@@ -491,7 +527,7 @@ test('explicit start wakes a sleeping native generation without replacing its bi
 
 test('desired bindings restore exact histories without enrollment and explicit stops remain stopped across restart', async scope => {
   const calls: string[] = [], sessions = new Map<string, string>(); let preparations = 0;
-  const fixture = fixtureController({ prepare: async () => { preparations++; return success({ failed: [] }); },
+  const fixture = fixtureController({ prepare: async () => { preparations++; return success(undefined); },
     start: async (_configuration, instance, _signal, reason) => {
       const sessionId = sessions.get(instance.key) ?? randomUUID(); sessions.set(instance.key, sessionId); calls.push(reason + ':' + instance.key);
       const stop = new AbortController(); return success(runtimeFixture({ sessionId, signal: stop.signal,
@@ -686,7 +722,7 @@ test('explicit stop does not depend on valid roster files and clears desired key
 test('late preparation success after an explicit stop cannot restore activation intent or start a runtime', async scope => {
   let release!: () => void;
   const fixture = fixtureController({ prepare: async () => {
-    await new Promise<void>(resolve => { release = resolve; }); return success({ failed: [] });
+    await new Promise<void>(resolve => { release = resolve; }); return success(undefined);
   } }); cleanup(scope, () => fixture.controller.close());
   const starting = await fixture.operation('start'); await until(() => release !== undefined);
   const stopping = await fixture.operation('stop'); release();

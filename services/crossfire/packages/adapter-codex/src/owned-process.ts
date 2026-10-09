@@ -5,7 +5,8 @@ import { writeFileSync, unlinkSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { ownedVersion, ownedQuestionCapability } from './owned-options.js';
-import { nativeEnvironment } from './prerequisites.js';
+import { nativeEnvironment } from './home.js';
+import { failureError } from '@ctlflow/crossfire-kernel/result';
 import { inspectInstructionCapability } from './capability.js';
 
 export async function startProcess(home: string, workspace: string, stateDirectory: string, profile: string, stop: AbortSignal, binary = 'codex', questions = false) {
@@ -13,13 +14,13 @@ export async function startProcess(home: string, workspace: string, stateDirecto
   const environment = nativeEnvironment(realpathSync(home), stateDirectory, profile);
   const version = execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 10000, maxBuffer: 4096, env: environment, cwd: workspace }).trim();
   const supported = ownedVersion(version);
-  if (!supported.ok) throw new Error(supported.error.message);
+  if (!supported.ok) throw failureError(supported.error);
   const instructions = await inspectInstructionCapability(binary, home, workspace, environment, stop);
-  if (!instructions.ok) throw new Error(instructions.error.message);
+  if (!instructions.ok) throw failureError(instructions.error);
   if (questions) {
     const listing = execFileSync(binary, ['features', 'list'], { encoding: 'utf8', timeout: 10000, maxBuffer: 65536, env: environment, cwd: workspace });
     const capability = ownedQuestionCapability(listing);
-    if (!capability.ok) throw new Error(capability.error.message);
+    if (!capability.ok) throw failureError(capability.error);
   }
   stop.throwIfAborted();
   const path = process.env.PATH;

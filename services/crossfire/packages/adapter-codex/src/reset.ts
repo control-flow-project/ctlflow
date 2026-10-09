@@ -5,15 +5,16 @@ import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index
 import { archiveState } from '@ctlflow/crossfire-adapter-filesystem/archive';
 import { identifier } from '@ctlflow/crossfire-contracts/schema/validation';
 import { nativeDirectories, prepareHome } from './home.js';
+import { contextState, CONTEXT_REGISTRY } from './context-state.js';
 
 export async function resetCodex(input: { workspace: string; stateDirectory: string; resetId: string }) {
   if (!identifier(input.resetId).ok) return failure('invalid', 'Invalid context reset identity');
   try {
     nativeDirectories(input);
     const home = prepareHome(input.stateDirectory), marker = join(home, 'crossfire-reset.json');
+    contextState(home);
     if (existsSync(marker) && readJson<{ resetId: string }>(marker).resetId === input.resetId) return success(undefined);
-    archiveState(home, join(home, 'crossfire-archive', input.resetId), name => name === 'crossfire-contexts.json' || name.startsWith('crossfire-contexts.json.')
-      || name === 'crossfire-session.json' || name.startsWith('crossfire-session.json.'));
+    archiveState(home, join(home, 'crossfire-archive', input.resetId), name => name === CONTEXT_REGISTRY || name.startsWith(CONTEXT_REGISTRY + '.'));
     writeJson(marker, { resetId: input.resetId });
     return success(undefined);
   } catch (error) { return failure('native', error instanceof Error ? error.message : 'Native context reset failed'); }

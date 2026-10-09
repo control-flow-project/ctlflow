@@ -460,8 +460,10 @@ export function createController(services: Services) {
         if (operation.action === 'start' && !selected.length) return;
         await stopSelected(operation, selected.filter(instance => recovering.has(key(fleetId, instance.key))));
         const valid = services.execution.validate(configuration);
-        if (!valid.ok) throw new Error(valid.error.message);
+        if (!valid.ok) { operation.errors.push({ instanceKey: null, ...valid.error }); return; }
         if (operation.action === 'reset') {
+          const inspected = await services.execution.inspect(configuration, signal, selected);
+          if (!inspected.ok) { operation.errors.push({ instanceKey: null, ...inspected.error }); return; }
           await stopSelected(operation, selected.filter(instance => !operation.errors.some(error => error.instanceKey === instance.key)));
           for (const instance of selected) {
             if (operation.errors.some(error => error.instanceKey === instance.key)) continue;
@@ -482,7 +484,6 @@ export function createController(services: Services) {
         signal.throwIfAborted();
         connect(configuration);
         if (connectionErrors.has(configuration.directory)) { operation.errors.push({ instanceKey: null, code: 'unavailable', message: connectionErrors.get(configuration.directory)! }); return; }
-        operation.errors.push(...prepared.value.failed);
         operation.status = 'running'; operation.approval = null; saveOperation(operation);
         if (operation.action === 'enroll') {
           for (const instance of selected) {

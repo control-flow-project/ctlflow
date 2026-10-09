@@ -11,6 +11,7 @@ import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordin
 import { exportResetHistory } from '@ctlflow/crossfire-agent-core/reset-history';
 import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { Configuration, Instance } from '@ctlflow/fleetd-domain/model';
+import { nativeOptions } from '@ctlflow/fleetd-domain/model';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { initializeHistory } from '@ctlflow/fleetd-storage/history';
 
@@ -48,7 +49,7 @@ export async function resetInstance(configuration: Configuration, instance: Inst
       const prepared = await exportResetHistory({ resetId: generation, root, storage: localState,
         matrix: matrix({ base: profile.settings.homeserver, token: profile.account.access_token, signal, timeoutMs: 45000 }),
         coordination: createCoordination({ origin: profile.settings.homeserver, token: profile.account.access_token, signal }),
-        settings: profile.settings, account: profile.account, agentId: profile.id, runtime: definition.runtime, runtimeOptions: definition.options,
+        settings: profile.settings, account: profile.account, agentId: profile.id, runtime: definition.runtime, runtimeOptions: nativeOptions(configuration, instance),
         historyMode: instance.listenerOptions?.historyMode ?? 'shared', signal });
       state = { resetId: generation, phase: 'prepared', manifest: prepared.manifest, cursors: Object.entries(prepared.cursors).map(([room, cursor]) => ({ room, cursor })) };
       writeJson(file, state);
@@ -58,7 +59,7 @@ export async function resetInstance(configuration: Configuration, instance: Inst
       const verified = await exportResetHistory({ resetId: generation, root, storage: localState,
         matrix: matrix({ base: profile.settings.homeserver, token: profile.account.access_token, signal, timeoutMs: 45000 }),
         coordination: createCoordination({ origin: profile.settings.homeserver, token: profile.account.access_token, signal }),
-        settings: profile.settings, account: profile.account, agentId: profile.id, runtime: definition.runtime, runtimeOptions: definition.options,
+        settings: profile.settings, account: profile.account, agentId: profile.id, runtime: definition.runtime, runtimeOptions: nativeOptions(configuration, instance),
         historyMode: instance.listenerOptions?.historyMode ?? 'shared', signal });
       if (verified.manifest !== state.manifest || JSON.stringify(verified.cursors) !== JSON.stringify(Object.fromEntries(state.cursors.map(entry => [entry.room, entry.cursor])))) return failure('conflict', 'Reset history boundaries changed; context was not replaced');
       const rotated = await adapter.reset({ workspace, stateDirectory, resetId: generation });

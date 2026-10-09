@@ -33,9 +33,9 @@ export type Execution = {
   disconnect(configuration: Configuration): Promise<void>;
   close(): Promise<void>;
   validate(configuration: Configuration): Result<void>;
-  inspect(configuration: Configuration, signal: AbortSignal): Promise<Result<void>>;
+  inspect(configuration: Configuration, signal: AbortSignal, instances?: readonly Instance[]): Promise<Result<void>>;
   test(configuration: Configuration, instance: Instance): Promise<Result<void>>;
-  prepare(configuration: Configuration, controller: Controller, intent: 'resume' | 'enroll', signal: AbortSignal, approval: (approval: Approval) => void): Promise<Result<{ failed: { instanceKey: string; code: string; message: string }[] }>>;
+  prepare(configuration: Configuration, controller: Controller, intent: 'resume' | 'enroll', signal: AbortSignal, approval: (approval: Approval) => void): Promise<Result<void>>;
   start(configuration: Configuration, instance: Instance, signal: AbortSignal, reason: 'operator' | 'recovery'): Promise<Result<Running>>;
   contexts(configuration: Configuration, instance: Instance): Promise<Result<RetainedContext[]>>;
   confirmStopped(configuration: Configuration, instance: Instance): Promise<Result<void>>;

@@ -188,6 +188,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     }
   }
   async function work<Result>(operation: (client: Matrix, scope: AbortSignal) => Promise<Result>): Promise<Result> {
+    if (urgentControl()) throw new Error('Ordinary listener work preempted by accepted steering', { cause: steeringPreemptionCause });
     const deadline = options.clock.deadline(options.reconcileMs);
     const preempted = ordinary.signal;
     const scope = AbortSignal.any([signal, options.control.current().signal, preempted, deadline]);
@@ -216,6 +217,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   }
   async function send(operation: (scope: AbortSignal) => Promise<void>, priority = false, parent = signal): Promise<boolean> {
     if (!options.control.current().active) return false;
+    if (!priority && urgentControl()) throw new Error('Ordinary listener work preempted by accepted steering', { cause: steeringPreemptionCause });
     const generation = options.control.current().signal;
     const cancel = new AbortController();
     const preempted = ordinary.signal;
@@ -420,7 +422,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       }
       if (!await activity.activate() || generation.aborted) continue;
       if (!synchronized) { await wait(previous); continue; }
-      if (controlling && (!completed || ordinary.signal.aborted)) { await wait(previous, options.reconcileMs, true); continue; }
+      if (controlling && (!completed || ordinary.signal.aborted || urgentControl())) { await wait(previous, options.reconcileMs, true); continue; }
       if (!controlling && priorityChat.pending()) {
         let recovered: Awaited<ReturnType<typeof priorityChat.recover>>;
         await send(async scope => { recovered = await priorityChat.recover(new Set([...allowed].filter(room => joined.has(room))), scope); }, true);
@@ -517,7 +519,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         selected, maximum, since, allowed, cycle, artifacts), scope));
       statistics.observed(batch.events);
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
-      if (!senders.size) { windowEnd = 0; await wait(previous); continue; }
+      if (!senders.size) { windowEnd = 0; acquiring = false; await wait(previous); continue; }
       async function accept(event: ReceivedEvent): Promise<boolean> {
         if (isListenerNotice(event)) return false;
         if (event.sender === options.account.user_id && event.type === 'm.room.message') return false;
@@ -531,12 +533,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         if (trigger) {
           const now = options.clock.now();
           if (!windowEnd) windowEnd = now + options.debounceMs;
-          if (now < windowEnd) { await wait(previous, Math.ceil(windowEnd - now)); continue; }
+          if (now < windowEnd) { acquiring = false; await wait(previous, Math.ceil(windowEnd - now)); continue; }
           cycle = await work(client => captureWake(client, trigger,
             new Set(Object.keys(batch.cursors).filter(room => allowed.has(room) && (!selected || room === selected)
               && (options.historyMode !== 'per-room' || room === trigger.room_id))), since!));
           saveWake(storage, options.cursorFile, cycle); windowEnd = 0;
-        } else if (pending.length) { windowEnd = 0; await wait(previous); continue; }
+        } else if (pending.length) { windowEnd = 0; acquiring = false; await wait(previous); continue; }
       }
       if (cycle) {
         const eligible = options.historyMode === 'per-room' ? new Set(Object.keys(cycle.ends).filter(room => allowed.has(room))) : allowed;

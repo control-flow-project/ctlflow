@@ -5,7 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import test from 'node:test';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
-import { connectCodex, type CodexConnection } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from '../test-support/codex-runtime.js';
+import type { CodexConnection } from '@ctlflow/crossfire-adapter-codex/connection';
 import { nativeEngine, materialize } from '../test-support/native-engine.js';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { matrixFixture, message, temporary, until, ROOM, OWNER_DM, SELF, OBSERVER } from '../test-support/listener.js';
@@ -26,7 +27,7 @@ test('a real native permission is answered through the exact owner decision and 
   let nativeRequest = false;
   let failure: unknown;
   const receiving = listen({ ...fixture, reconcileMs: 120_000, limit: 20, pollMs: 100, debounceMs: 0,
-    runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, timeoutMs: 10_000,
+    runtime: (signal, pollMs, hooks) => resumeFixture({ ...engine, pollMs, timeoutMs: 10_000,
       hooks: { ...hooks, requestDecision: (permission, cancelled) => {
         nativeRequest = true;
         assert.equal(permission.runtime, 'codex');
@@ -66,7 +67,7 @@ for (const reason of ['forbidden', 'unavailable'] as const) {
     await materialize(engine, provider);
     const stop = new AbortController();
     let requests = 0;
-    const runtime = await connectCodex({ ...engine, pollMs: 100, timeoutMs: 10_000,
+    const runtime = await resumeFixture({ ...engine, pollMs: 100, timeoutMs: 10_000,
       hooks: { requestDecision: async () => { requests++; return failure(reason, 'Fixture approval is not available'); } } }, stop.signal);
     cleanup(scope, async () => { stop.abort(); await runtime.close(); });
     await engine.call('thread/unsubscribe', { threadId: engine.session });
@@ -100,7 +101,7 @@ test('a real native owner approval permits an intentional verified-client Matrix
   let disconnected: unknown;
   let runtime: CodexConnection | undefined;
   const receiving = listen({ ...fixture, reconcileMs: 120_000, limit: 20, pollMs: 100, debounceMs: 0,
-    runtime: async (signal, pollMs, hooks) => { runtime = await connectCodex({ ...engine, pollMs, timeoutMs: 10_000, hooks }, signal); return runtime; },
+    runtime: async (signal, pollMs, hooks) => { runtime = await resumeFixture({ ...engine, pollMs, timeoutMs: 10_000, hooks }, signal); return runtime; },
   }, stop.signal).catch(error => { disconnected = error; return error; });
   cleanup(scope, async () => { stop.abort(); await receiving; });
   await until(() => fixture.waiting() > 0);

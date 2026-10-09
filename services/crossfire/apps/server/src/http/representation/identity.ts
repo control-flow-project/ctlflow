@@ -19,7 +19,7 @@ export function listenerRun(value: ListenerRun) {
 export function agent(value: AgentDetails) {
   const { record, activity } = value;
   return { agentId: record.principal.id, matrixUserId: record.principal.matrixUserId, name: record.name,
-    displayName: agentDisplayName(record.name, record.ownerMember.displayName, record.agent.displayNameOverride),
+    displayName: agentDisplayName(record.name, record.ownerMember.displayName),
     owner: { memberId: record.owner.id, matrixUserId: record.owner.matrixUserId, displayName: record.ownerMember.displayName, status: record.owner.status },
     status: record.principal.status, revision: record.principal.revision, createdAt: record.principal.createdAt,
     application: application(record.application), activity: { status: activity.status, activeMs: activity.activeMs,

@@ -45,16 +45,21 @@ export function readJson<T>(path: string, maximumBytes = MAX_JSON_BYTES): T {
 
 export function writeJson(path: string, value: unknown, maximumBytes = MAX_JSON_BYTES): void {
   const bytes = Buffer.from(JSON.stringify(value, null, 2) + "\n");
+  if (lstatSync(path, { throwIfNoEntry: false })) readJson<unknown>(path, maximumBytes);
+  writePrivateBytes(path, bytes, maximumBytes);
+}
+
+export function writePrivateBytes(path: string, bytes: Buffer, maximumBytes: number): void {
   if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || bytes.length > maximumBytes) throw new Error("State exceeds its finite byte limit");
   privateDir(dirname(path));
-  if (existsSync(path)) readJson<unknown>(path, maximumBytes);
+  if (lstatSync(path, { throwIfNoEntry: false })) readPrivateBytes(path, maximumBytes);
   const temporary = join(dirname(path), ".pending-" + randomUUID());
   const descriptor = openSync(temporary, "wx", 0o600);
   try {
-    writeFileSync(descriptor, bytes);
-    fsyncSync(descriptor);
-  } finally { closeSync(descriptor); }
-  try {
+    try {
+      writeFileSync(descriptor, bytes);
+      fsyncSync(descriptor);
+    } finally { closeSync(descriptor); }
     renameSync(temporary, path);
     const directory = openSync(dirname(path), "r");
     try { fsyncSync(directory); } finally { closeSync(directory); }

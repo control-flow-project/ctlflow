@@ -7,8 +7,9 @@ import { parse } from 'smol-toml';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { nativeConfiguration, prepareHome } from '@ctlflow/crossfire-adapter-codex/home';
-import { nativeEnvironment } from '@ctlflow/crossfire-adapter-codex/prerequisites';
+import { nativeEnvironment } from '@ctlflow/crossfire-adapter-codex/home';
 import { refreshAuthentication } from '@ctlflow/crossfire-adapter-codex/authentication';
+import { nativeModels } from '@ctlflow/crossfire-test-support/native-models';
 
 function fixture(scope: TestContext) {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-native-prerequisites-'));
@@ -103,7 +104,9 @@ test('prerequisite inspection checks the current host login without overwriting 
 
 test('native prerequisite inspection validates configured inert providers without sessions, adoption or model calls', async scope => {
   const { source, stateDirectory, workspace } = fixture(scope);
+  const catalog = join(source, 'models.json'); writeFileSync(catalog, JSON.stringify(nativeModels()), { mode: 0o600 });
   writeFileSync(join(source, 'config.toml'), `model = "fixture-model"
+model_catalog_json = ${JSON.stringify(catalog)}
 model_provider = "fixture"
 [model_providers.fixture]
 name = "Inert prerequisite fixture"
@@ -114,11 +117,14 @@ requires_openai_auth = false
   const adapter = codexRuntime(process.env.CROSSFIRE_TEST_CODEX ?? 'codex');
   const result = await adapter.inspect({ workspace, stateDirectory, options: {} }, new AbortController().signal);
   assert.deepEqual(result, { ok: true, value: undefined });
-  assert.equal(existsSync(join(stateDirectory, '.codex', 'crossfire-session.json')), false);
-  assert.equal(existsSync(join(stateDirectory, '.codex', 'crossfire-contexts.json')), false);
+  assert.equal(existsSync(join(stateDirectory, '.codex', 'crossfire-context-registry.json')), false);
   assert.equal(existsSync(join(workspace, '.codex')), false);
   assert.equal(existsSync(join(stateDirectory, '.codex', 'sessions')), false);
   assert.deepEqual(await adapter.savedContexts({ workspace, stateDirectory }), { ok: true, value: [] });
+  const unavailable = await adapter.inspect({ workspace, stateDirectory, options: { model: 'unavailable-model' } }, new AbortController().signal);
+  assert.equal(unavailable.ok, false);
+  if (!unavailable.ok) assert.equal(unavailable.error.code, 'invalid');
+  assert.equal(existsSync(join(stateDirectory, '.codex', 'sessions')), false, 'Capability refusal starts no native conversation');
   const environment = nativeEnvironment(join(stateDirectory, '.codex'), stateDirectory, 'managed-agent');
   assert.equal(environment.CROSSFIRE_PROJECT, stateDirectory); assert.equal(environment.CROSSFIRE_AGENT_NAME, 'managed-agent');
   assert.equal(environment.CODEX_THREAD_ID, undefined);
@@ -143,5 +149,5 @@ requires_openai_auth = false
   assert.equal((await adapter.inspect({ workspace, stateDirectory, options: {} }, cancelled.signal)).ok, false);
   const noBinary = await codexRuntime('/missing-native-codex').inspect({ workspace, stateDirectory, options: {} }, new AbortController().signal);
   assert.equal(noBinary.ok, false); if (!noBinary.ok) assert.match(noBinary.error.message, /prerequisite command/u);
-  assert.equal(existsSync(join(stateDirectory, '.codex', 'crossfire-session.json')), false);
+  assert.equal(existsSync(join(stateDirectory, '.codex', 'crossfire-context-registry.json')), false);
 });

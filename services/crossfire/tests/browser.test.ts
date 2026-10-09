@@ -36,7 +36,7 @@ import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from '../scripts/test-support/codex-runtime.js';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
 import { until } from '../scripts/test-support/listener.js';
@@ -237,9 +237,9 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const agent = { base: origin, token: profile.account.access_token };
   assert(!(await nativeOk(agent, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/denied', { msgtype: 'm.text', body: 'Denied' })).ok);
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Settings', exact: true }).click();
-  await page.getByLabel('Configured display name').fill('Holmes');
-  await submit(page, 'Save name');
-  await expect(page.getByRole('heading', { name: 'Holmes', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Registered name', exact: true, level: 2 })).toBeVisible();
+  await expect(page.getByLabel('Configured display name')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save name', exact: true })).toHaveCount(0);
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Rooms', exact: true }).click();
   await page.getByRole('link', { name: 'Engineering', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Native Matrix permissions', exact: true })).toBeVisible();
@@ -267,7 +267,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await submit(page, 'Save access');
   await page.waitForLoadState('load'); await worker.drain();
   await page.goto(origin + '/manage/agents');
-  await expect(page.getByRole('table', { name: 'Agents', exact: true }).getByRole('link', { name: 'Holmes', exact: true })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Agents', exact: true }).getByRole('link', { name: 'holmes (admin)', exact: true })).toBeVisible();
   await page.screenshot({ path: join(directory, 'admin-agents.png'), fullPage: true });
   const home = join(directory, 'codex-home'); mkdirSync(home);
   const provider = await nativeProvider(scope, home);
@@ -299,7 +299,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const cursorFile = join(stateDirectory, 'cursors.json');
   const receiving = listen({ binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile,
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
-    runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, hooks }, signal),
+    runtime: (signal, pollMs, hooks) => resumeFixture({ ...engine, pollMs, hooks }, signal),
   }, stop.signal).catch(error => { if (!stop.signal.aborted) listenerFailure = error; });
   cleanup(scope, async () => { stop.abort(); await receiving; binding.close(); });
   await until(() => listenerReady || listenerFailure !== undefined);
@@ -390,13 +390,13 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   value(await coordination.receiptDecision(profile.id, decision.id, 'cancelled'));
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(origin + '/manage/agents/' + profile.id + '/settings');
-  await page.getByLabel('Configured display name').fill('Unsaved name');
-  await page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
-  await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
+  const registeredName = page.getByRole('region', { name: 'Registered name', exact: true });
+  await expect(registeredName.getByText('holmes', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Configured display name')).toHaveCount(0);
   const statusRefresh = page.waitForResponse(response => response.url().endsWith('/api/agents/' + profile.id) && response.request().method() === 'GET');
   await page.getByRole('button', { name: 'Refresh status', exact: true }).click();
   await statusRefresh;
-  await expect(page.getByLabel('Configured display name')).toHaveValue('Unsaved name');
+  await expect(registeredName.getByText('holmes', { exact: true })).toBeVisible();
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Activity', exact: true }).click();
   await expect(activity.getByText('online', { exact: true })).toBeVisible();
   const requestsBeforeStop = provider.requests.length;
@@ -524,7 +524,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await page.goto(origin + '/manage/agents/' + profile.id + '/rooms/' + encodeURIComponent(room));
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('none');
   await page.getByRole('button', { name: 'Save access', exact: true }).click();
-  await decideConfirmation(page, 'Remove access');
+  await Promise.all([page.waitForEvent('load'), decideConfirmation(page, 'Remove access')]);
   await worker.drain();
   await page.reload();
   await expect(page.locator('.status').filter({ hasText: /^No access$/u })).toBeVisible();

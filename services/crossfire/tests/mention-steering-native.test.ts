@@ -10,7 +10,9 @@ import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
 import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
-import { matrixFixture, message, mention, ROOM, temporary, until } from '../scripts/test-support/listener.js';
+import { matrixFixture, message, mention, ROOM, SELF, temporary, until } from '../scripts/test-support/listener.js';
+import { executeOperation, selectOperation } from '@ctlflow/crossfire-adapter-matrix/commands';
+import { matrix as matrixClient } from '@ctlflow/crossfire-adapter-matrix/http';
 
 for (const historyMode of ['shared', 'per-room'] as const) for (const sourceKind of ['human', 'agent'] as const) {
   test('stock Codex ' + sourceKind + ' mention steering preserves ' + historyMode + ' histories without a replacement engine', { timeout: 60_000 }, async scope => {
@@ -60,7 +62,15 @@ for (const historyMode of ['shared', 'per-room'] as const) for (const sourceKind
     }
     const received = provider.requests.length;
     if (peer) matrix.add(ROOM, message('$ordinary-backlog', '@context:test.localhost'));
-    matrix.add(ROOM, mention('$native-mention-steer', sender, 'Stop the old task and inspect the replacement evidence.'));
+    const redirect = 'Stop the old task and inspect the replacement evidence.';
+    if (sourceKind === 'agent') {
+      await executeOperation(matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token }),
+        matrix.settings, matrix.account, selectOperation('send-message'), { 'room-id': ROOM, 'event-type': 'm.room.message',
+          'txn-id': 'native-agent-redirect', 'mention-user': SELF, markdown: redirect });
+      const sent = matrix.requests.find(request => request.path.endsWith('/native-agent-redirect'))!;
+      matrix.add(ROOM, { ...message('$native-mention-steer', sender, redirect), content: sent.body as ReturnType<typeof message>['content'] });
+    } else matrix.add(ROOM, mention('$native-mention-steer', sender, redirect));
+    const expectedCursor = String(matrix.rooms.get(ROOM)!.length);
     if (peer) matrix.add(other, mention('$native-other-steer', sender, 'Inspect the other replacement evidence.'));
     const replacements = peer ? 2 : 1;
     await check(() => {
@@ -84,7 +94,7 @@ for (const historyMode of ['shared', 'per-room'] as const) for (const sourceKind
         return ['$native-mention-steer', '$native-other-steer'].every(id => state.controls.some(control => control.event === id && control.status === 'delivered'));
       });
       assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0', 'Urgent receipts do not mark the earlier backlog read');
-    } else await check(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
+    } else await check(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === expectedCursor);
     assert.deepEqual((await current.attachments()).map(entry => [entry.context, entry.attachment.sessionId]), before);
     assert.equal(selected.sessionId, selectedSession);
     assert.equal(provider.requests.length, received + replacements, 'Routing and cancellation make no model call; each new task reaches the inert provider once');

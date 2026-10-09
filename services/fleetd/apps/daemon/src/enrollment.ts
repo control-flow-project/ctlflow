@@ -36,7 +36,7 @@ export async function prepareEnrollment(configuration: Configuration, controller
       if (observed.status !== 'active' || observed.owner.status !== 'active') return failure('forbidden', 'Fleet resume requires active existing agent and owner accounts');
     }
     migrateInstanceProfiles(configuration, binding);
-    return success({ failed: [] });
+    return success(undefined);
   }
   migrateInstanceProfiles(configuration, binding);
   const instances = roster.instances.map(instance => {
@@ -81,11 +81,9 @@ export async function prepareEnrollment(configuration: Configuration, controller
       binding.fleetId = exchanged.fleet.fleetId;
       binding.controllerCredential = exchanged.fleet.controllerCredential ?? binding.controllerCredential;
       if (!binding.controllerCredential) return failure('forbidden', 'This fleet controller has not been authorized');
-      const failed: { instanceKey: string; code: string; message: string }[] = [];
       for (const instance of exchanged.instances) {
         const requested = roster.instances.find(item => item.key === instance.instanceKey && item.name === instance.name);
         if (!requested) return failure('native', 'Unexpected enrollment identity');
-        if (instance.status === 'failed') { failed.push({ instanceKey: instance.instanceKey, code: instance.errorCode ?? 'native', message: instance.name + ': ' + (instance.errorCode ?? 'Enrollment failed') }); continue; }
         if (!instance.agentId || !instance.account) return failure('native', 'Approved identity is not ready');
         const account = { user_id: instance.account.matrixUserId, access_token: instance.account.accessToken, device_id: instance.account.deviceId };
         const existing = binding.identities.find(item => item.instanceKey === instance.instanceKey);
@@ -98,7 +96,7 @@ export async function prepareEnrollment(configuration: Configuration, controller
       const current = await authenticated.call(operations.fleet, { fleetId: binding.fleetId }, {});
       if (!current.ok) return current;
       const updated = await authenticated.call(operations.changeFleet, { fleetId: binding.fleetId }, { expectedRevision: current.value.data.revision, label: current.value.data.label, controller });
-      return updated.ok ? success({ failed }) : updated;
+      return updated.ok ? success(undefined) : updated;
     }
     await delay(1000, undefined, { signal });
   }

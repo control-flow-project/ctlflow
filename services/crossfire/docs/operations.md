@@ -26,14 +26,17 @@ Crossfire installs no systemd, global skills, certificates or host permissions.
 
 ## Schema and report storage
 
-Schema 14 accepts a fresh store or the inventoried deployed schema 13 only.
+Schema 15 accepts a fresh store or inventoried deployed schemas 13 and 14 only.
 Versions 1–12 and foreign/future stores fail without mutation. Conversion retains
 identities, native credentials, histories, grants, publications, receipts and audit.
 It converts old wake presets to exact explicit person/group selections in agent,
 enrollment and archive relations. Pending review digests advance to the current
 representation; revisions and effective permissions stay unchanged. Historical
 requests remain immutable archive data. No fleet or authority is invented during
-conversion. The current inventory has 63 singular tables.
+conversion. Independent agent captions are archived in `agent.name.canonicalized`
+audit records before removing their column and scheduling derived-name
+reconciliation. Principal revisions, registered names and effective grants stay
+unchanged. The current inventory has 63 singular tables.
 Unbound historical identities are excluded from operational authentication and
 directories until a new owner-reviewed fleet enrollment proves private identity.
 Every new reporting run requires its exact active fleet/current controller lease.
@@ -69,6 +72,10 @@ the update. Sleeping agents are not woken solely for maintenance.
 
 After consent:
 1. Install the exact version-pinned `@ctlflow/fleet`/`@ctlflow/fleetd` release.
+   For the 0.1.15 context-registry conversion, first orderly-stop the controller,
+   verify its complete private backup and run the new `fleetd --migrate-contexts`
+   against that root before restarting. This is an explicit forward migration,
+   not automatic old-format support.
 2. Run `fleet update FLEET` or `fleet agent update FLEET INSTANCE` using the
    newly installed CLI. It verifies that package's bundled local assets and
    explicitly stops/installs/resumes selected desired-active instances.
@@ -83,6 +90,7 @@ use installed software,
 not implicit upgrades. An explicitly stopped instance stays stopped.
 - [Setup and update commands](onboarding/README.md)
 - [Fleet operations](../../fleet/docs/operations.md)
+- [Exact context-registry migration](../../fleetd/docs/storage.md)
 
 ## Troubleshooting
 

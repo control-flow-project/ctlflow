@@ -7,7 +7,6 @@ import { API } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
 import { reconcileRoomGrant } from '@ctlflow/crossfire-domain/room-access/reconcile-grant';
-import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
 import { changeFleet } from '@ctlflow/crossfire-domain/fleet/change-fleet';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
@@ -54,23 +53,17 @@ test('real room refresh updates pristine edits and explicitly fences dirty edits
   assert.deepEqual(errors, []);
 });
 
-test('actual retained name editor refreshes pristine names and preserves dirty names until explicit review', { timeout: 60000 }, async scope => {
+test('agent names are registered-only while retained fleet labels fence concurrent dirty edits', { timeout: 60000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin } = fixture;
   const agent = await fixture.agent(admin.actor, 'editable-name');
   const browser = await chromium.launch(browserOptions); cleanup(scope, () => browser.close());
   const context = await browser.newContext(); await context.addCookies([{ name: COOKIE_NAME, value: admin.secret, url: origin, secure: true, httpOnly: true, sameSite: 'Strict' }]);
   const page = await context.newPage(); await page.goto(origin + '/manage/agents/' + agent.id + '/settings');
-  const input = page.getByLabel('Configured display name'); await expect(input).not.toHaveValue('');
-  const rename = (displayName: string) => value(changeAgent(services, admin.actor, agent.id,
-    { expectedRevision: value(services.directory.agent(agent.id))!.principal.revision, displayName }, randomUUID()));
-  rename('Updated name'); await expect(input).toHaveValue('Updated name', { timeout: 12000 });
-  await input.fill('Unsaved name'); rename('Other writer');
-  await expect(page.getByRole('alert')).toContainText('changed elsewhere', { timeout: 12000 });
-  await expect(input).toHaveValue('Unsaved name'); await expect(page.getByRole('button', { name: 'Save name', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Discard edits & load latest' }).click(); await expect(input).toHaveValue('Other writer');
-  await input.fill('Reviewed name'); const saved = page.waitForResponse(response => response.request().method() === 'PATCH' && new URL(response.url()).pathname === '/api/agents/' + agent.id);
-  await page.getByRole('button', { name: 'Save name', exact: true }).click(); assert.equal((await saved).status(), 202);
-  assert.equal(value(services.directory.agent(agent.id))!.agent.displayNameOverride, 'Reviewed name');
+  await expect(page.getByRole('heading', { name: 'Registered name', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Configured display name')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save name', exact: true })).toHaveCount(0);
+  await expect(page.getByText('The identity and history stay the same.', { exact: false })).toBeVisible();
+  assert.equal(value(services.directory.agent(agent.id))!.name, 'editable-name');
   await page.goto(origin + '/manage/fleets/' + agent.controller.fleetId + '/settings');
   const label = page.getByLabel('Fleet label'); await expect(label).not.toHaveValue('');
   const renameFleet = (label: string) => {

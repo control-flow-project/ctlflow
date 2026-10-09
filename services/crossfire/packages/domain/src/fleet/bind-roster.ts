@@ -1,13 +1,13 @@
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 export function bindRoster(services: Pick<Services, 'repositories' | 'collection' | 'clock'>, ownerId: string, fleetKey: string,
-  entries: { instanceKey: string; agentId: string | null; outcome: string }[]) {
+  entries: { instanceKey: string; agentId: string | null }[]) {
   const fleet = services.repositories.fleet.find({ ownerId, fleetKey }); if (!fleet.ok) return fleet;
   if (!fleet.value) return failure('missing', 'Fleet has not been approved');
   const existing = services.collection.fleetInstances({ ownerId, fleetKey }); if (!existing.ok) return existing;
   let size = existing.value.length, changed = false;
   for (const entry of entries) {
-    if (entry.outcome === 'failed' || entry.agentId === null) continue;
+    if (entry.agentId === null) return failure('conflict', 'Approved roster identity is missing: ' + entry.instanceKey);
     const authoritative = services.repositories.fleetInstance.findByAgent(entry.agentId); if (!authoritative.ok) return authoritative;
     if (authoritative.value && (authoritative.value.ownerId !== ownerId || authoritative.value.fleetKey !== fleetKey || authoritative.value.instanceKey !== entry.instanceKey))
       return failure('conflict', 'Agent already belongs to another fleet instance');

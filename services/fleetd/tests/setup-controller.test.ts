@@ -28,7 +28,7 @@ function fixture(execution: Partial<Execution> = {}) {
       connect: () => success(undefined), connection: () => ({ connected: true, deliveryEnabled: true, revision: 0, error: null }),
       disconnect: async () => {}, close: async () => {}, delivery: async () => failure('unavailable', 'Unused fixture port'), message: async () => failure('unavailable', 'Unused fixture port'),
       validate: () => success(undefined), inspect: async () => { calls.push('inspect'); return success(undefined); }, test: async () => success(undefined),
-      prepare: async () => { calls.push('prepare'); return success({ failed: [] }); },
+      prepare: async () => { calls.push('prepare'); return success(undefined); },
       reset: async () => { calls.push('reset'); return success(undefined); }, confirmStopped: async () => success(undefined), remove: async () => success(undefined), archive: async () => success(undefined),
       update: async (_configuration, instance, releaseDirectory) => { calls.push('update:' + instance.key + ':' + releaseDirectory); return success(undefined); },
       contexts: async (_configuration, instance) => success(histories.has(instance.key) ? [{ context: 'shared', runtime: 'codex', sessionId: histories.get(instance.key)! }] : []),
@@ -79,7 +79,7 @@ test('setup waits for exact human approval, concurrent repeats share its operati
   const current = fixture({ prepare: async (_configuration, _controller, _intent, signal, approval) => {
     approvals++; approval({ url: 'https://example.test/manage/enrollments/exact', code: 'ABCDEF123456' });
     await new Promise<void>(resolve => { approve = resolve; signal.addEventListener('abort', () => resolve(), { once: true }); });
-    return signal.aborted ? failure('unavailable', 'Approval cancelled') : success({ failed: [] });
+    return signal.aborted ? failure('unavailable', 'Approval cancelled') : success(undefined);
   } }); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
   const [first, repeated] = await Promise.all([current.controller.setup(current.input), current.controller.setup(current.input)]);
   const prepared = value(first), duplicate = value(repeated); assert(prepared.operation); assert(duplicate.operation);
@@ -221,7 +221,7 @@ test('missing prerequisite fails before enrollment and retry reuses the private 
 
 test('failed setup can retry its initial operation without another identity; explicit stop remains stopped across repeat setup and restart', async scope => {
   let fail = true;
-  const current = fixture({ prepare: async () => fail ? failure('unavailable', 'Fixture enrollment transport failure') : success({ failed: [] }) });
+  const current = fixture({ prepare: async () => fail ? failure('unavailable', 'Fixture enrollment transport failure') : success(undefined) });
   cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
   const first = value(await current.controller.setup(current.input)); assert(first.operation);
   assert.equal((await current.finish(first.operation)).status, 'failed'); fail = false;

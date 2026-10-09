@@ -1,11 +1,11 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import type { TestContext } from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { codexDelivery, type CodexConnection } from '@ctlflow/crossfire-adapter-codex/connection';
-import { connectSession } from '@ctlflow/crossfire-adapter-codex/session';
+import { openSession } from '@ctlflow/crossfire-adapter-codex/session';
 import { nativeEngine, materialize } from './native-engine.js';
 import type { NativeEvent } from '@ctlflow/crossfire-adapter-codex/protocol';
 
@@ -16,6 +16,7 @@ export async function nativeCodex(context: TestContext) {
   console.log(execFileSync(binary, ['--version'], { encoding: 'utf8' }).trim());
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), '.temp/crossfire-native-'));
+  cleanup(context, () => rmSync(directory, { recursive: true, force: true }));
   const home = join(directory, 'home'); mkdirSync(home);
   const workspace = join(directory, 'workspace'); mkdirSync(workspace);
   const provider = await nativeProvider(context, home);
@@ -27,7 +28,7 @@ export async function nativeCodex(context: TestContext) {
   const historyQueries: { method: string; params: unknown; result: unknown }[] = [];
   const acknowledgements: { params: Record<string, unknown>; turn: { id: string } }[] = [];
   let adapter: CodexConnection | undefined;
-  const session = await connectSession({ ...fixture, timeoutMs: 10_000 }, stop.signal, {
+  const session = await openSession({ ...fixture, timeoutMs: 10_000 }, { kind: 'resume', id: fixture.session, config: {} }, stop.signal, {
     requestDecision: async () => { throw new Error('Unexpected permission in inert native delivery fixture'); },
   }, notice => { notifications.push(notice); adapter?.event(notice); });
   cleanup(context, async () => {

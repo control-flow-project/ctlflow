@@ -27,6 +27,7 @@ import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
 import { codexInput } from '@ctlflow/crossfire-adapter-codex/input';
+import { contextState, contextReceipt } from '@ctlflow/crossfire-adapter-codex/context-state';
 
 const execute = promisify(execFile);
 async function until(predicate: () => boolean | Promise<boolean>): Promise<void> {
@@ -82,7 +83,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   assert.equal(value(await controller.call(operations.fleetAgents, { fleetId: binding.fleetId }, {})).data.length, 2);
   const north = binding.identities.find(identity => identity.instanceKey === 'north')!;
   const cursor = join(definition, 'workarea/north/.crossfire/state/north/cursors.json.sync');
-  const journal = join(definition, 'workarea/north/.codex/crossfire-session.json.receipt');
+  const journal = contextReceipt(join(definition, 'workarea/north/.codex'), 'shared');
   async function acquired() {
     await until(async () => {
       if (!existsSync(cursor)) return false;
@@ -95,7 +96,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   }
   async function acknowledged() {
     await until(() => {
-      const session = readJson<{ sessionId: string }>(join(definition, 'workarea/north/.codex/crossfire-session.json'));
+      const session = contextState(join(definition, 'workarea/north/.codex')).state.bindings.find(binding => binding.context === 'shared')!;
       const state = readDeliveryJournal(journal, session.sessionId, codexInput);
       return state.pending === null && state.confirmed.length === 0;
     });

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from '../scripts/test-support/codex-runtime.js';
 
 test('external app-server owns model, reasoning and workspace settings', async scope => {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
@@ -15,7 +15,7 @@ test('external app-server owns model, reasoning and workspace settings', async s
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, workspace, ['-c', 'model="fixture-selected"', '-c', 'model_reasoning_effort="high"']);
   await materialize(engine, provider);
-  const attached = await connectCodex({ ...engine, hooks: { requestDecision: async () => { throw new Error('Unexpected permission'); } } }, new AbortController().signal);
+  const attached = await resumeFixture({ ...engine, hooks: { requestDecision: async () => { throw new Error('Unexpected permission'); } } }, new AbortController().signal);
   cleanup(scope, attached.close);
   assert.equal(engine.thread.cwd, workspace);
   assert.equal(engine.thread.model, 'fixture-selected');

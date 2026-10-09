@@ -7,10 +7,12 @@ import { codexProtocol, type NativeEvent } from './protocol.js';
 import { approvalRouting } from './permission-policy.js';
 import { codexQuestion, validQuestionAnswer } from './questions.js';
 import { nativeObservation } from './observation.js';
+import { admitCodex } from './admission.js';
+import { failureError } from '@ctlflow/crossfire-kernel/result';
+import { codexClientVersion } from './version.js';
 
-export type CodexOptions = {
-  workspace: string; session: string; endpoint: string; token: string; receiptFile: string;
-  timeoutMs?: number; pollMs?: number;
+export type SessionOptions = {
+  workspace: string; endpoint: string; token: string; timeoutMs?: number;
 };
 export type CodexSession = {
   sessionId: string; workspace: string; signal: AbortSignal;
@@ -19,14 +21,9 @@ export type CodexSession = {
   close: () => Promise<void>;
 };
 
-export async function connectSession(options: CodexOptions, stop: AbortSignal, hooks: RuntimeHooks,
-  event: (event: NativeEvent) => void): Promise<CodexSession> {
-  return openSession(options, { kind: 'attach', id: options.session }, stop, hooks, event);
-}
-
-export type ThreadSelection = { kind: 'attach'; id: string } | { kind: 'create'; name: string; config: Record<string, unknown> }
+export type ThreadSelection = { kind: 'create'; name: string; config: Record<string, unknown> }
   | { kind: 'resume'; id: string; config: Record<string, unknown> };
-export async function openSession(options: Omit<CodexOptions, 'session' | 'receiptFile'>, selection: ThreadSelection, stop: AbortSignal, hooks: RuntimeHooks,
+export async function openSession(options: SessionOptions, selection: ThreadSelection, stop: AbortSignal, hooks: RuntimeHooks,
   event: (event: NativeEvent) => void): Promise<CodexSession> {
   let sessionId = selection.kind === 'create' ? '' : selection.id;
   if (selection.kind !== 'create' && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu.test(sessionId)) throw new Error('Supply the exact Codex session UUID');
@@ -72,14 +69,16 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
   }, stop);
   async function close(): Promise<void> { engine.close(); await engine.closed; }
   try {
-    const initialized = object(await engine.request('initialize', { clientInfo: { name: 'crossfire', title: 'Crossfire listener', version: '0.1.0' },
+    const initialized = object(await engine.request('initialize', { clientInfo: { name: 'crossfire', title: 'Crossfire listener', version: codexClientVersion },
       capabilities: { experimentalApi: true } }));
     const version = initialized.ok && typeof initialized.value.userAgent === 'string' ? initialized.value.userAgent : null;
     engine.notify('initialized');
     let approval: RuntimeApproval | undefined;
-    if (selection.kind !== 'attach') {
+    {
+      const admitted = await admitCodex(engine.request, selection.config);
+      if (!admitted.ok) throw failureError(admitted.error);
       const selected = object(await engine.request(selection.kind === 'create' ? 'thread/start' : 'thread/resume', {
-        cwd: workspace, config: selection.config,
+        cwd: workspace, config: { ...selection.config, model: admitted.value.model, model_reasoning_effort: admitted.value.effort },
         ...(selection.kind === 'resume' ? { threadId: selection.id, excludeTurns: true } : { historyMode: 'paginated', ephemeral: false }),
       }));
       const thread = selected.ok ? object(selected.value.thread) : selected;
@@ -96,9 +95,11 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
         const sandboxTypes: Record<string, string> = { 'danger-full-access': 'dangerFullAccess', 'workspace-write': 'workspaceWrite', 'read-only': 'readOnly' };
         if (selection.config.sandbox_mode !== undefined && (!sandbox.ok || sandbox.value.type !== sandboxTypes[String(selection.config.sandbox_mode)])
           || selection.config.approval_policy !== undefined && selected.value.approvalPolicy !== selection.config.approval_policy
-          || selection.config.model !== undefined && selected.value.model !== selection.config.model
-          || selection.config.model_reasoning_effort !== undefined && selected.value.reasoningEffort !== selection.config.model_reasoning_effort) {
-          throw new Error('Codex did not apply the selected model, reasoning, sandbox and approval settings');
+          || selected.value.model !== admitted.value.model
+          || selected.value.reasoningEffort !== admitted.value.effort) {
+          throw failureError({ code: 'invalid', message: 'Codex did not apply the selected model, reasoning, sandbox and approval settings: requested '
+            + admitted.value.model + '/' + admitted.value.effort + ', reported ' + String(selected.value.model).slice(0, 200)
+            + '/' + String(selected.value.reasoningEffort).slice(0, 100) });
         }
       }
       if (selection.kind === 'create') await engine.request('thread/name/set', { threadId: sessionId, name: selection.name });
@@ -109,13 +110,6 @@ export async function openSession(options: Omit<CodexOptions, 'session' | 'recei
     if (!thread.ok || !state.ok || thread.value.id !== sessionId || thread.value.canAcceptDirectInput !== true
       || !['idle', 'active'].includes(String(state.value.type)) || typeof thread.value.cwd !== 'string'
       || realpathSync(thread.value.cwd) !== workspace) throw new Error('The selected Codex session must be loaded in this exact workspace');
-    if (selection.kind === 'attach') {
-      const resumed = object(await engine.request('thread/resume', { threadId: sessionId, excludeTurns: true }));
-      const routing = resumed.ok ? approvalRouting(resumed.value.approvalPolicy) : resumed;
-      if (!routing.ok) throw new Error(routing.error.message);
-      approval = routing.value;
-      if (resumed.ok) observer.configure({}, resumed.value, version);
-    }
     if (!approval) throw new Error('Native approval policy was not selected');
     observer.state(state.value.type === 'idle' ? 'idle' : 'working');
     engine.signal.addEventListener('abort', () => {

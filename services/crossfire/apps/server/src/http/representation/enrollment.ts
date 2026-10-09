@@ -9,7 +9,7 @@ export function enrollment({ request: value, owner }: EnrollmentOverview) {
 }
 export function enrollmentItem(value: EnrollmentItemView) {
   return { instanceKey: value.instanceKey, requestedName: value.requestedName, currentName: value.currentName, outcome: value.outcome, agentId: value.agentId,
-    failureCode: value.failureCode, coordinationPolicy: value.coordinationPolicy };
+    coordinationPolicy: value.coordinationPolicy };
 }
 export function enrollmentDetails(value: EnrollmentReceipt) {
   return { enrollment: enrollment(value), instances: value.instances.map(enrollmentItem) };

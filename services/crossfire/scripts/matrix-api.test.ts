@@ -13,8 +13,10 @@ import { operations, nativeRequest, selectOperation, executeOperation, requestBo
 import { kebab } from '@ctlflow/crossfire-adapter-matrix/schema';
 import { encodeOutput, outputBytes } from '@ctlflow/crossfire-contracts/limits';
 import { uploadStream, saveStream } from '@ctlflow/crossfire-adapter-matrix/files';
-import { matrixFixture, temporary, ROOM } from './test-support/listener.js';
+import { matrixFixture, temporary, ROOM, SELF, message } from './test-support/listener.js';
 import { builtClient } from './test-support/release.js';
+import { mentionsAgent } from '@ctlflow/crossfire-contracts/notices';
+import { messageContent } from '@ctlflow/crossfire-adapter-matrix/message';
 
 test('all 157 official operations have one mechanically derived spelling and exact native path', () => {
   assert.equal(operations.length, 157);
@@ -92,6 +94,56 @@ test('native bodies support Markdown once and reject ambiguous, excessive or mal
   assert.throws(() => requestBody({ 'body-file': file }), /limit/);
 });
 
+test('explicit repeated targets produce native mentions; visual links, quotations and ordinary updates never infer controls', async scope => {
+  const fixture = await matrixFixture(scope, temporary(scope));
+  const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token });
+  const peer = '@agent-holmes:test.localhost', body = `[peer](https://matrix.to/#/${SELF}): use the saved evidence.`;
+  const operation = selectOperation('send-message'), base = { 'room-id': ROOM, 'event-type': 'm.room.message', markdown: body };
+  await executeOperation(client, fixture.settings, fixture.account, operation, { ...base, 'txn-id': 'targeted', 'mention-user': [SELF, peer] });
+  const sent = fixture.requests.find(request => request.path.endsWith('/targeted'))!;
+  assert.deepEqual(sent.body, { ...messageContent({ msgtype: 'm.text', body }), 'm.mentions': { user_ids: [SELF, peer] } });
+  const event = { ...message('$explicit-target', peer, body), content: sent.body as ReturnType<typeof message>['content'] };
+  assert.equal(mentionsAgent(event, SELF), true);
+  for (const [index, text] of [body, `> ${body}`, '```\n' + body + '\n```', 'Routine progress: one page read.'].entries()) {
+    await executeOperation(client, fixture.settings, fixture.account, operation, { ...base, 'txn-id': 'ordinary-' + index, markdown: text });
+    const ordinary = fixture.requests.find(request => request.path.endsWith('/ordinary-' + index))!.body as ReturnType<typeof message>['content'];
+    assert.equal(Object.hasOwn(ordinary, 'm.mentions'), false);
+    assert.equal(mentionsAgent({ ...event, content: ordinary }, SELF), false);
+  }
+  const count = fixture.requests.length;
+  await executeOperation(client, fixture.settings, fixture.account, operation, { ...base, 'txn-id': 'targeted', 'mention-user': [SELF, peer] });
+  assert.equal(fixture.requests.length, count + 1);
+  assert.deepEqual(fixture.requests.at(-1)!.body, sent.body, 'A stable transaction retry preserves exact native targets');
+});
+
+test('built native CLI sends repeated explicit handoff targets through the same sender', async scope => {
+  const fixture = await matrixFixture(scope, temporary(scope)), peer = '@agent-holmes:test.localhost';
+  const result = await promisify(execFile)(process.execPath, [builtClient(), '--project', fixture.workspace, '--profile', 'watson',
+    'matrix', 'send-message', '--room-id', ROOM, '--event-type', 'm.room.message', '--txn-id', 'cli-targeted',
+    '--markdown', 'Read the saved evidence.', '--mention-user', SELF, '--mention-user', peer], { timeout: 10000, maxBuffer: 65536 });
+  assert.equal(result.stderr, '');
+  assert.equal(typeof JSON.parse(result.stdout).event_id, 'string');
+  const sent = fixture.requests.find(request => request.path.endsWith('/cli-targeted'))!;
+  assert.deepEqual(sent.body, messageContent({ msgtype: 'm.text', body: 'Read the saved evidence.', 'm.mentions': { user_ids: [SELF, peer] } }));
+});
+
+test('invalid, competing and nonfresh mention targets fail before a Matrix request', async scope => {
+  const fixture = await matrixFixture(scope, temporary(scope)), operation = selectOperation('send-message');
+  const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token });
+  const base = { 'room-id': ROOM, 'event-type': 'm.room.message' };
+  for (const targets of [true, [], ['@peer:test', '@peer:test'], ['peer'], ['@peer:bad host']] as const) {
+    await assert.rejects(executeOperation(client, fixture.settings, fixture.account, operation, { ...base, markdown: 'Stop.', 'mention-user': targets }), /distinct exact Matrix/);
+  }
+  for (const content of [{ msgtype: 'm.notice', body: 'Notice.' }, { msgtype: 'm.text', body: 'x', 'm.mentions': { user_ids: [SELF] } },
+    { msgtype: 'm.text', body: 'x', 'm.new_content': { msgtype: 'm.text', body: 'y' } },
+    { msgtype: 'm.text', body: 'x', 'm.relates_to': { rel_type: 'm.replace', event_id: '$old' } }]) {
+    await assert.rejects(executeOperation(client, fixture.settings, fixture.account, operation, { ...base, body: JSON.stringify(content), 'mention-user': SELF }));
+  }
+  await assert.rejects(executeOperation(client, fixture.settings, fixture.account, operation,
+    { ...base, 'event-type': 'm.reaction', body: '{}', 'mention-user': SELF }), /event-type m.room.message/);
+  assert.equal(fixture.requests.length, 0);
+});
+
 test('binary streams are bounded, exclusive, hashed and remove partial files', async context => {
   const directory = temporary(context), original = join(directory, 'original.bin'), received = join(directory, 'received.bin');
   const bytes = Buffer.from(Array.from({ length: 131113 }, (_, index) => index % 256));
@@ -112,6 +164,8 @@ test('CLI exposes the native manifest and rejects every superseded top-level com
   const execute = promisify(execFile), script = builtClient();
   const result = await execute(process.execPath, [script, 'matrix', 'get-room-events', '--help']);
   assert.equal(JSON.parse(result.stdout).id, 'getRoomEvents');
+  const help = await execute(process.execPath, [script, 'matrix', 'send-message', '--help']);
+  assert(JSON.parse(help.stdout).cli_options.includes('mention-user'));
   for (const command of ['init', 'read', 'listen', 'send', 'history', 'rooms', 'who', 'upload', 'download']) {
     await assert.rejects(execute(process.execPath, [script, command]), /Use agent, room, report or matrix/);
   }

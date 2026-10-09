@@ -42,8 +42,8 @@ test('Matrix directory authenticates native principals, bounds searches and reta
   assert.equal((await search(unregistered.accessToken)).status, 403);
   assert.equal((await request('/api/members', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
   assert.equal((await request('/api/agents', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
-  value(changeAgent(services, owner.actor, agent.id, { expectedRevision: revision(), displayName: 'Research Bea' }, randomUUID()));
-  assert.equal((await (await search(owner.token, { search_term: 'research' })).json() as MatrixDirectoryResult).results[0]?.display_name, 'Research Bea');
+  assert.equal((await (await search(owner.token, { search_term: 'bea' })).json() as MatrixDirectoryResult).results[0]?.display_name,
+    'bea (' + owner.member.member.displayName + ')');
   value(changeAgent(services, owner.actor, agent.id, { expectedRevision: revision(), status: 'suspended' }, randomUUID()));
   assert.equal((await search(agent.token)).status, 403);
   assert.deepEqual((await (await search(other.token)).json() as MatrixDirectoryResult).results, []);

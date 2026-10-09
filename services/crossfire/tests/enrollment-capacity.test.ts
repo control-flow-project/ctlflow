@@ -17,6 +17,21 @@ function introduction(ownerMatrixId: string, count: number, prefix: string) {
     instances: Array.from({ length: count }, (_, index) => ({ instanceKey: prefix + '-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) })) };
 }
 
+test('concurrent introductions reject all colliding names and leave no partial roster', async scope => {
+  const { services, admin } = await applicationFixture(scope);
+  const first = introduction(admin.member.principal.matrixUserId, 2, 'shared');
+  const second = { ...introduction(admin.member.principal.matrixUserId, 3, 'later'),
+    instances: [...first.instances, introduction(admin.member.principal.matrixUserId, 1, 'unique').instances[0]!] };
+  const outcomes = await Promise.all([introduceEnrollment(services, first), introduceEnrollment(services, second)]);
+  assert(outcomes[0]!.ok); assert(!outcomes[1]!.ok);
+  assert.equal(outcomes[1]!.error.code, 'name_collision');
+  assert.match(outcomes[1]!.error.message, /shared-0, shared-1/u);
+  assert.equal(value(services.repositories.enrollmentRequest.find({ id: second.enrollmentId })), null);
+  assert.deepEqual(value(services.collection.enrollmentItems({ requestId: second.enrollmentId })), []);
+  assert.equal(value(services.repositories.agentName.find({ name: 'unique-0' })), null);
+  assert.equal(value(services.collection.pendingIdentityCount()), 2);
+});
+
 test('administrator default capacity is 100 while member owners retain the configured limit', async scope => {
   const { services, admin, member } = await applicationFixture(scope);
   const owner = await member('owner');
@@ -56,16 +71,15 @@ test('twenty administrators agents share one approved request without policy ove
   assert.equal(value(services.repositories.instancePolicy.find({ id: 'instance' }))!.maxOwnerAgents, 10);
 });
 
-test('member introduction reserves only the configured capacity and administrative reviewers cannot lend theirs', async scope => {
-  const { services, admin, member } = await applicationFixture(scope);
+test('member introduction rejects an oversized entire roster without reserving names or capacity', async scope => {
+  const { services, member } = await applicationFixture(scope);
   const owner = await member('owner'), request = introduction(owner.member.principal.matrixUserId, 11, 'member');
-  const receipt = value(await introduceEnrollment(services, request));
-  assert.equal(receipt.instances.filter(item => item.outcome === 'claimed').length, 10);
-  assert.equal(receipt.instances[10]!.failureCode, 'capacity');
-  const decision = { expectedRevision: 0, decision: 'approve' as const, verificationCode: receipt.request.verificationCode };
-  assert.equal(decideEnrollment(services, admin.actor, request.enrollmentId, decision, randomUUID()).ok, false);
-  value(decideEnrollment(services, owner.actor, request.enrollmentId, decision, randomUUID()));
-  assert.equal(value(services.directory.activeAgentCount(owner.actor.principalId)), 10);
+  const refused = await introduceEnrollment(services, request);
+  assert(!refused.ok); assert.equal(refused.error.code, 'capacity');
+  assert.equal(value(services.repositories.enrollmentRequest.find({ id: request.enrollmentId })), null);
+  assert.equal(value(services.collection.pendingIdentityCount()), 0);
+  for (const instance of request.instances) assert.equal(value(services.repositories.agentName.find({ name: instance.name })), null);
+  assert.equal(value(services.directory.activeAgentCount(owner.actor.principalId)), 0);
 });
 
 test('administrator reservations still consume the instance cap and cannot race another owner', async scope => {
@@ -79,8 +93,8 @@ test('administrator reservations still consume the instance cap and cannot race 
     assert(!refused.ok);
     assert.equal(refused.error.code, 'capacity');
   }
-  const other = value(await introduceEnrollment(services, introduction(owner.member.principal.matrixUserId, 1, 'other')));
-  assert.equal(other.instances[0]!.failureCode, 'capacity');
+  const other = await introduceEnrollment(services, introduction(owner.member.principal.matrixUserId, 1, 'other'));
+  assert(!other.ok); assert.equal(other.error.code, 'capacity');
   assert.equal(value(services.collection.pendingIdentityCount()), 100);
   value(decideEnrollment(services, admin.actor, request.enrollmentId,
     { expectedRevision: 0, decision: 'approve', verificationCode: receipt.request.verificationCode }, randomUUID()));

@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 import { loadConfiguration } from '@ctlflow/fleetd-storage/configuration';
 import { loadBinding } from '@ctlflow/fleetd-storage/binding';
+import { nativeOptions } from '@ctlflow/fleetd-domain/model';
 import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
 import { command } from '@ctlflow/crossfire-operator-support/process';
 import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
@@ -85,7 +86,7 @@ export async function verifyFleet(input: { root: string; directory: string; runn
         const pointer = await client.call(operations.attachment, { fleetId: fleet.fleetId, instanceKey: instance.instance.key }, {}, new URLSearchParams({ context: history.context })); if (!pointer.ok) return pointer;
         const attachment = pointer.value.data;
         if (attachment.workspace !== workspace || attachment.runtime !== role.runtime || attachment.sessionId !== history.sessionId) return failure('conflict', 'Native attachment differs from its registered exact history/workspace');
-        const result = await native({ attachment, options: role.options, fresh: input.fresh, requiredSkills: input.skills }, signal); if (!result.ok) return result;
+        const result = await native({ attachment, options: nativeOptions(configuration, configured), fresh: input.fresh, requiredSkills: input.skills }, signal); if (!result.ok) return result;
         const expectedPaths = [];
         for (let parent = workspace; projectRoot !== null && (parent.startsWith(projectRoot + '/') || parent === projectRoot); parent = dirname(parent)) {
           const skills = join(parent, '.agents', 'skills');

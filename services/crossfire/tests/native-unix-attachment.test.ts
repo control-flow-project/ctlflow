@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { codexProtocol } from '@ctlflow/crossfire-adapter-codex/protocol';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from '../scripts/test-support/codex-runtime.js';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { materialize } from '../scripts/test-support/native-engine.js';
 import type { NativeEvent } from '@ctlflow/crossfire-adapter-codex/protocol';
@@ -31,7 +31,7 @@ test('stock Codex native Unix transport connects the exact fixture-owned session
   await owner.request('initialize', { clientInfo: { name: 'crossfire-unix-proof', version: '0.1.0' }, capabilities: { experimentalApi: true } }); owner.notify('initialized');
   const started = await owner.request('thread/start', { cwd: workspace }) as { thread: { id: string } };
   await materialize({ session: started.thread.id, call: async (method, params) => await owner.request(method, params) as Record<string, unknown>, notifications: notices }, provider);
-  const connection = await connectCodex({ workspace, session: started.thread.id, endpoint: 'unix://' + socket, token: '', receiptFile: join(home, 'receipt.json'),
+  const connection = await resumeFixture({ workspace, session: started.thread.id, endpoint: 'unix://' + socket, token: '', receiptFile: join(home, 'receipt.json'),
     pollMs: 100, hooks: { requestDecision: async () => { throw Error('Unexpected permission'); } } }, stop.signal);
   assert.equal((await connection.inspect()).busy, false);
   assert.equal(connection.sessionId, started.thread.id);

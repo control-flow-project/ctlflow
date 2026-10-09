@@ -4,7 +4,7 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from '../scripts/test-support/codex-runtime.js';
 import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listener-host';
@@ -40,7 +40,7 @@ test('real Conduit and stock Codex deliver idle-only scheduled input without cre
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' }, id: agent.id,
     release: release.manifest,
     cursorFile: join(directory, 'cursor.json'), limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000,
-    ready: () => { ready = true; }, runtime: (signal, pollMs, hooks) => connectCodex({ ...engine, pollMs, timeoutMs: 10000,
+    ready: () => { ready = true; }, runtime: (signal, pollMs, hooks) => resumeFixture({ ...engine, pollMs, timeoutMs: 10000,
       hooks: hooks ?? { requestDecision: async () => { throw new Error('Unexpected fixture permission'); } } }, signal),
   }, stop.signal).catch(error => { ended = error; });
   cleanup(scope, async () => { stop.abort(); await clock.complete(receiver); });

@@ -7,11 +7,15 @@ export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled
 export type FleetMessageResult = { messageId: string; body: string; createdAt: number; expiresAt: number;
   total: number; pending: number; delivered: number; failed: number; skipped: number; expired: number };
 export type Controller = { name: string; metadata?: Record<string, string> };
-export type Instance = { key: string; name: string; definition: string; workarea: string; workspace?: string; listenerOptions?: ListenerOptions };
+export type Instance = { key: string; name: string; definition: string; workarea: string; workspace?: string; listenerOptions?: ListenerOptions;
+  runtimeOptions?: Record<string, unknown> };
 export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string }; instances: Instance[] };
 export type Definition = { name: string; runtime: string; options: Record<string, unknown>; instructions: string;
   coordinationPolicy: CoordinationPolicy };
 export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
+export function nativeOptions(configuration: Configuration, instance: Instance): Record<string, unknown> {
+  return { ...configuration.definitions[instance.definition]!.options, ...instance.runtimeOptions };
+}
 export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
 export type DesiredIntent = { fleetId: string; instanceKey: string };
 export type ResumeSelection = { fleetId: string; instanceKeys: string[] };

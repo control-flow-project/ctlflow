@@ -44,7 +44,7 @@ export async function previewGrantPlan(services: Dependencies, actor: Actor, pla
         expectedRevision: target.value.principal.revision, expectedGeneration: previous?.generation ?? null });
       if (!authorized.ok) return authorized;
       const facts = authorized.value.native ? success(authorized.value.native) : await readRoom(services, actor, roomId, binding.value.agentId);
-      changes.push({ ...authorized.value, agentName: target.value.agent.displayNameOverride ?? target.value.name,
+      changes.push({ ...authorized.value, agentName: target.value.name,
         instanceKey: proposed.instanceKey, roomName: facts.ok ? facts.value.name : roomId, roomAlias: facts.ok ? facts.value.alias : null });
     }
   }
