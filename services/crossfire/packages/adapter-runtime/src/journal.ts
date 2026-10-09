@@ -2,7 +2,7 @@ import { lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
-import { success, failure } from '@ctlflow/crossfire-kernel/result';
+import { success, failure, failureError } from '@ctlflow/crossfire-kernel/result';
 import { fields } from '@ctlflow/crossfire-contracts/validation';
 import { acquireFileLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { MAX_INPUT_BYTES } from '@ctlflow/crossfire-contracts/runtime';
@@ -16,15 +16,17 @@ export function deliveryJournalExists(file: string): boolean {
 }
 
 export function readDeliveryJournal<Pending extends { text: string; messageId: string }>(file: string, sessionId: string, pending: check.Parser<Pending>) {
-  const parsed = fields(deliveryJournalExists(file) ? readJson<unknown>(file, 32 * 1024 * 1024) : { sessionId, pending: null, confirmed: [] }, ['sessionId', 'pending', 'confirmed']);
-  if (!parsed.ok || !check.text(200)(parsed.value.sessionId).ok || parsed.value.sessionId !== sessionId) throw new Error('Invalid native delivery journal or session binding');
-  const delivery = check.nullable(pending)(parsed.value.pending);
-  const confirmed = check.list(check.object({ messageId: check.text(200),
-    digest: check.refine(check.text(64), value => /^[a-f0-9]{64}$/u.test(value), 'Invalid native receipt digest') }), 128)(parsed.value.confirmed);
-  if (!delivery.ok || !confirmed.ok) throw new Error('Invalid native delivery journal');
-  if (new Set(confirmed.value.map(item => item.messageId)).size !== confirmed.value.length) throw new Error('Duplicate native receipt identities');
-  if (delivery.value && confirmed.value.some(item => item.messageId === delivery.value!.messageId)) throw new Error('Native input cannot be both pending and confirmed');
-  return { sessionId, pending: delivery.value, confirmed: confirmed.value };
+  try {
+    const parsed = fields(deliveryJournalExists(file) ? readJson<unknown>(file, 32 * 1024 * 1024) : { sessionId, pending: null, confirmed: [] }, ['sessionId', 'pending', 'confirmed']);
+    if (!parsed.ok || !check.text(200)(parsed.value.sessionId).ok || parsed.value.sessionId !== sessionId) throw new Error('Invalid native delivery journal or session binding');
+    const delivery = check.nullable(pending)(parsed.value.pending);
+    const confirmed = check.list(check.object({ messageId: check.text(200),
+      digest: check.refine(check.text(64), value => /^[a-f0-9]{64}$/u.test(value), 'Invalid native receipt digest') }), 128)(parsed.value.confirmed);
+    if (!delivery.ok || !confirmed.ok) throw new Error('Invalid native delivery journal');
+    if (new Set(confirmed.value.map(item => item.messageId)).size !== confirmed.value.length) throw new Error('Duplicate native receipt identities');
+    if (delivery.value && confirmed.value.some(item => item.messageId === delivery.value!.messageId)) throw new Error('Native input cannot be both pending and confirmed');
+    return { sessionId, pending: delivery.value, confirmed: confirmed.value };
+  } catch (error) { throw failureError({ code: 'invalid', message: error instanceof Error ? error.message : 'Invalid native delivery journal' }); }
 }
 
 export function deliveryJournal<Pending extends { text: string; messageId: string }>(file: string, sessionId: string, pending: check.Parser<Pending>) {
@@ -42,13 +44,13 @@ export function deliveryJournal<Pending extends { text: string; messageId: strin
       confirmed(text: string, messageId: string): boolean {
         owned();
         const existing = state.confirmed.find(item => item.messageId === messageId);
-        if (existing && existing.digest !== digest(text)) throw new Error('Native delivery identity was reused with different content');
+        if (existing && existing.digest !== digest(text)) throw failureError({ code: 'conflict', message: 'Native delivery identity was reused with different content' });
         return existing !== undefined;
       },
       prepare(value: Pending): void {
         owned();
         const valid = pending(value);
-        if (!valid.ok) throw new Error(valid.error.message);
+        if (!valid.ok) throw failureError(valid.error);
         if (state.confirmed.length >= 128) throw new Error('Acknowledge confirmed native deliveries before submitting more input');
         state.pending = valid.value; save();
       },

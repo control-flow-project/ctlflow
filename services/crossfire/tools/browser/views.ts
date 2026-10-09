@@ -46,7 +46,7 @@ export function managementViews(viewer: SessionView, policy: PolicyView, agents:
       { suffix: '', current: 'Rooms', sections: ['Rooms & access', 'Who can wake this agent?'] },
       { suffix: '/session', current: 'Session', sections: ['Decisions', 'Agent session', 'Runtime settings'] },
       { suffix: '/activity', current: 'Activity', sections: ['Listener activity'] },
-      { suffix: '/settings', current: 'Settings', sections: ['Listener software', 'Display name', 'Account access', 'Identity'] },
+      { suffix: '/settings', current: 'Settings', sections: ['Listener software', 'Registered name', 'Account access', 'Identity'] },
     ]) views.push({ route: base + view.suffix, title: 'Agent details', sections: view.sections, navigation: { label: 'Agent sections', current: view.current, items } });
     if (agent.allowedActions.includes('configure') && agent.status !== 'revoked') {
       views.push({ route: base + '/wake', title: 'Who can wake this agent?', sections: ['Wake audience'] });

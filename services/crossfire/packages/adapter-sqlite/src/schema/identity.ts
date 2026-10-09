@@ -29,7 +29,6 @@ CREATE TABLE agent (
   principal_id TEXT NOT NULL,
   principal_kind TEXT NOT NULL,
   owner_id TEXT NOT NULL,
-  display_name_override TEXT,
   wake_mode TEXT NOT NULL,
   PRIMARY KEY (principal_id),
   CHECK(principal_kind = 'agent'),

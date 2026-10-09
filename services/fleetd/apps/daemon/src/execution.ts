@@ -27,20 +27,21 @@ import { resetInstance, resetInstructions } from './reset.js';
 import { canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storage/history';
 import { createNativeStopReceipts, type NativeStopActivity } from './native-stops.js';
 import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
+import { nativeOptions } from '@ctlflow/fleetd-domain/model';
 
 export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
   const stops = new Map<string, ReturnType<typeof createNativeStopReceipts>>();
   let host: Promise<ListenerHost> | undefined;
-  const inspect: Execution['inspect'] = async (configuration, signal) => {
+  const inspect: Execution['inspect'] = async (configuration, signal, instances = configuration.roster.instances) => {
     try {
-      for (const instance of configuration.roster.instances) {
+      for (const instance of instances) {
         signal.throwIfAborted();
         const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
         if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
         const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
-        const inspected = await adapter.inspect({ stateDirectory, workspace: instance.workspace ?? stateDirectory, options: definition.options }, signal);
+        const inspected = await adapter.inspect({ stateDirectory, workspace: instance.workspace ?? stateDirectory, options: nativeOptions(configuration, instance) }, signal);
         if (!inspected.ok) return inspected;
       }
       return success(undefined);
@@ -103,6 +104,12 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         const options = adapter.validate(definition.options);
         if (!options.ok) return options;
       }
+      for (const instance of configuration.roster.instances) {
+        if (!instance.runtimeOptions) continue;
+        const definition = configuration.definitions[instance.definition]!;
+        const options = adapters[definition.runtime]!.validate(nativeOptions(configuration, instance));
+        if (!options.ok) return options;
+      }
       return success(undefined);
     },
     inspect,
@@ -135,7 +142,10 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
       if (!binding.ok) return binding;
       const identity = binding.value.identities.find(item => item.instanceKey === instance.key);
       if (!identity) return failure('missing', 'Instance has no enrolled identity');
-      return adapter ? resetInstance(configuration, instance, identity.agentId, resetId, adapter, signal) : failure('invalid', 'Unsupported runtime: ' + definition.runtime);
+      if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
+      const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
+      const admitted = await adapter.inspect({ workspace: instance.workspace ?? stateDirectory, stateDirectory, options: nativeOptions(configuration, instance) }, signal);
+      return admitted.ok ? resetInstance(configuration, instance, identity.agentId, resetId, adapter, signal) : admitted;
     },
     async contexts(configuration, instance) {
       const definition = configuration.definitions[instance.definition]!, adapter = adapters[definition.runtime];
@@ -203,7 +213,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
             void destination.activate().then(ready, error => { rejectReady(error); stop.abort(error); });
           },
           runtime: async (runtimeStop, _poll, hooks) => {
-            const options = adapter.validate(definition.options);
+            const options = adapter.validate(nativeOptions(configuration, instance));
             if (!options.ok) throw Object.assign(new Error(options.error.message), { code: options.error.code });
             const publicSettings = ['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'dangerously_bypass_approvals_and_sandbox'];
             const started = await createNativeLifecycle({ clock: nativeClock, hooks, runtime: definition.runtime, approval: options.value.approval,
@@ -223,7 +233,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
                 admission?.signal.addEventListener('abort', cancelled, { once: true });
                 try {
                   admission?.signal.throwIfAborted();
-                  const opened = await adapter.start({ profile: instance.key, name: instance.name, workspace, stateDirectory, instructions, options: definition.options, hooks: { ...hooks, observe },
+                  const opened = await adapter.start({ profile: instance.key, name: instance.name, workspace, stateDirectory, instructions, options: nativeOptions(configuration, instance), hooks: { ...hooks, observe },
                     allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
                     ...(instance.listenerOptions ? { listenerOptions: instance.listenerOptions } : {}) }, AbortSignal.any([scope, starting.signal]));
                   if (admission?.signal.aborted) {

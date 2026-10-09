@@ -28,6 +28,7 @@ import { readBinary } from './binary.js';
 import { registrationTransport, invitationCookie, setInvitationCookie, registrationStage } from './registration.js';
 import { verifyInvitation } from '@ctlflow/crossfire-domain/member/registration';
 import { searchMatrixDirectory } from './matrix-directory.js';
+import { changeMatrixProfile } from './matrix-profile.js';
 export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: ElementPresentation = {}) {
   const { services, config } = application;
   const register = registrationTransport(services);
@@ -77,6 +78,9 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (url.origin !== config.publicOrigin || request.headers.host !== new URL(config.publicOrigin).host) { send(response, requestId, failure('forbidden', 'Invalid request host')); return; }
       if (request.headers.origin !== undefined && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Invalid request origin')); return; }
       const method = request.method ?? 'GET';
+      if (method === 'PUT' && /^\/_matrix\/client\/v3\/profile\/[^/]+\/displayname$/u.test(url.pathname)) {
+        await changeMatrixProfile(services, request, response, url, requestId); worker.wake(); return;
+      }
       if (url.pathname === '/_matrix/client/v3/user_directory/search') {
         await searchMatrixDirectory(services, request, response, url, requestId); return;
       }

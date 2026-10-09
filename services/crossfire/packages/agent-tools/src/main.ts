@@ -43,7 +43,10 @@ export async function main(arguments_: string[]): Promise<void> {
   if (parsed.positionals.length > 2) throw new Error('Expected one namespace and one command');
   const maximum = outputBytes(option(values, 'max-output-bytes'));
   if (values.help) {
-    if (group === 'matrix' && command) emit(selectOperation(command), maximum);
+    if (group === 'matrix' && command) {
+      const operation = selectOperation(command);
+      emit({ ...operation, cli_options: operationOptions(operation) }, maximum);
+    }
     else if (group === 'matrix') emit({ namespace: 'matrix', schema: 'v1.12', operations: operations.map(operation => ({ command: operation.command, access: operation.access })) }, maximum);
     else emit({ usage: 'node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" [--project DIRECTORY] [--profile NAME] agent status|test|read|history|directory', agent: agentOptions, room: roomOptions,
       matrix: 'Native Matrix operation IDs converted to kebab-case; use matrix COMMAND --help.',

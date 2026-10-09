@@ -14,7 +14,7 @@ export const enrollment = check.object({ ...roster, enrollmentId: check.identifi
 export const enrollmentDecision = check.object({ expectedRevision: revision, decision: check.choice('approve', 'reject'), verificationCode: check.text(12, 12) });
 export const exchange = check.object({ claimSecret: check.secret });
 export const session = check.object({ nativeAccessToken: check.text(8192) });
-export const agentChange = check.object({ expectedRevision: revision, status: check.optional(check.status), displayName: check.optional(check.nullable(check.text(200))) });
+export const agentChange = check.object({ expectedRevision: revision, status: check.optional(check.status) });
 export const wakeSelection = check.object({ principalId: check.identifier, includeAgents: check.boolean });
 export const wakePolicy = check.refine(check.object({ expectedRevision: revision, mode: check.wakeMode, senders: check.list(wakeSelection, 2000) }),
   policy => new Set(policy.senders.map(sender => sender.principalId)).size === policy.senders.length

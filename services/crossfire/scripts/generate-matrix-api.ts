@@ -12,7 +12,7 @@ const disabled = new Set(['old_sync', 'room_initial_sync', 'peeking_events', 'th
   'appservice_ping', 'appservice_room_directory', 'to_device']);
 const operator = new Set(['admin', 'create_room', 'inviting', 'banning', 'kicking', 'room_state', 'room_upgrades']);
 const account = new Set(['login', 'login_token', 'logout', 'refresh', 'registration', 'registration_tokens']);
-const protectedIds = new Set(['setRoomAlias', 'deleteRoomAlias', 'setRoomVisibilityOnDirectory', 'deleteDevice', 'deleteDevices', 'postPusher']);
+const protectedIds = new Set(['setDisplayName', 'setRoomAlias', 'deleteRoomAlias', 'setRoomVisibilityOnDirectory', 'deleteDevice', 'deleteDevices', 'postPusher']);
 const disabledIds = new Set(['getUrlPreviewAuthed']);
 
 function object(value: unknown): ObjectValue {
@@ -101,13 +101,13 @@ export function generate(source: string): MatrixSchema {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { values } = parseArgs({ options: { root: { type: 'string' }, source: { type: 'string' }, check: { type: 'boolean' } } });
-  if (!values.root) throw new Error('--root must name the exact Crossfire source directory');
+  if (!values.root) throw new Error('--root must name the exact Crossfire monorepo root');
   if (!values.source) throw new Error('--source must name the official v1.12 data/api/client-server directory');
   const text = JSON.stringify(generate(values.source), null, 2) + '\n';
   if (JSON.parse(text).sourceSha256 !== '037337015f765c9d96a0561888ea15c870d34ea327dac94bab6884e33a0b30cd') {
     throw new Error('Source files differ from the audited official v1.12 schema snapshot');
   }
-  const output = join(resolve(values.root), 'packages/matrix/src/operations.json');
+  const output = join(resolve(values.root), 'services/crossfire/packages/adapter-matrix/src/operations.json');
   if (values.check) {
     if (readFileSync(output, 'utf8') !== text) throw new Error('Generated Matrix operation catalog is stale');
   } else writeFileSync(output, text);

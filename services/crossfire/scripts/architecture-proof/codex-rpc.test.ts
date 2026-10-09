@@ -1,7 +1,7 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -18,6 +18,7 @@ test("proof observer closes on malformed or oversized protocol responses", { tim
   for (const input of cases) {
     await context.test(input.name, async child => {
       const directory = mkdtempSync(join(tmpdir(), "crossfire-rpc-"));
+      cleanup(child, () => rmSync(directory, { recursive: true, force: true }));
       const path = join(directory, "rpc.sock");
       const server = createServer();
       const websocket = new WebSocketServer({ server });

@@ -51,7 +51,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
       for (let agentIndex = 0; agentIndex < 200; agentIndex++) {
         const agentId = ownerId + '-agent-' + String(agentIndex).padStart(3, '0');
         value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: agentIndex }));
-        value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'selected' }));
+        value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, wakeMode: 'selected' }));
         value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
         application(agentId);
         value(repositories.fleetInstance.insert({ ownerId, fleetKey: ownerId, instanceKey: agentId, agentId, retiredAt: null }));
@@ -188,7 +188,7 @@ test('sender identity batches seek exact Matrix indexes across large human and a
       value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
       value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
-      value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, displayNameOverride: null, wakeMode: 'selected' }));
+      value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, wakeMode: 'selected' }));
       value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
     }
   })();
@@ -231,7 +231,7 @@ test('fleet enrollment review hydrates the entire roster and selected identities
       for (let index = 0; index < count; index++) {
         const instanceKey = 'agent-' + String(index).padStart(3, '0');
         value(repositories.enrollmentItem.insert({ requestId, instanceKey, requestedName: requestId + '-' + instanceKey,
-          agentId: null, outcome: 'claimed', failureCode: null }));
+          agentId: null, outcome: 'claimed' }));
         value(repositories.fleetPolicy.insertRequested({ requestId, instanceKey }, { wakeMode: 'selected', expectedAgentRevision: null,
           permissions: ['room.agent.invite'], senders: Array.from({ length: 100 }, (_, senderIndex) => ({ principalId: 'sender-' + senderIndex, includeAgents: senderIndex % 2 === 0 })) }));
       }

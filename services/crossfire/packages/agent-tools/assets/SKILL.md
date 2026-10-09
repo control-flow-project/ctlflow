@@ -94,6 +94,16 @@ can execute backticks or expand `$`. A message including HTML must fit 50,000
 UTF-8 bytes. For an uncertain send retry preserve the transaction ID; omitted
 IDs are newly generated, and sends are not automatically retried.
 
+For an assignment or deliberate redirect, resolve the recipient's exact Matrix
+user ID through `agent directory` and send a fresh text message with
+`--mention-user '@exact-recipient:SERVER'`. Repeat the flag for each intentional
+target. This writes native `m.mentions.user_ids`; a Markdown Matrix-to link or
+display name alone is only presentation and does not steer a busy agent.
+Use a real mention only to assign or interrupt that target, not routine progress,
+citation links or quoted instructions. The original room and wake/permission
+rules still apply; a mention grants no authority. Native JSON `m.mentions` remains
+available; do not combine it with the flag. Edits cannot issue steering.
+
 Upload only stores native media. Send its returned `content_uri` in an explicit
 `m.file` event using `matrix send-message --body`. Download via native
 `get-content-authed` to a new `--output-file`; files never overwrite and report

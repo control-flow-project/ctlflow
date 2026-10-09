@@ -9,6 +9,9 @@ import { loadConfiguration } from '@ctlflow/fleetd-storage/configuration';
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import { createRegistry } from '@ctlflow/fleetd-storage/registry';
 import { instanceView } from '@ctlflow/fleetd-contracts/api';
+import { nativeOptions, type Configuration } from '@ctlflow/fleetd-domain/model';
+import { createExecution } from '../apps/daemon/src/execution.js';
+import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 
 test('role coordination options are separate from native options and strictly validate modes, capabilities and selected identities', () => {
   const native = { name: 'Analyst', runtime: 'codex', runtime_options: { model: 'fixture', native_option: true } };
@@ -77,5 +80,57 @@ test('listener history options have one camelCase domain and API representation 
     assert.equal(instanceView({ ...view, instance: { ...instance, listener_options: {} } }).ok, false);
     const written = registry.writeRoster(loaded.value, loaded.value.roster); assert(written.ok);
     assert.deepEqual(written.value.roster, loaded.value.roster);
+  }
+});
+
+test('native instance options share one role and replace only explicitly selected top-level settings across TOML, registry and preflight', async scope => {
+  const directory = mkdtempSync(join(tmpdir(), 'fleet-native-options-')), role = join(directory, 'agents/analyst');
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  mkdirSync(role, { recursive: true, mode: 0o700 });
+  writeFileSync(join(role, 'agent.toml'), 'name="Analyst"\nruntime="codex"\n[runtime_options]\nmodel="fixture"\nmodel_reasoning_effort="high"\n'
+    + 'sandbox_mode="danger-full-access"\napproval_policy="on-request"\n[runtime_options.features]\ndefault_mode_request_user_input=true\n', { mode: 0o600 });
+  writeFileSync(join(role, 'AGENTS.md'), 'One complete shared role and skill library.', { mode: 0o600 });
+  const source = 'fleet="research"\n[coordination]\nadapter="crossfire"\nserver="https://example.test"\nowner="@owner:test"\n'
+    + '[[instances]]\nkey="analyst"\nname="analyst"\ndefinition="analyst"\nworkarea="agents/analyst/workarea/analyst"\n'
+    + '[[instances]]\nkey="analyst-fast"\nname="analyst-fast"\ndefinition="analyst"\nworkarea="agents/analyst/workarea/analyst-fast"\n';
+  writeFileSync(join(directory, 'runtime.toml'), source + '[instances.runtime_options]\nmodel_reasoning_effort="medium"\n', { mode: 0o600 });
+  const loaded = loadConfiguration(directory); assert(loaded.ok);
+  assert.equal(Object.keys(loaded.value.definitions).length, 1);
+  const [ordinary, fast] = loaded.value.roster.instances;
+  const baseline = nativeOptions(loaded.value, ordinary!), selected = nativeOptions(loaded.value, fast!);
+  assert.deepEqual(selected, { ...baseline, model_reasoning_effort: 'medium' });
+  assert.equal(baseline.model_reasoning_effort, 'high');
+  assert.equal(Object.hasOwn(fast!, 'runtime_options'), false);
+  assert.deepEqual(nativeOptions(loaded.value, { ...fast!, runtimeOptions: { features: {} } }).features, {}, 'Nested tables replace as one explicit native value, not a second deep-merge policy');
+  const view = { instance: fast!, phase: 'stopped', listenerActive: false, desiredActive: false, lastActivityAt: null, historyAvailable: null,
+    sessionId: null, error: null, startedAt: null };
+  assert(instanceView(view).ok);
+  assert.equal(instanceView({ ...view, instance: { ...fast!, runtime_options: {} } }).ok, false);
+  const registry = createRegistry(join(directory, '.registry'));
+  const written = registry.writeRoster(loaded.value, loaded.value.roster); assert(written.ok);
+  assert.deepEqual(written.value.roster, loaded.value.roster);
+  const execution = createExecution({ codex: codexRuntime() }, directory);
+  assert(execution.validate(written.value).ok);
+  for (const effort of ['low', 'medium', 'high', 'xhigh', 'max']) {
+    const configured: Configuration = { ...written.value, roster: { ...written.value.roster, instances: [
+      ordinary!, { ...fast!, runtimeOptions: { model_reasoning_effort: effort } } ] } };
+    assert(execution.validate(configured).ok, 'Supported native reasoning effort: ' + effort);
+    assert.deepEqual(nativeOptions(configured, configured.roster.instances[1]!), { ...baseline, model_reasoning_effort: effort });
+  }
+  const invalid = { ...written.value, roster: { ...written.value.roster, instances: [
+    ordinary!, { ...fast!, runtimeOptions: { model_reasoning_effort: 'made-up' } } ] } };
+  assert.equal(execution.validate(invalid).ok, false, 'Every effective instance selection is validated, not only role defaults');
+  const inspected: Record<string, unknown>[] = [];
+  const adapter = { ...codexRuntime(), inspect: async (input: { options: unknown }) => {
+    inspected.push(input.options as Record<string, unknown>); return { ok: true as const, value: undefined };
+  } };
+  assert((await createExecution({ codex: adapter }, directory).inspect(written.value, new AbortController().signal)).ok);
+  assert.deepEqual(inspected, [baseline, selected]);
+  writeFileSync(join(directory, 'runtime.toml'), source + '[instances.runtime_options]\nmodel_reasoning_effort="low"\n', { mode: 0o600 });
+  const changed = loadConfiguration(directory); assert(changed.ok);
+  assert.notEqual(changed.value.digest, loaded.value.digest);
+  for (const malformed of ['runtime_options="not-a-table"\n', 'runtimeOptions={}\n', '[instances.coordination_options]\nwake_mode="everyone"\n']) {
+    writeFileSync(join(directory, 'runtime.toml'), source + malformed, { mode: 0o600 });
+    assert.equal(loadConfiguration(directory).ok, false);
   }
 });

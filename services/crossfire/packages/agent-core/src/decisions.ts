@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
 import { ownerNotice, ownerNoticeChunks } from './owner-notices.js';
-import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { failure, failureError, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Json } from '@ctlflow/crossfire-contracts/json';
 import type { RuntimeDecision } from './runtime.js';
 import type { Clock, Matrix, LocalState } from './port.js';
@@ -14,9 +14,12 @@ const journal = check.list(check.object({ id: check.identifier, native: check.te
   status: check.choice('pending', 'responded', 'cancelled') }), 4096);
 export function decisions(options: { clock: Clock; client: Matrix; coordination: Coordination; settings: Settings;
   agent: string; matrixUserId: string; run: () => Promise<string>; storage: LocalState; file: string }, stop: AbortSignal) {
-  const loaded = journal(options.storage.exists(options.file) ? options.storage.read(options.file) : []);
-  if (!loaded.ok) throw new Error(loaded.error.message);
-  const receipts = loaded.value;
+  let receipts: check.Parsed<typeof journal>;
+  try {
+    const loaded = journal(options.storage.exists(options.file) ? options.storage.read(options.file) : []);
+    if (!loaded.ok) throw failureError(loaded.error);
+    receipts = loaded.value;
+  } catch { throw failureError({ code: 'invalid', message: 'Invalid native decision journal; retained decisions require owner inspection' }); }
   const pending = new Set<string>();
   const key = (decision: RuntimeDecision) => JSON.stringify([decision.runtime, decision.session, decision.request]);
   const save = () => options.storage.write(options.file, receipts);

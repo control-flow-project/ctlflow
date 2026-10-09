@@ -51,7 +51,8 @@ export function createRegistry(root: string): Registry {
     load: loadConfiguration,
     writeRoster(configuration, roster) {
       return attempt(() => {
-        const wire = { ...roster, instances: roster.instances.map(({ listenerOptions, ...instance }) => ({ ...instance,
+        const wire = { ...roster, instances: roster.instances.map(({ listenerOptions, runtimeOptions, ...instance }) => ({ ...instance,
+          ...(runtimeOptions ? { runtime_options: runtimeOptions } : {}),
           ...(listenerOptions ? { listener_options: listenerOptions.historyMode === undefined ? {} : { history_mode: listenerOptions.historyMode } } : {}) })) };
         const valid = validateRoster(wire);
         if (!valid.ok) return valid;

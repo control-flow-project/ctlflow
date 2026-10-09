@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { readPrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { codexProtocol } from '@ctlflow/crossfire-adapter-codex/protocol';
 import { ownedOptions } from '@ctlflow/crossfire-adapter-codex/owned-options';
+import { admitCodex } from '@ctlflow/crossfire-adapter-codex/admission';
+import { codexClientVersion } from '@ctlflow/crossfire-adapter-codex/version';
 import { object } from '@ctlflow/crossfire-contracts/validation';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { fingerprint } from '@ctlflow/crossfire-operator-support/files';
@@ -25,7 +27,7 @@ export const inspectCodex: NativeInspector = async (input, signal) => {
     const token = new TextDecoder('utf-8', { fatal: true }).decode(readPrivateBytes(tokenFile, 4096));
     protocol = codexProtocol({ endpoint, token, timeoutMs: 15000, event: () => {},
       approval: async () => { protocol?.close(); throw new Error('Read-only operator inspection cannot answer native requests'); } }, signal);
-    await protocol.request('initialize', { clientInfo: { name: 'crossfire-operator-inspection', version: '0.1.0' }, capabilities: { experimentalApi: true } });
+    await protocol.request('initialize', { clientInfo: { name: 'crossfire-operator-inspection', version: codexClientVersion }, capabilities: { experimentalApi: true } });
     protocol.notify('initialized');
     const account = object(await protocol.request('account/read', { refreshToken: false }));
     if (!account.ok || !account.value.account) return failure('unauthorized', 'The selected native engine has no provider login');
@@ -35,15 +37,9 @@ export const inspectCodex: NativeInspector = async (input, signal) => {
     if (!thread.ok || !status.ok || thread.value.id !== attachment.sessionId || thread.value.cwd !== attachment.workspace
       || realpathSync(attachment.workspace) !== attachment.workspace || thread.value.canAcceptDirectInput !== true || typeof status.value.type !== 'string') return failure('conflict', 'Native thread does not match its exact running attachment/workspace');
     if (input.fresh && (status.value.type !== 'idle' || !Array.isArray(thread.value.turns) || thread.value.turns.length !== 0)) return failure('conflict', 'The selected native history is not idle and unused; inspection did not interrupt it');
-    const listing = object(await protocol.request('model/list', { includeHidden: true }));
-    if (!listing.ok || !Array.isArray(listing.value.data)) return failure('native', 'Invalid native model catalog');
     const configured = settings.value.options;
-    if (configured.model) {
-      const model = listing.value.data.map(object).find(item => item.ok && item.value.model === configured.model);
-      if (!model?.ok) return failure('conflict', 'Configured model is unavailable in this native engine');
-      if (configured.model_reasoning_effort && (!Array.isArray(model.value.supportedReasoningEfforts)
-        || !model.value.supportedReasoningEfforts.some(item => { const parsed = object(item); return parsed.ok && parsed.value.reasoningEffort === configured.model_reasoning_effort; }))) return failure('conflict', 'Configured reasoning effort is unavailable for this model');
-    }
+    const admitted = await admitCodex(protocol.request, configured);
+    if (!admitted.ok) return admitted;
     const discovered = object(await protocol.request('skills/list', { cwds: [attachment.workspace], forceReload: true }));
     if (!discovered.ok || !Array.isArray(discovered.value.data)) return failure('native', 'Invalid native skill catalog');
     const current = discovered.value.data.map(object).find(item => item.ok && item.value.cwd === attachment.workspace);

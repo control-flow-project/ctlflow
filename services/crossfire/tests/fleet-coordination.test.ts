@@ -204,7 +204,7 @@ test('stale, rejected and deactivated-sender reviews roll back complete rosters 
   const fixture = await coordinationFixture(scope), { services, admin } = fixture;
   const ada = await fixture.agent(admin.actor, 'ada'), kit = await fixture.agent(admin.actor, 'kit');
   const input = request(fixture, [ada, kit]), pending = value(await introduceEnrollment(services, input));
-  value(changeAgent(services, admin.actor, kit.id, { expectedRevision: value(services.directory.agent(kit.id))!.principal.revision, displayName: 'Changed while reviewing' }, randomUUID()));
+  value(changeAgent(services, admin.actor, kit.id, { expectedRevision: value(services.directory.agent(kit.id))!.principal.revision, status: 'active' }, randomUUID()));
   const decision = { expectedRevision: 0, decision: 'approve' as const, verificationCode: pending.request.verificationCode };
   assert.equal(decideEnrollment(services, admin.actor, input.enrollmentId, decision, randomUUID()).ok, false);
   assert.deepEqual(value(services.repositories.fleetPolicy.approved(ada.id))!.permissions, []);

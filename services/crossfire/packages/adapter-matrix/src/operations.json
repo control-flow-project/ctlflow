@@ -2805,7 +2805,7 @@
       "command": "set-display-name",
       "method": "PUT",
       "path": "/_matrix/client/v3/profile/{userId}/displayname",
-      "access": "agent",
+      "access": "operator",
       "parameters": [
         {
           "name": "userId",

@@ -2,7 +2,6 @@ import type { AgentView } from '@ctlflow/crossfire-contracts/schema/response';
 import { HEARTBEAT_MS } from '@ctlflow/crossfire-contracts/activity';
 import { call, operations, useAction, useResource } from './api.js';
 import { useSession } from './session.js';
-import { useEditable, EditConflict } from './use-editable.js';
 import { Alert, Empty, Help, Loaded, Page, Panel, Pagination, Status, SubjectHeading, applied, timestamp } from './ui.js';
 import { AgentFilters } from './agent-filters.js';
 import { AgentRooms } from './agent-rooms.js';
@@ -39,14 +38,11 @@ function Activity({ agent }: { agent: AgentView }) {
 }
 function Lifecycle({ agent }: { agent: AgentView }) {
   const viewer = useSession(), action = useAction(), confirmation = useConfirmation();
-  const edit = useEditable(agent.agentId + '/name', agent.revision, agent.displayName);
-  const changeName = (displayName: string | null) => call(operations.changeAgent, { agentId: agent.agentId }, { expectedRevision: edit.version, displayName }, viewer.csrfSecret);
   const changeStatus = (status: 'active' | 'suspended' | 'revoked') => call(operations.changeAgent, { agentId: agent.agentId }, { expectedRevision: agent.revision, status }, viewer.csrfSecret);
   const mutable = agent.allowedActions.includes('configure') && agent.status !== 'revoked';
-  return <><Panel title="Display name" description="The name shown in management and Matrix."><form className="bounded-form" onSubmit={event => { event.preventDefault(); if (!edit.conflict) void action.run(() => changeName(edit.value)); }}>
-      <fieldset disabled={!mutable || action.pending}><label>Configured display name<input maxLength={200} required value={edit.value} onChange={event => edit.setValue(event.target.value)}/></label>
-        <div className="actions"><button disabled={edit.conflict}>Save name</button><button type="button" disabled={edit.conflict} onClick={() => { void action.run(() => changeName(null)); }}>Use owner-qualified name</button></div><EditConflict {...edit}/></fieldset></form>
-    <Alert>{action.error}</Alert></Panel><Panel title="Account access" description="Suspension is reversible. Revocation permanently disables this identity."><dl><dt>Account</dt><dd><Status value={agent.status}/></dd><dt>Native application</dt><dd><Status value={applied(agent)}/></dd><dt>Last applied</dt><dd>{timestamp(agent.application.lastSuccessAt)}</dd></dl><Alert>{agent.application.errorMessage}</Alert>
+  return <><Panel title="Registered name" description="One unique name identifies this agent in management and Matrix."><dl><dt>Name</dt><dd>{agent.name}</dd><dt>Conversation label</dt><dd>{agent.displayName}</dd></dl>
+    <p className="support">To rename this agent, change its name in the fleet configuration and run setup with its existing private credentials. The owner reviews the rename before it takes effect. The identity and history stay the same.</p>
+    </Panel><Panel title="Account access" description="Suspension is reversible. Revocation permanently disables this identity."><dl><dt>Account</dt><dd><Status value={agent.status}/></dd><dt>Native application</dt><dd><Status value={applied(agent)}/></dd><dt>Last applied</dt><dd>{timestamp(agent.application.lastSuccessAt)}</dd></dl><Alert>{agent.application.errorMessage}</Alert>
     <div className="actions">{mutable && <><button disabled={action.pending} onClick={() => {
       confirmation.request({ title: agent.status === 'active' ? 'Suspend agent?' : 'Reactivate agent?', description: 'Change account access for ' + agent.displayName + '.', label: agent.status === 'active' ? 'Suspend agent' : 'Activate agent', danger: agent.status === 'active',
         execute: () => action.run(() => changeStatus(agent.status === 'active' ? 'suspended' : 'active')) });

@@ -37,7 +37,6 @@ type AgentRow = {
   agent_principal_id: Tables['agent']['principal_id'];
   agent_principal_kind: Tables['agent']['principal_kind'];
   agent_owner_id: Tables['agent']['owner_id'];
-  agent_display_name_override: Tables['agent']['display_name_override'];
   agent_wake_mode: Tables['agent']['wake_mode'];
   principal_id: Tables['principal']['id'];
   principal_matrix_user_id: Tables['principal']['matrix_user_id'];
@@ -73,7 +72,7 @@ function memberRecord(row: MemberRow): MemberRecord { return {
     application: { principalId: row.application_principal_id, appliedRevision: row.application_applied_revision, appliedIntentHash: row.application_applied_intent_hash, appliedStatus: row.application_applied_status, nativeDisplayName: row.application_native_display_name, lastAttemptAt: row.application_last_attempt_at, lastSuccessAt: row.application_last_success_at, nextCheckAt: row.application_next_check_at, errorCode: row.application_error_code, errorMessage: row.application_error_message }
   }; }
 function agentRecord(row: AgentRow): AgentRecord { return {
-    agent: { principalId: row.agent_principal_id, principalKind: row.agent_principal_kind, ownerId: row.agent_owner_id, displayNameOverride: row.agent_display_name_override, wakeMode: row.agent_wake_mode },
+    agent: { principalId: row.agent_principal_id, principalKind: row.agent_principal_kind, ownerId: row.agent_owner_id, wakeMode: row.agent_wake_mode },
     principal: { id: row.principal_id, matrixUserId: row.principal_matrix_user_id, kind: row.principal_kind, status: row.principal_status, revision: row.principal_revision, createdAt: row.principal_created_at },
     application: { principalId: row.application_principal_id, appliedRevision: row.application_applied_revision, appliedIntentHash: row.application_applied_intent_hash, appliedStatus: row.application_applied_status, nativeDisplayName: row.application_native_display_name, lastAttemptAt: row.application_last_attempt_at, lastSuccessAt: row.application_last_success_at, nextCheckAt: row.application_next_check_at, errorCode: row.application_error_code, errorMessage: row.application_error_message },
     owner: { id: row.owner_id, matrixUserId: row.owner_matrix_user_id, kind: row.owner_kind, status: row.owner_status, revision: row.owner_revision, createdAt: row.owner_created_at },
@@ -111,7 +110,6 @@ function allAgents(database: Database.Database, filter: DirectoryFilter): Page<A
       agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
       agent_owner_id: row.agent.owner_id,
-      agent_display_name_override: row.agent.display_name_override,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
       principal_matrix_user_id: row.principal.matrix_user_id,
@@ -171,7 +169,6 @@ function ownedAgents(database: Database.Database, filter: DirectoryFilter): Page
       agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
       agent_owner_id: row.agent.owner_id,
-      agent_display_name_override: row.agent.display_name_override,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
       principal_matrix_user_id: row.principal.matrix_user_id,
@@ -263,7 +260,6 @@ export function createDirectoryRepository(database: Database.Database): Director
     (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.principal.id === params.principalId).select(row => ({ agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
       agent_owner_id: row.agent.owner_id,
-      agent_display_name_override: row.agent.display_name_override,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
       principal_matrix_user_id: row.principal.matrix_user_id,
@@ -396,7 +392,6 @@ export function createDirectoryRepository(database: Database.Database): Director
           .select(row => ({ agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
       agent_owner_id: row.agent.owner_id,
-      agent_display_name_override: row.agent.display_name_override,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
       principal_matrix_user_id: row.principal.matrix_user_id,
@@ -426,7 +421,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       name: row.name.name })));
         return success([
           ...humans.map(memberRecord).map(row => ({ principal: row.principal, displayName: row.member.displayName, ownerId: row.principal.id })),
-          ...agents.map(agentRecord).map(row => ({ principal: row.principal, displayName: agentDisplayName(row.name, row.ownerMember.displayName, row.agent.displayNameOverride), ownerId: row.owner.id })),
+          ...agents.map(agentRecord).map(row => ({ principal: row.principal, displayName: agentDisplayName(row.name, row.ownerMember.displayName), ownerId: row.owner.id })),
         ]);
       });
     },

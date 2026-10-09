@@ -13,11 +13,11 @@ import { releaseFixture } from './release-fixture.js';
 import { browserOptions } from './support/tls.js';
 
 test('stock Element uses Crossfire English activity wording', { timeout: 120000 }, async scope => {
-  const { origin, native } = await nativeServer(scope, await releaseFixture(), {}, elementAssets());
+  const { origin, native, member } = await nativeServer(scope, await releaseFixture(), {}, elementAssets());
   const viewer = await native.register('viewer');
   const participants = [];
   for (const name of ['ada', 'bea', 'kit', 'lou']) {
-    const account = await native.register(name);
+    const registered = await member(name), account = { id: registered.accepted.account.userId, token: registered.token };
     value(await nativeOk({ base: origin, token: account.token }, 'PUT', API + '/profile/' + segment(account.id) + '/displayname', { displayname: name }));
     participants.push(account);
   }

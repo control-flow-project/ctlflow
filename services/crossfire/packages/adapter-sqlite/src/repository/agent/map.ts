@@ -5,7 +5,6 @@ export function mapAgent(row: Tables['agent']): Agent {
     principalId: row.principal_id,
     principalKind: row.principal_kind,
     ownerId: row.owner_id,
-    displayNameOverride: row.display_name_override,
     wakeMode: row.wake_mode,
   };
 }

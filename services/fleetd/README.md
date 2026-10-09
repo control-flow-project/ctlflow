@@ -5,6 +5,7 @@ The guides cover controller ownership and the shared runtime configuration:
 - [Controller documentation](docs/README.md)
 - [Noninteractive project setup and private workspace/state](docs/setup.md)
 - [Lifecycle, private API and execution boundaries](docs/operations.md)
+- [Context storage and explicit forward migration](docs/storage.md)
 - [Read-only native fleet verification](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
 - [Fleet runtime defaults and overrides](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
 - [Fleet-defined wake rules and invitation defaults](docs/coordination.md)

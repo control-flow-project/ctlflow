@@ -8,7 +8,7 @@ import { deliveryText, readDeliveryJournal } from '@ctlflow/crossfire-adapter-ru
 import { captureHistory, historyBoundary, historyHeader, historySince } from '@ctlflow/crossfire-adapter-runtime/native-file';
 import type { CodexSession } from './session.js';
 
-const instructionInput = check.object({ text: deliveryText,
+export const instructionInput = check.object({ text: deliveryText,
   messageId: check.refine(check.text(100), value => value.startsWith('crossfire-instructions-')
     && check.identifier(value.slice('crossfire-instructions-'.length)).ok, 'Invalid native instruction identity'),
   path: check.text(4096), boundary: check.nullable(historyBoundary) });

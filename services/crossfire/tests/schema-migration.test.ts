@@ -54,7 +54,12 @@ test('schema 13 advances atomically with exact wake semantics and protected hist
     createSchema(database);
     assert.equal(database.pragma('user_version', { simple: true }), SCHEMA_VERSION);
     const after = snapshot(database), converted = new Set([...schema13Tables, 'enrollment_request']);
-    for (const [table, rows] of before) if (!converted.has(table)) assert.deepEqual(after.get(table), rows, table);
+    for (const [table, rows] of before) if (!converted.has(table)) {
+      const expected = table === 'enrollment_item' ? rows.map(({ failure_code, ...row }) => {
+        assert.equal(failure_code, null); return row;
+      }) : rows;
+      assert.deepEqual(after.get(table), expected, table);
+    }
     for (const entry of after.get('agent')!) assert.equal(entry.wake_mode, ['agent-humans', 'agent-everyone'].includes(String(entry.principal_id)) ? String(entry.principal_id).slice(6) : 'selected');
     const expected = ['owner', 'owner-agents', 'humans', 'selected'].map(mode => ({
       agent_id: 'agent-' + mode, sender_principal_id: mode === 'selected' ? 'other' : 'owner', include_agents: mode === 'owner' || mode === 'selected' ? 0 : 1,
@@ -97,12 +102,12 @@ test('a failed forward conversion rolls back every table, guard, credential and 
 });
 
 test('only the verified deployed schema can migrate; prototypes, foreign stores and future versions remain unchanged', () => {
-  for (const version of [...Array.from({ length: 12 }, (_, index) => index + 1), 15]) {
+  for (const version of [...Array.from({ length: 12 }, (_, index) => index + 1), SCHEMA_VERSION + 1]) {
     const database = schema13Store();
     try {
       seed(database); database.pragma('user_version = ' + version);
       const before = snapshot(database), schema = database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all();
-      assert.throws(() => createSchema(database), /only deployed schema 13/u);
+      assert.throws(() => createSchema(database), /only deployed schemas 13 and 14/u);
       assert.equal(database.pragma('user_version', { simple: true }), version); assert.deepEqual(snapshot(database), before);
       assert.deepEqual(database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all(), schema);
       database.pragma('application_id = 99'); assert.throws(() => createSchema(database), /Unsupported/u);

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { CONTEXT_REGISTRY } from '@ctlflow/crossfire-adapter-codex/context-state';
 
 function workspace(scope: TestContext) {
   const directory = mkdtempSync(join(tmpdir(), 'native-context-metadata-'));
@@ -21,29 +22,28 @@ test('saved native contexts are read without starting an engine, initializing a 
   assert.deepEqual(await adapter.savedContexts({ workspace: directory, stateDirectory: directory }), { ok: true, value: [] });
   assert.deepEqual(readdirSync(home), []);
   const shared = randomUUID(), control = randomUUID(), room = randomUUID();
-  writeFileSync(join(home, 'crossfire-session.json'), JSON.stringify({ sessionId: shared }), { mode: 0o600 });
   for (const mode of ['shared', 'per-room']) {
-    writeFileSync(join(home, 'crossfire-contexts.json'), JSON.stringify({ mode, control, rooms: [{ room: '!alpha:test', sessionId: room }] }), { mode: 0o600 });
+    writeFileSync(join(home, CONTEXT_REGISTRY), JSON.stringify({ mode, bindings: [{ context: 'shared', sessionId: shared },
+      { context: 'control', sessionId: control }, { context: '!alpha:test', sessionId: room }] }), { mode: 0o600 });
     const result = await adapter.savedContexts({ workspace: directory, stateDirectory: directory }); assert(result.ok);
     assert.deepEqual(result.value, [
       { context: 'shared', runtime: 'codex', sessionId: shared, workspace: directory },
       { context: 'control', runtime: 'codex', sessionId: control, workspace: directory },
       { context: '!alpha:test', runtime: 'codex', sessionId: room, workspace: directory },
     ]);
-    assert.deepEqual(readdirSync(home).sort(), ['crossfire-contexts.json', 'crossfire-session.json']);
+    assert.deepEqual(readdirSync(home), [CONTEXT_REGISTRY]);
   }
 });
 
 test('invalid or unsafe native metadata never becomes an empty or guessed history', async scope => {
   const directory = workspace(scope), home = join(directory, '.codex'), adapter = codexRuntime('/not-executed');
   mkdirSync(home, { mode: 0o700 });
-  const shared = randomUUID(), file = join(home, 'crossfire-contexts.json');
-  writeFileSync(join(home, 'crossfire-session.json'), JSON.stringify({ sessionId: shared }), { mode: 0o600 });
-  for (const invalid of [{ mode: 'shared', control: shared, rooms: [] },
-    { mode: 'shared', control: null, rooms: [{ room: '!alpha:test', sessionId: randomUUID() }, { room: '!alpha:test', sessionId: randomUUID() }] },
-    { mode: 'per-room', control: null, rooms: [{ room: '!alpha:test', sessionId: shared }] },
-    { mode: 'per-room', control: null, rooms: [{ room: '!alpha:test', sessionId: 'unknown-native-session' }] },
-    { mode: 'legacy', control: null, rooms: [] }, { mode: 'shared', control: null, rooms: [], extra: true }]) {
+  const shared = randomUUID(), file = join(home, CONTEXT_REGISTRY);
+  for (const invalid of [{ mode: 'shared', bindings: [{ context: 'shared', sessionId: shared }, { context: 'control', sessionId: shared }] },
+    { mode: 'shared', bindings: [{ context: '!alpha:test', sessionId: randomUUID() }, { context: '!alpha:test', sessionId: randomUUID() }] },
+    { mode: 'per-room', bindings: [{ context: 'shared', sessionId: shared }, { context: '!alpha:test', sessionId: shared }] },
+    { mode: 'per-room', bindings: [{ context: '!alpha:test', sessionId: 'unknown-native-session' }] },
+    { mode: 'legacy', bindings: [] }, { mode: 'shared', bindings: [], extra: true }]) {
     writeFileSync(file, JSON.stringify(invalid), { mode: 0o600 });
     const result = await adapter.savedContexts({ workspace: directory, stateDirectory: directory }); assert.equal(result.ok, false, JSON.stringify(invalid));
     if (!result.ok) assert.equal(result.error.code, 'invalid');
@@ -56,7 +56,7 @@ test('invalid or unsafe native metadata never becomes an empty or guessed histor
   chmodSync(home, 0o700);
   const alias = join(directory, 'alias'); symlinkSync(directory, alias);
   assert.equal((await adapter.savedContexts({ workspace: alias, stateDirectory: directory })).ok, false);
-  rmSync(join(home, 'crossfire-session.json')); rmdirSync(home); symlinkSync(join(directory, 'missing-home'), home);
+  rmdirSync(home); symlinkSync(join(directory, 'missing-home'), home);
   assert.equal((await adapter.savedContexts({ workspace: directory, stateDirectory: directory })).ok, false);
 });
 
@@ -66,11 +66,11 @@ test('saved contexts belong to private managed state, never the existing native 
   const nativeHome = join(project, '.codex'), managedHome = join(stateDirectory, '.codex');
   mkdirSync(nativeHome, { mode: 0o700 }); mkdirSync(managedHome, { mode: 0o700 });
   const existing = randomUUID(), managed = randomUUID(), adapter = codexRuntime('/not-executed');
-  writeFileSync(join(nativeHome, 'crossfire-session.json'), JSON.stringify({ sessionId: existing }), { mode: 0o600 });
-  writeFileSync(join(managedHome, 'crossfire-session.json'), JSON.stringify({ sessionId: managed }), { mode: 0o600 });
+  writeFileSync(join(nativeHome, CONTEXT_REGISTRY), JSON.stringify({ mode: 'shared', bindings: [{ context: 'shared', sessionId: existing }] }), { mode: 0o600 });
+  writeFileSync(join(managedHome, CONTEXT_REGISTRY), JSON.stringify({ mode: 'shared', bindings: [{ context: 'shared', sessionId: managed }] }), { mode: 0o600 });
   assert.deepEqual(await adapter.savedContexts({ workspace: project, stateDirectory }), { ok: true,
     value: [{ context: 'shared', runtime: 'codex', sessionId: managed, workspace: project }] });
-  assert.deepEqual(readdirSync(nativeHome), ['crossfire-session.json']);
+  assert.deepEqual(readdirSync(nativeHome), [CONTEXT_REGISTRY]);
   const alias = join(directory, 'state-alias'); symlinkSync(stateDirectory, alias);
   assert.equal((await adapter.savedContexts({ workspace: project, stateDirectory: alias })).ok, false);
 });

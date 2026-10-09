@@ -19,9 +19,8 @@ export type EnrollmentItem = {
   requestId: string;
   instanceKey: string;
   requestedName: string;
-  outcome: 'existing' | 'claimed' | 'failed';
+  outcome: 'existing' | 'claimed';
   agentId: string | null;
-  failureCode: string | null;
 };
 
 export type AgentName = {

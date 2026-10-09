@@ -19,6 +19,7 @@ import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { randomUUID } from 'node:crypto';
+import { nativeModels } from '@ctlflow/crossfire-test-support/native-models';
 
 const execute = promisify(execFile);
 test('native SSH forwards the private controller API, attaches the exact Codex TUI and leaves the daemon running', { timeout: 90000 }, async scope => {
@@ -82,12 +83,13 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   provider.listen(0, '127.0.0.1'); await once(provider, 'listening');
   cleanup(scope, () => new Promise<void>(resolve => { provider.closeAllConnections(); provider.close(() => resolve()); }));
   const providerAddress = provider.address(); assert(providerAddress && typeof providerAddress !== 'string');
-  writeFileSync(join(nativeHome, 'config.toml'), 'model_provider = "fixture"\n[model_providers.fixture]\nname = "Inert SSH fixture"\nbase_url = "http://127.0.0.1:' + providerAddress.port + '/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n', { mode: 0o600 });
+  const catalog = join(nativeHome, 'fixture-models.json'); writeFileSync(catalog, JSON.stringify(nativeModels()), { mode: 0o600 });
+  writeFileSync(join(nativeHome, 'config.toml'), 'model_catalog_json = ' + JSON.stringify(catalog) + '\nmodel_provider = "fixture"\n[model_providers.fixture]\nname = "Inert SSH fixture"\nbase_url = "http://127.0.0.1:' + providerAddress.port + '/v1"\nwire_api = "responses"\nrequires_openai_auth = false\n', { mode: 0o600 });
   trustWorkspace(nativeHome, workspace);
   const runtime = await codexRuntime().start({ profile: 'ssh-native', name: 'ssh-native', workspace, stateDirectory: workspace, instructions: 'Inert verification. No work is requested.', allowNewHistory: true,
     options: { model: 'gpt-5.1', model_reasoning_effort: 'medium', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No tool approval is expected'); } } }, scope.signal);
-  assert(runtime.ok); nativeRuntime = runtime.value;
+  assert(runtime.ok, runtime.ok ? '' : runtime.error.code + ': ' + runtime.error.message); nativeRuntime = runtime.value;
   const realPointer = codexTerminal().command(nativeRuntime.attachment); assert(realPointer.ok);
   const realRemote = sshTerminalCommand('fixture', realPointer.value);
   terminal = spawn('/usr/bin/script', ['--quiet', '--return', '--flush', '--command', 'stty cols 110 rows 35; ' + realRemote, '/dev/null'],

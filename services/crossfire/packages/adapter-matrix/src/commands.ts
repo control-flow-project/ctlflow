@@ -8,6 +8,7 @@ import type { JsonObject } from '@ctlflow/crossfire-contracts/json';
 import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
 import { DEFAULT_EVENTS, MAX_EVENTS, MAX_JSON_BYTES } from '@ctlflow/crossfire-contracts/limits';
 import { messageContent, MAX_MESSAGE_BYTES } from './message.js';
+import { matrixUserId } from '@ctlflow/crossfire-contracts/schema/validation';
 import { uploadStream, saveStream } from './files.js';
 
 export const operations: readonly Operation[] = (catalog as MatrixSchema).operations;
@@ -30,7 +31,7 @@ export function selectOperation(command: string): Operation {
 export function operationOptions(operation: Operation): string[] {
   return [...operation.parameters.map(parameter => kebab(parameter.name)),
     ...(operation.body === 'binary' ? ['input-file', 'content-type'] : operation.body !== 'none' ? ['body', 'body-file'] : []),
-    ...(operation.id === 'sendMessage' ? ['markdown', 'markdown-file'] : []),
+    ...(operation.id === 'sendMessage' ? ['markdown', 'markdown-file', 'mention-user'] : []),
     ...(operation.response === 'binary' || operation.method === 'GET' || ['search', 'queryPublicRooms'].includes(operation.id) ? ['output-file'] : []),
     ...(operation.response === 'json' && (operation.method === 'GET' || operation.id === 'search') ? ['view'] : [])];
 }
@@ -95,6 +96,21 @@ export function requestBody(arguments_: Arguments): JsonObject | undefined {
   return jsonObject(JSON.parse(text), 'Request body');
 }
 
+function targetedMessage(body: JsonObject, value: Arguments['mention-user']): JsonObject {
+  if (value === undefined) return body;
+  const users = typeof value === 'string' ? [value] : typeof value === 'boolean' ? [] : value;
+  if (!users.length || users.some(user => !matrixUserId(user).ok) || new Set(users).size !== users.length) {
+    throw new Error('--mention-user requires distinct exact Matrix user IDs');
+  }
+  if (body['m.mentions'] !== undefined) throw new Error('Supply mention targets through --mention-user or native m.mentions, not both');
+  const relation = body['m.relates_to'];
+  if (body.msgtype !== 'm.text' || body['m.new_content'] !== undefined ||
+    relation && typeof relation === 'object' && !Array.isArray(relation) && relation.rel_type === 'm.replace') {
+    throw new Error('--mention-user requires a fresh m.text message; native edits and other events use their explicit JSON content');
+  }
+  return { ...body, 'm.mentions': { user_ids: [...users] } };
+}
+
 function selfId(id: string | undefined, account: Account): void {
   if (id !== undefined && id !== account.user_id) throw new Error('This operation is restricted to the selected agent identity');
 }
@@ -149,9 +165,12 @@ export async function executeOperation(client: Matrix, settings: Settings, accou
   }
   if ((option(arguments_, 'markdown') !== undefined || option(arguments_, 'markdown-file'))
       && (operation.id !== 'sendMessage' || parameters.eventType !== 'm.room.message')) throw new Error('Markdown requires send-message with event-type m.room.message');
+  if (arguments_['mention-user'] !== undefined && (operation.id !== 'sendMessage' || parameters.eventType !== 'm.room.message' || !body)) {
+    throw new Error('--mention-user requires send-message with event-type m.room.message and a body');
+  }
   if (body && operation.id === 'sendMessage') {
     if (parameters.eventType === 'm.room.message') {
-      body = messageContent(body);
+      body = messageContent(targetedMessage(body, arguments_['mention-user']));
     } else if (Buffer.byteLength(JSON.stringify(body)) > MAX_MESSAGE_BYTES) throw new Error('Encoded event content exceeds 50000 bytes');
   } else if (option(arguments_, 'markdown') !== undefined || option(arguments_, 'markdown-file')) throw new Error('Markdown requires send-message with event-type m.room.message');
   const wire = input ? uploadStream(input, settings.max_upload_bytes) : body ? Buffer.from(JSON.stringify(body)) : undefined;

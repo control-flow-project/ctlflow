@@ -23,7 +23,6 @@ export function createEnrollmentItemRepository(database: Database.Database): Enr
       requested_name: params.requestedName,
       outcome: params.outcome,
       agent_id: params.agentId,
-      failure_code: params.failureCode,
         }), value);
         return success(undefined);
       });
@@ -34,7 +33,6 @@ export function createEnrollmentItemRepository(database: Database.Database): Enr
       requested_name: params.requestedName,
       outcome: params.outcome,
       agent_id: params.agentId,
-      failure_code: params.failureCode,
         }).where(row => row.request_id === params.requestId && row.instance_key === params.instanceKey), value);
         return changed === 1 ? success(undefined) : failure('missing', 'EnrollmentItem not found');
       });

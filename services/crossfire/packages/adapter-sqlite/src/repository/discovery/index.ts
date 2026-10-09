@@ -8,9 +8,9 @@ import { page } from '../directory/index.js';
 import { mapRole } from '../role/map.js';
 import { mapPermission } from '../permission/map.js';
 import { agentDisplayName } from '@ctlflow/crossfire-domain/identity/display-name';
-function namedAgent(row: Omit<PrincipalSummary, 'displayName'> & { name: string; ownerName: string; override: string | null }): PrincipalSummary {
-  const { name, ownerName, override, ...principal } = row;
-  return { ...principal, displayName: agentDisplayName(name, ownerName, override) };
+function namedAgent(row: Omit<PrincipalSummary, 'displayName'> & { name: string; ownerName: string }): PrincipalSummary {
+  const { name, ownerName, ...principal } = row;
+  return { ...principal, displayName: agentDisplayName(name, ownerName) };
 }
 export function createDiscoveryRepository(database: Database.Database): DiscoveryRepository {
   return {
@@ -27,8 +27,8 @@ export function createDiscoveryRepository(database: Database.Database): Discover
           .join(query.from('agent_name'), row => row.agent.principal_id, name => name.agent_id, (row, name) => ({ ...row, name }))
           .where(row => params.matrixUserIds.includes(row.principal.matrix_user_id))
           .select(row => ({ matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind, ownerMatrixId: row.owner.matrix_user_id,
-            name: row.name.name, ownerDisplayName: row.member.display_name, override: row.agent.display_name_override })), { matrixUserIds });
-        const named = agents.map(({ name, override, ...identity }) => ({ ...identity, displayName: agentDisplayName(name, identity.ownerDisplayName, override) }));
+            name: row.name.name, ownerDisplayName: row.member.display_name })), { matrixUserIds });
+        const named = agents.map(({ name, ...identity }) => ({ ...identity, displayName: agentDisplayName(name, identity.ownerDisplayName) }));
         return success([...humans, ...named]);
       });
     },
@@ -46,7 +46,7 @@ export function createDiscoveryRepository(database: Database.Database): Discover
           .join(query.from('member'), row => row.agent.owner_id, member => member.principal_id, (row, member) => ({ ...row, member }))
           .where(row => params.principalIds.includes(row.principal.id)).orderBy(row => row.principal.id)
           .select(row => ({ principalId: row.principal.id, matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind,
-            name: row.name.name, ownerName: row.member.display_name, override: row.agent.display_name_override, ownerId: row.agent.owner_id, ownerMatrixId: row.owner.matrix_user_id })), { principalIds }).map(namedAgent);
+            name: row.name.name, ownerName: row.member.display_name, ownerId: row.agent.owner_id, ownerMatrixId: row.owner.matrix_user_id })), { principalIds }).map(namedAgent);
         return success([...humans, ...agents].sort((left, right) => left.principalId.localeCompare(right.principalId)));
       });
     },
@@ -63,8 +63,7 @@ export function createDiscoveryRepository(database: Database.Database): Discover
         .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id, (row, owner) => ({ ...row, owner }))
         .join(query.from('member'), row => row.agent.owner_id, member => member.principal_id, (row, member) => ({ ...row, member }))
         .where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.principal.status === 'active' && row.owner.status === 'active' && row.principal.id !== params.excludeId
-          && (row.principal.matrix_user_id.toLowerCase().includes(params.search) || row.name.name.toLowerCase().includes(params.search)
-            || (row.agent.display_name_override ?? row.name.name).toLowerCase().includes(params.search))).count(), parameters);
+          && (row.principal.matrix_user_id.toLowerCase().includes(params.search) || row.name.name.toLowerCase().includes(params.search))).count(), parameters);
         const offset = (input.page - 1) * input.pageSize;
         const humanLimit = Math.min(input.pageSize, Math.max(0, humanCount - offset));
         const rows: PrincipalSummary[] = humanLimit === 0 ? [] : executeSelect(database, schema, (query, params) => query.from('member').join(query.from('principal'), member => member.principal_id, principal => principal.id, (member, principal) => ({ member, principal }))
@@ -81,11 +80,10 @@ export function createDiscoveryRepository(database: Database.Database): Discover
         .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id, (row, owner) => ({ ...row, owner }))
         .join(query.from('member'), row => row.agent.owner_id, member => member.principal_id, (row, member) => ({ ...row, member }))
         .where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.principal.status === 'active' && row.owner.status === 'active' && row.principal.id !== params.excludeId
-          && (row.principal.matrix_user_id.toLowerCase().includes(params.search) || row.name.name.toLowerCase().includes(params.search)
-            || (row.agent.display_name_override ?? row.name.name).toLowerCase().includes(params.search)))
+          && (row.principal.matrix_user_id.toLowerCase().includes(params.search) || row.name.name.toLowerCase().includes(params.search)))
           .orderBy(row => row.name.name).thenBy(row => row.principal.id).skip(params.offset).take(params.limit)
           .select(row => ({ principalId: row.principal.id, matrixUserId: row.principal.matrix_user_id, kind: row.principal.kind,
-            name: row.name.name, ownerName: row.member.display_name, override: row.agent.display_name_override, ownerId: row.agent.owner_id, ownerMatrixId: row.owner.matrix_user_id })),
+            name: row.name.name, ownerName: row.member.display_name, ownerId: row.agent.owner_id, ownerMatrixId: row.owner.matrix_user_id })),
           { ...parameters, offset: Math.max(0, offset - humanCount), limit: input.pageSize - rows.length }).map(namedAgent));
         return success(page(rows, humanCount + agentCount, input));
       });

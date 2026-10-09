@@ -8,11 +8,14 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { trustWorkspace } from '@ctlflow/crossfire-test-support/codex';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { contextReceipt } from '@ctlflow/crossfire-adapter-codex/context-state';
 import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
 import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
 import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
+import { nativeOptions, type Configuration } from '@ctlflow/fleetd-domain/model';
+import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.code + ': ' + result.error.message); return result.value; }
 async function until(predicate: () => boolean | Promise<boolean>): Promise<void> {
@@ -39,7 +42,15 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
     for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.callback(); }
     await yieldLoop();
   }
-  const options = { sandbox_mode: 'read-only', approval_policy: 'never' };
+  const configuration: Configuration = { directory, digest: 'native-fast-proof',
+    definitions: { analyst: { name: 'Analyst', runtime: 'codex', instructions: 'Same complete shared role.',
+      coordinationPolicy: defaultCoordinationPolicy('@owner:test'),
+      options: { sandbox_mode: 'read-only', approval_policy: 'never', model_reasoning_effort: 'high' } } },
+    roster: { fleet: 'native-proof', coordination: { adapter: 'crossfire', server: 'https://example.test', owner: '@owner:test' },
+      instances: [{ key: 'analyst-fast', name: 'analyst-fast', definition: 'analyst', workarea: 'workspace',
+        runtimeOptions: { model_reasoning_effort: 'medium' } }] } };
+  const options = nativeOptions(configuration, configuration.roster.instances[0]!);
+  assert.equal(configuration.definitions.analyst!.options.model_reasoning_effort, 'high');
   const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'codex', approval: value(adapter.validate(options)).approval,
     work: createResumeWork(join(workspace, '.crossfire', 'state', 'native-sleep-proof'), () => now),
     initial: 'running', initialSettings: [], saved: () => adapter.savedContexts({ workspace, stateDirectory: workspace }),
@@ -59,7 +70,7 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   const history = managed.runtime.sessionId, firstPointer = value(await managed.attachment());
   assert.equal(provider.requests.length, 0, 'Startup does not call a model');
   managed.runtime.acknowledge([]);
-  assert.equal(existsSync(join(home, 'crossfire-session.json.receipt')), false, 'Checkpoint-only acknowledgment creates no native receipt');
+  assert.equal(existsSync(contextReceipt(home, 'shared')), false, 'Checkpoint-only acknowledgment creates no native receipt');
   await managed.runtime.deliver('First retained native sleep proof', 'sleep-proof-one'); managed.runtime.acknowledge(['sleep-proof-one']);
   await until(() => provider.held() !== undefined);
   await advance(1800000); assert.equal(managed.nativeState().phase, 'running', 'A native working turn vetoes idle sleep');
@@ -107,6 +118,11 @@ test('stock Codex sleeps, wakes and survives binding restart with exact full his
   assert(continued.includes('No pending question or permission has been answered or approved'));
   assert.deepEqual(value(services.work.read()), []); value(await managed.resume());
   assert.equal(provider.requests.length, 5, 'Repeated resume does not repeat continuation or the interrupted task');
+  for (const request of provider.requests) {
+    const reasoning = (request as Record<string, unknown>).reasoning;
+    assert(reasoning && typeof reasoning === 'object' && 'effort' in reasoning, 'Native input retains reasoning settings');
+    assert.equal(reasoning.effort, 'medium', 'Every native start/resume/recovery uses the selected same-role instance effort');
+  }
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'sleeping'));
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'waking'));
   assert.equal(failures.length, 0, failures.join('; '));

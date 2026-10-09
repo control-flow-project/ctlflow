@@ -17,7 +17,6 @@ export type Agent = {
   principalId: string;
   principalKind: 'agent';
   ownerId: string;
-  displayNameOverride: string | null;
   wakeMode: 'humans' | 'everyone' | 'selected';
 };
 

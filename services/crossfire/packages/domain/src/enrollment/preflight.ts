@@ -62,21 +62,26 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
 export async function preflightEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster) {
   const verified = await verifyRoster(services, input);
   if (!verified.ok) return verified;
+  const admitted = admitRoster(services, input, verified.value);
+  return admitted.ok ? success({ available: true, instances: input.instances.length }) : admitted;
+}
+
+export function admitRoster(services: Pick<Services, 'repositories' | 'directory' | 'collection'>, input: EnrollmentRoster, verified: VerifiedRoster): Result<void> {
   const collisions: string[] = [];
   for (const item of input.instances) {
     const name = services.repositories.agentName.find({ name: item.name });
     if (!name.ok) return name;
-    if (name.value && !verified.value.existing.some(existing => existing.instanceKey === item.instanceKey && existing.agentId === name.value!.agentId)) collisions.push(item.name);
-    const binding = services.repositories.fleetInstance.find({ ownerId: verified.value.ownerId, fleetKey: input.fleetKey, instanceKey: item.instanceKey });
+    if (name.value && !verified.existing.some(existing => existing.instanceKey === item.instanceKey && existing.agentId === name.value!.agentId)) collisions.push(item.name);
+    const binding = services.repositories.fleetInstance.find({ ownerId: verified.ownerId, fleetKey: input.fleetKey, instanceKey: item.instanceKey });
     if (!binding.ok) return binding;
-    if (binding.value && !verified.value.existing.some(existing => existing.instanceKey === item.instanceKey && existing.agentId === binding.value!.agentId)) return failure('conflict', 'Missing private credentials for saved fleet instance ' + item.instanceKey);
+    if (binding.value && !verified.existing.some(existing => existing.instanceKey === item.instanceKey && existing.agentId === binding.value!.agentId)) return failure('conflict', 'Missing private credentials for saved fleet instance ' + item.instanceKey);
   }
   if (collisions.length) return failure('name_collision', 'Name collision: ' + collisions.join(', '));
-  const capacity = enrollmentCapacity(services, verified.value.ownerId);
+  const capacity = enrollmentCapacity(services, verified.ownerId);
   if (!capacity.ok) return capacity;
-  const additional = input.instances.length - verified.value.existing.filter(item => item.operational).length;
+  const additional = input.instances.length - verified.existing.filter(item => item.operational).length;
   if (additional > capacity.value.remaining) return failure('capacity', 'Enrollment needs ' + additional + ' new agents; owner capacity is '
     + capacity.value.ownerCount + '/' + capacity.value.ownerLimit + ' and instance capacity is '
     + capacity.value.instanceCount + '/' + capacity.value.policy.maxAgents + '. Ask an administrator to adjust the applicable limits.');
-  return success({ available: true, instances: input.instances.length });
+  return success(undefined);
 }

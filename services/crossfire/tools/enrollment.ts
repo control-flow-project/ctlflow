@@ -18,7 +18,7 @@ export async function reviewEnrollment(origin: string, account: Credentials, pla
         permissions: [...item.coordinationPolicy.permissions].sort() } : null]).sort((left, right) => String(left[0]).localeCompare(String(right[0]))));
     if (record.status !== 'pending' || record.owner.matrixUserId !== plan.ownerMatrixId || record.fleetKey !== plan.fleetKey
       || record.controllerName !== plan.controllerName || record.verificationCode !== plan.verificationCode
-      || roster(review.instances) !== roster(plan.instances) || review.instances.some(item => item.outcome === 'failed')) return failure('conflict', 'Enrollment differs from the supplied owner, controller, roster, coordination policies or code; no approval sent');
+      || roster(review.instances) !== roster(plan.instances)) return failure('conflict', 'Enrollment differs from the supplied owner, controller, roster, coordination policies or code; no approval sent');
     if (human.viewer.member.matrixUserId !== plan.ownerMatrixId) return failure('forbidden', 'Only the intended owner may approve this enrollment');
     if (execute) {
       const decision = await human.client.call(operations.decideEnrollment, { enrollmentId: plan.enrollmentId }, {

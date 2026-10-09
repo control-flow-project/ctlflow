@@ -3,7 +3,7 @@ import type { Services } from '../port/services.js';
 import type { EnrollmentIntroduction } from './input.js';
 import { controllerToken } from '../fleet/authority.js';
 import { bindRoster } from '../fleet/bind-roster.js';
-import { verifyRoster } from './preflight.js';
+import { admitRoster, verifyRoster } from './preflight.js';
 import { expireEnrollments } from './expire.js';
 import type { EnrollmentRequest, EnrollmentItem } from './types.js';
 import { enrollmentCapacity } from './capacity.js';
@@ -54,13 +54,14 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       if (!principal.ok) return principal;
       if (!principal.value || principal.value.status !== 'active' && !(item.retired && principal.value.status === 'suspended') || principal.value.revision !== item.revision) return failure('conflict', 'Existing agent authority changed');
     }
+    const admitted = admitRoster(services, input, verified.value);
+    if (!admitted.ok) return admitted;
     const capacity = enrollmentCapacity(services, owner.value.id);
     if (!capacity.ok) return capacity;
     const policy = capacity.value.policy;
     const pendingRequests = services.collection.pendingEnrollmentCount();
     if (!pendingRequests.ok) return pendingRequests;
     if (pendingRequests.value >= policy.maxPending) return failure('limit', 'Pending enrollment capacity reached');
-    let remaining = capacity.value.remaining;
     const now = services.clock.now();
     const request: EnrollmentRequest = { controllerName: input.controller.name,
       controllerCredentialHash: services.identity.hash(controllerToken(services, input.enrollmentId, input.claimSecret)), id: input.enrollmentId, ownerId: owner.value.id, fleetKey: input.fleetKey,
@@ -74,12 +75,8 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
     const instances: EnrollmentItem[] = [];
     for (const item of input.instances) {
       const existing = verified.value.existing.find(proof => proof.instanceKey === item.instanceKey);
-      const claim = services.repositories.agentName.find({ name: item.name });
-      if (!claim.ok) return claim;
-      if (existing && claim.value && claim.value.agentId !== existing.agentId) return failure('name_collision', 'Name collision: ' + item.name);
-      const failureCode = !existing && claim.value ? 'name_collision' : !existing && remaining <= 0 ? 'capacity' : null;
       const record: EnrollmentItem = { requestId: request.id, instanceKey: item.instanceKey, requestedName: item.name,
-        outcome: existing ? 'existing' : failureCode ? 'failed' : 'claimed', agentId: existing?.agentId ?? null, failureCode };
+        outcome: existing ? 'existing' : 'claimed', agentId: existing?.agentId ?? null };
       const added = services.repositories.enrollmentItem.insert(record);
       if (!added.ok) return added;
       const requestedPolicy = verified.value.policies.find(entry => entry.instanceKey === item.instanceKey)?.policy;
@@ -92,7 +89,6 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       if (record.outcome === 'claimed' || existing && existing.name !== item.name) {
         const claimed = services.repositories.agentName.insert({ name: item.name, requestId: request.id, instanceKey: item.instanceKey, agentId: null });
         if (!claimed.ok) return claimed;
-        if (record.outcome === 'claimed') remaining--;
       }
       instances.push(record);
     }

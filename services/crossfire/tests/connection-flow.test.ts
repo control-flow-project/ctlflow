@@ -135,12 +135,12 @@ test('public fleet setup starts a separate native history, reuses identity and p
   assert.equal(provider.requests.length, 0);
   assert.equal(existing.child.exitCode, null);
   await cli('stop', first.fleetKey);
-  const preservedHistory = readFileSync(join(privateState, '.codex/crossfire-session.json'));
+  const preservedHistory = readFileSync(join(privateState, '.codex/crossfire-context-registry.json'));
   await cli('remove', first.fleetKey);
   const archived = value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: first.fleetKey }));
   assert(archived?.archivedAt !== null && archived?.archivedAt !== undefined, 'CLI removal archives through the same receipt-gated domain operation as management');
   assert.deepEqual(readFileSync(profilePath), profileBytes);
-  assert.deepEqual(readFileSync(join(privateState, '.codex/crossfire-session.json')), preservedHistory);
+  assert.deepEqual(readFileSync(join(privateState, '.codex/crossfire-context-registry.json')), preservedHistory);
   assert.equal(value(services.directory.agentIds(admin.actor.principalId)).length, 1, 'Archival retains the enrolled identity');
   await assert.rejects(cli('setup'), 'Repeated setup cannot reactivate an archived fleet');
   assert.equal(provider.requests.length, 0);

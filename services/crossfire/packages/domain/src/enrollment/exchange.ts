@@ -2,7 +2,7 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { controllerToken } from '../fleet/authority.js';
 import { agentDisplayName } from '../identity/display-name.js';
 import type { Services } from '../port/services.js';
-export type ExchangedInstance = { instanceKey: string; name: string; agentId: string | null; status: 'ready' | 'provisioning' | 'failed'; errorCode: string | null;
+export type ExchangedInstance = { instanceKey: string; name: string; agentId: string | null; status: 'ready' | 'provisioning'; errorCode: string | null;
   account: { matrixUserId: string; accessToken: string; deviceId: string } | null };
 export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock'>,
   enrollmentId: string, claimSecret: string): Result<{ status: string; ownerMatrixId: string; fleet: { fleetId: string; controllerCredential: string | null } | null; instances: ExchangedInstance[] }> {
@@ -24,7 +24,6 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
   const instances: ExchangedInstance[] = [];
   for (const item of items.value) {
     const base = { instanceKey: item.instanceKey, name: item.requestedName, agentId: item.agentId };
-    if (item.outcome === 'failed') { instances.push({ ...base, status: 'failed', errorCode: item.failureCode, account: null }); continue; }
     if (item.agentId === null) return failure('unavailable', 'Approved identity is not assigned');
     const binding = services.repositories.fleetInstance.findByAgent(item.agentId); if (!binding.ok) return binding;
     if (!binding.value || binding.value.retiredAt !== null || binding.value.ownerId !== currentFleet.value.ownerId || binding.value.fleetKey !== currentFleet.value.fleetKey
@@ -35,7 +34,7 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
     if (!agent.value || !credentials.value || agent.value.principal.status !== 'active' || agent.value.owner.status !== 'active') return failure('forbidden', 'Agent access is no longer active');
     if (agent.value.name !== item.requestedName) return failure('conflict', 'This enrollment no longer matches the registered agent name');
     const ready = credentials.value.accessToken !== null && agent.value.application.appliedStatus === 'active'
-      && agent.value.application.nativeDisplayName === agentDisplayName(agent.value.name, agent.value.ownerMember.displayName, agent.value.agent.displayNameOverride)
+      && agent.value.application.nativeDisplayName === agentDisplayName(agent.value.name, agent.value.ownerMember.displayName)
       && agent.value.application.errorCode === null;
     instances.push({ ...base, status: ready ? 'ready' : 'provisioning', errorCode: agent.value.application.errorCode,
       account: ready ? { matrixUserId: agent.value.principal.matrixUserId, accessToken: credentials.value.accessToken!, deviceId: 'CROSSFIRE_AGENT' } : null });

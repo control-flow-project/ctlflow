@@ -191,7 +191,7 @@ test('native create and resume retain configured defaults without ignored instru
     const requests = native.requests().slice(start);
     assert.equal(session.sessionId, THREAD);
     const selected = requests.find(request => request.method === (kind === 'create' ? 'thread/start' : 'thread/resume'));
-    assert.deepEqual(selected?.params, { cwd: native.directory, config: {}, ...(kind === 'create'
+    assert.deepEqual(selected?.params, { cwd: native.directory, config: { model: 'native-default-model', model_reasoning_effort: 'high' }, ...(kind === 'create'
       ? { historyMode: 'paginated', ephemeral: false } : { threadId: THREAD, excludeTurns: true }) });
     assert.equal(requests.some(request => ['thread/inject_items', 'thread/settings/update'].includes(request.method ?? '') || request.method?.startsWith('turn/')), false);
     await session.close();

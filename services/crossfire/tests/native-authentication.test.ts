@@ -25,7 +25,7 @@ test('every activation atomically refreshes exact host login bytes while retaini
   writeFileSync(sourceFile, '{"auth_mode":"apikey","OPENAI_API_KEY":"first-fixture-only"}\n', { mode: 0o600 });
   const config = readFileSync(join(home, 'config.toml'));
   const history = '{"sessionId":"retained-fixture-native-history"}';
-  writeFileSync(join(home, 'crossfire-session.json'), history, { mode: 0o600 });
+  writeFileSync(join(home, 'crossfire-context-registry.json'), history, { mode: 0o600 });
   assert.equal(refreshAuthentication(home).ok, true);
   const descriptorIdentity = statSync(destination).ino;
   writeFileSync(sourceFile, '{"auth_mode":"apikey","OPENAI_API_KEY":"second-fixture-only"}\n', { mode: 0o600 });
@@ -35,7 +35,7 @@ test('every activation atomically refreshes exact host login bytes while retaini
   assert.equal(statSync(destination).mode & 0o777, 0o600);
   assert.equal(statSync(home).mode & 0o777, 0o700);
   assert.deepEqual(readFileSync(join(home, 'config.toml')), config);
-  assert.equal(readFileSync(join(home, 'crossfire-session.json'), 'utf8'), history);
+  assert.equal(readFileSync(join(home, 'crossfire-context-registry.json'), 'utf8'), history);
   assert.equal(readdirSync(home).some(name => name.startsWith('.crossfire-auth-')), false);
 });
 
@@ -101,9 +101,9 @@ test('invalid or cancelled credential refresh never starts or replaces native hi
   const adapter = codexRuntime('/missing-native-binary');
   const result = await adapter.start(input, new AbortController().signal);
   assert.equal(result.ok, false); if (!result.ok) assert.equal(result.error.code, 'unauthorized');
-  assert.equal(existsSync(destination), false); assert.equal(existsSync(join(home, 'crossfire-contexts.json')), false);
+  assert.equal(existsSync(destination), false); assert.equal(existsSync(join(home, 'crossfire-context-registry.json')), false);
   writeFileSync(sourceFile, '{}', { mode: 0o600 });
   const cancelled = new AbortController(); cancelled.abort();
   assert.equal((await adapter.start(input, cancelled.signal)).ok, false);
-  assert.equal(existsSync(destination), false); assert.equal(existsSync(join(home, 'crossfire-session.json')), false);
+  assert.equal(existsSync(destination), false); assert.equal(existsSync(join(home, 'crossfire-context-registry.json')), false);
 });

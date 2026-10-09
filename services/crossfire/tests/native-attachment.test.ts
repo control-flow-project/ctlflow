@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from '../scripts/test-support/codex-runtime.js';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
 import { until } from '../scripts/test-support/listener.js';
@@ -15,7 +15,7 @@ test('exact authenticated WS attachment leaves the external engine and sessions 
   mkdirSync(home); mkdirSync(workspace);
   const provider = await nativeProvider(scope, home);
   const engine = await nativeEngine(scope, home, workspace);
-  await assert.rejects(connectCodex({ ...engine, hooks: { requestDecision: async () => { throw new Error('Unexpected permission'); } } },
+  await assert.rejects(resumeFixture({ ...engine, hooks: { requestDecision: async () => { throw new Error('Unexpected permission'); } } },
     new AbortController().signal), /no rollout found|not found/);
   assert.equal(provider.requests.length, 0, 'Attachment cannot insert a synthetic first model turn');
   await materialize(engine, provider);
@@ -23,8 +23,8 @@ test('exact authenticated WS attachment leaves the external engine and sessions 
   const stop = new AbortController();
   const options = { ...engine, timeoutMs: 10_000, pollMs: 100,
     hooks: { requestDecision: async () => { throw new Error('Unexpected permission in inert attachment proof'); } } };
-  await assert.rejects(connectCodex({ ...options, token: 'incorrect-token' }, stop.signal), /connection failed/);
-  const attached = await connectCodex(options, stop.signal);
+  await assert.rejects(resumeFixture({ ...options, token: 'incorrect-token' }, stop.signal), /connection failed/);
+  const attached = await resumeFixture(options, stop.signal);
   cleanup(scope, attached.close);
   await attached.deliver('Exact existing-session input', 'native-attachment-receipt');
   await until(() => provider.held() !== undefined);
@@ -39,7 +39,7 @@ test('exact authenticated WS attachment leaves the external engine and sessions 
   }
   const history = await engine.call('thread/timeline/list', { threadId: engine.session, limit: 10 });
   assert(JSON.stringify(history).includes('native-attachment-receipt'));
-  const reattached = await connectCodex(options, new AbortController().signal);
+  const reattached = await resumeFixture(options, new AbortController().signal);
   cleanup(scope, reattached.close);
   engine.child.kill('SIGTERM');
   await engine.ended;

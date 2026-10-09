@@ -16,7 +16,8 @@ import { fleetRuntimeSchema } from './fleet-runtime.js';
 import { publicationSchema } from './publication.js';
 import { controllerRunGuards, enrollmentArchiveSchema, enrollmentArchiveGuards, nativeStopSchema } from './controller.js';
 import { migrateWakeSchema } from './wake-migration.js';
-export const SCHEMA_VERSION = 14;
+import { migrateAgentNames } from './name-migration.js';
+export const SCHEMA_VERSION = 15;
 export function createSchema(database: Database.Database): void {
   const application = database.pragma('application_id', { simple: true });
   const version = database.pragma('user_version', { simple: true });
@@ -25,8 +26,12 @@ export function createSchema(database: Database.Database): void {
     migrateWakeSchema(database);
     return;
   }
+  if (application === 1129465426 && version === 14) {
+    migrateAgentNames(database);
+    return;
+  }
   const existing = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
-  if (existing.length || application !== 0 || version !== 0) throw new Error('Unsupported Crossfire schema; only deployed schema 13 can advance to the current schema. No data was changed');
+  if (existing.length || application !== 0 || version !== 0) throw new Error('Unsupported Crossfire schema; only deployed schemas 13 and 14 can advance to the current schema. No data was changed');
   database.transaction(() => {
     database.exec(identitySchema + authorizationSchema + enrollmentSchema + roomAccessSchema + activitySchema + auditSchema + fleetControlSchema + wakeUpSchema + ownerConversationSchema + runtimeSchema + statisticsSchema + fleetPolicySchema + fleetRuntimeSchema + publicationSchema + enrollmentArchiveSchema + enrollmentArchiveGuards + controllerRunGuards + nativeStopSchema);
     seedReferenceData(database);

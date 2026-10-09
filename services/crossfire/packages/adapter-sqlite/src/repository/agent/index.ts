@@ -21,7 +21,6 @@ export function createAgentRepository(database: Database.Database): AgentReposit
       principal_id: params.principalId,
       principal_kind: params.principalKind,
       owner_id: params.ownerId,
-      display_name_override: params.displayNameOverride,
       wake_mode: params.wakeMode,
         }), value);
         return success(undefined);
@@ -32,7 +31,6 @@ export function createAgentRepository(database: Database.Database): AgentReposit
         const changed = executeUpdate(database, schema, (query, params) => query.update('agent').set({
       principal_kind: params.principalKind,
       owner_id: params.ownerId,
-      display_name_override: params.displayNameOverride,
       wake_mode: params.wakeMode,
         }).where(row => row.principal_id === params.principalId), value);
         return changed === 1 ? success(undefined) : failure('missing', 'Agent not found');

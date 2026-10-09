@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from 'node:os';
 import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
+import { nativeModels } from './native-models.js';
 
 export async function nativeProvider(context: TestContext, home: string) {
   const loginHome = mkdtempSync(join(tmpdir(), 'crossfire-fixture-login-')), previous = process.env.CODEX_HOME;
@@ -46,7 +47,11 @@ export async function nativeProvider(context: TestContext, home: string) {
   await new Promise<void>(resolve => model.listen(0, "127.0.0.1", resolve));
   cleanup(context, () => new Promise<void>(resolve => { model.closeAllConnections(); model.close(() => resolve()); }));
   const address = model.address(); assert(address && typeof address === "object");
+  const catalog = join(home, 'fixture-models.json');
+  writeFileSync(catalog, JSON.stringify(nativeModels()), { mode: 0o600 });
   writeFileSync(join(home, "config.toml"), `model = "fixture-model"
+model_reasoning_effort = "medium"
+model_catalog_json = ${JSON.stringify(catalog)}
 model_provider = "fixture"
 approval_policy = "never"
 [model_providers.fixture]

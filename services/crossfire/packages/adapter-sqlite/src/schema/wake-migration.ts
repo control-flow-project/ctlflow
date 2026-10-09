@@ -8,6 +8,8 @@ import { roomAccessSchema } from './room-access.js';
 import { fleetPolicySchema } from './fleet-policy.js';
 import { enrollmentArchiveSchema, enrollmentArchiveGuards } from './controller.js';
 import { schema } from './tables.js';
+import { archiveAgentLabels } from './name-migration.js';
+import { migrateEnrollmentItems } from './enrollment-migration.js';
 
 function tableSchema(source: string, table: string): string {
   const start = source.indexOf('CREATE TABLE ' + table + ' (');
@@ -43,6 +45,7 @@ export function migrateWakeSchema(database: Database.Database): void {
   database.pragma('foreign_keys = OFF');
   try {
     database.transaction(() => {
+      archiveAgentLabels(database);
       for (const table of ['enrollment_archive_policy', 'enrollment_archive_wake_sender']) {
         database.exec('DROP TRIGGER protect_' + table + '_update; DROP TRIGGER protect_' + table + '_delete;');
       }
@@ -56,7 +59,7 @@ export function migrateWakeSchema(database: Database.Database): void {
           .replace(/CREATE INDEX ([a-z_]+)/gu, 'CREATE INDEX $1_next'));
       }
       database.exec(`
-INSERT INTO agent_next SELECT principal_id,principal_kind,owner_id,display_name_override,
+INSERT INTO agent_next SELECT principal_id,principal_kind,owner_id,
  CASE WHEN wake_mode IN ('humans','everyone') THEN wake_mode ELSE 'selected' END FROM agent;
 INSERT INTO agent_wake_sender_next SELECT sender.agent_id,sender.sender_principal_id,0
  FROM agent_wake_sender AS sender JOIN agent ON agent.principal_id=sender.agent_id WHERE agent.wake_mode='selected';
@@ -84,10 +87,12 @@ INSERT INTO ${sender}_next SELECT policy.request_id,policy.instance_key,request.
       }
       database.exec(enrollmentArchiveGuards.split('CREATE TRIGGER').filter(fragment => /^ protect_enrollment_archive_(policy|wake_sender)_/u.test(fragment))
         .map(fragment => 'CREATE TRIGGER' + fragment).join(''));
+      migrateEnrollmentItems(database);
       updatePendingDigests(database);
       const violations = database.pragma('foreign_key_check');
       if (!Array.isArray(violations) || violations.length !== 0) throw new Error('Wake migration would violate retained relational history');
-      database.pragma('user_version = 14');
+      database.exec("UPDATE principal_application SET applied_intent_hash=NULL,next_check_at=0 WHERE principal_id IN (SELECT principal_id FROM agent)");
+      database.pragma('user_version = 15');
     }).immediate();
   } finally { database.pragma('foreign_keys = ' + (foreignKeys === 1 ? 'ON' : 'OFF')); }
 }

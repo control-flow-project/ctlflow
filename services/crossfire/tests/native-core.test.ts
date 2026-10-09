@@ -119,12 +119,12 @@ test("management core applies and verifies direct native authority", { timeout: 
     value(await nativeOk(client!, "GET", path + "/event/" + segment(arbitrary.event_id as string)));
     value(await nativeOk(serviceClient, "PUT", path + "/state/m.room.power_levels", powers));
   });
-  await scope.test("reply is explicit; rename and mute do not rejoin a kicked room", async () => {
+  await scope.test("reply is explicit; account revision and mute edits do not rejoin a kicked room", async () => {
     value(await grant('reply', null, false));
     value(await reconcile());
     value(await nativeOk(client!, "PUT", path + "/send/m.room.message/allowed", { msgtype: "m.text", body: "allowed" }));
     value(await nativeOk(serviceClient, "POST", path + "/kick", { user_id: agent.matrixUserId }));
-    value(changeAgent(services, admin.actor, agentId, { expectedRevision: current().principal.revision, displayName: "Detective" }, randomUUID()));
+    value(changeAgent(services, admin.actor, agentId, { expectedRevision: current().principal.revision, status: 'active' }, randomUUID()));
     value(await grant('reply', null, true));
     value(await reconcile());
     assert.deepEqual(value(await joined(client!)), [ownerRoom]);

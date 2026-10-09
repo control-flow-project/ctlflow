@@ -8,6 +8,14 @@ const modelKeys = ['model', 'model_provider', 'model_reasoning_effort', 'model_r
   'model_context_window', 'model_auto_compact_token_limit', 'model_auto_compact_token_limit_scope', 'model_supports_reasoning_summaries',
   'model_catalog_json', 'openai_base_url', 'chatgpt_base_url'];
 
+export function nativeEnvironment(home: string, stateDirectory: string, profile?: string): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = { ...process.env, CODEX_HOME: home, CROSSFIRE_PROJECT: stateDirectory };
+  delete environment.CODEX_THREAD_ID;
+  delete environment.CROSSFIRE_AGENT_NAME;
+  if (profile !== undefined) environment.CROSSFIRE_AGENT_NAME = profile;
+  return environment;
+}
+
 export function metadataExists(file: string): boolean {
   try { lstatSync(file); return true; }
   catch (error) { if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return false; throw error; }

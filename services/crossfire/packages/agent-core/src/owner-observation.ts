@@ -6,6 +6,7 @@ import type { NativeSessionState } from './runtime.js';
 import { observation, type RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
 import type { Clock, LocalState, Transport } from './port.js';
 import type { Coordination } from './coordination.js';
+import { failureError } from '@ctlflow/crossfire-kernel/result';
 
 type Output = { id: string; text: string; sources: string[]; streamId: string | null; sealed: boolean };
 type Journal = { output: Output[]; observations: RuntimeObservation[] };
@@ -13,11 +14,15 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
   transport: Transport; coordination: Coordination; historyMode: 'shared' | 'per-room'; maximum: number;
   native?: () => NativeSessionState | undefined }, stop: AbortSignal) {
   const journalBytes = 64 * 1024 * 1024;
-  const journal = options.storage.exists(options.file) ? options.storage.read<Journal>(options.file, journalBytes) : { output: [], observations: [] };
-  if (!journal || !Array.isArray(journal.output) || journal.output.some(item => typeof item.id !== 'string' || typeof item.text !== 'string'
-    || !ownerNoticeFits(item.text) || typeof item.sealed !== 'boolean' || item.streamId !== null && typeof item.streamId !== 'string'
-    || !Array.isArray(item.sources) || !item.sources.length || item.sources.some(source => typeof source !== 'string'))
-    || !Array.isArray(journal.observations) || journal.observations.some(item => !observation(item).ok)) throw new Error('Invalid owner observation journal');
+  let journal: Journal;
+  try {
+    journal = options.storage.exists(options.file) ? options.storage.read<Journal>(options.file, journalBytes) : { output: [], observations: [] };
+    if (!journal || !Array.isArray(journal.output) || journal.output.some(item => !item || typeof item !== 'object'
+      || typeof item.id !== 'string' || typeof item.text !== 'string' || !ownerNoticeFits(item.text) || typeof item.sealed !== 'boolean'
+      || item.streamId !== null && typeof item.streamId !== 'string' || !Array.isArray(item.sources) || !item.sources.length
+      || item.sources.some(source => typeof source !== 'string')) || !Array.isArray(journal.observations)
+      || journal.observations.some(item => !observation(item).ok)) throw new Error('Invalid owner observation journal');
+  } catch { throw failureError({ code: 'invalid', message: 'Invalid owner observation journal; retained state requires owner inspection' }); }
   let runId: string | undefined;
   const active = new Map<string, boolean>();
   const latest = new Map(journal.observations.map(value => [value.sessionId, value]));

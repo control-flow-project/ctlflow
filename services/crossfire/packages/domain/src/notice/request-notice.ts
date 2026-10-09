@@ -35,7 +35,7 @@ export async function requestWakeNotice(services: Dependencies, actor: Actor, re
     const recent = services.collection.noticeHistory({ receiverAgentId, senderMatrixId: message.senderMatrixId, since: services.clock.now() - NOTICE_COOLDOWN_MS });
     if (!recent.ok) return recent;
     if (recent.value.length) return success({ outcome: 'rate-limited' });
-    const receiverName = current.value.agent.displayNameOverride ?? current.value.name;
+    const receiverName = current.value.name;
     const body = message.senderMatrixId + ', ' + receiverName + ' won’t wake under its current rules. '
       + current.value.ownerMember.displayName + ' (' + current.value.owner.matrixUserId + ') can change them.';
     const saved = services.repositories.wakeNotice.insert({ receiverAgentId, eventId, senderMatrixId: message.senderMatrixId, roomId,

@@ -160,6 +160,13 @@ Stop/start applies native and listener options. History changes never copy,
 merge, fork or replay old history. Unconfirmed publication and pending decisions
 block a mode switch. Original room/shared/control histories and cursors remain
 intact for deliberate reuse.
+
+One private `.codex/crossfire-context-registry.json` records the current mode and
+unique shared/control/room bindings to exact native session UUIDs. Every context
+uses the same registry, receipt naming and create/resume implementation. Old
+split metadata is rejected, never silently read, guessed or replaced. Explicit
+locked conversion preserves original bytes and native histories.
+- [Context storage and forward conversion](../../fleetd/docs/storage.md)
 - [TOML configuration and limits](../../fleet/docs/configuration.md)
 - [Exact-context terminal attachment](../../fleet/docs/remote.md)
 

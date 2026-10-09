@@ -1,18 +1,20 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { connectCodex } from '@ctlflow/crossfire-adapter-codex/connection';
+import { resumeFixture } from './test-support/codex-runtime.js';
 import { fakeCodex, inputReceipt, THREAD, until } from './test-support/listener.js';
+import { codexDelivery } from '@ctlflow/crossfire-adapter-codex/connection';
+import { openSession } from '@ctlflow/crossfire-adapter-codex/session';
 
 test('native delivery verifies the selected workspace and uses only start-or-steer without policy overrides', async t => {
   const fixture = await fakeCodex(t);
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(t, connection.close);
   await connection.deliver('idle input', 'first');
   fixture.update({ status: 'active' });
   await connection.deliver('active input', 'second');
   assert.deepEqual(fixture.requests().map(request => request.method),
-    ['initialize', 'initialized', 'thread/read', 'thread/resume', 'thread/read', 'thread/read', 'thread/timeline/list', 'turn/start', 'thread/read', 'thread/timeline/list',
+    ['initialize', 'initialized', 'config/read', 'model/list', 'thread/resume', 'thread/read', 'thread/read', 'thread/read', 'thread/timeline/list', 'turn/start', 'thread/read', 'thread/timeline/list',
       'thread/read', 'thread/timeline/list', 'turn/start', 'thread/read', 'thread/timeline/list']);
   const starts = fixture.requests().filter(request => request.method === 'turn/start');
   assert.deepEqual(starts.map(request => request.params), ['idle input', 'active input'].map((text, index) => ({
@@ -21,20 +23,20 @@ test('native delivery verifies the selected workspace and uses only start-or-ste
   })));
 });
 
-test('explicit attachment rejects foreign or unavailable native sessions before delivering input', async t => {
+test('owned resumption rejects foreign or unavailable native sessions without creating history or delivering input', async t => {
   for (const configuration of [{ status: 'notLoaded' }, { status: 'systemError' }, { directInput: false },
     { directInput: null }, { thread: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee' }, { workspace: '/missing-workspace' }]) {
     const fixture = await fakeCodex(t, configuration);
-    await assert.rejects(connectCodex(fixture.options, new AbortController().signal).then(connection => { connection.close(); return connection; }));
+    await assert.rejects(resumeFixture(fixture.options, new AbortController().signal).then(connection => { connection.close(); return connection; }));
     assert(!fixture.requests().some(request => request.method?.startsWith('turn/')));
-    assert.equal(fixture.requests().filter(request => request.method === 'thread/resume').length, 0);
+    assert.equal(fixture.requests().filter(request => request.method === 'thread/resume').length, 1);
     assert(!fixture.requests().some(request => ['thread/start', 'thread/fork'].includes(request.method ?? '')));
   }
 });
 
 test('the thread is checked again before each input', async t => {
   const fixture = await fakeCodex(t);
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(t, connection.close);
   fixture.update({ directInput: false });
   await assert.rejects(connection.deliver('blocked', 'blocked'), /not loaded for direct input/);
@@ -43,7 +45,7 @@ test('the thread is checked again before each input', async t => {
 
 test('invalid native permission requests fail closed rather than being answered or delegated to the model', async t => {
   const fixture = await fakeCodex(t, { mode: 'server-requests' });
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(t, connection.close);
   await connection.deliver('input', 'input');
   await until(() => fixture.requests().some(request => request.id === 'approval' && !request.method));
@@ -53,7 +55,7 @@ test('invalid native permission requests fail closed rather than being answered 
 test('invalid protocol responses fail promptly and do not leave unresolved requests', async t => {
   for (const mode of ['invalid-json', 'malformed-error', 'unexpected-id', 'oversized']) {
     const fixture = await fakeCodex(t, { mode });
-    await assert.rejects(connectCodex(fixture.options, new AbortController().signal),
+    await assert.rejects(resumeFixture(fixture.options, new AbortController().signal),
       error => error instanceof Error && !error.message.includes('timed out'));
   }
 });
@@ -61,7 +63,7 @@ test('invalid protocol responses fail promptly and do not leave unresolved reque
 test('rejected, missing, lost, and timed-out acknowledgements never retry native input', async t => {
   for (const mode of ['reject', 'missing-turn', 'disconnect', 'timeout']) {
     const fixture = await fakeCodex(t, { mode });
-    const connection = await connectCodex({ ...fixture.options, timeoutMs: 500 }, new AbortController().signal);
+    const connection = await resumeFixture({ ...fixture.options, timeoutMs: 500 }, new AbortController().signal);
     try {
       await assert.rejects(connection.deliver('input', 'stable-id'));
       assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
@@ -72,7 +74,7 @@ test('rejected, missing, lost, and timed-out acknowledgements never retry native
 test('cancellation stops a pending native request', async t => {
   const fixture = await fakeCodex(t, { mode: 'timeout' });
   const controller = new AbortController();
-  const connection = await connectCodex(fixture.options, controller.signal);
+  const connection = await resumeFixture(fixture.options, controller.signal);
   const delivery = connection.deliver('input', 'input');
   controller.abort(new Error('cancelled by test'));
   await assert.rejects(delivery, /cancelled by test/);
@@ -83,7 +85,7 @@ test('cancellation stops a pending native request', async t => {
 test('selected native thread closure cancels hung requests and receipt waits without replay', async context => {
   for (const mode of ['timeout', 'accepted']) {
     const fixture = await fakeCodex(context, { mode });
-    const connection = await connectCodex({ ...fixture.options, timeoutMs: 30_000 }, new AbortController().signal);
+    const connection = await resumeFixture({ ...fixture.options, timeoutMs: 30_000 }, new AbortController().signal);
     cleanup(context, connection.close);
     const rejected = assert.rejects(connection.deliver('input', 'closed-input'), /selected Codex thread closed/);
     await until(() => fixture.requests().some(request => request.method === 'turn/start'));
@@ -98,7 +100,7 @@ test('selected native thread closure cancels hung requests and receipt waits wit
 
 test('another native thread closing does not stop the selected connection', async context => {
   const fixture = await fakeCodex(context);
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(context, connection.close);
   fixture.notify('thread/closed', { threadId: 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee' });
   await connection.verify();
@@ -110,18 +112,26 @@ test('another native thread closing does not stop the selected connection', asyn
 test('invalid destinations and credentials fail before native requests', async t => {
   const fixture = await fakeCodex(t);
   const signal = new AbortController().signal;
-  await assert.rejects(connectCodex({ ...fixture.options, session: 'latest' }, signal), /exact Codex session UUID/);
-  await assert.rejects(connectCodex({ ...fixture.options, endpoint: 'ws://public:1234' }, signal), /loopback/);
-  await assert.rejects(connectCodex({ ...fixture.options, token: '' }, signal), /bearer token/);
-  for (const pollMs of [0, 99, 30_001, NaN, Infinity]) {
-    await assert.rejects(connectCodex({ ...fixture.options, pollMs }, signal), /poll interval/);
-  }
+  await assert.rejects(resumeFixture({ ...fixture.options, session: 'latest' }, signal), /exact Codex session UUID/);
+  await assert.rejects(resumeFixture({ ...fixture.options, endpoint: 'ws://public:1234' }, signal), /loopback/);
+  await assert.rejects(resumeFixture({ ...fixture.options, token: '' }, signal), /bearer token/);
   assert.deepEqual(fixture.requests(), []);
+});
+
+test('delivery configuration rejects invalid receipt polling before any delivery request', async scope => {
+  const fixture = await fakeCodex(scope);
+  const session = await openSession(fixture.options, { kind: 'resume', id: THREAD, config: {} }, scope.signal, fixture.options.hooks, () => {});
+  cleanup(scope, session.close);
+  const before = fixture.requests().length;
+  for (const pollMs of [0, 99, 30_001, NaN, Infinity]) {
+    assert.throws(() => codexDelivery(session, { pollMs, timeoutMs: 1000, receiptFile: fixture.options.receiptFile }), /poll interval/);
+  }
+  assert.equal(fixture.requests().length, before);
 });
 
 test('acceptance is not receipt: only the exact completed native user item acknowledges input', async context => {
   const fixture = await fakeCodex(context, { mode: 'accepted' });
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(context, connection.close);
   let delivered = false;
   const delivery = connection.deliver('input', 'exact').then(() => { delivered = true; });
@@ -140,17 +150,32 @@ test('acceptance is not receipt: only the exact completed native user item ackno
 
 test('history receipts acknowledge input without detailed event subscriptions', async context => {
   const fixture = await fakeCodex(context, { receiptFirst: true });
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(context, connection.close);
   await connection.deliver('input', 'early');
   assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
   assert(fixture.requests().some(request => request.method === 'thread/timeline/list'));
 });
 
+test('native user-item notifications wake receipt verification without waiting for the configured poll', async context => {
+  const fixture = await fakeCodex(context, { mode: 'accepted' });
+  const connection = await resumeFixture({ ...fixture.options, timeoutMs: 30000, pollMs: 10000 }, context.signal);
+  cleanup(context, connection.close);
+  let delivered = false;
+  const delivery = connection.deliver('input', 'notified-receipt').then(() => { delivered = true; });
+  void delivery.catch(() => {});
+  await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
+  fixture.notify('item/completed', { threadId: THREAD, item: inputReceipt('notified-receipt') });
+  await until(() => delivered, 'A native receipt must wake verification before the ten-second polling interval');
+  await delivery;
+  assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
+  assert(fixture.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length >= 2);
+});
+
 test('busy receipt checks are bounded polls, not additional model turns or turn-duration timeouts', async context => {
 
   const fixture = await fakeCodex(context, { mode: 'accepted' });
-  const connection = await connectCodex({ ...fixture.options, timeoutMs: 100 }, new AbortController().signal);
+  const connection = await resumeFixture({ ...fixture.options, timeoutMs: 100 }, new AbortController().signal);
   cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'waiting');
   await until(() => fixture.requests().some(request => request.method === 'turn/start'));
@@ -166,7 +191,7 @@ test('busy receipt checks are bounded polls, not additional model turns or turn-
 
 test('interrupted input is retried only after complete bounded history proves it absent', async context => {
   const fixture = await fakeCodex(context, { mode: 'accepted' });
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(context, connection.close);
   const delivery = connection.deliver('input', 'interrupted');
   await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
@@ -195,7 +220,7 @@ test('history receipts prevent retries even when interruption precedes the start
     { data: [{ type: 'turnStarted', turnId: 'existing-turn', position: 1 },
       { type: 'item', turnId: 'existing-turn', position: 2, item: inputReceipt('persisted') }], nextCursor: null },
   ] });
-  const connection = await connectCodex(fixture.options, new AbortController().signal);
+  const connection = await resumeFixture(fixture.options, new AbortController().signal);
   cleanup(context, connection.close);
   await connection.deliver('input', 'persisted');
   assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
@@ -218,7 +243,7 @@ test('uncertain, malformed, foreign, cyclic, or excessive history cannot authori
   ];
   for (const configuration of configurations) {
     const fixture = await fakeCodex(context, { mode: 'accepted' });
-    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    const connection = await resumeFixture(fixture.options, new AbortController().signal);
     const rejection = assert.rejects(connection.deliver('input', 'input'));
     await until(() => fixture.requests().some(request => request.method === 'thread/timeline/list' && request.params!.limit === 100));
     fixture.update(configuration);
@@ -232,7 +257,7 @@ test('uncertain, malformed, foreign, cyclic, or excessive history cannot authori
 test('successful or failed turns without input evidence stop instead of resubmitting', async context => {
   for (const status of ['completed', 'failed']) {
     const fixture = await fakeCodex(context, { mode: 'accepted' });
-    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    const connection = await resumeFixture(fixture.options, new AbortController().signal);
     const rejection = assert.rejects(connection.deliver('input', 'input'), /without recording the input/);
     await until(() => fixture.requests().some(request => request.method === 'turn/start'));
     fixture.notify('turn/completed', { threadId: THREAD, turn: { id: 'existing-turn', status, error: null } });
@@ -246,7 +271,7 @@ test('mismatched receipts, cancellation, and disconnect release a pending receip
   for (const mode of ['wrong-content', 'cancel', 'disconnect']) {
     const fixture = await fakeCodex(context, { mode: 'accepted' });
     const controller = new AbortController();
-    const connection = await connectCodex(fixture.options, controller.signal);
+    const connection = await resumeFixture(fixture.options, controller.signal);
     const rejection = assert.rejects(connection.deliver('input', 'input'));
     await until(() => fixture.requests().some(request => request.method === 'turn/start'));
     if (mode === 'wrong-content') fixture.notify('item/completed', { threadId: THREAD,
@@ -264,7 +289,7 @@ test('missing or malformed turn history never proves interruption or permits rep
   for (const data of [[], [{ type: 'turnCompleted', turnId: 'existing-turn', position: 1, status: 'unknown' }],
     [{ type: 'unknown', turnId: 'existing-turn', position: 1 }]]) {
     const fixture = await fakeCodex(context, { mode: 'accepted', historyPages: Array.from({ length: 3 }, () => ({ data, nextCursor: null })) });
-    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    const connection = await resumeFixture(fixture.options, new AbortController().signal);
     cleanup(context, connection.close);
     await assert.rejects(connection.deliver('input', 'input'), /turn/);
     assert.equal(fixture.requests().filter(request => request.method === 'turn/start').length, 1);
@@ -274,7 +299,7 @@ test('missing or malformed turn history never proves interruption or permits rep
 test('an unsupported native history contract fails without another input or compatibility retry', async context => {
   for (const count of [2, 3]) {
     const fixture = await fakeCodex(context, { historyUnavailable: Array.from({ length: count }, () => -32601) });
-    const connection = await connectCodex(fixture.options, new AbortController().signal);
+    const connection = await resumeFixture(fixture.options, new AbortController().signal);
     cleanup(context, connection.close);
     await assert.rejects(connection.deliver('input', 'input'), /not supported yet/);
     assert.equal(fixture.requests().filter(request => request.method === 'thread/timeline/list' && request.params!.limit === 100).length, 1);

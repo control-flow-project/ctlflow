@@ -16,13 +16,28 @@ research/
 ```
 
 A definition owns native settings/instructions. Instances share a definition,
-not mutable sessions or work areas. Different native settings require different
-definitions; listener history settings belong to each roster instance.
+not mutable sessions or work areas. Definitions supply native setting defaults;
+each instance may explicitly select different native values without copying the
+definition, instructions or skills. Listener history settings remain instance-owned.
 The fleet's private `.fleet` state holds bindings, desired enrollment and reset
 evidence. Each instance's private workarea holds `.codex` native provider/history
 and `.crossfire` delivery/tool state. Never commit private state.
 
 ## runtime.toml
+
+An optional `[instances.runtime_options]` table selects native values for that
+instance, for example `model_reasoning_effort = "medium"` for a fast worker on
+the same analyst definition. Only supplied top-level keys replace defaults;
+nested tables replace their entire default value. All effective selections are
+validated by the runtime adapter. Native inspection, start/resume, recovery,
+history reset and operator verification resolve them identically. The API uses
+`runtimeOptions`; only the TOML boundary uses `runtime_options`.
+Runtime kind, role instructions, skills and coordination policy stay definition-owned.
+Codex supports explicit `low`, `medium`, `high`, `xhigh` and `max` reasoning
+efforts; the chosen model must actually advertise the requested effort. There
+is no silent effort substitution or `med` alias for native `medium`.
+Explicit configuration is not authority from a source or agent chat. Apply
+changes through the existing stopped-controller and revision-checked procedures.
 
 ```toml
 fleet = "research"

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { canRecoverFailure } from '@ctlflow/crossfire-kernel/lifecycle';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { nativeObservation } from '@ctlflow/crossfire-adapter-codex/observation';
 import { observedEvent } from '@ctlflow/crossfire-adapter-codex/observed-event';
@@ -12,6 +16,38 @@ import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
 import { matrix as matrixClient } from '@ctlflow/crossfire-adapter-matrix/http';
 import type { Transport } from '@ctlflow/crossfire-agent-core/port';
 import { failure } from '@ctlflow/crossfire-kernel/result';
+import { decisions } from '@ctlflow/crossfire-agent-core/decisions';
+
+test('corrupt owner observations fail permanently and retain exact evidence without recovery or reset', async scope => {
+  const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock);
+  const file = matrix.cursorFile + '.observation';
+  privateDir(dirname(file));
+  for (const text of ['{', 'null', '{"output":[null],"observations":[]}', '{"output":[],"observations":[null]}']) {
+    writeFileSync(file, text, { mode: 0o600 });
+    assert.throws(() => ownerObservation({ agentId: matrix.id, userId: SELF, file, storage: localState, clock,
+      transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+      coordination: matrix.coordination, historyMode: 'shared', maximum: 65536 }, scope.signal), error => {
+      assert(error instanceof Error && 'code' in error); assert.equal(error.code, 'invalid');
+      assert.equal(canRecoverFailure(error), false); return true;
+    });
+    assert.equal(readFileSync(file, 'utf8'), text);
+  }
+});
+
+test('malformed decision receipts cannot enter automatic recovery or erase retained owner decisions', async scope => {
+  const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock);
+  const file = matrix.cursorFile + '.decisions'; privateDir(dirname(file));
+  for (const text of ['{', 'null', '[null]', '[{"id":"invalid","native":"original","status":"pending"}]']) {
+    writeFileSync(file, text, { mode: 0o600 });
+    assert.throws(() => decisions({ clock, client: matrixClient({ base: matrix.settings.homeserver,
+      token: matrix.account.access_token, signal: scope.signal, timeoutMs: 1000 }), coordination: matrix.coordination,
+      settings: matrix.settings, agent: matrix.id, matrixUserId: SELF, run: async () => randomUUID(), storage: localState, file }, scope.signal), error => {
+      assert(error instanceof Error && 'code' in error); assert.equal(error.code, 'invalid');
+      assert.equal(canRecoverFailure(error), false); return true;
+    });
+    assert.equal(readFileSync(file, 'utf8'), text);
+  }
+});
 
 test('current native observations use exact discriminants and never guess alternative output fields', () => {
   const events: RuntimeObservationEvent[] = [], observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => events.push(event) }, () => 'original');

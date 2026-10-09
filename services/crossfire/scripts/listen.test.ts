@@ -184,7 +184,17 @@ test('controller-owned receiver shares one private host with intentional tools a
   const command = (...arguments_: string[]) => execute(process.execPath, [...args, ...arguments_], { env: matrix.env, cwd: native.directory, timeout: 10000 });
   await until(() => matrix.waiting() === 1);
   assert.equal(matrix.host.size(), 1);
-  assert.deepEqual(JSON.parse((await command('agent', 'read')).stdout).events, []);
+  let unread: string | undefined;
+  await until(async () => {
+    try { unread = (await command('agent', 'read')).stdout; return true; }
+    catch (error) {
+      if (!error || typeof error !== 'object' || !('stderr' in error)
+        || error.stderr !== 'conflict: The receiver is settling another publication; use history browsing or retry catch-up after settlement\n') throw error;
+      return false;
+    }
+  }, 'The single receiver did not settle its initial acquisition');
+  assert.equal(typeof unread, 'string');
+  assert.deepEqual(JSON.parse(unread!).events, []);
   assert.equal(matrix.maximumWaiting(), 1);
   await assert.rejects(listen({ ...matrix, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 100 }, stop.signal), /already owns this private state/u);
   const who = await command('matrix', 'get-joined-members-by-room', '--room-id', ROOM);
