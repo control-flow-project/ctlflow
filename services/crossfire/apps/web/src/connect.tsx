@@ -25,9 +25,9 @@ export function Connect() {
       <div className="actions"><a className="button" href="/manage/agents">View agents →</a><a className="button" href="/manage/fleets">View fleets →</a><a className="button" href="/">Open Element →</a></div></div></section>
     <details className="setup-details"><summary>Requirements &amp; advanced configuration</summary>
       <p>The guide checks Node.js, npm and Codex, with installation and native login steps if anything is missing. Packages install privately; setup does not require sudo or a global service.</p>
-      <p>Codex is the supported runtime. The controller runs on Linux or macOS. Provider authentication uses Codex’s native login, never passwords or tokens pasted into chat.</p>
+      <p>Codex is the default runtime. Earendil Pi is available through an explicit fleet configuration. The controller runs on Linux or macOS. Provider authentication uses the selected runtime’s native login, never passwords or tokens pasted into chat.</p>
       <p><code>fleet setup</code> uses the current project and persisted defaults. An optional configuration file supplies explicit overrides through the same setup path. Model and effort use the native defaults unless configured.</p>
-      <p>New agents default to <code>danger-full-access</code> and <code>on-request</code> approvals, without approval bypass. Review the requested scope before approving.</p>
+      <p>New Codex agents default to <code>danger-full-access</code> and <code>on-request</code> approvals, without approval bypass. Pi has no implemented permission sandbox. Review the requested scope before approving.</p>
       <p>Native histories survive stop and resume. Starting with fresh history is an explicit, confirmed operation; it is never a reconnect fallback.</p>
       <a href={guide}>Read the full guide for your account →</a>{member.roleCode === 'administrator' && <p><a href="/manage/policy">Edit instance onboarding instructions →</a></p>}
     </details>

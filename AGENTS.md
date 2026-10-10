@@ -57,8 +57,10 @@ owns native lifecycle through runtime adapters, including one-agent fleets.
 The coding session performing setup remains independent; do not adopt its
 process or conversation. Setup is noninteractive with private persisted defaults
 and optional validated configuration. Human enrollment approval remains required.
-Codex is the only implemented runtime; Claude and Pi are unimplemented, not
-alternate standalone paths or placeholder adapters.
+Codex and Earendil Pi are implemented through the same owned-runtime ports.
+Claude remains unimplemented; no standalone paths or placeholder adapters exist.
+Pi requires verified native 1.0.0 RPC. Its owned extension implements native
+control/instruction/input correlation, not terminal scraping or history writing.
 All npm names use @ctlflow. Only @ctlflow/fleet and @ctlflow/fleetd may be public;
 every other workspace remains private. Public builds cannot require publishing
 internal modules or resolving source through the monorepo.
@@ -87,8 +89,9 @@ weaken tests/gates or claim fixture-only evidence as real-provider certification
 Root commands coordinate typecheck, build, tests and architecture verification.
 
 ## Test execution
-Runtime verification is Codex only. Claude and Pi are unimplemented and have no
-product test suites or retained legacy adapters.
+Runtime verification includes Codex and Pi. Claude remains unimplemented and has
+no product test suite or retained legacy adapter. Prepare pinned native assets
+once before isolated workers; do not select an optional runtime verification path.
 Run isolated test files on every available CPU core. Build shared artifacts and
 pinned browser assets once per run. Unconditional sleeps are forbidden: use
 controlled clocks for timing logic and bounded observations for native I/O.

@@ -17,21 +17,24 @@ import { publicationSchema } from './publication.js';
 import { controllerRunGuards, enrollmentArchiveSchema, enrollmentArchiveGuards, nativeStopSchema } from './controller.js';
 import { migrateWakeSchema } from './wake-migration.js';
 import { migrateAgentNames } from './name-migration.js';
-export const SCHEMA_VERSION = 15;
+import { migrateUsageSchema } from './usage-migration.js';
+export const SCHEMA_VERSION = 16;
 export function createSchema(database: Database.Database): void {
   const application = database.pragma('application_id', { simple: true });
   const version = database.pragma('user_version', { simple: true });
   if (application === 1129465426 && version === SCHEMA_VERSION) return;
-  if (application === 1129465426 && version === 13) {
-    migrateWakeSchema(database);
-    return;
-  }
-  if (application === 1129465426 && version === 14) {
-    migrateAgentNames(database);
+  if (application === 1129465426 && [13, 14, 15].includes(Number(version))) {
+    const foreignKeys = database.pragma('foreign_keys', { simple: true });
+    database.pragma('foreign_keys=OFF');
+    try { database.transaction(() => {
+      if (version === 13) migrateWakeSchema(database);
+      if (version === 14) migrateAgentNames(database);
+      migrateUsageSchema(database);
+    }).immediate(); } finally { database.pragma('foreign_keys=' + (foreignKeys === 1 ? 'ON' : 'OFF')); }
     return;
   }
   const existing = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
-  if (existing.length || application !== 0 || version !== 0) throw new Error('Unsupported Crossfire schema; only deployed schemas 13 and 14 can advance to the current schema. No data was changed');
+  if (existing.length || application !== 0 || version !== 0) throw new Error('Unsupported Crossfire schema; only deployed schemas 13, 14 and 15 can advance to the current schema. No data was changed');
   database.transaction(() => {
     database.exec(identitySchema + authorizationSchema + enrollmentSchema + roomAccessSchema + activitySchema + auditSchema + fleetControlSchema + wakeUpSchema + ownerConversationSchema + runtimeSchema + statisticsSchema + fleetPolicySchema + fleetRuntimeSchema + publicationSchema + enrollmentArchiveSchema + enrollmentArchiveGuards + controllerRunGuards + nativeStopSchema);
     seedReferenceData(database);

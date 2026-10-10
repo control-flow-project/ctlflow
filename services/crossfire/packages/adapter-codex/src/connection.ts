@@ -6,7 +6,7 @@ import type { CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
 import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
 import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
-import { resumptionText, retainResumptionInput } from './resumption.js';
+import { resumptionText, retainResumptionInput } from '@ctlflow/crossfire-adapter-runtime/resumption';
 
 export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>;
   inspectSession: (sessionId: string) => Promise<{ busy: boolean }>; unsettled: () => boolean; event: (event: NativeEvent) => void };

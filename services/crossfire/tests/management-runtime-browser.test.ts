@@ -34,7 +34,7 @@ test('Management distinguishes native sleep and wake from listener readiness wit
     value(await client.call(operations.reportListener, { agentId, runId: runs[index]! }, { release: release.manifest.release,
       stopped: false, controller: proof, messagesDelivered: 0, statistics: null }));
     value(await client.call(operations.reportRuntime, { agentId, runId: runs[index]! }, { sessionId: 'native-history-' + index,
-      roomId: null, runtime: 'codex', state: index === 0 ? 'sleeping' : index === 1 ? 'waking' : 'idle', observedAt,
+      roomId: null, runtime: index === 0 ? 'pi' : 'codex', state: index === 0 ? 'sleeping' : index === 1 ? 'waking' : 'idle', observedAt,
       lastActivityAt: index === 2 ? null : lastActivityAt, historyAvailable: index === 2 ? null : true,
       historyMode: 'shared', maxInputBytes: 65536, errorMessage: null,
       settings: [{ name: 'model', configured: 'fixture-model', effective: 'fixture-model' }] }));
@@ -77,6 +77,7 @@ test('Management distinguishes native sleep and wake from listener readiness wit
   await expect(page.getByRole('table', { name: 'Runtime settings', exact: true })).toContainText('fixture-model');
   await expect(page.getByRole('region', { name: 'Runtime settings', exact: true })).toContainText('Available for resume');
   await expect(page.getByRole('region', { name: 'Runtime settings', exact: true })).toContainText('Last activity');
+  await expect(page.getByRole('region', { name: 'Runtime settings', exact: true })).toContainText('pi');
   await checkPaperLayout(page); await page.screenshot({ path: join(directory, 'native-runtime-mobile.png'), fullPage: true });
   await page.goto(origin + '/manage/agents/' + instances[2]!.agentId + '/session');
   await expect(page.getByRole('region', { name: 'Runtime settings', exact: true })).toContainText('not proof that the process is running');
@@ -85,5 +86,9 @@ test('Management distinguishes native sleep and wake from listener readiness wit
   await page.goto(origin + '/manage/agents/' + unreported.id + '/session');
   await expect(page.getByRole('region', { name: 'Agent session', exact: true })).toContainText('Not reported');
   await expect(page.getByRole('heading', { name: 'No native observation yet', exact: true })).toBeVisible();
+  await page.goto(origin + '/manage/connect');
+  await page.getByText('Requirements & advanced configuration', { exact: true }).click();
+  await expect(page.getByText('Codex is the default runtime.', { exact: false })).toContainText('Earendil Pi');
+  await checkPaperLayout(page);
   assert.deepEqual(errors, []); scope.diagnostic('Real API browser screenshots: ' + directory);
 });

@@ -117,7 +117,7 @@ systemd-run --user --scope --quiet \
   'npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
 ```
 
-Runtime verification is Codex only. Unsupported runtimes fail configuration
+Runtime verification includes Codex and Pi. Unsupported runtimes fail configuration
 validation; operator tools do not provide another lifecycle or runtime path.
 The development guide documents resource guards and evidence boundaries.
 - [Development and bounded verification](development.md)

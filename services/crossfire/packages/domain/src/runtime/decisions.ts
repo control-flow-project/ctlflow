@@ -1,4 +1,4 @@
-import type { DecisionCreation, DecisionAnswer, DecisionView, DecisionSummary } from './values.js';
+import { implementedRuntimes, type DecisionCreation, type DecisionAnswer, type DecisionView, type DecisionSummary } from './values.js';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor, Services } from '../port/services.js';
 import { authorize, authorizeAgent } from '../authorization/authorize.js';
@@ -37,7 +37,7 @@ function currentDecision<Value extends DecisionSummary>(services: Services, valu
   return success(value);
 }
 export function createDecision(services: Services, actor: Actor, agentId: string, input: DecisionCreation) {
-  if (input.runtime !== 'codex') return failure('invalid', 'Codex is the only implemented runtime');
+  if (!implementedRuntimes.some(runtime => runtime === input.runtime)) return failure('invalid', 'Unsupported native runtime');
   return services.unitOfWork.run(() => {
     const authority = authorize(services, actor, 'runtime.report.self');
     if (!authority.ok) return authority;

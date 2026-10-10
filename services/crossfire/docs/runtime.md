@@ -39,7 +39,7 @@ the exact native history.
 The private journal compares a stable content digest and confirms the exact
 session/history/item ID, developer role and text. Unchanged confirmed instructions
 are not appended again; lost replies require receipt recovery before any append.
-Confirmed revisions require no growing-history rescan. Pending recovery scans
+Confirmed Codex revisions require no growing-history rescan. Pending recovery scans
 the fixed post-publication snapshot with bounded chunk/record memory.
 Changing skills/roles uses this same producer, never a direct native-history edit
 or settings-update fallback. These receipts do not consume unread Matrix input.
@@ -49,6 +49,13 @@ enrollment/start; there is no guessed additional minimum version. Stock Codex
 confirms zero-model creation, exact resume and changed native developer items.
 Installed-release gates remain the integration owner's responsibility; this is
 not macOS or paid-model certification.
+
+Pi appends the same role/skill/administrator text through its native system-prompt
+input and records its exact effective digest/text using native `appendEntry`.
+An unchanged revision does not add another entry. Native SessionManager creates
+the zero-turn file and identity, and resume requires that same file and identity.
+It neither fabricates a developer chat role nor writes native conversation entries
+directly. These native differences stay inside the adapter.
 
 ### Delivered context
 
@@ -136,10 +143,13 @@ Actual question/answer/continuation is verified on Linux with an inert provider;
 that does not certify paid models or macOS. Native questions may be nonblocking
 and expire. Native provider restrictions remain authoritative.
 
-Codex is the only implemented runtime; unsupported runtime values fail validation.
+Codex and Earendil Pi are implemented; Claude and unknown runtimes fail validation.
 The adapter does not emulate arbitrary interactive stdin. Prose questions
 can be mirrored and answered through ordinary chat or a native terminal, but
 receive no invented native-decision links.
+Pi native questions and its `crossfire_question` tool use this same decision UI.
+It does not offer an attachment to a running RPC process or emulate a TUI.
+- [Pi native settings, histories, decisions and limitations](../../fleet/docs/pi.md)
 
 ## Fleet histories
 
@@ -161,7 +171,8 @@ merge, fork or replay old history. Unconfirmed publication and pending decisions
 block a mode switch. Original room/shared/control histories and cursors remain
 intact for deliberate reuse.
 
-One private `.codex/crossfire-context-registry.json` records the current mode and
+One private native registry (`.codex/crossfire-context-registry.json` or Pi's
+`.pi/crossfire-contexts.json`) records the current mode and
 unique shared/control/room bindings to exact native session UUIDs. Every context
 uses the same registry, receipt naming and create/resume implementation. Old
 split metadata is rejected, never silently read, guessed or replaced. Explicit
@@ -201,7 +212,7 @@ The controller reports failure and retries transient faults after exact owned
 process cleanup, with bounded backoff and the same deployed parameters/software/
 history. Permanent authority/configuration errors require operator action. It
 never silently replaces history, upgrades software or blindly repeats uncertain
-input. A restarted idle Codex process with an unverifiable last message gets a
+input. A restarted idle Codex or Pi process with an unverifiable last message gets a
 new turn: the exact last input and attribution are saved in a private file, and
 the notice asks it to review history and existing work, avoid repeating completed
 actions and continue unfinished authorized work. The new notice has its own
@@ -217,8 +228,10 @@ are fixed at their native adapter owner.
 
 For a missing response, check account and native read/reply access, wake sources,
 mute/owner pause/fleet gate, Session decisions and receipt-confirmed Activity.
-Obtain the exact native terminal pointer and inspect the original error before
-deliberately restarting. Printed terminal answers are private owner output, not
+For Codex, obtain the exact native terminal pointer and inspect the original error
+before deliberately restarting. Pi has no live terminal attachment; use its
+observed state, owner decisions and controller diagnostics instead.
+Printed terminal answers are private owner output, not
 room replies. Retired-room visibility on an existing Element device needs that
 device's evidence; a fresh clean browser is not proof of repair. Do not reset
 production databases, discard history or guess a cache workaround.

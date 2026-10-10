@@ -4,6 +4,50 @@ Run these tools from a built Crossfire source checkout on the controller compute
 They are internal operator tools, not additional public npm packages. Keep reports
 and backups private. The commands use the existing runtime and storage interfaces.
 
+## Explicit Pi provider acceptance
+
+This is not a readiness/status command. It starts real model requests only with
+`--execute`, using the native Pi login (`PI_CODING_AGENT_DIR`) or environment.
+It never targets a registered fleet, modifies production histories or imports
+another harness's credentials. Use a deliberately selected exact provider/model
+and a separate existing private evidence directory. The Pi executable must be
+the admitted stock 1.0.0 installation. Linux is required for the exact owned-PID
+crash proof; this command does not certify macOS hardware.
+
+After building the workspace, run inside verified finite process-group limits:
+
+```sh
+systemd-run --user --scope --quiet \
+  --property=MemoryMax=4294967296 --property=MemorySwapMax=0 --property=TasksMax=512 \
+  node services/fleetd/dist/tools/pi-provider-acceptance.js \
+  --binary /absolute/private/pi-install/node_modules/.bin/pi \
+  --provider YOUR_NATIVE_PROVIDER --model YOUR_EXACT_NATIVE_MODEL \
+  --thinking-level medium --evidence /absolute/private/provider-evidence --execute
+```
+
+Unknown or duplicate options, missing consent, unavailable native settings and
+nonprivate/symlink evidence directories fail. Every native process and synthetic
+workspace belongs to this proof. Native/model work has bounded observation and
+overall deadlines, with at most 32 measured model responses and 250,000 measured
+tokens before cancellation; these are verification budgets, not product limits
+or a guaranteed billing cap. The normal test suite never executes this command
+against an external provider.
+
+The proof checks exact provider responses, native file writes, owner-choice/text
+round trips, question and blocking-tool interruption, stale-run fences, sleep/wake
+authentication recopy, controller stop/saved resume, exact idle-process crash
+recovery, per-room isolation/resume and native usage. FIFO observation controls
+the blocking tool; no unconditional sleep fabricates an active turn. It kills
+only the exact idle synthetic native PID after verifying its private environment.
+
+Private JSON reports contain completed checks, timings, usage and failure phase,
+not credentials, model responses or reasoning. Native workspaces and copied
+credentials are removed after owned processes close; failed cleanup is reported
+and retained for operator inspection, never claimed successful. The caller's
+original native login remains outside disposable state. This is one selected
+provider/model/Linux proof, not certification of all providers, every crash,
+external side effects, a security sandbox or live TUI attachment.
+
 ## Read-only verification
 
 The controller's read-only operator command inspects existing registered fleets,
@@ -74,8 +118,10 @@ Treat IDs/paths/digests as operator evidence, not public telemetry.
   History content and provider behavior are not inferred from these fingerprints.
 
 Native inspection lives under `tools/runtime/` with explicit supported-runtime
-dispatch. Codex is the currently supported fleet runtime. Unsupported runtimes
-fail rather than using an approximate inspector. The Codex inspector reuses the
+dispatch. The native terminal inspector supports Codex; Pi's existing RPC process
+has no attachable endpoint. Pi status and saved-context reads use ordinary Fleet
+commands, not an approximate inspector or a second native writer. Unsupported
+inspection capabilities fail explicitly. The Codex inspector reuses the
 native adapter's authenticated protocol and settings validation. It uses only
 initialization, account/thread/model/skill reads: no `turn/start`, `thread/resume`,
 model inference or native answer. An unsolicited permission/question request

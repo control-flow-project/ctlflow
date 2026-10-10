@@ -24,6 +24,7 @@ and history on repetition, and waits for the required human enrollment approval.
 - [Crossfire: installation, agents, permissions and administration](services/crossfire/README.md)
 - [fleet: configuration, commands, remote access and operations](services/fleet/README.md)
 - [fleetd: controller lifecycle and private API](services/fleetd/README.md)
+- [Earendil Pi runtime: setup, settings, questions and limitations](services/fleet/docs/pi.md)
 - [Architecture, data model, REST contracts and acceptance requirements](docs/specification.md)
 - [Repository instructions](AGENTS.md)
 
@@ -39,9 +40,9 @@ systemd-run --user --scope --quiet \
 ```
 
 `npm test` builds once and runs isolated test files across available cores.
-It includes Codex, browser and fleet integration tests. Codex is the only
-implemented runtime; unsupported runtimes have no selectable product path or
-test flag. Builds/tests require a verified finite process-group resource scope.
+It includes Codex, Pi, browser and fleet integration tests. Claude remains
+unimplemented; unsupported runtimes have no selectable product path or test flag.
+Builds/tests require a verified finite process-group resource scope.
 The pinned SQLite package includes the verified Linux native binary; source
 compilation is required only on platforms without a usable bundled binary.
 Tests use disposable private state, Conduit and inert providers, not production

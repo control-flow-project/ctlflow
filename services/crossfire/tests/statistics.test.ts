@@ -98,3 +98,17 @@ test('statistics transaction failure never cancels the independently committed l
   assert(value(fixture.services.repositories.listenerRun.find({ id: run })));
   assert.equal(value(fixture.services.statistics.read([agent.id], 0, 1, 20)).intervals, 0);
 });
+
+test('unknown reasoning remains unknown in mixed-runtime interval and fleet summaries', async scope => {
+  const fixture = await fixtureStore(scope), agent = await fixture.agent(fixture.admin.actor, 'pi-stats');
+  const runId = randomUUID(), sessionId = randomUUID();
+  const report = (sequence: number, input: number, reasoningOutput: number | null) => value(reportListener(fixture.services, agent.actor, agent.id, runId,
+    { release: 'fixture', stopped: false, messagesDelivered: 0, controller: agent.controller,
+      statistics: { sequence, startedAt: fixture.now(), endedAt: fixture.now(), dropped: 0, flows: [],
+        usage: [{ runtime: 'pi', sessionId, tokens: { input, cachedInput: 0, cacheWriteInput: 0, output: 20, reasoningOutput, total: input + 20 } }] } }, 'fixture'));
+  assert(report(1, 100, null).statisticsAccepted); assert(report(2, 160, null).statisticsAccepted);
+  const data = value(fixture.services.statistics.read([agent.id], 0, 1, 20));
+  assert.equal(data.tokens?.input, 60); assert.equal(data.tokens?.reasoningOutput, null); assert.equal(data.agents[0]?.tokens?.reasoningOutput, null);
+  assert(report(3, 200, 5).statisticsAccepted);
+  assert.equal(value(fixture.services.statistics.read([agent.id], 0, 1, 20)).tokens?.reasoningOutput, null, 'Later known values cannot fill an unknown earlier interval');
+});

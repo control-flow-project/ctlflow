@@ -5,7 +5,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { retainResumptionInput, resumptionText } from '@ctlflow/crossfire-adapter-codex/resumption';
+import { retainResumptionInput, resumptionText } from '@ctlflow/crossfire-adapter-runtime/resumption';
 
 test('restart context is flushed before its file and parent directory references are retained', scope => {
   const directory = mkdtempSync(join(tmpdir(), 'codex-resumption-files-'));

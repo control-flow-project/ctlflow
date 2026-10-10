@@ -14,6 +14,7 @@ import { prepareControllerRoot } from '@ctlflow/fleetd-storage/controller-root';
 import { createController } from '@ctlflow/fleetd-domain/controller';
 import type { Execution } from '@ctlflow/fleetd-domain/port';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
+import { piRuntime } from '@ctlflow/crossfire-adapter-pi/owned';
 import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
@@ -49,7 +50,7 @@ export async function startDaemon(root: string, name?: string, execution?: Execu
       if (current.ino !== information.ino || current.dev !== information.dev) throw new Error('Controller socket changed during startup');
       unlinkSync(socketPath);
     }
-    const created = createController({ registry: createRegistry(root), execution: execution ?? createExecution({ codex: codexRuntime() },
+    const created = createController({ registry: createRegistry(root), execution: execution ?? createExecution({ codex: codexRuntime(), pi: piRuntime() },
       dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts')))), controller: parsed.value, id: randomUUID, now: Date.now, delay: nativeClock.delay });
     if (!created.ok) throw new Error(created.error.message);
     const controller = created.value;

@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import Database from 'better-sqlite3';
+import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { statisticsSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/statistics';
+
+function schema15() {
+  const database = new Database(':memory:'); createSchema(database);
+  database.exec('DROP TABLE listener_stat_usage; DROP TABLE runtime_usage_checkpoint;');
+  const start = statisticsSchema.indexOf('CREATE TABLE listener_stat_usage');
+  database.exec(statisticsSchema.slice(start).replace('reasoning_output INTEGER CHECK', 'reasoning_output INTEGER NOT NULL CHECK').replace('reasoning_output INTEGER,', 'reasoning_output INTEGER NOT NULL,'));
+  database.pragma('user_version=15');
+  database.exec("INSERT INTO principal VALUES('owner','@owner:test','human','active',0,1),('retained-agent','@agent:test','agent','active',0,1); INSERT INTO member VALUES('owner','human','Owner'); INSERT INTO agent VALUES('retained-agent','agent','owner','selected');");
+  database.pragma('foreign_keys=ON');
+  database.exec("INSERT INTO runtime_usage_checkpoint VALUES('retained-agent','codex','original-history',100,20,NULL,30,10,130,1)");
+  return database;
+}
+test('schema 15 preserves every usage checkpoint and atomically admits unknown reasoning measurements', () => {
+  const database = schema15();
+  try {
+    const before = database.prepare('SELECT * FROM runtime_usage_checkpoint').all(); createSchema(database);
+    assert.deepEqual(database.prepare('SELECT * FROM runtime_usage_checkpoint').all(), before);
+    assert.equal(database.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+    database.exec("INSERT INTO runtime_usage_checkpoint VALUES('retained-agent','pi','pi-history',100,20,0,30,NULL,130,1)");
+    assert.equal(database.prepare<[], { reasoning_output: number | null }>("SELECT reasoning_output FROM runtime_usage_checkpoint WHERE runtime='pi'").get()?.reasoning_output, null);
+    assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
+    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    createSchema(database); assert.equal(database.prepare<[], { count: number }>('SELECT COUNT(*) AS count FROM runtime_usage_checkpoint').get()?.count, 2);
+  } finally { database.close(); }
+});
+test('a failed usage conversion rolls back retained data, table definitions and schema version', () => {
+  const database = schema15();
+  try {
+    database.exec('CREATE INDEX ix_runtime_usage_checkpoint_retention_next ON principal(created_at)');
+    const schema = database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all(), rows = database.prepare('SELECT * FROM runtime_usage_checkpoint').all();
+    assert.throws(() => createSchema(database), /already exists/u);
+    assert.equal(database.pragma('user_version', { simple: true }), 15);
+    assert.deepEqual(database.prepare('SELECT * FROM runtime_usage_checkpoint').all(), rows);
+    assert.deepEqual(database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all(), schema);
+  } finally { database.close(); }
+});

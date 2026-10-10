@@ -1,7 +1,7 @@
 import { parse } from 'smol-toml';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
-import { listenerOptions } from '@ctlflow/crossfire-contracts/runtime';
+import { listenerOptions, implementedRuntime } from '@ctlflow/crossfire-contracts/runtime';
 import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 export const runtimeOptions = (input: unknown): Result<Record<string, unknown>> =>
@@ -15,7 +15,7 @@ export const roster = check.object({ fleet: check.name, coordination, instances:
 const coordinationOptions = check.object({ wake_mode: check.wakeMode,
   wake_senders: check.list(check.object({ matrix_user_id: check.matrixUserId, include_agents: check.boolean }), 2000),
   permissions: check.list(check.choice('room.agent.invite'), 1) });
-export const definition = check.object({ name: check.text(100), runtime: check.choice('codex'), coordination_options: check.optional(input => {
+export const definition = check.object({ name: check.text(100), runtime: implementedRuntime, coordination_options: check.optional(input => {
   const parsed = coordinationOptions(input);
   if (!parsed.ok) return parsed;
   const valid = coordinationPolicy({ wakeMode: parsed.value.wake_mode,

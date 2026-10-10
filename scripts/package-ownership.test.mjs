@@ -47,5 +47,5 @@ test('private packages require the same proprietary license and author as public
 
 test('there is no optional runtime test path or hidden flag', () => {
   assert.equal(testOptions([]), undefined);
-  for (const options of [['--all-runtimes'], ['--runtime', 'pi'], ['--runtime', 'claude'], ['--unknown']]) assert.throws(() => testOptions(options), /only implemented runtime/u);
+  for (const options of [['--all-runtimes'], ['--runtime', 'pi'], ['--runtime', 'claude'], ['--unknown']]) assert.throws(() => testOptions(options), /verify all implemented runtimes/u);
 });

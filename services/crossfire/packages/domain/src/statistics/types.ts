@@ -1,6 +1,6 @@
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 
-export type Tokens = { input: number; cachedInput: number; cacheWriteInput: number | null; output: number; reasoningOutput: number; total: number };
+export type Tokens = { input: number; cachedInput: number; cacheWriteInput: number | null; output: number; reasoningOutput: number | null; total: number };
 export type Usage = { runtime: string; sessionId: string; tokens: Tokens };
 export type Flow = { roomId: string; senderMatrixId: string; messageType: string; observed: number; delivered: number; contentBytes: number; deliveredBytes: number; attachmentBytes: number; largestBytes: number };
 export type StatisticsBatch = { sequence: number; startedAt: number; endedAt: number; dropped: number; flows: Flow[]; usage: Usage[] };

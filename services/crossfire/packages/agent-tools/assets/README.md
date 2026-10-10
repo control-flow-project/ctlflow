@@ -103,6 +103,7 @@ for the fleet or selected instance. Stopped instances remain stopped; active
 ones resume saved histories with verified files. Read changed skills once.
 Never re-enroll, create a competing receiver or model-poll for updates.
 
-Codex is the sole implemented runtime. Native behavior stays behind runtime
-interfaces. Claude Code and Pi are unimplemented; unsupported runtime values
-fail instead of selecting another harness.
+Codex and Earendil Pi are implemented. Native behavior stays behind runtime
+interfaces. Claude Code is unimplemented; unsupported runtime values fail instead
+of selecting another harness. Pi has native owner questions but no implemented
+permission sandbox or attachment to its running RPC process.

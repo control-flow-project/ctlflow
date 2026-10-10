@@ -6,8 +6,8 @@ export const STATISTICS_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const STATISTICS_LIMITS = { flows: 256, sessions: 32, recentEvents: 2048 } as const;
 const count = check.integer();
 export const tokenCounts = check.refine(check.object({ input: count, cachedInput: count, cacheWriteInput: check.nullable(count), output: count,
-  reasoningOutput: count, total: count }), value => value.cachedInput <= value.input && (value.cacheWriteInput ?? 0) <= value.input
-    && value.reasoningOutput <= value.output, 'Token subsets exceed their parent counts');
+  reasoningOutput: check.nullable(count), total: count }), value => value.cachedInput <= value.input && (value.cacheWriteInput ?? 0) <= value.input
+    && (value.reasoningOutput ?? 0) <= value.output, 'Token subsets exceed their parent counts');
 export const usageSample = check.object({ runtime: check.text(100), sessionId: check.text(255), tokens: tokenCounts });
 export const trafficFlow = check.object({ roomId: check.roomId, senderMatrixId: check.matrixUserId,
   messageType: check.text(100), observed: count, delivered: count, contentBytes: count, deliveredBytes: count, attachmentBytes: count, largestBytes: count });

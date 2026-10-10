@@ -36,7 +36,7 @@ export function statisticsReader(database: Database.Database): StatisticsReposit
       .where(row => row.sample.bucket_at === row.interval.bucket_at && params.agentIds.includes(row.interval.agent_id) && row.interval.captured_at >= params.since)
       .groupBy(row => row.interval.agent_id).select(group => ({ agentId: group.key, input: group.sum(row => row.sample.input), cachedInput: group.sum(row => row.sample.cached_input),
         cacheWriteInput: group.sum(row => row.sample.cache_write_input ?? 0), unknownCacheWrite: group.sum(row => row.sample.cache_write_input === null ? 1 : 0),
-        output: group.sum(row => row.sample.output), reasoningOutput: group.sum(row => row.sample.reasoning_output), total: group.sum(row => row.sample.total) })), parameters);
+        output: group.sum(row => row.sample.output), reasoningOutput: group.sum(row => row.sample.reasoning_output ?? 0), unknownReasoning: group.sum(row => row.sample.reasoning_output === null ? 1 : 0), total: group.sum(row => row.sample.total) })), parameters);
     const empty = () => ({ observed: 0, delivered: 0, contentBytes: 0, deliveredBytes: 0, attachmentBytes: 0, largestBytes: 0 });
     const totals = empty(), perAgent = new Map(agentIds.map(id => [id, empty()]));
     function add(target: ReturnType<typeof empty>, source: Omit<Flow, 'roomId' | 'senderMatrixId' | 'messageType'>) {
@@ -47,10 +47,11 @@ export function statisticsReader(database: Database.Database): StatisticsReposit
     const byUsage = new Map<string, Tokens>(), tokens: Tokens | null = usage.length ? { input: 0, cachedInput: 0, cacheWriteInput: 0, output: 0, reasoningOutput: 0, total: 0 } : null;
     for (const sample of usage) {
       const counts = { input: sample.input, cachedInput: sample.cachedInput, cacheWriteInput: sample.unknownCacheWrite ? null : sample.cacheWriteInput,
-        output: sample.output, reasoningOutput: sample.reasoningOutput, total: sample.total };
+        output: sample.output, reasoningOutput: sample.unknownReasoning ? null : sample.reasoningOutput, total: sample.total };
       byUsage.set(sample.agentId, counts);
       if (tokens) {
-        tokens.input += counts.input; tokens.cachedInput += counts.cachedInput; tokens.output += counts.output; tokens.reasoningOutput += counts.reasoningOutput; tokens.total += counts.total;
+        tokens.input += counts.input; tokens.cachedInput += counts.cachedInput; tokens.output += counts.output; tokens.total += counts.total;
+        tokens.reasoningOutput = tokens.reasoningOutput === null || counts.reasoningOutput === null ? null : tokens.reasoningOutput + counts.reasoningOutput;
         tokens.cacheWriteInput = tokens.cacheWriteInput === null || counts.cacheWriteInput === null ? null : tokens.cacheWriteInput + counts.cacheWriteInput;
       }
     }

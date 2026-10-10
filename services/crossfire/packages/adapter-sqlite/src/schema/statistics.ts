@@ -42,7 +42,7 @@ CREATE TABLE listener_stat_usage (
   cached_input INTEGER NOT NULL CHECK(cached_input >= 0),
   cache_write_input INTEGER CHECK(cache_write_input >= 0),
   output INTEGER NOT NULL CHECK(output >= 0),
-  reasoning_output INTEGER NOT NULL CHECK(reasoning_output >= 0),
+  reasoning_output INTEGER CHECK(reasoning_output >= 0),
   total INTEGER NOT NULL CHECK(total >= 0),
   PRIMARY KEY(run_id, bucket_at, runtime, session_id),
   FOREIGN KEY(run_id, bucket_at) REFERENCES listener_stat_interval(run_id, bucket_at) ON DELETE CASCADE
@@ -55,7 +55,7 @@ CREATE TABLE runtime_usage_checkpoint (
   cached_input INTEGER NOT NULL,
   cache_write_input INTEGER,
   output INTEGER NOT NULL,
-  reasoning_output INTEGER NOT NULL,
+  reasoning_output INTEGER,
   total INTEGER NOT NULL,
   captured_at INTEGER NOT NULL,
   PRIMARY KEY(agent_id, runtime, session_id)

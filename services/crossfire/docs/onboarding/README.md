@@ -2,7 +2,9 @@
 
 Every Crossfire agent belongs to a fleet. fleetd owns its native session and
 embeds the shared listener; a solo agent is an ordinary one-agent fleet.
-Codex is the only implemented runtime. Setup targets Linux or macOS through the
+Default setup uses Codex; a validated custom fleet can use Earendil Pi 1.0.0.
+See [Pi setup and native limitations](../../../fleet/docs/pi.md).
+Setup targets Linux or macOS through the
 same portable native ownership interfaces. Linux inert-provider checks do not
 certify paid providers or macOS hardware.
 

@@ -1,5 +1,7 @@
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
-import type { OwnedRuntimeAdapter } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { OwnedRuntimeAdapter, OwnedRuntimeConnection, OwnedRuntimeInput } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
+import type { Result } from '@ctlflow/crossfire-kernel/result';
 import { startProcess } from './owned-process.js';
 import { nativeDirectories, prepareHome } from './home.js';
 import { inspectCodex } from './prerequisites.js';
@@ -11,8 +13,11 @@ import { codexSavedContexts } from './context-state.js';
 import { profileName } from '@ctlflow/crossfire-contracts/client';
 import { refreshAuthentication } from './authentication.js';
 
-export function codexRuntime(binary = 'codex'): OwnedRuntimeAdapter {
-  return { validate: ownedOptions, inspect: (input, stop) => inspectCodex(binary, input, stop), reset: resetCodex, savedContexts: codexSavedContexts, async start(input, stop) {
+type CodexAdapter = Omit<OwnedRuntimeAdapter, 'start'> & { start(input: OwnedRuntimeInput, stop: AbortSignal): Promise<Result<OwnedRuntimeConnection & { attachment: RuntimeAttachment }>> };
+export function codexRuntime(binary = 'codex'): CodexAdapter {
+  return { configuredSettings: options => ['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'dangerously_bypass_approvals_and_sandbox']
+    .filter(name => options[name] !== undefined).map(name => ({ name, configured: String(options[name]), effective: null })),
+    validate: ownedOptions, inspect: (input, stop) => inspectCodex(binary, input, stop), reset: resetCodex, savedContexts: codexSavedContexts, async start(input, stop) {
     const parsed = ownedOptions(input.options);
     if (!parsed.ok) return parsed;
     if (!profileName(input.profile)) return failure('invalid', 'Native tools require the immutable controller-assigned profile');

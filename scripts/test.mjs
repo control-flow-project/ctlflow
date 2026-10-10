@@ -39,6 +39,10 @@ export async function runTests(selected, selection) {
     const root = join(repository, 'services/crossfire');
     await command(process.execPath, [join(root, 'dist/scripts/architecture-proof/conduit-assets.js')], root);
   }
+  if (jobs.some(job => products.includes(job.service))) {
+    const root = join(repository, 'services/crossfire');
+    await command(process.execPath, [join(root, 'dist/scripts/architecture-proof/pi-assets.js')], root);
+  }
   if (jobs.some(job => job.service === 'crossfire' && elementFiles.has(basename(job.file)))) {
     const root = join(repository, 'services/crossfire');
     await command(process.execPath, [join(root, 'dist/tests/support/element.js')], root);
@@ -46,8 +50,8 @@ export async function runTests(selected, selection) {
   const preparationMs = Math.round(performance.now() - started);
   let next = 0;
   const results = [];
-  const runtimes = ['codex'];
-  console.log('Runtime test suite: Codex. Every current test file in the selected suite is included.');
+  const runtimes = ['codex', 'pi'];
+  console.log('Runtime test suite: Codex and Pi. Every current test file in the selected suite is included.');
   console.log('Running ' + jobs.length + ' isolated test files on ' + concurrency + ' parallel workers. Logs: ' + evidence);
   await Promise.all(Array.from({ length: concurrency }, async () => {
     for (;;) {
