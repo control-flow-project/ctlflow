@@ -182,8 +182,11 @@ Missed occurrences coalesce to one due delivery per rule/agent, not a backlog;
 the next deadline lies after the current server time. At most one claimed input
 per agent is pending, serializing several rules without coupling different agents.
 Native publication is sequential and receipt-backed; exact session identity is
-retained during retries. Receipt-only recovery never submits a new input.
-Uncertain input is never silently retargeted to another native session.
+retained during retries. Recovery checks the original exact receipt first. On a
+restarted idle native process, an unverifiable previous message is explicitly
+supplied as context in a new restart turn in the same history, with its own
+durable native correlation and exact receipt. It is not a claim that the earlier
+turn received it. Uncertain input is never retargeted to another native session.
 Disabled, edited or deleted rules stop subsequent publication admission; already
 accepted native input is not rolled back. Suspension, listener disconnection,
 owner pause and inactive fleet/controller delivery gates remain authoritative.
@@ -821,6 +824,11 @@ only exact room/event identities in a validated durable journal, bounded to
 10,000 entries and 24 MiB. Native history queries, partial marker recovery and
 controller message receipts honor the same operation cancellation scope.
 Capacity or cancellation never acknowledges unread input.
+Urgent admission bounds source authorization, exact-turn capture and interruption;
+its deadline ends before durable replacement-input publication. Native receipt
+settlement is owned by the publication/lifecycle cancellation scope and bounded
+native requests, not a reconciliation deadline. A still-pending native receipt
+is neither failed nor accepted merely because the admission interval elapsed.
 Controller-generation cancellation also covers queued publication permits. Cancelled
 work releases its permit, preserves its checkpoint and leaves the logical receiver
 available for the next authorized generation.
@@ -874,8 +882,12 @@ removes the selected intent before cleanup and stays stopped after restart.
 Orderly daemon shutdown preserves intent while closing owned resources.
 Starting the same daemon/root restores desired bindings from saved configuration
 and exact native histories, initially without a native process where possible.
-Restoration is bounded to four concurrent attempts with 30-second startup
-observations. A late result is drained/closed, not allowed to overlap a retry.
+Restoration is resource-bounded to four concurrent attempts. Native transport
+requests retain their own deadlines; an overall startup deadline must not cancel
+waiting for a retained input's receipt or continuation readiness. Queued or
+initializing bindings remain `starting`, with the private API and explicit Stop
+available. An explicitly cancelled result is drained/closed before replacement,
+not allowed to overlap a retry or publish false readiness.
 Permanent errors retain failed intent and require operator action.
 
 The controller's private `resume-selections.json` durably owns saved Stop targets,
@@ -891,13 +903,33 @@ for an answer/approval. Idle completion removes its checkpoint. Repeated working
 observations do not rewrite it. Shutdown retains exact context/session IDs,
 checkpoint time and a stable message receipt; abrupt death retains the most
 recent unfinished checkpoint. The next activation validates every saved context,
-then delivers one restart/continue instruction to its exact native history,
+settles any preceding publication through its exact native receipt owner, then
+delivers one restart/continue instruction to its exact native history,
 recovering ambiguous delivery by receipt before retrying. The inserted continuation
 message asks the agent to re-read applicable AGENTS.md files and follow their current
 instructions before continuing authorized unfinished work. Continuation activation
 waits for authenticated delivery policy, reporting and local tool/query readiness;
 startup idle observations cannot erase a pending continuation. Initialization must
-finish before incoming messages use that generation. Idle/sleeping contexts
+finish before incoming messages use that generation or ready native states/recovery
+callbacks are published. Original confirmed input remains available for its own
+producer's acknowledgment; the continuation cannot discard or replay it. Unknown
+settlement on a restarted idle Codex process supplies the exact original input
+through a private file in a new restart turn. The notice says earlier delivery
+is unknown. The exact input file is atomically written and flushed, including
+its directory entries, before its reference is journaled or submitted. Reopening
+a recorded restart attempt restores and validates that file from the retained
+original input before acknowledging the attempt's receipt. Changed or unsafe
+files are rejected without replacing evidence. The notice
+directs the model to review history/effects, avoid repeating
+completed actions and continue unfinished authorized work. Original identity/text
+remain immutable; the new native correlation, text, turn and boundary are journaled
+before submission and verified before acknowledging the original producer. A
+recorded restart notice is not resubmitted after another failure. A live new turn
+already continuing work needs no additional restart reminder. Generation readiness
+settles retained input even without an unfinished-work
+checkpoint and rechecks that exact native generation after continuation completion.
+A mismatched receipt identity/content is a permanent conflict, not a cause
+for unlimited process replacement. Idle/sleeping contexts
 receive no synthetic task. This owner-requested continuation is task steering,
 not lifecycle accounting or a Matrix message. It confers no new permissions,
 approves no pending decision, infers no room destination and never forwards
@@ -1702,7 +1734,12 @@ history boundary before publication. A confirmed receipt remains durable until
 the shared receiver commits its cursor/control checkpoint and acknowledges it.
 Restarting the native engine cannot replay a confirmed input. A lost RPC response
 is resolved only against the captured native history interval and exact receipt;
-an unprovable publication stops explicitly with unread positions unchanged.
+unprovable delivery in a live process retains unread positions. A restarted idle
+process instead receives the exact last input as restart context through the
+runtime adapter, under the explicitly approved continuation policy above. Its
+new exact receipt proves delivery of that context, not receipt by the earlier
+turn. Transport failure, invalid state and unavailable history remain explicit;
+no system can promise execution while the native/provider service is unavailable.
 Native client IDs are correlation, not an assumed native deduplication guarantee.
 Native user-item notifications wake pending receipt verification immediately;
 the exact retained timeline remains the receipt authority, not the notification.
@@ -1885,7 +1922,14 @@ The model-free `agent test` checks fleetd's existing receiver, effective
 authentication and exact native binding, including observed busy state. It
 neither starts an engine nor treats saved credentials as readiness. Native turn
 interruption is a typed capability, not assumed from a runtime name. Codex
-supports captured-turn interruption. The existing agent `matrix send-message` tool's
+supports captured-turn interruption.
+Native activity is established from the live thread state, not a historical
+inProgress label. A restarted idle process has no old running turn to interrupt;
+thread/resume loads conversation history, and each submitted input starts a new
+turn. Native lifecycle opening and new-input readiness are separate phases of
+one generation owner, so live exact-turn controls remain available during
+original-input checks without creating another process or bypassing readiness.
+The existing agent `matrix send-message` tool's
 repeatable `--mention-user MATRIX_USER_ID` flag writes exact native
 `m.mentions.user_ids`. It requires a fresh `m.text` event; explicit native JSON
 mentions remain available and cannot be combined with the flag. Markdown links,
@@ -2178,6 +2222,12 @@ only a connected reporting listener; it is not proof of model progress.
 Pending questions/permissions remain visible to the owner while the runtime
 waits. A busy runtime without a structured request is not declared to be waiting
 for a decision merely because it has been quiet.
+Native initialization remains waking until retained receipt and continuation
+readiness succeeds. Initial native idle/working/waiting observations remain internal
+until that fence opens; actual failures remain visible. Failure incidents recover
+only on a ready idle, working, waiting-answer or waiting-approval observation for
+their exact history. Waking, sleeping and unavailable metadata cannot produce a
+"Native execution resumed" notification.
 
 Nullable last native activity and history availability are observations, not
 guessed effective settings. Agent/fleet directory native summaries are hydrated

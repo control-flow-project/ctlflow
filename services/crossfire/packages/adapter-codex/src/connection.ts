@@ -1,10 +1,12 @@
 import { realpathSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { RuntimeConnection, TurnControl, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
+import type { RuntimeConnection, TurnControl, InputAdmission, RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
 import type { CodexSession } from './session.js';
 import type { NativeEvent } from './protocol.js';
 import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
 import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
+import { resumptionText, retainResumptionInput } from './resumption.js';
 
 export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>;
   inspectSession: (sessionId: string) => Promise<{ busy: boolean }>; unsettled: () => boolean; event: (event: NativeEvent) => void };
@@ -19,11 +21,13 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-export function codexDelivery(session: CodexSession, options: { pollMs: number; timeoutMs: number; receiptFile: string }): CodexConnection {
+export function codexDelivery(session: CodexSession, options: { pollMs: number; timeoutMs: number; receiptFile: string; observe?: RuntimeHooks['observe'] }): CodexConnection {
   const { sessionId, request } = session;
   const pollMs = pollInterval(options.pollMs), timeoutMs = options.timeoutMs;
   const failure = { signal: session.signal };
   let revision = 0, checkedRevision = 0, unavailable = 0;
+  let resumed = false;
+  let retainedResumption: string | undefined;
   let wake: (() => void) | undefined;
   async function nativeState(threadId: string, scope?: AbortSignal): Promise<'idle' | 'active' | 'notLoaded'> {
     scope?.throwIfAborted();
@@ -59,7 +63,9 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
 
   async function activeTurn(_room?: string, admission?: InputAdmission): Promise<string | null> {
     const scope = admission?.signal;
-    await verify(scope);
+    const state = await nativeState(sessionId, scope);
+    if (state === 'idle') return null;
+    if (state !== 'active') throw new Error('The selected native session is not loaded for turn inspection');
     let turn: Awaited<ReturnType<typeof latestTurn>>;
     try { turn = await latestTurn(scope); }
     catch (error) {
@@ -93,7 +99,9 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
 
   async function interrupt(turnId: string, recovery = false, admission?: InputAdmission): Promise<'interrupted' | 'inactive'> {
     const scope = admission ? AbortSignal.any([failure.signal, admission.signal]) : failure.signal;
-    await verify(scope);
+    const state = await nativeState(sessionId, scope);
+    if (state === 'idle') return 'inactive';
+    if (state !== 'active') throw new Error('The selected native session is not loaded for interruption');
     const status = await turnStatus(turnId, scope);
     if (status !== 'inProgress') return status === 'interrupted' ? 'interrupted' : 'inactive';
     if (recovery) throw new Error('Previous cancellation is uncertain and the captured turn is still active; inspect it before restarting the listener');
@@ -238,7 +246,7 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
   }
 
   const delivery = nativeDelivery<CodexInput>({ sessionId, approval: session.approval, signal: session.signal, verify,
-    inspect: async () => ({ busy: await activeTurn() !== null || await nativeState(sessionId) === 'active' }), wait,
+    inspect: async () => ({ busy: await nativeState(sessionId) === 'active' }), wait,
     prepare: async (text, messageId, scope) => {
       unavailable = 0;
       return { turn: null, text, messageId, ...await historyBoundary(scope) };
@@ -252,17 +260,41 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
       if (typeof turn.id !== 'string' || !turn.id) throw new Error('Codex did not acknowledge a turn; delivery may be uncertain');
       retain({ ...input, turn: turn.id });
     },
-    received: async (input, retain, scope) => {
+    received: async (input, retain, scope, restored) => {
       checkedRevision = revision;
+      if (input.resumption && retainedResumption !== input.messageId) {
+        retainResumptionInput(input, options.receiptFile);
+        retainedResumption = input.messageId;
+      }
+      const published = input.resumption ?? input;
       let checked: Awaited<ReturnType<typeof receipt>>;
-      try { checked = await receipt(input.turn, input.text, input.messageId, input.boundary, scope); }
+      try { checked = await receipt(published.turn, published.text, published.messageId, published.boundary, scope); }
       catch (error) {
-        if (!input.initializing || !protocolError(error, -32601) || ++unavailable >= 3) throw error;
+        if (!published.initializing || !protocolError(error, -32601) || ++unavailable >= 3) throw error;
         return false;
       }
-      if (checked.status === 'received') return true;
-      if (input.turn === null) throw new Error('Native input publication is uncertain; retained delivery journal prevents resubmission');
-      if (input.initializing || checked.boundary?.key !== input.boundary?.key) retain({ ...input, initializing: false, boundary: checked.boundary });
+      if (checked.status === 'received') {
+        if (input.resumption) options.observe?.({ kind: 'output', sessionId, id: input.resumption.messageId + '-verified', streamId: null,
+          text: 'The previous message could not be verified after restart. Its exact source and text were supplied to a new Codex turn, with instructions to review history, avoid repeating completed actions and continue unfinished work.' });
+        return true;
+      }
+      if ((restored && !resumed || input.resumption && checked.status === 'interrupted')
+          && await nativeState(sessionId, scope) === 'idle') {
+        resumed = true;
+        const resumption = { turn: null as string | null, text: resumptionText(input, options.receiptFile, session.workspace),
+          messageId: 'crossfire-resume-' + randomUUID(), ...await historyBoundary(scope) };
+        retainedResumption = input.messageId;
+        retain({ ...input, resumption });
+        const result = object(await request('turn/start', { threadId: sessionId, clientUserMessageId: resumption.messageId,
+          input: [{ type: 'text', text: resumption.text, text_elements: [] }] }, scope));
+        const turn = object(result.turn);
+        if (typeof turn.id !== 'string' || !turn.id) throw new Error('Codex did not acknowledge the restart message');
+        retain({ ...input, resumption: { ...resumption, turn: turn.id } });
+        return 'waiting';
+      }
+      if (published.turn === null) throw new Error('Native input publication is uncertain; retained delivery journal prevents resubmission');
+      const advanced = { ...published, initializing: false, boundary: checked.boundary };
+      if (published.initializing || checked.boundary?.key !== published.boundary?.key) retain(input.resumption ? { ...input, resumption: advanced } : advanced);
       if (checked.status === 'unavailable') {
         if (++unavailable >= 3) throw new Error('Codex did not retain the accepted turn; read positions were not advanced');
         return false;

@@ -554,7 +554,7 @@ test('thrown restoration and retry failures retain their transient or permanent 
     const waits: { milliseconds: number; release(): void }[] = [];
     fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
       const release = () => { signal.removeEventListener('abort', release); resolve(); };
-      if (milliseconds !== 30000) waits.push({ milliseconds, release });
+      waits.push({ milliseconds, release });
       if (signal.aborted) release(); else signal.addEventListener('abort', release, { once: true });
     });
     fixture.services.execution.start = async (_configuration, _instance, _signal, mode) => {
@@ -612,64 +612,75 @@ test('a permanent restoration failure preserves desired intent without spinning 
   assert.equal(value(edited.view(fixture.record.fleetId)).instances[0]!.desiredActive, true);
 });
 
-test('startup restoration deadline is controlled and late native success is closed instead of published', { timeout: 5000 }, async scope => {
+test('slow startup receipt confirmation preserves the exact generation without a whole-restoration deadline', { timeout: 5000 }, async scope => {
   const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
-  let release!: () => void, finish!: (result: Result<Running>) => void, closed = 0, recoveryWaits = 0;
+  let finish!: (result: Result<Running>) => void, starting!: AbortSignal, closed = 0, now = 0;
+  const waits: { due: number; release(): void }[] = [];
+  fixture.services.now = () => now;
   fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
-    if (milliseconds === 30000) release = resolve;
-    else recoveryWaits++;
+    waits.push({ due: now + milliseconds, release: resolve });
     if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
   });
-  fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
-  const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
-  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  fixture.services.execution.start = async (_configuration, _instance, signal) => new Promise<Result<Running>>(resolve => { starting = signal; finish = resolve; });
+  const restarted = value(createController(fixture.services)); cleanup(scope, async () => { finish?.(failure('unavailable', 'Controlled test ended')); await restarted.close(); });
+  let ready = false; const restoration = restarted.ready().then(() => { ready = true; });
+  await until(() => finish !== undefined);
+  now = 180000; for (const wait of waits.filter(wait => wait.due <= now)) wait.release(); await yieldLoop();
+  assert.equal(starting.aborted, false, 'Elapsed time cannot cancel waiting for the original native input');
   const state = value(restarted.view(fixture.record.fleetId)).instances[0]!;
-  assert.equal(state.phase, 'failed'); assert.equal(state.desiredActive, true); assert(state.error?.includes('deadline'));
-  assert.equal(recoveryWaits, 0, 'A timed-out start must settle before another generation can be scheduled');
+  assert.equal(state.phase, 'starting'); assert.equal(state.desiredActive, true); assert.equal(state.error, null);
+  assert.equal(ready, false); assert.equal(waits.length, 0);
   const stop = new AbortController();
-  finish(success(runtimeFixture({ sessionId: 'too-late', signal: stop.signal, control: createListenerControl(async () => {}).connection,
-    pointer: { runtime: 'fixture', sessionId: 'too-late', workspace: '/fixture', connection: {} }, close: async () => { closed++; stop.abort(); } })));
-  await until(() => closed === 1);
-  await until(() => recoveryWaits === 1);
-  assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.phase, 'failed');
+  finish(success(runtimeFixture({ sessionId: 'retained-native-history', signal: stop.signal, control: createListenerControl(async () => {}).connection,
+    pointer: { runtime: 'fixture', sessionId: 'retained-native-history', workspace: '/fixture', connection: {} }, close: async () => { closed++; stop.abort(); } })));
+  await restoration;
+  assert.equal(closed, 0); assert.equal(value(restarted.view(fixture.record.fleetId)).phase, 'running');
+  assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.sessionId, 'retained-native-history');
 });
 
-test('late restoration cleanup failure retains its exact generation and blocks replacement', { timeout: 5000 }, async scope => {
+test('cancelled restoration cleanup failure retains its exact generation and blocks replacement', { timeout: 5000 }, async scope => {
   const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
-  let release!: () => void, finish!: (result: Result<Running>) => void, cleanupFails = true, recoveryWaits = 0;
-  fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
-    if (milliseconds === 30000) release = resolve; else recoveryWaits++;
+  let finish!: (result: Result<Running>) => void, starting!: AbortSignal, cleanupFails = true, recoveryWaits = 0;
+  fixture.services.delay = async (_milliseconds, signal) => new Promise<void>(resolve => {
+    recoveryWaits++;
     if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
   });
-  fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
+  fixture.services.execution.start = async (_configuration, _instance, signal) => new Promise<Result<Running>>(resolve => { starting = signal; finish = resolve; });
   const restarted = value(createController(fixture.services)); cleanup(scope, async () => { cleanupFails = false; await restarted.close(); });
-  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  await until(() => finish !== undefined);
+  const update = value(await restarted.operate({ operationId: randomUUID(), action: 'update', releaseDirectory: '/owned/release',
+    target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 }));
+  await until(() => starting.aborted);
   const stop = new AbortController();
   finish(success(runtimeFixture({ sessionId: 'uncleaned', signal: stop.signal, control: createListenerControl(async () => {}).connection,
     pointer: { runtime: 'fixture', sessionId: 'uncleaned', workspace: '/fixture', connection: {} },
     close: async () => { if (cleanupFails) throw new Error('Late native generation cleanup failed'); stop.abort(); } })));
-  await until(() => value(restarted.view(fixture.record.fleetId)).instances[0]!.error === 'Late native generation cleanup failed');
+  await until(() => value(restarted.operation(update.operationId)).completedAt !== null); await restarted.ready();
+  assert.equal(value(restarted.operation(update.operationId)).status, 'failed');
+  assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.error, 'Late native generation cleanup failed');
   assert.equal(recoveryWaits, 0);
   const refused = await restarted.operate({ operationId: randomUUID(), action: 'start', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 });
   assert(!refused.ok); assert.equal(refused.error.code, 'conflict');
   assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
 });
 
-test('a permanent start failure remains permanent when reported after the restoration deadline', { timeout: 5000 }, async scope => {
+test('a slow permanent restoration failure retains its actual error and does not retry', { timeout: 5000 }, async scope => {
   const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
-  let release!: () => void, finish!: (result: Result<Running>) => void, recoveryWaits = 0;
-  fixture.services.delay = async (milliseconds, signal) => new Promise<void>(resolve => {
-    if (milliseconds === 30000) release = resolve; else recoveryWaits++;
+  let finish!: (result: Result<Running>) => void, recoveryWaits = 0;
+  fixture.services.delay = async (_milliseconds, signal) => new Promise<void>(resolve => {
+    recoveryWaits++;
     if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
   });
   fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
   const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
-  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  await until(() => finish !== undefined); await yieldLoop();
+  assert.equal(value(restarted.view(fixture.record.fleetId)).phase, 'starting');
   finish(failure('invalid', 'Saved native identity is invalid'));
-  await until(() => value(restarted.view(fixture.record.fleetId)).instances[0]!.error === 'Saved native identity is invalid');
+  await restarted.ready();
+  assert.equal(value(restarted.view(fixture.record.fleetId)).instances[0]!.error, 'Saved native identity is invalid');
   assert.equal(recoveryWaits, 0);
   assert.deepEqual(value(fixture.registry.desiredIntent()), [{ fleetId: fixture.record.fleetId, instanceKey: 'analyst' }]);
 });
@@ -677,14 +688,11 @@ test('a permanent start failure remains permanent when reported after the restor
 test('shutdown drains pending restoration even if roster files become invalid and retains desired intent', { timeout: 5000 }, async scope => {
   const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
   await fixture.finish(await fixture.operation('start')); await fixture.controller.close();
-  let release!: () => void, finish!: (result: Result<Running>) => void, executionClosed = false, nativeClosed = false;
-  fixture.services.delay = async (_milliseconds, signal) => new Promise<void>(resolve => {
-    release = resolve; if (signal.aborted) resolve(); else signal.addEventListener('abort', () => resolve(), { once: true });
-  });
+  let finish!: (result: Result<Running>) => void, executionClosed = false, nativeClosed = false;
   fixture.services.execution.start = async () => new Promise<Result<Running>>(resolve => { finish = resolve; });
   fixture.services.execution.close = async () => { executionClosed = true; };
   const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close());
-  await until(() => release !== undefined && finish !== undefined); release(); await restarted.ready();
+  await until(() => finish !== undefined);
   writeFileSync(join(fixture.fleet, 'runtime.toml'), 'invalid TOML');
   const closing = restarted.close(); await yieldLoop(); assert.equal(executionClosed, false);
   const stop = new AbortController();
@@ -823,7 +831,7 @@ test('empty saved selection cannot silently start manually stopped agents and sa
   assert.equal(value(current.controller.view(current.record.fleetId)).instances[0]!.phase, 'running');
 });
 
-test('private controller API stays responsive while bounded native restoration is queued and explicit stop cancels it without enrollment', { timeout: 5000 }, async scope => {
+test('private controller API stays responsive while resource-bounded restoration is queued and explicit stop cancels it without enrollment', { timeout: 5000 }, async scope => {
   const current = fixtureController(); cleanup(scope, () => rmSync(current.directory, { recursive: true })); cleanup(scope, () => current.controller.close());
   for (let index = 1; index < 8; index++) {
     const key = 'queued-' + index, revision = value(current.controller.view(current.record.fleetId)).revision;

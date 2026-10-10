@@ -215,15 +215,14 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     });
     signal.throwIfAborted();
   }
-  async function send(operation: (scope: AbortSignal) => Promise<void>, priority = false, parent = signal): Promise<boolean> {
+  async function send(operation: (scope: AbortSignal) => Promise<void>, priority = false): Promise<boolean> {
     if (!options.control.current().active) return false;
     if (!priority && urgentControl()) throw new Error('Ordinary listener work preempted by accepted steering', { cause: steeringPreemptionCause });
     const generation = options.control.current().signal;
     const cancel = new AbortController();
     const preempted = ordinary.signal;
     const done = (async () => {
-      const scope = AbortSignal.any([cancel.signal, signal, generation, parent,
-        ...(priority ? [options.clock.deadline(options.reconcileMs)] : [preempted])]);
+      const scope = AbortSignal.any([cancel.signal, signal, generation, ...(!priority ? [preempted] : [])]);
       let release: (() => void) | undefined;
       try {
         if (!priority) release = await budget.acquire('publication', scope);
@@ -458,8 +457,9 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
             scope.throwIfAborted();
             priorityChat.prepare({ events, cursors: {}, latest: {}, more_rooms: [] }, events, identities);
           }
+          scope.throwIfAborted();
           let published: Awaited<ReturnType<typeof priorityChat.publish>>;
-          await send(async scope => { published = await priorityChat.publish(new Set([...allowed].filter(room => joined.has(room))), scope); }, true, scope);
+          await send(async scope => { published = await priorityChat.publish(new Set([...allowed].filter(room => joined.has(room))), scope); }, true);
           if (published) { destination.acknowledge(published.messageIds); priorityChat.acknowledge(); }
         } catch (error) {
           if (steeringPreempted(scope.reason)) throw scope.reason;

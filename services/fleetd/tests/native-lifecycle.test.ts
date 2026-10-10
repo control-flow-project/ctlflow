@@ -66,6 +66,19 @@ function fixture() {
     setInspect: (value: typeof inspect) => { inspect = value; }, recovered: () => recovered, timers: () => timers.size };
 }
 
+test('opened native generation stays waking and cannot report recovery until listener activation', async scope => {
+  const current = fixture(), managed = value(await createNativeLifecycle(current.services, scope.signal));
+  scope.after(() => managed.close());
+  managed.runtime.lifecycle!.configureIdle(1800);
+  assert.equal(managed.nativeState().phase, 'waking'); assert.equal(current.recovered(), 0);
+  assert.equal(current.started.length, 1);
+  assert(current.observed.every(event => event.kind !== 'state' || event.observation.state === 'waking'));
+  await managed.activate();
+  assert.equal(managed.nativeState().phase, 'running'); assert.equal(current.recovered(), 1);
+  assert(current.observed.some(event => event.kind === 'state' && event.observation.state === 'idle'));
+  await managed.activate(); assert.equal(current.recovered(), 1);
+});
+
 test('sleeping mention capture uses immediate admission and retained history without a dummy model input', async scope => {
   const current = fixture(), stop = new AbortController(), deadline = new AbortController();
   const admission: InputAdmission = { priority: 'steering', signal: deadline.signal };

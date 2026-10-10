@@ -190,13 +190,29 @@ episode-deduplicated notices with agent/controller identity, observation time
 and management links. Lost contact is unknown execution state, not a confirmed
 crash. Meaningful recovery produces an update. Failed delivery retries after
 connectivity returns; a total outage cannot deliver an immediate notice.
+"Native execution resumed" requires a ready observation from the exact native
+history. Sleeping, waking and unavailable observations do not resolve a failure.
+fleetd withholds startup idle/working/waiting states until original input receipts
+and restart-continuation readiness are settled. A connected process alone is not
+successful recovery.
 
 Idle, decision wait, deliberate stop and fleet deactivation are not crashes.
 The controller reports failure and retries transient faults after exact owned
 process cleanup, with bounded backoff and the same deployed parameters/software/
 history. Permanent authority/configuration errors require operator action. It
-never silently replaces history, upgrades software or replays uncertain
-input. One failed agent does not stop healthy peers. Avoidable protocol failures
+never silently replaces history, upgrades software or blindly repeats uncertain
+input. A restarted idle Codex process with an unverifiable last message gets a
+new turn: the exact last input and attribution are saved in a private file, and
+the notice asks it to review history and existing work, avoid repeating completed
+actions and continue unfinished authorized work. The new notice has its own
+durable correlation and exact native receipt; the original receipt remains
+unknown, which is reported in the owner DM. Another restart verifies that notice
+only after restoring and validating its exact private input file. The file and
+its directory references are flushed before publication; missing context is rebuilt
+from the retained original input, while changed or unsafe files are rejected.
+It checks the exact receipt before submitting anything else. Large original inputs stay in the file rather
+than inflating the restart turn. No question or permission is approved.
+One failed agent does not stop healthy peers. Avoidable protocol failures
 are fixed at their native adapter owner.
 
 For a missing response, check account and native read/reply access, wake sources,
@@ -206,3 +222,14 @@ deliberately restarting. Printed terminal answers are private owner output, not
 room replies. Retired-room visibility on an existing Element device needs that
 device's evidence; a fresh clean browser is not proof of repair. Do not reset
 production databases, discard history or guess a cache workaround.
+
+"Receipt recovery does not match the pending native input" means a producer
+attempted recovery with different input while an original publication remained
+unsettled. This is a permanent identity conflict, not permission to remove its
+journal. Recovery checks the original input first; on a restarted idle process,
+the approved last-message continuation resolves delivery through its own exact
+receipt without claiming the earlier turn received it. A historical inProgress
+label does not mean work is running after process death. thread/resume reopens
+history; turn/start starts new work. Only a live running turn is interrupted.
+Opening that exact native process and preparing it for new input are separate
+phases of one owner, so live controls cannot be blocked by earlier-message checks.

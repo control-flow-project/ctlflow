@@ -87,7 +87,7 @@ export async function fakeCodex(t: TestContext, config: Record<string, unknown> 
       send({ id: request.id, result: { data: [{ model: 'native-default-model', isDefault: true, defaultReasoningEffort: 'high', supportedReasoningEfforts: [{ reasoningEffort: 'high' }] }], nextCursor: null } });
     } else if (['thread/start', 'thread/resume', 'thread/read'].includes(request.method)) {
       send({ id: request.id, result: { model: request.params?.config?.model ?? 'native-default-model', reasoningEffort: request.params?.config?.model_reasoning_effort ?? 'high', ...(configuration.selection as Record<string, unknown> | undefined), approvalPolicy: configuration.approvalPolicy ?? 'never', thread: { id: configuration.thread, cwd: configuration.workspace,
-        status: { type: configuration.status ?? 'idle' },
+        status: { type: configuration.status ?? (activeTurnId ? 'active' : 'idle') },
         canAcceptDirectInput: 'directInput' in configuration ? configuration.directInput : true } } });
     } else if (request.method === 'thread/name/set') {
       send({ id: request.id, result: {} });
