@@ -15,6 +15,7 @@ import { codexProtocol } from '@ctlflow/crossfire-adapter-codex/protocol';
 import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
 
 async function instructionItems(runtime: OwnedRuntimeConnection) {
+  assert(runtime.attachment);
   const connection = runtime.attachment.connection;
   assert(connection.endpoint && connection.tokenFile);
   const protocol = codexProtocol({ endpoint: connection.endpoint, token: readFileSync(connection.tokenFile, 'utf8'), timeoutMs: 10000,

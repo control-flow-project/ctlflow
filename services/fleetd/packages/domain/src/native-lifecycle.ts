@@ -365,12 +365,14 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       },
       async attachment(): Promise<Result<RuntimeAttachment>> {
         const selected = native;
-        return selected && !selected.signal.aborted && phase === 'running' ? success(selected.attachment)
+        return selected && !selected.signal.aborted && phase === 'running' ? selected.attachment ? success(selected.attachment)
+          : failure('unavailable', 'This native runtime does not support attaching a terminal to its existing process')
           : failure('conflict', 'Native session is sleeping or unavailable; resume it explicitly before attaching a terminal');
       },
       async attachments(): Promise<Result<{ context: string; attachment: RuntimeAttachment }[]>> {
         const selected = native;
-        return selected && !selected.signal.aborted && phase === 'running' ? success(await selected.attachments())
+        return selected && !selected.signal.aborted && phase === 'running' ? selected.attachment ? success(await selected.attachments())
+          : failure('unavailable', 'This native runtime does not support attaching a terminal to its existing process')
           : failure('conflict', 'Native session is sleeping or unavailable; metadata inspection never wakes it');
       }, close });
   } catch (error) {

@@ -194,7 +194,7 @@ test('REST controller archive requires the exact owned live lease, preserves his
 });
 
 test('unsupported runtime values are rejected at input contracts and managed HTTP observation boundaries', async scope => {
-  const fixture = await applicationFixture(scope), http = await httpFixture(scope, fixture.application), agent = await fixture.agent(fixture.admin.actor, 'codex-only');
+  const fixture = await applicationFixture(scope), http = await httpFixture(scope, fixture.application), agent = await fixture.agent(fixture.admin.actor, 'native-runtime');
   const runId = randomUUID(), release = contractRelease().manifest.release;
   value(reportListener(fixture.services, agent.actor, agent.id, runId,
     { release, stopped: false, messagesDelivered: 0, controller: agent.controller, statistics: null }, release));
@@ -206,11 +206,19 @@ test('unsupported runtime values are rejected at input contracts and managed HTT
       options: [{ id: 'yes', label: 'Yes', description: 'Approve the native request' }] }] };
   assert.equal(observation({ ...input, runtime: 'codex' }).ok, true);
   assert.equal(decisionCreation({ ...decision, runtime: 'codex' }).ok, true);
-  for (const runtime of ['claude', 'pi', 'unknown']) {
+  assert.equal(observation({ ...input, runtime: 'pi' }).ok, true);
+  assert.equal(decisionCreation({ ...decision, runtime: 'pi' }).ok, true);
+  for (const runtime of ['claude', 'unknown']) {
     assert.equal(observation({ ...input, runtime }).ok, false);
     assert.equal(decisionCreation({ ...decision, runtime }).ok, false);
     const response = await http.request('/api/agents/' + agent.id + '/listener-runs/' + runId + '/runtime', 'PUT', { ...input, runtime }, { Authorization: 'Bearer ' + agent.token });
     assert.equal(response.status, 400);
   }
   assert.deepEqual(value(fixture.services.runtime.observation(agent.id)), []);
+  const reported = await http.request('/api/agents/' + agent.id + '/listener-runs/' + runId + '/runtime', 'PUT', { ...input, runtime: 'pi' }, { Authorization: 'Bearer ' + agent.token });
+  assert.equal(reported.status, 200, await reported.clone().text());
+  assert.equal(value(fixture.services.runtime.observation(agent.id))[0]?.runtime, 'pi');
+  const requested = await http.request('/api/agents/' + agent.id + '/runtime-decisions', 'POST',
+    { ...decision, runtime: 'pi', kind: 'question' }, { Authorization: 'Bearer ' + agent.token });
+  assert.equal(requested.status, 201, await requested.clone().text());
 });

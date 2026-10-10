@@ -9,6 +9,7 @@ The guides cover controller ownership and the shared runtime configuration:
 - [Read-only native fleet verification](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
 - [Fleet runtime defaults and overrides](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
 - [Fleet-defined wake rules and invitation defaults](docs/coordination.md)
+- [Earendil Pi settings, histories and native limitations](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/pi.md)
 
 The public `@ctlflow/fleet` CLI depends on the exact matching public
 `@ctlflow/fleetd` release. Both ship self-contained bundles, not registry
@@ -39,7 +40,7 @@ the controller root; invalid/symlinked/unowned private state is rejected.
 - `packages/contracts` owns validated requests, responses and operation routes.
 - `packages/storage` owns private atomic controller/fleet state.
 - Crossfire packages own enrollment, authorization, the shared listener and
-  native Codex settings/protocol. No copied listener or native integration exists.
+  native Codex and Pi settings/protocols. No copied listener or native integration exists.
 
 The private API exposes `/api/setup`, `/api/status`, `/api/fleets`, nested fleet `/agents`,
 fleet `/delivery` and `/messages`, and `/api/operations`. Delivery intent is distinct from
@@ -69,7 +70,7 @@ Eligible input resumes the exact saved native histories. Crossfire owns the
 instance-wide timeout. The independent coding session performing setup is not
 controlled by fleetd.
 
-Orderly shutdown stops all owned listeners and Codex processes, preserving
+Orderly shutdown stops all owned listeners and native processes, preserving
 desired activation for restart with the same root. Explicit Stop remains stopped.
 A full machine restart ends the native engines; ordinary restoration retains
 their saved histories. Abruptly killing only fleetd is different: the verified
@@ -78,6 +79,7 @@ A replacement refuses the competing writer rather than adopting the orphan or
 creating fresh history. This is safe rejection, not successful automatic recovery.
 The verified orphan must stop before the same history can resume.
 Detached tool-subprocess supervision after a crash is also not promised.
+Pi instead owns stdio RPC children and has no live TUI attachment endpoint.
 No systemd, privileged daemon,
 global skill, host package installer or shell supervisor is installed.
 

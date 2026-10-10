@@ -20,7 +20,7 @@ not mutable sessions or work areas. Definitions supply native setting defaults;
 each instance may explicitly select different native values without copying the
 definition, instructions or skills. Listener history settings remain instance-owned.
 The fleet's private `.fleet` state holds bindings, desired enrollment and reset
-evidence. Each instance's private workarea holds `.codex` native provider/history
+evidence. Each instance's private workarea holds `.codex` or `.pi` native provider/history
 and `.crossfire` delivery/tool state. Never commit private state.
 
 ## runtime.toml
@@ -117,7 +117,8 @@ uses separate protocol and owner-output resource bounds.
 Shared history preserves context across all rooms, DMs and private operator
 input. Per-room history retains one exact native conversation per room ID and a
 separate private control history for fleet messages, schedules and maintenance.
-It is the same process, workarea and identity. Returning to a room resumes its
+It is the same workarea and identity. Codex uses one native engine; Pi uses one
+owned RPC process per open context. Returning to a room resumes its
 history, not an empty conversation. Files/tools/credentials remain shared;
 terminal output still goes privately to the owner. This is not a security sandbox.
 
@@ -149,8 +150,10 @@ include_agents = true
 
 The roster's optional workspace, or private workarea by default, supplies native
 cwd. The companion `AGENTS.md` supplies
-role instructions. The functional Codex adapter alone validates/translates native
-options; fleetd does not interpret Codex-specific settings.
+role instructions. The selected functional runtime adapter alone validates native
+options; fleetd does not interpret engine-specific settings. The table below is
+Codex-specific. Pi uses `provider`, `model` and `thinking_level`, with no emulated
+Codex options; see [Pi configuration and limitations](pi.md).
 
 The role's separate `coordination_options` declares Crossfire wake authority and
 invitation defaults for every instance. Owner approval applies the exact policy

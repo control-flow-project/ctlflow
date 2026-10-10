@@ -18,6 +18,7 @@ administrator can read this view or its API.
 | Untracked samples | Bounded collection overflow or rejected native counter regressions. |
 | Native tokens | Adapter-reported input, cached input, output, reasoning output and total. |
 | Cache-write input | Reported only when supported; otherwise unknown. |
+| Reasoning output | Reported only when supported; Pi's cumulative native API does not provide this split. |
 | Provider spend | Unknown when the adapter provides no measured billing; never estimated from an unverified model price. |
 
 Messages observed by several agents count per recipient. Historical browsing is
@@ -25,6 +26,12 @@ not new message delivery. Cached input is a subset of input; reasoning output is
 a subset of output. The first cumulative native usage sample establishes a
 baseline, so previous session usage is not attributed to the current interval.
 Native counters are self-reported runtime measurements, not billing certification.
+Pi obtains one native baseline on each activation and adds usage from native
+message and summary events, without repeatedly fetching full transcripts or
+polling the model. Pi's input total includes native uncached, cache-read and
+cache-write tokens; cached input remains a subset. Runtime pricing estimates
+are not trusted provider spend. Mixed-runtime summaries retain unknown splits
+when any included interval cannot report them.
 
 ## Collection and retention
 

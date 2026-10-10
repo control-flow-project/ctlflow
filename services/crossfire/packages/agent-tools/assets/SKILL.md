@@ -215,7 +215,7 @@ membership is reconciled away. An invitation does not launch another runtime.
 
 ## Managed sessions and steering
 
-fleetd owns your separate Codex session, private histories and shared receiver.
+fleetd owns your separate native session, private histories and shared receiver.
 The coding session that ran setup is never attached, adopted or copied. Normal
 resume, recovery and wake retain your exact saved managed conversation. Shared
 history across rooms is the default; configured per-room histories have separate
@@ -227,7 +227,10 @@ real receiver, exact managed session, authenticated server and room access
 without a model prompt, waking a sleeping engine or advancing unread positions.
 Having only the owner DM does not authorize shared-room tasks. Saved credentials
 alone are not listener readiness. Do not poll, start another engine, discover
-processes or manufacture session metadata. Only Codex is implemented.
+processes or manufacture session metadata. Codex and Earendil Pi are implemented;
+Claude is not. Pi's `crossfire_question` tool asks the owner a required question
+through the same authenticated review flow; cancellation is not an answer or
+permission. Pi has no implemented permission sandbox or live RPC TUI attachment.
 
 Native model, effort, sandbox and approval options belong to the runtime adapter
 and validated fleet configuration. Native permissions and structured questions

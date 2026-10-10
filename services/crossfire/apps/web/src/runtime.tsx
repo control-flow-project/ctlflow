@@ -21,7 +21,7 @@ export function Runtime({ agent }: { agent: AgentView }) {
           <tbody>{context.settings.map(setting => <tr key={setting.name}><td><code>{setting.name}</code></td><td>{setting.configured ?? 'Not explicitly configured'}</td><td>{setting.effective ?? 'Not reported by native runtime'}</td></tr>)}</tbody></table></div>
       </details>)}</PageItems>
       <Help title="Inspect the original session"><p>In the fleet CLI, run <code>fleet agent contexts FLEET AGENT</code> to list retained histories, then <code>fleet agent attach FLEET AGENT --context CONTEXT</code> for the exact native terminal command. Use the controller connection on the computer where this fleet runs.</p>
-        <p>Listing histories does not wake an agent. A sleeping, stopped or failed runtime has no live terminal pointer. Resume the session first when you need to attach; the controller reopens the saved history, not a new one.</p>
+        <p>Listing histories does not wake an agent. Codex supports attachment to a live engine; resume a sleeping or stopped session first to reopen its saved history. Pi cannot attach a terminal to its existing RPC process, and attachment never starts a second writer.</p>
         <p>The controller retries transient failures using the original history. Inspect its recorded error if recovery cannot proceed.</p>
         <p>Terminal-visible output is shared with the owner, including output derived from rooms the owner has not joined. Separate histories isolate conversation history, not files, tools or credentials.</p></Help>
     </> : <Empty title="No native observation yet">Start this agent through its controller to report native settings. An online heartbeat alone does not prove the model is working.</Empty>}</Loaded>

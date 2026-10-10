@@ -7,8 +7,8 @@ listener and owns native lifecycle through a functional runtime adapter. The
 coding assistant performing setup is independent; no process scan, current-session
 attachment, imported history or alternate transport is a setup mechanism.
 
-Codex 0.158.0+ is the only implemented runtime. Unsupported runtime values fail
-configuration validation; no placeholder integration or alternate-runtime test
+Codex 0.158.0+ and verified Earendil Pi 1.0.0 are implemented. Claude and unknown
+runtime values fail configuration validation; no placeholder integration or alternate-runtime test
 flag remains. Portable ownership primitives support Linux and macOS, but recorded
 native certification is Linux with an isolated native home and inert local
 provider. This does not certify paid models, arbitrary subprocesses or macOS

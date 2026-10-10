@@ -3,9 +3,10 @@
 ## Current ownership
 
 Every Crossfire agent belongs to a fleet. fleetd owns the shared listener host,
-private instance state and native Codex process groups. The coding conversation
+private instance state and native runtime process groups. The coding conversation
 performing setup remains independent; no readiness check adopts its process or
-history. Codex is the only implemented runtime. Typed adapter ports own native
+history. Codex and Earendil Pi are implemented; Claude remains unimplemented.
+Typed adapter ports own native
 settings, decisions, receipts, observations and exact saved-context lifecycle.
 
 Every reporting run requires its exact live controller lease. Saved credentials,
@@ -13,6 +14,9 @@ a controller heartbeat or process existence alone do not prove replying. Agent
 **Session** shows native parameters, decisions, contexts and terminal inspection;
 **Activity** shows listener/receipt evidence; **Settings** shows current/latest
 software. Native failures and lost contact are distinct observations.
+Pi supports owner questions through the same decision interface but has no native
+permission sandbox or live RPC TUI attachment; unavailable capabilities fail
+explicitly rather than selecting another harness or starting a second writer.
 
 ## Historical failure and ownership
 

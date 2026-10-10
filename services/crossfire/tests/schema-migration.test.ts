@@ -107,7 +107,7 @@ test('only the verified deployed schema can migrate; prototypes, foreign stores 
     try {
       seed(database); database.pragma('user_version = ' + version);
       const before = snapshot(database), schema = database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all();
-      assert.throws(() => createSchema(database), /only deployed schemas 13 and 14/u);
+      assert.throws(() => createSchema(database), /only deployed schemas 13, 14 and 15/u);
       assert.equal(database.pragma('user_version', { simple: true }), version); assert.deepEqual(snapshot(database), before);
       assert.deepEqual(database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all(), schema);
       database.pragma('application_id = 99'); assert.throws(() => createSchema(database), /Unsupported/u);

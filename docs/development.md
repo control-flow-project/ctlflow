@@ -39,7 +39,7 @@ redundant `npm run build`. Do not add a global package pool.
 
 ## Test selection
 
-Codex is the only implemented runtime. There is no alternate-runtime test flag:
+Codex and Pi are implemented. There is no alternate-runtime test flag:
 ```sh
 npm test
 npm run test:browser
@@ -53,7 +53,7 @@ Codex, Conduit and integration checks. It is useful when deployment must finish
 before browser verification. Run the full gates afterward.
 
 Tests use isolated processes across all available CPU cores. Build/typecheck
-and pinned stock Element/Conduit extraction occur once per coordinated run.
+and pinned stock Element/Conduit/Pi extraction occur once per coordinated run.
 Each native homeserver runs the image's unchanged static binary on loopback in
 its test's resource scope, with an isolated RocksDB directory and one async
 worker. Docker is not an unbounded execution escape for these native fixtures;
@@ -76,8 +76,10 @@ Node/curl child clients inherit that test authority. Production TLS verification
 and Secure host-only cookie attributes are never relaxed for tests.
 
 Default native tests require Codex 0.158.0+, Git, OpenSSH client/server, Chrome
-and Docker. `CROSSFIRE_TEST_CODEX` selects Codex; `CROSSFIRE_BROWSER` selects
-Chrome.
+and Docker. The runner prepares the verified native Pi 1.0.0 asset in disposable
+test storage before workers; it never replaces a host installation. Its npm
+dependency installation retains the repository's release-age policy and disabled
+scripts. `CROSSFIRE_TEST_CODEX` selects Codex; `CROSSFIRE_BROWSER` selects Chrome.
 Inert local providers establish protocol behavior, not paid-model quality or
 untested-platform certification. Fixtures do not use production accounts.
 

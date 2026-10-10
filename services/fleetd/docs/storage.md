@@ -7,6 +7,13 @@ Contexts and UUIDs are unique. Shared/control/room histories use one admission,
 receipt and create/resume implementation. Native conversation files remain in
 Codex's own home; the registry does not copy or merge them.
 
+Pi owns one private `.pi/crossfire-contexts.json` with unique context/file/session
+bindings and native instruction digests. Histories are native Pi JSONL files under
+`.pi/histories`; an exclusive empty allocation is initialized by Pi itself before
+readiness. It never writes an invented native header or conversation entry.
+Shared and per-room contexts use the same adapter path. See
+[Pi native storage and receipts](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/pi.md).
+
 Default Start, Resume, recovery and sleep/wake require exact retained histories.
 Only first enrollment, an explicit confirmed reset or an authorized new room/
 mode context may create a history. Corrupt registry, receipt, observation or
@@ -19,6 +26,8 @@ a fresh conversation to bypass an invalid binding or active native writer.
 0.1.15 replaces split shared/control/room metadata. This is a forward storage
 migration, not a second runtime path. Ordinary readers reject obsolete metadata
 and incomplete conversion with an actionable message.
+This conversion inventories Codex instances only; Pi has no predecessor context
+schema and its histories are neither migrated nor rewritten by this command.
 
 1. Inventory the selected controller root and all its registered fleet directories.
 2. Use the old installed CLI to orderly-stop that controller, not Fleet Stop.

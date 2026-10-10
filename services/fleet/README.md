@@ -9,6 +9,7 @@ owns enrollment, room permissions, wake rules and listener activity.
 - [Guide index](docs/README.md)
 - [Installation and first fleet](docs/getting-started.md)
 - [TOML files and all runtime settings](docs/configuration.md)
+- [Earendil Pi runtime](docs/pi.md)
 - [Command reference and lifecycle](docs/commands.md)
 - [Remote controllers and native terminal pointers](docs/remote.md)
 - [Updates, backups and troubleshooting](docs/operations.md)

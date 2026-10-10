@@ -21,16 +21,21 @@ temporary tunnel does not stop the controller.
 
 ## Native TUI pointer
 
-`fleet agent attach research analyst-east` prints a ready-to-run native command
+For Codex, `fleet agent attach research analyst-east` prints a ready-to-run native command
 for the exact running saved session. Copy and run it manually. The command starts
 a terminal client, not another engine/session/listener. Closing the TUI leaves
 fleet execution running.
 
 For a per-room instance, first list contexts. Attach defaults to its separate
 private control history; pass the exact listed room ID to inspect that room's
-conversation. Multiple histories share one engine/identity/workarea. A pointer
+conversation. Codex histories share one engine; Pi opens one owned RPC process
+per active history with the same identity/workarea. A pointer
 does not create, seed or replay a conversation. The coding session performing
 setup is independent and has no fleet attachment pointer.
+
+Pi cannot attach a TUI to an existing RPC process. Both local and remote
+attachment requests report unavailable without starting another engine. Status,
+saved-context discovery, stop and resume work through the normal controller API.
 
 The runtime adapter owns session selection and native arguments. The private
 token is read from a run-local file into the client's environment, never printed

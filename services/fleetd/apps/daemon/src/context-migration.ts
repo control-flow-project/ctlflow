@@ -17,7 +17,7 @@ export async function migrateControllerContexts(root: string) {
       const loaded = registry.load(registration.directory);
       if (!loaded.ok) throw failureError(loaded.error);
       for (const instance of loaded.value.roster.instances) {
-        if (loaded.value.definitions[instance.definition]!.runtime !== 'codex') throw new Error('Only the implemented Codex adapter owns context migration');
+        if (loaded.value.definitions[instance.definition]!.runtime !== 'codex') continue;
         const stateDirectory = join(registration.directory, instance.workarea);
         if (!existsSync(stateDirectory)) continue;
         const local = paths(stateDirectory, instance.key);

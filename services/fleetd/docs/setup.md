@@ -4,9 +4,10 @@
 
 Every Crossfire agent belongs to a fleet. Project setup creates a normal
 one-instance roster; larger role fleets use the same configuration, enrollment,
-controller, runtime adapter and shared listener. Codex is the implemented runtime.
-Unsupported runtimes fail validation; no standalone path or placeholder adapter
-is retained.
+controller, runtime adapter and shared listener. Codex is the default runtime;
+[Earendil Pi](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/pi.md) uses the same path through an explicit roster.
+Unsupported runtimes, including Claude, fail validation; no standalone path or
+placeholder adapter is retained.
 
 The CLI validates the personalized descriptor and submits `POST /api/setup` to
 the existing private controller API. Domain ports own storage, prerequisite
@@ -63,9 +64,9 @@ configuration loader. Existing approved identities remain immutable.
 Generated project setup points `workspace` at the human-selected existing
 project and keeps `workarea` beneath the private controller project directory.
 The runtime receives both `workspace` and `stateDirectory`. It does not chmod
-the existing project, overwrite its `.codex` configuration/history or install
+the existing project, overwrite its native configuration/history or install
 global skills. Role instructions, administrator instructions and the pinned
-Crossfire skill are native developer instructions on first create and resume;
+Crossfire skill are native instructions on first create and resume;
 the external cwd need not discover private workarea ancestor skills.
 
 ### Provider login on resume
@@ -78,7 +79,7 @@ Sign in on the controller host with `codex login`, then stop/resume any already
 running engines that need the new account. A running engine is not hot-switched
 by a status check or another agent's preflight.
 
-Only the bounded owned private login file is copied. Model/provider configuration
+For Codex, only the bounded owned private login file is copied. Model/provider configuration
 is initialized once and retained; configured instance parameters still apply.
 Native histories, saved session UUIDs, Matrix identities, room access and unread
 positions are not replaced. The independent coding session is not adopted.
@@ -87,6 +88,12 @@ There is no stale credential fallback. A missing source removes an old file copy
 native environment/provider authentication remains native-owned. Provider-account
 and billing changes therefore follow the current host login on the next resume.
 Do not paste credentials into Matrix or management forms.
+
+Pi refreshes its private `auth.json` and `models.json` from the controller's host
+`PI_CODING_AGENT_DIR` (default `~/.pi/agent`) on every actual activation. Its
+native settings file is not imported. Exact provider/model/thinking admission,
+history retention and unsafe-source rejection belong to the Pi adapter; see
+[Pi configuration and authentication](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/pi.md).
 
 The native runtime receives the immutable instance key as its required tool
 profile, separately from its human-readable name. CROSSFIRE_AGENT_NAME carries
@@ -97,7 +104,7 @@ before native startup, without an alias or a guessed identity.
 
 ## Approval, readiness and failure
 
-Model-free runtime inspection precedes enrollment. Missing Codex, native
+Model-free runtime inspection precedes enrollment. A missing selected runtime, native
 capabilities, authentication or unsafe state is an actionable failure, not a
 configuration prompt or a guessed replacement identity. The owner sees the exact
 approval URL/code while code waits. Accepted controller operations outlive CLI

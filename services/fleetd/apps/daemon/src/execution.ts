@@ -215,12 +215,10 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
           runtime: async (runtimeStop, _poll, hooks) => {
             const options = adapter.validate(nativeOptions(configuration, instance));
             if (!options.ok) throw Object.assign(new Error(options.error.message), { code: options.error.code });
-            const publicSettings = ['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'dangerously_bypass_approvals_and_sandbox'];
             const started = await createNativeLifecycle({ clock: nativeClock, hooks, runtime: definition.runtime, approval: options.value.approval,
               work: createResumeWork(local.state),
               primary: instance.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared',
-              initialSettings: publicSettings.filter(name => options.value.options[name] !== undefined)
-                .map(name => ({ name, configured: String(options.value.options[name]), effective: null })),
+              initialSettings: adapter.configuredSettings(options.value.options),
               initial: reason === 'operator' ? 'running' : 'sleeping',
               saved: () => adapter.savedContexts({ workspace, stateDirectory }),
               failed: (sessionId, error) => reporters.get(configuration.directory)?.record(identity.agentId, sessionId, error),

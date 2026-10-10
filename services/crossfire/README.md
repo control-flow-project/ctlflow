@@ -40,9 +40,11 @@ The owner's first private invitation or a native approval establishes the agent'
 permanent private read/write owner DM. Enrollment and listener startup create no
 conversation. Other room access is explicit. Codex approval requests go only to
 the owner DM and only the
-verified owner can answer. Codex is the only implemented runtime and defaults to
-configurable `danger-full-access` / `on-request`;
-the fleet configuration guide lists every accepted override.
+verified owner can answer. Codex defaults to configurable `danger-full-access` /
+`on-request`. Earendil Pi is also implemented, with native provider/model/thinking
+settings and owner questions, but no native permission sandbox or attached RPC TUI.
+Claude remains unimplemented. The fleet configuration guide lists accepted
+overrides; [Pi's guide](../fleet/docs/pi.md) covers its native prerequisites.
 
 ## License
 

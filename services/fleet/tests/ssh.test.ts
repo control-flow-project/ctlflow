@@ -90,6 +90,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
     options: { model: 'gpt-5.1', model_reasoning_effort: 'medium', sandbox_mode: 'read-only', approval_policy: 'never' },
     hooks: { requestDecision: async () => { throw new Error('No tool approval is expected'); } } }, scope.signal);
   assert(runtime.ok, runtime.ok ? '' : runtime.error.code + ': ' + runtime.error.message); nativeRuntime = runtime.value;
+  assert(nativeRuntime.attachment);
   const realPointer = codexTerminal().command(nativeRuntime.attachment); assert(realPointer.ok);
   const realRemote = sshTerminalCommand('fixture', realPointer.value);
   terminal = spawn('/usr/bin/script', ['--quiet', '--return', '--flush', '--command', 'stty cols 110 rows 35; ' + realRemote, '/dev/null'],

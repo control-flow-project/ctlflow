@@ -85,8 +85,12 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       startedAt: reportTime - 300000, endedAt: reportTime, dropped: 2,
       flows: Array.from({ length: 25 }, (_, index) => ({ roomId, senderMatrixId: admin.member.principal.matrixUserId,
         messageType: 'type-' + index, observed: 1, delivered: 1, contentBytes: 1024, deliveredBytes: 1024, attachmentBytes: 0, largestBytes: 1024 })),
-      usage: [] } }, 'browser'));
+      usage: [{ runtime: 'pi', sessionId: 'browser-pi-history', tokens: { input: 100, cachedInput: 20, cacheWriteInput: 0, output: 30, reasoningOutput: null, total: 130 } }] } }, 'browser'));
   assert(reporting.statisticsAccepted);
+  value(reportListener(services, { kind: 'agent', principalId: alpha.agentId }, alpha.agentId, randomUUID(), {
+    release: 'browser', stopped: true, controller, messagesDelivered: 0, statistics: { sequence: 1, startedAt: reportTime, endedAt: reportTime + 1,
+      dropped: 0, flows: [], usage: [{ runtime: 'pi', sessionId: 'browser-pi-history',
+        tokens: { input: 200, cachedInput: 40, cacheWriteInput: 0, output: 60, reasoningOutput: null, total: 260 } }] } }, 'browser'));
   const runtimeCommands: { action: string; agentId: string | null }[] = [];
   const runtimeRuns = new Map<string, string>();
   const control = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId, execute: async command => {
@@ -261,6 +265,9 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByRole('table', { name: 'Message flows', exact: true }).locator('tbody tr')).toHaveCount(20);
   await expect(page.getByRole('region', { name: 'Traffic', exact: true })).toContainText('25');
   await expect(page.getByRole('region', { name: 'Native usage', exact: true })).toContainText('Not reported by this runtime');
+  await expect(page.getByRole('region', { name: 'Native usage', exact: true })).toContainText('100');
+  await expect(page.getByRole('region', { name: 'Native usage', exact: true }).locator('dt').filter({ hasText: /^Reasoning output$/u })
+    .locator('xpath=following-sibling::dd[1]')).toHaveText('Not reported');
   await page.getByRole('region', { name: 'Sender → recipient', exact: true }).getByRole('link', { name: 'Next', exact: true }).click();
   await expect(page).toHaveURL(origin + '/manage/fleets/' + fleet.id + '/activity?view=traffic&page=2');
   await expect(page.getByRole('table', { name: 'Message flows', exact: true }).locator('tbody tr')).toHaveCount(5);

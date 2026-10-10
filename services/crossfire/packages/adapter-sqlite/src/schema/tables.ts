@@ -37,8 +37,8 @@ export type Tables = {
   listener_stat_checkpoint: { run_id: string; sequence: number; digest: string; captured_at: number };
   listener_stat_interval: { run_id: string; bucket_at: number; agent_id: string; started_at: number; ended_at: number; captured_at: number; dropped: number };
   listener_stat_flow: { run_id: string; bucket_at: number; room_id: string; sender_matrix_id: string; message_type: string; observed: number; delivered: number; content_bytes: number; delivered_bytes: number; attachment_bytes: number; largest_bytes: number };
-  listener_stat_usage: { run_id: string; bucket_at: number; runtime: string; session_id: string; input: number; cached_input: number; cache_write_input: number | null; output: number; reasoning_output: number; total: number };
-  runtime_usage_checkpoint: { agent_id: string; runtime: string; session_id: string; input: number; cached_input: number; cache_write_input: number | null; output: number; reasoning_output: number; total: number; captured_at: number };
+  listener_stat_usage: { run_id: string; bucket_at: number; runtime: string; session_id: string; input: number; cached_input: number; cache_write_input: number | null; output: number; reasoning_output: number | null; total: number };
+  runtime_usage_checkpoint: { agent_id: string; runtime: string; session_id: string; input: number; cached_input: number; cache_write_input: number | null; output: number; reasoning_output: number | null; total: number; captured_at: number };
   runtime_decision: { id: string; agent_id: string; run_id: string; runtime: string; session_id: string; request_id: string; turn_id: string; item_id: string; kind: 'permission' | 'question'; action: string; review_text: string; blocking: number; expires_at: number | null; created_at: number; status: 'pending' | 'answered' | 'responded' | 'cancelled' | 'expired' };
   runtime_decision_question: { decision_id: string; question_id: string; position: number; title: string; prompt: string; secret: number; allow_text: number };
   runtime_decision_option: { decision_id: string; question_id: string; option_id: string; position: number; label: string; description: string };

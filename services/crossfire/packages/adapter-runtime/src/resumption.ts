@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, lstatSync, openSync, closeSync, fsyncSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import type { NativeMessage } from '@ctlflow/crossfire-adapter-runtime/delivery';
+import type { NativeMessage } from './delivery.js';
 import { failureError } from '@ctlflow/crossfire-kernel/result';
 import { readPrivateBytes, writePrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
 

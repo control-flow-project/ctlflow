@@ -21,7 +21,8 @@ function delta(value: Tokens, before: Tables['runtime_usage_checkpoint'] | null 
     && before[key as keyof typeof latest] !== null && current < before[key as keyof typeof latest]!)) return null;
   return { input: before ? latest.input - before.input : 0, cached_input: before ? latest.cached_input - before.cached_input : 0,
     cache_write_input: before && latest.cache_write_input !== null && before.cache_write_input !== null ? latest.cache_write_input - before.cache_write_input : null,
-    output: before ? latest.output - before.output : 0, reasoning_output: before ? latest.reasoning_output - before.reasoning_output : 0,
+    output: before ? latest.output - before.output : 0, reasoning_output: latest.reasoning_output === null || before?.reasoning_output === null ? null
+      : before ? latest.reasoning_output - before.reasoning_output! : 0,
     total: before ? latest.total - before.total : 0 };
 }
 export function statisticsRecorder(database: Database.Database) {
@@ -68,7 +69,8 @@ export function statisticsRecorder(database: Database.Database) {
       const counts = { ...key, ...identity, input: add(existing?.input ?? 0, difference.input), cached_input: add(existing?.cached_input ?? 0, difference.cached_input),
         cache_write_input: existing ? existing.cache_write_input === null || difference.cache_write_input === null ? null
           : add(existing.cache_write_input, difference.cache_write_input) : difference.cache_write_input,
-        output: add(existing?.output ?? 0, difference.output), reasoning_output: add(existing?.reasoning_output ?? 0, difference.reasoning_output), total: add(existing?.total ?? 0, difference.total) };
+        output: add(existing?.output ?? 0, difference.output), reasoning_output: existing?.reasoning_output === null || difference.reasoning_output === null ? null
+          : add(existing?.reasoning_output ?? 0, difference.reasoning_output), total: add(existing?.total ?? 0, difference.total) };
       if (existing) executeUpdate(database, schema, (query, params) => query.update('listener_stat_usage').set({ input: params.input,
         cached_input: params.cached_input, cache_write_input: params.cache_write_input, output: params.output, reasoning_output: params.reasoning_output, total: params.total })
         .where(row => row.run_id === params.runId && row.bucket_at === params.bucketAt && row.runtime === params.runtime && row.session_id === params.sessionId), counts);

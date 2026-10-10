@@ -55,9 +55,9 @@ There is one listener and one native integration per supported runtime, not per-
 Only concrete, supported capabilities have packages. Every agent belongs to a
 fleet managed by fleetd, including a one-agent fleet. There is no standalone
 deployment, existing-session attachment, optional controller or detach-to-direct
-operation. Runtime behavior remains behind pure adapter interfaces. Codex
-0.158.0+ is the only implemented runtime; Claude Code and Pi are unimplemented,
-not selectable alternatives, placeholders or retained legacy integrations.
+operation. Runtime behavior remains behind pure adapter interfaces. Supported
+engines are Codex 0.158.0+ and verified Earendil Pi 1.0.0. Claude Code is
+unimplemented, not a selectable placeholder or retained legacy integration.
 
 All npm names use @ctlflow. Product names are @ctlflow/crossfire,
 @ctlflow/fleetd and @ctlflow/fleet; internal modules consistently use
@@ -1831,11 +1831,12 @@ receipt path rather than a separate listener.
 
 fleetd composes the shared receiver, activity reporter, wake controls, artifact
 installer and cursor owner with a runtime-owned native lifecycle adapter.
-Codex is the only implementation. Claude Code and Pi values are rejected at
-configuration boundaries; no selectable placeholder, extension, hook or retained
-direct-session implementation exists. The architecture keeps pure runtime ports
-so another concrete implementation must satisfy the same capabilities rather
-than adding runtime dispatch to listener or fleet domain code.
+Codex and Earendil Pi implement the same owned-runtime ports. Claude Code is
+rejected at configuration boundaries. Only the daemon composition selects
+concrete adapters; listener and fleet domain logic never dispatch native protocol.
+Each adapter owns settings admission, instructions, receipts, histories, process
+cleanup, observations and human questions. Native limitations are explicit, not
+emulated by an alternate transport or an additional history writer.
 
 Codex prerequisites are checked in ordinary code before enrollment/start:
 supported stock version, configured provider authentication, selected native
@@ -1857,11 +1858,12 @@ First startup creates the managed native history; later startup resumes that
 exact history. Initial instruction publication materializes zero-turn native
 history without a dummy user message. No runtime-session import or history copying is
 part of setup. Model, sandbox and approval use validated native configuration;
-role/skill/admin instruction text uses the single receipt-confirmed developer
-producer on creation, exact resumption and changed instruction revisions.
+role/skill/admin instruction text uses one native instruction producer per runtime
+on creation, exact resumption and changed instruction revisions.
 
-One adapter-owned private `crossfire-context-registry.json` is the native context
-index for every instance. Its `mode` is `shared` or `per-room`; its unique
+One adapter-owned private registry is the native context index for every instance:
+Codex `.codex/crossfire-context-registry.json`, Pi `.pi/crossfire-contexts.json`.
+Its `mode` is `shared` or `per-room`; its unique
 `bindings` map `shared`, `control` or an exact room ID to distinct session UUIDs.
 Mode changes retain prior bindings rather than copying, merging or substituting
 histories. Delivery and instruction receipts use the same context-derived family.
@@ -1871,6 +1873,39 @@ incomplete migration. The explicit locked `fleetd --migrate-contexts` conversion
 archives verified original bytes before publishing the canonical registry,
 preserves credentials and native histories, and resumes safely after interrupted
 conversion. It does not make a model call or change desired activation.
+
+Pi owns a stock JSONL RPC process per open context, a private extension loaded
+explicitly with automatic extensions disabled, and exact native-created format-3
+session files. One fleet listener and Matrix identity remain unchanged. A saved
+allocation reserves an empty private file; native SessionManager creates its
+header. Native appendEntry records verified effective instructions before
+readiness with zero model calls and no synthetic user turn. An established file
+or session ID is never substituted. Discovery is read-only; reset archives exact
+files. Pi uses its native provider/model/thinking_level names, rejects unsupported
+combinations before publication, refreshes private auth/models files on every
+activation and does not accept Codex sandbox/approval options. Tools run with the
+controller user's privileges; there is no emulated sandbox or permission gate.
+
+Pi publication correlates exact text and ID in a native custom entry followed by
+the actual native user entry on the active branch. A command response alone is
+not receipt. Verification reads only the post-publication file interval and
+flushes proven native entries before advancing unread positions. Busy input
+remains in the common durable journal; it is never hidden in a native queue.
+Mentions use an in-process captured-run fence, synchronous abort and native idle
+completion before replacement input. Retired captures cannot interrupt a new
+run or process. Mention admission cancellation owns only unfinished startup;
+after readiness it cannot become the native engine lifetime. Intentional abort cancels its owner decision without being
+reported as a crash. Unknown receipt after restart retains the exact last message
+in a private file and supplies the same correlated continuation contract as Codex.
+
+Native confirm/select/input/editor questions use the shared owner decision port;
+Pi's crossfire_question tool offers model-originated owner questions. Native
+text/tool results reach the owner, not thinking or tool arguments. Native usage
+starts with one cumulative baseline and incremental events. Missing reasoning
+measurements and provider billing remain null; schema 16 preserves prior usage
+through an atomic forward migration, never a reset. Pi does not expose live RPC
+TUI attachment; the attachment API returns unsupported without waking or starting
+a second writer. See services/fleet/docs/pi.md for exact native prerequisites.
 
 The Codex adapter owns exact capability admission through native `config/read`
 and bounded `model/list`, resolving explicit instance settings over role defaults
@@ -3364,8 +3399,8 @@ then executes independent test files in separate processes with a worker for
 every available CPU core. Browser and native fleet integration belong to that
 same run; architecture verification includes installation checks. Focused suite
 commands select subsets rather than adding duplicate certification runs.
-Runtime verification is Codex only. No alternate-runtime implementation, test
-bank or opt-in flag is retained. Native inert-provider evidence identifies its
+Runtime verification includes Codex and pinned Earendil Pi. Claude remains
+unimplemented; there is no opt-in runtime test flag. Native inert-provider evidence identifies its
 actual Linux/platform/protocol scope; it does not certify paid model behavior
 or untested macOS execution.
 Per-file output, durations and a machine-readable summary identify slow tails.

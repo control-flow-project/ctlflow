@@ -1,4 +1,4 @@
-import type { RuntimeObservation } from './values.js';
+import { implementedRuntimes, type RuntimeObservation } from './values.js';
 import type { Services, Actor } from '../port/services.js';
 import { authorize, authorizeAgent } from '../authorization/authorize.js';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
@@ -7,9 +7,9 @@ import { openIncident, recoverIncidents } from './incidents.js';
 import { agentDisplayName } from '../identity/display-name.js';
 
 const names = new Set(['model', 'model_reasoning_effort', 'sandbox_mode', 'approval_policy', 'native_version',
-  'dangerously_bypass_approvals_and_sandbox', 'features.default_mode_request_user_input', 'provider']);
+  'dangerously_bypass_approvals_and_sandbox', 'features.default_mode_request_user_input', 'provider', 'thinking_level']);
 export function reportRuntime(services: Services, actor: Actor, agentId: string, runId: string, input: RuntimeObservation) {
-  if (input.runtime !== 'codex') return failure('invalid', 'Codex is the only implemented runtime');
+  if (!implementedRuntimes.some(runtime => runtime === input.runtime)) return failure('invalid', 'Unsupported native runtime');
   return services.unitOfWork.run(() => {
     const authority = authorize(services, actor, 'runtime.report.self');
     if (!authority.ok) return authority;

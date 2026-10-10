@@ -43,10 +43,13 @@ input or receipts and unknown activity prevent sleep.
 `fleet show` exposes native phase, desired binding intent, last native activity,
 listener activity and history availability separately. `fleet agent contexts`
 reads saved context IDs while sleeping or stopped without waking a process.
-Attachment requires a live native endpoint; GET never launches one. Use Resume
+Codex attachment requires a live native endpoint; GET never launches one. Use Resume
 sessions or `fleet agent start` to wake a sleeping native engine for a terminal
 without changing its binding. Idle histories receive no model prompt; interrupted
 work receives the continuation instruction described below.
+Pi cannot attach a TUI to its existing RPC process; attachment reports unavailable
+without launching a second writer. Its status, contexts, sleep and resume still
+use these same lifecycle interfaces.
 
 Orderly daemon shutdown preserves desired activation. Starting the same daemon
 root after a reboot restores active bindings with retained histories; explicitly
