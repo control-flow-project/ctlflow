@@ -18,6 +18,7 @@ import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
 import { applicationFixture, value, secret } from './support/application.js';
 import { inspectDatabase, verifyPreservation, databaseExpectations } from '../tools/database.js';
 import { restoreSchema14EnrollmentItems } from './support/schema14.js';
+import { schema15Store } from './support/schema15.js';
 
 test('operator database inspection is readonly, complete and proves protected records across upgrades', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-database-'));
@@ -112,6 +113,26 @@ test('operator preservation covers immutable archived children and exact native-
       .where(row => row.agent_id === params.agentId && row.receipt_id === params.receiptId),
     { agentId: agent.id, receiptId, now: fixture.now() });
     assert.equal(verifyPreservation(before, current).ok, false, 'Changed native-stop authority must fail preservation');
+  } finally { database.close(); }
+});
+
+test('operator preservation proves schema 15 conversion without modifying either evidence store', scope => {
+  const directory = mkdtempSync(join(tmpdir(), 'crossfire-usage-preservation-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  const current = join(directory, 'current.sqlite'), before = join(directory, 'before.sqlite');
+  const database = schema15Store(current);
+  try {
+    chmodSync(current, 0o600); copyFileSync(current, before);
+    const originalBytes = readFileSync(before), originalUsage = database.prepare('SELECT * FROM runtime_usage_checkpoint').all();
+    createSchema(database);
+    const currentBytes = readFileSync(current), report = value(verifyPreservation(before, current));
+    assert.equal(report.beforeSchema, 15); assert.equal(report.afterSchema, SCHEMA_VERSION); assert.equal(report.forwardMigration, true);
+    assert.equal(report.preserved.agent, 1); assert.equal(report.preserved.member, 1);
+    assert.deepEqual(database.prepare('SELECT * FROM runtime_usage_checkpoint').all(), originalUsage);
+    assert.deepEqual(readFileSync(before), originalBytes); assert.deepEqual(readFileSync(current), currentBytes);
+    database.prepare("UPDATE member SET display_name='Changed' WHERE principal_id='owner'").run();
+    assert.equal(verifyPreservation(before, current).ok, false, 'Forward conversion never excuses changed protected records');
+    assert.deepEqual(readFileSync(before), originalBytes);
   } finally { database.close(); }
 });
 

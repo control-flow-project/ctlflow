@@ -126,7 +126,7 @@ export function verifyPreservation(before: string, after: string) {
     original = new Database(before, { readonly: true, fileMustExist: true });
     current = new Database(after, { readonly: true, fileMustExist: true });
     if (first.value.schemaVersion !== second.value.schemaVersion) {
-      if (![13, 14].includes(Number(first.value.schemaVersion)) || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
+      if (![13, 14, 15].includes(Number(first.value.schemaVersion)) || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
       converted = new Database(original.serialize());
       converted.pragma('foreign_keys = ON');
       createSchema(converted);
