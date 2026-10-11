@@ -104,8 +104,9 @@ test('clean installed public tarballs resolve only public dependencies and own o
   const agentFile = join(definition, 'agent.toml'), agentOptions = (model: string) => 'name = "Worker"\nruntime = "pi"\n[runtime_options]\nprovider = "fixture"\nmodel = "' + model + '"\nthinking_level = "medium"\n';
   writeFileSync(agentFile, agentOptions('unavailable-model'), { mode: 0o600 });
   const client = createDaemonClient(join(root, 'fleetd.sock'));
+  const installedVersion = (JSON.parse(readFileSync(join(prefix, 'node_modules', '@ctlflow', 'fleet', 'package.json'), 'utf8')) as { version: string }).version;
   const setup = () => client.call(operations.setup, {}, { workspace: directory, configuration: join(configuration, 'runtime.toml'),
-    descriptor: { schemaVersion: 1, server: 'https://127.0.0.1:1', ownerMatrixId: '@owner:example.test', package: { name: '@ctlflow/fleet', version: '0.1.19' }, instructions: '' } });
+    descriptor: { schemaVersion: 1, server: 'https://127.0.0.1:1', ownerMatrixId: '@owner:example.test', package: { name: '@ctlflow/fleet', version: installedVersion }, instructions: '' } });
   const rejected = await setup(); assert(!rejected.ok); assert.equal(rejected.error.code, 'invalid'); assert.match(rejected.error.message, /Unavailable Pi model/u);
   writeFileSync(agentFile, agentOptions('fixture-model'), { mode: 0o600 });
   const accepted = await setup(); assert(accepted.ok, 'Installed bundle admits native Pi and its exact instruction extension before enrollment');

@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-adapter-sqlite",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -13,9 +13,9 @@
     "@tinqerjs/better-sqlite3-adapter": "0.0.28",
     "@tinqerjs/tinqer": "0.0.28",
     "better-sqlite3": "13.0.3",
-    "@ctlflow/crossfire-domain": "0.1.19",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.19",
-    "@ctlflow/crossfire-kernel": "0.1.19"
+    "@ctlflow/crossfire-domain": "0.1.20",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.20",
+    "@ctlflow/crossfire-kernel": "0.1.20"
   },
   "exports": {
     "./*": {
