@@ -2881,6 +2881,15 @@ Tinqer owns all application reads/writes. Raw SQL is restricted to schema,
 configuration and metadata/query-plan inspection. Private store creation and
 credential access remain validated and access-restricted.
 
+Management storage uses the supported SQLite engine's native page-count capacity;
+Crossfire imposes no application-wide database-size ceiling. Reopening an existing
+store does not restore a former application page limit or require a data rewrite.
+Native SQLITE_FULL is an expected storage-unavailable Result: the entire affected
+transaction rolls back and its original operation can be retried when capacity
+is available. This never authorizes deleting audit, identity, receipt or history
+records. Existing API bounds, normalized queries and statistics retention remain
+unchanged; operators provision and monitor actual disk and backup capacity.
+
 Private controller and instance state is user-owned and atomic, separate from
 an optional existing native workspace. Public availability checks
 return no credentials or private workspaces. Enrollment claim proof and exact

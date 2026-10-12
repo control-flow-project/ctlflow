@@ -18,9 +18,6 @@ export function openStore(path: string): Database.Database {
     database.pragma('foreign_keys = ON');
     database.pragma('busy_timeout = 5000');
     database.pragma('journal_mode = DELETE');
-    const pageSize = database.pragma('page_size', { simple: true });
-    if (typeof pageSize !== 'number' || pageSize < 512 || pageSize > 65536) throw new Error('Invalid SQLite page size');
-    database.pragma('max_page_count = ' + Math.floor(256 * 1024 * 1024 / pageSize));
     createSchema(database);
     return database;
   } catch (error) { database.close(); throw error; }

@@ -63,6 +63,23 @@ It validates and passes that exact slice; it never creates host services or
 configures resource policy. Omit the flag when the operator supplies no budget.
 Repository container verification creates its own temporary bounded test slice.
 
+## Management database capacity
+
+Crossfire uses SQLite's native database capacity, not a 256 MiB application
+ceiling. The former startup override capped every database connection and could
+reject new listener registrations when the file reached that size with no free
+pages. The corrected adapter does not apply that override. Its limit was
+connection-local: an ordinary backup-preserving server deployment and reopen
+restores native capacity on existing stores. No reset, VACUUM, deletion, manual
+PRAGMA, schema migration or copying into another database is required.
+
+Provision and monitor available filesystem space, including rollback journals,
+report storage and verified backups. Native disk/capacity exhaustion returns
+storage-unavailable; its transaction rolls back without committing partial
+changes. Retry the original operation after capacity is available. It is not
+permission to discard audit, credentials, identities, receipts or native history.
+API payload bounds and the existing thirty-day statistics retention are unchanged.
+
 ## Software updates
 
 Running agent bindings report their installed tool release. A different offered

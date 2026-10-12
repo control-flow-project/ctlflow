@@ -5,6 +5,7 @@ export function stored<T>(operation: () => Result<T>): Result<T> {
     if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
       if (error.code.startsWith('SQLITE_CONSTRAINT')) return failure('conflict', 'The operation conflicts with the current stored state');
       if (error.code === 'SQLITE_BUSY') return failure('unavailable', 'Storage is busy; retry this operation');
+      if (error.code === 'SQLITE_FULL') return failure('unavailable', 'Management storage is full; check available disk space before retrying');
     }
     throw error;
   }
