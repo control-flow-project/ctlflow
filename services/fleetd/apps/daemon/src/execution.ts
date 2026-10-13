@@ -29,7 +29,7 @@ import { createNativeStopReceipts, type NativeStopActivity } from './native-stop
 import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 import { nativeOptions } from '@ctlflow/fleetd-domain/model';
 
-export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string): Execution {
+export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string, log: (message: string) => void): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
   const stops = new Map<string, ReturnType<typeof createNativeStopReceipts>>();
@@ -202,7 +202,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         let ready!: () => void, rejectReady!: (error: unknown) => void;
         bindingControl = connection.listener(identity.agentId);
         const readiness = new Promise<void>((resolve, reject) => { ready = resolve; rejectReady = reject; });
-        done = listen({ settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
+        done = listen({ log, settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
           binding: 'fleet-' + identity.agentId, host: listenerHost,
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,

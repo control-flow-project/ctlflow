@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { loggingSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/logging';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { enrollmentRosterValue } from '@ctlflow/crossfire-domain/enrollment/roster-digest';
 import { schema13Store, schema13Tables } from './support/schema13.js';
+import DatabaseConstructor from 'better-sqlite3';
+import { restoreSchema16Logging } from './support/schema16.js';
 
 function snapshot(database: Database.Database) {
   const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[];
@@ -78,13 +81,15 @@ test('schema 13 advances atomically with exact wake semantics and protected hist
         coordinationPolicy: { wakeMode: policy.wakeMode, senders: policy.matrixSenders, permissions: policy.permissions } })) })).digest('hex');
     assert.deepEqual(after.get('enrollment_request'), before.get('enrollment_request')!.map(row => ({ ...row, roster_digest: digest })));
     assert.throws(() => database.exec("UPDATE enrollment_archive_policy SET wake_mode='everyone'"), /immutable/u);
-    assert.throws(() => database.exec('DELETE FROM enrollment_archive_wake_sender'), /immutable/u);
+    database.exec('DELETE FROM enrollment_archive_wake_sender');
+    assert.equal(snapshot(database).get('enrollment_archive_wake_sender')!.length, 0);
     assert.throws(() => database.exec("UPDATE agent SET wake_mode='owner'"), /CHECK/u);
     assert.throws(() => database.exec("UPDATE agent_wake_sender SET include_agents=2"), /CHECK/u);
     assert.equal(database.pragma('foreign_keys', { simple: true }), 1);
     assert.deepEqual(database.pragma('foreign_key_check'), []);
     assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
-    assert.equal(database.prepare('SELECT name FROM sqlite_schema ORDER BY name').all().length, schema.length);
+    assert.equal(database.prepare('SELECT name FROM sqlite_schema ORDER BY name').all().length,
+      schema.length + [...loggingSchema.matchAll(/CREATE INDEX /gu)].length - 6);
     const complete = snapshot(database); createSchema(database); assert.deepEqual(snapshot(database), complete);
   } finally { database.close(); }
 });
@@ -101,13 +106,30 @@ test('a failed forward conversion rolls back every table, guard, credential and 
   } finally { database.close(); }
 });
 
+test('schema 16 logging migration preserves every row, matches a fresh schema and cannot partially remove archive guards', () => {
+  const database = new DatabaseConstructor(':memory:'), fresh = new DatabaseConstructor(':memory:');
+  try {
+    createSchema(database); restoreSchema16Logging(database); createSchema(fresh);
+    const before = snapshot(database);
+    database.exec('CREATE INDEX ix_listener_run_retention ON listener_run(last_seen_at,id)');
+    assert.throws(() => createSchema(database), /already exists/u);
+    assert.equal(database.pragma('user_version', { simple: true }), 16);
+    assert.equal(database.prepare("SELECT name FROM sqlite_schema WHERE type='trigger' AND name LIKE 'protect_enrollment_archive%_delete'").all().length, 6);
+    database.exec('DROP INDEX ix_listener_run_retention'); createSchema(database);
+    assert.deepEqual(snapshot(database), before);
+    const metadata = (store: DatabaseConstructor.Database) => store.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all();
+    assert.deepEqual(metadata(database), metadata(fresh)); assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.equal(database.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+  } finally { fresh.close(); database.close(); }
+});
+
 test('only the verified deployed schema can migrate; prototypes, foreign stores and future versions remain unchanged', () => {
   for (const version of [...Array.from({ length: 12 }, (_, index) => index + 1), SCHEMA_VERSION + 1]) {
     const database = schema13Store();
     try {
       seed(database); database.pragma('user_version = ' + version);
       const before = snapshot(database), schema = database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all();
-      assert.throws(() => createSchema(database), /only deployed schemas 13, 14 and 15/u);
+      assert.throws(() => createSchema(database), /only deployed schemas 13, 14, 15 and 16/u);
       assert.equal(database.pragma('user_version', { simple: true }), version); assert.deepEqual(snapshot(database), before);
       assert.deepEqual(database.prepare('SELECT * FROM sqlite_schema ORDER BY name').all(), schema);
       database.pragma('application_id = 99'); assert.throws(() => createSchema(database), /Unsupported/u);

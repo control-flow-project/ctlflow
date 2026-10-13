@@ -7,6 +7,7 @@ import type { listenerStatistics } from './statistics.js';
 import { reportActivity } from './activity.js';
 
 export function createListenerActivity(options: { client: Coordination; agentId: string; release: Manifest; control: ListenerControl;
+  log(message: string): void;
   clock: Clock; statistics: ReturnType<typeof listenerStatistics>; updated(release: string): void;
   started(runId: string, binding: ControllerBinding): void; failed(error: unknown): void }, signal: AbortSignal) {
   let current: { generation: AbortSignal; reporter: Awaited<ReturnType<typeof reportActivity>> } | undefined;
@@ -24,7 +25,7 @@ export function createListenerActivity(options: { client: Coordination; agentId:
     let reporter: Awaited<ReturnType<typeof reportActivity>>;
     try {
       reporter = await reportActivity(options.client, options.agentId, options.release, AbortSignal.any([signal, generation]),
-        binding, options.clock, options.statistics, options.updated);
+        binding, options.clock, options.statistics, options.log, options.updated);
     } catch (error) {
       signal.throwIfAborted();
       if (generation.aborted) return false;

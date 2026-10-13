@@ -5,22 +5,21 @@ import { canRecoverFailure, isListenerStop } from '@ctlflow/crossfire-kernel/lif
 import type { Configuration, Registration, FleetState, InstanceState, Operation, OperationInput, Instance, RetainedContext } from './model.js';
 import { createSetup } from './setup.js';
 import { createResumeSelections } from './resume-selection.js';
+import { loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
+import { createOperationHistory } from './operation-history.js';
 
 export function createController(services: Services) {
-  const initial = services.registry.registrations(), history = services.registry.operations(), intent = services.registry.desiredIntent();
+  const retention = loggingRetentionDays(services.loggingRetentionDays); if (!retention.ok) return retention;
+  const initial = services.registry.registrations(), histories = createOperationHistory(services.registry, services.now, retention.value), intent = services.registry.desiredIntent();
   if (!initial.ok) return initial;
-  if (!history.ok) return history;
+  if (!histories.ok) return histories;
   if (!intent.ok) return intent;
   const selections = createResumeSelections(services.registry, initial.value);
   if (!selections.ok) return selections;
   const resuming = selections.value;
   if (intent.value.some(item => !initial.value.some(record => record.fleetId === item.fleetId))) return failure('invalid', 'Desired binding references an unregistered fleet');
   let records = initial.value;
-  let operations = history.value.map(operation => ['succeeded', 'failed'].includes(operation.status) ? operation : {
-    ...operation, status: 'failed' as const, completedAt: services.now(), errors: [{ instanceKey: null, code: 'unavailable', message: 'Controller stopped before this operation completed; inspect and retry explicitly' }],
-  });
-  const saved = services.registry.saveOperations(operations);
-  if (!saved.ok) return saved;
+  const history = histories.value;
   const states = new Map<string, InstanceState>(), running = new Map<string, Running>();
   const active = new Map<string, { stop: AbortController; done: Promise<void> }>();
   const deployed = new Map<string, Configuration>(), mutations = new Map<string, Promise<void>>();
@@ -35,8 +34,9 @@ export function createController(services: Services) {
     const result = services.execution.connect(configuration, lifetime.signal, { execute: async input => {
       const record = records.find(item => item.directory === configuration.directory);
       if (!record) return failure('missing', 'This fleet is no longer registered');
-      const previous = operations.find(operation => operation.operationId === input.operationId);
-      for (const completed of operations.filter(operation => operation.target.fleetId === record.fleetId && operation.operationId !== input.operationId
+      const found = history.find(input.operationId); if (!found.ok) return found;
+      const previous = found.value;
+      for (const completed of history.pending().filter(operation => operation.target.fleetId === record.fleetId && operation.operationId !== input.operationId
         && operation.receiptPending && operation.completedAt !== null)) {
         const acknowledged = acknowledgeOperation(completed.operationId); if (!acknowledged.ok) return acknowledged;
       }
@@ -45,7 +45,8 @@ export function createController(services: Services) {
         expectedRevision: previous?.expectedRevision ?? record.revision }, true);
       if (!requested.ok) return requested;
       if (requested.value.completedAt === null) await active.get(record.fleetId)?.done;
-      const completed = operations.find(operation => operation.operationId === input.operationId);
+      const result = history.find(input.operationId); if (!result.ok) return result;
+      const completed = result.value;
       if (!completed || completed.completedAt === null) return failure('unavailable', 'The native session operation did not complete');
       return success({ status: completed.status === 'succeeded' ? 'succeeded' as const : 'failed' as const,
         errorMessage: completed.status === 'succeeded' ? null : completed.errors.map(error => (error.instanceKey ? error.instanceKey + ': ' : '') + error.message).join('; ').slice(0, 4096) || 'Native session operation failed' });
@@ -168,7 +169,7 @@ export function createController(services: Services) {
   }
   const setup = createSetup({ registry: services.registry, signal: lifetime.signal, id: services.id, stopping: () => stopping,
     registered: directory => records.find(record => record.directory === directory), restoring: fleetId => restoring.get(fleetId),
-    inspect: services.execution.inspect, add, view, test, operations: () => operations, operate });
+    inspect: services.execution.inspect, add, view, test, operation: history.find, operate });
   function mutable(fleetId: string, revision: number) {
     if (stopping) return failure('unavailable', 'Controller is stopping');
     if (mutations.has(fleetId)) return failure('conflict', 'A roster change is in progress');
@@ -226,13 +227,12 @@ export function createController(services: Services) {
     } finally { mutations.delete(fleetId); release(); }
   }
   function saveOperation(operation: Operation): void {
-    const next = operations.map(item => item.operationId === operation.operationId ? structuredClone(operation) : item);
-    const saved = services.registry.saveOperations(next);
+    const saved = history.save(operation);
     if (!saved.ok) throw new Error(saved.error.message);
-    operations = next;
   }
   function acknowledgeOperation(operationId: string): Result<void> {
-    const operation = operations.find(item => item.operationId === operationId);
+    const found = history.find(operationId); if (!found.ok) return found;
+    const operation = found.value;
     if (!operation || operation.completedAt === null) return failure('conflict', 'Only completed native operations can release their receipt pin');
     try {
       const { receiptPending: _pending, ...completed } = operation; saveOperation(completed);
@@ -513,8 +513,10 @@ export function createController(services: Services) {
     }
   }
   async function operate(input: OperationInput, receiptPending = false): Promise<Result<Operation>> {
+    const maintained = history.prune(); if (!maintained.ok) return maintained;
     if ((input.action === 'update') !== (input.releaseDirectory !== undefined)) return failure('invalid', 'Only an explicit software update supplies its installed release directory');
-    const existing = operations.find(operation => operation.operationId === input.operationId);
+    const found = history.find(input.operationId); if (!found.ok) return found;
+    const existing = found.value;
     if (existing) {
       const previous = { operationId: existing.operationId, target: existing.target, action: existing.action, expectedRevision: existing.expectedRevision, releaseDirectory: existing.releaseDirectory };
       return previous.action === input.action && previous.expectedRevision === input.expectedRevision && previous.target.kind === input.target.kind
@@ -526,7 +528,6 @@ export function createController(services: Services) {
     if (target.kind === 'daemon') {
       if (input.action !== 'stop' || input.expectedRevision !== 0 || target.fleetId !== undefined || target.instanceKey !== undefined) return failure('invalid', 'Daemon supports only an exact stop request');
       const operation: Operation = { ...input, status: 'running', createdAt: services.now(), completedAt: null, approval: null, errors: [] };
-      operations.push(operation);
       saveOperation(operation);
       await close();
       operation.status = 'succeeded'; operation.completedAt = services.now(); saveOperation(operation);
@@ -565,10 +566,8 @@ export function createController(services: Services) {
     const predecessor = active.get(target.fleetId);
     if (predecessor && input.action !== 'stop') return failure('conflict', 'Another operation is active for this fleet');
     const operation: Operation = { ...input, ...(receiptPending ? { receiptPending: true as const } : {}), status: 'accepted', createdAt: services.now(), completedAt: null, approval: null, errors: [] };
-    operations = [...operations.filter(item => item.completedAt === null || item.receiptPending),
-      ...operations.filter(item => item.completedAt !== null && !item.receiptPending).slice(-399), operation];
-    const stored = services.registry.saveOperations(operations);
-    if (!stored.ok) { operations = operations.filter(item => item !== operation); return stored; }
+    const stored = history.save(operation);
+    if (!stored.ok) return stored;
     if (input.action === 'stop' || input.action === 'reset') {
       const checkpoint = input.action === 'stop' ? resuming.stop(target.fleetId, enabled, target.instanceKey) : success(undefined);
       if (!checkpoint.ok) {
@@ -620,7 +619,7 @@ export function createController(services: Services) {
     running.clear();
     await services.execution.close();
   }
-  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), ready: () => restoration, list, view, attachment, contexts, test, add, setup, rename, remove, editInstance, operate, close,
+  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), maintainHistory: history.prune, ready: () => restoration, list, view, attachment, contexts, test, add, setup, rename, remove, editInstance, operate, close,
     async delivery(fleetId: string, input: { expectedRevision: number; enabled: boolean }) {
       const current = inspect(fleetId); if (!current.ok) return current;
       if (stopping) return failure('unavailable', 'Controller is stopping');
@@ -631,6 +630,6 @@ export function createController(services: Services) {
       if (stopping) return failure('unavailable', 'Controller is stopping');
       return services.execution.message(current.value.configuration, input);
     },
-    operation(id: string): Result<Operation> { const operation = operations.find(item => item.operationId === id); return operation ? success(structuredClone(operation)) : failure('missing', 'Operation not found'); } });
+    operation(id: string): Result<Operation> { const found = history.find(id); return !found.ok ? found : found.value ? success(structuredClone(found.value)) : failure('missing', 'Operation not found'); } });
 }
 export type FleetController = Extract<ReturnType<typeof createController>, { ok: true }>['value'];

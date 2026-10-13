@@ -7,7 +7,7 @@ import { readAuditEvents } from '@ctlflow/crossfire-domain/audit/read-events';
 import { success } from '@ctlflow/crossfire-kernel/result';
 import { bind, reply, paged, actor } from '../bind.js';
 import * as view from '../representation/instance.js';
-export function instanceRoutes(instance: string, startedAt: number) {
+export function instanceRoutes(instance: string, startedAt: number, loggingError: () => string | null) {
   return [
     bind(operations.principals, (context, _params, query) => paged(discoverPrincipals(context.services, actor(context), query))),
     bind(operations.resolvePrincipals, (context, _params, _query, input) => reply(resolvePrincipals(context.services, actor(context), input.matrixUserIds))),
@@ -20,6 +20,7 @@ export function instanceRoutes(instance: string, startedAt: number) {
     }),
     bind(operations.audit, (context, _params, query) => paged(readAuditEvents(context.services, actor(context), query), view.audit)),
     bind(operations.release, context => success({ data: context.manifest })),
-    bind(operations.health, context => success({ data: { instance, release: context.manifest.release, version: context.manifest.version, startedAt } })),
+    bind(operations.health, context => success({ data: { instance, release: context.manifest.release, version: context.manifest.version, startedAt,
+      loggingRetentionDays: context.services.logging.days, loggingError: loggingError() } })),
   ];
 }

@@ -126,6 +126,15 @@ not preservation assertions. Each protected relation is bounded to 100,000 rows;
 exceeding that bound fails explicitly. Hashes are used internally for comparison;
 reports contain counts, not private row data or credential hashes.
 
+After authorized logging cleanup, pass `--logging-retention-days DAYS` and
+`--retention-at UTC_ISO` together to `preservation`. Both are required; omission
+retains strict preservation. The proof permits only absent eligible logging
+records and reports their counts separately. Changed retained records, current
+native-stop evidence, credentials, active signup claims and business state remain
+strictly protected. Match the actual service configuration and cleanup timestamp;
+do not move the cutoff to excuse unrelated loss.
+- [Complete logging policy and preservation example](../docs/logging.md)
+
 This comparison is strict: configuration writes between snapshots, including a
 revision-only controller update, a fleet pause/resume or renewed native
 observations invalidating a close receipt, cause a conflict. Review

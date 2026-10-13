@@ -12,6 +12,10 @@ selects a dedicated content hostname, separate from the application and Matrix
 hosts. For public deployments use exact HTTPS origins and separate reverse-proxy
 vhosts; no origin is inferred. Optional `publicationBudget` configures finite
 reserved bytes, report counts and concurrent uploads.
+Optional `loggingRetentionDays` controls all owned logging history and diagnostic
+files, defaulting to 7 when omitted. It is a positive exact integer, not a string
+or an unlimited-retention switch. Service restart applies a private-file change.
+- [Logging families, controller configuration and preservation](logging.md)
 - [Content configuration, defaults and physical disk overhead](publications.md)
 
 ## Administration

@@ -9,6 +9,7 @@ import { verifyServer, serverExpectations } from './server.js';
 import { hostPlan, verifyHost, verifyArchive } from './host.js';
 import { enrollmentPlan, reviewEnrollment } from './enrollment.js';
 import { fleetWakePlan, reviewFleetWake } from './fleet-wake.js';
+import { loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
 
 const usage = `Crossfire operator tools (run after npm run build)
 release --origin URL --release-directory PATH [--web-directory PATH]
@@ -16,7 +17,7 @@ server --origin URL --credentials PATH [--expect PATH]
 browser --origin URL --credentials PATH --browser PATH --evidence PATH
 content --url URL --main-origin URL --browser PATH --evidence PATH
 database --file PATH [--expect PATH] [--schema]
-preservation --before PATH --after PATH
+preservation --before PATH --after PATH [--logging-retention-days DAYS --retention-at UTC_ISO]
 files --plan PATH
 archive --file PATH --sha256 HASH
 source --directory PATH [--revision SHA] [--tree SHA]
@@ -30,7 +31,7 @@ export async function inspect(arguments_: string[], signal: AbortSignal): Promis
   const required: Record<string, string[]> = { release: ['origin', 'release-directory'], server: ['origin', 'credentials'], browser: ['origin', 'credentials', 'browser', 'evidence'],
     content: ['url', 'main-origin', 'browser', 'evidence'], database: ['file'], preservation: ['before', 'after'], files: ['plan'], archive: ['file', 'sha256'], source: ['directory'], host: ['plan'], enrollment: ['origin', 'credentials', 'plan'], 'fleet-wake': ['origin', 'credentials', 'plan'] };
   if (!command || !Object.hasOwn(required, command)) return failure('invalid', usage);
-  const extra: Record<string, string[]> = { release: ['web-directory'], server: ['expect'], database: ['expect'], source: ['revision', 'tree'] };
+  const extra: Record<string, string[]> = { release: ['web-directory'], server: ['expect'], database: ['expect'], source: ['revision', 'tree'], preservation: ['logging-retention-days', 'retention-at'] };
   const parsed = options(args, required[command]!, [...(extra[command] ?? []), 'output'], command === 'database' ? ['schema'] : ['enrollment', 'fleet-wake'].includes(command) ? ['execute'] : []);
   if (!parsed.ok) return parsed;
   return saveReport(await selected(command, parsed.value, signal), parsed.value);
@@ -46,7 +47,15 @@ async function selected(command: string, values: Options, signal: AbortSignal): 
   if (command === 'files') { const plan = inputFile(text('plan'), fingerprintPlan); return plan.ok ? verifyFingerprints(plan.value) : plan; }
   if (command === 'source') return verifySource(text('directory'), textOption(values, 'revision'), textOption(values, 'tree'), signal);
   if (command === 'archive') return verifyArchive(text('file'), text('sha256'), signal);
-  if (command === 'preservation') return verifyPreservation(text('before'), text('after'));
+  if (command === 'preservation') {
+    const retention = textOption(values, 'logging-retention-days'), at = textOption(values, 'retention-at');
+    if (retention === undefined && at === undefined) return verifyPreservation(text('before'), text('after'));
+    if (retention === undefined || at === undefined || !/^[1-9][0-9]*$/u.test(retention)) return failure('invalid', 'Supply retention days and the exact cleanup UTC timestamp together');
+    const days = loggingRetentionDays(Number(retention)); if (!days.ok) return days;
+    const time = Date.parse(at);
+    if (!Number.isSafeInteger(time) || time < 0 || new Date(time).toISOString() !== at) return failure('invalid', 'Use a canonical UTC ISO retention timestamp');
+    return verifyPreservation(text('before'), text('after'), { loggingRetentionDays: days.value, at: time });
+  }
   if (command === 'database') {
     const expected = values.expect ? inputFile(text('expect'), databaseExpectations) : databaseExpectations({});
     return expected.ok ? inspectDatabase(text('file'), expected.value, values.schema === true) : expected;

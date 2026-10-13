@@ -49,8 +49,6 @@ export const enrollmentArchiveGuards = ['enrollment_archive', 'enrollment_archiv
   'enrollment_archive_permission', 'enrollment_archive_wake_sender', 'enrollment_archive_metadata'].map(table => `
 CREATE TRIGGER protect_${table}_update BEFORE UPDATE ON ${table}
 BEGIN SELECT RAISE(ABORT, 'Archived enrollment history is immutable'); END;
-CREATE TRIGGER protect_${table}_delete BEFORE DELETE ON ${table}
-BEGIN SELECT RAISE(ABORT, 'Archived enrollment history is immutable'); END;
 `).join('');
 
 export const controllerRunGuards = `

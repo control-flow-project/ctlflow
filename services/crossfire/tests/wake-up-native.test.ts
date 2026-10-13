@@ -35,7 +35,7 @@ test('real Conduit and stock Codex deliver idle-only scheduled input without cre
   const configuration = { name: 'Fetch fixture data', message: 'Scheduled fixture task; no paid provider.', schedule: { kind: 'interval' as const, seconds: 1 }, enabled: true, agentIds: [agent.id] };
   value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID()));
   const stop = new AbortController(); let ended: unknown, ready = false;
-  const receiver = listen({ binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ log: (_message: string) => {}, binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: admin.member.principal.matrixUserId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' }, id: agent.id,
     release: release.manifest,

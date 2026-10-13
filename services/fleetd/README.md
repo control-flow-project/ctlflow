@@ -23,6 +23,10 @@ fleetd --name laptop --root /absolute/private/controller
 
 The controller root contains its private descriptor, registry, operation state,
 desired binding intent, log and `fleetd.sock`. The API binds only this Unix socket, not a public port.
+Optional private `config.json` controls `loggingRetentionDays` (default 7).
+Timestamped diagnostics and completed operation history expire during idle
+maintenance; desired activation, saved histories and outstanding receipts do not.
+- [Logging configuration, rotation and preservation](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/logging.md)
 Private SQLite exclusive transactions own the daemon and each active fleet/receiver;
 OS locks survive suspension and release on process exit. No timeout lease or
 process-name scanning decides ownership. One root has one stable controller name.

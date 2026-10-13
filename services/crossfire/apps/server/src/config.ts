@@ -2,11 +2,13 @@ import { fields, text, userId } from "@ctlflow/crossfire-contracts/validation";
 import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
 import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 import { PUBLICATION_LIMITS, type PublicationBudget } from '@ctlflow/crossfire-domain/publication/values';
+import { loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
 
 export type Config = {
   instance: string; serverName: string; publicOrigin: string; contentOrigin: string; matrixOrigin: string;
   administrator: string; jwtSecret: string; registrationSecret: string;
   publicationBudget?: PublicationBudget;
+  loggingRetentionDays?: number;
 };
 
 export function publicationBudget(value: unknown = { instanceBytes: PUBLICATION_LIMITS.instanceBytes, agentBytes: PUBLICATION_LIMITS.agentBytes,
@@ -29,7 +31,7 @@ export function serviceUser(config: Config): string {
 }
 
 export function config(value: unknown): Result<Config> {
-  const parsed = fields(value, ["instance", "serverName", "publicOrigin", "contentOrigin", "matrixOrigin", "administrator", "jwtSecret", "registrationSecret"], ['publicationBudget']);
+  const parsed = fields(value, ["instance", "serverName", "publicOrigin", "contentOrigin", "matrixOrigin", "administrator", "jwtSecret", "registrationSecret"], ['publicationBudget', 'loggingRetentionDays']);
   if (!parsed.ok) return parsed;
   const input = parsed.value;
   if (!text(input.instance, 40) || !/^[a-z][a-z0-9-]*$/u.test(input.instance)
@@ -48,7 +50,8 @@ export function config(value: unknown): Result<Config> {
     || new URL(contentOrigin.value).protocol === 'https:' && [new URL(publicOrigin.value).hostname, new URL(matrixOrigin.value).hostname].includes(new URL(contentOrigin.value).hostname))
     return failure('invalid', 'Publications require a separate content hostname and origin');
   const budget = publicationBudget(input.publicationBudget); if (!budget.ok) return budget;
+  const retention = loggingRetentionDays(input.loggingRetentionDays); if (!retention.ok) return retention;
   return success({ instance: input.instance, serverName: input.serverName, publicOrigin: publicOrigin.value,
     contentOrigin: contentOrigin.value, matrixOrigin: matrixOrigin.value, administrator: input.administrator, jwtSecret: input.jwtSecret,
-    registrationSecret: input.registrationSecret, publicationBudget: budget.value });
+    registrationSecret: input.registrationSecret, publicationBudget: budget.value, loggingRetentionDays: retention.value });
 }

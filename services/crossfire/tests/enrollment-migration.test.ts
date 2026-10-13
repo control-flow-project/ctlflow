@@ -3,10 +3,12 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 import { restoreSchema14EnrollmentItems } from './support/schema14.js';
+import { restoreSchema16Logging } from './support/schema16.js';
 
 function priorStore() {
   const database = new Database(':memory:');
   database.pragma('foreign_keys=ON'); createSchema(database); restoreSchema14EnrollmentItems(database);
+  restoreSchema16Logging(database);
   database.exec(`ALTER TABLE agent ADD COLUMN display_name_override TEXT;
     INSERT INTO principal VALUES('owner','@owner:test','human','active',4,1),('agent','@agent:test','agent','active',7,1);
     INSERT INTO member VALUES('owner','human','Owner');
@@ -45,7 +47,7 @@ test('schema 14 partial rosters become exact immutable history without a runtime
     for (const [index,[source,target,key]] of relations.entries()) {
       assert.deepEqual(database.prepare('SELECT * FROM ' + target + ' ORDER BY 1,2').all(), originals[index], target);
       assert.deepEqual(database.prepare('SELECT * FROM ' + source + ' WHERE ' + key + " IN ('partial','pending')").all(), [], source);
-      assert.throws(() => database.exec('DELETE FROM ' + target), /immutable/u);
+      assert.throws(() => database.exec('UPDATE ' + target + ' SET ' + key + '=' + key), /immutable/u);
     }
     for (const [index,table] of protectedTables.entries()) assert.deepEqual(database.prepare('SELECT * FROM ' + table + ' ORDER BY 1').all(), protectedRows[index], table);
     assert.deepEqual(database.prepare('SELECT * FROM enrollment_item').all(), current);

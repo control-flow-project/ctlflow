@@ -16,9 +16,13 @@ export function authorizedRule(services: Services, actor: Actor, ruleId: string,
     || found.value.ownerId === actor.principalId && permissions.value.includes('wake-rule.' + action + '.owned')
     ? success(found.value) : failure('missing', 'Wake-up not found');
 }
-export function scheduledReceiver(services: Services, actor: Actor, agentId: string, runId: string) {
+export function wakeReceiverAuthority(services: Services, actor: Actor, agentId: string) {
   const allowed = authorize(services, actor, 'wake-delivery.receive.self'); if (!allowed.ok) return allowed;
   if (actor.kind !== 'agent' || actor.principalId !== agentId) return failure('missing', 'Wake-up receiver not found');
+  return success(undefined);
+}
+export function scheduledReceiver(services: Services, actor: Actor, agentId: string, runId: string) {
+  const allowed = wakeReceiverAuthority(services, actor, agentId); if (!allowed.ok) return allowed;
   const run = services.repositories.listenerRun.find({ id: runId }); if (!run.ok) return run;
   if (!run.value || run.value.agentId !== agentId) return failure('missing', 'Listener run not found');
   return success(run.value);

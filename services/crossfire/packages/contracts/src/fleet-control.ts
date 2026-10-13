@@ -19,8 +19,6 @@ export const fleetControlSnapshot = check.refine(check.object({ fleetId: check.i
   && snapshot.runtimeOperations.every(operation => operation.fleetId === snapshot.fleetId && (operation.status === 'pending' || operation.status === 'running')), 'Invalid fleet control snapshot');
 export const fleetMessageSummary = check.object({ messageId: check.identifier, body: messageBody, createdAt: check.integer(), expiresAt: check.integer(),
   total: check.integer(0, 100), delivered: check.integer(0, 100), failed: check.integer(0, 100), skipped: check.integer(0, 100), pending: check.integer(0, 100), expired: check.integer(0, 100) });
-export const fleetMessageReceipt = check.object({ messageId: check.identifier, agentId: check.identifier, status: check.choice('pending', 'delivered', 'failed', 'skipped'),
-  completedAt: check.nullable(check.integer()), errorMessage: check.nullable(check.text(1000)) });
 export const deliveryChange = check.object({ expectedRevision: check.integer(), enabled: check.boolean });
 export const messageCreation = check.object({ messageId: check.identifier, body: messageBody });
 export const connectionReport = check.object({ stopped: check.boolean });

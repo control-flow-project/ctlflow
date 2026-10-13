@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { executeSelect, executeInsert, executeUpdate, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
+import { executeSelect, executeInsert, executeUpdate } from '@tinqerjs/better-sqlite3-adapter';
 import type Database from 'better-sqlite3';
 import { schema, type Tables } from '../../schema/tables.js';
 import type { StatisticsBatch, Tokens } from '@ctlflow/crossfire-domain/statistics/types';
@@ -26,7 +26,6 @@ function delta(value: Tokens, before: Tables['runtime_usage_checkpoint'] | null 
     total: before ? latest.total - before.total : 0 };
 }
 export function statisticsRecorder(database: Database.Database) {
-  let prunedAt = -Infinity;
   return (agentId: string, runId: string, batch: StatisticsBatch, now: number) => stored(() => {
     const digest = createHash('sha256').update(JSON.stringify(batch)).digest('hex');
     const checkpoint = executeSelect(database, schema, (query, params) => query.from('listener_stat_checkpoint')
@@ -94,13 +93,6 @@ export function statisticsRecorder(database: Database.Database) {
       digest: params.digest, captured_at: params.now }).where(row => row.run_id === params.runId), receipt);
     else executeInsert(database, schema, (query, params) => query.insertInto('listener_stat_checkpoint').values({ run_id: params.runId,
       sequence: params.sequence, digest: params.digest, captured_at: params.now }), receipt);
-    if (now - prunedAt >= 3_600_000) {
-      const since = now - 30 * 24 * 60 * 60 * 1000;
-      executeDelete(database, schema, (query, params) => query.deleteFrom('listener_stat_interval').where(row => row.captured_at < params.since), { since });
-      executeDelete(database, schema, (query, params) => query.deleteFrom('runtime_usage_checkpoint').where(row => row.captured_at < params.since), { since });
-      executeDelete(database, schema, (query, params) => query.deleteFrom('listener_stat_checkpoint').where(row => row.captured_at < params.since), { since });
-      prunedAt = now;
-    }
     return success(undefined);
   });
 }

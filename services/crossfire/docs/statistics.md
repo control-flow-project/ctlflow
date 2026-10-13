@@ -47,11 +47,14 @@ statistics ingestion does not cancel a successful heartbeat or message delivery.
 Acknowledged summaries are released locally; shutdown attempts a final flush.
 Process death can lose unsent approximate counters, not delivery checkpoints.
 
-Crossfire aggregates normalized indexed hourly relations and keeps thirty days.
-Retention pruning occurs at most hourly on ingestion. Reads aggregate and page
+Crossfire aggregates normalized indexed hourly relations and follows the shared
+`loggingRetentionDays` policy (default seven days). Cleanup runs at startup and
+hourly even without ingestion; the configured retention bounds every period view.
+Reads aggregate and page
 in SQL. Period windows use summary capture time, not exact per-message billing
 timestamps. No polling model calls, message-body archive, pricing requests or
 realtime analytics stream are involved.
+- [Platform logging retention and protected state](logging.md)
 
 ## REST
 

@@ -19,15 +19,24 @@ import { createExecution } from './execution.js';
 import { createDaemonHttp } from './http.js';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
 import { migrateControllerContexts } from './context-migration.js';
+import { readLoggingConfiguration } from '@ctlflow/fleetd-storage/logging';
+import { createDiagnosticLog, migrateDiagnosticLog } from '@ctlflow/crossfire-adapter-filesystem/logging';
+import { createLoggingMaintenance } from '@ctlflow/crossfire-agent-core/logging-maintenance';
+import { LOGGING_MAINTENANCE_MS } from '@ctlflow/crossfire-kernel/logging';
+import { success } from '@ctlflow/crossfire-kernel/result';
 
 export async function startDaemon(root: string, name?: string, execution?: Execution) {
   if (!['linux', 'darwin'].includes(process.platform)) throw new Error('Fleet controller requires Linux or macOS');
   let parsed = parseController({ name: name ?? 'local' });
   if (!parsed.ok) throw new Error(parsed.error.message);
   prepareControllerRoot(root);
+  const loggingConfiguration = readLoggingConfiguration(root);
+  if (!loggingConfiguration.ok) throw new Error(loggingConfiguration.error.message);
   const unlock = await acquireProcessLock(join(root, 'daemon'));
   let cleanup = unlock;
+  let acquiredDiagnostics: ReturnType<typeof createDiagnosticLog> | undefined;
   try {
+    const diagnostics = acquiredDiagnostics = createDiagnosticLog(join(root, 'logs'), loggingConfiguration.value.loggingRetentionDays);
     const file = join(root, 'controller.json');
     if (existsSync(file)) {
       const existing = parseController(readJson<unknown>(file));
@@ -51,23 +60,38 @@ export async function startDaemon(root: string, name?: string, execution?: Execu
       unlinkSync(socketPath);
     }
     const created = createController({ registry: createRegistry(root), execution: execution ?? createExecution({ codex: codexRuntime(), pi: piRuntime() },
-      dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts')))), controller: parsed.value, id: randomUUID, now: Date.now, delay: nativeClock.delay });
+      dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts'))), diagnostics.write), controller: parsed.value,
+      loggingRetentionDays: loggingConfiguration.value.loggingRetentionDays, id: randomUUID, now: Date.now, delay: nativeClock.delay });
     if (!created.ok) throw new Error(created.error.message);
     const controller = created.value;
+    cleanup = async () => { try { await controller.close(); } finally { await unlock(); } };
+    const logging = createLoggingMaintenance(nativeClock, async () => {
+      const files = await diagnostics.prune();
+      const records = controller.maintainHistory();
+      const converted = await migrateDiagnosticLog(join(root, 'daemon.log'), join(root, 'logs'), loggingConfiguration.value.loggingRetentionDays);
+      if (!records.ok) return records;
+      if (!converted.ok) return converted;
+      if (!files.ok) return files;
+      return success({ more: records.value.more });
+    }, LOGGING_MAINTENANCE_MS, diagnostics.maintenanceError);
+    cleanup = async () => { try { await logging.close(); await controller.close(); } finally { await unlock(); } };
     let closing: Promise<void> | undefined;
-    const server = createDaemonHttp(controller, () => { void close(); });
+    const server = createDaemonHttp(controller, () => { void close(); }, () => ({ loggingRetentionDays: loggingConfiguration.value.loggingRetentionDays,
+      loggingError: diagnostics.error() }));
     const close = () => closing ??= (async () => {
-      try { await controller.close(); }
+      try { await logging.close(); await controller.close(); }
       finally {
         server.closeAllConnections();
-        await new Promise<void>(resolve => server.close(() => resolve()));
+        if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
         await unlock();
+        diagnostics.close();
       }
     })();
     cleanup = close;
     server.listen(socketPath); await once(server, 'listening'); chmodSync(socketPath, 0o600);
-    return { controller, close, socketPath };
-  } catch (error) { await cleanup(); throw error; }
+    diagnostics.write('Fleet controller ready: ' + parsed.value.name);
+    return { controller, close, socketPath, diagnostics };
+  } catch (error) { acquiredDiagnostics?.write(error instanceof Error ? error.message : 'Fleet controller failed'); await cleanup(); acquiredDiagnostics?.close(); throw error; }
 }
 const invoked = process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invoked) {
@@ -79,6 +103,9 @@ if (invoked) {
   } else {
     const daemon = await startDaemon(resolve(values.root), values.name);
     console.log(JSON.stringify({ status: 'ready', controller: daemon.controller.status().controller, socket: daemon.socketPath }));
+    const fatal = (error: Error) => daemon.diagnostics.write('Fleet controller process failed: ' + error.message);
+    process.on('uncaughtExceptionMonitor', fatal);
+    process.on('warning', warning => daemon.diagnostics.write('Node warning: ' + warning.message));
     for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => { void daemon.close(); });
   }
 }

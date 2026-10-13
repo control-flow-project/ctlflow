@@ -73,7 +73,7 @@ test("private service starts with real native bootstrap and shuts down idempoten
   const identity = (await health.json() as { data: { startedAt: number } }).data;
   assert(Number.isFinite(identity.startedAt));
   assert.deepEqual(identity, { instance: config.instance, version: release.version, release: release.release,
-    startedAt: identity.startedAt });
+    startedAt: identity.startedAt, loggingRetentionDays: 7, loggingError: null });
   await service.worker.drain();
   await Promise.all([service.close(), service.close()]);
   assert.equal(service.server.listening, false);

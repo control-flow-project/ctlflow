@@ -44,7 +44,7 @@ test('uncertain receipts reclaim the same command identity after reconnect witho
     assert.equal(body.connectionId, generation);
     if (String(url).endsWith('/claim')) { generations.push(body.connectionId); return response({ ...operation, status: 'running' }); }
     if (loseReceipt) { loseReceipt = false; throw new Error('Native result was saved, but remote receipt was lost'); }
-    return response({ ...operation, status: 'succeeded', completedAt: 2 });
+    return response({ recorded: true });
   } });
   const worker = createFleetRuntimeWorker({ client, fleetId: operation.fleetId, connection: () => ({ connected: true, id: generation }),
     fail: message => { failures.push(message); }, acknowledged: () => { acknowledgements++; return success(undefined); },
@@ -70,7 +70,7 @@ test('slow native lifecycle operations do not block controller polling, lease re
       const view = { fleetId: operation.fleetId, revision: 1, deliveryEnabled: true, connection: { status: 'online', lastSeenAt: Date.now() } };
       let data: unknown;
       if (url.pathname.endsWith('/claim')) { claims++; data = { ...operation, status: 'running' }; }
-      else if (url.pathname.endsWith('/receipt')) { finished = true; data = { ...operation, status: 'succeeded', completedAt: 2 }; }
+      else if (url.pathname.endsWith('/receipt')) { finished = true; data = { recorded: true }; }
       else if (request.method === 'PUT') { renewals++; data = view; }
       else { polls++; data = { ...view, agentIds: [], messages: [], runtimeOperations: finished ? [] : [operation] }; }
       request.resume(); reply.writeHead(200, { 'Content-Type': 'application/json' }); reply.end(JSON.stringify({ data, meta: { requestId: randomUUID() } }));

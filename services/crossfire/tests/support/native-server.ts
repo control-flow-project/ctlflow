@@ -11,7 +11,7 @@ import { publicRouter } from '../../apps/server/src/router.js';
 import type { ElementPresentation } from '../../apps/server/src/element-configuration.js';
 import { secureRouter } from './tls.js';
 export async function nativeServer(scope: TestContext, release: Release, presentation: ElementPresentation = {}, element?: string) {
-  const fixture = await nativeApplication(scope), worker = createWorker(fixture.services);
+  const fixture = await nativeApplication(scope), worker = createWorker(fixture.services, fixture.application.diagnostics);
   const server = createHttpServer(fixture.application, worker, release, presentation);
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const address = server.address(); assert(address && typeof address !== 'string');

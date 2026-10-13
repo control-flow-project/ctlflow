@@ -188,8 +188,8 @@ application state.
 
 ## Migration and verification
 
-The current database is schema 15. Fresh stores initialize it directly. Only the
-inventoried deployed schemas 13 and 14 have transactional forward conversions;
+The current database is schema 17. Fresh stores initialize it directly. Only the
+inventoried deployed schemas 13–16 have transactional forward conversions;
 versions 1–12, foreign stores and future versions are refused without changes. Conversion
 retains publications/files, identities, credentials, room grants, native histories,
 runtime/usage/receipt records and audit. Wake selections gain explicit ownership

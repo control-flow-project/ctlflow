@@ -109,7 +109,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const initialized = await bootstrap(config, { servicePassword: secret(), administratorPassword: password });
   assert(initialized.ok, JSON.stringify(initialized));
   const application = createApplication(join(directory, 'management.sqlite'), config), { services } = application;
-  const worker = createWorker(services);
+  const worker = createWorker(services, application.diagnostics);
   const release = await releaseFixture();
   const service = createHttpServer(application, worker, release);
   service.listen(0, '127.0.0.1'); await once(service, 'listening');
@@ -297,7 +297,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const binding = control.listener(profile.id);
   await until(() => control.status().connected);
   const cursorFile = join(stateDirectory, 'cursors.json');
-  const receiving = listen({ binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile,
+  const receiving = listen({ log: (_message: string) => {}, binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile,
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
     runtime: (signal, pollMs, hooks) => resumeFixture({ ...engine, pollMs, hooks }, signal),
   }, stop.signal).catch(error => { if (!stop.signal.aborted) listenerFailure = error; });

@@ -11,7 +11,9 @@ import type { ScheduleCalculator } from './schedule.js';
 import type { RuntimeRepository } from '../runtime/types.js';
 import type { StatisticsRepository } from '../statistics/types.js';
 import type { PublicationService } from '../publication/port.js';
+import type { LoggingRetention } from './logging.js';
 export type Services = {
+  logging: LoggingRetention;
   publication: PublicationService;
   statistics: StatisticsRepository;
   runtime: RuntimeRepository;

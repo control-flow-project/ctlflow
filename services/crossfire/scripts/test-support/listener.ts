@@ -370,7 +370,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   settings.homeserver = `http://127.0.0.1:${address.port}`;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
+  return { log: (_message: string) => {}, binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
     answerDecision(id: string, optionId = '0', text: string | null = null) {
       const decision = decisions.get(id)!; decision.status = 'answered';
       decision.answers = decision.questions.map(question => ({ questionId: question.id, optionId: text === null ? optionId : null, text }));

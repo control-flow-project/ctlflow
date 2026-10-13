@@ -19,6 +19,7 @@ import { applicationFixture, value, secret } from './support/application.js';
 import { inspectDatabase, verifyPreservation, databaseExpectations } from '../tools/database.js';
 import { restoreSchema14EnrollmentItems } from './support/schema14.js';
 import { schema15Store } from './support/schema15.js';
+import { restoreSchema16Logging } from './support/schema16.js';
 
 test('operator database inspection is readonly, complete and proves protected records across upgrades', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-database-'));
@@ -146,7 +147,7 @@ test('operator preservation proves schema 14 conversion including exact prior au
     database.exec('ALTER TABLE agent ADD COLUMN display_name_override TEXT');
     restoreSchema14EnrollmentItems(database);
     database.prepare('UPDATE agent SET display_name_override=? WHERE principal_id=?').run('Retired caption', agent.id);
-    database.pragma('user_version=14'); copyFileSync(current, before);
+    restoreSchema16Logging(database); database.pragma('user_version=14'); copyFileSync(current, before);
     createSchema(database);
     const report = value(verifyPreservation(before, current));
     assert.equal(report.forwardMigration, true); assert.equal(report.preserved.agent, 1);

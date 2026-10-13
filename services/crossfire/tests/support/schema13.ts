@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 import { restoreSchema14EnrollmentItems } from './schema14.js';
+import { restoreSchema16Logging } from './schema16.js';
 
 export const schema13Tables = ["agent","agent_wake_sender","enrollment_item_policy","enrollment_item_wake_sender","enrollment_archive_policy","enrollment_archive_wake_sender"];
 export const schema13Wake = `
@@ -63,6 +64,7 @@ export function schema13Store() {
   const database = new Database(':memory:');
   database.pragma('foreign_keys = ON');
   createSchema(database);
+  restoreSchema16Logging(database);
   restoreSchema14EnrollmentItems(database);
   database.pragma('foreign_keys = OFF');
   for (const table of schema13Tables) database.exec('DROP TABLE ' + table);

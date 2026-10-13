@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -120,7 +120,8 @@ test('repeat setup waits for its ongoing native restoration without another star
   finish(); const result = value(await repeated); assert.equal(result.status, 'ready'); assert.equal(result.operation, null);
   assert.equal(result.fleet.instances[0]!.sessionId, history);
   assert.deepEqual(current.calls.filter(call => call.startsWith('start:')).map(call => call.split(':').at(-1)), ['operator', 'recovery']);
-  assert.equal(current.calls.filter(call => call === 'prepare').length, 1); assert.equal(value(current.registry.operations()).length, 1);
+  assert.equal(current.calls.filter(call => call === 'prepare').length, 1); assert.equal(value(current.registry.operation(first.operation!.operationId))!.operationId, first.operation!.operationId);
+  assert.equal(readdirSync(join(current.directory, 'controller', 'operations')).length, 1);
 });
 
 test('setup awaits only its own restored fleet and does not wait for unrelated native initialization', async scope => {
@@ -152,7 +153,8 @@ test('successful restoration finishes interrupted setup without repeating lifecy
   const repeated = value(await reopened.setup(current.input)); assert.equal(repeated.status, 'ready'); assert.equal(repeated.operation, null);
   assert.equal(repeated.fleet.instances[0]!.sessionId, history); assert.equal(value(current.registry.setup(current.input)).completed, true);
   assert.deepEqual(current.calls.filter(call => call.startsWith('start:')).map(call => call.split(':').at(-1)), ['operator', 'recovery']);
-  assert.equal(current.calls.filter(call => call === 'prepare').length, 1); assert.equal(value(current.registry.operations()).length, 1);
+  assert.equal(current.calls.filter(call => call === 'prepare').length, 1); assert.equal(value(current.registry.operation(first.operation!.operationId))!.operationId, first.operation!.operationId);
+  assert.equal(readdirSync(join(current.directory, 'controller', 'operations')).length, 1);
 });
 
 test('explicit stop during setup restoration stays stopped rather than restarting after its readiness wait', async scope => {

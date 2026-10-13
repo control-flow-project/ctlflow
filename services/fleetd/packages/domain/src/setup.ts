@@ -13,7 +13,7 @@ type SetupPorts = {
   add(directory: string): Result<FleetState>;
   view(fleetId: string): Result<FleetState>;
   test(fleetId: string): Promise<Result<void>>;
-  operations(): Operation[];
+  operation(id: string): Result<Operation | null>;
   operate(input: OperationInput): Promise<Result<Operation>>;
 };
 
@@ -41,9 +41,10 @@ export function createSetup(ports: SetupPorts) {
       const fleet = registered ? ports.view(registered.fleetId) : ports.add(configuration.directory);
       if (!fleet.ok) return fleet;
       if (completed) return existing(fleet.value);
-      const operation = ports.operations().find(operation => operation.operationId === operationId);
-      const deliberatelyStopped = operation && ports.operations().some(candidate => candidate.action === 'stop' && candidate.target.fleetId === fleet.value.fleetId
-        && candidate.status === 'succeeded' && candidate.createdAt >= operation.createdAt);
+      const history = ports.operation(operationId); if (!history.ok) return history;
+      const operation = history.value;
+      const deliberatelyStopped = registered && fleet.value.resumeInstanceKeys !== null
+        && fleet.value.instances.every(instance => !instance.desiredActive);
       const restored = registered && operation?.status === 'failed' && fleet.value.instances.length > 0
         && fleet.value.instances.every(instance => instance.desiredActive && !!instance.sessionId && ['running', 'sleeping'].includes(instance.phase));
       if (deliberatelyStopped || restored) {

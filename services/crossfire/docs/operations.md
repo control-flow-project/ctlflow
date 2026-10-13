@@ -26,7 +26,7 @@ Crossfire installs no systemd, global skills, certificates or host permissions.
 
 ## Schema and report storage
 
-Schema 15 accepts a fresh store or inventoried deployed schemas 13 and 14 only.
+Schema 17 accepts a fresh store or inventoried deployed schemas 13–16 only.
 Versions 1–12 and foreign/future stores fail without mutation. Conversion retains
 identities, native credentials, histories, grants, publications, receipts and audit.
 It converts old wake presets to exact explicit person/group selections in agent,
@@ -40,7 +40,9 @@ unchanged. The current inventory has 63 singular tables.
 Unbound historical identities are excluded from operational authentication and
 directories until a new owner-reviewed fleet enrollment proves private identity.
 Every new reporting run requires its exact active fleet/current controller lease.
-Archive/retirement timestamps and native-stop receipts do not authorize data loss.
+Archive/retirement timestamps and native-stop receipts do not authorize resets or
+loss of current authority. Schema 17 allows age-based historical archive deletion
+while retaining update immutability and required current native-stop evidence.
 Management and Fleet CLI use the same archive resource and expected revision.
 An authorized human or the owning authenticated controller can archive; controller
 archive also requires its current live lease. Both require settled native-stop
@@ -78,7 +80,9 @@ report storage and verified backups. Native disk/capacity exhaustion returns
 storage-unavailable; its transaction rolls back without committing partial
 changes. Retry the original operation after capacity is available. It is not
 permission to discard audit, credentials, identities, receipts or native history.
-API payload bounds and the existing thirty-day statistics retention are unchanged.
+API payload bounds are unchanged. All platform-owned logging uses
+`loggingRetentionDays`, default seven days, with bounded idle maintenance.
+- [Logging policy, records covered, files and backup verification](logging.md)
 
 ## Software updates
 

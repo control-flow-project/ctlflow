@@ -4,12 +4,14 @@ import Database from 'better-sqlite3';
 import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 import { agentChange } from '@ctlflow/crossfire-contracts/schema/request';
 import { restoreSchema14EnrollmentItems } from './support/schema14.js';
+import { restoreSchema16Logging } from './support/schema16.js';
 
 test('schema 14 preserves identity and private state while retiring independent labels into audit', () => {
   const database = new Database(':memory:');
   try {
     database.pragma('foreign_keys=ON'); createSchema(database);
     restoreSchema14EnrollmentItems(database);
+    restoreSchema16Logging(database);
     database.exec(`ALTER TABLE agent ADD COLUMN display_name_override TEXT;
       INSERT INTO principal VALUES('owner','@owner:test','human','active',4,1),('agent','@agent:test','agent','active',7,1);
       INSERT INTO member VALUES('owner','human','Owner');

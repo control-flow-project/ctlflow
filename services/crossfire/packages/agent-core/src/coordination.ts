@@ -10,7 +10,7 @@ export type Coordination = {
   origin: string;
   createDecision(agentId: string, input: DecisionCreation, signal?: AbortSignal): Promise<Result<DecisionView>>;
   pollDecision(agentId: string, decisionId: string, signal?: AbortSignal): Promise<Result<{ status: DecisionView['status']; answers: DecisionAnswer[] }>>;
-  receiptDecision(agentId: string, decisionId: string, status: 'responded' | 'cancelled', signal?: AbortSignal): Promise<Result<{ accepted: boolean }>>;
+  receiptDecision(agentId: string, decisionId: string, status: 'responded' | 'cancelled', signal?: AbortSignal): Promise<Result<{ recorded: boolean }>>;
   runtime(agentId: string, runId: string, input: RuntimeObservation, signal?: AbortSignal): Promise<Result<{ accepted: boolean }>>;
   release(signal?: AbortSignal): Promise<Result<Manifest>>;
   delivery(agentId: string, signal?: AbortSignal): Promise<Result<DeliveryPolicy>>;
