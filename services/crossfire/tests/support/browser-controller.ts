@@ -1,7 +1,7 @@
 import type { TestContext } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
 import type { FleetRuntimeExecutor } from '@ctlflow/crossfire-adapter-crossfire/fleet-runtime';
 import type { ControllerProof } from '@ctlflow/crossfire-domain/listener/controller';

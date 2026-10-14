@@ -1,10 +1,10 @@
+import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { join } from 'node:path';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import type { TestContext } from 'node:test';
 import { listenerStatistics } from '@ctlflow/crossfire-agent-core/statistics';
 import { eventView } from '@ctlflow/crossfire-agent-core/receive';
@@ -12,13 +12,16 @@ import { codexUsage } from '@ctlflow/crossfire-adapter-codex/usage';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
 import { statisticsBatch, statisticsQuery, STATISTICS_LIMITS, type UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 import { reportListener } from '@ctlflow/crossfire-domain/listener/report';
+import { maintainLogging } from '@ctlflow/crossfire-domain/maintenance/logging';
 import { applicationFixture, value } from './support/application.js';
 import { message, OBSERVER, ROOM } from '../scripts/test-support/listener.js';
 
 const sample = (sessionId: string, input = 100, output = 20): UsageSample => ({ runtime: 'codex', sessionId,
   tokens: { input, cachedInput: input / 2, cacheWriteInput: null, output, reasoningOutput: output / 2, total: input + output } });
 async function fixtureStore(scope: TestContext) {
-  const file = join(mkdtempSync(join(process.cwd(), '.temp/statistics-')), 'management.sqlite'), database = openStore(file);
+  const directory = mkdtempSync(join(process.cwd(), '.temp/statistics-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true }));
+  const file = join(directory, 'management.sqlite'), database = openTestStore(file);
   cleanup(scope, () => database.close());
   return { ...await applicationFixture(scope, file), database };
 }
@@ -59,7 +62,7 @@ test('collection overflow is observable and native token hooks reject corrupt, f
   for (const query of ['hours=0', 'hours=24&hours=24', 'page=1e2', 'page=01', 'agentPage=2', 'pageSize=101']) assert(!statisticsQuery(new URLSearchParams(query)).ok);
 });
 
-test('hourly normalized summaries are idempotent, paginated in SQL, token-baselined across restarts and retained for thirty days', async scope => {
+test('hourly normalized summaries are idempotent, paginated in SQL, token-baselined across restarts and cleaned by shared retention', async scope => {
   const fixture = await fixtureStore(scope), agent = await fixture.agent(fixture.admin.actor, 'stats'), other = await fixture.agent(fixture.admin.actor, 'other');
   const run = randomUUID(), session = randomUUID(), collected = listenerStatistics(agent.matrixUserId, fixture.now);
   const heartbeat = (statistics: ReturnType<typeof collected.batch>, runId = run) => value(reportListener(fixture.services, agent.actor, agent.id, runId,
@@ -83,7 +86,7 @@ test('hourly normalized summaries are idempotent, paginated in SQL, token-baseli
   assert.deepEqual(database.pragma('foreign_key_check'), []);
   const plan = database.prepare('EXPLAIN QUERY PLAN SELECT * FROM listener_stat_interval WHERE agent_id = ? AND captured_at >= ?').all(agent.id, 0) as { detail: string }[];
   assert(plan.some(row => row.detail.includes('ix_listener_stat_interval_agent_captured')));
-  fixture.advance(31 * 86400000); fixture.renewController(agent.controller);
+  fixture.advance(8 * 86400000); value(maintainLogging(fixture.services)); fixture.renewController(agent.controller);
   assert(heartbeat({ ...second, sequence: 2, flows: [], usage: [sample(session, 200, 50)] }, randomUUID()).statisticsAccepted);
   assert.equal(value(fixture.services.statistics.read([agent.id], 0, 1, 20)).totals.observed, 0);
 });

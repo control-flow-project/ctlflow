@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import { API } from '@ctlflow/crossfire-contracts/matrix';

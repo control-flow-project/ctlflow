@@ -34,7 +34,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
   const register = registrationTransport(services);
   const fleetChanges = createFleetChanges();
   const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...wakeUpRoutes(), ...roomRoutes(), ...memberRoutes(),
-    ...runtimeRoutes(), ...publicationRoutes(), ...instanceRoutes(config.instance, services.clock.now())];
+    ...runtimeRoutes(), ...publicationRoutes(), ...instanceRoutes(config.instance, services.clock.now(), application.diagnostics.error)];
   const limits = new Map<string, { count: number; expiresAt: number }>();
   function rate(request: IncomingMessage): boolean {
     const now = services.clock.now();

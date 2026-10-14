@@ -1,0 +1,41 @@
+<Solution>
+  <Folder Name="/crossfire/">
+    <Project Path="services/crossfire/csharp/apps/Crossfire.Server/Crossfire.Server.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.Kernel/Crossfire.Kernel.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.Contracts/Crossfire.Contracts.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.Domain/Crossfire.Domain.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterHttp/Crossfire.AdapterHttp.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Crossfire.AdapterMatrix.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterSchedule/Crossfire.AdapterSchedule.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Crossfire.AdapterSqlite.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AgentCore/Crossfire.AgentCore.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterCodex/Crossfire.AdapterCodex.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterPi/Crossfire.AdapterPi.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterRuntime/Crossfire.AdapterRuntime.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterToml/Crossfire.AdapterToml.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterClient/Crossfire.AdapterClient.csproj" />
+  </Folder>
+  <Folder Name="/fleetd/">
+    <Project Path="services/fleetd/csharp/apps/Fleetd.Daemon/Fleetd.Daemon.csproj" />
+    <Project Path="services/fleetd/csharp/packages/Fleetd.Domain/Fleetd.Domain.csproj" />
+    <Project Path="services/fleetd/csharp/packages/Fleetd.Contracts/Fleetd.Contracts.csproj" />
+    <Project Path="services/fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj" />
+    <Project Path="services/fleetd/csharp/packages/Fleetd.AdapterExecution/Fleetd.AdapterExecution.csproj" />
+  </Folder>
+  <Folder Name="/fleet/">
+    <Project Path="services/fleet/csharp/apps/Fleet.Cli/Fleet.Cli.csproj" />
+    <Project Path="services/fleet/csharp/packages/Fleet.DaemonClient/Fleet.DaemonClient.csproj" />
+    <Project Path="services/fleet/csharp/packages/Fleet.SshTransport/Fleet.SshTransport.csproj" />
+  </Folder>
+  <Folder Name="/build/">
+    <Project Path="services/crossfire/csharp/build/Crossfire.EfCompiler/Crossfire.EfCompiler.csproj" />
+    <Project Path="services/crossfire/csharp/build/Crossfire.EfHost/Crossfire.EfHost.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="services/crossfire/csharp/tests/Crossfire.Storage.Tests/Crossfire.Storage.Tests.csproj" />
+    <Project Path="services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Crossfire.Runtime.Tests.csproj" />
+    <Project Path="services/fleetd/csharp/tests/Fleetd.Domain.Tests/Fleetd.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

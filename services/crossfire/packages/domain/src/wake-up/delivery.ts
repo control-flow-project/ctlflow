@@ -1,7 +1,7 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor, Services } from '../port/services.js';
 import { HEARTBEAT_EXPIRY_MS } from '../listener/report.js';
-import { liveReceiver, scheduledReceiver, ruleCanWake } from './authority.js';
+import { liveReceiver, scheduledReceiver, ruleCanWake, wakeReceiverAuthority } from './authority.js';
 import type { ScheduledWake, WakeDelivery, WakeRule } from './types.js';
 
 export type WakeAttachment = { runId: string; sessionId: string };
@@ -77,9 +77,11 @@ export function validateWake(services: Services, actor: Actor, agentId: string, 
 }
 export function acknowledgeWake(services: Services, actor: Actor, agentId: string, deliveryId: string, input: WakeAttachment) {
   return services.unitOfWork.run(() => {
-    const receiver = scheduledReceiver(services, actor, agentId, input.runId); if (!receiver.ok) return receiver;
+    const parsed = attachment(input); if (!parsed.ok) return parsed;
+    const authority = wakeReceiverAuthority(services, actor, agentId); if (!authority.ok) return authority;
     const delivery = services.repositories.wakeDelivery.find(deliveryId); if (!delivery.ok) return delivery;
     if (!delivery.value) return success({ recorded: false });
+    const receiver = scheduledReceiver(services, actor, agentId, input.runId); if (!receiver.ok) return receiver;
     if (delivery.value.agentId !== agentId || delivery.value.runId !== input.runId || delivery.value.sessionId !== input.sessionId) {
       return failure('missing', 'Wake-up receipt not found');
     }

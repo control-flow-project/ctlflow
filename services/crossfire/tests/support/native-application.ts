@@ -16,13 +16,14 @@ import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authorit
 import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
 import type { Actor } from '@ctlflow/crossfire-domain/port/services';
 import { value, secret } from './application.js';
+import { applicationDatabase } from './storage.js';
 export async function nativeApplication(scope: TestContext) {
   const started = performance.now();
   const jwtSecret = secret(), native = await conduitFixture(scope, { jwtSecret });
   const service = await native.register('crossfire-tests'), administrator = await native.register('admin');
   const config = { instance: 'tests', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost', matrixOrigin: native.base,
     administrator: administrator.id, registrationSecret: native.registrationToken, jwtSecret };
-  const application = createApplication(':memory:', config), { services } = application;
+  const application = createApplication(applicationDatabase(scope), config), { services } = application;
   cleanup(scope, () => application.close());
   async function login(token: string) {
     const session = value(await createSession(services, token)), authenticated = value(await authenticateMember(services, session.secret));

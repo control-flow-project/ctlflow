@@ -10,8 +10,10 @@ export type Registry = {
   saveDesiredIntent(values: DesiredIntent[]): Result<void>;
   resumeSelections(): Result<ResumeSelection[]>;
   saveResumeSelections(values: ResumeSelection[]): Result<void>;
-  operations(): Result<Operation[]>;
-  saveOperations(values: Operation[]): Result<void>;
+  pendingOperations(): Result<Operation[]>;
+  operation(id: string): Result<Operation | null>;
+  saveOperation(value: Operation): Result<void>;
+  pruneOperations(cutoff: number, limit: number): Result<{ more: boolean }>;
   load(directory: string): Result<Configuration>;
   writeRoster(configuration: Configuration, roster: Roster): Result<Configuration>;
   setup(input: SetupInput): Result<SetupConfiguration>;
@@ -45,4 +47,5 @@ export type Execution = {
   update(configuration: Configuration, instance: Instance, releaseDirectory: string, signal: AbortSignal): Promise<Result<void>>;
 };
 export type Services = { registry: Registry; execution: Execution; controller: Controller; now(): number; id(): string;
+  loggingRetentionDays?: number;
   delay(milliseconds: number, signal: AbortSignal): Promise<void> };

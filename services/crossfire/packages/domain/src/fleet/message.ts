@@ -92,13 +92,14 @@ export function acknowledgeFleetMessage(services: FleetControlServices, actor: F
   return services.unitOfWork.run(() => {
     const fleet = authorizedFleet(services, actor, fleetId); if (!fleet.ok) return fleet;
     const message = services.repositories.fleetMessage.find(messageId); if (!message.ok) return message;
-    if (!message.value || message.value.fleetId !== fleetId) return failure('missing', 'Fleet message not found');
+    if (!message.value) return success({ recorded: false });
+    if (message.value.fleetId !== fleetId) return failure('missing', 'Fleet message not found');
     const delivery = services.repositories.fleetMessageDelivery.find(messageId, agentId); if (!delivery.ok) return delivery;
     if (!delivery.value) return failure('missing', 'Fleet message recipient not found');
     if (delivery.value.status !== 'pending') return delivery.value.status === input.status && delivery.value.errorMessage === input.errorMessage
-      ? success(delivery.value) : failure('conflict', 'This recipient already has a different final outcome');
+      ? success({ recorded: true }) : failure('conflict', 'This recipient already has a different final outcome');
     const next = { ...delivery.value, ...input, completedAt: services.clock.now() };
     const saved = services.repositories.fleetMessageDelivery.update(next);
-    return saved.ok ? success(next) : saved;
+    return saved.ok ? success({ recorded: true }) : saved;
   });
 }

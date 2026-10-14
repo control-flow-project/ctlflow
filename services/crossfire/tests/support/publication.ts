@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { binaryBytes } from '@ctlflow/crossfire-kernel/bytes';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { publicationMedia } from '@ctlflow/crossfire-domain/publication/validation';

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { value } from './application.js';

@@ -94,7 +94,7 @@ export function auditSource(root: string, owner: string, file: string, text: str
       continue;
     }
     if (name.startsWith('node:')) {
-      if (kind === 'domain' || kind === 'kernel' || kind === 'contracts') failures.push('Pure domain/value/contracts layers cannot import native platform APIs: ' + name);
+      if (kind === 'domain' || kind === 'kernel' || kind === 'contracts' || kind === 'client' || kind === 'web') failures.push('Pure domain/value/contracts and browser layers cannot import native platform APIs: ' + name);
       continue;
     }
     const packageName = name.startsWith('@') ? name.split('/').slice(0, 2).join('/') : name.split('/')[0]!;
@@ -112,12 +112,13 @@ export function auditSource(root: string, owner: string, file: string, text: str
       || relative(resolve(root, target.path), resolve(root, target.path, exported)).startsWith('..')
       || !existsSync(resolve(root, target.path, exported))) failures.push('Use an existing declared package export: ' + name);
     const targetKind = target.path.split('/')[3]!;
+    if ((kind === 'client' || kind === 'web') && !['client', 'kernel', 'contracts'].includes(targetKind)) failures.push('Shared browser/client code cannot depend on backend implementations: ' + name);
     if (kind === 'kernel' && targetKind !== 'kernel') failures.push('Kernel cannot depend on a higher product layer: ' + name);
     if (kind === 'contracts' && !['contracts', 'kernel', 'domain'].includes(targetKind)) failures.push('Wire contracts cannot depend on runtime ports or concrete implementations: ' + name);
-    if (kind === 'domain' && (targetKind === 'contracts' || targetKind.startsWith('adapter-') || targetKind === 'test-support')) failures.push('Domain cannot depend on transport, storage, adapters or fixtures: ' + name);
+    if (kind === 'domain' && (targetKind === 'contracts' || targetKind === 'client' || targetKind.startsWith('adapter-') || targetKind === 'test-support')) failures.push('Domain cannot depend on transport, storage, adapters or fixtures: ' + name);
     if ((kind === 'contracts' || kind === 'agent-core' || kind === 'domain' && target.path !== owner)
       && targetKind === 'domain' && (!exported || !pureValues(resolve(root, target.path, exported)))) failures.push('Consume only pure domain values, not use cases or repositories: ' + name);
-    if (kind === 'agent-core' && (targetKind.startsWith('adapter-') || targetKind === 'test-support')) failures.push('Core ports cannot depend on concrete adapters: ' + name);
+    if (kind === 'agent-core' && (targetKind === 'client' || targetKind.startsWith('adapter-') || targetKind === 'test-support')) failures.push('Core ports cannot depend on concrete adapters: ' + name);
     if (kind === 'domain' && targetKind === 'agent-core'
       && (!exported || !pureValues(resolve(root, target.path, exported)))) failures.push('Domain consumes pure core ports and values, not executable core logic: ' + name);
   }

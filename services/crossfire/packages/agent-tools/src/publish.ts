@@ -1,5 +1,5 @@
 import { publicationSource } from '@ctlflow/crossfire-adapter-filesystem/publication/source';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { Profile } from '@ctlflow/crossfire-contracts/client';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';

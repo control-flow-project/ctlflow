@@ -1,0 +1,109 @@
+using System.Buffers;
+using System.Text;
+using System.Text.Json;
+using Crossfire.Contracts;
+using Crossfire.Kernel;
+
+namespace Crossfire.Server.Http;
+
+public static class Transport
+{
+    public const string CookieName = "__Host-crossfire";
+
+    public static string Cookie(HttpRequest request)
+    {
+        var values = request.Headers.Cookie.ToString().Split(';').Select(value => value.Trim()).Where(value => value.StartsWith(CookieName + "=", StringComparison.Ordinal)).ToArray();
+        return values.Length == 1 && Validation.Secret(values[0][(CookieName.Length + 1)..]) ? values[0][(CookieName.Length + 1)..] : "";
+    }
+
+    public static void SetCookie(HttpResponse response, string value)
+        => response.Headers.Append("Set-Cookie", CookieName + "=" + value + "; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=" + (value.Length == 0 ? "0" : "28800"));
+
+    public static async ValueTask<Result<JsonElement>> Read(HttpRequest request, int maximum, CancellationToken cancellation)
+    {
+        if (request.ContentType?.Split(';', 2)[0] != "application/json") return Results.Fail<JsonElement>("invalid", "Expected application/json");
+        var body = await ReadBytes(request, maximum, cancellation);
+        if (!body.IsSuccess) return Result<JsonElement>.Fail(body.Error);
+        try
+        {
+            using var document = JsonDocument.Parse(Encoding.UTF8.GetString(body.Value));
+            return Result<JsonElement>.Success(document.RootElement.Clone());
+        }
+        catch (JsonException) { return Results.Fail<JsonElement>("invalid", "Invalid JSON"); }
+    }
+
+    public static async ValueTask<Result<byte[]>> ReadBytes(HttpRequest request, int maximum, CancellationToken cancellation)
+    {
+        if (request.ContentLength > maximum) return Results.Fail<byte[]>("body_too_large", "Request body exceeds the configured bound");
+        var buffer = new ArrayBufferWriter<byte>(Math.Min(maximum + 1, 16384));
+        while (true)
+        {
+            var available = Math.Min(16384, maximum + 1 - buffer.WrittenCount);
+            if (available == 0) return Results.Fail<byte[]>("body_too_large", "Request body exceeds the configured bound");
+            var count = await request.Body.ReadAsync(buffer.GetMemory(available)[..available], cancellation);
+            if (count == 0) break;
+            buffer.Advance(count);
+            if (buffer.WrittenCount > maximum) return Results.Fail<byte[]>("body_too_large", "Request body exceeds the configured bound");
+        }
+        return Result<byte[]>.Success(buffer.WrittenSpan.ToArray());
+    }
+
+    public static async Task Send(HttpContext http, string requestId, Result<ApiReply> result, int status)
+    {
+        byte[] bytes = result.IsSuccess
+            ? JsonSerializer.SerializeToUtf8Bytes(new ApiResponse(result.Value.Data, result.Value.Pagination ?? new(requestId)), ApiJson.Default.ApiResponse)
+            : JsonSerializer.SerializeToUtf8Bytes(new ApiFailure(new(result.Error.Code, result.Error.Message, result.Error.FieldErrors), new(requestId)), ApiJson.Default.ApiFailure);
+        if (bytes.Length > 33554432)
+        {
+            result = Results.Fail<ApiReply>("unavailable", "Response exceeds the finite output bound");
+            bytes = JsonSerializer.SerializeToUtf8Bytes(new ApiFailure(new(result.Error.Code, result.Error.Message), new(requestId)), ApiJson.Default.ApiFailure);
+        }
+        var response = http.Response;
+        response.StatusCode = result.IsSuccess ? status : ApiErrors.Status(result.Error.Code);
+        response.ContentType = "application/json; charset=utf-8"; response.Headers.CacheControl = "no-store";
+        response.Headers.XContentTypeOptions = "nosniff"; response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
+        response.Headers["X-Request-ID"] = requestId;
+        if (result.IsSuccess && result.Value.SetCookie is not null) SetCookie(response, result.Value.SetCookie);
+        response.ContentLength = bytes.Length;
+        await response.Body.WriteAsync(bytes, http.RequestAborted);
+    }
+
+    public static Result<IReadOnlyDictionary<string, string>> Query(HttpRequest request, IReadOnlyList<string> allowed)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in request.Query)
+        {
+            if (!allowed.Contains(entry.Key, StringComparer.Ordinal) || entry.Value.Count != 1)
+                return Results.Fail<IReadOnlyDictionary<string, string>>("invalid", "Unknown or duplicated query parameters");
+            values.Add(entry.Key, entry.Value[0]!);
+        }
+        return Result<IReadOnlyDictionary<string, string>>.Success(values);
+    }
+
+    public static Result<PageRequest> Page(IReadOnlyDictionary<string, string> values)
+    {
+        var page = Integer(values.GetValueOrDefault("page", "1")); var size = Integer(values.GetValueOrDefault("pageSize", "20"));
+        return page is >= 1 and <= 100000 && size is >= 1 and <= 100 ? Result<PageRequest>.Success(new((int)page.Value, (int)size.Value))
+            : Results.Fail<PageRequest>("invalid", "Use page ≥ 1 and pageSize 1–100");
+    }
+
+    private static double? Integer(string value)
+    {
+        var trimmed = TextRules.Trim(value);
+        if (trimmed.Length == 0) return 0;
+        if (trimmed.StartsWith("0b", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("0o", StringComparison.OrdinalIgnoreCase))
+        {
+            var radix = char.ToLowerInvariant(trimmed[1]) == 'b' ? 2 : 8; double digits = 0;
+            if (trimmed.Length == 2) return null;
+            foreach (var character in trimmed.AsSpan(2))
+            {
+                var digit = character - '0';
+                if (digit < 0 || digit >= radix) return null;
+                digits = digits * radix + digit;
+            }
+            return double.IsFinite(digits) ? digits : null;
+        }
+        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase) && long.TryParse(trimmed[2..], System.Globalization.NumberStyles.HexNumber, null, out var hexadecimal)) return hexadecimal;
+        return double.TryParse(trimmed, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var result) && double.IsFinite(result) && Math.Truncate(result) == result ? result : null;
+    }
+}

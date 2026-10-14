@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { openSync, closeSync, constants, fstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -42,11 +41,8 @@ async function launch(root: string, name: string | undefined, signal: AbortSigna
   }
   if (existing.error.code !== 'unavailable') throw new Error('Existing controller response is invalid: ' + existing.error.message);
   signal.throwIfAborted();
-  const output = openSync(join(root, 'daemon.log'), constants.O_CREAT | constants.O_APPEND | constants.O_WRONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
-  const info = fstatSync(output);
-  if (!info.isFile() || info.uid !== process.getuid!() || info.mode & 0o077) { closeSync(output); throw new Error('Daemon log is not a private owned file'); }
-  const child = spawn(process.execPath, [fileURLToPath(import.meta.resolve('@ctlflow/fleetd/executable')), '--root', root, ...(name === undefined ? [] : ['--name', name])], { detached: true, stdio: ['ignore', output, output] });
-  closeSync(output); child.unref();
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.resolve('@ctlflow/fleetd/executable')), '--root', root, ...(name === undefined ? [] : ['--name', name])], { detached: true, stdio: 'ignore' });
+  child.unref();
   const ended = new Promise<void>(resolve => { child.once('close', () => resolve()); });
   let failed = false;
   child.once('error', () => { failed = true; }); child.once('exit', () => { failed = true; });
@@ -56,7 +52,7 @@ async function launch(root: string, name: string | undefined, signal: AbortSigna
       signal.throwIfAborted();
       const status = await client.call(operations.status, {}, {});
       if (status.ok && (name === undefined || status.value.data.controller.name === name) && !status.value.data.stopping) return status.value.data;
-      if (status.ok || failed || Date.now() > deadline) throw new Error('Daemon did not start with the requested identity; inspect ' + join(root, 'daemon.log'));
+      if (status.ok || failed || Date.now() > deadline) throw new Error('Daemon did not start with the requested identity; inspect ' + join(root, 'logs'));
       await delay(100, undefined, { signal });
     }
   } catch (error) {

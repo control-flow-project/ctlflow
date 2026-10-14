@@ -1,4 +1,4 @@
-import { createClient, type ClientOptions } from './client.js';
+import { createClient, type ClientOptions } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure } from '@ctlflow/crossfire-kernel/result';
 

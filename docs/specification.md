@@ -28,6 +28,9 @@ services/
     apps/web/
     packages/
       agent-tools/assets/
+    database/<database>/<backend>/migrations/
+    database/<database>/<backend>/seeds/
+    knexfile.<database>.mjs
     tests/
     scripts/
     tools/
@@ -52,6 +55,23 @@ documentation and shared verification tooling; it contains no application source
 or repository-wide package pool. Cross-project reuse is through declared package
 exports and dependencies. Applications never import another application's source.
 There is one listener and one native integration per supported runtime, not per-product copies.
+The owner authorized independent Node, C# and Rust implementations of these same
+three products. On 2026-10-14 the owner authorized a separate parallel Rust
+worktree, superseding the initial C#-before-Rust sequencing gate. Each native
+implementation requires complete capability parity and successful verification
+before release.
+Enrollment roster digests use explicit English (`en-US`) collation for metadata
+keys, instance keys and sender identities, stable ties, ordinal permission order
+and compact well-formed JSON bytes. Host locale must not change an enrollment's
+identity. Native implementations preserve the same bytes, including Unicode and
+escaped unpaired UTF-16 surrogates.
+The C# target is .NET 11 NativeAOT with EF Core and SQLite. This is an explicit
+language-selection exception, not permission for legacy interfaces or runtime
+fallbacks. One shared React management project remains authoritative. API routes,
+validation, authentication, authorization and persisted SQLite representations
+must remain interchangeable across implementations, without an import/export or
+database reset. See [native implementation readiness](architecture/native-implementations.md)
+for the implementation plan, dependency evidence and current uncompleted scope.
 Only concrete, supported capabilities have packages. Every agent belongs to a
 fleet managed by fleetd, including a one-agent fleet. There is no standalone
 deployment, existing-session attachment, optional controller or detach-to-direct
@@ -138,6 +158,14 @@ lockfile. Each product has coherent build/test commands. Named exports, strict
 TypeScript without any, functional modules, Result for expected failures,
 explicit .js relative imports, validated boundaries, and semantic splits near
 600 lines are mandatory.
+
+`apps/web` owns the single management UI build, including its Element translation
+asset. The private `crossfire-client` package owns the browser-safe typed REST,
+binary-upload and Matrix password-login clients. Web/client dependencies cannot
+reach backend implementations or native platform APIs. Backend coordination
+adapters and command tools consume this client through declared exports; removed
+backend-named client paths have no aliases. The UI build emits the same
+content-addressed `/manage/assets/` URLs independently of the selected backend.
 
 ## 2. User experience and lifecycle
 
@@ -672,8 +700,9 @@ against declared dependencies and semantic directions, including negative fixtur
 The useful reference patterns are Lesser's singular relational names, explicit
 repository interfaces, functional per-operation modules and row/entity mappers;
 and Snapped's transport/domain separation, composition, per-operation permission
-checks and batched read projections. Frameworks, process counts, historical
-migration machinery and unimplemented database backends are not requirements.
+checks and batched read projections. Their database-name/backend nesting, Knex
+configuration and one-shot migration containers are required for all SQL stores
+and language implementations. Unimplemented database backends remain unsupported.
 
 ### Naming and source conventions
 
@@ -709,7 +738,8 @@ no placeholder alternative backend.
 | Component | Sole responsibility |
 | --- | --- |
 | Domain | Identity, role/permission evaluation, enrollment, name allocation, desired room access, invitation provenance, chat wake policy, scheduled Wake-up rules/claims, listener activity, notices, policy and audit intent. |
-| SQLite adapter | One schema, integrity constraints, Tinqer repositories, row mapping, indexed queries, transactions and page-wide projections. |
+| Database assets | Knex schema creation, versioned forward conversions and reference data; backend-specific nesting and one migration container for all language implementations. |
+| SQLite adapter | Existing-schema validation, Tinqer or EF repositories, row mapping, indexed queries, transactions and page-wide projections; no runtime schema creation/migration. |
 | Matrix adapter | Native account, room, power, membership, media and event operations; map native facts/failures into domain ports. |
 | Calendar adapter | Validate interval/calendar schedules and calculate the next occurrence through the domain's schedule port, with one pinned parser and explicit time-zone semantics. |
 | Server | Configuration, composition, authentication boundary, routing and worker scheduling. |
@@ -2359,8 +2389,9 @@ batch; shutdown attempts a final flush. Process death may lose unsent approximat
 statistics but cannot affect chat delivery or receipts. Persisted times are integer
 UTC milliseconds, never process-relative uptime.
 
-Crossfire owns indexed normalized hourly rollups, retained for thirty days and
-pruned at most hourly on ingestion. The read-only fleet endpoint accepts `hours`
+Crossfire owns indexed normalized hourly rollups under the platform logging
+retention policy, default seven days, with startup and hourly idle cleanup.
+The read-only fleet endpoint accepts `hours`
 in 1, 24, 168 or 720 (default 24), canonical `page` and `pageSize` (default 20,
 maximum 100); unknown/duplicate parameters fail. Only the fleet owner or an
 administrator can read it. SQL aggregation and pagination supply fleet totals,
@@ -2368,6 +2399,72 @@ per-agent traffic/usage and sender-to-recipient flows without storing message
 bodies. Management's fleet Activity traffic view supports period selection, explicit refresh,
 paginated flows and clear unknown/approximate measurement labels. No realtime
 analytics subscription, periodic model use or provider-billing polling exists.
+
+### Platform logging retention
+
+Optional private service configuration `loggingRetentionDays` is a positive
+safe integer; omission means seven days. Crossfire applies it to all owned
+database history and server/Matrix diagnostic files. fleetd uses the same parser
+and default for its local controller configuration, operation history and
+diagnostics. A controller can serve independent instances; its private store has
+its own explicit policy, not whichever remote fleet happened to connect first.
+
+Covered logging includes audit events, historical reporting runs and their
+observation/settings children, traffic/token summaries and checkpoints, terminal
+native decisions and their children, recovered incidents and sent notices,
+terminal scheduled deliveries, expired broadcast and invitation history,
+historical enrollment archives and rejected/expired requests, old native-stop
+receipts, completed operation history and owned diagnostic output. Each family
+uses its documented capture/report/completion/expiry time; exact cutoff equality
+is retained. There is no second thirty-day statistics-only cleanup owner.
+
+Current authority and recovery are not historical logging: retain latest
+per-agent run projections, latest native-close evidence, the last successful
+stop per fleet/agent scope needed by the current session projection, pending or
+answered decisions, outstanding notices, pending delivery, approved enrollment
+exchange identity, active signup claims and local unacknowledged outcomes.
+Chats/media, native histories, prepared unconfirmed input, credentials,
+configuration, reports and desired resume selections keep their explicit owners.
+Native database journals/WAL are recovery data, never diagnostic logs.
+
+Maintenance is ordinary code, independent of native work and Matrix reconciliation.
+It runs at startup and hourly while idle, with bounded 500-record family batches
+and five-second backlog/error retries. SQLite owns one child-before-parent
+transaction per batch. Indexed run/operation scans retain only a small transient
+continuation after commit; pinned current records cannot starve later expired
+history. Restarts begin scanning again without changing workflow state. Reclaimed
+pages are reused, not an automatic VACUUM or physical-file shrink promise.
+
+Owned diagnostics use private daily timestamped JSONL partitions, bounded records,
+streaming exact boundary filtering and unchanged-file checks. Reject symlinks,
+hardlinks, unowned/public files and malformed boundary data without erasing them.
+Server/Matrix output uses `management.sqlite.logs`; fleetd uses `logs` beside its
+private registry. Externally retained CLI/Docker/system output belongs to the host.
+Controller `config.json` currently permits only the optional retention field.
+Health and daemon status expose configured days and nullable maintenance/logging
+failure; errors retry without pretending native execution completed.
+
+Actual deployed `daemon.log` and `operations.json` are one-time forward conversion
+inputs, never parallel readers. Untimestamped output uses explicitly marked file
+modification-time upper bounds. Operations become individual atomic UUID files;
+remove the old count-only history limit. Native histories/desired intent never
+enter diagnostic conversion or cleanup.
+
+Receipt-only acknowledgments use `{recorded: boolean}` consistently for native
+decisions, scheduled delivery, fleet broadcast and lifecycle outcomes. Missing
+expired history returns false only after required actor/fleet authorization; it
+does not claim an old outcome, authorize execution or replay input. Existing
+ownership/outcome/generation conflicts still fail. Admission/claim/answer reads
+retain their strict live authority. Acknowledgments of already-confirmed local
+work can therefore finish after remote log expiry without blocking recovery.
+
+Forward migration preserves every row; later maintenance applies the configured
+cutoff after a verified production backup. Strict operator preservation can
+explicitly admit only absent age-eligible logging using both the actual configured
+days and exact cleanup UTC timestamp. Surviving records remain byte-exact and
+business/authority state is never exempted. The complete family/time matrix,
+file format, configuration and operator procedure are in
+[Platform logging retention](../services/crossfire/docs/logging.md).
 
 ### Public static reports
 
@@ -2434,13 +2531,26 @@ are in [Public static reports](../services/crossfire/docs/publications.md).
 
 ## 11. Normalized persistence and authorization
 
-One canonical schema and permission catalog own current state. Fresh stores
-initialize schema 15 directly. Inventoried deployed schemas 13 and 14 advance to 15
-transactionally after a verified backup. Versions 1–12, foreign stores and future
-versions are refused without mutation; there is no historical migration ladder,
-historical runtime reader or reset-on-error behavior.
+One canonical schema and permission catalog own current state. Knex is the sole
+creation/migration owner for all SQL databases and language implementations.
+Service-owned database assets use database/<database>/<backend>/migrations and
+seeds with a per-database knexfile. The current owned SQL store is management
+SQLite; fleetd/fleet file state and Conduit's external RocksDB are not SQL stores.
+Fresh stores initialize schema 17 through Knex. Inventoried deployed schemas
+13–16 advance to 17 transactionally after a verified backup; schema 17 stores
+without Knex history are adopted without changing application data. Versions
+1–12, foreign stores and future versions are refused without mutation. There is
+no historical runtime reader, ORM-created schema or reset-on-error behavior.
 
-The canonical schema has 63 singular tables. The forward migration preserves
+Upgrade deployment stops writers, verifies a private backup, runs a one-shot
+Knex migration container against the shared store and activates the selected
+application only after successful completion. A failure blocks subsequent phases
+without an old-runtime or language fallback. All runtime adapters validate the
+same application identity, version and applied Knex migration filenames before
+using an existing database. The EF model generator reads a Knex-created database.
+
+The canonical schema has 63 singular application tables; Knex owns its two
+tracking/locking tables separately. The forward migration preserves
 immutable identities, native credentials and histories, room/access records,
 receipt and usage history, publications, policy and audit. It converts agent,
 pending/current enrollment and historical archive wake policies into explicit
@@ -2473,8 +2583,10 @@ Archived outcomes are evidence, never another runtime admission path.
 Retained archives and their normalized item/policy/permission/sender/metadata
 relations remain historical records, never operational approval authority.
 Foreign keys retain original owner, decider, identity and permission attribution.
-Update/delete triggers protect all six archive relations. These are immutable
-historical data, not another enrollment reader, approval API or authority source.
+Update triggers protect all six archive relations against mutation. Schema 17
+allows their explicit age-based deletion through the logging owner. These are
+immutable historical data while retained, not another enrollment reader,
+approval API or authority source.
 Unbound identities are not invented into fleets, discarded or given live
 authority. Normal directories and operational authentication require an active
 nonretired binding in a nonarchived fleet. Restoration requires a newly
@@ -2877,9 +2989,21 @@ bypass is justified merely by the proposal.
 
 ### Storage and runtime safety
 
-Tinqer owns all application reads/writes. Raw SQL is restricted to schema,
-configuration and metadata/query-plan inspection. Private store creation and
-credential access remain validated and access-restricted.
+Tinqer owns Node application reads/writes and EF owns C# application reads/writes.
+Knex owns all schema creation/conversion and migration reference-data changes.
+Raw SQL is restricted to migration schema/conversion, configuration and
+metadata/query-plan inspection. Private store creation by the migrator and
+existing-store/credential access remain validated and access-restricted.
+
+Management storage uses the supported SQLite engine's native page-count capacity;
+Crossfire imposes no application-wide database-size ceiling. Reopening an existing
+store does not restore a former application page limit or require a data rewrite.
+Native SQLITE_FULL is an expected storage-unavailable Result: the entire affected
+transaction rolls back and its original operation can be retried when capacity
+is available. This never authorizes deleting audit, identity, receipt or history
+records. Existing API bounds and normalized queries remain unchanged; all logging
+uses the configured age policy. Operators provision and monitor actual disk and
+backup capacity.
 
 Private controller and instance state is user-owned and atomic, separate from
 an optional existing native workspace. Public availability checks
@@ -3404,6 +3528,20 @@ unimplemented; there is no opt-in runtime test flag. Native inert-provider evide
 actual Linux/platform/protocol scope; it does not certify paid model behavior
 or untested macOS execution.
 Per-file output, durations and a machine-readable summary identify slow tails.
+External product behavior has one service-owned contract suite selected through
+an explicit executable/argument matrix for Node, C# managed, actual C# NativeAOT
+and Rust. Assertions do not vary by backend. Root scripts own build/assets/process
+coordination, not behavior. Language-specific unit tests remain for internal
+parsers, compilers, data structures and state transitions. Node participates as
+the direct same-file SQLite reference; selecting C# requires managed and AOT.
+Every configured target runs all scenarios with actual Codex and Pi. Missing or
+failed configured targets cannot be silently skipped. Results name exactly the
+outputs executed; Rust may join from its separate worktree without making Rust
+source a prerequisite of the C# PR. A subset's evidence is never presented as a
+pass for an unselected implementation. Knex alone initializes the shared fixtures;
+backend changes retain the identical database. Complete applicable unit,
+architecture, package, container/browser, warning-audit and performance gates
+remain mandatory beyond this integration suite.
 Test fixtures own distinct directories, databases, runtime homes, ports and
 containers. Tests never mutate production or another fixture's state.
 The service-owned test-support export provides one reverse-acquisition cleanup

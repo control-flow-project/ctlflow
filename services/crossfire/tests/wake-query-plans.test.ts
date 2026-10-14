@@ -1,15 +1,15 @@
+import { migrateFixture } from './support/storage.js';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
-import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
 
-test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized indexes', scope => {
+test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized indexes', async scope => {
   let statements: string[] = [];
   const database = new Database(':memory:', { verbose(statement) { if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement); } });
-  cleanup(scope, () => database.close()); database.pragma('foreign_keys = ON'); createSchema(database);
+  cleanup(scope, () => database.close()); database.pragma('foreign_keys = ON'); await migrateFixture(database);
   const repositories = createRepositories(database);
   database.transaction(() => {
     for (let ownerIndex = 0; ownerIndex < 2; ownerIndex++) {

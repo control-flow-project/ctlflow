@@ -63,13 +63,14 @@ export function receiptFleetRuntime(services: FleetControlServices, actor: Fleet
   return services.unitOfWork.run(() => {
     const current = liveFleetConnection(services, actor, fleetId, input.connectionId); if (!current.ok) return current;
     const found = services.repositories.fleetRuntimeOperation.find(operationId); if (!found.ok) return found;
-    if (!found.value || found.value.fleetId !== fleetId) return failure('missing', 'Session operation not found');
+    if (!found.value) return success({ recorded: false });
+    if (found.value.fleetId !== fleetId) return failure('missing', 'Session operation not found');
     if (found.value.status === 'succeeded' || found.value.status === 'failed') return found.value.status === input.status && found.value.errorMessage === input.errorMessage
-      ? success(runtimeOperationView(found.value)) : failure('conflict', 'This session operation already has a different final outcome');
+      ? success({ recorded: true }) : failure('conflict', 'This session operation already has a different final outcome');
     if (found.value.status !== 'running' || found.value.connectionId !== input.connectionId || found.value.credentialId !== current.value.connection.credentialId) return failure('conflict', 'Claim this operation on the current controller connection before reporting its outcome');
     const next: RuntimeOperation = { ...found.value, ...input, completedAt: services.clock.now() };
     const stored = services.repositories.fleetRuntimeOperation.update(next);
     if (!stored.ok) return stored;
-    return success(runtimeOperationView(next));
+    return success({ recorded: true });
   });
 }

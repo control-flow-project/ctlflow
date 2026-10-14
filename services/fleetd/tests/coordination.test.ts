@@ -109,7 +109,7 @@ test('native instance options share one role and replace only explicitly selecte
   const registry = createRegistry(join(directory, '.registry'));
   const written = registry.writeRoster(loaded.value, loaded.value.roster); assert(written.ok);
   assert.deepEqual(written.value.roster, loaded.value.roster);
-  const execution = createExecution({ codex: codexRuntime() }, directory);
+  const execution = createExecution({ codex: codexRuntime() }, directory, () => {});
   assert(execution.validate(written.value).ok);
   for (const effort of ['low', 'medium', 'high', 'xhigh', 'max']) {
     const configured: Configuration = { ...written.value, roster: { ...written.value.roster, instances: [
@@ -124,7 +124,7 @@ test('native instance options share one role and replace only explicitly selecte
   const adapter = { ...codexRuntime(), inspect: async (input: { options: unknown }) => {
     inspected.push(input.options as Record<string, unknown>); return { ok: true as const, value: undefined };
   } };
-  assert((await createExecution({ codex: adapter }, directory).inspect(written.value, new AbortController().signal)).ok);
+  assert((await createExecution({ codex: adapter }, directory, () => {}).inspect(written.value, new AbortController().signal)).ok);
   assert.deepEqual(inspected, [baseline, selected]);
   writeFileSync(join(directory, 'runtime.toml'), source + '[instances.runtime_options]\nmodel_reasoning_effort="low"\n', { mode: 0o600 });
   const changed = loadConfiguration(directory); assert(changed.ok);

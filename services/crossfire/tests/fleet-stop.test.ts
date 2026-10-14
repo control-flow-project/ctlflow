@@ -39,13 +39,15 @@ test('stop completion survives historical runs and lease rollover without fabric
     assert.equal(recordNativeStop(...params, agentId, { connectionId: next, runId: runs[index]!, receiptId: randomUUID() }).ok, false);
   }
   const completed = value(receiptFleetRuntime(...params, operation.operationId, outcome));
-  assert.equal(completed.status, 'succeeded'); assert.equal(completed.completedAt, services.clock.now());
+  assert.equal(completed.recorded, true);
+  const storedOperation = value(services.repositories.fleetRuntimeOperation.find(operation.operationId))!;
+  assert.equal(storedOperation.status, 'succeeded'); assert.equal(storedOperation.completedAt, services.clock.now());
   assert.deepEqual(value(receiptFleetRuntime(...params, operation.operationId, outcome)), completed, 'Exact receipt replay is idempotent');
   assert.equal(value(services.repositories.fleetRuntimeOperation.pending(fleet.id)), null);
   assert.equal(value(readFleet(services, admin.actor, fleet.id)).connection.status, 'online');
   const summaries = value(services.runtime.summaries(agents));
   for (const agentId of agents) {
-    assert.deepEqual(summaries.get(agentId), { state: 'stopped', observedAt: completed.completedAt, lastActivityAt, historyAvailable: true });
+    assert.deepEqual(summaries.get(agentId), { state: 'stopped', observedAt: storedOperation.completedAt, lastActivityAt, historyAvailable: true });
     assert.equal(value(services.repositories.nativeStop.find(agentId)), null);
     assert.equal(value(retirementEligible(services, fleet.id, agentId)), false, 'A lifecycle receipt is not a current-generation retirement proof');
   }

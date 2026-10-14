@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../packages/Crossfire.AdapterSqlite/Crossfire.AdapterSqlite.csproj" />
+    <ProjectReference Include="../../packages/Crossfire.AdapterMatrix/Crossfire.AdapterMatrix.csproj" />
+    <ProjectReference Include="../../apps/Crossfire.Server/Crossfire.Server.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tasks" PrivateAssets="all" IncludeAssets="runtime;build;native;contentfiles;analyzers;buildtransitive" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

@@ -101,6 +101,7 @@ export const audit = check.object({ auditId: check.identifier, requestId: check.
   addedById: check.nullable(check.identifier), permissionCode: check.nullable(check.text(100)), action: check.text(100),
   outcome: check.text(100), message: check.text(4096, 0), createdAt: check.integer() });
 export const acknowledged = check.object({ accepted: check.boolean });
+export const recorded = check.object({ recorded: check.boolean });
 export const report = check.object({ disconnect: check.boolean, currentRelease: check.text(200), statisticsAccepted: check.boolean });
 export const notice = check.object({ outcome: check.choice('pending', 'sent', 'denied', 'not-applicable', 'not-permitted', 'rate-limited') });
 export type AgentView = Parsed<typeof agent>;

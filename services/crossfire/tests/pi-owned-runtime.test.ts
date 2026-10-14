@@ -40,6 +40,18 @@ async function fixture(scope: TestContext) {
   return { directory, provider, adapter, input, events, usage, start, idle, entries };
 }
 
+test('Pi resume never manufactures an initial history in either mode', { timeout: 60000 }, async scope => {
+  const proof = await fixture(scope);
+  for (const historyMode of ['shared', 'per-room'] as const) {
+    const result = await proof.adapter.start({ ...proof.input, allowNewHistory: false, listenerOptions: { historyMode } }, new AbortController().signal);
+    if (result.ok) await result.value.close();
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'missing');
+    assert.deepEqual(value(await proof.adapter.savedContexts(proof.input)), []);
+  }
+  assert.equal(proof.provider.requests.length, 0);
+});
+
 test('stock Pi retains zero-turn native identity and effective instructions across restart', { timeout: 60000 }, async scope => {
   const proof = await fixture(scope);
   let runtime = await proof.start();

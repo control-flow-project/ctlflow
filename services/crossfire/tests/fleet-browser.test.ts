@@ -372,7 +372,7 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
     execute: async () => failure('invalid', 'This invitation fixture does not execute native lifecycle operations') });
   const binding = controller.listener(agent.id);
   let ended: unknown;
-  const receiver = listen({ binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ log: (_message: string) => {}, binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
     id: agent.id, release: release.manifest, cursorFile: join(runtime.directory, 'cursor.json'),

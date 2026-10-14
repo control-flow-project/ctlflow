@@ -1,12 +1,15 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { lstatSync, realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { lstatSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
-import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
+import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
+import { retentionProof, recordIdentity, type RetentionProof } from './database-retention.js';
 
 function counts(database: Database.Database) {
   return {
@@ -101,7 +104,7 @@ export function inspectDatabase(file: string, expected: check.Parsed<typeof data
       if (expected.schemaVersion !== undefined && version !== expected.schemaVersion) return failure('conflict', 'Unexpected Crossfire schema version');
       const integrity = selected.pragma('integrity_check', { simple: true });
       if (integrity !== 'ok' || (selected.pragma('foreign_key_check') as unknown[]).length !== 0) return failure('native', 'Database integrity or foreign keys failed');
-      const names = selected.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[];
+      const names = selected.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('knex_migrations','knex_migrations_lock') ORDER BY name").all() as { name: string }[];
       const readers = counts(selected), totals: Record<string, number> = {};
       if (names.length !== Object.keys(readers).length) return failure('invalid', 'Database does not contain the complete current schema');
       for (const { name } of names) {
@@ -118,7 +121,7 @@ export function inspectDatabase(file: string, expected: check.Parsed<typeof data
   finally { database?.close(); }
 }
 
-export function verifyPreservation(before: string, after: string) {
+export async function verifyPreservation(before: string, after: string, retention?: RetentionProof) {
   const first = inspectDatabase(before, {}, false), second = inspectDatabase(after, {}, false);
   if (!first.ok) return first; if (!second.ok) return second;
   let original: Database.Database | undefined, current: Database.Database | undefined, converted: Database.Database | undefined;
@@ -126,26 +129,38 @@ export function verifyPreservation(before: string, after: string) {
     original = new Database(before, { readonly: true, fileMustExist: true });
     current = new Database(after, { readonly: true, fileMustExist: true });
     if (first.value.schemaVersion !== second.value.schemaVersion) {
-      if (![13, 14, 15].includes(Number(first.value.schemaVersion)) || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
+      if (![13, 14, 15, 16].includes(Number(first.value.schemaVersion)) || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
       converted = new Database(original.serialize());
       converted.pragma('foreign_keys = ON');
-      createSchema(converted);
+      const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'crossfire-preservation-'));
+      try {
+        const file = join(temporary, 'management.sqlite');
+        writeFileSync(file, converted.serialize(), { mode: 0o600 });
+        converted.close();
+        await migrateDatabase(file);
+        const migrated = new Database(file, { readonly: true, fileMustExist: true });
+        try { converted = new Database(migrated.serialize()); }
+        finally { migrated.close(); }
+      } finally { rmSync(temporary, { recursive: true }); }
     }
     const firstDatabase = converted ?? original, secondDatabase = current;
     return firstDatabase.transaction(() => secondDatabase.transaction(() => {
-      const previous = protectedRecords(firstDatabase), next = protectedRecords(secondDatabase), preserved: Record<string, number> = {};
+      const proof = retentionProof(firstDatabase, retention); if (!proof.ok) return proof;
+      const previous = protectedRecords(firstDatabase), next = protectedRecords(secondDatabase), preserved: Record<string, number> = {}, expired: Record<string, number> = {};
       for (const name of Object.keys(previous) as (keyof typeof previous)[]) {
         const existing = name === 'audit_event' && converted ? protectedRecords(original!).audit_event() : previous[name](), actual = next[name]();
         if (existing.length > 100000 || actual.length > 100000) return failure('limit', 'Protected-record verification exceeds its 100000-row per-relation bound');
+        const identity = recordIdentity(firstDatabase, name), identities = new Set(actual.map(identity));
         const rowHash = (row: object) => createHash('sha256').update(JSON.stringify(Object.entries(row).sort(([left], [right]) => left.localeCompare(right)))).digest('hex');
         const available = new Map<string, number>();
         for (const row of actual) { const key = rowHash(row); available.set(key, (available.get(key) ?? 0) + 1); }
         for (const row of existing) {
+          if (!identities.has(identity(row)) && proof.value.eligible(name, row)) { expired[name] = (expired[name] ?? 0) + 1; continue; }
           const key = rowHash(row), count = available.get(key) ?? 0;
           if (!count) return failure('conflict', 'Existing protected domain data changed or disappeared in ' + name);
           available.set(key, count - 1);
         }
-        preserved[name] = existing.length;
+        preserved[name] = existing.length - (expired[name] ?? 0);
       }
       if (converted) {
         const archived = (database: Database.Database) => executeSelect(database, schema, query => query.from('audit_event')
@@ -163,7 +178,7 @@ export function verifyPreservation(before: string, after: string) {
         }
       }
       return success({ beforeSchema: first.value.schemaVersion, afterSchema: second.value.schemaVersion, forwardMigration: converted !== undefined, preserved,
-        beforeCounts: first.value.counts, afterCounts: second.value.counts });
+        expired, loggingRetention: retention ?? null, beforeCounts: first.value.counts, afterCounts: second.value.counts });
     })())();
   } catch { return failure('invalid', 'Cannot inspect protected records using the current schema'); }
   finally { converted?.close(); original?.close(); current?.close(); }

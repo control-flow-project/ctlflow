@@ -1,7 +1,8 @@
 import type { Services } from '@ctlflow/crossfire-domain/port/services';
 import { reconcile } from '@ctlflow/crossfire-domain/maintenance/reconcile';
 import { maintainPublications } from '@ctlflow/crossfire-domain/publication/maintenance';
-export function createWorker(services: Services) {
+import type { DiagnosticLog } from '@ctlflow/crossfire-domain/port/logging';
+export function createWorker(services: Services, diagnostics: Pick<DiagnosticLog, 'write'>) {
   let running: Promise<void> | undefined, timer: ReturnType<typeof setTimeout> | undefined;
   let pending = false, stopped = false;
   function drain(): Promise<void> {
@@ -12,13 +13,13 @@ export function createWorker(services: Services) {
       do {
         pending = false;
         const result = await reconcile(services, () => stopped);
-        if (!result.ok) process.stderr.write('Crossfire reconciliation remains pending: ' + result.error.code + '\n');
+        if (!result.ok) diagnostics.write('Crossfire reconciliation remains pending: ' + result.error.code);
         if (!stopped) {
           const publications = await maintainPublications(services);
-          if (!publications.ok) process.stderr.write('Crossfire report cleanup remains pending: ' + publications.error.code + '\n');
+          if (!publications.ok) diagnostics.write('Crossfire report cleanup remains pending: ' + publications.error.code);
         }
       } while (pending && !stopped);
-    })().catch(() => { process.stderr.write('Crossfire reconciliation failed; native state remains unverified.\n'); }).finally(() => {
+    })().catch(() => { diagnostics.write('Crossfire reconciliation failed; native state remains unverified.'); }).finally(() => {
       running = undefined;
       if (!stopped) { timer = setTimeout(() => { void drain(); }, 5000); timer.unref(); }
     });

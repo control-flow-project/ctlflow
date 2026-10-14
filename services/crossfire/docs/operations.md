@@ -12,7 +12,9 @@ Before changing production state:
 2. Stop the addressed instance for a consistent backup.
 3. Back up database, report store, operator configuration and credentials;
    verify that backup before mutation.
-4. Deploy the selected image and its transactional forward migration.
+4. Run the selected release's one-shot Knex migration container successfully,
+   then activate the selected application image. The same migration image/file
+   set serves Node, managed .NET and NativeAOT. Applications never migrate on open.
 5. Verify readiness, source/tool release provenance and database integrity.
 6. Verify identities, credentials, grants, histories, receipt/audit continuity and
    the intended history-only archival of formerly unbound identities.
@@ -26,7 +28,7 @@ Crossfire installs no systemd, global skills, certificates or host permissions.
 
 ## Schema and report storage
 
-Schema 15 accepts a fresh store or inventoried deployed schemas 13 and 14 only.
+Schema 17 accepts a fresh store or inventoried deployed schemas 13–16 only.
 Versions 1–12 and foreign/future stores fail without mutation. Conversion retains
 identities, native credentials, histories, grants, publications, receipts and audit.
 It converts old wake presets to exact explicit person/group selections in agent,
@@ -40,7 +42,9 @@ unchanged. The current inventory has 63 singular tables.
 Unbound historical identities are excluded from operational authentication and
 directories until a new owner-reviewed fleet enrollment proves private identity.
 Every new reporting run requires its exact active fleet/current controller lease.
-Archive/retirement timestamps and native-stop receipts do not authorize data loss.
+Archive/retirement timestamps and native-stop receipts do not authorize resets or
+loss of current authority. Schema 17 allows age-based historical archive deletion
+while retaining update immutability and required current native-stop evidence.
 Management and Fleet CLI use the same archive resource and expected revision.
 An authorized human or the owning authenticated controller can archive; controller
 archive also requires its current live lease. Both require settled native-stop
@@ -62,6 +66,31 @@ Docker build steps and its runtime container under an existing resource budget.
 It validates and passes that exact slice; it never creates host services or
 configures resource policy. Omit the flag when the operator supplies no budget.
 Repository container verification creates its own temporary bounded test slice.
+The same resource parent also bounds the one-shot migration container. It has no
+published ports or network access and runs only Knex. `crossfire start` performs
+writer stop, verified database backup when needed, migration and activation in
+that order. Failure blocks every later phase. A current migrated database does
+not acquire another redundant upgrade backup on every restart.
+- [Database nesting, Knex commands and migration-container contract](../database/README.md)
+
+## Management database capacity
+
+Crossfire uses SQLite's native database capacity, not a 256 MiB application
+ceiling. The former startup override capped every database connection and could
+reject new listener registrations when the file reached that size with no free
+pages. The corrected adapter does not apply that override. Its limit was
+connection-local: an ordinary backup-preserving server deployment and reopen
+restores native capacity on existing stores. No reset, VACUUM, deletion, manual
+PRAGMA, schema migration or copying into another database is required.
+
+Provision and monitor available filesystem space, including rollback journals,
+report storage and verified backups. Native disk/capacity exhaustion returns
+storage-unavailable; its transaction rolls back without committing partial
+changes. Retry the original operation after capacity is available. It is not
+permission to discard audit, credentials, identities, receipts or native history.
+API payload bounds are unchanged. All platform-owned logging uses
+`loggingRetentionDays`, default seven days, with bounded idle maintenance.
+- [Logging policy, records covered, files and backup verification](logging.md)
 
 ## Software updates
 

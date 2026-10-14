@@ -11,8 +11,11 @@
   "description": "Human-led Matrix coordination and agent management",
   "devDependencies": {
     "@ctlflow/crossfire-test-support": "0.1.20",
+    "@ctlflow/crossfire-data": "0.1.20",
+    "knex": "3.2.10",
     "@ctlflow/crossfire-operator-support": "0.1.20",
     "@ctlflow/crossfire-adapter-crossfire": "0.1.20",
+    "@ctlflow/crossfire-client": "0.1.20",
     "@ctlflow/crossfire-adapter-matrix": "0.1.20",
     "@ctlflow/crossfire-adapter-sqlite": "0.1.20",
     "@ctlflow/crossfire-adapter-filesystem": "0.1.20",
@@ -30,6 +33,9 @@
     "npm": ">=11.17.0"
   },
   "scripts": {
+    "migrate:latest:management:sqlite": "knex migrate:latest --knexfile ./knexfile.management.mjs --env production",
+    "migrate:status:management:sqlite": "knex migrate:list --knexfile ./knexfile.management.mjs --env production",
+    "migrate:make:management:sqlite": "knex migrate:make --knexfile ./knexfile.management.mjs --env development -x mjs",
     "typecheck": "tsc -p tsconfig.core.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "build": "node ../../scripts/build-service.mjs crossfire",
     "test": "node ../../scripts/test.mjs crossfire all",

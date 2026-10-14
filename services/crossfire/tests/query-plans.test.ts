@@ -1,8 +1,8 @@
+import { migrateFixture } from './support/storage.js';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
-import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
 import { createDiscoveryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/discovery/index';
@@ -19,14 +19,14 @@ function value<T>(result: Result<T>): T {
   return result.value;
 }
 
-test('actual Tinqer owner pages seek indexes and hydrate activity and selected identities in constant query counts', scope => {
+test('actual Tinqer owner pages seek indexes and hydrate activity and selected identities in constant query counts', async scope => {
   let statements: string[] = [];
   const database = new Database(':memory:', { verbose(statement) {
     if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
   } });
   cleanup(scope, () => database.close());
   database.pragma('foreign_keys = ON');
-  createSchema(database);
+  await migrateFixture(database);
   const repositories = createRepositories(database);
   const directory = createDirectoryRepository(database);
   const discovery = createDiscoveryRepository(database);
@@ -173,14 +173,14 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   assert.deepEqual(database.pragma('foreign_key_check'), []);
 });
 
-test('sender identity batches seek exact Matrix indexes across large human and agent populations', scope => {
+test('sender identity batches seek exact Matrix indexes across large human and agent populations', async scope => {
   let statements: string[] = [];
   const database = new Database(':memory:', { verbose(statement) {
     if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
   } });
   cleanup(scope, () => database.close());
   database.pragma('foreign_keys = ON');
-  createSchema(database);
+  await migrateFixture(database);
   const repositories = createRepositories(database), discovery = createDiscoveryRepository(database);
   database.transaction(() => {
     for (let index = 0; index < 1000; index++) {
@@ -210,14 +210,14 @@ test('sender identity batches seek exact Matrix indexes across large human and a
   assert.deepEqual(database.pragma('foreign_key_check'), []);
 });
 
-test('fleet enrollment review hydrates the entire roster and selected identities in three indexed queries', scope => {
+test('fleet enrollment review hydrates the entire roster and selected identities in three indexed queries', async scope => {
   let statements: string[] = [];
   const database = new Database(':memory:', { verbose(statement) {
     if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
   } });
   cleanup(scope, () => database.close());
   database.pragma('foreign_keys = ON');
-  createSchema(database);
+  await migrateFixture(database);
   const repositories = createRepositories(database);
   database.transaction(() => {
     value(repositories.principal.insert({ id: 'owner', matrixUserId: '@owner:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));

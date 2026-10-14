@@ -34,11 +34,13 @@ export async function nativeCodex(context: TestContext) {
   cleanup(context, async () => {
     stop.abort(); if (adapter) await adapter.close(); else await session.close();
   });
-  adapter = codexDelivery({ ...session, request: async (method, params) => {
+  adapter = codexDelivery({ ...session, request: async (method, params, signal) => {
     const input = params as Record<string, unknown>;
     relayRequests.push({ method, params: input });
-    const result = await session.request(method, params);
-    if (method === 'turn/start') acknowledgements.push({ params: input, turn: (result as { turn: { id: string } }).turn });
+    const result = await session.request(method, params, signal);
+    if (method === 'turn/start') {
+      acknowledgements.push({ params: input, turn: (result as { turn: { id: string } }).turn });
+    }
     if (method.endsWith('/list')) historyQueries.push({ method, params, result });
     return result;
   } }, { pollMs: 100, timeoutMs: 10_000, receiptFile: fixture.receiptFile });

@@ -38,7 +38,12 @@ intentional tool releases. Its application and content ports are published only 
 Published reports use `http://localhost:8099/OPAQUE_PUBLIC_KEY/index.html` in this
 local setup. The content root itself returns 404 and exposes no application API.
 
-First startup builds a content-addressed image. `--compile` explicitly rebuilds.
+First startup builds content-addressed server and Knex migration images.
+Startup stops existing writers, verifies an upgrade backup, runs the one-shot
+migration container and starts the server only after successful migration.
+The migration image is shared by Node, managed .NET and NativeAOT implementations.
+Neither an application nor EF creates or upgrades the database at startup.
+`--compile` explicitly rebuilds both images.
 Ctrl+C or orderly terminal closure stops this instance. A force-killed launcher
 may leave its exact container running; stop it explicitly through Docker.
 The chosen state directory persists across starts.

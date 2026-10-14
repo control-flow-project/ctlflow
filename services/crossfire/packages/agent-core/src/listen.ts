@@ -38,6 +38,7 @@ function steeringPreempted(error: unknown): boolean {
 }
 
 export type ListenerOptions = {
+  log(message: string): void;
   clock: Clock;
   budget?: ListenerBudget;
   control: ListenerControl;
@@ -116,6 +117,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const updates = releaseUpdates(storage, options.cursorFile, options.release.release, options.settings.owner, destination.sessionId);
   const signal = AbortSignal.any([stop, destination.signal, failed.signal]);
   activity = createListenerActivity({ client: options.coordination, agentId: options.id, release: options.release, control: options.control,
+    log: options.log,
     clock: options.clock, statistics, updated: release => { updates.available(release); changed(); }, failed: error => failed.abort(error),
     started: (runId, binding) => { reportingRun = runId; runReady(); approval.start(); observer.start(runId); options.activity?.(runId, binding); } }, signal);
   const client = options.transport(signal, 45_000);

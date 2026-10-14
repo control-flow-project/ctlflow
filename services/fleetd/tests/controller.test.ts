@@ -2,7 +2,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
@@ -290,7 +290,7 @@ test('remote commands use the same native lifecycle journal and retain uncertain
   await fixture.controller.close();
   const past: Operation[] = Array.from({ length: 400 }, () => ({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: fixture.record.fleetId },
     expectedRevision: 0, status: 'succeeded', createdAt: 1, completedAt: 2, approval: null, errors: [] }));
-  value(fixture.registry.saveOperations([pinned, ...past]));
+  for (const operation of [pinned, ...past]) value(fixture.registry.saveOperation(operation));
   const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); assert(control);
   const stop = value(await restarted.operate({ operationId: randomUUID(), action: 'stop', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0 }));
   await until(() => value(restarted.operation(stop.operationId)).completedAt !== null);
@@ -306,7 +306,7 @@ test('an interrupted remote operation becomes a recorded failure, never an autom
   await fixture.controller.close();
   const interrupted: Operation = { operationId: randomUUID(), action: 'reset', target: { kind: 'fleet', fleetId: fixture.record.fleetId }, expectedRevision: 0,
     receiptPending: true, status: 'running', createdAt: 1, completedAt: null, approval: null, errors: [] };
-  value(fixture.registry.saveOperations([interrupted]));
+  value(fixture.registry.saveOperation(interrupted));
   const restarted = value(createController(fixture.services)); cleanup(scope, () => restarted.close()); assert(control);
   const result = value(await control.execute({ operationId: interrupted.operationId, action: 'reset', instanceKey: null }));
   assert.equal(result.status, 'failed'); assert(result.errorMessage?.includes('Controller stopped')); assert.equal(resets, 0);
@@ -349,7 +349,9 @@ test('terminal pointers exist only for live instances and never leak into regist
   for (const sessionId of ['', 'x'.repeat(201), 'unsafe\nidentity']) assert.equal(instanceView({ ...current.instances[0], sessionId }).ok, false);
   pointer.connection.tokenFile = '/changed-by-caller';
   assert.equal(value((await fixture.controller.attachment(fleetId, 'analyst'))).connection.tokenFile, '/fixture/private-token');
-  for (const view of [fixture.controller.list(), fixture.controller.view(fleetId), fixture.registry.registrations(), fixture.registry.operations()]) {
+  const operationDirectory = join(fixture.directory, 'controller', 'operations');
+  const storedOperations = readdirSync(operationDirectory).map(file => JSON.parse(readFileSync(join(operationDirectory, file), 'utf8')) as unknown);
+  for (const view of [fixture.controller.list(), fixture.controller.view(fleetId), fixture.registry.registrations(), storedOperations]) {
     assert(!JSON.stringify(view).includes('/fixture/private-token'));
     assert(!JSON.stringify(view).includes('ws://127.0.0.1:12345'));
   }

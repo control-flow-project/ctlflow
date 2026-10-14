@@ -50,10 +50,10 @@ async function body(request: IncomingMessage): Promise<Result<unknown>> {
   try { return success(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers)))); }
   catch { return failure('invalid', 'Invalid JSON'); }
 }
-export function createDaemonHttp(controller: FleetController, stopped: () => void) {
+export function createDaemonHttp(controller: FleetController, stopped: () => void, logging: () => { loggingRetentionDays: number; loggingError: string | null }) {
   const routes = [
     bind(operations.setup, async (_params, _query, input) => reply(await controller.setup(input))),
-    bind(operations.status, () => reply(success(controller.status()))),
+    bind(operations.status, () => reply(success({ ...controller.status(), ...logging() }))),
     bind(operations.fleets, (_params, query) => paged(controller.list(), query)),
     bind(operations.addFleet, (_params, _query, input) => reply(controller.add(input.directory))),
     bind(operations.fleet, params => reply(controller.view(params.fleetId))),

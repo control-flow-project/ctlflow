@@ -12,7 +12,8 @@
   "workspaces": [
     "services/*",
     "services/*/apps/*",
-    "services/*/packages/*"
+    "services/*/packages/*",
+    "services/*/database"
   ],
   "scripts": {
     "typecheck": "node scripts/workspaces.mjs typecheck",
@@ -22,7 +23,12 @@
     "verify:structure": "node scripts/verify-structure.mjs",
     "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@ctlflow/crossfire",
     "verify:installation": "npm run verify:installation --workspace=@ctlflow/crossfire",
-    "verify:container": "node scripts/verify-container.mjs"
+    "verify:container": "node scripts/verify-container.mjs",
+    "verify:csharp": "node services/crossfire/csharp/scripts/verify.mjs && node services/crossfire/csharp/scripts/verify-runtime.mjs",
+    "verify:csharp:core": "node services/crossfire/csharp/scripts/verify.mjs",
+    "verify:csharp:runtime": "node services/crossfire/csharp/scripts/verify-runtime.mjs",
+    "publish:csharp": "node scripts/publish-csharp.mjs",
+    "verify:contracts": "node scripts/verify-contracts.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

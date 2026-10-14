@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { stringify } from 'smol-toml';
 import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
-import { operationView } from '@ctlflow/fleetd-contracts/api';
 import { validateRoster } from '@ctlflow/fleetd-contracts/configuration';
 import type { Registry } from '@ctlflow/fleetd-domain/port';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
@@ -12,9 +11,9 @@ import { MAX_JSON_BYTES } from '@ctlflow/crossfire-contracts/limits';
 import { loadConfiguration } from './configuration.js';
 import { createSetupStorage } from './setup.js';
 import { resumeSelections } from './resume-selection.js';
+import { operationStorage } from './operation.js';
 
 const registrations = check.list(check.object({ fleetId: check.identifier, fleetKey: check.name, directory: check.text(4096), label: check.text(100), revision: check.integer(), digest: check.text(64, 64) }), 100);
-const operations = check.list(operationView, 700);
 const desiredRelation = check.list(check.object({ fleetId: check.identifier, instanceKey: check.name }), 10000);
 const DESIRED_INTENT_BYTES = 2 * 1024 * 1024;
 const desiredIntent: typeof desiredRelation = input => {
@@ -36,6 +35,7 @@ function attempt<Value>(action: () => Result<Value>): Result<Value> {
 export function createRegistry(root: string): Registry {
   privateDir(root);
   const setup = createSetupStorage(root);
+  const operations = operationStorage(root);
   function read<Value>(name: string, parser: check.Parser<Value>, initial: Value, maximum = MAX_JSON_BYTES): Result<Value> {
     return attempt(() => lstatSync(join(root, name), { throwIfNoEntry: false }) ? parser(readJson<unknown>(join(root, name), maximum)) : success(initial));
   }
@@ -47,7 +47,7 @@ export function createRegistry(root: string): Registry {
     registrations: () => read('fleets.json', registrations, []), saveRegistrations: values => save('fleets.json', registrations, values),
     desiredIntent: () => read('desired-intent.json', desiredIntent, [], DESIRED_INTENT_BYTES), saveDesiredIntent: values => save('desired-intent.json', desiredIntent, values, DESIRED_INTENT_BYTES),
     resumeSelections: () => read('resume-selections.json', resumeSelections, []), saveResumeSelections: values => save('resume-selections.json', resumeSelections, values),
-    operations: () => read('operations.json', operations, []), saveOperations: values => save('operations.json', operations, values),
+    ...operations,
     load: loadConfiguration,
     writeRoster(configuration, roster) {
       return attempt(() => {

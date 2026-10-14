@@ -6,7 +6,7 @@ import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index
 import { failureReport } from '@ctlflow/crossfire-contracts/runtime';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import type { Binding } from '@ctlflow/fleetd-storage/binding';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 

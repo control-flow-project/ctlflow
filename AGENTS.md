@@ -14,6 +14,26 @@ the superseded path; do not leave it available behind a flag. Record any explici
 exception and its exact scope in these instructions, local memory and the ledger.
 There are currently no project-wide compatibility exceptions.
 
+On 2026-10-13 the owner explicitly authorized independently selected Node and
+C# implementations of all three products in this monorepo. C# targets .NET 11,
+NativeAOT and EF Core. All implementations must use one shared React UI, identical
+wire contracts and directly interchangeable SQLite databases. This authorization
+does not permit cross-language runtime fallbacks, compatibility handlers or
+duplicate implementations within a selected language. On 2026-10-14 the owner
+superseded the initial C#-before-Rust sequencing gate and authorized a separate
+parallel Rust track in its own worktree. Both tracks retain the same shared UI,
+API and SQLite guarantees and their own complete verification requirements.
+Native implementation readiness and outstanding dependency decisions are
+recorded in docs/architecture/native-implementations.md.
+
+On 2026-10-14 the owner approved producing managed and NativeAOT .NET 11 builds
+from the same C# source and initially deploying the managed build. EF remains the
+C# data-access owner. NativeAOT diagnostics must remain visible and receive an
+evidence-based disposition; their number is not proof of independent bugs or a
+required EF fork. All tests must pass. This is explicit build selection, never an
+automatic managed/Node fallback inside a native executable. Neither a checkpoint
+nor an isolated proof establishes full product readiness in either native track.
+
 On 2026-10-06 the owner approved a one-time npm release-age exception only for
 the reviewed `source-map-js` 1.2.2 security patch. Native npm resolution changes
 only that transitive lock entry. The persistent seven-day policy and existing
@@ -22,6 +42,15 @@ compatibility paths or broader dependency updates.
 
 Necessary forward data migrations convert a verified deployed schema into the
 single current schema; they do not authorize concurrent old/new runtime paths.
+Knex is the sole owner of database creation and migrations across every language
+implementation. Database assets use the Lesser/Snapped structure under their
+service: database/<database>/<backend>/migrations and seeds, with a per-database
+knexfile and one-shot migration container. Deployment verifies a backup, stops
+writers, runs the migration container and starts the selected implementation only
+after success. Node and C# validate existing databases; neither creates schemas,
+runs ORM migrations or silently migrates at startup. New databases follow the
+same nesting and owner. File state and Conduit's externally owned RocksDB are
+not SQL databases and are not converted into artificial Knex stores.
 Preserve production data, credentials and native histories. Inventory actual
 stores before removing obsolete migration inputs; never reset production to avoid
 designing the correct migration. Required native protocol behavior is not an

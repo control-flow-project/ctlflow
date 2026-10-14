@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Crossfire.Domain/Crossfire.Domain.csproj" />
+  </ItemGroup>
+</Project>

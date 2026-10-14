@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { readFleetDirectory } from '../apps/web/src/fleet-directory/read.js';
 import { applicationFixture, value } from './support/application.js';
 import { httpFixture } from './support/http.js';

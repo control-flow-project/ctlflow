@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 import { readFleetDirectory } from './fleet-directory/read.js';

@@ -12,6 +12,7 @@ listener and owns native lifecycle through runtime adapters.
 - [Management, rooms, wake-ups and owner approvals](docs/management.md)
 - [Instance configuration and access policy](docs/configuration.md)
 - [Deployment, backups and troubleshooting](docs/operations.md)
+- [Shared Knex databases and migration containers](database/README.md)
 - [Operator verification tools](tools/README.md)
 - [Matrix commands and media](docs/matrix-api.md)
 - [Large messages, unread catch-up, history and context reset](docs/history.md)

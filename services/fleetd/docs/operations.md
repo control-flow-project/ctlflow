@@ -13,6 +13,11 @@ fleetd --name laptop --root /absolute/private/controller
 
 The private root contains descriptor, registry, desired binding intent, operation state, log and
 `fleetd.sock`. It binds a private Unix HTTP socket, not a public network port.
+Optional private root `config.json` accepts `loggingRetentionDays`, default 7.
+Diagnostics use `logs/` daily timestamped JSONL files; completed operations use
+`operations/OPERATION_UUID.json`. Startup/hourly cleanup runs while idle and
+retains unfinished or unacknowledged outcomes and every desired resume selection.
+- [Platform logging retention and safe forward conversions](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/logging.md)
 One root has one stable controller name. Optional metadata is descriptive and
 contains no credentials.
 

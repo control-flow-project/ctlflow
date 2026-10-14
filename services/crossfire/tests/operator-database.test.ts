@@ -1,3 +1,4 @@
+import { migrateFixture } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +8,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { executeInsert, executeUpdate, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
-import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
 import type { EnrollmentIntroduction } from '@ctlflow/crossfire-domain/enrollment/input';
@@ -19,6 +20,7 @@ import { applicationFixture, value, secret } from './support/application.js';
 import { inspectDatabase, verifyPreservation, databaseExpectations } from '../tools/database.js';
 import { restoreSchema14EnrollmentItems } from './support/schema14.js';
 import { schema15Store } from './support/schema15.js';
+import { restoreSchema16Logging } from './support/schema16.js';
 
 test('operator database inspection is readonly, complete and proves protected records across upgrades', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-database-'));
@@ -47,19 +49,19 @@ test('operator database inspection is readonly, complete and proves protected re
   assert.equal(inspectDatabase(current, { schemaVersion: 7 }, false).ok, false);
   assert.equal(inspectDatabase(current, { counts: { agent: 0 } }, false).ok, false);
   assert.equal(databaseExpectations({ counts: { 'agent; DROP TABLE agent': 1 } }).ok, false);
-  const preserved = value(verifyPreservation(before, current));
+  const preserved = value((await verifyPreservation(before, current)));
   assert.equal(preserved.preserved.agent, 1); assert.equal(preserved.preserved.agent_credential, 1);
   assert.equal(preserved.preserved.fleet_instance_policy, 1); assert.equal(preserved.preserved.enrollment_item_permission, 1);
   await fixture.member('additional');
-  assert(verifyPreservation(before, current).ok, 'New records may be added without losing existing records');
+  assert((await verifyPreservation(before, current)).ok, 'New records may be added without losing existing records');
   const database = new Database(current);
   try {
     executeDelete(database, schema, (query, params) => query.deleteFrom('fleet_instance_permission').where(row => row.agent_id === params.id), { id: agent.id });
-    assert.equal(verifyPreservation(before, current).ok, false, 'Approved future delegation is protected operator state');
+    assert.equal((await verifyPreservation(before, current)).ok, false, 'Approved future delegation is protected operator state');
     executeUpdate(database, schema, (query, params) => query.update('agent').set({ wake_mode: 'everyone' }).where(row => row.principal_id === params.id), { id: agent.id });
   }
   finally { database.close(); }
-  assert.equal(verifyPreservation(before, current).ok, false);
+  assert.equal((await verifyPreservation(before, current)).ok, false);
   const linked = join(directory, 'linked.sqlite'); symlinkSync(current, linked);
   assert.equal(inspectDatabase(linked, {}, false).ok, false);
   chmodSync(before, 0o644); assert.equal(inspectDatabase(before, {}, false).ok, false);
@@ -107,16 +109,16 @@ test('operator preservation covers immutable archived children and exact native-
     assert.equal(Object.keys(report.counts).length, 63); assert.deepEqual(readFileSync(current), bytes);
     for (const privateText of [agent.token, agent.controller.credential, record.claimHash, 'Archived private metadata'])
       assert.equal(JSON.stringify(report).includes(privateText), false);
-    const preserved = value(verifyPreservation(before, current));
+    const preserved = value((await verifyPreservation(before, current)));
     for (const name of relationNames) assert.equal(preserved.preserved[name], 1, name);
     executeUpdate(database, schema, (query, params) => query.update('fleet_native_stop').set({ invalidated_at: params.now })
       .where(row => row.agent_id === params.agentId && row.receipt_id === params.receiptId),
     { agentId: agent.id, receiptId, now: fixture.now() });
-    assert.equal(verifyPreservation(before, current).ok, false, 'Changed native-stop authority must fail preservation');
+    assert.equal((await verifyPreservation(before, current)).ok, false, 'Changed native-stop authority must fail preservation');
   } finally { database.close(); }
 });
 
-test('operator preservation proves schema 15 conversion without modifying either evidence store', scope => {
+test('operator preservation proves schema 15 conversion without modifying either evidence store', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-usage-preservation-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const current = join(directory, 'current.sqlite'), before = join(directory, 'before.sqlite');
@@ -124,14 +126,14 @@ test('operator preservation proves schema 15 conversion without modifying either
   try {
     chmodSync(current, 0o600); copyFileSync(current, before);
     const originalBytes = readFileSync(before), originalUsage = database.prepare('SELECT * FROM runtime_usage_checkpoint').all();
-    createSchema(database);
-    const currentBytes = readFileSync(current), report = value(verifyPreservation(before, current));
+    await migrateFixture(database);
+    const currentBytes = readFileSync(current), report = value((await verifyPreservation(before, current)));
     assert.equal(report.beforeSchema, 15); assert.equal(report.afterSchema, SCHEMA_VERSION); assert.equal(report.forwardMigration, true);
     assert.equal(report.preserved.agent, 1); assert.equal(report.preserved.member, 1);
     assert.deepEqual(database.prepare('SELECT * FROM runtime_usage_checkpoint').all(), originalUsage);
     assert.deepEqual(readFileSync(before), originalBytes); assert.deepEqual(readFileSync(current), currentBytes);
     database.prepare("UPDATE member SET display_name='Changed' WHERE principal_id='owner'").run();
-    assert.equal(verifyPreservation(before, current).ok, false, 'Forward conversion never excuses changed protected records');
+    assert.equal((await verifyPreservation(before, current)).ok, false, 'Forward conversion never excuses changed protected records');
     assert.deepEqual(readFileSync(before), originalBytes);
   } finally { database.close(); }
 });
@@ -146,13 +148,13 @@ test('operator preservation proves schema 14 conversion including exact prior au
     database.exec('ALTER TABLE agent ADD COLUMN display_name_override TEXT');
     restoreSchema14EnrollmentItems(database);
     database.prepare('UPDATE agent SET display_name_override=? WHERE principal_id=?').run('Retired caption', agent.id);
-    database.pragma('user_version=14'); copyFileSync(current, before);
-    createSchema(database);
-    const report = value(verifyPreservation(before, current));
+    restoreSchema16Logging(database); database.pragma('user_version=14'); copyFileSync(current, before);
+    await migrateFixture(database);
+    const report = value((await verifyPreservation(before, current)));
     assert.equal(report.forwardMigration, true); assert.equal(report.preserved.agent, 1);
     database.prepare("DELETE FROM audit_event WHERE action='agent.name.canonicalized'").run();
-    assert.equal(verifyPreservation(before, current).ok, false, 'Independent labels must be preserved in immutable migration evidence');
+    assert.equal((await verifyPreservation(before, current)).ok, false, 'Independent labels must be preserved in immutable migration evidence');
     database.prepare("UPDATE audit_event SET message='changed' WHERE action<>'agent.name.canonicalized'").run();
-    assert.equal(verifyPreservation(before, current).ok, false, 'Every original audit record remains exactly protected');
+    assert.equal((await verifyPreservation(before, current)).ok, false, 'Every original audit record remains exactly protected');
   } finally { database.close(); }
 });

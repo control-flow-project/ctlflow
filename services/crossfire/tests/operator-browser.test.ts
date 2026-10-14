@@ -7,7 +7,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { publicRouter } from '../apps/server/src/router.js';
 import { browserFailureMessage, verifyBrowser } from '../tools/browser/verify.js';
 import { managementViews, managementViewports } from '../tools/browser/views.js';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { operatorFixture } from './support/operator.js';
 import { value } from './support/application.js';

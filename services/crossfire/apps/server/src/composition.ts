@@ -21,28 +21,36 @@ import type { MatrixAuthority } from '@ctlflow/crossfire-domain/port/matrix-auth
 import { serviceUser, publicationBudget, type Config } from './config.js';
 import { createRuntimeRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/runtime/index';
 import { createStatisticsRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/statistics/index';
-export type Application = { services: Services; config: Config; close(): void };
-export function createApplication(path: string, config: Config, options: { now?: () => number; matrix?: MatrixAuthority; publicationDirectory?: string } = {}): Application {
+import { createLoggingRetention } from '@ctlflow/crossfire-adapter-sqlite/repository/logging/index';
+import { loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
+import { createDiagnosticLog } from '@ctlflow/crossfire-adapter-filesystem/logging';
+import type { DiagnosticLog } from '@ctlflow/crossfire-domain/port/logging';
+export type Application = { services: Services; config: Config; diagnostics: DiagnosticLog; close(): void };
+export function createApplication(path: string, config: Config, options: { now?: () => number; matrix?: MatrixAuthority; publicationDirectory?: string; diagnostics?: DiagnosticLog } = {}): Application {
   const budget = publicationBudget(config.publicationBudget); if (!budget.ok) throw new Error(budget.error.message);
-  const temporary = path === ':memory:' && !options.publicationDirectory ? mkdtempSync(join(realpathSync(tmpdir()), 'crossfire-publications-')) : undefined;
+  const retention = loggingRetentionDays(config.loggingRetentionDays); if (!retention.ok) throw new Error(retention.error.message);
+  const temporary = path === ':memory:' ? mkdtempSync(join(realpathSync(tmpdir()), 'crossfire-publications-')) : undefined;
   let acquiredStore: ReturnType<typeof createPublicationStore> | undefined;
   let acquiredDatabase: ReturnType<typeof openStore> | undefined;
   let acquiredMatrix: MatrixAuthority | undefined;
+  let diagnostics: DiagnosticLog | undefined;
   let closed = false;
   function close() {
     if (closed) return; closed = true;
     try { acquiredMatrix?.close(); } finally {
       try { acquiredDatabase?.close(); } finally {
-        try { acquiredStore?.close(); } finally { if (temporary) rmSync(temporary, { recursive: true }); }
+        try { acquiredStore?.close(); } finally { if (!options.diagnostics) diagnostics?.close(); if (temporary) rmSync(temporary, { recursive: true }); }
       }
     }
   }
   try {
     const store = acquiredStore = createPublicationStore(options.publicationDirectory ?? temporary ?? path + '.publications', budget.value.uploads);
+    diagnostics = options.diagnostics ?? createDiagnosticLog(temporary ? join(temporary, 'logs') : path + '.logs', retention.value, options.now ?? Date.now);
     const database = acquiredDatabase = openStore(path);
     const matrix = acquiredMatrix = options.matrix ?? createMatrixAuthority({ ...config, serviceMatrixId: serviceUser(config) });
     function hash(value: string) { return createHash('sha256').update(value).digest('hex'); }
     const services: Services = {
+      logging: createLoggingRetention(database, retention.value),
       publication: { repository: createPublicationRepository(database), store, budget: budget.value, get origin() { return config.contentOrigin; } },
       statistics: createStatisticsRepository(database),
       runtime: createRuntimeRepository(database),
@@ -56,6 +64,6 @@ export function createApplication(path: string, config: Config, options: { now?:
     };
     const initialized = initializeInstance(services, config.administrator);
     if (!initialized.ok) throw new Error(initialized.error.message);
-    return { services, config, close };
+    return { services, config, diagnostics, close };
   } catch (error) { close(); throw error; }
 }

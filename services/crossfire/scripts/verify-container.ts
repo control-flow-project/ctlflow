@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, expect } from '@playwright/test';
-import { main, imageName, runArguments, cgroupArguments } from '../apps/server/src/operator.js';
+import { main, imageName, migrationImageName, runArguments, cgroupArguments } from '../apps/server/src/operator.js';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { ARTIFACTS } from '@ctlflow/crossfire-contracts/release';
 import { messageContent } from '@ctlflow/crossfire-adapter-matrix/message';
@@ -35,9 +35,10 @@ const image = imageName(repository);
 const arguments_ = runArguments(directory, image, port, contentPort, cgroupParent);
 const name = arguments_[arguments_.indexOf('--name') + 1]!;
 const secrets = readJson<{ administratorPassword: string }>(join(directory, 'bootstrap.json'));
-if (spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) {
-  console.log('Building the verification image: ' + image);
-  const build = spawnSync('docker', ['build', ...resources, '--file', join(root, 'Dockerfile'), '--tag', image, repository], { stdio: 'inherit', timeout: 1_800_000 });
+for (const [target, selectedImage] of [['production', image], ['migrations', migrationImageName(image)]] as const) {
+  if (spawnSync('docker', ['image', 'inspect', selectedImage], { stdio: 'ignore' }).status === 0) continue;
+  console.log('Building the verification image: ' + selectedImage);
+  const build = spawnSync('docker', ['build', ...resources, '--file', join(root, 'Dockerfile'), '--target', target, '--tag', selectedImage, repository], { stdio: 'inherit', timeout: 1_800_000 });
   assert.equal(build.status, 0, 'Verification image build failed');
 }
 
@@ -237,6 +238,9 @@ try {
   }
 } finally {
   try { await browser.close(); }
-  finally { while (disposal.length) await disposal.pop()!(); }
+  finally {
+    try { while (disposal.length) await disposal.pop()!(); }
+    finally { rmSync(directory, { recursive: true }); }
+  }
 }
-console.log('Container startup, Element public-room creation and attachment download, React/native routes, artifacts, shutdown and persisted rooms passed: ' + directory);
+console.log('Container startup, shared Knex migration, Element rooms/media, React/native routes, artifacts, shutdown and persisted rooms passed; disposable fixture removed.');

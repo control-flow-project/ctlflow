@@ -38,7 +38,7 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
     assert(!JSON.stringify(incremental.rooms ?? {}).includes(roomId), 'An unchanged pending invite is absent even from full-state incremental sync');
   }
   let ended: unknown, ready = false;
-  const receiver = listen({ binding: 'fixture', host, coordination: createCoordination({ origin, token: agent.token }), settings: {
+  const receiver = listen({ log: (_message: string) => {}, binding: 'fixture', host, coordination: createCoordination({ origin, token: agent.token }), settings: {
     instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
     account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
     id: agent.id, release: release.manifest, cursorFile,

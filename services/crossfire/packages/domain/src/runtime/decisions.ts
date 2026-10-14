@@ -118,11 +118,12 @@ export function receiptDecision(services: Services, actor: Actor, agentId: strin
     if (actor.principalId !== agentId) return failure('missing', 'Decision not found');
     const decision = services.runtime.decision(id);
     if (!decision.ok) return decision;
+    if (!decision.value) return success({ recorded: false });
     if (decision.value?.agentId !== agentId) return failure('missing', 'Decision not found');
     if (status === 'responded' && decision.value.status !== 'answered' && decision.value.status !== 'responded') return failure('conflict', 'No answer was submitted to this native request');
     if (status === 'cancelled' && !['pending', 'answered', 'cancelled'].includes(decision.value.status)) return failure('conflict', 'The native request is already settled');
     const saved = services.runtime.decisionStatus(id, status);
-    return saved.ok ? success({ accepted: true }) : saved;
+    return saved.ok ? success({ recorded: true }) : saved;
   });
 }
 export function expireDecisions(services: Services) {

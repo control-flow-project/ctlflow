@@ -156,3 +156,6 @@ verification/
 .codex/
 .test/
 .tests/
+**/bin/
+**/obj/
+**/target/

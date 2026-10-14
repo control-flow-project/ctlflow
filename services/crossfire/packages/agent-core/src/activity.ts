@@ -6,7 +6,7 @@ import type { Coordination } from './coordination.js';
 import type { listenerStatistics } from './statistics.js';
 import type { ControllerBinding } from './listener-control-port.js';
 
-export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controller: ControllerBinding, clock: Clock, statistics: ReturnType<typeof listenerStatistics>, onUpdate?: (release: string) => void) {
+export async function reportActivity(client: Coordination, agent: string, installed: Manifest, stop: AbortSignal, controller: ControllerBinding, clock: Clock, statistics: ReturnType<typeof listenerStatistics>, log: (message: string) => void, onUpdate?: (release: string) => void) {
   const run = randomUUID();
   const failed = new AbortController(), lifetime = new AbortController();
   const signal = AbortSignal.any([stop, failed.signal, lifetime.signal]);
@@ -18,7 +18,7 @@ export async function reportActivity(client: Coordination, agent: string, instal
     if (!response.ok) {
       if (initial) throw Object.assign(new Error(response.error.message), { code: response.error.code });
       if (!stopped && ['invalid', 'unauthorized', 'forbidden', 'missing', 'conflict'].includes(response.error.code)) failed.abort(Object.assign(new Error(response.error.message), { code: response.error.code }));
-      if (!signal.aborted && !unavailable) process.stderr.write('Crossfire heartbeat unavailable; management will show offline when it expires.\n');
+      if (!signal.aborted && !unavailable) log('Crossfire heartbeat unavailable; management will show offline when it expires.');
       unavailable = true; return;
     }
     if (response.value.statisticsAccepted) statistics.acknowledge(batch);
@@ -26,7 +26,7 @@ export async function reportActivity(client: Coordination, agent: string, instal
     if (!stopped) onUpdate?.(current);
     if (!stopped && current !== installed.release && current !== warnedRelease) {
       warnedRelease = current;
-      process.stderr.write('Crossfire release ' + current + ' is available. Ask the owner to update the fleet controller and review changed skills; this listener remains running.\n');
+      log('Crossfire release ' + current + ' is available. Ask the owner to update the fleet controller and review changed skills; this listener remains running.');
     }
     unavailable = false;
     if (response.value.disconnect && !stopped) failed.abort(Object.assign(new Error('Listener admission expired; reconnect its controller lease'), { code: 'unavailable' }));
