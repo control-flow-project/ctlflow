@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Crossfire.Kernel/Crossfire.Kernel.csproj" />
+    <ProjectReference Include="../Crossfire.Domain/Crossfire.Domain.csproj" />
+    <ProjectReference Include="../Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" IncludeAssets="all" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tasks" PrivateAssets="all" IncludeAssets="runtime;build;native;contentfiles;analyzers;buildtransitive" />
+    <EmbeddedResource Include="../../../packages/data/sqlite/schema.json" LogicalName="Crossfire.Sqlite.Schema" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PublishAot)' != 'true'">
+    <ProjectReference Include="../../build/Crossfire.EfCompiler/Crossfire.EfCompiler.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PublishAot)' == 'true'">
+    <Compile Remove="DesignServices.cs" />
+  </ItemGroup>
+</Project>

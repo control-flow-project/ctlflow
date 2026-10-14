@@ -51,7 +51,7 @@ test('both Element configuration URLs preserve branding and reflect enforced sig
   assert.equal(translations.status, 200);
   assert.equal(translations.headers.get('content-type'), 'application/json');
   assert.equal(translations.headers.get('x-content-type-options'), 'nosniff');
-  assert.deepEqual(await translations.json(), JSON.parse(readFileSync(join(process.cwd(), 'assets/element-translations.json'), 'utf8')));
+  assert.deepEqual(await translations.json(), JSON.parse(readFileSync(join(process.cwd(), 'apps/web/assets/element-translations.json'), 'utf8')));
   const policy = value(services.repositories.instancePolicy.find({ id: 'instance' }))!;
   value(changeInstancePolicy(services, admin.actor, { ...policy, expectedRevision: policy.revision, signupMode: 'open' }, 'open'));
   for (const path of paths) await configuration(path, false);

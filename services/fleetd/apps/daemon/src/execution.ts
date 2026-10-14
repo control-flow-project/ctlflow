@@ -13,7 +13,7 @@ import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { privateDir, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { installSoftware, installedSoftware } from '@ctlflow/crossfire-adapter-crossfire/software';
 import { createCoordination } from '@ctlflow/crossfire-adapter-crossfire/coordination';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { createFleetControlConnection, type FleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';

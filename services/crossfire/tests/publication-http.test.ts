@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { request } from 'node:http';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { binaryBytes } from '@ctlflow/crossfire-kernel/bytes';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { deletePublication } from '@ctlflow/crossfire-domain/publication/delete';

@@ -52,6 +52,18 @@ documentation and shared verification tooling; it contains no application source
 or repository-wide package pool. Cross-project reuse is through declared package
 exports and dependencies. Applications never import another application's source.
 There is one listener and one native integration per supported runtime, not per-product copies.
+The owner authorized independent Node, C# and Rust implementations of these same
+three products. On 2026-10-14 the owner authorized a separate parallel Rust
+worktree, superseding the initial C#-before-Rust sequencing gate. Each native
+implementation requires complete capability parity and successful verification
+before release.
+The C# target is .NET 11 NativeAOT with EF Core and SQLite. This is an explicit
+language-selection exception, not permission for legacy interfaces or runtime
+fallbacks. One shared React management project remains authoritative. API routes,
+validation, authentication, authorization and persisted SQLite representations
+must remain interchangeable across implementations, without an import/export or
+database reset. See [native implementation readiness](architecture/native-implementations.md)
+for the implementation plan, dependency evidence and current uncompleted scope.
 Only concrete, supported capabilities have packages. Every agent belongs to a
 fleet managed by fleetd, including a one-agent fleet. There is no standalone
 deployment, existing-session attachment, optional controller or detach-to-direct
@@ -138,6 +150,14 @@ lockfile. Each product has coherent build/test commands. Named exports, strict
 TypeScript without any, functional modules, Result for expected failures,
 explicit .js relative imports, validated boundaries, and semantic splits near
 600 lines are mandatory.
+
+`apps/web` owns the single management UI build, including its Element translation
+asset. The private `crossfire-client` package owns the browser-safe typed REST,
+binary-upload and Matrix password-login clients. Web/client dependencies cannot
+reach backend implementations or native platform APIs. Backend coordination
+adapters and command tools consume this client through declared exports; removed
+backend-named client paths have no aliases. The UI build emits the same
+content-addressed `/manage/assets/` URLs independently of the selected backend.
 
 ## 2. User experience and lifecycle
 

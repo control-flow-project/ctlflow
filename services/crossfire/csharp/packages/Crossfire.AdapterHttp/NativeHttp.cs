@@ -1,0 +1,91 @@
+using System.Buffers;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Crossfire.Contracts;
+using Crossfire.Kernel;
+
+namespace Crossfire.AdapterHttp;
+
+public sealed record NativeEndpoint(string Base, string? Token = null, int TimeoutMs = 15000);
+public sealed record NativeJsonResponse(int Status, JsonDocument Document) : IDisposable
+{
+    public JsonElement Body => Document.RootElement;
+    public void Dispose() => Document.Dispose();
+}
+
+public static class NativeHttp
+{
+    public const int MaxJsonBytes = 1048576;
+
+    public static HttpClient Client()
+        => new(new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false, UseCookies = false, AutomaticDecompression = DecompressionMethods.None,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10), ConnectTimeout = TimeSpan.FromSeconds(15)
+        }) { Timeout = Timeout.InfiniteTimeSpan };
+
+    public static async ValueTask<Result<NativeJsonResponse>> Json(HttpClient client, NativeEndpoint endpoint, string method,
+        string path, JsonElement? body = null, int maximumBytes = MaxJsonBytes, CancellationToken cancellation = default)
+    {
+        var origin = Validation.Origin(endpoint.Base);
+        if (!origin.IsSuccess) return Result<NativeJsonResponse>.Fail(origin.Error);
+        if (endpoint.TimeoutMs is < 100 or > 45000 || maximumBytes is < 1 or > 67108864
+            || method is not ("GET" or "POST" or "PUT" or "DELETE") || !path.StartsWith('/') || path.StartsWith("//", StringComparison.Ordinal)
+            || path.Length > 65536 || path.Any(value => value is '\\' or '#' || Validation.WhiteSpace(value) || value is <= '\u001f' or '\u007f'))
+            return Results.Fail<NativeJsonResponse>("invalid", "Invalid bounded HTTP request");
+        if (!Uri.TryCreate(origin.Value + path, UriKind.Absolute, out var destination)
+            || destination.GetLeftPart(UriPartial.Authority) != origin.Value || destination.UserInfo.Length != 0 || destination.Fragment.Length != 0)
+            return Results.Fail<NativeJsonResponse>("invalid", "HTTP request must remain on its configured origin");
+        if (body is not null && !Validation.Json(body.Value)) return Results.Fail<NativeJsonResponse>("invalid", "Invalid HTTP JSON request");
+        byte[]? encoded = body is null ? null : JsonSerializer.SerializeToUtf8Bytes(body.Value, ApiJson.Default.JsonElement);
+        if (encoded?.Length > MaxJsonBytes) return Results.Fail<NativeJsonResponse>("limit", "HTTP request exceeds 1 MiB");
+        if (cancellation.IsCancellationRequested) return Results.Fail<NativeJsonResponse>("native", "HTTP request failed or exceeded its deadline");
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        deadline.CancelAfter(endpoint.TimeoutMs);
+        using var request = new HttpRequestMessage(new HttpMethod(method), destination);
+        if (endpoint.Token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", endpoint.Token);
+        if (encoded is not null) request.Content = new ByteArrayContent(encoded);
+        if (request.Content is not null) request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        else request.Headers.TryAddWithoutValidation("Content-Type", "application/json");
+        try
+        {
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
+            if ((int)response.StatusCode is 301 or 302 or 303 or 307 or 308 && response.Headers.Location is not null)
+                return Results.Fail<NativeJsonResponse>("native", "HTTP request failed or exceeded its deadline");
+            await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
+            var collected = await Collect(stream, maximumBytes, deadline.Token);
+            if (!collected.IsSuccess) return Result<NativeJsonResponse>.Fail(collected.Error);
+            var document = JsonDocument.Parse(collected.Value, new JsonDocumentOptions { MaxDepth = 65 });
+            if (!Validation.Json(document.RootElement))
+            {
+                document.Dispose();
+                return Results.Fail<NativeJsonResponse>("native", "Invalid HTTP JSON response");
+            }
+            return Result<NativeJsonResponse>.Success(new((int)response.StatusCode, document));
+        }
+        catch (Exception error) when (error is HttpRequestException or OperationCanceledException or IOException or JsonException)
+        {
+            return Results.Fail<NativeJsonResponse>("native", "HTTP response is invalid or exceeds its deadline");
+        }
+    }
+
+    public static async ValueTask<Result<byte[]>> Collect(Stream stream, int maximumBytes, CancellationToken cancellation = default)
+    {
+        if (maximumBytes < 1) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+        var buffer = ArrayPool<byte>.Shared.Rent(Math.Min(16384, maximumBytes + (maximumBytes < int.MaxValue ? 1 : 0)));
+        try
+        {
+            using var output = new MemoryStream();
+            for (;;)
+            {
+                var count = await stream.ReadAsync(buffer.AsMemory(), cancellation);
+                if (count == 0) return Result<byte[]>.Success(output.ToArray());
+                if (output.Length + count > maximumBytes)
+                    return Results.Fail<byte[]>("body_too_large", "HTTP response exceeds its collection resource bound");
+                output.Write(buffer, 0, count);
+            }
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+    }
+}

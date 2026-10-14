@@ -13,12 +13,16 @@ function files(directory: string): string[] {
     : entry.isDirectory() ? files(join(directory, entry.name)) : [join(directory, entry.name)]);
 }
 
-test('all services have one strict implementation and declared package-export boundaries', () => {
-  const root = resolve(process.cwd(), '../..');
+function workspaceManifests(root: string): Map<string, PackageManifest> {
   const owners = ['crossfire', 'fleetd', 'fleet'].flatMap(service => ['apps', 'packages'].flatMap(folder =>
     readdirSync(join(root, 'services', service, folder)).map(name => join('services', service, folder, name))
       .filter(owner => existsSync(join(root, owner, 'package.json')))));
-  const manifests = new Map(owners.map(owner => [owner, JSON.parse(readFileSync(join(root, owner, 'package.json'), 'utf8')) as PackageManifest]));
+  return new Map(owners.map(owner => [owner, JSON.parse(readFileSync(join(root, owner, 'package.json'), 'utf8')) as PackageManifest]));
+}
+
+test('all services have one strict implementation and declared package-export boundaries', () => {
+  const root = resolve(process.cwd(), '../..');
+  const manifests = workspaceManifests(root), owners = [...manifests.keys()];
   for (const owner of owners) {
     for (const file of files(join(root, owner, 'src')).filter(file => /\.tsx?$/u.test(file))) {
       const failures = auditSource(root, owner, file, readFileSync(file, 'utf8'), manifests);
@@ -93,6 +97,26 @@ test('every import form is inspected, including erased types, exports and curren
   for (const text of ['import(variable);', 'type Value = any;', 'const Value = class {};', 'export default function value() {}', 'export { value as default };']) {
     assert.equal(imports(ts.createSourceFile('negative.ts', text, ts.ScriptTarget.Latest, true)).failures.length > 0, true, text);
   }
+});
+
+test('the common UI and HTTP client reject backend and native-platform dependencies', () => {
+  const root = resolve(process.cwd(), '../..');
+  const manifests = workspaceManifests(root);
+  for (const owner of ['services/crossfire/apps/web', 'services/crossfire/packages/client']) {
+    const file = join(root, owner, 'src/negative.ts');
+    for (const [text, violation] of [
+      ["import { value } from 'node:fs';", 'Pure domain/value/contracts and browser layers cannot import native platform APIs: node:fs'],
+      ["type Value = import('@ctlflow/crossfire-adapter-matrix/http').Native;", 'Shared browser/client code cannot depend on backend implementations: @ctlflow/crossfire-adapter-matrix/http'],
+      ["import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';", 'Shared browser/client code cannot depend on backend implementations: @ctlflow/crossfire-adapter-sqlite/open-store'],
+    ] as const)
+      assert.equal(auditSource(root, owner, file, text, manifests).includes(violation), true, owner + ':' + violation);
+  }
+  for (const file of ['src/client.ts', 'src/binary-request.ts', 'src/matrix-login.ts']) {
+    const owner = 'services/crossfire/packages/client', path = join(root, owner, file);
+    assert.deepEqual(auditSource(root, owner, path, readFileSync(path, 'utf8'), manifests), []);
+  }
+  for (const file of ['client.ts', 'binary-request.ts']) assert.equal(existsSync(join(root, 'services/crossfire/packages/adapter-crossfire/src', file)), false);
+  assert.equal(existsSync(join(root, 'services/crossfire/packages/adapter-matrix/src/browser-session.ts')), false);
 });
 
 test('declared dependencies cannot bypass semantic domain direction or package-export ownership', () => {

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
-import type { Client } from '@ctlflow/crossfire-adapter-crossfire/client';
+import type { Client } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { binaryBytes } from '@ctlflow/crossfire-kernel/bytes';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';

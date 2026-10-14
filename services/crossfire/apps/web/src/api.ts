@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import type { Operation } from '@ctlflow/crossfire-contracts/rest/operation';
 import type { Response } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';

@@ -1,4 +1,4 @@
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import type { FleetView } from '@ctlflow/crossfire-contracts/schema/response';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';

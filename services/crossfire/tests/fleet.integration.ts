@@ -19,7 +19,7 @@ import { openTerminal } from '../scripts/test-support/terminal.js';
 import { decideEnrollment } from '@ctlflow/crossfire-domain/enrollment/decide';
 import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
 import { roomAccess } from '@ctlflow/crossfire-adapter-crossfire/room-access';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { runtimeOperation, type FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
 import { API, segment } from '@ctlflow/crossfire-contracts/matrix';

@@ -1,11 +1,11 @@
-import { createClient, type Client } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient, type Client } from '@ctlflow/crossfire-client/client';
 import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { SessionView } from '@ctlflow/crossfire-contracts/schema/response';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 import { failure, type Result } from '@ctlflow/crossfire-kernel/result';
-import type { ClientOptions } from '@ctlflow/crossfire-adapter-crossfire/client';
+import type { ClientOptions } from '@ctlflow/crossfire-client/client';
 
 export function operatorClient(options: ClientOptions): Client {
   const client = createClient(options);

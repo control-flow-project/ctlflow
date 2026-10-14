@@ -28,7 +28,7 @@ import { publicRouter } from '../apps/server/src/router.js';
 import { releaseFixture, updatedRelease } from './release-fixture.js';
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';

@@ -50,14 +50,15 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
   const acceptedTurn = native.acknowledgements().at(-1)!.turn.id;
   await native.call('turn/interrupt', { threadId: native.thread.id, turnId: acceptedTurn });
   await interrupted;
-  await until(() => native.completed() >= beforeTool + 3);
-  const replay = native.acknowledgements().filter(value => value.params.clientUserMessageId === 'fixture-interrupted');
-  assert.equal(replay.length, 2, JSON.stringify({ replay, history: native.historyQueries, users: users().map(event => event.params) }));
-  assert.notEqual(replay[0]!.turn.id, replay[1]!.turn.id);
-  assert.deepEqual(replay[0]!.params, replay[1]!.params);
+  await until(() => native.notifications.some(event => event.method === 'turn/completed'
+    && (event.params.turn as { id: string; status: string }).id === acceptedTurn
+    && (event.params.turn as { id: string; status: string }).status === 'interrupted'));
+  const submitted = native.acknowledgements().filter(value => value.params.clientUserMessageId === 'fixture-interrupted');
+  assert.equal(submitted.length, 1, 'Recorded native input must not be submitted again after interruption');
+  assert.equal(submitted[0]!.turn.id, acceptedTurn);
+  assert.deepEqual(submitted[0]!.params.input, [{ type: 'text', text: 'must survive interruption', text_elements: [] }]);
   assert(native.relayRequests.some(request => request.method === 'thread/timeline/list'));
   assert.equal(users().filter(event => (event.params.item as { clientId: string }).clientId === 'fixture-interrupted').length, 1);
-  assert(native.requests.some(request => JSON.stringify(request).includes('must survive interruption')));
   for (const clientId of ['fixture-idle', 'fixture-busy', 'fixture-tool', 'fixture-original']) {
     assert.equal(users().filter(event => (event.params.item as { clientId: string }).clientId === clientId).length, 1, clientId);
   }
@@ -66,6 +67,8 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
   const beforeReceivedInterrupt = native.completed();
   await adapter.deliver('already recorded before cancellation', 'fixture-recorded');
   await until(() => native.held() !== undefined);
+  assert(native.requests.some(request => JSON.stringify(request).includes('must survive interruption')),
+    'The next native model request must retain the recorded interrupted input in history');
   await native.call('turn/interrupt', { threadId: native.thread.id, turnId: native.acknowledgements().at(-1)!.turn.id });
   await until(() => native.completed() > beforeReceivedInterrupt);
   assert.equal(native.acknowledgements().filter(value => value.params.clientUserMessageId === 'fixture-recorded').length, 1);
@@ -136,6 +139,7 @@ test('a human Matrix control cancels the owned native Codex run during receipt w
   await until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   await native.call('turn/start', { threadId: native.thread.id, input: [{ type: 'text', text: 'human-owned work', text_elements: [] }] });
   await until(() => native.held() !== undefined);
+  native.hold();
   matrix.add(ROOM, message('$pending-native'));
   await until(() => native.acknowledgements().length === 1);
   const captured = native.acknowledgements()[0]!.turn.id;

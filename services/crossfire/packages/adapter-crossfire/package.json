@@ -10,6 +10,7 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
+    "@ctlflow/crossfire-client": "0.1.20",
     "@ctlflow/crossfire-adapter-filesystem": "0.1.20",
     "@ctlflow/crossfire-adapter-matrix": "0.1.20",
     "@ctlflow/crossfire-adapter-runtime": "0.1.20",

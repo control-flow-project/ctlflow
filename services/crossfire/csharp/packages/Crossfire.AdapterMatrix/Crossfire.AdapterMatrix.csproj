@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Crossfire.Kernel/Crossfire.Kernel.csproj" />
+    <ProjectReference Include="../Crossfire.Contracts/Crossfire.Contracts.csproj" />
+    <ProjectReference Include="../Crossfire.Domain/Crossfire.Domain.csproj" />
+    <ProjectReference Include="../Crossfire.AdapterHttp/Crossfire.AdapterHttp.csproj" />
+  </ItemGroup>
+</Project>

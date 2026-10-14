@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, expect } from '@playwright/test';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { failure } from '@ctlflow/crossfire-kernel/result';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';

@@ -1,18 +1,21 @@
 import assert from 'node:assert/strict';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { buildWeb } from '../scripts/build-web.js';
 
-test('management updates publish content-addressed assets without reusing stale browser URLs', async () => {
+test('management updates publish content-addressed assets without reusing stale browser URLs', async scope => {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const root = mkdtempSync(join(process.cwd(), '.temp/web-build-'));
+  scope.after(() => rmSync(root, { recursive: true, force: true }));
   const source = join(root, 'apps/web/src');
   mkdirSync(source, { recursive: true });
   copyFileSync(join(process.cwd(), 'apps/web/index.html'), join(root, 'apps/web/index.html'));
-  mkdirSync(join(root, 'assets'));
-  const translations = readFileSync(join(process.cwd(), 'assets/element-translations.json'));
-  writeFileSync(join(root, 'assets/element-translations.json'), translations);
+  mkdirSync(join(root, 'apps/web/scripts'));
+  copyFileSync(join(process.cwd(), 'apps/web/scripts/build.mjs'), join(root, 'apps/web/scripts/build.mjs'));
+  mkdirSync(join(root, 'apps/web/assets'));
+  const translations = readFileSync(join(process.cwd(), 'apps/web/assets/element-translations.json'));
+  writeFileSync(join(root, 'apps/web/assets/element-translations.json'), translations);
   const script = join(source, 'main.tsx');
   const stylesheet = join(source, 'style.css');
   writeFileSync(script, 'import "./style.css"; document.title = "First";');

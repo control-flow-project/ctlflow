@@ -5,7 +5,7 @@ import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { FleetControlSnapshot } from '@ctlflow/crossfire-contracts/fleet-control';
 import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
 import type { ControllerState } from '@ctlflow/crossfire-agent-core/listener-control-port';
-import { createClient } from './client.js';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { createFleetRuntimeWorker, type FleetRuntimeExecutor } from './fleet-runtime.js';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 

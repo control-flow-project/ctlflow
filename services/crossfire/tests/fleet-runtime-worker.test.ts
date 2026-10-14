@@ -6,7 +6,7 @@ import { once } from 'node:events';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
 import { createFleetRuntimeWorker } from '@ctlflow/crossfire-adapter-crossfire/fleet-runtime';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { until } from '../scripts/test-support/listener.js';
 import type { FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';

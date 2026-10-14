@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/crossfire/">
+    <Project Path="services/crossfire/csharp/packages/Crossfire.Kernel/Crossfire.Kernel.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.Contracts/Crossfire.Contracts.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.Domain/Crossfire.Domain.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterHttp/Crossfire.AdapterHttp.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Crossfire.AdapterMatrix.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Crossfire.AdapterSqlite.csproj" />
+  </Folder>
+  <Folder Name="/build/">
+    <Project Path="services/crossfire/csharp/build/Crossfire.EfCompiler/Crossfire.EfCompiler.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="services/crossfire/csharp/tests/Crossfire.Storage.Tests/Crossfire.Storage.Tests.csproj" />
+  </Folder>
+</Solution>

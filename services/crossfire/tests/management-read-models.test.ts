@@ -7,7 +7,7 @@ import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introd
 import { listEnrollments, readEnrollment } from '@ctlflow/crossfire-domain/enrollment/read-enrollment';
 import { readAuditEvents } from '@ctlflow/crossfire-domain/audit/read-events';
 import { recordEvent } from '@ctlflow/crossfire-domain/audit/record-event';
-import { createClient } from '@ctlflow/crossfire-adapter-crossfire/client';
+import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { audit } from '@ctlflow/crossfire-contracts/schema/response';
 import { identifier } from '@ctlflow/crossfire-contracts/schema/validation';
