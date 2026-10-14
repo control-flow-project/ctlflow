@@ -42,6 +42,15 @@ compatibility paths or broader dependency updates.
 
 Necessary forward data migrations convert a verified deployed schema into the
 single current schema; they do not authorize concurrent old/new runtime paths.
+Knex is the sole owner of database creation and migrations across every language
+implementation. Database assets use the Lesser/Snapped structure under their
+service: database/<database>/<backend>/migrations and seeds, with a per-database
+knexfile and one-shot migration container. Deployment verifies a backup, stops
+writers, runs the migration container and starts the selected implementation only
+after success. Node and C# validate existing databases; neither creates schemas,
+runs ORM migrations or silently migrates at startup. New databases follow the
+same nesting and owner. File state and Conduit's externally owned RocksDB are
+not SQL databases and are not converted into artificial Knex stores.
 Preserve production data, credentials and native histories. Inventory actual
 stores before removing obsolete migration inputs; never reset production to avoid
 designing the correct migration. Required native protocol behavior is not an

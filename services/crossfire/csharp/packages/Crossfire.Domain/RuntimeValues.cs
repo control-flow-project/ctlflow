@@ -15,6 +15,7 @@ public sealed record DecisionPorts(AuthorizationPorts Authorization, UnitOfWork 
     Func<string, string, Result<Unit>> LiveRun, Func<string, Result<DecisionView?>> Find,
     Func<DecisionView, Result<Unit>> Insert, Func<string, IReadOnlyList<DecisionAnswer>, Result<Unit>> Answer,
     Func<string, Result<IReadOnlyList<DecisionAnswer>>> Answers, Func<string, string, Result<Unit>> Status,
+    Func<string, int, int, string?, Result<Page<DecisionSummary>>> List,
     Func<Result<IReadOnlyList<DecisionSummary>>> Pending, Func<AuditIntent, Result<Unit>> Audit);
 
 public sealed record ListenerController(string FleetId, string ConnectionId, string CredentialId);

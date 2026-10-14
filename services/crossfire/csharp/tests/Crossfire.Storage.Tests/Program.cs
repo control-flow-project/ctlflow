@@ -8,13 +8,21 @@ using Crossfire.Storage.Tests;
 using static Crossfire.Storage.Tests.Checks;
 using System.Runtime.CompilerServices;
 
+if (SchemaAcceptance.Run(args)) return;
+if (CalendarAcceptance.Run(args)) return;
+if (await StateLockAcceptance.Run(args)) return;
+if (await MatrixAcceptance.Run(args)) return;
+
 var directory = Path.Combine(Path.GetTempPath(), "crossfire-storage-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(directory);
 try
 {
-    var database = ArgumentsDatabase(args, Path.Combine(directory, "management.sqlite"));
+    var database = ArgumentsDatabase(args);
     using var context = new CrossfireDbContext(database);
-    Equal(Schema.Initialize(context).IsSuccess, true, "canonical schema initialization");
+    Equal(Schema.Validate(context).IsSuccess, true, "Knex-created canonical schema validation");
+    Equal(Stored.Read<Unit>(() => throw new Microsoft.Data.Sqlite.SqliteException("busy", 5)).Error.Code, "unavailable", "expected storage contention remains a typed failure");
+    Equal(Stored.Read<Unit>(() => throw new Microsoft.Data.Sqlite.SqliteException("full", 13)).Error.Message,
+        "Management storage is full; check available disk space before retrying", "storage capacity failure retains actionable cause");
     Equal(context.Role.AsNoTracking().Count(), 3, "canonical reference role count");
     Equal(context.Permission.AsNoTracking().Count(), 36, "canonical permission count");
     var ownerId = Identity.Identifier();
@@ -68,8 +76,10 @@ try
     Equal(nested.IsSuccess, true, "outer transaction commits after handled nested failure");
     await DomainAcceptance.Verify(context, ownerId, matrixId);
     await HttpAcceptance.Verify();
+    await FleetChangesAcceptance.Verify();
     FilesystemAcceptance.Verify(directory);
     RoomAcceptance.Verify();
+    WireAcceptance.Verify();
     Console.WriteLine(JsonSerializer.Serialize(new StorageResult("passed", database, ownerId, matrixId,
         RuntimeFeature.IsDynamicCodeSupported, JsonSerializer.IsReflectionEnabledByDefault, Checks.Passed), StorageJson.Default.StorageResult));
 }
@@ -78,8 +88,8 @@ finally
     Directory.Delete(directory, recursive: true);
 }
 
-static string ArgumentsDatabase(string[] arguments, string fallback)
-    => arguments.Length switch { 0 => fallback, 1 when Path.IsPathFullyQualified(arguments[0]) => arguments[0], _ => throw new ArgumentException("Select one absolute verification database") };
+static string ArgumentsDatabase(string[] arguments)
+    => arguments.Length switch { 1 when Path.IsPathFullyQualified(arguments[0]) => arguments[0], _ => throw new ArgumentException("Select an existing absolute Knex-migrated verification database") };
 
 sealed record StorageResult(string Status, string Database, string OwnerId, string MatrixId, bool DynamicCode, bool ReflectionJson, int Assertions);
 

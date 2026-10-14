@@ -1,6 +1,6 @@
+import { openTestStore } from './support/storage.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
 import { createUnitOfWork } from '@ctlflow/crossfire-adapter-sqlite/unit-of-work';
@@ -11,12 +11,12 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 function value<T>(result: Result<T>): T { if (!result.ok) assert.fail(result.error.message); return result.value; }
 
 test('canonical schema has singular normalized tables and enforced identity/role boundaries', () => {
-  const database = openStore(':memory:');
+  const database = openTestStore(':memory:');
   try {
     const repositories = createRepositories(database);
     const directory = createDirectoryRepository(database);
     const unit = createUnitOfWork(database);
-    const tables = database.prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all() as { name: string; sql: string }[];
+    const tables = database.prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('knex_migrations','knex_migrations_lock')").all() as { name: string; sql: string }[];
     assert.equal(tables.length, 63);
     assert(tables.every(table => !/json_valid/iu.test(table.sql)));
     assert.deepEqual(database.pragma('foreign_key_check'), []);

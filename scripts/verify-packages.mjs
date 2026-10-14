@@ -65,6 +65,13 @@ export function verifyPackageOwnership(root) {
       if (PUBLIC_PACKAGES.includes(name)) assert.equal(version, workspace.version, 'Public controller dependencies match the exact coordinated release');
     }
     if (isPublic) published.push(product.name);
+    const database = join(directory, 'database', 'package.json');
+    if (existsSync(database)) {
+      const manifest = JSON.parse(readFileSync(database, 'utf8'));
+      verifyPackageManifest(manifest, '@ctlflow/' + service + '-data', false);
+      assert.equal(manifest.version, workspace.version, 'Database assets share the coordinated release');
+      manifests['services/' + service + '/database'] = manifest;
+    }
     for (const kind of ['apps', 'packages']) {
       const parent = join(directory, kind);
       if (!existsSync(parent)) continue;

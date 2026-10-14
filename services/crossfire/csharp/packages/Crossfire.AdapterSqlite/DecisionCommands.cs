@@ -44,6 +44,7 @@ public static class DecisionCommands
     public static DecisionPorts Ports(CrossfireDbContext context, Func<long> now)
         => new(AuthorizationQueries.Ports(context, now), new SqliteUnitOfWork(context), (agent, run) => ListenerQueries.Live(context, agent, run, now()),
             id => DecisionQueries.Find(context, id), value => Insert(context, value), (id, answers) => Answer(context, id, answers),
-            id => DecisionQueries.Answers(context, id), (id, status) => Status(context, id, status), () => DecisionQueries.Pending(context),
+            id => DecisionQueries.Answers(context, id), (id, status) => Status(context, id, status),
+            (agent, page, size, status) => DecisionQueries.List(context, agent, page, size, status), () => DecisionQueries.Pending(context),
             intent => MemberCommands.Audit(context, intent, now));
 }

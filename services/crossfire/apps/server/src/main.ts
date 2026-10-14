@@ -24,16 +24,18 @@ async function closeHttp(server: Server): Promise<void> {
 
 export async function serve(directory: string, releaseDirectory: string, port = 8080, presentation: ElementPresentation = {}, contentPort = 8082, contentAddress = '127.0.0.1', diagnostics?: DiagnosticLog) {
   if (process.platform !== "linux" || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire requires Linux and Node.js 26+");
-  if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) throw new Error("Invalid private service port");
+  if (!Number.isSafeInteger(port) || port !== 0 && port < 1024 || port > 65535) throw new Error("Invalid private service port");
   if (!Number.isSafeInteger(contentPort) || contentPort < 1024 || contentPort > 65535 || contentPort === port) throw new Error('Invalid separate content port');
   const release = loadRelease(releaseDirectory);
   const configuration = config(readJson<unknown>(join(directory, "config.json")));
   const secrets = bootstrapSecrets(readJson<unknown>(join(directory, "bootstrap.json")));
   if (!configuration.ok) throw new Error(configuration.error.message);
   if (!secrets.ok) throw new Error(secrets.error.message);
-  const initialized = await bootstrap(configuration.value, secrets.value);
-  if (!initialized.ok) throw new Error(initialized.error.message);
   const application = createApplication(join(directory, 'management.sqlite'), configuration.value, diagnostics ? { diagnostics } : {});
+  try {
+    const initialized = await bootstrap(configuration.value, secrets.value);
+    if (!initialized.ok) throw new Error(initialized.error.message);
+  } catch (error) { application.close(); throw error; }
   const worker = createWorker(application.services, application.diagnostics);
   const logging = createLoggingMaintenance(nativeClock, async () => {
     const files = await application.diagnostics.prune();

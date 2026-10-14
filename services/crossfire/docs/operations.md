@@ -12,7 +12,9 @@ Before changing production state:
 2. Stop the addressed instance for a consistent backup.
 3. Back up database, report store, operator configuration and credentials;
    verify that backup before mutation.
-4. Deploy the selected image and its transactional forward migration.
+4. Run the selected release's one-shot Knex migration container successfully,
+   then activate the selected application image. The same migration image/file
+   set serves Node, managed .NET and NativeAOT. Applications never migrate on open.
 5. Verify readiness, source/tool release provenance and database integrity.
 6. Verify identities, credentials, grants, histories, receipt/audit continuity and
    the intended history-only archival of formerly unbound identities.
@@ -64,6 +66,12 @@ Docker build steps and its runtime container under an existing resource budget.
 It validates and passes that exact slice; it never creates host services or
 configures resource policy. Omit the flag when the operator supplies no budget.
 Repository container verification creates its own temporary bounded test slice.
+The same resource parent also bounds the one-shot migration container. It has no
+published ports or network access and runs only Knex. `crossfire start` performs
+writer stop, verified database backup when needed, migration and activation in
+that order. Failure blocks every later phase. A current migrated database does
+not acquire another redundant upgrade backup on every restart.
+- [Database nesting, Knex commands and migration-container contract](../database/README.md)
 
 ## Management database capacity
 

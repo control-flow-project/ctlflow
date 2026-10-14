@@ -42,11 +42,15 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
   native.hold();
   await adapter.deliver('interruptible original input', 'fixture-original');
   await until(() => native.held() !== undefined);
+  const originalTurn = native.acknowledgements().at(-1)!.turn.id;
+  await native.call('turn/interrupt', { threadId: native.thread.id, turnId: originalTurn });
+  await until(async () => !(await adapter.inspect()).busy);
+  native.hold();
   const beforeInterrupted = native.acknowledgements().length;
   received = false;
   const interrupted = adapter.deliver('must survive interruption', 'fixture-interrupted').then(() => { received = true; });
   await until(() => native.acknowledgements().length > beforeInterrupted);
-  assert.equal(received, false);
+  await until(() => users().some(event => (event.params.item as { clientId: string }).clientId === 'fixture-interrupted'));
   const acceptedTurn = native.acknowledgements().at(-1)!.turn.id;
   await native.call('turn/interrupt', { threadId: native.thread.id, turnId: acceptedTurn });
   await interrupted;
@@ -130,7 +134,7 @@ test('installed Codex verifies new input independently of previous turn history'
   console.log('PASS 60 native deliveries over paginated prior history with bounded, non-historical receipt queries.');
 });
 
-test('a human Matrix control cancels the owned native Codex run during receipt wait', { timeout: 60_000 }, async context => {
+test('a human Matrix control cancels owned native work without discarding a verified message', { timeout: 60_000 }, async context => {
   const native = await nativeCodex(context);
   const matrix = await matrixFixture(context, native.workspace);
   const stop = new AbortController();
@@ -143,6 +147,11 @@ test('a human Matrix control cancels the owned native Codex run during receipt w
   matrix.add(ROOM, message('$pending-native'));
   await until(() => native.acknowledgements().length === 1);
   const captured = native.acknowledgements()[0]!.turn.id;
+  const clientId = native.acknowledgements()[0]!.params.clientUserMessageId;
+  await until(() => native.notifications.some(event => event.method === 'item/completed'
+    && (event.params.item as { type: string; clientId?: string }).type === 'userMessage'
+    && (event.params.item as { clientId?: string }).clientId === clientId));
+  await until(() => JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '1');
   matrix.add(ROOM, message('$stop-native', OBSERVER, '!!'));
   await until(() => {
     const state = JSON.parse(readFileSync(matrix.cursorFile + '.control', 'utf8'));
@@ -151,11 +160,11 @@ test('a human Matrix control cancels the owned native Codex run during receipt w
   const interruptions = native.relayRequests.filter(request => request.method === 'turn/interrupt');
   assert.equal(interruptions.length, 1);
   assert.deepEqual(interruptions[0]!.params, { threadId: native.thread.id, turnId: captured });
-  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], 'sync-0');
+  assert.equal(JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM], '1', 'Stopping work cannot discard receipt-verified input');
   assert.equal(native.acknowledgements().length, 1);
   assert(native.notifications.some(event => event.method === 'turn/completed' && (event.params.turn as { id: string; status: string }).id === captured));
   matrix.add(ROOM, mention('$redirect-native', OBSERVER, 'Only do this new work.', SELF));
   await until(() => native.requests.some(request => JSON.stringify(request).includes('Only do this new work.')));
   assert(!native.relayRequests.some(request => ['thread/resume', 'thread/start', 'thread/fork'].includes(request.method ?? '')));
-  console.log('PASS noncontrolling exact-turn cancellation, paused unread input, and human redirect through the real Codex server.');
+  console.log('PASS noncontrolling exact-turn cancellation, verified input preservation, and human redirect through the real Codex server.');
 });

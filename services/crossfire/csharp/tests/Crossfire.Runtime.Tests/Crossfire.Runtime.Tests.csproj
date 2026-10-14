@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../packages/Crossfire.AdapterCodex/Crossfire.AdapterCodex.csproj" />
+    <ProjectReference Include="../../packages/Crossfire.AdapterPi/Crossfire.AdapterPi.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

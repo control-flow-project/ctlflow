@@ -153,9 +153,16 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
             _ => Visit(node),
         };
 
-        // TODO: Insert necessary Convert nodes etc. when the expected and actual types differ
-
-        return result;
+        if (result is null || result.Type == expectedType || result is LambdaExpression
+            || !result.Type.IsValueType && expectedType.IsAssignableFrom(result.Type)) return result;
+        if (expectedType.IsGenericType && expectedType.GetGenericTypeDefinition() is var genericDefinition
+            && (genericDefinition == typeof(Span<>) || genericDefinition == typeof(ReadOnlySpan<>)))
+        {
+            var conversion = expectedType.GetMethod("op_Implicit", BindingFlags.Public | BindingFlags.Static, [result.Type])
+                ?? result.Type.GetMethod("op_Implicit", BindingFlags.Public | BindingFlags.Static, [result.Type]);
+            if (conversion is not null && conversion.ReturnType == expectedType) return Call(conversion, result);
+        }
+        return Convert(result, expectedType);
     }
 
     /// <summary>
@@ -261,11 +268,11 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
         var left = Visit(binary.Left);
         var right = Visit(binary.Right);
 
-        if (Nullable.GetUnderlyingType(left.Type) == right.Type)
+        if (!binary.IsKind(SyntaxKind.CoalesceExpression) && Nullable.GetUnderlyingType(left.Type) == right.Type)
         {
             right = Convert(right, left.Type);
         }
-        else if (Nullable.GetUnderlyingType(right.Type) == left.Type)
+        else if (!binary.IsKind(SyntaxKind.CoalesceExpression) && Nullable.GetUnderlyingType(right.Type) == left.Type)
         {
             left = Convert(left, right.Type);
         }
@@ -347,10 +354,12 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public override Expression VisitConditionalExpression(ConditionalExpressionSyntax conditional)
-        => Condition(
-            Visit(conditional.Condition),
-            Visit(conditional.WhenTrue),
-            Visit(conditional.WhenFalse));
+    {
+        var information = _semanticModel.GetTypeInfo(conditional);
+        var type = ResolveType(information.Type ?? information.ConvertedType
+            ?? throw new InvalidOperationException("Conditional expression has no resolved type: " + conditional));
+        return Condition(Visit(conditional.Condition, typeof(bool)), Visit(conditional.WhenTrue, type), Visit(conditional.WhenFalse, type));
+    }
 
     /// <summary>
     ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -674,7 +683,7 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
         // TODO: Test invoking extension without extension syntax (as static)
         if (methodSymbol is { IsExtensionMethod: true /*, ReceiverType: { } */ })
         {
-            destArguments[0] = instance;
+            destArguments[0] = Visit(((MemberAccessExpressionSyntax)invocation.Expression).Expression, parameters[0].ParameterType);
             paramIndex = 1;
             instance = null;
         }
@@ -846,7 +855,7 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
         var newExpression = constructor is not null
             ? New(
                 constructor,
-                objectCreation.ArgumentList?.Arguments.Select(a => Visit(a)) ?? [])
+                objectCreation.ArgumentList?.Arguments.Select((argument, position) => Visit(argument, parameterTypes[position])) ?? [])
             : parameterTypes.Length == 0 // For structs, there's no actual parameterless constructor
                 ? New(type)
                 : throw new InvalidOperationException($"ObjectCreation: Missing constructor: {objectCreation}");
@@ -882,7 +891,7 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
                         return memberInfo is null
                             ? throw new InvalidOperationException(
                                 $"ObjectCreation: couldn't find initialized member '{lValueSymbol.Name}': {e}")
-                            : Bind(memberInfo, Visit(value));
+                            : Bind(memberInfo, Visit(value, memberInfo is PropertyInfo property ? property.PropertyType : ((FieldInfo)memberInfo).FieldType));
                     }));
 
             // Non-assignment initializer => list initializer (new List<int> { 1, 2, 3 })
@@ -901,7 +910,7 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
 
                 return ListInit(
                     newExpression,
-                    objectCreation.Initializer.Expressions.Select(e => ElementInit(addMethod, Visit(e))));
+                    objectCreation.Initializer.Expressions.Select(e => ElementInit(addMethod, Visit(e, addMethod.GetParameters()[0].ParameterType))));
         }
     }
 
@@ -1217,7 +1226,7 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
             {
                 var containingType = ResolveType(symbol.ContainingType);
 
-                return containingType.GetNestedType(name)
+                return containingType.GetNestedType(name, BindingFlags.Public | BindingFlags.NonPublic)
                     ?? throw new InvalidOperationException(
                         $"Couldn't find nested type '{name}' on containing type '{containingType.Name}'");
             }
@@ -1318,7 +1327,11 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
                 ? Activator.CreateInstance(FieldType)
                 : FieldType == typeof(string)
                     ? "<dummy>"
-                    : null;
+                    : FieldType.IsArray
+                        ? Array.CreateInstance(FieldType.GetElementType()!, new int[FieldType.GetArrayRank()])
+                        : FieldType.IsInterface || FieldType.IsAbstract
+                            ? null
+                            : RuntimeHelpers.GetUninitializedObject(FieldType);
 
         public override void SetValue(
             object? obj,

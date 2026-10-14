@@ -1,3 +1,4 @@
+import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
@@ -7,7 +8,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { executeInsert, executeSelect, executeUpdate } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
-import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { maintainLogging } from '@ctlflow/crossfire-domain/maintenance/logging';
 import { DAY_MS, loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
@@ -35,7 +35,7 @@ async function fixtureStore(scope: TestContext, days?: number) {
   cleanup(scope, () => rmSync(directory, { recursive: true }));
   const file = join(directory, 'management.sqlite');
   const fixture = await applicationFixture(scope, file, days === undefined ? {} : { loggingRetentionDays: days });
-  const database = openStore(file); cleanup(scope, () => database.close());
+  const database = openTestStore(file); cleanup(scope, () => database.close());
   return { ...fixture, database, file };
 }
 
@@ -189,8 +189,8 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   assert.equal(value(services.repositories.nativeStop.receipt(agent.id, oldStop)), null);
   assert.equal(value(services.repositories.nativeStop.find(agent.id))?.receiptId, currentStop);
   assert.deepEqual(database.pragma('foreign_key_check'), []);
-  assert.equal(verifyPreservation(backup, fixture.file).ok, false, 'Strict preservation cannot excuse deleted history without explicit retention evidence');
-  const proof = value(verifyPreservation(backup, fixture.file, { loggingRetentionDays: 7, at: fixture.now() }));
+  assert.equal((await verifyPreservation(backup, fixture.file)).ok, false, 'Strict preservation cannot excuse deleted history without explicit retention evidence');
+  const proof = value((await verifyPreservation(backup, fixture.file, { loggingRetentionDays: 7, at: fixture.now() })));
   assert.equal(proof.expired.enrollment_archive, 1); assert.equal(proof.expired.fleet_native_stop, 1); assert.equal(proof.preserved.fleet_native_stop, 1);
   assert.deepEqual(readFileSync(backup), backupBytes);
   fixture.renewController(agent.controller);
@@ -202,7 +202,7 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   assert.equal(acknowledgeFleetMessage(services, admin.actor, fleetId, messageId, agent.id, { status: 'delivered', errorMessage: null }).ok, false);
   assert.equal(claimFleetRuntime(services, controller, fleetId, operationId, agent.controller.connectionId).ok, false, 'Expired history never becomes a fresh execution request');
   executeUpdate(database, schema, (query, params) => query.update('fleet_native_stop').set({ invalidated_at: params.at }).where(row => row.receipt_id === params.id), { id: currentStop, at: fixture.now() });
-  assert.equal(verifyPreservation(backup, fixture.file, { loggingRetentionDays: 7, at: fixture.now() }).ok, false, 'Retention never excuses changing a surviving old record');
+  assert.equal((await verifyPreservation(backup, fixture.file, { loggingRetentionDays: 7, at: fixture.now() })).ok, false, 'Retention never excuses changing a surviving old record');
 });
 
 test('reconnect-heavy history is cleaned in bounded batches and expected cleanup failures roll back the whole batch', async scope => {

@@ -31,6 +31,7 @@ namespace Crossfire.Build.Ef;
 public class CrossfireQueryLocator : CSharpSyntaxWalker
 {
     private Compilation? _compilation;
+    private INamedTypeSymbol _contextSymbol = null!;
     private Symbols _symbols;
 
     private SemanticModel _semanticModel = null!;
@@ -48,10 +49,12 @@ public class CrossfireQueryLocator : CSharpSyntaxWalker
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </remarks>
-    public virtual void Initialize(Compilation compilation)
+    public virtual void Initialize(Compilation compilation, Type contextType)
     {
         _compilation = compilation;
         _symbols = Symbols.Load(compilation);
+        _contextSymbol = compilation.GetTypeByMetadataName(contextType.FullName!)
+            ?? throw new InvalidOperationException("The selected DbContext type is missing from the compilation");
     }
 
     /// <summary>
@@ -265,6 +268,7 @@ public class CrossfireQueryLocator : CSharpSyntaxWalker
         if (operatorSyntax is MemberAccessExpressionSyntax { Expression: var innerExpression2 }
             && IsDbContext(innerExpression2))
         {
+            if (!IsSelectedContext(innerExpression2)) return true;
             _locatedQueries.Add(query);
 
             // TODO: Check symbol for DbSet?
@@ -274,6 +278,7 @@ public class CrossfireQueryLocator : CSharpSyntaxWalker
         // If we had context.Set<Blog>(), the Set() method was skipped like any other method, and we're on the context.
         if (IsDbContext(operatorSyntax))
         {
+            if (!IsSelectedContext(operatorSyntax)) return true;
             _locatedQueries.Add(query);
             return true;
         }
@@ -282,6 +287,24 @@ public class CrossfireQueryLocator : CSharpSyntaxWalker
             new PrecompiledQueryCodeGenerator.QueryPrecompilationError(
                 query, new InvalidOperationException(DesignStrings.DynamicQueryNotSupported)));
         return false;
+
+        ITypeSymbol? ContextType(ExpressionSyntax expression)
+            => _semanticModel.GetSymbolInfo(expression, _cancellationToken).Symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                IPropertySymbol propertySymbol => propertySymbol.Type,
+                IFieldSymbol fieldSymbol => fieldSymbol.Type,
+                IMethodSymbol methodSymbol => methodSymbol.ReturnType,
+                _ => null
+            };
+
+        bool IsSelectedContext(ExpressionSyntax expression)
+        {
+            for (var type = ContextType(expression); type is not null; type = type.BaseType)
+                if (type.Equals(_contextSymbol, SymbolEqualityComparer.Default)) return true;
+            return false;
+        }
 
         bool IsDbContext(ExpressionSyntax expression)
         {

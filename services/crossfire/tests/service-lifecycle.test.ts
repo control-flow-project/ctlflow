@@ -1,4 +1,5 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { mkdirSync, mkdtempSync } from "node:fs";
@@ -66,6 +67,7 @@ test("private service starts with real native bootstrap and shuts down idempoten
   const output = join(directory, "release");
   const release = await buildRelease(process.cwd(), output);
   for (const probe of probes) await new Promise<void>(resolve => probe.close(() => resolve()));
+  await migrateDatabase(join(directory, 'management.sqlite'));
   const service = await serve(directory, join(output, "onboarding", release.release), port, {}, contentPort);
   cleanup(scope, service.close);
   const health = await fetch(config.publicOrigin + "/api/health", { signal: AbortSignal.timeout(5000) });

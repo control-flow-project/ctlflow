@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="Crossfire.Kernel.Results" Alias="Results" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Crossfire.AgentCore/Crossfire.AgentCore.csproj" />
+    <ProjectReference Include="../Crossfire.AdapterHttp/Crossfire.AdapterHttp.csproj" />
+    <ProjectReference Include="../Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+  </ItemGroup>
+</Project>

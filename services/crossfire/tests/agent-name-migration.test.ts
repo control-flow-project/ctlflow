@@ -1,15 +1,16 @@
+import { migrateFixture } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
-import { createSchema, SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
+import { SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
 import { agentChange } from '@ctlflow/crossfire-contracts/schema/request';
 import { restoreSchema14EnrollmentItems } from './support/schema14.js';
 import { restoreSchema16Logging } from './support/schema16.js';
 
-test('schema 14 preserves identity and private state while retiring independent labels into audit', () => {
+test('schema 14 preserves identity and private state while retiring independent labels into audit', async () => {
   const database = new Database(':memory:');
   try {
-    database.pragma('foreign_keys=ON'); createSchema(database);
+    database.pragma('foreign_keys=ON'); await migrateFixture(database);
     restoreSchema14EnrollmentItems(database);
     restoreSchema16Logging(database);
     database.exec(`ALTER TABLE agent ADD COLUMN display_name_override TEXT;
@@ -21,7 +22,7 @@ test('schema 14 preserves identity and private state while retiring independent 
     database.pragma('user_version=14');
     const identities = database.prepare('SELECT * FROM principal ORDER BY id').all();
     const credentials = database.prepare('SELECT * FROM agent_credential').all();
-    createSchema(database);
+    await migrateFixture(database);
     assert.equal(database.pragma('user_version', { simple: true }), SCHEMA_VERSION);
     assert.deepEqual(database.prepare('SELECT * FROM principal ORDER BY id').all(), identities);
     assert.deepEqual(database.prepare('SELECT * FROM agent_credential').all(), credentials);
@@ -30,7 +31,7 @@ test('schema 14 preserves identity and private state while retiring independent 
     assert.deepEqual(database.prepare('SELECT target_id,action,message FROM audit_event').all(),
       [{ target_id: 'agent', action: 'agent.name.canonicalized', message: '{"retiredDisplayName":"Ambiguous caption"}' }]);
     assert.throws(() => database.exec("UPDATE agent SET display_name_override='registered'"), /no such column/u);
-    createSchema(database); assert.equal(database.prepare<[], { count: number }>('SELECT count(*) AS count FROM audit_event').get()?.count, 1);
+    await migrateFixture(database); assert.equal(database.prepare<[], { count: number }>('SELECT count(*) AS count FROM audit_event').get()?.count, 1);
     assert.deepEqual(database.pragma('foreign_key_check'), []);
     assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
     assert.equal(agentChange({ expectedRevision: 7, displayName: 'Another caption' }).ok, false);

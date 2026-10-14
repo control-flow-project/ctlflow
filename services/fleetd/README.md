@@ -10,6 +10,8 @@ The guides cover controller ownership and the shared runtime configuration:
 - [Fleet runtime defaults and overrides](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
 - [Fleet-defined wake rules and invitation defaults](docs/coordination.md)
 - [Earendil Pi settings, histories and native limitations](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/pi.md)
+- [C# controller/CLI distribution and readiness](../crossfire/csharp/README.md)
+- [Shared implementation contracts](../../docs/verification/shared-contracts.md)
 
 The public `@ctlflow/fleet` CLI depends on the exact matching public
 `@ctlflow/fleetd` release. Both ship self-contained bundles, not registry

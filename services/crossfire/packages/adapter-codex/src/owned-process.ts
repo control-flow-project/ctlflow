@@ -8,8 +8,21 @@ import { ownedVersion, ownedQuestionCapability } from './owned-options.js';
 import { nativeEnvironment } from './home.js';
 import { failureError } from '@ctlflow/crossfire-kernel/result';
 import { inspectInstructionCapability } from './capability.js';
+import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
+import { refreshAuthentication } from './authentication.js';
 
 export async function startProcess(home: string, workspace: string, stateDirectory: string, profile: string, stop: AbortSignal, binary = 'codex', questions = false) {
+  stop.throwIfAborted();
+  const release = await acquireProcessLock(join(home, 'owner'));
+  try {
+    const authentication = refreshAuthentication(home);
+    if (!authentication.ok) throw failureError(authentication.error);
+    const owner = await launchProcess(home, workspace, stateDirectory, profile, stop, binary, questions);
+    return { ...owner, close: async () => { try { await owner.close(); } finally { await release(); } } };
+  } catch (error) { await release(); throw error; }
+}
+
+async function launchProcess(home: string, workspace: string, stateDirectory: string, profile: string, stop: AbortSignal, binary: string, questions: boolean) {
   stop.throwIfAborted();
   const environment = nativeEnvironment(realpathSync(home), stateDirectory, profile);
   const version = execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 10000, maxBuffer: 4096, env: environment, cwd: workspace }).trim();

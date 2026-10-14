@@ -67,20 +67,27 @@ public sealed partial class AccountAuthority
     }
 
     public async ValueTask<Result<RoomMembership>> Membership(string matrixId, string target, string roomId, CancellationToken cancellation = default)
+        => (await MembershipState(matrixId, target, roomId, cancellation)).Map(state => state.Member);
+
+    private sealed record ObservedMembership(RoomMembership Member, long ReadLevel, long ReplyLevel);
+
+    private async ValueTask<Result<ObservedMembership>> MembershipState(string matrixId, string target, string roomId, CancellationToken cancellation)
     {
         var state = await State(matrixId, roomId, cancellation);
-        if (!state.IsSuccess) return Result<RoomMembership>.Fail(state.Error);
+        if (!state.IsSuccess) return Result<ObservedMembership>.Fail(state.Error);
         var content = RoomState.Content(state.Value, "m.room.member", target);
         var membership = content is null ? "leave" : RoomState.String(content.Value, "membership") ?? "leave";
-        if (membership is not ("join" or "invite" or "leave" or "ban")) return Results.Fail<RoomMembership>("native", "Unsupported native membership");
+        if (membership is not ("join" or "invite" or "leave" or "ban")) return Results.Fail<ObservedMembership>("native", "Unsupported native membership");
         var powers = RoomState.Content(state.Value, "m.room.power_levels");
-        if (powers is null) return Results.Fail<RoomMembership>("native", "Native room power levels are missing");
+        if (powers is null) return Results.Fail<ObservedMembership>("native", "Native room power levels are missing");
         var levels = RoomState.Powers(powers.Value, target); var creators = RoomState.Creators(state.Value);
-        if (!levels.IsSuccess) return Result<RoomMembership>.Fail(levels.Error);
-        if (!creators.IsSuccess) return Result<RoomMembership>.Fail(creators.Error);
+        if (!levels.IsSuccess) return Result<ObservedMembership>.Fail(levels.Error);
+        if (!creators.IsSuccess) return Result<ObservedMembership>.Fail(creators.Error);
         var creator = creators.Value.Contains(target, StringComparer.Ordinal);
         var name = content is null ? null : MatrixJson.Text(content.Value, "displayname");
-        return Result<RoomMembership>.Success(new(target, name ?? target, membership, creator, creator ? null : levels.Value.OwnerLevel));
+        var member = new RoomMembership(target, name ?? target, membership, creator, creator ? null : levels.Value.OwnerLevel);
+        var read = Math.Min(levels.Value.Ceiling, Math.Min(levels.Value.Ordinary - 1, Math.Min(levels.Value.Message - 1, levels.Value.Reaction - 1)));
+        return Result<ObservedMembership>.Success(new(member, read, Math.Max(levels.Value.Message, levels.Value.Reaction)));
     }
 
     public async ValueTask<Result<Unit>> SetDisplayName(string matrixId, string displayName, CancellationToken cancellation = default)

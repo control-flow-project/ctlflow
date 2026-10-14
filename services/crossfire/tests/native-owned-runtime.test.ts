@@ -53,6 +53,11 @@ test('stock Codex default and native bypass execute synchronous subprocess IPC a
   const initialInstructions = await instructionItems(runtime); assert.equal(initialInstructions.length, 1);
   assert.equal(runtime.approval, 'listener');
   assert.equal(provider.requests.length, 0);
+  const duplicate = await adapter.start(input, stop.signal);
+  if (duplicate.ok) await duplicate.value.close();
+  assert.equal(duplicate.ok, false, 'An existing native home has exactly one process owner');
+  assert.equal((await adapter.reset({ workspace, stateDirectory: workspace, resetId: '62408984-971d-4c0c-b8bc-becc75848bc6' })).ok, false,
+    'Reset cannot archive live Codex histories');
   for (const bypass of [false, true]) {
     if (bypass) {
       await runtime.close();

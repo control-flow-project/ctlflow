@@ -28,6 +28,18 @@ public static class DecisionQueries
             .Select(row => new DecisionSummary(row.Id, row.AgentId, row.RunId, row.Runtime, row.SessionId, row.RequestId, row.TurnId, row.ItemId,
                 row.Kind, row.Action, row.Blocking == 1, row.ExpiresAt, row.CreatedAt, row.Status)).ToArray());
 
+    public static Result<Page<DecisionSummary>> List(CrossfireDbContext context, string agentId, int page, int pageSize, string? status)
+    {
+        var offset = checked((page - 1) * pageSize);
+        var count = Stored.Read(() => context.RuntimeDecision.AsNoTracking().Where(row => row.AgentId == agentId && (status == null || row.Status == status)).LongCount());
+        if (!count.IsSuccess) return Result<Page<DecisionSummary>>.Fail(count.Error);
+        var items = Stored.Read(() => context.RuntimeDecision.AsNoTracking().Where(row => row.AgentId == agentId && (status == null || row.Status == status))
+            .OrderByDescending(row => row.CreatedAt).ThenBy(row => row.Id).Skip(offset).Take(pageSize)
+            .Select(row => new DecisionSummary(row.Id, row.AgentId, row.RunId, row.Runtime, row.SessionId, row.RequestId, row.TurnId, row.ItemId,
+                row.Kind, row.Action, row.Blocking == 1, row.ExpiresAt, row.CreatedAt, row.Status)).ToArray());
+        return items.Map(values => new Page<DecisionSummary>(values, page, pageSize, count.Value));
+    }
+
     public static Result<IReadOnlyList<DecisionAnswer>> Answers(CrossfireDbContext context, string id)
         => Stored.Read<IReadOnlyList<DecisionAnswer>>(() => context.RuntimeDecisionAnswer.AsNoTracking().Where(row => row.DecisionId == id)
             .Select(row => new DecisionAnswer(row.QuestionId, row.OptionId, row.AnswerText)).ToArray());

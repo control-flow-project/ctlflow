@@ -1,7 +1,7 @@
+import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { join } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -21,7 +21,7 @@ const sample = (sessionId: string, input = 100, output = 20): UsageSample => ({ 
 async function fixtureStore(scope: TestContext) {
   const directory = mkdtempSync(join(process.cwd(), '.temp/statistics-'));
   cleanup(scope, () => rmSync(directory, { recursive: true }));
-  const file = join(directory, 'management.sqlite'), database = openStore(file);
+  const file = join(directory, 'management.sqlite'), database = openTestStore(file);
   cleanup(scope, () => database.close());
   return { ...await applicationFixture(scope, file), database };
 }

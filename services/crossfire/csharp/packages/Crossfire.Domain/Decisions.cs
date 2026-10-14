@@ -64,6 +64,29 @@ public static class Decisions
             : Results.Fail<DecisionView>("missing", "Decision not found");
     }
 
+    public static Result<Page<DecisionSummary>> List(DecisionPorts ports, Actor actor, string agentId, int page, int pageSize, string? status = null)
+    {
+        var authority = Authorization.Agent(ports.Authorization, actor, agentId, "read");
+        if (!authority.IsSuccess) return Result<Page<DecisionSummary>>.Fail(authority.Error);
+        if (page is < 1 or > 100000 || pageSize is < 1 or > 100) return Results.Fail<Page<DecisionSummary>>("invalid", "Use page ≥ 1 and pageSize 1–100");
+        if (status is not (null or "pending")) return Results.Fail<Page<DecisionSummary>>("invalid", "Invalid native decision status filter");
+        var expired = Expire(ports);
+        if (!expired.IsSuccess) return Result<Page<DecisionSummary>>.Fail(expired.Error);
+        var values = ports.List(agentId, page, pageSize, status);
+        if (!values.IsSuccess) return values;
+        return ports.Transaction.Run(() =>
+        {
+            var items = new List<DecisionSummary>(values.Value.Items.Count);
+            foreach (var value in values.Value.Items)
+            {
+                var current = CurrentStatus(ports, value.AgentId, value.RunId, value.ExpiresAt, value.Status);
+                if (!current.IsSuccess) return Result<Page<DecisionSummary>>.Fail(current.Error);
+                items.Add(value with { Status = current.Value });
+            }
+            return Result<Page<DecisionSummary>>.Success(values.Value with { Items = items });
+        });
+    }
+
     public static Result<Unit> Answer(DecisionPorts ports, Actor actor, string agentId, string id, IReadOnlyList<DecisionAnswer> answers, string requestId)
         => ports.Transaction.Run(() =>
         {
@@ -82,7 +105,7 @@ public static class Decisions
             {
                 var answer = answers.FirstOrDefault(value => value.QuestionId == question.Id);
                 if (answer is null || (answer.OptionId is null) == (answer.Text is null) || answer.OptionId is not null && !question.Options.Any(option => option.Id == answer.OptionId)
-                    || answer.Text is not null && (!question.AllowText || string.IsNullOrWhiteSpace(answer.Text)))
+                    || answer.Text is not null && (!question.AllowText || TextRules.Blank(answer.Text)))
                     return Results.Fail<Unit>("invalid", "Answer is not one of the native choices");
             }
             var saved = ports.Answer(id, answers);

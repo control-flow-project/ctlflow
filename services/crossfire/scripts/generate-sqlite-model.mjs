@@ -2,14 +2,17 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
+import knex from 'knex';
+import { databaseConfiguration } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const definition = JSON.parse(readFileSync(join(root, 'packages/data/sqlite/schema.json'), 'utf8'));
+const contract = JSON.parse(readFileSync(join(root, 'database/management/sqlite/contract.json'), 'utf8'));
 const output = join(root, 'csharp/packages/Crossfire.AdapterSqlite');
 const check = process.argv.slice(2);
 assert(check.length === 0 || check.length === 1 && check[0] === '--check', 'Use --check or no arguments');
-const database = new Database(':memory:');
+const migrator = knex(databaseConfiguration(':memory:'));
+await migrator.migrate.latest();
+const database = await migrator.client.acquireConnection();
 const pascal = value => value.split('_').map(part => part[0].toUpperCase() + part.slice(1)).join('');
 const quote = value => JSON.stringify(value);
 const nativeTypes = { TEXT: 'string', INTEGER: 'long', REAL: 'double', BLOB: 'byte[]' };
@@ -21,8 +24,7 @@ function emit(relative, lines) {
 }
 
 try {
-  for (const part of definition.initialization) database.exec(definition.parts[part]);
-  const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY rowid").all()
+  const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%' ORDER BY rowid").all()
     .map(({ name }) => ({ name, columns: database.prepare('PRAGMA table_info(' + quote(name) + ')').all(),
       foreignKeys: database.prepare('PRAGMA foreign_key_list(' + quote(name) + ')').all() }));
   for (const table of tables) {
@@ -62,10 +64,8 @@ try {
     }
   }
   emit('ForeignKeys.g.cs', [...imports, '    private static void ConfigureForeignKeys(ModelBuilder model)', '    {', ...foreignKeys, '    }', '}']);
-  const rows = [];
-  for (const [table, values] of Object.entries(definition.reference)) for (const value of values)
-    rows.push('        context.' + pascal(table) + '.Add(new ' + pascal(table) + 'Row { ' + Object.entries(value).map(([key, entry]) => pascal(key) + ' = ' + quote(entry)).join(', ') + ' });');
-  emit('ReferenceRows.g.cs', ['using Crossfire.AdapterSqlite.Entities;', '', 'namespace Crossfire.AdapterSqlite;', '', 'public static class ReferenceRows', '{',
-    '    public static void Seed(CrossfireDbContext context)', '    {', ...rows, '        context.SaveChanges();', '    }', '}']);
+  emit('SchemaContract.g.cs', ['namespace Crossfire.AdapterSqlite;', '', 'public static class SchemaContract', '{',
+    '    public const long ApplicationId = ' + contract.application + ';', '    public const long Version = ' + contract.version + ';',
+    '    public static readonly string[] Migrations = [' + contract.migrations.map(quote).join(', ') + '];', '}']);
   console.log(JSON.stringify({ tables: tables.length, relationships: foreignKeys.length / 3, mode: check.length ? 'check' : 'generate' }));
-} finally { database.close(); }
+} finally { await migrator.client.releaseConnection(database); await migrator.destroy(); }

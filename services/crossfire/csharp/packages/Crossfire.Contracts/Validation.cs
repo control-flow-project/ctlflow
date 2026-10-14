@@ -11,14 +11,16 @@ public static partial class Validation
 
     public static Result<string> Text(JsonElement input, int maximum = 255, int minimum = 1)
     {
-        var value = input.ValueKind == JsonValueKind.String ? input.GetString() : null;
+        var parsed = input.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(input.GetRawText()) : Results.Fail<string>("invalid", "Expected text");
+        var value = parsed.IsSuccess ? parsed.Value : null;
         return value is not null && value.Length >= minimum && value.Length <= maximum && !Controls().IsMatch(value)
             ? Result<string>.Success(value) : Results.Fail<string>("invalid", $"Expected text of {minimum}–{maximum} characters");
     }
 
     public static Result<string> PlainText(JsonElement input, int maximumBytes)
     {
-        var value = input.ValueKind == JsonValueKind.String ? input.GetString() : null;
+        var parsed = input.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(input.GetRawText()) : Results.Fail<string>("invalid", "Expected plain text");
+        var value = parsed.IsSuccess ? parsed.Value : null;
         return value is not null && Encoding.UTF8.GetByteCount(value) <= maximumBytes && !PlainControls().IsMatch(value)
             ? Result<string>.Success(value) : Results.Fail<string>("invalid", $"Expected plain text up to {maximumBytes} UTF-8 bytes");
     }
@@ -33,9 +35,21 @@ public static partial class Validation
         => input.ValueKind is JsonValueKind.True or JsonValueKind.False
             ? Result<bool>.Success(input.GetBoolean()) : Results.Fail<bool>("invalid", "Expected a boolean");
 
+    public static Result<string?> NullableText(JsonElement input, int maximum = 255, int minimum = 1)
+        => input.ValueKind == JsonValueKind.Null ? Result<string?>.Success(null) : Text(input, maximum, minimum).Map<string?>(value => value);
+
+    public static Result<long?> NullableInteger(JsonElement input, long minimum = 0, long maximum = MaxWireInteger)
+        => input.ValueKind == JsonValueKind.Null ? Result<long?>.Success(null) : Integer(input, minimum, maximum).Map<long?>(value => value);
+
+    public static Result<bool?> NullableBoolean(JsonElement input)
+        => input.ValueKind == JsonValueKind.Null ? Result<bool?>.Success(null) : Boolean(input).Map<bool?>(value => value);
+
     public static Result<string> Choice(JsonElement input, params string[] choices)
-        => input.ValueKind == JsonValueKind.String && choices.Contains(input.GetString(), StringComparer.Ordinal)
-            ? Result<string>.Success(input.GetString()!) : Results.Fail<string>("invalid", "Choose one of: " + string.Join(", ", choices));
+    {
+        var parsed = input.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(input.GetRawText()) : Results.Fail<string>("invalid", "Expected a choice");
+        return parsed.IsSuccess && choices.Contains(parsed.Value, StringComparer.Ordinal)
+            ? parsed : Results.Fail<string>("invalid", "Choose one of: " + string.Join(", ", choices));
+    }
 
     public static Result<JsonElement> Fields(JsonElement input, IReadOnlyList<string> required, IReadOnlyList<string>? optional = null)
     {
@@ -60,14 +74,12 @@ public static partial class Validation
         return Result<IReadOnlyList<T>>.Success(values);
     }
 
-    public static bool Identifier(string value) => IdentifierPattern().IsMatch(value);
-    public static bool Name(string value) => NamePattern().IsMatch(value);
-    public static bool UserId(string value) => value.Length <= 255 && UserPattern().IsMatch(value);
+    public static bool Identifier(string value) => IdentitySyntax.Identifier(value);
+    public static bool Name(string value) => IdentitySyntax.Name(value);
+    public static bool UserId(string value) => IdentitySyntax.MatrixUser(value);
     public static bool RoomId(string value) => value.Length <= 255 && RoomPattern().IsMatch(value);
     public static bool EventId(string value) => value.Length <= 255 && EventPattern().IsMatch(value);
     public static bool Secret(string value) => SecretPattern().IsMatch(value);
-    public static bool WhiteSpace(char value) => value is >= '\u0009' and <= '\u000d' or '\u0020' or '\u00a0' or '\u1680'
-        or >= '\u2000' and <= '\u200a' or '\u2028' or '\u2029' or '\u202f' or '\u205f' or '\u3000' or '\ufeff';
 
     public static bool Json(JsonElement value, int depth = 0)
         => depth <= 64 && value.ValueKind switch
@@ -92,12 +104,6 @@ public static partial class Validation
     private static partial Regex Controls();
     [GeneratedRegex("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]", RegexOptions.CultureInvariant)]
     private static partial Regex PlainControls();
-    [GeneratedRegex("\\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex IdentifierPattern();
-    [GeneratedRegex("\\A[a-z][a-z0-9-]{0,39}\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex NamePattern();
-    [GeneratedRegex("\\A@[^:\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+:[^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex UserPattern();
     [GeneratedRegex("\\A![^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]
     private static partial Regex RoomPattern();
     [GeneratedRegex("\\A\\$[^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]
