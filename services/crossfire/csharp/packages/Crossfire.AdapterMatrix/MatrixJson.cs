@@ -39,7 +39,7 @@ public static class MatrixJson
         if (response.Status is < 200 or >= 300)
         {
             var error = Text(response.Body, "errcode", 8192);
-            return Results.Fail<JsonElement>("native", "Native HTTP " + response.Status + (error is null ? "" : ": " + error[..Math.Min(error.Length, 80)]));
+            return Results.Fail<JsonElement>("native", "Native HTTP " + response.Status + (error is null ? "" : ": " + Validation.TruncateUtf16(error, 80)));
         }
         return Result<JsonElement>.Success(response.Body.Clone());
     }

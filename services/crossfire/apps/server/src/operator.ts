@@ -6,6 +6,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { config } from './config.js';
 import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { backupBeforeMigration, prepareDatabaseUpgrade } from './database-upgrade.js';
+import { standalone } from './standalone.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const repository = resolve(root, '../..');
@@ -13,7 +15,7 @@ export function imageName(source: string): string {
   const hash = createHash('sha256');
   function add(path: string): void {
     for (const item of readdirSync(path, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
-      if (['node_modules', 'dist', '.temp', '.analysis'].includes(item.name)) continue;
+      if (['node_modules', 'dist', 'bin', 'obj', 'target', '.temp', '.analysis'].includes(item.name)) continue;
       const file = join(path, item.name);
       if (item.isDirectory()) add(file);
       else if (item.isFile()) hash.update(relative(source, file)).update(readFileSync(file));
@@ -43,7 +45,20 @@ export function runArguments(directory: string, image: string, port: number, con
     ...cgroupArguments(cgroupParent), '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image];
 }
 
+export function migrationImageName(runtimeImage: string): string {
+  if (!/^crossfire-runtime:[a-f0-9]{20}$/u.test(runtimeImage)) throw new Error('Select a content-addressed Crossfire release image');
+  return runtimeImage.replace('crossfire-runtime:', 'crossfire-migrations:');
+}
+
+export function migrationArguments(directory: string, image: string, cgroupParent?: string): string[] {
+  const name = 'crossfire-migration-' + createHash('sha256').update(directory).digest('hex').slice(0, 16);
+  return ['run', '--rm', '--name', name, '--mount', 'type=bind,"source=' + directory.replaceAll('"', '""') + '",target=/runtime',
+    ...cgroupArguments(cgroupParent), '--network', 'none', '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m',
+    '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image];
+}
+
 export async function main(args = process.argv.slice(2)): Promise<void> {
+  if (args[0] === 'serve') { await standalone(args.slice(1)); return; }
   const parsed = parseArgs({ args, allowPositionals: true, options: { directory: { type: 'string' }, instance: { type: 'string' },
     origin: { type: 'string' }, 'content-origin': { type: 'string' }, 'server-name': { type: 'string' }, administrator: { type: 'string' }, port: { type: 'string' }, 'content-port': { type: 'string' },
     'cgroup-parent': { type: 'string' }, compile: { type: 'boolean' }, help: { type: 'boolean' } } });
@@ -79,9 +94,22 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const docker = spawnSync('docker', ['info', '--format', '{{json .SecurityOptions}}'], { encoding: 'utf8' });
   if (docker.status !== 0 || !docker.stdout.includes('rootless')) throw new Error('A working rootless Docker engine is required; no host changes are made by Crossfire');
   const image = imageName(repository);
-  if (parsed.values.compile || spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status !== 0) await command(['build', ...resources, '--file', join(root, 'Dockerfile'), '--tag', image, repository]);
+  const migrationImage = migrationImageName(image);
+  for (const [target, tag] of [['production', image], ['migrations', migrationImage]])
+    if (parsed.values.compile || spawnSync('docker', ['image', 'inspect', tag!], { stdio: 'ignore' }).status !== 0)
+      await command(['build', ...resources, '--file', join(root, 'Dockerfile'), '--target', target!, '--tag', tag!, repository]);
   const options = runArguments(directory, image, port, contentPort, parsed.values['cgroup-parent']);
   const name = options[options.indexOf('--name') + 1]!;
+  await prepareDatabaseUpgrade({
+    async stopWriters() {
+      const running = spawnSync('docker', ['container', 'inspect', '--format', '{{index .Config.Labels "org.crossfire.directory"}}', name], { encoding: 'utf8' });
+      if (running.status !== 0) return;
+      if (running.stdout.trim() !== directory) throw new Error('Existing runtime container has different ownership; nothing was stopped');
+      await command(['stop', '--time', '15', name]);
+    },
+    async backup() { await backupBeforeMigration(directory); },
+    async migrate() { await command(migrationArguments(directory, migrationImage, parsed.values['cgroup-parent'])); },
+  });
   let stopping = false;
   const stop = () => { if (!stopping) { stopping = true; void command(['stop', '--time', '15', name]).catch(error => console.error(String(error))); } };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, stop);

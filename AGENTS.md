@@ -25,6 +25,11 @@ parallel Rust track in its own worktree. Both tracks retain the same shared UI,
 API and SQLite guarantees and their own complete verification requirements.
 Native implementation readiness and outstanding dependency decisions are
 recorded in docs/architecture/native-implementations.md.
+Native targets must retain equivalent service, application, package and test
+ownership, following docs/architecture/native-layout.md. Use idiomatic target
+patterns inside those boundaries. Knex alone creates/migrates all databases;
+the SQLite adapter owns connections, query metadata and transactions in every
+target. Do not add another database runtime package or a target-specific UI.
 
 On 2026-10-14 the owner approved producing managed and NativeAOT .NET 11 builds
 from the same C# source and initially deploying the managed build. EF remains the

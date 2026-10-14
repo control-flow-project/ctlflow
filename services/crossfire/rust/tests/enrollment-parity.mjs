@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import test from 'node:test';
+import { conduitFixture } from '../../dist/scripts/architecture-proof/conduit-fixture.js';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { verifyTestResources } from '../../../../scripts/test-resources.mjs';
+const [binary] = process.argv.slice(2);
+assert(binary && process.argv.length === 3 && binary.startsWith('/'), 'One compiled Rust enrollment authority executable is required');
+assert(process.cwd().endsWith('/services/crossfire'), 'Native enrollment verification uses its service root');
+verifyTestResources();
+test('Rust owner-reviewed enrollment and room lifecycle use real Conduit and canonical Knex SQLite', {timeout:120000}, async context => {
+  const jwtSecret = randomBytes(32).toString('hex');
+  const conduit = await conduitFixture(context, {jwtSecret});
+  const owner = await conduit.register('rust-owner');
+  const outsider = await conduit.register('rust-outsider');
+  const directory = mkdtempSync(join(process.cwd(), '.temp/rust-enrollment-')); chmodSync(directory, 0o700);
+  cleanup(context, () => rmSync(directory, {recursive:true}));
+  const file = join(directory, 'configuration.json');
+  writeFileSync(file, JSON.stringify({origin:conduit.base, serverName:'architecture.localhost', jwtSecret,
+    registrationSecret:conduit.registrationToken, owner:owner.id, ownerToken:owner.token, outsider:outsider.id, agent:'@unrelated-specialist:architecture.localhost'}), {mode:0o600});
+  const result = await new Promise((resolve,reject) => {
+    const child = spawn(binary,[file],{stdio:['ignore','pipe','pipe']});
+    let output = '', errors = '';
+    child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
+    child.stdout.on('data',chunk => {output = (output + chunk).slice(-65536);});
+    child.stderr.on('data',chunk => {errors = (errors + chunk).slice(-65536);});
+    const deadline = setTimeout(() => child.kill('SIGKILL'),105000);
+    cleanup(context, () => {if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');});
+    child.once('error',error => {clearTimeout(deadline);reject(error);});
+    child.once('close',(code,signal) => {clearTimeout(deadline);
+      if (code !== 0) reject(new Error(`Native Rust enrollment acceptance failed (${signal ?? code})\n${errors}${output}`));
+      else {try {resolve(JSON.parse(output));} catch(error) {reject(error);}}});
+  });
+  assert.equal(result.status,'passed');
+  assert.equal(result.provider,'pinned native Conduit and Knex SQLite');
+  assert(result.assertions >= 52, 'Every actual enrollment, room, notice and human signup lifecycle assertion must execute');
+  context.diagnostic(JSON.stringify(result));
+});

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../packages/Crossfire.Contracts/Crossfire.Contracts.csproj" />
+    <Compile Include="../Crossfire.Storage.Tests/Checks.cs" Link="Checks.cs" />
+    <Compile Include="../Crossfire.Storage.Tests/RoomAcceptance.cs" Link="RoomAcceptance.cs" />
+  </ItemGroup>
+</Project>

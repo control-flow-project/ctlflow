@@ -8,6 +8,26 @@ public static class RoomAcceptance
 {
     public static void Verify()
     {
+        foreach (var malformedText in new[] { "\ud800", "\udfff", "before\ud800after", "\ud800🚀" })
+        {
+            Equal(Validation.WellFormed(malformedText), false, "malformed Unicode rejected without replacement");
+            Equal(Validation.UserId("@" + malformedText + ":example.test"), false, "malformed Matrix identity rejected");
+        }
+        foreach (var malformedJson in new[] { "\"\\ud800\"", "{\"\\udfff\":true}" })
+        {
+            using var input = JsonDocument.Parse(malformedJson);
+            Equal(Validation.Json(input.RootElement), false, "malformed JSON text rejected at boundary");
+        }
+        using (var malformedString = JsonDocument.Parse("\"\\ud800\""))
+        {
+            Equal(Validation.Text(malformedString.RootElement).IsSuccess, false, "text parser returns expected malformed Unicode failure");
+            Equal(Validation.PlainText(malformedString.RootElement, 8192).IsSuccess, false, "plain-text parser returns expected malformed Unicode failure");
+        }
+        Equal(Validation.TruncateUtf16("a🚀b", 2), "a", "truncation never separates Unicode scalar");
+        Equal(Validation.TruncateUtf16("a🚀b", 3), "a🚀", "truncation preserves complete Unicode scalar");
+        Equal(Validation.TruncateUtf16("🚀", 0), "", "zero text bound");
+        Equal(Validation.TruncateUtf16("🚀", 1), "", "surrogate pair does not fit one unit");
+        Equal(Validation.TruncateUtf16("🚀", 2), "🚀", "surrogate pair fits exactly");
         using var document = JsonDocument.Parse("""
         [
           {"sender":"@owner:example.test","type":"m.room.create","state_key":"","content":{"room_version":"12","additional_creators":["@agent:example.test"]}},

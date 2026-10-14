@@ -1,15 +1,15 @@
+import { openTestStore } from './support/storage.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import schemaDefinition from '@ctlflow/crossfire-data/sqlite/schema' with { type: 'json' };
-import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import schemaDefinition from '@ctlflow/crossfire-data/management/sqlite/schema' with { type: 'json' };
 import { permissionCatalog, roleCatalog } from '@ctlflow/crossfire-domain/authorization/catalog';
 
 test('shared SQLite schema preserves canonical authorization and direct language interchangeability', () => {
-  const database = openStore(':memory:');
+  const database = openTestStore(':memory:');
   try {
     assert.equal(database.pragma('user_version', { simple: true }), schemaDefinition.version);
     assert.equal(database.pragma('application_id', { simple: true }), schemaDefinition.application);
-    const schema = database.prepare("SELECT type,name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").all() as { type: string; name: string }[];
+    const schema = database.prepare("SELECT type,name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%'").all() as { type: string; name: string }[];
     assert.equal(schema.filter(row => row.type === 'table').length, 63);
     assert.equal(schema.filter(row => row.type === 'index').length, 93);
     assert.equal(schema.filter(row => row.type === 'trigger').length, 26);

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2023", "lib": ["ES2023"], "module": "NodeNext",
+    "target": "ES2023", "lib": ["ES2024"], "module": "NodeNext",
     "moduleResolution": "NodeNext", "resolveJsonModule": true, "strict": true, "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true, "noUnusedLocals": true, "noUnusedParameters": true, "erasableSyntaxOnly": true,
     "noEmitOnError": true, "rootDir": ".", "types": ["node"], "skipLibCheck": true

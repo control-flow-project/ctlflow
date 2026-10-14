@@ -12,12 +12,14 @@
   "workspaces": [
     "services/*",
     "services/*/apps/*",
-    "services/*/packages/*"
+    "services/*/packages/*",
+    "services/*/database"
   ],
   "scripts": {
     "typecheck": "node scripts/workspaces.mjs typecheck",
     "build": "node scripts/workspaces.mjs build",
     "test": "node scripts/workspaces.mjs test",
+    "test:rust": "node scripts/verify-rust.mjs",
     "test:browser": "node scripts/test.mjs crossfire browser",
     "verify:structure": "node scripts/verify-structure.mjs",
     "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@ctlflow/crossfire",

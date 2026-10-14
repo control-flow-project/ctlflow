@@ -12,6 +12,7 @@
     <Project Path="services/crossfire/csharp/build/Crossfire.EfCompiler/Crossfire.EfCompiler.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="services/crossfire/csharp/tests/Crossfire.Contracts.Tests/Crossfire.Contracts.Tests.csproj" />
     <Project Path="services/crossfire/csharp/tests/Crossfire.Storage.Tests/Crossfire.Storage.Tests.csproj" />
   </Folder>
 </Solution>

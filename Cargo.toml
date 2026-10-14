@@ -1,0 +1,103 @@
+[workspace]
+resolver = "3"
+members = [
+  "services/crossfire/rust/packages/kernel",
+  "services/crossfire/rust/packages/domain",
+  "services/crossfire/rust/packages/contracts",
+  "services/crossfire/rust/packages/adapter-filesystem",
+  "services/crossfire/rust/packages/adapter-sqlite",
+  "services/crossfire/rust/packages/adapter-http",
+  "services/crossfire/rust/packages/adapter-matrix",
+  "services/crossfire/rust/packages/adapter-schedule",
+  "services/crossfire/rust/packages/agent-core",
+  "services/crossfire/rust/packages/adapter-codex",
+  "services/crossfire/rust/packages/adapter-runtime",
+  "services/crossfire/rust/packages/adapter-process",
+  "services/crossfire/rust/packages/adapter-toml",
+  "services/crossfire/rust/packages/adapter-pi",
+  "services/crossfire/rust/tests/support",
+  "services/fleetd/rust/packages/domain",
+  "services/fleetd/rust/packages/contracts",
+  "services/fleetd/rust/packages/storage",
+]
+
+[workspace.package]
+version = "0.1.20"
+edition = "2024"
+rust-version = "1.98"
+authors = ["Jeswin P Kumar <jeswinpk@agilehead.com>"]
+license-file = "LICENSE"
+publish = false
+
+[workspace.dependencies]
+crossfire-kernel = { path = "services/crossfire/rust/packages/kernel" }
+crossfire-domain = { path = "services/crossfire/rust/packages/domain" }
+crossfire-contracts = { path = "services/crossfire/rust/packages/contracts" }
+crossfire-adapter-filesystem = { path = "services/crossfire/rust/packages/adapter-filesystem" }
+crossfire-adapter-sqlite = { path = "services/crossfire/rust/packages/adapter-sqlite" }
+crossfire-adapter-http = { path = "services/crossfire/rust/packages/adapter-http" }
+crossfire-adapter-matrix = { path = "services/crossfire/rust/packages/adapter-matrix" }
+crossfire-adapter-schedule = { path = "services/crossfire/rust/packages/adapter-schedule" }
+crossfire-agent-core = { path = "services/crossfire/rust/packages/agent-core" }
+crossfire-adapter-codex = { path = "services/crossfire/rust/packages/adapter-codex" }
+crossfire-adapter-runtime = { path = "services/crossfire/rust/packages/adapter-runtime" }
+crossfire-adapter-process = { path = "services/crossfire/rust/packages/adapter-process" }
+crossfire-adapter-toml = { path = "services/crossfire/rust/packages/adapter-toml" }
+crossfire-adapter-pi = { path = "services/crossfire/rust/packages/adapter-pi" }
+crossfire-test-support = { path = "services/crossfire/rust/tests/support" }
+fleetd-domain = { path = "services/fleetd/rust/packages/domain" }
+fleetd-contracts = { path = "services/fleetd/rust/packages/contracts" }
+fleetd-storage = { path = "services/fleetd/rust/packages/storage" }
+base64 = "=0.22.1"
+diesel = { version = "=2.3.14", default-features = false, features = ["sqlite", "32-column-tables", "returning_clauses_for_sqlite_3_35"] }
+libsqlite3-sys = { version = "=0.37.0", features = ["bundled"] }
+rustix = { version = "=1.1.4", features = ["fs", "process", "rand"] }
+serde = { version = "=1.0.229", features = ["derive", "rc"] }
+serde_json = "=1.0.154"
+sha2 = "=0.10.9"
+subtle = "=2.6.1"
+tempfile = "=3.27.0"
+uuid = { version = "=1.24.0", features = ["v4"] }
+zeroize = "=1.9.1"
+hmac = "=0.12.1"
+reqwest = { version = "=0.13.4", default-features = false, features = ["rustls", "json"] }
+tokio = { version = "=1.53.3", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "process", "signal", "fs"] }
+tokio-util = { version = "=0.7.20", features = ["rt"] }
+url = "=2.5.8"
+chrono = { version = "=0.4.45", default-features = false, features = ["std"] }
+chrono-tz = { version = "=0.10.4", default-features = false, features = ["std"] }
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
+futures-util = { version = "=0.3.34", default-features = false, features = ["sink", "std", "async-await"] }
+async-io = "=2.6.0"
+toml = { version = "=1.1.6", default-features = false, features = ["parse", "display", "serde", "std"] }
+icu_collator = "=2.3.1"
+bytes = "=1.12.1"
+hyper = { version = "=1.12.0", default-features = false, features = ["server", "http1"] }
+hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
+http-body-util = "=0.1.5"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+non_ascii_idents = "forbid"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+overflow-checks = true
+panic = "unwind"
+
+[profile.dev]
+debug = 1
+incremental = false
+
+[profile.test]
+debug = 1
+incremental = false

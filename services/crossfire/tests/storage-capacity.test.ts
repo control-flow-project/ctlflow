@@ -1,10 +1,9 @@
+import { openTestStore, migrateFixture } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import Database from 'better-sqlite3';
 import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
-import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createUnitOfWork } from '@ctlflow/crossfire-adapter-sqlite/unit-of-work';
 import type { AuditEvent } from '@ctlflow/crossfire-domain/audit/types';
@@ -25,18 +24,18 @@ function audit(id: string, message: string): AuditEvent {
     authorizerId: null, addedById: null, permissionCode: null, action: 'storage.capacity', outcome: 'accepted', message, createdAt: 1 };
 }
 
-test('management storage retains native SQLite capacity for memory and every supported page size', scope => {
+test('management storage retains native SQLite capacity for memory and every supported page size', async scope => {
   const native = new Database(':memory:'); cleanup(scope, () => native.close());
   const expected = native.pragma('max_page_count', { simple: true });
-  const memory = openStore(':memory:'); cleanup(scope, () => memory.close());
+  const memory = openTestStore(':memory:'); cleanup(scope, () => memory.close());
   assert.equal(memory.pragma('max_page_count', { simple: true }), expected);
   const root = directory(scope);
   for (const pageSize of [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]) {
     const path = join(root, 'pages-' + pageSize + '.sqlite'); writeFileSync(path, '', { mode: 0o600 });
     const initialized = new Database(path);
-    try { initialized.pragma('page_size = ' + pageSize); createSchema(initialized); }
+    try { initialized.pragma('page_size = ' + pageSize); await migrateFixture(initialized); }
     finally { initialized.close(); }
-    const database = openStore(path);
+    const database = openTestStore(path);
     try {
       assert.equal(database.pragma('page_size', { simple: true }), pageSize);
       assert.equal(database.pragma('max_page_count', { simple: true }), expected);
@@ -93,15 +92,15 @@ test('a full 256 MiB management store reopens and registers listeners without lo
   }
   value(reopened.services.repositories.auditEvent.insert(audit('after-capacity', 'New audit after listener registration')));
   reopened.application.close();
-  database = openStore(path);
+  database = openTestStore(path);
   assert.ok(statSync(path).size > maximum, 'The original database must grow beyond its former ceiling');
   assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
   assert.deepEqual(database.pragma('foreign_key_check'), []);
   value(createRepositories(database).auditEvent.insert(audit('after-second-open', 'Growth remains enabled after another reopen')));
 });
 
-test('native storage exhaustion is retryable and rolls back the complete transaction', scope => {
-  const database = openStore(join(directory(scope), 'management.sqlite')); cleanup(scope, () => database.close());
+test('native storage exhaustion is retryable and rolls back the complete transaction', async scope => {
+  const database = openTestStore(join(directory(scope), 'management.sqlite')); cleanup(scope, () => database.close());
   const repositories = createRepositories(database), unit = createUnitOfWork(database);
   const principal = { id: 'capacity-owner', matrixUserId: '@capacity-owner:test', kind: 'human' as const,
     status: 'active' as const, revision: 0, createdAt: 1 };
@@ -129,8 +128,8 @@ test('native storage exhaustion is retryable and rolls back the complete transac
 });
 
 for (const stage of ['start', 'finish']) {
-  test('transaction-level capacity failure at ' + stage + ' preserves the original state', scope => {
-    const database = openStore(join(directory(scope), 'management.sqlite')); cleanup(scope, () => database.close());
+  test('transaction-level capacity failure at ' + stage + ' preserves the original state', async scope => {
+    const database = openTestStore(join(directory(scope), 'management.sqlite')); cleanup(scope, () => database.close());
     const repositories = createRepositories(database), unit = createUnitOfWork(database);
     const principal = { id: 'transaction-owner', matrixUserId: '@transaction-owner:test', kind: 'human' as const,
       status: 'active' as const, revision: 0, createdAt: 1 };

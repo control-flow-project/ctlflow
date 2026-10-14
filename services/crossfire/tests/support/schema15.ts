@@ -1,10 +1,8 @@
-import Database from 'better-sqlite3';
-import { createSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/create-schema';
-import { statisticsSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/statistics';
+import { openTestStore, statisticsSchema } from './storage.js';
 import { restoreSchema16Logging } from './schema16.js';
 
 export function schema15Store(file = ':memory:') {
-  const database = new Database(file); createSchema(database);
+  const database = openTestStore(file);
   restoreSchema16Logging(database);
   database.exec('DROP TABLE listener_stat_usage; DROP TABLE runtime_usage_checkpoint;');
   const start = statisticsSchema.indexOf('CREATE TABLE listener_stat_usage');

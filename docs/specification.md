@@ -64,6 +64,11 @@ validation, authentication, authorization and persisted SQLite representations
 must remain interchangeable across implementations, without an import/export or
 database reset. See [native implementation readiness](architecture/native-implementations.md)
 for the implementation plan, dependency evidence and current uncompleted scope.
+Native service/layer ownership follows the common
+[native implementation structure](architecture/native-layout.md). Knex alone
+creates and migrates databases; the selected SQLite adapter owns prepared-store
+validation, connections, transactions and application queries. Target-specific
+compiler, framework and module patterns do not create another product owner.
 Only concrete, supported capabilities have packages. Every agent belongs to a
 fleet managed by fleetd, including a one-agent fleet. There is no standalone
 deployment, existing-session attachment, optional controller or detach-to-direct
