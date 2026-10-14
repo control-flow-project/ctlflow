@@ -6,12 +6,12 @@ The guides cover controller ownership and the shared runtime configuration:
 - [Noninteractive project setup and private workspace/state](docs/setup.md)
 - [Lifecycle, private API and execution boundaries](docs/operations.md)
 - [Context storage and explicit forward migration](docs/storage.md)
-- [Read-only native fleet verification](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
+- [Read-only native fleet verification](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
 - [Fleet runtime defaults and overrides](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
 - [Fleet-defined wake rules and invitation defaults](docs/coordination.md)
 - [Earendil Pi settings, histories and native limitations](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/pi.md)
-- [C# controller/CLI distribution and readiness](../crossfire/csharp/README.md)
-- [Shared implementation contracts](../../docs/verification/shared-contracts.md)
+- [C# controller/CLI distribution and readiness](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/csharp/README.md)
+- [Shared implementation contracts](https://github.com/control-flow-project/crossfire/blob/main/docs/verification/shared-contracts.md)
 
 The public `@ctlflow/fleet` CLI depends on the exact matching public
 `@ctlflow/fleetd` release. Both ship self-contained bundles, not registry
@@ -90,7 +90,7 @@ No systemd, privileged daemon,
 global skill, host package installer or shell supervisor is installed.
 
 - [Abrupt controller death and native writer ownership](docs/operations.md#abrupt-controller-death)
-- [Source-checkout verification and explicit observation conversion](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
+- [Source-checkout verification and explicit observation conversion](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
 
 - [CLI and first-run workflow](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/README.md)
 - [Canonical API, data and lifecycle specification](https://github.com/control-flow-project/crossfire/blob/main/docs/specification.md)

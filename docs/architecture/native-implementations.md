@@ -1,215 +1,223 @@
-# Native implementation readiness
+# Node/C# implementation readiness
 
-Status: **C# product source and shared tests written; integrated verification deferred.**
-Evidence date: 14 October 2026. Baseline: `12df2c5`, version `0.1.20`.
-Worktree: `/tmp/crossfire-csharp-20261013`.
-Branch: `feat/csharp-nativeaot-20261013`.
-Production, credentials, native histories and fleet selections remain unchanged.
+Review date: 15 October 2026. Version: `0.1.20`.
+Source: `feat/node-csharp-symmetry-20261015`, based on merged PR #51,
+`9b8ce881d5f77d93eeb7f0bc2344a79ac226ffcd`.
 
-## Approved architecture
+Status: **All nine integrated verification phases pass for Node, managed C# and
+actual NativeAOT on Linux x64. The supported product paths are signed off within
+the platform/provider scope and explicit preview-framework risks below.**
 
-- Implement every Crossfire, fleetd and fleet capability in .NET 11 with EF Core
-  and SQLite. Produce managed and NativeAOT outputs from the same source.
-  Initial managed deployment is explicitly approved.
-- Keep the independently selectable Node implementation. Neither executable
-  invokes another language implementation as a fallback.
-- Keep one React UI, HTTP contract and canonical SQLite representation.
-  A language switch must work directly with the same database.
-- Use functional domain modules, immutable values and typed ports. Classes are
-  restricted to required framework boundaries and actual resource ownership.
-- The owner authorized a separate parallel Rust worktree on 14 October 2026,
-  superseding the initial C#-before-Rust gate. This C# track contains no Rust
-  implementation; each track must independently finish and verify all capabilities.
-  Rust lands separately later and is not a completion dependency for this PR.
-- Preserve data and forward migrations. No ORM-specific migration history,
-  destructive initialization, compatibility handlers or silent substitution.
-- Knex alone creates/migrates all owned SQL databases. Match the inspected
-  Lesser/Snapped database/backend nesting and one-shot upgrade container.
-  Application implementations only validate/open the resulting shared store.
+Production, credentials, saved native histories and fleet selections are unchanged.
+Rust is a separate worktree/PR, not an implementation certified by this report.
 
-## Implemented and verified boundaries
+## One architecture
 
-The web project owns its build and Element translation asset. The private common
-client owns REST transport, binary streaming and Matrix password login.
-Every owned consumer has migrated; former helper paths are removed without
-aliases. Architecture tests reject backend/native dependencies from browser code.
+```text
+services/
+  crossfire/
+    node/{apps/server,packages,tests,scripts,tools,Dockerfile}
+    csharp/{apps/Crossfire.Server,packages,tests,build,scripts,Dockerfile}
+    apps/web/                         one shared React application
+    database/management/sqlite/        one Knex schema/migration owner
+    knexfile.management.mjs
+    tests/contracts/                  one external assertion bank
+    scripts/                          shared schema/protocol generators
+    docs/
+  fleetd/
+    node/{apps/daemon,packages,tests,scripts,tools}
+    csharp/{apps/Fleetd.Daemon,packages,tests}
+    tests/contracts/
+  fleet/
+    node/{apps/cli,packages,tests,scripts}
+    csharp/{apps/Fleet.Cli,packages}
+    tests/contracts/
+scripts/                              workspace/build/verification only
+```
 
-The canonical migration owner is the private `@ctlflow/crossfire-data` package
-at `services/crossfire/database`. It owns `management/sqlite/migrations`,
-`management/sqlite/seeds` and `knexfile.management.mjs`. Its immutable schema-17
-baseline describes application ID 1129465426: 63 singular application tables,
-93 explicit indexes, 26 triggers, three roles, 36 permissions and 51 role grants.
-The C# model generator derives all 63 typed entities and 111 foreign-key mappings,
-including actual cascade semantics, from SQLite metadata. Its check mode detects
-source drift. The generator inspects an actual Knex-created database. Neither
-Node nor C# retains schema creation, forward conversion or startup migration.
-Knex owns its migration/lock metadata separately from application data.
+The tree describes real owners, not required empty directories. No old service-level
+backend application, package pool or alternate path remains. Architecture checks
+reject removed layouts, reversed domain dependencies, application-source
+reach-through and runtime dependencies on build/test projects. C# has 29 owned
+projects. Public Node packages retain service-root manifests and `dist/`
+distribution layout; their implementation source now lives under `node/`.
 
-Managed SQLite acceptance passes existing-store validation, ordered foreign-key
-insertion, filtered reads, joins, expected-failure rollback and uniqueness.
-The implemented-core gate previously passed 752 managed / 734 NativeAOT assertions
-(bounded retention scan counts vary with generated fixture ordering),
-all six direct same-file Node/managed/AOT directions and schema 15/16 upgrades
-through the shared Knex owner. Sixteen additional cases cover schema 13/14
-exact rows, Unicode digests, rollback, repeat execution and unsupported-version
-preservation followed by read-only application validation. Dynamic code and
-reflection JSON are disabled in native execution. Nested rollback, owner-only
-decisions, paginated listing, controller generation/credential/lease admission,
-lifecycle claim/completion, broadcasts, name collisions, retired identity review,
-room invitations/delegation/private-DM protection, native reconciliation and
-wire/digest edge cases are included. Calendar differential verification covers
-2,072 cases in each output; six cross-process file-lock directions include forced
-exit. Current build-host and filesystem changes require an integrated rerun.
-This is not full product certification.
+| Responsibility | Common rule | Necessary language difference |
+|---|---|---|
+| Domain | Functional modules, immutable values, typed ports and expected failures | TypeScript modules / C# static modules and records |
+| Composition | One server, daemon and CLI in each selected implementation | npm exports / .NET project references |
+| Persistence | Same SQLite file, tables, rows and constraints | Node Tinqer / C# EF Core |
+| Migrations | Knex alone, in the same one-shot upgrade container | Neither backend creates or migrates schemas at startup |
+| Browser | One React project and identical built assets | No backend-specific UI or frontend API variant |
+| Native engines | fleetd owns lifecycle through Codex/Pi ports | Process, HTTP and filesystem libraries follow their platform |
+| Coordination | Same REST and private daemon contracts | `adapter-crossfire` / `Crossfire.AdapterCrossfire` |
+| Native execution composition | Enrollment, runtime lifecycle, failure reporting, stop receipts and resets belong to fleetd's execution adapter, not its daemon application | `adapter-execution` / `Fleetd.AdapterExecution` |
+| Build | Service ownership and production dependency separation | .NET compiled-model/query generation has build-only owners |
+| Distribution | Standalone products with exact shared tools and licensing | Node npm archives / managed self-contained and NativeAOT trees |
+| Verification | Identical external expected values and assertions | Internal compiler/EF/protocol tests remain language-owned |
 
-C# modules now include authorization, member reads/changes, administrator
-protection, principal initialization, session creation/authentication/expiry and
-termination, audit persistence, canonical policy defaults, bounded HTTP JSON,
-Matrix identity/profiles/provisioning/JWT authentication, room power enforcement,
-owner conversations, invitations, events/notices and account deactivation.
-Domain acceptance operates on real SQLite. Both managed and NativeAOT outputs
-also pass 490 Matrix/HTTP assertions against actual pinned Conduit in each output: meaningful private DMs,
-preserved identity during repair, exact native invitation checks, explicit mention
-metadata, quoted-name non-controls and third-party isolation. Deactivation remains
-separately bounded and tested at the protocol fixture boundary; the live gate does
-not yet certify every Matrix command, history/file operation or server workflow.
+The selected backend never invokes another backend as a fallback. The shared
+JavaScript agent IPC tool and Pi extension are intentional common assets, not
+another server/controller implementation. C# runtime images need no Node backend.
+The explicitly approved Knex migration container remains Node-based for every
+implementation. Claude stays unimplemented.
 
-Private filesystem operations use Linux descriptor-relative, non-symlink opens,
-owned-file metadata, bounded reads and atomic durable writes. SQLite file opening
-uses that owner. Full filesystem/native lifecycle coverage remains a release gate.
+Package boundaries also match semantically: the layout gate checks 19 Node/C#
+package pairs, not just similarly named language directories. C#'s HTTP transport
+project corresponds to the browser-safe Node client. Its process/TOML projects
+isolate .NET-specific native transport and parsing; Node uses its standard-library
+process APIs and the pinned TOML library inside their concrete adapter owners.
+Shared agent-tool/Pi JavaScript assets and operator/test tooling have one owner,
+not redundant C# copies. The daemon apps retain only API/host composition and the
+explicit controller context-migration command in both languages.
 
-## EF build-time corrections
+## Corrections from integrated verification
 
-SDK and matching EF packages are pinned to .NET 11 RC1.
-Build-only compiler sources pin upstream commit
-`c22dd77aa7f7392f997cf779f0c23e0b9aab1988`; original MIT notices remain intact.
-They are not a production runtime dependency.
+- One web build owner prepares assets and compiled helper exports. Backend/release
+  builds consume them rather than rebuilding/deleting an active shared UI tree.
+- C# HTTP transport omits bearer credentials on public operations, sends no GET
+  body and serializes `{}` for bodyless JSON POST operations. Owner-DM, typing
+  and recovery requests are corrected at their transport owner.
+- Both implementations inspect unstarted contexts without creating work areas.
+  Dangling links, foreign ownership and shared-writable ancestors fail closed.
+- Both listeners fence actual native publication during unread queries, not idle
+  watch metadata or read-only acquisition. Cursor identity is semantic and checked
+  again before committing asynchronous query results.
+- Pausing releases only ordinary publication plans whose native sends have never
+  been attempted, including empty plans. Matrix messages remain unread; attempted,
+  uncertain and delivered native evidence cannot be discarded. Both languages
+  cover these transitions without weakening checkpoint or stop-receipt guards.
+- C# reporting distinguishes delivery-generation cancellation from real transport
+  failure, matching Node. Deterministic barriers cover registration cancellation,
+  old-run cleanup, rapid pause/resume, reuse, exact disposal counts and actual
+  failure. Native close uses the final authenticated activity; controller-generation
+  and stop-receipt guards remain intact.
+- Installed managed controllers receive independent standard streams before
+  background startup. CLI completion no longer waits on inherited controller pipes.
+  Published executables have explicit owner-safe executable permissions.
+- Node runtime staging includes its declared compiled first-party dependency
+  closure, not tests, TypeScript source, unrelated products or C# source. C#
+  publication excludes EF design/compiler/MSBuild tooling.
+- Container assertions have one language-independent owner. The selected real
+  operator, rootless image, Knex migration, Element and persistent restart run
+  instead of a simulated container or substitute backend.
+- The common coordinator runs Element's first-run public-room scenario before
+  API cases seed rooms, with an explicit empty-room precondition. Every target
+  retains the same room creation, attachment download and persistence assertions.
+- Node and C# container-command owners create, attach, stop and remove by exact
+  identity. Docker automatic removal no longer races explicit operator cleanup.
+  Client process groups are isolated, cancellation also covers build/migration,
+  and the unchanged shared fixture still signals the whole foreground group.
+- EF's build-only compiler/host use the selected SDK's proper restore-then-build
+  invocation. Calling `Restore;Build` inside one already evaluated project lost
+  NuGet-generated build-host content on a genuinely cold build; warm local output
+  had hidden it. Actual cold container publication verifies the owning fix.
+- Container timezone data is compiled from the checksum-pinned IANA `2026c`
+  archive and must match Node's pinned ICU release, including historical aliases.
+  A moving Alpine package cannot silently change C# calendar behavior. Shared
+  process observations distinguish signal termination from a running child.
 
-Confirmed corrections are made at their owning generator:
-- Emit the nullable annotation context before generated code.
-- Recognize strongly typed DbContext method parameters.
-- Translate captured method parameters and ordinary anonymous-object shorthand.
-- Preserve native numeric literal carriers and semantic conversions.
-- Keep generated-file constants, accessors, translator caches and namespaces
-  scoped to their owning file instead of leaking into subsequent files.
-- Register design services explicitly in compilation roots.
-- Scope queries to their actual DbContext; preserve constructor-free captured
-  scalar analysis, sealed-type materializers and independently filtered joins.
-- Bind only DbSet roots before compilation; keep actual caller paging and
-  nullable/Boolean/conditional values instead of folding compiler placeholders.
-- Preserve implicit native argument conversions and original captured-array paths
-  for first-class span operations; bind every boxed/nullable ExecuteUpdate setter.
+## Verification evidence
 
-No generated output is patched afterward. Callers are not required to introduce
-artificial local aliases or redundant annotations to compensate for these defects.
-Native acceptance executes the same repository queries and writes as managed code.
+Run `npm run verify:parity -- /absolute/new-evidence-directory` inside the finite
+Linux scope in [shared contracts](../verification/shared-contracts.md). It
+serializes builds and gates: never rebuild a worktree while tests still consume
+its `dist/`, package or native output.
 
-Native/trimming warnings remain visible and require audit. Warning counts alone
-do not establish runtime bugs or prove that a major EF runtime fork is needed.
-The earlier fork/direct-SQLite decision proposal is **superseded** by the owner's
-managed-plus-NativeAOT approval. EF and .NET 11 are not replaced.
-
-## Native engine progress
-
-The last completed runtime gate passes 465 checks in each managed and NativeAOT
-output against stock Codex 0.162.1 and an inert local provider. It covers private
-process ownership, protocol bounds/cancellation/deadlines, exact advertised native
-settings, API-backed message evidence, durable restart recovery, actual turn
-interruption before replacement input, and developer instruction injection with
-read-only native-history evidence. Unchanged instructions are stored once and
-do not execute a model turn. Actual process restarts preserve the same native
-history; an unsent original message is retained verbatim in a private file and
-supplied through a newly verified restart instruction. No paid provider is used.
-
-Scoped Codex histories, reset, authentication refresh, attachment metadata,
-observations and owner decisions pass that preceding gate. Pinned Earendil Pi
-1.0.0 runs its shared owned extension through real RPC, including tools, cached
-usage, hard interruption, owner questions, shared/per-room isolation, auth
-refresh, reset and uncertain-original recovery. Eighteen focused Node Codex/Pi
-regressions also pass. Those results precede the current listener/controller/CLI
-and protocol-writer edits and do not certify them. The preceding runtime publish
-has no trim/AOT warnings; the separate server EF warning audit is unfinished.
-
-## Written integration and remaining verification
-
-| Area | Remaining completion requirement |
+| Gate | Current result |
 |---|---|
-| Portable API | All 92 operations are bound; integrated executable-level contracts are written but unrun |
-| Domain/data | Fleet, enrollment, rooms, wake-ups, publication, decisions, telemetry and retention are written; rerun complete integrated evidence |
-| Schema | Shared Knex owner, backup/migration container and direct same-file reopening are written; new operator/container wiring remains unverified |
-| Matrix/listener | Sync/history/files, authorization, hard steering, owner output/decisions, typing, schedules and maintenance are written; execute shared actual-Conduit scenarios |
-| Native engines | Existing 465-check managed/AOT checkpoint is green; latest integration/protocol changes require rerun |
-| fleetd | Native lifecycle, durable unfinished work/intents, reset export, controller lease, failure/stop receipts, enrollment and all 19 daemon operations are written; integration unverified |
-| Fleet CLI | Local/SSH commands, no-question setup, installed sibling controller launch, software updates, contexts and terminal pointers are written; integration unverified |
-| Distribution | Managed/self-contained and actual AOT publication for all three products, common UI/tools and owned container cleanup are written; builds not run |
-| Shared tests | One executable matrix and service-owned scenarios cover Node/C#/Rust without backend-specific assertions; every selected target runs both native engines |
-| UI/gates | Execute shared real browser checks, full applicable Node/C# suites, containers/distributions, architecture, EF diagnostic audit and performance review |
+| Architecture | 33 architecture assertions, 8 layout/negative fixtures, 19 semantic package pairs and 29 C# projects pass |
+| Full Node bank | 878 tests, 191 files, 24 isolated workers; zero failed/cancelled/skipped |
+| Managed solution | Zero compiler warnings/errors |
+| C# controller ownership | 28 assertions in managed and NativeAOT |
+| C# SQLite/domain/HTTP core | 779 assertions in each mode |
+| C# actual Conduit authority | 490 assertions in each mode |
+| C# actual Codex/Pi and protocol acceptance | 517 assertions in each mode |
+| Calendar parity | 2,072 comparisons in each mode |
+| Same-file SQLite and cross-process locking | All six Node/managed/AOT directions; forced-exit lock recovery |
+| Historical data | Schema 13/14/15/16 to 17; 16 schema-13/14/rollback/unsupported-version cases |
+| Standalone C# products | Server, daemon and CLI built in managed and NativeAOT modes |
+| Shared installed-product matrix | All 40 tests pass on each of Node, managed C# and NativeAOT |
+| Real container matrix | All 46 tests pass, including Element, media, React, exact container cleanup and cross-backend restarts; zero failed/cancelled/skipped |
+| Actual Knex migration container | Empty/schema-13/current stores advance successfully; future schema 18 is rejected without changing data |
 
-The coding closure review replaces untracked startup restoration with the same
-per-instance recovery owner used after failure. Start results are installed under
-the controller's state lock only while their cancellation and saved desired intent
-still permit it. Individual/fleet stop and daemon shutdown wait for unresolved
-startup cleanup. Lifetime callbacks are registered outside that lock and retained
-only for the still-current runtime. Recovery startup concurrency remains bounded.
-Service-owned internal cases hold startup at a deterministic barrier and check
-these races, stop completion and exact-history resume in both .NET build modes.
+The complete serialized command exits successfully. Its nine phases are
+architecture, full Node, C# internal/native, managed publication, NativeAOT
+publication, strict matrix generation, shared installed-product contracts,
+real container contracts and actual Knex migration-container verification.
+The local evidence directory is `/tmp/crossfire-parity-completion-20261015`;
+its summary records every phase, duration, exit result and bounded log.
 
-Instance cleanup has one owner on both failed initialization and normal shutdown.
-It attempts receiver, observer, activation and native cleanup even after another
-step fails; a native-close receipt and listener-ownership release require actual
-native disposal. Connection, activity, decision and report owners expose the same
-in-progress disposal task to every caller instead of returning early. The shared
-large-input fixture pauses delivery before queuing its batch, avoiding a timing
-assumption about debounce. These final changes are written, not verified.
+The shared scenarios cover every protected canonical route's authentication,
+strict envelopes, signup/origin/CSRF, host-only cookies, exact name collisions,
+owner/room isolation, decisions, controller/native-close receipts, static report
+upload/deletion and an actual browser's opaque-origin sandbox. They also run
+actual Codex/Pi chat, source attribution, immediate mention interruption of held
+native work, owner-DM receipt/acceptance, large-message files, room/global/unread
+queries, exact-history stop/restart/resume, CLI/SSH trust and mobile/desktop React.
+Each backend reopens the identical SQLite file without import/export or reset.
 
-The same review removes a reversed C# dependency: the setup descriptor is now a
-pure Crossfire domain value, with wire parsing owned by contracts. Canonical UUID
-syntax belongs to the kernel, not HTTP validation. Fleetd's runtime port exposes
-listener activity as a value rather than the concrete listener control owner.
-The root architecture gate now checks service-owned C# project references, pure
-domain imports and build/runtime dependency separation, with negative fixtures.
-Publication disables persistent compiler/build servers so its work cannot reuse
-an unbounded server outside the selected resource scope. These gates are unrun.
+The schema remains application ID `1129465426`, version 17: 63 application tables,
+111 mapped foreign keys, 93 explicit indexes and 26 triggers. Generated model and
+REST catalogs are checked for drift. All 120 external npm dependency records are
+byte-for-byte unchanged from main; NuGet pins are unchanged.
 
-The owner explicitly requested completing code before running further tests.
-No new build, test, lint or deployment gate has been started in this coding phase.
-Implementation being written is **not release certification**. There is no
-production release/deployment/publication or Rust completion claim. Rust remains
-in its separately authorized worktree and PR.
+The shared executable run also records 100 sequential authenticated SQLite policy
+reads after 10 warmups, including loopback TLS and its proxy: Node p50/p95
+6.25/7.93 ms, managed C# 17.67/24.79 ms and NativeAOT 16.55/21.72 ms. These are
+observations from concurrent functional-test targets, not an isolated throughput
+benchmark, a latency SLA or a claim that EF/NativeAOT universally beats Tinqer.
+Calendar execution covers the same 2,072 cases in 117 ms managed and 39 ms AOT
+on this host; those timings likewise do not replace correctness assertions.
 
-The shared integration suite supplies executable commands, not alternate expected
-values. It checks protected routes, signup/origin/CSRF, exact enrollment and
-identity collisions, native invitation/DM authority, controller/decision receipts,
-static publications, wake revisions, real native model settings, immediate
-steering/DM evidence, large-file delivery, scoped/global/unread queries, saved
-history/stop intent, actual CLI and unchanged mobile/desktop React. Configured
-servers reopen the identical SQLite file. Node plus both C# modes form this PR's
-matrix; Rust joins the same scenarios when its separate output is available.
-Internal unit tests and full release gates remain necessary beyond these cases.
+## NativeAOT diagnostic audit
 
-## Verification discipline
+The SDK is pinned to `11.0.100-rc.1.26425.128`; EF/SQLite packages to
+`11.0.0-rc.1.26425.128`. These remain preview dependencies. The owner approved both
+outputs, with initial managed deployment permitted after verification. Build
+selection is explicit; no executable falls back to managed or Node execution.
 
-The two prior Codex failures reproduced on unchanged baseline source. Inspection
-showed test assumptions, not adapter defects: interrupted queued input was already
-durably recorded, and the stop fixture allowed native work to finish before the
-control arrived. Corrections preserve exact payload/turn/receipt assertions and
-hold native I/O where the test is exercising cancellation. All three focused
-real-Codex cases pass. Fake tests of genuinely unrecorded-input replay remain.
+The NativeAOT server publication emits 1,007 visible IL diagnostics in this run. They are not
+suppressed or converted into a warning-free claim. Counts describe emitted
+diagnostics, not independent defects or stable totals across incremental builds.
+The separate runtime-adapter NativeAOT publication is clean.
 
-Earlier Conduit preparation deadlines cleared without restarting Docker or other
-projects. Full Node verification now runs all 186 files with real Conduit,
-Codex, Pi, browser and fleet integration. Final integrated evidence belongs to
-the dated necessity ledger. Targeted passes are not substitute full gates.
-Native fixtures establish recorded input before asserting no replay and preserve
-verified input on cancellation; a held model response does not imply native
-receipt persistence is held.
+| Diagnostic family | Reviewed owner and disposition |
+|---|---|
+| IL2026 | Annotated EF DbContext/query entrypoints, including owned query call sites. Generated model and query interceptors execute in actual AOT CRUD, joins, retention, HTTP and Matrix tests. This is execution evidence, not a claim that arbitrary EF queries are trim-safe. |
+| IL3050, IL3051 | EF/BCL dynamic generic, expression and provider paths. Native tests disable dynamic code and reflection JSON. The product exposes fixed owned queries, not arbitrary LINQ/models/plugins; no managed fallback exists. |
+| IL2046, IL2092, IL2093 | Retained EF implementation/interface annotation mismatches. Pins remain explicit; supported-path tests do not certify unused provider APIs. |
+| IL2055, IL2060, IL2062, IL2067, IL2069, IL2070/71/72/74/75/76, IL2081/87, IL2090/91, IL2111 | Generic reflection/metadata annotations in EF/BCL dependencies. All 63 entities and actual relationships have generated metadata. Changed queries/models require native verification again; these diagnostics are not blanket waivers for new code. |
+| IL3002 | EF Spatialite assembly-file discovery. The application schema has no Spatialite feature, dynamic-extension API or assembly-location dependency. The retained provider diagnostic remains visible. |
 
-The actual isolated Knex migration container passes fresh initialization,
-schema-13 upgrade, repeat schema-17 execution and schema-18 rejection.
-Upgrade code stops writers, verifies a backup when needed, runs the migration
-container and starts the server only after success. Production remains unchanged.
+Compiler corrections stay in their owning pinned build-time generator, not
+post-generation patches or caller workarounds. Upstream commit
+`c22dd77aa7f7392f997cf779f0c23e0b9aab1988` and its MIT notices are unchanged.
+The generator handles native carriers/conversions, captured parameters, roots,
+joins and updates; production contains none of its tooling. Captured-expression
+evaluation explicitly requests interpretation rather than JIT.
 
-All verification uses bounded process-group resources. Production stores,
-research originals, user histories and shared checkouts are untouched. Recreated
-fixtures, compiler output and caches are removed after their last required use;
-concise evidence is retained instead of fixture trees.
+This audit does **not** establish that the complete EF framework is warning-free
+or support arbitrary reflected types/dynamic queries. It records the approved
+preview-framework risk separately from demonstrated supported-product behavior.
+
+## Scope and resources
+
+All gates have finite process-group memory, swap and task limits. Docker's finite
+aggregate slice contains its test process, build steps and actual containers.
+Fixtures use inert local providers and actual stock Codex 0.162.1, Pi 1.0.0 and
+pinned Conduit, not paid providers or production accounts. Linux x64 is the
+verified target, not macOS or arbitrary host/runtime versions.
+
+Disposable fixtures, databases, native test homes, build output and verification
+caches are removed after their last use; concise evidence is retained. Active
+resources, source worktrees, credentials, production state, research originals
+and saved user/native histories are never cleanup targets.
+
+Final cleanup removes 90 inactive generated directories (3.76 GiB logical), six
+failed task-owned build containers and 30 task-owned image tags. Shared/preexisting
+images, dependency caches and other worktrees remain untouched; no global Docker
+prune is performed. The worktree retains 8.6 MiB of concise test evidence.
+
+No deployment, npm publication, paid-provider quality certification, Rust sign-off,
+production data change or automatic PR creation is part of this review.

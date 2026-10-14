@@ -69,9 +69,9 @@ public sealed class HistoryQueries
         try { return await AgentIO.Boundary(async () =>
         {
             if (input.Kind == "unread" && publishing()) return Results.Fail<JsonElement>("conflict", "The receiver is settling another publication; use history browsing or retry catch-up after settlement");
-            var authority = await Allowed(scope.Token); if (!authority.IsSuccess) return Result<JsonElement>.Fail(authority.Error); var (policy, allowed) = authority.Value;
+            var original = ReceiveState.Load(storage, file); var authority = await Allowed(scope.Token); if (!authority.IsSuccess) return Result<JsonElement>.Fail(authority.Error); var (policy, allowed) = authority.Value;
             if (input.Room is not null && !allowed.Contains(input.Room) || input.Cursors.Keys.Any(room => !allowed.Contains(room))) return Results.Fail<JsonElement>("forbidden", "Requested room is outside current agent access");
-            var original = ReceiveState.Load(storage, file); ReadBatch batch;
+            ReadBatch batch;
             if (input.Kind == "unread")
             {
                 if (storage.Exists(pendingFile)) return Results.Fail<JsonElement>("conflict", "A previous unread query needs its acknowledgment before another catch-up"); if (input.Cursors.Count != 0) return Results.Fail<JsonElement>("invalid", "Unread queries use saved delivery checkpoints, not supplied history cursors");

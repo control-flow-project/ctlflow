@@ -4,12 +4,12 @@
     <EFStartupAssembly>$(CrossfireEfHostOutput)Crossfire.EfHost.exe</EFStartupAssembly>
   </PropertyGroup>
   <Target Name="CrossfirePrepareEfHost" Condition="'$(_EFGenerationStage)'=='$(EFScaffoldModelStage)' Or '$(_EFGenerationStage)'=='$(EFPrecompileQueriesStage)'">
-    <MSBuild Projects="$(MSBuildThisFileDirectory)Crossfire.EfCompiler/Crossfire.EfCompiler.csproj"
-             Targets="Restore;Build"
-             Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=$(TargetFramework);RuntimeIdentifier=;SelfContained=false;PublishAot=false;_EFGenerationStage=$(_EFGenerationStage)" />
-    <MSBuild Projects="$(MSBuildThisFileDirectory)Crossfire.EfHost/Crossfire.EfHost.csproj"
-             Targets="Restore;Build"
-             Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=$(TargetFramework);RuntimeIdentifier=;SelfContained=false;PublishAot=false;_EFGenerationStage=$(_EFGenerationStage);CrossfireEfTargetName=$(MSBuildProjectName);CrossfireEfTargetProject=$(MSBuildProjectFullPath);RestoreRecursive=false;BuildProjectReferences=false" />
+    <Error Condition="'$(DOTNET_HOST_PATH)'==''" Text="EF native query compilation requires the selected dotnet SDK host." />
+    <PropertyGroup>
+      <_CrossfireEfBuildArguments>--disable-build-servers --configuration &quot;$(Configuration)&quot; --framework &quot;$(TargetFramework)&quot; -p:Platform=&quot;$(Platform)&quot; -p:RuntimeIdentifier= -p:SelfContained=false -p:PublishAot=false -p:UseSharedCompilation=false -p:_EFGenerationStage=&quot;$(_EFGenerationStage)&quot;</_CrossfireEfBuildArguments>
+    </PropertyGroup>
+    <Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; build &quot;$(MSBuildThisFileDirectory)Crossfire.EfCompiler/Crossfire.EfCompiler.csproj&quot; $(_CrossfireEfBuildArguments)" />
+    <Exec Command="&quot;$(DOTNET_HOST_PATH)&quot; build &quot;$(MSBuildThisFileDirectory)Crossfire.EfHost/Crossfire.EfHost.csproj&quot; $(_CrossfireEfBuildArguments) -p:CrossfireEfTargetName=&quot;$(MSBuildProjectName)&quot; -p:CrossfireEfTargetProject=&quot;$(MSBuildProjectFullPath)&quot; -p:RestoreRecursive=false -p:BuildProjectReferences=false" />
   </Target>
   <Target Name="OptimizeDbContext" DependsOnTargets="ResolvePackageAssets;CrossfirePrepareEfHost">
     <PropertyGroup>

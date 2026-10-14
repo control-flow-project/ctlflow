@@ -1,0 +1,18 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".."
+  },
+  "include": [
+    "apps/**/*.ts",
+    "packages/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "tools/**/*.ts",
+    "../tests/contracts/**/*.ts"
+  ],
+  "exclude": [
+    "scripts/architecture-proof/*.test.ts",
+    "scripts/verify-architecture.ts"
+  ]
+}

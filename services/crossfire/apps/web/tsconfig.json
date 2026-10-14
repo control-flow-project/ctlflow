@@ -1,5 +1,20 @@
 {
-  "extends": "../../tsconfig.core.json",
-  "compilerOptions": { "lib": ["ES2023", "DOM", "DOM.Iterable"], "jsx": "react-jsx", "noEmit": true, "types": ["react", "react-dom"] },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "types": [
+      "react",
+      "react-dom"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ]
 }

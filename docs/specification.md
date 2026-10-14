@@ -24,32 +24,72 @@ The repository contains exactly three product roots:
 ```text
 services/
   crossfire/
-    apps/server/
     apps/web/
-    packages/
-      agent-tools/assets/
+    node/
+      apps/server/
+      packages/
+        agent-tools/assets/
+      tests/
+      scripts/
+      tools/
+      Dockerfile
+    csharp/
+      apps/Crossfire.Server/
+      packages/
+      tests/
+      build/
+      scripts/
+      Dockerfile
     database/<database>/<backend>/migrations/
     database/<database>/<backend>/seeds/
     knexfile.<database>.mjs
-    tests/
+    tests/contracts/
     scripts/
-    tools/
     docs/
   fleetd/
-    apps/daemon/
-    packages/domain/
-    packages/contracts/
-    packages/storage/
-    tests/
-    tools/
+    node/
+      apps/daemon/
+      packages/
+      tests/
+      scripts/
+      tools/
+    csharp/
+      apps/Fleetd.Daemon/
+      packages/
+      tests/
+    tests/contracts/
   fleet/
-    apps/cli/
-    packages/daemon-client/
-    packages/ssh-transport/
-    tests/
+    node/
+      apps/cli/
+      packages/
+      tests/
+      scripts/
+    csharp/
+      apps/Fleet.Cli/
+      packages/
+    tests/contracts/
 ```
 
 Every product owns its applications, packages, tests and product-specific assets.
+Node and C# implementations use matching language-local apps/packages/tests
+ownership. C# project and file names follow .NET conventions; native libraries,
+EF build-time compilation and generated output retain their actual framework
+owners rather than artificial copies. Product-level database assets, documentation,
+the single React project and external contract assertions remain shared.
+Fleetd's concrete execution composition is a language-local adapter package in
+both implementations. It owns enrollment, native lifecycle wiring, reporting,
+stop receipts and reset execution; the daemon application wires that adapter to
+its domain and private API. Architecture verification checks semantic package
+pairs and rejects execution source reintroduced into the daemon application.
+Container operators likewise have one lifecycle owner: create an exact container
+identity, attach, stop on cancellation and confirm removal by that identity.
+Automatic Docker removal must not compete with the operator's explicit cleanup.
+Docker client processes have isolated owned process groups, so foreground-group
+signals reach the operator before it deliberately stops its owned containers.
+The root product npm manifest owns the public Node archive and its service-local
+dist output; .NET projects own managed/NativeAOT output. Those build conventions
+do not create alternate source readers or backend fallbacks. The browser project
+uses the root compiler policy, not either backend's project configuration.
 The root contains workspace/build coordination, repository instructions,
 documentation and shared verification tooling; it contains no application source
 or repository-wide package pool. Cross-project reuse is through declared package
@@ -71,7 +111,7 @@ fallbacks. One shared React management project remains authoritative. API routes
 validation, authentication, authorization and persisted SQLite representations
 must remain interchangeable across implementations, without an import/export or
 database reset. See [native implementation readiness](architecture/native-implementations.md)
-for the implementation plan, dependency evidence and current uncompleted scope.
+for verification evidence, dependency diagnostics and explicit evidence limits.
 Only concrete, supported capabilities have packages. Every agent belongs to a
 fleet managed by fleetd, including a one-agent fleet. There is no standalone
 deployment, existing-session attachment, optional controller or detach-to-direct
@@ -589,7 +629,7 @@ a descriptor persisted as restart authority.
 
 Only composition roots select concrete runtime adapters. Native terminal
 arguments, authentication and session selection live in
-`services/crossfire/packages/adapter-codex`, reused through declared exports.
+`services/crossfire/node/packages/adapter-codex`, reused through declared exports.
 Each adapter declares approval ownership as `none`, `runtime` or `listener`.
 Owned-runtime configuration validation reports that capability before enrollment;
 live connections report the effective native policy after session selection.
@@ -904,6 +944,14 @@ failures cannot cancel a replacement generation. Native stop receipts retain the
 original tuple and cannot authorize retirement after lease replacement. Expired
 proofs are not retried by the current-generation worker or presented as current
 connection errors; explicit retirement still rejects that stale evidence.
+
+Pausing delivery releases ordinary chat plans whose native steps are all still
+prepared, including empty checkpoint-only plans. This never advances a Matrix
+cursor or drops a message: the original records remain unread for explicit tools
+or later delivery. A publishing, uncertain or delivered native step is not an
+unsent reservation and cannot be discarded this way. Its exact receipt/checkpoint
+must still settle before a conflicting unread mutation. The same rule applies to
+the controller gate and an explicit source-control pause.
 
 The private controller `desired-intent.json` stores activation separately from
 observed execution. Its key pairs are bounded to 100 fleets and 100 instances

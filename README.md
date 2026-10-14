@@ -37,9 +37,9 @@ installation/build/test children inside one verified finite process-group scope:
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
-  --property=TasksMax=4096 /bin/bash -c \
-  'npm ci --ignore-scripts && npm run typecheck && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
+  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
+  --property=TasksMax=8192 /bin/bash -c \
+  'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
 `npm test` builds once and runs isolated test files across available cores.
@@ -50,10 +50,15 @@ The pinned SQLite package includes the verified Linux native binary; source
 compilation is required only on platforms without a usable bundled binary.
 Tests use disposable private state, Conduit and inert providers, not production
 credentials or paid models.
-The C# source targets .NET 11 with managed and NativeAOT outputs. Its latest
-integration changes are not yet verified or deployed. Implementations share one
+The complete gate also requires the pinned .NET 11 SDK and native AOT toolchain.
+It builds managed and NativeAOT distributions and runs the same API, native-engine,
+CLI, browser, container and migration assertions against all three targets.
+Implementations share one
 React UI, REST/daemon contracts and Knex-created SQLite representation; the
-shared contract suite accepts explicit backend executables.
+shared contract suite accepts explicit backend executables. Source lives under
+each product's `node/` and `csharp/` owners; UI, database and external contracts
+remain shared. Current evidence and framework/provider limits are in
+[implementation readiness](docs/architecture/native-implementations.md).
 - [Test selection, prerequisites and evidence](docs/development.md)
 
 ## License

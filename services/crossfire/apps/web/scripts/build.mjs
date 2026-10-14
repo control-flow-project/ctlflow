@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,6 +7,9 @@ const project = fileURLToPath(new URL('../', import.meta.url));
 const output = process.argv[2] ?? join(project, 'dist');
 if (process.argv.length > 3 || !isAbsolute(output)) throw new Error('Select one explicit absolute UI output directory');
 mkdirSync(output, { recursive: true });
+const source = join(project, 'src'), modules = join(output, 'modules');
+rmSync(modules, { recursive: true, force: true });
+await build({ entryPoints: readdirSync(source, { recursive: true }).filter(file => file.endsWith('.ts') && !file.endsWith('.d.ts')).map(file => join(source, file)), outdir: modules, outbase: source, platform: 'browser', format: 'esm', target: 'es2023' });
 const result = await build({ entryPoints: { app: join(project, 'src/main.tsx') }, outdir: join(output, 'assets'), bundle: true,
   entryNames: '[name]-[hash]', metafile: true, platform: 'browser', format: 'esm', target: 'es2023', minify: true, jsx: 'automatic',
   define: { 'process.env.NODE_ENV': '"production"' } });

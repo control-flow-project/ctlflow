@@ -1,4 +1,4 @@
-import { accessSync, constants, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { accessSync, chmodSync, constants, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildProducts, command, products, repository } from './build.mjs';
@@ -8,6 +8,7 @@ const { values, positionals } = parseArgs({ options: { output: { type: 'string' 
 if (positionals.length || !values.output || !isAbsolute(values.output) || !['managed', 'nativeaot'].includes(values.mode)) throw new Error('Use publish-csharp.mjs --output /absolute/new-directory --mode managed|nativeaot');
 if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('This pinned distribution targets Linux x64');
 const resources = verifyTestResources(), output = resolve(values.output), parent = dirname(output);
+process.umask(0o022);
 if (existsSync(output) || !existsSync(parent) || !lstatSync(parent).isDirectory() || lstatSync(parent).isSymbolicLink()) throw new Error('Use a new output directory inside an existing, non-symlink parent');
 const stage = mkdtempSync(join(parent, '.crossfire-publish-')), dotnet = process.env.DOTNET_EXECUTABLE ?? 'dotnet';
 process.env.DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER = '1'; process.env.MSBUILDDISABLENODEREUSE = '1'; process.env.UseSharedCompilation = 'false';
@@ -19,6 +20,7 @@ try {
     mkdirSync(destination);
     await command(dotnet, ['publish', project, '--disable-build-servers', '-c', 'Release', '-r', 'linux-x64', '--self-contained', 'true', '-p:PublishAot=' + (values.mode === 'nativeaot'), '-p:UseAppHost=true', '-p:CppCompilerAndLinker=gcc', '-o', destination], repository);
     accessSync(join(destination, executable), constants.X_OK);
+    chmodSync(join(destination, executable), 0o755);
     cpSync(join(repository, 'LICENSE'), join(destination, 'LICENSE'));
   }
   const releases = join(repository, 'services/crossfire/dist/onboarding'), entries = readdirSync(releases);

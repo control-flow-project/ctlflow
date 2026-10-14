@@ -113,28 +113,28 @@ owner verifies the complete current source; this guide does not claim a new run.
 
 The focused cases live in:
 
-- `services/crossfire/tests/runtime-decisions.test.ts`: immutable request binding,
+- `services/crossfire/node/tests/runtime-decisions.test.ts`: immutable request binding,
   exact owner, private answers, expiry, receipts, incident recovery and private
   management-DM permission enforcement.
-- `services/crossfire/tests/runtime-observation.test.ts`: complete visible output,
+- `services/crossfire/node/tests/runtime-observation.test.ts`: complete visible output,
   no reasoning, coalesced streams, immutable retry bodies and typing expiry.
-- `services/crossfire/tests/runtime-history.test.ts`: actual native structured
+- `services/crossfire/node/tests/runtime-history.test.ts`: actual native structured
   questions and persistent exact-context history/terminal attachment proofs.
 - `services/crossfire/scripts/listener-permissions.test.ts`: roomless listeners
   report readiness without creating chats; failed first-use routing denies only
   the pending request; unauthorized established routes do not report ready;
   owner decisions work while paused.
-- `services/crossfire/scripts/native-tests/permissions.test.ts`: stock Codex with
+- `services/crossfire/node/scripts/native-tests/permissions.test.ts`: stock Codex with
   an inert local provider, actual native approval, forbidden/unavailable denial,
   following input in the same session, and an intentional Matrix reply through
   the verified intentional tool in a controller-owned, Git-protected native workspace.
-- `services/crossfire/tests/client-state.test.ts`: real Git privacy and real
+- `services/crossfire/node/tests/client-state.test.ts`: real Git privacy and real
   missing/inaccessible executable diagnostics without credential creation.
-- `services/crossfire/tests/release-awareness.test.ts`: complete verified installed
+- `services/crossfire/node/tests/release-awareness.test.ts`: complete verified installed
   assets and strict actual diagnostic contract without a second installer/receiver.
-- `services/fleetd/tests/execution-validation.test.ts`: generic adapter approval
+- `services/fleetd/node/tests/execution-validation.test.ts`: generic adapter approval
   capabilities without provider-key interpretation.
-- `services/fleetd/tests/controller.test.ts`: actual failure causes, immediate
+- `services/fleetd/node/tests/controller.test.ts`: actual failure causes, immediate
   inactivity, peer independence and cleanup/restart ordering.
 
 Native fixtures explicitly unsubscribe their test-owned setup connection after the listener

@@ -73,7 +73,8 @@ relative imports, Result for expected failures and boundary validation. Split
 modules by responsibility near 600 lines. Domain code imports neither transport
 nor concrete storage/adapter/UI modules. Composition roots wire implementations.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
-relations. Tinqer owns application queries. Raw SQL is schema/metadata only.
+relations. Tinqer owns Node application queries; EF Core owns C# queries.
+Raw SQL is schema/metadata only.
 Expected transaction failures roll back. Native operations stay outside transactions.
 
 ## Execution and security
@@ -126,6 +127,14 @@ pinned browser assets once per run. Unconditional sleeps are forbidden: use
 controlled clocks for timing logic and bounded observations for native I/O.
 Fixtures dispose owned resources in reverse acquisition order. Record selected
 runtimes, per-file timings and any failures without weakening assertions.
+
+Remove automatically regenerated test fixtures, databases, native test homes,
+build output and verification caches after their last required use. Check disk
+use periodically during long verification runs and retain concise evidence, not
+accumulated fixture trees. Never remove active resources, source worktrees,
+credentials, production state, research originals or saved user/native histories.
+Node and C# must keep symmetric service ownership and semantic source structure;
+language/framework differences must be explicit and justified, not hidden paths.
 
 ## Git
 Never commit/push main, force-push, reset/clean/stash shared work or create PRs.

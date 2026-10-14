@@ -24,9 +24,9 @@ public static partial class DaemonLauncher
             while (ownership is null) { linked.Token.ThrowIfCancellationRequested(); try { ownership = new(Path.Combine(root, "launcher")); } catch (IOException) { await Task.Delay(TimeSpan.FromMilliseconds(100), clock, linked.Token); } }
             using var client = new Client(Path.Combine(root, "fleetd.sock")); var previous = await Call(client, "status", linked.Token);
             if (previous.IsSuccess) { ValidateStatus(previous.Value, name); return previous.Value; } if (previous.Error.Code != "unavailable") throw new CommandFailure(previous.Error.Message);
-            var executable = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "fleetd", "fleetd")); PrivateFiles.Executable(executable); var start = new ProcessStartInfo("/usr/bin/setsid") { UseShellExecute = false, WorkingDirectory = root };
+            var executable = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "fleetd", "fleetd")); PrivateFiles.Executable(executable); var start = new ProcessStartInfo("/usr/bin/setsid") { UseShellExecute = false, WorkingDirectory = root, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (var item in new[] { "--", executable, "--root", root, "--artifacts", ReleaseDirectory, "--background" }) start.ArgumentList.Add(item); if (name is not null) { start.ArgumentList.Add("--name"); start.ArgumentList.Add(name); }
-            using var process = Process.Start(start) ?? throw new CommandFailure("Cannot start the installed native fleet controller"); var ready = false;
+            using var process = Process.Start(start) ?? throw new CommandFailure("Cannot start the installed native fleet controller"); process.StandardInput.Close(); process.StandardOutput.Close(); process.StandardError.Close(); var ready = false;
             try
             {
                 for (;;)
