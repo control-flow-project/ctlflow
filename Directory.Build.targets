@@ -1,0 +1,3 @@
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)services/crossfire/csharp/build/NativeQueries.targets" />
+</Project>

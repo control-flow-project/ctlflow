@@ -12,13 +12,7 @@ public static class MatrixJson
         .Replace("%27", "'", StringComparison.Ordinal).Replace("%28", "(", StringComparison.Ordinal)
         .Replace("%29", ")", StringComparison.Ordinal).Replace("%2A", "*", StringComparison.Ordinal);
 
-    public static JsonElement Object(Action<Utf8JsonWriter> write)
-    {
-        using var output = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(output)) { writer.WriteStartObject(); write(writer); writer.WriteEndObject(); }
-        using var document = JsonDocument.Parse(output.ToArray());
-        return document.RootElement.Clone();
-    }
+    public static JsonElement Object(Action<ProtocolWriter> write) => WireJson.Object(write);
 
     public static string? Text(JsonElement input, string key, int maximum = 255)
     {

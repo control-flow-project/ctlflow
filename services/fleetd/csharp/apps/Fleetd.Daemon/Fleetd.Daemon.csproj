@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>fleetd</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="Crossfire.Kernel.Results" Alias="Results" />
+    <ProjectReference Include="../../packages/Fleetd.AdapterExecution/Fleetd.AdapterExecution.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterCodex/Crossfire.AdapterCodex.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterPi/Crossfire.AdapterPi.csproj" />
+  </ItemGroup>
+</Project>

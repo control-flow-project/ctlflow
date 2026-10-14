@@ -28,6 +28,9 @@ services/
     apps/web/
     packages/
       agent-tools/assets/
+    database/<database>/<backend>/migrations/
+    database/<database>/<backend>/seeds/
+    knexfile.<database>.mjs
     tests/
     scripts/
     tools/
@@ -57,6 +60,11 @@ three products. On 2026-10-14 the owner authorized a separate parallel Rust
 worktree, superseding the initial C#-before-Rust sequencing gate. Each native
 implementation requires complete capability parity and successful verification
 before release.
+Enrollment roster digests use explicit English (`en-US`) collation for metadata
+keys, instance keys and sender identities, stable ties, ordinal permission order
+and compact well-formed JSON bytes. Host locale must not change an enrollment's
+identity. Native implementations preserve the same bytes, including Unicode and
+escaped unpaired UTF-16 surrogates.
 The C# target is .NET 11 NativeAOT with EF Core and SQLite. This is an explicit
 language-selection exception, not permission for legacy interfaces or runtime
 fallbacks. One shared React management project remains authoritative. API routes,
@@ -697,8 +705,9 @@ against declared dependencies and semantic directions, including negative fixtur
 The useful reference patterns are Lesser's singular relational names, explicit
 repository interfaces, functional per-operation modules and row/entity mappers;
 and Snapped's transport/domain separation, composition, per-operation permission
-checks and batched read projections. Frameworks, process counts, historical
-migration machinery and unimplemented database backends are not requirements.
+checks and batched read projections. Their database-name/backend nesting, Knex
+configuration and one-shot migration containers are required for all SQL stores
+and language implementations. Unimplemented database backends remain unsupported.
 
 ### Naming and source conventions
 
@@ -734,7 +743,8 @@ no placeholder alternative backend.
 | Component | Sole responsibility |
 | --- | --- |
 | Domain | Identity, role/permission evaluation, enrollment, name allocation, desired room access, invitation provenance, chat wake policy, scheduled Wake-up rules/claims, listener activity, notices, policy and audit intent. |
-| SQLite adapter | One schema, integrity constraints, Tinqer repositories, row mapping, indexed queries, transactions and page-wide projections. |
+| Database assets | Knex schema creation, versioned forward conversions and reference data; backend-specific nesting and one migration container for all language implementations. |
+| SQLite adapter | Existing-schema validation, Tinqer or EF repositories, row mapping, indexed queries, transactions and page-wide projections; no runtime schema creation/migration. |
 | Matrix adapter | Native account, room, power, membership, media and event operations; map native facts/failures into domain ports. |
 | Calendar adapter | Validate interval/calendar schedules and calculate the next occurrence through the domain's schedule port, with one pinned parser and explicit time-zone semantics. |
 | Server | Configuration, composition, authentication boundary, routing and worker scheduling. |
@@ -2526,13 +2536,26 @@ are in [Public static reports](../services/crossfire/docs/publications.md).
 
 ## 11. Normalized persistence and authorization
 
-One canonical schema and permission catalog own current state. Fresh stores
-initialize schema 17 directly. Inventoried deployed schemas 13–16 advance to 17
-transactionally after a verified backup. Versions 1–12, foreign stores and future
-versions are refused without mutation; there is no historical migration ladder,
-historical runtime reader or reset-on-error behavior.
+One canonical schema and permission catalog own current state. Knex is the sole
+creation/migration owner for all SQL databases and language implementations.
+Service-owned database assets use database/<database>/<backend>/migrations and
+seeds with a per-database knexfile. The current owned SQL store is management
+SQLite; fleetd/fleet file state and Conduit's external RocksDB are not SQL stores.
+Fresh stores initialize schema 17 through Knex. Inventoried deployed schemas
+13–16 advance to 17 transactionally after a verified backup; schema 17 stores
+without Knex history are adopted without changing application data. Versions
+1–12, foreign stores and future versions are refused without mutation. There is
+no historical runtime reader, ORM-created schema or reset-on-error behavior.
 
-The canonical schema has 63 singular tables. The forward migration preserves
+Upgrade deployment stops writers, verifies a private backup, runs a one-shot
+Knex migration container against the shared store and activates the selected
+application only after successful completion. A failure blocks subsequent phases
+without an old-runtime or language fallback. All runtime adapters validate the
+same application identity, version and applied Knex migration filenames before
+using an existing database. The EF model generator reads a Knex-created database.
+
+The canonical schema has 63 singular application tables; Knex owns its two
+tracking/locking tables separately. The forward migration preserves
 immutable identities, native credentials and histories, room/access records,
 receipt and usage history, publications, policy and audit. It converts agent,
 pending/current enrollment and historical archive wake policies into explicit
@@ -2971,9 +2994,11 @@ bypass is justified merely by the proposal.
 
 ### Storage and runtime safety
 
-Tinqer owns all application reads/writes. Raw SQL is restricted to schema,
-configuration and metadata/query-plan inspection. Private store creation and
-credential access remain validated and access-restricted.
+Tinqer owns Node application reads/writes and EF owns C# application reads/writes.
+Knex owns all schema creation/conversion and migration reference-data changes.
+Raw SQL is restricted to migration schema/conversion, configuration and
+metadata/query-plan inspection. Private store creation by the migrator and
+existing-store/credential access remain validated and access-restricted.
 
 Management storage uses the supported SQLite engine's native page-count capacity;
 Crossfire imposes no application-wide database-size ceiling. Reopening an existing
@@ -3508,6 +3533,20 @@ unimplemented; there is no opt-in runtime test flag. Native inert-provider evide
 actual Linux/platform/protocol scope; it does not certify paid model behavior
 or untested macOS execution.
 Per-file output, durations and a machine-readable summary identify slow tails.
+External product behavior has one service-owned contract suite selected through
+an explicit executable/argument matrix for Node, C# managed, actual C# NativeAOT
+and Rust. Assertions do not vary by backend. Root scripts own build/assets/process
+coordination, not behavior. Language-specific unit tests remain for internal
+parsers, compilers, data structures and state transitions. Node participates as
+the direct same-file SQLite reference; selecting C# requires managed and AOT.
+Every configured target runs all scenarios with actual Codex and Pi. Missing or
+failed configured targets cannot be silently skipped. Results name exactly the
+outputs executed; Rust may join from its separate worktree without making Rust
+source a prerequisite of the C# PR. A subset's evidence is never presented as a
+pass for an unselected implementation. Knex alone initializes the shared fixtures;
+backend changes retain the identical database. Complete applicable unit,
+architecture, package, container/browser, warning-audit and performance gates
+remain mandatory beyond this integration suite.
 Test fixtures own distinct directories, databases, runtime homes, ports and
 containers. Tests never mutate production or another fixture's state.
 The service-owned test-support export provides one reverse-acquisition cleanup

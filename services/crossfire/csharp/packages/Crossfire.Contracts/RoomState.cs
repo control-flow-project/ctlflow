@@ -3,7 +3,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Contracts;
 
-public sealed record RoomStateEvent(string Sender, string Type, string StateKey, JsonElement Content);
+public sealed record RoomStateEvent(string Sender, string Type, string StateKey, JsonElement Content, string? EventId = null);
 public sealed record RoomPowers(long OwnerLevel, long Ceiling, long Ordinary, long Message, long Reaction);
 
 public static class RoomState
@@ -18,7 +18,7 @@ public static class RoomState
             var sender = String(value, "sender"); var type = String(value, "type"); var key = String(value, "state_key");
             if (sender is null || type is null || key is null || !value.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Object)
                 return Results.Fail<IReadOnlyList<RoomStateEvent>>("native", "Invalid native state identity");
-            events.Add(new(sender, type, key, content.Clone()));
+            events.Add(new(sender, type, key, content.Clone(), String(value, "event_id")));
         }
         return Result<IReadOnlyList<RoomStateEvent>>.Success(events);
     }

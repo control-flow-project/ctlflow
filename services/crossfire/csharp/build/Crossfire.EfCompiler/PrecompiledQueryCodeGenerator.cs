@@ -31,9 +31,9 @@ public class CrossfirePrecompiledQueryCodeGenerator : IPrecompiledQueryCodeGener
     private readonly CrossfireCSharpToLinqTranslator _csharpToLinqTranslator;
 
     private SyntaxGenerator _g = null!;
-    private IQueryCompiler _queryCompiler = null!;
-    private ExpressionTreeFuncletizer _funcletizer = null!;
-    private RuntimeModelLinqToCSharpSyntaxTranslator _linqToCSharpTranslator = null!;
+    private IDatabase _database = null!;
+    private CrossfireFuncletizer _funcletizer = null!;
+    private NativeModelTranslator _linqToCSharpTranslator = null!;
     private LiftableConstantProcessor _liftableConstantProcessor = null!;
     private RuntimeConstantProcessor _runtimeConstantProcessor = null!;
 
@@ -82,19 +82,19 @@ public class CrossfirePrecompiledQueryCodeGenerator : IPrecompiledQueryCodeGener
         string? suffix = null,
         CancellationToken cancellationToken = default)
     {
-        _queryLocator.Initialize(compilation);
+        _queryLocator.Initialize(compilation, dbContext.GetType());
         _symbols = Symbols.Load(compilation);
         _g = syntaxGenerator;
-        _linqToCSharpTranslator = new RuntimeModelLinqToCSharpSyntaxTranslator(_g);
+        _linqToCSharpTranslator = new NativeModelTranslator(_g);
         _memberAccessReplacements = memberAccessReplacements;
         _liftableConstantProcessor = new LiftableConstantProcessor(null!);
         _constantReplacements.Clear();
         _runtimeConstants.Clear();
         _runtimeConstantProcessor = new RuntimeConstantProcessor();
-        _queryCompiler = dbContext.GetService<IQueryCompiler>();
+        _database = dbContext.GetService<IDatabase>();
         _unsafeAccessors.Clear();
         var contextType = dbContext.GetType();
-        _funcletizer = new ExpressionTreeFuncletizer(
+        _funcletizer = new CrossfireFuncletizer(
             dbContext.Model,
             dbContext.GetService<IEvaluatableExpressionFilter>(),
             contextType,
@@ -147,7 +147,7 @@ public class CrossfirePrecompiledQueryCodeGenerator : IPrecompiledQueryCodeGener
         CancellationToken cancellationToken)
     {
         var queriesPrecompiledInFile = 0;
-        _linqToCSharpTranslator = new RuntimeModelLinqToCSharpSyntaxTranslator(_g);
+        _linqToCSharpTranslator = new NativeModelTranslator(_g);
         _namespaces.Clear();
         _unsafeAccessors.Clear();
         _runtimeConstants.Clear();
@@ -197,8 +197,7 @@ public class CrossfirePrecompiledQueryCodeGenerator : IPrecompiledQueryCodeGener
                     _ => throw new UnreachableException()
                 };
 
-                penultimateOperator = Expression.Lambda<Func<IQueryable>>(penultimateOperator)
-                    .Compile(preferInterpretation: true)().Expression;
+                penultimateOperator = new QuerySource().Visit(penultimateOperator);
 
                 // Pass the query through EF's query pipeline; this returns the query's executor function, which can produce an enumerable
                 // that invokes the query.
@@ -378,10 +377,13 @@ namespace System.Runtime.CompilerServices
         // Compile the query, invoking CompileQueryToExpression on the IQueryCompiler from the user's context instance.
         try
         {
-            return (Expression)_queryCompiler.GetType()
-                .GetMethod(nameof(IQueryCompiler.PrecompileQuery))!
+            var parameters = new Dictionary<string, object?>();
+            preparedQuery = _funcletizer.ExtractParameters(preparedQuery, parameters, parameterize: true,
+                clearParameterizedValues: true, precompiledQuery: true);
+            return (Expression)typeof(IDatabase)
+                .GetMethod(nameof(IDatabase.CompileQueryExpression))!
                 .MakeGenericMethod(returnType)
-                .Invoke(_queryCompiler, [preparedQuery, async])!;
+                .Invoke(_database, [preparedQuery, async])!;
         }
         catch (TargetInvocationException e) when (e.InnerException is not null)
         {
@@ -777,7 +779,7 @@ namespace System.Runtime.CompilerServices
                             continue;
                         }
 
-                        ExpressionTreeFuncletizer.PathNode? evaluatableRootPaths;
+                        CrossfireFuncletizer.PathNode? evaluatableRootPaths;
 
                         // ExecuteUpdate requires really special handling: the function accepts a Func<UpdateSettersBuilder...> argument, but
                         // we need to run funcletization on the setter lambdas added via that Func<>.
@@ -812,6 +814,16 @@ namespace System.Runtime.CompilerServices
                             parameterName = "setters";
                             parameterType = typeof(NewArrayExpression);
                         }
+                        else if (typeof(IQueryable).IsAssignableFrom(operatorMethodCall.Arguments[i].Type))
+                        {
+                            var queryArgument = operatorMethodCall.Arguments[i];
+                            evaluatableRootPaths = _funcletizer.CalculatePathsToEvaluatableRoots(queryArgument);
+                            if (evaluatableRootPaths is null) continue;
+                            var argumentExpression = "queryArgument" + i;
+                            parameterType = evaluatableRootPaths.ExpressionType;
+                            code.AppendLine($"var {argumentExpression} = ({parameterType.Name})((IQueryable){parameterName}).Expression;");
+                            parameterName = argumentExpression;
+                        }
                         else
                         {
                             evaluatableRootPaths = _funcletizer.CalculatePathsToEvaluatableRoots(operatorMethodCall, i);
@@ -830,7 +842,7 @@ namespace System.Runtime.CompilerServices
                             declaredQueryContextVariable = true;
                         }
 
-                        if (!parameterType.IsSubclassOf(typeof(Expression)))
+                        if (!typeof(Expression).IsAssignableFrom(parameterType))
                         {
                             // Special case: this is a non-lambda argument (Skip/Take/FromSql).
                             // Simply add the argument directly as a parameter
@@ -848,7 +860,7 @@ namespace System.Runtime.CompilerServices
                             void GenerateCapturedVariableExtractors(
                                 string currentIdentifier,
                                 Type currentType,
-                                ExpressionTreeFuncletizer.PathNode capturedVariablesPathTree)
+                                CrossfireFuncletizer.PathNode capturedVariablesPathTree)
                             {
                                 var linqPathSegment =
                                     capturedVariablesPathTree.PathFromParent!(Expression.Parameter(currentType, currentIdentifier));

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Fleetd.Contracts/Fleetd.Contracts.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterToml/Crossfire.AdapterToml.csproj" />
+  </ItemGroup>
+</Project>

@@ -14,8 +14,8 @@ public static partial class Validation
         if (input.ValueKind != JsonValueKind.String) return null;
         try
         {
-            var value = input.GetString();
-            return value is not null && WellFormed(value) ? value : null;
+            var parsed = ProtocolJson.Unquote(input.GetRawText());
+            return parsed.IsSuccess && WellFormed(parsed.Value) ? parsed.Value : null;
         }
         catch (InvalidOperationException) { return null; }
     }
@@ -63,6 +63,15 @@ public static partial class Validation
         => input.ValueKind is JsonValueKind.True or JsonValueKind.False
             ? Result<bool>.Success(input.GetBoolean()) : Results.Fail<bool>("invalid", "Expected a boolean");
 
+    public static Result<string?> NullableText(JsonElement input, int maximum = 255, int minimum = 1)
+        => input.ValueKind == JsonValueKind.Null ? Result<string?>.Success(null) : Text(input, maximum, minimum).Map<string?>(value => value);
+
+    public static Result<long?> NullableInteger(JsonElement input, long minimum = 0, long maximum = MaxWireInteger)
+        => input.ValueKind == JsonValueKind.Null ? Result<long?>.Success(null) : Integer(input, minimum, maximum).Map<long?>(value => value);
+
+    public static Result<bool?> NullableBoolean(JsonElement input)
+        => input.ValueKind == JsonValueKind.Null ? Result<bool?>.Success(null) : Boolean(input).Map<bool?>(value => value);
+
     public static Result<string> Choice(JsonElement input, params string[] choices)
         => String(input) is { } value && choices.Contains(value, StringComparer.Ordinal)
             ? Result<string>.Success(value) : Results.Fail<string>("invalid", "Choose one of: " + string.Join(", ", choices));
@@ -90,14 +99,12 @@ public static partial class Validation
         return Result<IReadOnlyList<T>>.Success(values);
     }
 
-    public static bool Identifier(string value) => IdentifierPattern().IsMatch(value);
-    public static bool Name(string value) => NamePattern().IsMatch(value);
-    public static bool UserId(string value) => value.Length <= 255 && WellFormed(value) && UserPattern().IsMatch(value);
+    public static bool Identifier(string value) => IdentitySyntax.Identifier(value);
+    public static bool Name(string value) => IdentitySyntax.Name(value);
+    public static bool UserId(string value) => WellFormed(value) && IdentitySyntax.MatrixUser(value);
     public static bool RoomId(string value) => value.Length <= 255 && WellFormed(value) && RoomPattern().IsMatch(value);
     public static bool EventId(string value) => value.Length <= 255 && WellFormed(value) && EventPattern().IsMatch(value);
     public static bool Secret(string value) => SecretPattern().IsMatch(value);
-    public static bool WhiteSpace(char value) => value is >= '\u0009' and <= '\u000d' or '\u0020' or '\u00a0' or '\u1680'
-        or >= '\u2000' and <= '\u200a' or '\u2028' or '\u2029' or '\u202f' or '\u205f' or '\u3000' or '\ufeff';
 
     public static bool Json(JsonElement value, int depth = 0)
     {
@@ -129,12 +136,6 @@ public static partial class Validation
     private static partial Regex Controls();
     [GeneratedRegex("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]", RegexOptions.CultureInvariant)]
     private static partial Regex PlainControls();
-    [GeneratedRegex("\\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex IdentifierPattern();
-    [GeneratedRegex("\\A[a-z][a-z0-9-]{0,39}\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex NamePattern();
-    [GeneratedRegex("\\A@[^:\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+:[^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex UserPattern();
     [GeneratedRegex("\\A![^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]
     private static partial Regex RoomPattern();
     [GeneratedRegex("\\A\\$[^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]

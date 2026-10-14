@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Design;
 using Crossfire.AdapterSqlite.Entities;
 using Crossfire.AdapterFilesystem;
 
@@ -74,7 +73,8 @@ public sealed partial class CrossfireDbContext(string database) : DbContext
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
         {
-            DataSource = PrivateFiles.Database(database), ForeignKeys = true, DefaultTimeout = 5, Pooling = false
+            DataSource = PrivateFiles.Database(database), ForeignKeys = true, DefaultTimeout = 5, Pooling = false,
+            Mode = database == ":memory:" ? Microsoft.Data.Sqlite.SqliteOpenMode.Memory : Microsoft.Data.Sqlite.SqliteOpenMode.ReadWrite
         }.ToString());
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -88,9 +88,4 @@ public sealed partial class CrossfireDbContext(string database) : DbContext
         ConfigureTables6(model);
         ConfigureForeignKeys(model);
     }
-}
-
-public sealed class CrossfireDbContextFactory : IDesignTimeDbContextFactory<CrossfireDbContext>
-{
-    public CrossfireDbContext CreateDbContext(string[] arguments) => new(":memory:");
 }

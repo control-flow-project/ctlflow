@@ -9,8 +9,15 @@ public static class MemberCommands
 {
     public static Result<Unit> Register(CrossfireDbContext context, Principal principal, PrincipalRole role, PrincipalApplication application, Member member)
     {
-        context.Principal.Add(new() { Id = principal.Id, MatrixUserId = principal.MatrixUserId, Kind = principal.Kind, Status = principal.Status, Revision = principal.Revision, CreatedAt = principal.CreatedAt });
+        var registered = RegisterIdentity(context, principal, role, application);
+        if (!registered.IsSuccess) return registered;
         context.Member.Add(new() { PrincipalId = member.PrincipalId, PrincipalKind = member.PrincipalKind, DisplayName = member.DisplayName });
+        context.SaveChanges(); return Results.Done();
+    }
+
+    public static Result<Unit> RegisterIdentity(CrossfireDbContext context, Principal principal, PrincipalRole role, PrincipalApplication application)
+    {
+        context.Principal.Add(new() { Id = principal.Id, MatrixUserId = principal.MatrixUserId, Kind = principal.Kind, Status = principal.Status, Revision = principal.Revision, CreatedAt = principal.CreatedAt });
         context.PrincipalRole.Add(new() { PrincipalId = role.PrincipalId, PrincipalKind = role.PrincipalKind, RoleCode = role.RoleCode, AssignedByMemberId = role.AssignedByMemberId, AssignedAt = role.AssignedAt });
         context.PrincipalApplication.Add(new() { PrincipalId = application.PrincipalId, AppliedRevision = application.AppliedRevision, AppliedIntentHash = application.AppliedIntentHash,
             AppliedStatus = application.AppliedStatus, NativeDisplayName = application.NativeDisplayName, LastAttemptAt = application.LastAttemptAt,
@@ -55,9 +62,10 @@ public static class MemberCommands
 
     public static Result<Unit> Audit(CrossfireDbContext context, AuditIntent intent, Func<long> now)
     {
-        context.AuditEvent.Add(new AuditEventRow { Id = Identity.Identifier(), RequestId = intent.RequestId, ActorKind = intent.ActorKind,
+        context.AuditEvent.Add(new AuditEventRow { Id = Identity.Identifier(), RequestId = intent.RequestId, ActorKind = intent.ActorKind, ActorCredentialId = intent.ActorCredentialId,
             ActorPrincipalId = intent.ActorPrincipalId, OwnerId = intent.OwnerId, TargetKind = intent.TargetKind, TargetId = intent.TargetId,
-            Action = intent.Action, Outcome = intent.Outcome, Message = intent.Message, CreatedAt = now() });
+            Action = intent.Action, Outcome = intent.Outcome, Message = intent.Message, CreatedAt = now(), RoomId = intent.RoomId,
+            MembershipGeneration = intent.MembershipGeneration, AuthorizerId = intent.AuthorizerId, AddedById = intent.AddedById, PermissionCode = intent.PermissionCode });
         context.SaveChanges();
         return Results.Done();
     }

@@ -7,14 +7,15 @@ import { randomBytes, createHash } from 'node:crypto';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
-import definition from '../../packages/data/sqlite/schema.json' with { type: 'json' };
+import definition from '@ctlflow/crossfire-data/management/sqlite/schema' with { type: 'json' };
+import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 
 const [nativeBinary, managedAssembly, dotnetBinary] = process.argv.slice(2);
 assert(nativeBinary && managedAssembly && dotnetBinary && process.argv.length === 5, 'Provide native acceptance executable, managed assembly and dotnet executable');
 const directory = mkdtempSync(join(tmpdir(), 'crossfire-sqlite-parity-')); chmodSync(directory, 0o700);
 
 function checkDatabase(database) {
-  const rows = database.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all();
+  const rows = database.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%' ORDER BY type,name").all();
   assert.equal(rows.filter(row => row.type === 'table').length, 63);
   assert.equal(rows.filter(row => row.type === 'index').length, 93);
   assert.equal(rows.filter(row => row.type === 'trigger').length, 26);
@@ -37,6 +38,7 @@ try {
   assert.equal(readFileSync(nativeBinary).subarray(0, 4).toString('hex'), '7f454c46', 'Native acceptance must be an ELF executable');
   for (const firstNative of [true, false]) {
     const path = join(directory, firstNative ? 'native-created.sqlite' : 'managed-created.sqlite');
+    await migrateDatabase(path);
     const first = run(firstNative, path);
     let database = openStore(path);
     let schema;
@@ -62,11 +64,12 @@ try {
       assert.equal(directoryReader.member(second.OwnerId).value.principal.matrixUserId, second.MatrixId);
     } finally { database.close(); }
   }
-  const path = join(directory, 'node-created.sqlite'); const database = openStore(path);
+  const path = join(directory, 'knex-created.sqlite'); await migrateDatabase(path); const database = openStore(path);
   try { checkDatabase(database); } finally { database.close(); }
   run(true, path); run(false, path);
   for (const native of [true, false]) for (const version of [15, 16]) {
     const path = join(directory, 'schema-' + version + '-' + (native ? 'aot' : 'managed') + '.sqlite');
+    await migrateDatabase(path);
     const database = openStore(path);
     let canonical;
     try {
@@ -74,11 +77,14 @@ try {
       for (const index of definition.parts.loggingSchema.matchAll(/CREATE INDEX (\w+)/gu)) database.exec('DROP INDEX ' + index[1]);
       for (const table of ['enrollment_archive', 'enrollment_archive_item', 'enrollment_archive_policy', 'enrollment_archive_permission', 'enrollment_archive_wake_sender', 'enrollment_archive_metadata'])
         database.exec('CREATE TRIGGER protect_' + table + '_delete BEFORE DELETE ON ' + table + " BEGIN SELECT RAISE(ABORT, 'Archived enrollment history is immutable'); END;");
+      database.exec('DELETE FROM knex_migrations');
       database.pragma('user_version=' + version);
     } finally { database.close(); }
     const expectedPath = path + '.node-reference'; copyFileSync(path, expectedPath); chmodSync(expectedPath, 0o600);
+    await migrateDatabase(expectedPath);
     const expected = openStore(expectedPath);
     try { canonical = checkDatabase(expected); } finally { expected.close(); }
+    await migrateDatabase(path);
     run(native, path);
     const migrated = openStore(path);
     try { assert.deepEqual(checkDatabase(migrated), canonical, 'Forward schema conversion preserves the canonical database shape'); }

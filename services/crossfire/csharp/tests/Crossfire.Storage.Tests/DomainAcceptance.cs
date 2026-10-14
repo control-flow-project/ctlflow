@@ -42,6 +42,18 @@ public static class DomainAcceptance
         Equal((await Sessions.Create(sessions, "native-owner-token")).IsSuccess, true, "expired session replacement");
         Equal(SessionCommands.Count(context, ownerId, now).Value, 1L, "expired session retention");
         AgentAcceptance.Verify(context, owner, admin, () => now);
+        DecisionAcceptance.Verify(context, owner, admin, now);
+        FleetAcceptance.Verify(context, owner, admin, now);
+        await RoomGrantAcceptance.Verify(context, owner, admin, now);
+        await ReconciliationAcceptance.Verify(context, owner, now);
+        await EnrollmentAcceptance.Verify(context, admin, now);
+        await EnrollmentLifecycleAcceptance.Verify(context, owner, admin, now);
+        RuntimeLifecycleAcceptance.Verify(context, owner, now);
+        StatisticsAcceptance.Verify(context, owner, now);
+        DirectoryAcceptance.Verify(context, owner, admin, now);
+        WakeAcceptance.Verify(context, owner, admin, now);
+        await PublicationAcceptance.Verify(context, owner, admin, now);
+        await AuthenticationAcceptance.Verify(context, owner, admin, now);
         var policyPorts = PolicyCommands.Ports(context, () => now);
         Equal(Policies.Read(policyPorts, owner).IsSuccess, true, "members can read instance policy");
         var policy = Policies.Read(policyPorts, admin).Value;
@@ -56,5 +68,7 @@ public static class DomainAcceptance
         Equal(Invitations.Create(invitations, owner, "member", 600, Identity.Identifier()).Error.Code, "forbidden", "invitation issuer policy");
         Equal(Invitations.Revoke(invitations, admin, invitation.Value.InvitationId, Identity.Identifier()).IsSuccess, true, "invitation revocation");
         Equal(Invitations.Verify(invitations, invitation.Value.InvitationId, invitation.Value.ClaimSecret).Error.Code, "unauthorized", "revoked claim cannot be used");
+        ContactAcceptance.Verify(context, owner, now);
+        LoggingAcceptance.Verify(context, owner, now);
     }
 }

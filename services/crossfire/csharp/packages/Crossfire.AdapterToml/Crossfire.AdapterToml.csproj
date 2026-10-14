@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Crossfire.Kernel/Crossfire.Kernel.csproj" />
+    <PackageReference Include="CsToml" />
+  </ItemGroup>
+</Project>

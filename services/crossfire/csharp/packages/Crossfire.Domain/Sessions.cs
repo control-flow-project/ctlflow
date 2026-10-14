@@ -64,19 +64,5 @@ public static class Sessions
             : Result<AuthenticatedMember>.Fail(permissions.Error);
     }
 
-    public static async ValueTask<Result<Actor>> Native(SessionPorts ports, string token, bool agentOnly = false, CancellationToken cancellation = default)
-    {
-        var identity = await ports.Identify(token, cancellation);
-        if (!identity.IsSuccess) return Result<Actor>.Fail(identity.Error);
-        var principal = ports.ByMatrixId(identity.Value);
-        if (!principal.IsSuccess) return Result<Actor>.Fail(principal.Error);
-        if (principal.Value is null) return Results.Fail<Actor>("forbidden", "Registered identity authentication is required");
-        var actor = new Actor(principal.Value.Id, principal.Value.Kind, new NativeAuthentication(identity.Value));
-        var active = Authorization.ActiveActor(ports.Authorization, actor);
-        if (!active.IsSuccess) return Result<Actor>.Fail(active.Error);
-        return !agentOnly || actor.Kind == "agent" ? Result<Actor>.Success(actor)
-            : Results.Fail<Actor>("forbidden", "Registered agent authentication is required");
-    }
-
     public static Result<Unit> End(SessionPorts ports, string secret) => ports.Remove(ports.Hash(secret));
 }

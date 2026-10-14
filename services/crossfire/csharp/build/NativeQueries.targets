@@ -1,0 +1,53 @@
+<Project>
+  <PropertyGroup>
+    <CrossfireEfHostOutput>$(MSBuildThisFileDirectory)Crossfire.EfHost/bin/$(MSBuildProjectName)/$(Configuration)/net11.0/</CrossfireEfHostOutput>
+    <EFStartupAssembly>$(CrossfireEfHostOutput)Crossfire.EfHost.exe</EFStartupAssembly>
+  </PropertyGroup>
+  <Target Name="CrossfirePrepareEfHost" Condition="'$(_EFGenerationStage)'=='$(EFScaffoldModelStage)' Or '$(_EFGenerationStage)'=='$(EFPrecompileQueriesStage)'">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Crossfire.EfCompiler/Crossfire.EfCompiler.csproj"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=$(TargetFramework);RuntimeIdentifier=;SelfContained=false;PublishAot=false;_EFGenerationStage=$(_EFGenerationStage)" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Crossfire.EfHost/Crossfire.EfHost.csproj"
+             Targets="Restore;Build"
+             Properties="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=$(TargetFramework);RuntimeIdentifier=;SelfContained=false;PublishAot=false;_EFGenerationStage=$(_EFGenerationStage);CrossfireEfTargetName=$(MSBuildProjectName);CrossfireEfTargetProject=$(MSBuildProjectFullPath);RestoreRecursive=false;BuildProjectReferences=false" />
+  </Target>
+  <Target Name="OptimizeDbContext" DependsOnTargets="ResolvePackageAssets;CrossfirePrepareEfHost">
+    <PropertyGroup>
+      <EFRootNamespace Condition="'$(EFRootNamespace)'==''">$(RootNamespace)</EFRootNamespace>
+      <EFRootNamespace Condition="'$(EFRootNamespace)'==''">$(AssemblyName)</EFRootNamespace>
+      <EFTargetNamespace Condition="'$(EFTargetNamespace)'==''">$(EFRootNamespace)</EFTargetNamespace>
+      <EFOutputDir Condition="'$(EFOutputDir)'==''">$(_FullIntermediateOutputPath)</EFOutputDir>
+      <_EFNoScaffold>true</_EFNoScaffold>
+      <_EFNoScaffold Condition="'$(_EFGenerationStage)'=='$(EFScaffoldModelStage)'">false</_EFNoScaffold>
+      <_EFPrecompileQueries>false</_EFPrecompileQueries>
+      <_EFPrecompileQueries Condition="'$(_EFGenerationStage)'=='$(EFPrecompileQueriesStage)'">true</_EFPrecompileQueries>
+      <EFNullable Condition="'$(Nullable)'=='enable' Or '$(Nullable)'=='annotations'">true</EFNullable>
+      <EFNullable Condition="'$(EFNullable)'==''">false</EFNullable>
+    </PropertyGroup>
+    <OptimizeDbContext Assembly="$(_AssemblyFullName)"
+                       StartupAssembly="$(EFStartupAssembly)"
+                       ProjectAssetsFile="$(ProjectAssetsFile)"
+                       DesignAssembly="$(CrossfireEfHostOutput)Microsoft.EntityFrameworkCore.Design.dll"
+                       RuntimeFrameworkVersion="$(RuntimeFrameworkVersion)"
+                       TargetFrameworkMoniker="$(TargetFrameworkMoniker)"
+                       DbContextType="$(DbContextType)"
+                       RootNamespace="$(EFRootNamespace)"
+                       TargetNamespace="$(EFTargetNamespace)"
+                       Language="$(Language)"
+                       Nullable="$(EFNullable)"
+                       RuntimeCopyLocalItems="@(RuntimeCopyLocalItems)"
+                       OutputDir="$(EFOutputDir)"
+                       Project="$(MSBuildProjectFullPath)"
+                       ProjectDir="$(MSBuildProjectDirectory)"
+                       NoScaffold="$(_EFNoScaffold)"
+                       PrecompileQueries="$(_EFPrecompileQueries)"
+                       EnvironmentVariables="Configuration=$(Configuration);Platform=$(Platform);TargetFramework=$(TargetFramework);RuntimeIdentifier=;SelfContained=false;PublishAot=false"
+                       Condition="'$(_EFNoScaffold)'=='false' Or '$(_EFPrecompileQueries)'=='true'">
+      <Output TaskParameter="GeneratedFiles" PropertyName="_EFGeneratedFiles" />
+    </OptimizeDbContext>
+    <Delete Files="$(EFGeneratedSourcesBuildFile)" Condition="'$(_EFGenerationStage)'=='build'" />
+    <Delete Files="$(EFGeneratedSourcesPublishFile)" Condition="'$(_EFGenerationStage)'=='publish'" />
+    <WriteLinesToFile File="$(EFGeneratedSourcesBuildFile)" Lines="$(_EFGeneratedFiles)" Condition="'$(_EFGenerationStage)'=='build'" />
+    <WriteLinesToFile File="$(EFGeneratedSourcesPublishFile)" Lines="$(_EFGeneratedFiles)" Condition="'$(_EFGenerationStage)'=='publish'" />
+  </Target>
+</Project>

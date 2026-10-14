@@ -204,6 +204,6 @@ public sealed partial class AccountAuthority : IDisposable
     public void Dispose()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0) return;
-        lifetime.Cancel(); sessions.Clear(); client.Dispose(); lifetime.Dispose();
+        lifetime.Cancel(); sessions.Clear(); invitations.Clear(); client.Dispose(); lifetime.Dispose();
     }
 }

@@ -11,7 +11,6 @@ import { resetCodex } from './reset.js';
 import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { codexSavedContexts } from './context-state.js';
 import { profileName } from '@ctlflow/crossfire-contracts/client';
-import { refreshAuthentication } from './authentication.js';
 
 type CodexAdapter = Omit<OwnedRuntimeAdapter, 'start'> & { start(input: OwnedRuntimeInput, stop: AbortSignal): Promise<Result<OwnedRuntimeConnection & { attachment: RuntimeAttachment }>> };
 export function codexRuntime(binary = 'codex'): CodexAdapter {
@@ -27,8 +26,6 @@ export function codexRuntime(binary = 'codex'): CodexAdapter {
       stop.throwIfAborted();
       nativeDirectories(input);
       const home = prepareHome(input.stateDirectory);
-      const authentication = refreshAuthentication(home);
-      if (!authentication.ok) return authentication;
       process = await startProcess(home, input.workspace, input.stateDirectory, input.profile, stop, binary, parsed.value.options.features?.default_mode_request_user_input === true);
       const owner = process;
       const attachment = { runtime: 'codex', workspace: input.workspace,

@@ -10,7 +10,6 @@ import { startProcess } from './owned-process.js';
 import { codexProtocol } from './protocol.js';
 import { admitCodex } from './admission.js';
 import { codexClientVersion } from './version.js';
-import { refreshAuthentication } from './authentication.js';
 import { errorCode } from '@ctlflow/crossfire-contracts/rest/envelope';
 
 function command(binary: string, args: string[], workspace: string, environment: NodeJS.ProcessEnv, stop: AbortSignal): Promise<string> {
@@ -51,8 +50,6 @@ export async function inspectCodex(binary: string, input: { workspace: string; s
     const inspectionHome = mkdtempSync(join(input.stateDirectory, '.codex-inspection-'));
     try {
       writeFileSync(join(inspectionHome, 'config.toml'), stringify(nativeConfiguration(home)), { mode: 0o600 });
-      const authentication = refreshAuthentication(inspectionHome);
-      if (!authentication.ok) return authentication;
       const native = await startProcess(inspectionHome, input.workspace, input.stateDirectory, 'crossfire-inspection', stop, binary,
         parsed.value.options.features?.default_mode_request_user_input === true);
       let protocol: ReturnType<typeof codexProtocol> | undefined;

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="Crossfire.Kernel.Results" Alias="Results" />
+    <ProjectReference Include="../../packages/Crossfire.AdapterSqlite/Crossfire.AdapterSqlite.csproj" />
+    <ProjectReference Include="../../packages/Crossfire.AdapterMatrix/Crossfire.AdapterMatrix.csproj" />
+    <ProjectReference Include="../../packages/Crossfire.AdapterSchedule/Crossfire.AdapterSchedule.csproj" />
+    <ProjectReference Include="../../packages/Crossfire.Contracts/Crossfire.Contracts.csproj" />
+    <ProjectReference Include="../../packages/Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj" />
+  </ItemGroup>
+</Project>

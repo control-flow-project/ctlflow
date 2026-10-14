@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+  </ItemGroup>
+</Project>

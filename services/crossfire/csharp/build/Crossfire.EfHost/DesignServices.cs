@@ -5,9 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: DesignTimeServicesReference("Crossfire.AdapterSqlite.DesignServices, Crossfire.AdapterSqlite")]
+[assembly: DesignTimeServicesReference("Crossfire.EfHost.DesignServices, Crossfire.EfHost")]
 
-namespace Crossfire.AdapterSqlite;
+namespace Crossfire.EfHost;
 
 [Experimental("EF9100")]
 [SuppressMessage("Usage", "EF1001", Justification = "Registers the version-pinned build-time query generator through EF's design-time interface; no native safety diagnostics are suppressed.")]

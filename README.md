@@ -27,6 +27,9 @@ and history on repetition, and waits for the required human enrollment approval.
 - [Earendil Pi runtime: setup, settings, questions and limitations](services/fleet/docs/pi.md)
 - [Architecture, data model, REST contracts and acceptance requirements](docs/specification.md)
 - [Repository instructions](AGENTS.md)
+- [Language-independent Knex databases and migration containers](services/crossfire/database/README.md)
+- [C# products, distributions and verification](services/crossfire/csharp/README.md)
+- [Shared Node/C#/Rust contract suite](docs/verification/shared-contracts.md)
 
 ## Development
 Requires Node.js 26+ and npm 11.17+. On Linux, from this directory, run all
@@ -47,6 +50,10 @@ The pinned SQLite package includes the verified Linux native binary; source
 compilation is required only on platforms without a usable bundled binary.
 Tests use disposable private state, Conduit and inert providers, not production
 credentials or paid models.
+The C# source targets .NET 11 with managed and NativeAOT outputs. Its latest
+integration changes are not yet verified or deployed. Implementations share one
+React UI, REST/daemon contracts and Knex-created SQLite representation; the
+shared contract suite accepts explicit backend executables.
 - [Test selection, prerequisites and evidence](docs/development.md)
 
 ## License

@@ -12,6 +12,7 @@ import { conduitFixture } from '../scripts/architecture-proof/conduit-fixture.js
 import { bootstrap } from '../apps/server/src/bootstrap.js';
 import { secret, value } from './support/application.js';
 import { createApplication } from '../apps/server/src/composition.js';
+import { applicationDatabase } from './support/storage.js';
 
 
 import { createWorker } from '../apps/server/src/worker.js';
@@ -108,7 +109,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const password = secret();
   const initialized = await bootstrap(config, { servicePassword: secret(), administratorPassword: password });
   assert(initialized.ok, JSON.stringify(initialized));
-  const application = createApplication(join(directory, 'management.sqlite'), config), { services } = application;
+  const application = createApplication(applicationDatabase(scope, join(directory, 'management.sqlite')), config), { services } = application;
   const worker = createWorker(services, application.diagnostics);
   const release = await releaseFixture();
   const service = createHttpServer(application, worker, release);

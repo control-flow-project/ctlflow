@@ -8,7 +8,7 @@ public sealed record PrincipalApplication(string PrincipalId, long? AppliedRevis
 public sealed record MemberView(Principal Principal, Member Member, PrincipalRole Role, PrincipalApplication Application);
 public sealed record Page<T>(IReadOnlyList<T> Items, int PageNumber, int PageSize, long TotalItems)
 {
-    public long TotalPages => (long)Math.Ceiling((double)TotalItems / PageSize);
+    public long TotalPages => Math.Max(1, TotalItems / PageSize + (TotalItems % PageSize == 0 ? 0 : 1));
 }
 public sealed record MemberChange(long ExpectedRevision, string? Status = null, string? DisplayName = null, string? RoleCode = null);
 public sealed record MemberChanges(MemberView Before, MemberView After, bool NativeSelfName, long Now);
@@ -16,7 +16,9 @@ public sealed record InstancePolicy(string Id, long Revision, long MaxOwnerAgent
     long EnrollmentSeconds, long ReconcileSeconds, long MaxMessageBytes, long FleetIdleTimeoutSeconds,
     string AgentInstructions, string SignupMode, string InvitationIssuers);
 public sealed record AuditIntent(string RequestId, string ActorKind, string? ActorPrincipalId, string? OwnerId,
-    string TargetKind, string TargetId, string Action, string Outcome = "accepted", string Message = "");
+    string TargetKind, string TargetId, string Action, string Outcome = "accepted", string Message = "",
+    string? ActorCredentialId = null, string? RoomId = null, string? MembershipGeneration = null,
+    string? AuthorizerId = null, string? AddedById = null, string? PermissionCode = null);
 
 public interface UnitOfWork
 {

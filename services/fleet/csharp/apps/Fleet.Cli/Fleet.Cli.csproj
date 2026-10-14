@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>fleet</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../packages/Fleet.DaemonClient/Fleet.DaemonClient.csproj" />
+    <ProjectReference Include="../../packages/Fleet.SshTransport/Fleet.SshTransport.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterCodex/Crossfire.AdapterCodex.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterToml/Crossfire.AdapterToml.csproj" />
+  </ItemGroup>
+</Project>

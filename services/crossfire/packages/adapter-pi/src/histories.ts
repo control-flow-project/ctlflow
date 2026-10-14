@@ -34,7 +34,9 @@ export function piHistories(input: OwnedRuntimeInput, home: string, binary: stri
   if (stored.state.mode !== mode) {
     if (input.hooks.pendingDecisions?.() || contexts().some(unacknowledged)) throw failureError({ code: 'conflict', message: 'Resolve original Pi decisions and acknowledge native publications before changing history mode' });
   }
-  if (!retained(primary) && stored.state.mode === mode && (!input.allowNewHistory || lstatSync(stored.file, { throwIfNoEntry: false }))) {
+  const existing = lstatSync(stored.file, { throwIfNoEntry: false });
+  const changing = existing && stored.state.mode !== mode && retained(stored.state.mode === 'shared' ? 'shared' : 'control');
+  if (!retained(primary) && !changing && (!input.allowNewHistory || existing)) {
     throw failureError({ code: 'missing', message: 'Saved Pi history is missing; resume cannot create a new history. Use explicit fresh history if intended.' });
   }
   async function open(context: string, admission?: InputAdmission): Promise<PiConnection> {
