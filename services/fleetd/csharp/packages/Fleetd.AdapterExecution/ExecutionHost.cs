@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Crossfire.AdapterClient;
+using Crossfire.AdapterCrossfire;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterHttp;
 using Crossfire.AgentCore;
@@ -69,10 +69,10 @@ public sealed partial class ExecutionHost : IAsyncDisposable
         var inspected = await Inspect(configuration, configuration.Roster.Instances, cancellation); if (!inspected.IsSuccess) return inspected; var protectedFiles = await ProjectFiles.Protect(configuration.Directory, [".fleet/", "**/workarea/"], cancellation); if (!protectedFiles.IsSuccess) return protectedFiles;
         return await Enrollment.Prepare(configuration, controller, intent, token => Client(configuration.Roster.Coordination.Server, token), clock, approval, cancellation);
     });
-    private Result<IReadOnlyList<SavedRuntimeContext>> Contexts(FleetConfiguration configuration, FleetInstance instance)
+    private Result<IReadOnlyList<SavedRuntimeContext>> Contexts(FleetConfiguration configuration, FleetInstance instance) => ConfigurationFiles.Boundary<IReadOnlyList<SavedRuntimeContext>>(() =>
     {
-        var definition = configuration.Definitions[instance.Definition]; if (!adapters.TryGetValue(definition.Runtime, out var adapter)) return Results.Fail<IReadOnlyList<SavedRuntimeContext>>("invalid", "Unsupported native runtime: " + definition.Runtime); var state = Path.Combine(configuration.Directory, instance.Workarea); return adapter.SavedContexts(instance.Workspace ?? state, state);
-    }
+        var definition = configuration.Definitions[instance.Definition]; if (!adapters.TryGetValue(definition.Runtime, out var adapter)) return Results.Fail<IReadOnlyList<SavedRuntimeContext>>("invalid", "Unsupported native runtime: " + definition.Runtime); var state = Path.Combine(configuration.Directory, instance.Workarea); return PrivateFiles.Exists(state) ? adapter.SavedContexts(instance.Workspace ?? state, state) : Result<IReadOnlyList<SavedRuntimeContext>>.Success([]);
+    });
     private ValueTask<Result<Unit>> ConfirmStopped(FleetConfiguration configuration, FleetInstance instance, CancellationToken cancellation)
     { var loaded = BindingFiles.Load(configuration); if (!loaded.IsSuccess) return ValueTask.FromResult(Result<Unit>.Fail(loaded.Error)); var identity = loaded.Value.Identities.FirstOrDefault(identity => identity.InstanceKey == instance.Key); return identity is null ? ValueTask.FromResult(Results.Done()) : Find(configuration.Directory)?.Reports.Confirm(identity.AgentId, cancellation) ?? ValueTask.FromResult(Results.Done()); }
     private ValueTask<Result<Unit>> Reset(FleetConfiguration configuration, FleetInstance instance, string id, CancellationToken cancellation) => AgentIO.Boundary(async () =>

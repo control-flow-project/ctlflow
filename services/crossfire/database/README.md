@@ -66,7 +66,7 @@ changing application data; it cannot be opened by an application before adoption
 
 ## Upgrade containers
 
-`services/crossfire/Dockerfile` has explicit `production` and `migrations` targets.
+`services/crossfire/node/Dockerfile` has explicit `production` and `migrations` targets.
 The migration target runs `knex migrate:latest` and exits. It is independent of
 the selected application language and does not need a model, a network connection
 or Matrix credentials. It mounts the same private runtime directory as the server.

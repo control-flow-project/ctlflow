@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
-using Crossfire.AdapterClient;
+using Crossfire.AdapterCrossfire;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
 using Crossfire.Kernel;

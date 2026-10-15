@@ -46,8 +46,8 @@ Fleet's exported daemon client and Crossfire's native adapter exports. The
 existing Fleet CLI remains the only operator lifecycle interface; these tools
 do not start, stop, upgrade or resume an agent.
 
-- [Crossfire commands and input schemas](../services/crossfire/tools/README.md)
-- [fleetd native verification and preservation](../services/fleetd/tools/README.md)
+- [Crossfire commands and input schemas](../services/crossfire/node/tools/README.md)
+- [fleetd native verification and preservation](../services/fleetd/node/tools/README.md)
 - [Historical script disposition](operator-script-inventory.md)
 
 ## Preparation
@@ -112,9 +112,9 @@ one owner shared by the operator and application browser tests.
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
-  --property=TasksMax=4096 /bin/bash -c \
-  'npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
+  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
+  --property=TasksMax=8192 /bin/bash -c \
+  'npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
 Runtime verification includes Codex and Pi. Unsupported runtimes fail configuration

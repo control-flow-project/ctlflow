@@ -4,7 +4,7 @@ import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 
 if (process.argv.length > 3 || process.argv[2] !== undefined && process.argv[2] !== '--check') throw new Error('Use --check or print the canonical C# REST catalog');
 const lines = [
-  'using System.Text.Json;', '', 'namespace Crossfire.Contracts;', '',
+  '#nullable enable', 'using System.Text.Json;', '', 'namespace Crossfire.Contracts;', '',
   'public sealed record RestOperation(string Name, string Method, string Path, string Authentication, int Status, bool Collection, int MaximumBodyBytes, bool Binary);', '',
   'public sealed record RestCall(string Operation, IReadOnlyDictionary<string, string> Parameters, JsonElement? Body = null, IReadOnlyDictionary<string, string>? Query = null);', '',
   'public static class RestOperations', '{',

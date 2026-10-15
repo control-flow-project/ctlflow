@@ -82,7 +82,7 @@ export function verifyTestTiming(root) {
   assert.equal(timingViolations('await new Promise((resolve, reject) => { setTimeout(() => reject(new Error()), 5000); once(child, "close").then(resolve) })', 'proof.ts').length, 0);
   const violations = [];
   let files = 0;
-  for (const service of ['crossfire', 'fleetd', 'fleet']) for (const directory of ['tests', 'scripts']) {
+  for (const service of ['crossfire', 'fleetd', 'fleet']) for (const directory of ['tests', 'node/tests', 'node/scripts', 'node/packages/test-support/src']) {
     const base = join(root, 'services', service, directory);
     if (!existsSync(base)) continue;
     for (const file of readdirSync(base, { recursive: true }).filter(file => file.endsWith('.ts'))) {

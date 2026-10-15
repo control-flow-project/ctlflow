@@ -129,7 +129,7 @@ native usage observations, not independent billing certification. An earlier
 single-turn provider probe also completes with the exact response and native
 2,661 input / 12 output tokens.
 
-The reusable internal tool is `services/fleetd/tools/pi-provider-acceptance.ts`.
+The reusable internal tool is `services/fleetd/node/tools/pi-provider-acceptance.ts`.
 It requires explicit `--execute`, an exact native executable and a private owned
 evidence directory; it only creates synthetic disposable workspaces. Finite
 4 GiB/no-swap/512-task process limits, request/token observations and deadlines

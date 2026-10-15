@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "scripts/architecture-proof/**/*.ts"
+  ],
+  "exclude": [],
+  "compilerOptions": {
+    "rootDir": "."
+  }
+}

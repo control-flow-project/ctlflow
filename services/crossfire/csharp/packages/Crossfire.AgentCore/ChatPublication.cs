@@ -60,6 +60,7 @@ public sealed class ChatPublication
         }), MaximumJournal);
     }
     public bool Pending => plan is not null;
+    public bool Unpublished => plan is { } value && value.Steps.All(step => step.Status == "prepared");
     public bool Recovering => plan?.Steps.Any(step => step.Status == "publishing") == true;
     public IReadOnlyList<ReceivedEvent> Events => plan?.Batch.Events ?? [];
     public IReadOnlyList<string> ContentFiles => Events.Where(value => value.ContentFile is not null).Select(value => value.ContentFile!.File).ToArray();

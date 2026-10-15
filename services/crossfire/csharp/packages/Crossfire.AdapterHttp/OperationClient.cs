@@ -14,9 +14,9 @@ public sealed class OperationClient(HttpClient http, string origin, Func<string?
     {
         if (!operations.TryGetValue(operation, out var contract) || contract.Binary != (binary is not null)) return Results.Fail<JsonElement>("invalid", "Unknown operation or mismatched JSON/binary request");
         var path = Path(contract, parameters, query); if (!path.IsSuccess) return Result<JsonElement>.Fail(path.Error); var credential = token(); if (contract.Authentication != "public" && string.IsNullOrEmpty(credential)) return Results.Fail<JsonElement>("unauthorized", "The selected operation requires its configured identity credential");
-        var endpoint = new NativeEndpoint(origin, credential, timeoutMilliseconds);
+        var endpoint = new NativeEndpoint(origin, contract.Authentication == "public" ? null : credential, timeoutMilliseconds);
         var response = binary is { } bytes ? await NativeHttp.Binary(http, endpoint, contract.Method, path.Value, bytes, contentType!, contract.MaximumBodyBytes, 16777216, cancellation)
-            : await NativeHttp.Json(http, endpoint, contract.Method, path.Value, body, 16777216, cancellation, contract.MaximumBodyBytes);
+            : await NativeHttp.Json(http, endpoint, contract.Method, path.Value, contract.Method == "GET" ? null : body ?? WireJson.Object(_ => { }), 16777216, cancellation, contract.MaximumBodyBytes);
         if (!response.IsSuccess) return Result<JsonElement>.Fail(response.Error.Code == "native" ? response.Error with { Code = "unavailable" } : response.Error); using var received = response.Value;
         var input = received.Body;
         if (input.ValueKind != JsonValueKind.Object || !input.TryGetProperty("meta", out var meta) || !Metadata(meta, contract.Collection && received.Status == contract.Status)) return Results.Fail<JsonElement>("invalid", "Coordination response has invalid request or pagination metadata");

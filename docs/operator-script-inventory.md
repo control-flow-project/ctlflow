@@ -23,7 +23,7 @@ or copied test checkouts. One current implementation owns each reusable check.
 | Session/script family | Current owner and disposition |
 | --- | --- |
 | Adapter-review diagnostic probes | Existing adapter/listener regression tests; obsolete reproduction scripts are not another runtime implementation |
-| Agreement native models and skills | `services/fleetd/tools/runtime/codex.ts` and `tools/verify.ts`: exact session, model/effort and actual Git/ancestor skill inspection |
+| Agreement native models and skills | `services/fleetd/node/tools/runtime/codex.ts` and `tools/verify.ts`: exact session, model/effort and actual Git/ancestor skill inspection |
 | Fleet control-plane install/setup/activate/update scripts | Normal public-package build/installation gates and Fleet CLI own managed setup/lifecycle; operator `source`, `files`, `archive`, `host` and fleet preservation own reusable checks |
 | Managed readiness | `fleet test FLEET` and intentional `agent test` inspect actual existing shared-host bindings without models, cursor changes or lifecycle mutation |
 | Fleet-map administrator/API/approval/agent-visibility checks | Crossfire `server`, `enrollment` and `browser`; exact dynamic owner/code/roster instead of fixed deployment names |
@@ -63,7 +63,7 @@ Builds/tests use verified finite process-group memory/swap/task limits, not heap
 flags alone. Mutating regressions run in isolated fixtures, not production.
 
 - [Generic operator workflow and resource guards](operator-tools.md)
-- [Crossfire command and input schemas](../services/crossfire/tools/README.md)
-- [fleetd native verification and preservation](../services/fleetd/tools/README.md)
+- [Crossfire command and input schemas](../services/crossfire/node/tools/README.md)
+- [fleetd native verification and preservation](../services/fleetd/node/tools/README.md)
 - [Managed setup and pinned updates](../services/crossfire/docs/onboarding/README.md)
 - [Current schema and authorization contract](specification.md)

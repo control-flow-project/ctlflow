@@ -1,9 +1,9 @@
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { verifyTestResources } from './test-resources.mjs';
-import { target } from '../services/crossfire/packages/test-support/dist/contract-process.js';
+import { readContractMatrix } from './contract-targets.mjs';
+import { target } from '../services/crossfire/node/packages/test-support/dist/contract-process.js';
 import { contractStack } from '../services/crossfire/dist/tests/contracts/fixture.js';
 import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
 import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';
@@ -12,8 +12,7 @@ import { cliContracts } from '../services/fleet/dist/tests/contracts/cli.contrac
 
 verifyTestResources();
 if (!process.env.CROSSFIRE_CONTRACT_MATRIX || !process.env.CROSSFIRE_CONTRACT_TARGET) throw new Error('Run through the unified contract matrix coordinator');
-const matrix = JSON.parse(readFileSync(process.env.CROSSFIRE_CONTRACT_MATRIX, 'utf8'));
-const targets = matrix.targets.map(target), selected = targets.find(value => value.name === process.env.CROSSFIRE_CONTRACT_TARGET);
+const targets = readContractMatrix(process.env.CROSSFIRE_CONTRACT_MATRIX).map(target), selected = targets.find(value => value.name === process.env.CROSSFIRE_CONTRACT_TARGET);
 if (!selected) throw new Error('Selected implementation is absent from the validated matrix');
 process.chdir(fileURLToPath(new URL('../services/crossfire/', import.meta.url)));
 test('shared product contracts: ' + selected.name, { timeout: 780000 }, async scope => {

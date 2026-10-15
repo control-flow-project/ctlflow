@@ -1,5 +1,0 @@
-{
-  "extends": "./tsconfig.core.json",
-  "include": ["scripts/architecture-proof/**/*.ts"],
-  "exclude": []
-}
