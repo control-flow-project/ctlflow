@@ -1,5 +1,7 @@
 mod calendar;
 mod fields;
+mod time_zone;
+mod zones;
 
 use crossfire_domain::schedule::{Schedule, ScheduleCalculator};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
@@ -7,6 +9,9 @@ use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 const MAXIMUM_TIME: i64 = 9_007_199_254_740_991;
 
 pub struct Calculator;
+pub fn timezone_version() -> &'static str {
+    time_zone::version()
+}
 
 impl ScheduleCalculator for Calculator {
     fn next(&self, schedule: &Schedule, after: i64) -> Result<i64> {

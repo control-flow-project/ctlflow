@@ -5,7 +5,7 @@ use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use std::{os::unix::fs::PermissionsExt, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, UnixListener, UnixStream},
+    net::{TcpListener, UnixStream},
 };
 use tokio_util::sync::CancellationToken;
 async fn handler(
@@ -99,8 +99,7 @@ async fn the_same_http_owner_serves_private_unix_peers_and_closes_every_owned_co
     let directory = tempfile::tempdir()?;
     std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
     let path = directory.path().join("api.sock");
-    let listener = UnixListener::bind(&path)?;
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    let listener = server::private_unix(&path)?;
     let stop = CancellationToken::new();
     let task = tokio::spawn(server::serve(
         Listener::Unix(listener),
@@ -109,7 +108,8 @@ async fn the_same_http_owner_serves_private_unix_peers_and_closes_every_owned_co
         Limits::default(),
         stop.clone(),
     ));
-    let mut stream = UnixStream::connect(&path).await?;
+    let socket = crossfire_adapter_filesystem::socket::Socket::open(&path)?;
+    let mut stream = UnixStream::connect(socket.endpoint()).await?;
     stream
         .write_all(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
         .await?;

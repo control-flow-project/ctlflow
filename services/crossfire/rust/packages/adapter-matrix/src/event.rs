@@ -1,5 +1,5 @@
 use crate::account::{API, Authority};
-use crossfire_adapter_http::segment;
+use crossfire_contracts::origin::segment;
 use crossfire_contracts::{matrix_event, validation};
 use crossfire_domain::matrix::MatrixEvent;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};

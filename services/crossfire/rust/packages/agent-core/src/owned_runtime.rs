@@ -35,6 +35,22 @@ pub struct Input<H> {
     pub allow_new_history: bool,
 }
 
+impl<H> Clone for Input<H> {
+    fn clone(&self) -> Self {
+        Self {
+            profile: self.profile.clone(),
+            name: self.name.clone(),
+            workspace: self.workspace.clone(),
+            state_directory: self.state_directory.clone(),
+            instructions: self.instructions.clone(),
+            options: self.options.clone(),
+            hooks: self.hooks.clone(),
+            history_mode: self.history_mode,
+            allow_new_history: self.allow_new_history,
+        }
+    }
+}
+
 pub struct Inspection {
     pub workspace: PathBuf,
     pub state_directory: PathBuf,

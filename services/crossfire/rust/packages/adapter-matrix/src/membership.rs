@@ -1,5 +1,5 @@
 use crate::account::{API, Authority};
-use crossfire_adapter_http::segment;
+use crossfire_contracts::origin::segment;
 use crossfire_contracts::{
     matrix_room::{self, StateEvent},
     validation,
@@ -101,8 +101,7 @@ impl Authority {
                 Method::GET,
                 &format!("{API}/rooms/{}/state", segment(room)),
                 None,
-                crossfire_adapter_http::MAX_JSON_BYTES,
-                std::time::Duration::from_secs(15),
+                crossfire_adapter_http::JsonLimits::default(),
             )
             .await?;
         let events = response

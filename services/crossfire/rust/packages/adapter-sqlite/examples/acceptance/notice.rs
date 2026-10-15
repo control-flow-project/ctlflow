@@ -1,7 +1,8 @@
 use super::{Checks, SystemClock};
-use crossfire_adapter_http::{NativeHttp, segment};
+use crossfire_adapter_http::NativeHttp;
 use crossfire_adapter_matrix::account::Authority;
 use crossfire_adapter_sqlite::store::SharedStore;
+use crossfire_contracts::origin::segment;
 use crossfire_domain::{
     identity::Actor,
     notice::{self, NoticeRepository},

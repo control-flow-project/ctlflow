@@ -1,38 +1,36 @@
 use crossfire_contracts::validation::whitespace;
+pub mod operation;
+pub mod proxy;
+pub mod routing;
 pub mod server;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
 use reqwest::{Client, Method, Url};
 use serde_json::Value;
-use std::time::Duration;
+use std::{path::Path, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 
 pub const MAX_JSON_BYTES: usize = 1024 * 1024;
-
-pub fn origin(value: &str) -> Result<Url> {
-    let endpoint =
-        Url::parse(value).map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid server origin"))?;
-    let host = endpoint.host_str().unwrap_or_default();
-    if !endpoint.username().is_empty()
-        || endpoint.password().is_some()
-        || endpoint.query().is_some()
-        || endpoint.fragment().is_some()
-        || endpoint.path() != "/"
-        || endpoint.scheme() != "https"
-            && !(endpoint.scheme() == "http" && ["127.0.0.1", "[::1]", "localhost"].contains(&host))
-    {
-        return Err(Failure::new(
-            ErrorCode::Invalid,
-            "Use HTTPS or a loopback HTTP origin without credentials",
-        ));
-    }
-    Ok(endpoint)
+#[derive(Clone, Copy)]
+pub struct JsonLimits {
+    pub request_bytes: usize,
+    pub response_bytes: usize,
+    pub timeout: Duration,
 }
-
+impl Default for JsonLimits {
+    fn default() -> Self {
+        Self {
+            request_bytes: MAX_JSON_BYTES,
+            response_bytes: MAX_JSON_BYTES,
+            timeout: Duration::from_secs(15),
+        }
+    }
+}
 #[derive(Clone)]
 pub struct NativeHttp {
     client: Client,
     origin: Url,
     cancellation: CancellationToken,
+    socket: Option<Arc<crossfire_adapter_filesystem::socket::Socket>>,
 }
 
 pub struct NativeResponse {
@@ -42,23 +40,37 @@ pub struct NativeResponse {
 
 impl NativeHttp {
     pub fn new(endpoint: &str, cancellation: CancellationToken) -> Result<Self> {
-        let origin = origin(endpoint)?;
-        let client = Client::builder()
+        Self::configured(endpoint, None, cancellation)
+    }
+    pub fn unix(path: &Path, cancellation: CancellationToken) -> Result<Self> {
+        let socket = Arc::new(crossfire_adapter_filesystem::socket::Socket::open(path)?);
+        Self::configured("http://localhost", Some(socket), cancellation)
+    }
+    fn configured(
+        endpoint: &str,
+        socket: Option<Arc<crossfire_adapter_filesystem::socket::Socket>>,
+        cancellation: CancellationToken,
+    ) -> Result<Self> {
+        let origin = crossfire_contracts::origin::parse(endpoint)?;
+        let mut builder = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .pool_max_idle_per_host(16)
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .map_err(|_| {
-                Failure::new(
-                    ErrorCode::Unavailable,
-                    "Cannot create bounded native HTTP transport",
-                )
-            })?;
+            .connect_timeout(Duration::from_secs(10));
+        if let Some(socket) = &socket {
+            builder = builder.unix_socket(socket.endpoint());
+        }
+        let client = builder.build().map_err(|_| {
+            Failure::new(
+                ErrorCode::Unavailable,
+                "Cannot create bounded native HTTP transport",
+            )
+        })?;
         Ok(Self {
             client,
             origin,
             cancellation,
+            socket,
         })
     }
 
@@ -68,18 +80,32 @@ impl NativeHttp {
         method: Method,
         path: &str,
         body: Option<&Value>,
-        maximum: usize,
-        timeout: Duration,
+        limits: JsonLimits,
     ) -> Result<NativeResponse> {
-        if maximum == 0 || maximum > 64 * MAX_JSON_BYTES {
+        if let Some(socket) = &self.socket {
+            socket.validate()?;
+        }
+        let maximum = limits.response_bytes;
+        let timeout = limits.timeout;
+        if maximum == 0
+            || maximum > 64 * MAX_JSON_BYTES
+            || limits.request_bytes > 64 * MAX_JSON_BYTES
+        {
             return Err(Failure::new(
                 ErrorCode::Invalid,
                 "Invalid HTTP response resource bound",
             ));
         }
-        if ![Method::GET, Method::POST, Method::PUT, Method::DELETE].contains(&method)
+        if ![
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+        ]
+        .contains(&method)
             || timeout < Duration::from_millis(100)
-            || timeout > Duration::from_secs(45)
+            || timeout > Duration::from_secs(120)
             || !path.starts_with('/')
             || path.starts_with("//")
             || path.len() > 65536
@@ -123,12 +149,14 @@ impl NativeHttp {
         if let Some(body) = body {
             validate_json(body)
                 .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid HTTP JSON request"))?;
-            let encoded = serde_json::to_vec(body)
-                .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid HTTP JSON request"))?;
-            if encoded.len() > MAX_JSON_BYTES {
-                return Err(Failure::new(ErrorCode::Limit, "HTTP request exceeds 1 MiB"));
-            }
-            request = request.body(encoded);
+            let mut encoded = crossfire_kernel::bytes::Buffer::new(limits.request_bytes);
+            serde_json::to_writer(&mut encoded, body).map_err(|_| {
+                Failure::new(
+                    ErrorCode::BodyTooLarge,
+                    "HTTP JSON request exceeds its operation bound",
+                )
+            })?;
+            request = request.body(encoded.into_vec());
         }
         let opened = tokio::select! {
             biased;
@@ -196,14 +224,7 @@ impl NativeHttp {
         body: Option<&Value>,
     ) -> Result<NativeResponse> {
         let response = self
-            .json(
-                token,
-                method,
-                path,
-                body,
-                MAX_JSON_BYTES,
-                Duration::from_secs(15),
-            )
+            .json(token, method, path, body, JsonLimits::default())
             .await?;
         if !response.body.is_object() {
             return Err(Failure::new(
@@ -270,22 +291,4 @@ pub fn validate_json(value: &Value) -> Result<()> {
         Ok(())
     }
     visit(value, 0)
-}
-
-pub fn segment(value: &str) -> String {
-    let mut encoded = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        if byte.is_ascii_alphanumeric()
-            || matches!(
-                byte,
-                b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')'
-            )
-        {
-            encoded.push(char::from(byte));
-        } else {
-            use std::fmt::Write;
-            let _formatted = write!(encoded, "%{byte:02X}");
-        }
-    }
-    encoded
 }

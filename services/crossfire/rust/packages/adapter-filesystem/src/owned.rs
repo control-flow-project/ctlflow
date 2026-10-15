@@ -15,6 +15,24 @@ fn invalid() -> Failure {
 
 pub struct OwnedFile(File);
 
+pub fn write_configuration(path: &Path, bytes: &[u8], maximum: usize) -> Result<()> {
+    if bytes.len() > maximum {
+        return Err(Failure::new(
+            ErrorCode::BodyTooLarge,
+            "Configuration exceeds its declared file limit",
+        ));
+    }
+    let parent = path.parent().ok_or_else(invalid)?;
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(invalid)?;
+    if let Some(file) = OwnedFile::open(path, maximum as u64)? {
+        file.configuration_permissions()?;
+    }
+    crate::PrivateDirectory::open_configuration(parent)?.write_atomic(name, bytes)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Information {
     pub key: String,
@@ -22,6 +40,9 @@ pub struct Information {
 }
 
 impl OwnedFile {
+    pub fn into_file(self) -> File {
+        self.0
+    }
     pub fn configuration(&self, maximum: usize) -> Result<Vec<u8>> {
         self.configuration_permissions()?;
         let before = self.0.metadata().map_err(|_| invalid())?;

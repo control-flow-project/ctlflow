@@ -14,7 +14,7 @@ pub fn text(path: &Path, maximum: usize) -> Result<String> {
     String::from_utf8(file.configuration(maximum)?)
         .map_err(|_| Failure::new(ErrorCode::Invalid, "Fleet instructions must be valid UTF-8"))
 }
-fn json_value(value: Toml) -> Result<Value> {
+pub fn json_value(value: Toml) -> Result<Value> {
     Ok(match value {
         Toml::String(value) => Value::String(value),
         Toml::Integer(value) => json!(value),
@@ -150,4 +150,60 @@ pub fn roster_wire(roster: &Roster) -> Value {
             if let Some(options) = &instance.runtime_options { value["runtime_options"] = json!(options); }
             value
         }).collect::<Vec<_>>() })
+}
+pub fn toml_value(value: &Value) -> Result<Toml> {
+    Ok(match value {
+        Value::String(value) => Toml::String(value.clone()),
+        Value::Bool(value) => Toml::Boolean(*value),
+        Value::Number(value) => {
+            if let Some(integer) = value.as_i64() {
+                Toml::Integer(integer)
+            } else {
+                Toml::Float(value.as_f64().ok_or_else(|| {
+                    Failure::new(
+                        ErrorCode::Invalid,
+                        "Native configuration number cannot be represented as TOML",
+                    )
+                })?)
+            }
+        }
+        Value::Array(values) => Toml::Array(values.iter().map(toml_value).collect::<Result<_>>()?),
+        Value::Object(values) => Toml::Table(
+            values
+                .iter()
+                .map(|(key, value)| Ok((key.clone(), toml_value(value)?)))
+                .collect::<Result<_>>()?,
+        ),
+        Value::Null => {
+            return Err(Failure::new(
+                ErrorCode::Invalid,
+                "TOML cannot represent null configuration values",
+            ));
+        }
+    })
+}
+pub fn format(value: &Value) -> Result<String> {
+    let Toml::Table(table) = toml_value(value)? else {
+        return Err(Failure::new(
+            ErrorCode::Invalid,
+            "Configuration must be a TOML table",
+        ));
+    };
+    toml::format(&table)
+}
+pub fn write_roster(configuration: &Configuration, roster: &Roster) -> Result<Configuration> {
+    let source = format(&roster_wire(roster))?;
+    let validated = load(&configuration.directory, Some(&source))?;
+    if load(&configuration.directory, None)?.digest != configuration.digest {
+        return Err(Failure::new(
+            ErrorCode::Conflict,
+            "Fleet files changed during a roster update; no configuration was replaced",
+        ));
+    }
+    crossfire_adapter_filesystem::owned::write_configuration(
+        &configuration.directory.join("runtime.toml"),
+        source.as_bytes(),
+        1048576,
+    )?;
+    Ok(validated)
 }

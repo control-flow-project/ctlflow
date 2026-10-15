@@ -82,6 +82,37 @@ pub struct Authenticated {
     pub permissions: Vec<Permission>,
 }
 
+pub async fn native<A: RepositoryAccess>(
+    repository: &A,
+    matrix: &impl MatrixIdentity,
+    token: &Secret,
+    kind: Option<PrincipalKind>,
+    clock: impl Fn() -> Result<i64>,
+) -> Result<Actor>
+where
+    A::Repository: AuthorizationRepository,
+{
+    let matrix_user_id = matrix.identify(token).await?;
+    repository.with(|repo| {
+        let principal = repo
+            .principal_by_matrix_id(&matrix_user_id)?
+            .filter(|value| kind.is_none_or(|kind| value.kind == kind))
+            .ok_or_else(|| {
+                Failure::new(
+                    ErrorCode::Unauthorized,
+                    "The native session requires a registered identity of the correct kind",
+                )
+            })?;
+        let actor = Actor {
+            principal_id: principal.id,
+            kind: principal.kind,
+            authentication: Some(Authentication::Native { matrix_user_id }),
+        };
+        active_actor(repo, &actor, clock()?)?;
+        Ok(actor)
+    })
+}
+
 pub fn authenticate(
     repo: &mut impl CoreRepository,
     secret: &Secret,

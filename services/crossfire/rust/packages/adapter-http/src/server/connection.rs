@@ -3,7 +3,6 @@ use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use std::{
-    convert::Infallible,
     future::Future,
     net::SocketAddr,
     pin::Pin,
@@ -122,7 +121,7 @@ impl Limits {
             || self.idle < Duration::from_secs(1)
             || self.idle > Duration::from_secs(300)
             || self.request < Duration::from_millis(100)
-            || self.request > Duration::from_secs(60)
+            || self.request > Duration::from_secs(120)
         {
             return Err(Failure::new(
                 ErrorCode::Invalid,
@@ -142,13 +141,17 @@ async fn idle(mut activity: watch::Receiver<Option<Instant>>) {
         }
     }
 }
-fn failure(error: Failure) -> Response<Body> {
+fn failure(error: Failure) -> Result<Response<Body>> {
     let request = crossfire_kernel::identity::id();
     let status = crossfire_contracts::envelope::http_status(error.code);
     let value = serde_json::json!({"error": error, "meta": {"requestId": request}}).to_string();
     let mut response = Response::new(super::full(value));
-    *response.status_mut() =
-        hyper::StatusCode::from_u16(status).unwrap_or(hyper::StatusCode::SERVICE_UNAVAILABLE);
+    *response.status_mut() = hyper::StatusCode::from_u16(status).map_err(|_| {
+        Failure::new(
+            ErrorCode::Invalid,
+            "Canonical HTTP failure status is invalid",
+        )
+    })?;
     response.headers_mut().insert(
         hyper::header::CONTENT_TYPE,
         hyper::header::HeaderValue::from_static("application/json; charset=utf-8"),
@@ -168,7 +171,7 @@ fn failure(error: Failure) -> Response<Body> {
     if let Ok(request) = hyper::header::HeaderValue::from_str(&request) {
         response.headers_mut().insert("x-request-id", request);
     }
-    response
+    Ok(response)
 }
 async fn connection<State, Handler, Task>(
     stream: Stream,
@@ -191,13 +194,13 @@ async fn connection<State, Handler, Task>(
             activity.send_replace(None);
             let outcome = tokio::time::timeout(limits.request, handler(state, request, peer)).await;
             activity.send_replace(Some(Instant::now() + limits.idle));
-            Ok::<_, Infallible>(match outcome {
+            Ok::<_, Failure>(match outcome {
                 Ok(Ok(response)) => response,
-                Ok(Err(error)) => failure(error),
+                Ok(Err(error)) => failure(error)?,
                 Err(_) => failure(Failure::new(
                     ErrorCode::Unavailable,
                     "HTTP operation exceeded its finite deadline",
-                )),
+                ))?,
             })
         }
     });

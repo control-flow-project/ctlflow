@@ -48,15 +48,9 @@ pub struct Confirmation {
 )]
 pub struct JournalState<T> {
     pub session_id: String,
-    #[serde(deserialize_with = "required_option")]
+    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
     pub pending: Option<T>,
     pub confirmed: Vec<Confirmation>,
-}
-
-fn required_option<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
-    input: D,
-) -> std::result::Result<Option<T>, D::Error> {
-    Option::<T>::deserialize(input)
 }
 
 pub struct Journal<T> {

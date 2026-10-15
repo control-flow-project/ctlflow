@@ -105,6 +105,34 @@ pub fn attachment(value: &Value) -> Result<Attachment> {
         session_id: check::text(&value["sessionId"], 1, 200)?.to_owned(),
     })
 }
+pub fn scheduled(value: &Value) -> Result<ScheduledWake> {
+    let value = check::object(
+        value,
+        &[
+            "deliveryId",
+            "ruleId",
+            "ruleRevision",
+            "name",
+            "message",
+            "scheduledAt",
+            "sessionId",
+            "ownerMatrixId",
+            "authorizerMatrixId",
+        ],
+        &[],
+    )?;
+    Ok(ScheduledWake {
+        delivery_id: check::identifier(&value["deliveryId"])?.to_owned(),
+        rule_id: check::identifier(&value["ruleId"])?.to_owned(),
+        rule_revision: check::integer(&value["ruleRevision"], 0, check::SAFE_INTEGER)?,
+        name: check::text(&value["name"], 1, 100)?.to_owned(),
+        message: check::plain_text(&value["message"], 16384)?.to_owned(),
+        scheduled_at: check::integer(&value["scheduledAt"], 0, check::SAFE_INTEGER)?,
+        session_id: check::text(&value["sessionId"], 1, 200)?.to_owned(),
+        owner_matrix_id: check::matrix_user_id(&value["ownerMatrixId"])?.to_owned(),
+        authorizer_matrix_id: check::matrix_user_id(&value["authorizerMatrixId"])?.to_owned(),
+    })
+}
 
 pub struct ScheduleView<'a>(pub &'a Schedule);
 impl Serialize for ScheduleView<'_> {

@@ -1,4 +1,6 @@
-use crossfire_adapter_http::{NativeHttp, origin, segment, validate_json};
+use crossfire_adapter_http::{NativeHttp, validate_json};
+use crossfire_contracts::origin;
+use crossfire_contracts::origin::segment;
 use crossfire_kernel::{failure::ErrorCode, secret::Secret};
 use reqwest::Method;
 use serde_json::{Value, json};
@@ -98,8 +100,11 @@ async fn oversized_invalid_and_cancelled_http_remain_bounded()
             Method::GET,
             "/state",
             None,
-            10,
-            Duration::from_secs(1),
+            crossfire_adapter_http::JsonLimits {
+                response_bytes: 10,
+                timeout: Duration::from_secs(1),
+                ..Default::default()
+            },
         )
         .await;
     assert_eq!(
@@ -128,12 +133,12 @@ async fn oversized_invalid_and_cancelled_http_remain_bounded()
 
 #[test]
 fn origin_json_encoding_and_secrets_are_explicit() {
-    assert!(origin("https://server.test").is_ok());
-    assert!(origin("http://localhost:8080").is_ok());
-    assert!(origin("http://evil.test").is_err());
-    assert!(origin("https://user:secret@server.test").is_err());
-    assert!(origin("https://server.test/path").is_err());
-    assert!(origin("https://server.test?secret=1").is_err());
+    assert!(origin::parse("https://server.test").is_ok());
+    assert!(origin::parse("http://localhost:8080").is_ok());
+    assert!(origin::parse("http://evil.test").is_err());
+    assert!(origin::parse("https://user:secret@server.test").is_err());
+    assert!(origin::parse("https://server.test/path").is_err());
+    assert!(origin::parse("https://server.test?secret=1").is_err());
     assert_eq!(segment("!a:b /🚀"), "!a%3Ab%20%2F%F0%9F%9A%80");
     let secret = Secret::new("must-not-appear".to_owned());
     assert_eq!(format!("{secret:?}"), "[redacted]");

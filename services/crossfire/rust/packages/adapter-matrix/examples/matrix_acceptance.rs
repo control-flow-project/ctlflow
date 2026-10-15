@@ -1,5 +1,6 @@
-use crossfire_adapter_http::{NativeHttp, segment};
+use crossfire_adapter_http::NativeHttp;
 use crossfire_adapter_matrix::account::{Authority, Configuration};
+use crossfire_contracts::origin::segment;
 use crossfire_domain::{
     matrix::{AccessMode, Membership, RoomAccess, RoomAdmission, RoomPower},
     port::MatrixIdentity,

@@ -19,6 +19,47 @@ impl ReadRepository for Store {
     fn identities(&mut self, ids: &[String]) -> Result<Vec<PrincipalIdentity>> {
         discovery::identities(self, ids)
     }
+    fn wake_senders_many(
+        &mut self,
+        ids: &[String],
+    ) -> Result<BTreeMap<String, Vec<crossfire_domain::wake::Sender>>> {
+        use crate::{error::failure, tables::agent_wake_sender};
+        use diesel::prelude::*;
+        let rows = agent_wake_sender::table
+            .filter(agent_wake_sender::agent_id.eq_any(ids))
+            .select((
+                agent_wake_sender::agent_id,
+                agent_wake_sender::sender_principal_id,
+                agent_wake_sender::include_agents,
+            ))
+            .order((
+                agent_wake_sender::agent_id.asc(),
+                agent_wake_sender::sender_principal_id.asc(),
+            ))
+            .load::<(String, String, i64)>(self.database.connection())
+            .map_err(failure)?;
+        let mut result = BTreeMap::<String, Vec<crossfire_domain::wake::Sender>>::new();
+        for (agent, principal_id, include) in rows {
+            let include_agents = match include {
+                0 => false,
+                1 => true,
+                _ => {
+                    return Err(crossfire_kernel::Failure::new(
+                        crossfire_kernel::failure::ErrorCode::Unavailable,
+                        "Invalid stored wake sender",
+                    ));
+                }
+            };
+            result
+                .entry(agent)
+                .or_default()
+                .push(crossfire_domain::wake::Sender {
+                    principal_id,
+                    include_agents,
+                });
+        }
+        Ok(result)
+    }
     fn catalog_roles(&mut self, kind: PrincipalKind) -> Result<Vec<CatalogRole>> {
         catalog::roles(self, kind)
     }

@@ -8,11 +8,11 @@ use std::sync::Arc;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Published {
-    #[serde(deserialize_with = "required_option")]
+    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
     pub turn: Option<String>,
     pub text: Arc<str>,
     pub message_id: String,
-    #[serde(deserialize_with = "required_option")]
+    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
     pub boundary: Option<Boundary>,
     pub initializing: bool,
 }
@@ -24,12 +24,6 @@ pub struct Input {
     pub published: Published,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resumption: Option<Published>,
-}
-
-fn required_option<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
-    value: D,
-) -> std::result::Result<Option<T>, D::Error> {
-    Option::<T>::deserialize(value)
 }
 
 impl Published {

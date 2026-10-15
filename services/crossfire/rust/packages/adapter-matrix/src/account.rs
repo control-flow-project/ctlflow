@@ -1,5 +1,6 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use crossfire_adapter_http::{NativeHttp, segment};
+use crossfire_adapter_http::NativeHttp;
+use crossfire_contracts::origin::segment;
 use crossfire_contracts::validation;
 use crossfire_domain::matrix::Account;
 use crossfire_domain::port::MatrixIdentity;

@@ -1,7 +1,15 @@
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
+pub mod absolute_state;
+pub mod agent_projects;
+pub mod assets;
+pub mod local_state;
 pub mod lock;
+pub mod logging;
+pub mod managed_links;
 pub mod owned;
 pub mod publication;
+pub mod release;
+pub mod socket;
 use rustix::fs::{AtFlags, Mode, OFlags};
 use std::{
     fs::File,
@@ -152,6 +160,17 @@ impl PrivateDirectory {
     }
 
     pub fn open(path: &Path, create: bool) -> Result<Self> {
+        Self::open_directory(path, create, true)
+    }
+    pub(crate) fn open_configuration(path: &Path) -> Result<Self> {
+        let directory = Self::open_directory(path, false, false)?;
+        let info = rustix::fs::fstat(&directory.descriptor).map_err(|_| denied())?;
+        if info.st_uid != rustix::process::getuid().as_raw() || info.st_mode & 0o022 != 0 {
+            return Err(denied());
+        }
+        Ok(directory)
+    }
+    fn open_directory(path: &Path, create: bool, private_root: bool) -> Result<Self> {
         if !path.is_absolute()
             || path
                 .components()
@@ -178,7 +197,7 @@ impl PrivateDirectory {
             let Component::Normal(part) = component else {
                 return Err(denied());
             };
-            let private = index + 1 == components.len();
+            let private = private_root && index + 1 == components.len();
             let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
             let opened = match rustix::fs::openat(&current, *part, flags, Mode::empty()) {
                 Ok(opened) => opened,
@@ -206,6 +225,24 @@ impl PrivateDirectory {
         } else {
             Ok(())
         }
+    }
+    pub fn publish_directory(&self, source: &str, target: &str) -> Result<()> {
+        self.child(source, false)?;
+        Self::leaf(target)?;
+        rustix::fs::renameat_with(
+            &self.descriptor,
+            source,
+            &self.descriptor,
+            target,
+            rustix::fs::RenameFlags::NOREPLACE,
+        )
+        .map_err(|_| {
+            Failure::new(
+                ErrorCode::Conflict,
+                "Private directory publication conflicts with an existing identity",
+            )
+        })?;
+        self.sync()
     }
 
     pub fn prepared_database(&self, name: &str) -> Result<()> {
@@ -286,6 +323,19 @@ impl PrivateDirectory {
         Ok(File::from(opened))
     }
 
+    pub fn append(&self, name: &str) -> Result<File> {
+        Self::leaf(name)?;
+        let flags = OFlags::WRONLY
+            | OFlags::CREATE
+            | OFlags::APPEND
+            | OFlags::NOFOLLOW
+            | OFlags::NONBLOCK
+            | OFlags::CLOEXEC;
+        let opened = rustix::fs::openat(&self.descriptor, name, flags, Mode::from_raw_mode(0o600))
+            .map_err(|_| denied())?;
+        check_file(&opened)?;
+        Ok(File::from(opened))
+    }
     pub fn remove(&self, name: &str) -> Result<()> {
         Self::leaf(name)?;
         self.open_private(name, false)?;
@@ -293,9 +343,44 @@ impl PrivateDirectory {
         rustix::fs::fsync(&self.descriptor).map_err(|_| denied())
     }
 
+    pub fn remove_optional(&self, name: &str) -> Result<()> {
+        Self::leaf(name)?;
+        let descriptor = match rustix::fs::openat(
+            &self.descriptor,
+            name,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
+            Ok(descriptor) => descriptor,
+            Err(rustix::io::Errno::NOENT) => return Ok(()),
+            Err(_) => return Err(denied()),
+        };
+        check_file(&descriptor)?;
+        rustix::fs::unlinkat(&self.descriptor, name, AtFlags::empty()).map_err(|_| denied())?;
+        self.sync()
+    }
+    pub fn private_file_size(&self, name: &str) -> Result<Option<u64>> {
+        Self::leaf(name)?;
+        let descriptor = match rustix::fs::openat(
+            &self.descriptor,
+            name,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        ) {
+            Ok(descriptor) => descriptor,
+            Err(rustix::io::Errno::NOENT) => return Ok(None),
+            Err(_) => return Err(denied()),
+        };
+        check_file(&descriptor)?;
+        let metadata = rustix::fs::fstat(&descriptor).map_err(|_| denied())?;
+        u64::try_from(metadata.st_size)
+            .map(Some)
+            .map_err(|_| denied())
+    }
+
     pub fn write_atomic(&self, name: &str, contents: &[u8]) -> Result<()> {
         Self::leaf(name)?;
-        let temporary = format!(".{name}.{}", identity::id());
+        let temporary = format!(".pending-{}", identity::id());
         let opened = rustix::fs::openat(
             &self.descriptor,
             &temporary,

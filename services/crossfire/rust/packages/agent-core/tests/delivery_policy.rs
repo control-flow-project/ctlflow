@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 fn listener_policy_separates_wake_read_reply_and_shared_or_room_history_without_inventing_wire_generations()
  {
     let policy = Policy {
+        mode: crossfire_domain::identity::WakeMode::Selected,
         active: true,
         rooms: BTreeMap::from([
             (

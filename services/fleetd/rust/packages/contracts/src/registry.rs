@@ -23,14 +23,29 @@ pub fn registrations(value: &Value) -> Result<Vec<Registration>> {
                 ],
                 &[],
             )?;
-            Ok(Registration {
+            let record = Registration {
                 fleet_id: check::identifier(&value["fleetId"])?.to_owned(),
                 fleet_key: check::name(&value["fleetKey"])?.to_owned(),
                 directory: PathBuf::from(check::text(&value["directory"], 1, 4096)?),
                 label: check::text(&value["label"], 1, 100)?.to_owned(),
                 revision: check::integer(&value["revision"], 0, check::SAFE_INTEGER)?,
                 digest: check::text(&value["digest"], 64, 64)?.to_owned(),
-            })
+            };
+            if !record
+                .directory
+                .to_str()
+                .is_some_and(crate::configuration::absolute_path)
+                || !record
+                    .digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            {
+                return Err(Failure::new(
+                    ErrorCode::Invalid,
+                    "Invalid fleet registration path or digest",
+                ));
+            }
+            Ok(record)
         })
         .collect::<Result<Vec<_>>>()?;
     if values
@@ -49,6 +64,18 @@ pub fn registrations(value: &Value) -> Result<Vec<Registration>> {
         return Err(Failure::new(
             ErrorCode::Invalid,
             "Duplicate private fleet registration",
+        ));
+    }
+    if values
+        .iter()
+        .map(|value| &value.fleet_key)
+        .collect::<BTreeSet<_>>()
+        .len()
+        != values.len()
+    {
+        return Err(Failure::new(
+            ErrorCode::Invalid,
+            "Duplicate private fleet key",
         ));
     }
     Ok(values)

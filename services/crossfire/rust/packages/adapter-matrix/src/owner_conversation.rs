@@ -1,5 +1,5 @@
 use crate::account::{API, Authority, OperationKey};
-use crossfire_adapter_http::segment;
+use crossfire_contracts::origin::segment;
 use crossfire_contracts::{matrix_room, validation};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, secret::Secret};
 use reqwest::Method;

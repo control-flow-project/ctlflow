@@ -56,7 +56,7 @@ pub fn policy(value: &Value) -> Result<Policy> {
         invite_agents: !permissions.is_empty(),
     })
 }
-fn controller(value: &Value) -> Result<crossfire_domain::enrollment::values::Controller> {
+pub fn controller(value: &Value) -> Result<crossfire_domain::enrollment::values::Controller> {
     let value = check::object(value, &["name"], &["metadata"])?;
     let name = check::text(&value["name"], 1, 100)?.to_owned();
     let mut metadata = BTreeMap::new();

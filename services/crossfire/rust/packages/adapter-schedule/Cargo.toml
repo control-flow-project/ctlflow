@@ -11,7 +11,8 @@ publish.workspace = true
 crossfire-kernel.workspace = true
 crossfire-domain.workspace = true
 chrono.workspace = true
-chrono-tz.workspace = true
+tz.workspace = true
+crossfire-adapter-filesystem.workspace = true
 
 [dev-dependencies]
 serde.workspace = true

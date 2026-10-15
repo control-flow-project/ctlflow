@@ -1,5 +1,6 @@
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use std::collections::BTreeMap;
+pub mod operations;
 
 pub fn parameters<'a>(
     input: &'a [(String, String)],

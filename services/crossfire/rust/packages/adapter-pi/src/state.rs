@@ -17,9 +17,9 @@ use std::{
 pub struct Binding {
     pub context: String,
     pub file: String,
-    #[serde(deserialize_with = "required_option")]
+    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
     pub session_id: Option<String>,
-    #[serde(deserialize_with = "required_option")]
+    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
     pub instructions_digest: Option<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -27,11 +27,6 @@ pub struct Binding {
 pub struct Registry {
     pub mode: String,
     pub bindings: Vec<Binding>,
-}
-fn required_option<'de, T: Deserialize<'de>, D: serde::Deserializer<'de>>(
-    value: D,
-) -> std::result::Result<Option<T>, D::Error> {
-    Option::<T>::deserialize(value)
 }
 fn invalid(message: &str) -> Failure {
     Failure::new(ErrorCode::Invalid, message)

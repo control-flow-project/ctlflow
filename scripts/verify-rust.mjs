@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
-import { availableParallelism, tmpdir } from 'node:os';
+import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
@@ -17,7 +17,8 @@ const tasks = readFileSync(join('/sys/fs/cgroup', cgroup, 'pids.max'), 'utf8').t
 assert(memory !== 'max' && BigInt(memory) > 0n && BigInt(memory) <= 16n * 1024n ** 3n, 'Run verification in a process scope bounded to at most 16 GiB');
 assert.equal(swap, '0', 'Verification must not consume swap');
 assert(tasks !== 'max' && Number(tasks) <= 2048, 'Verification must have a finite 2048-task aggregate bound');
-const prepared = mkdtempSync(join(tmpdir(), 'crossfire-rust-knex-')); chmodSync(prepared, 0o700);
+const temporary = join(root, '.temp'); mkdirSync(temporary, {recursive:true, mode:0o700});
+const prepared = mkdtempSync(join(temporary, 'crossfire-rust-knex-')); chmodSync(prepared, 0o700);
 const template = join(prepared, 'management.sqlite');
 process.on('exit', () => rmSync(prepared, {recursive:true, force:true}));
 await migrateDatabase(template);
@@ -66,6 +67,9 @@ const nativeEnvironment = {...process.env, CROSSFIRE_TEST_PI_BINARY:piBinary};
 await execute('node', ['services/crossfire/scripts/generate-rust-schema.mjs','--database',template,'--check']);
 await execute('node', ['services/crossfire/scripts/generate-rust-catalog.mjs','--check']);
 await execute('node', ['services/crossfire/scripts/generate-rust-operations.mjs','--check']);
+await execute('node', ['services/crossfire/scripts/generate-rust-onboarding.mjs','--check']);
+await execute('node', ['services/fleetd/scripts/generate-rust-operations.mjs','--check']);
+await execute('node', ['services/crossfire/scripts/generate-rust-timezones.mjs','--check']);
 await execute('node', ['services/crossfire/scripts/generate-rust-pi-extension.mjs']);
 const examples = new Map();
 await execute('cargo', ['build','--workspace','--examples','--locked','--message-format=json'], {line:text => {
@@ -80,7 +84,7 @@ await execute('cargo', ['test','--workspace','--all-targets','--locked','--no-ru
   }
 }});
 assert(executables.size > 0, 'No compiled Rust test artifacts were found');
-const directory = mkdtempSync(join(tmpdir(), 'crossfire-rust-verification-')); chmodSync(directory, 0o700);
+const directory = mkdtempSync(join(temporary, 'crossfire-rust-verification-')); chmodSync(directory, 0o700);
 const pending = [...executables.entries()], results = [], failures = [];
 try {
   const workers = Array.from({length:Math.min(availableParallelism(), pending.length)}, async () => {

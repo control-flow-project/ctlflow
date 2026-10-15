@@ -1,4 +1,4 @@
-use crossfire_adapter_runtime::room_operations::Operations;
+use crossfire_adapter_matrix::room_operations::Operations;
 use crossfire_domain::room_access::operations::RoomOperations;
 use std::sync::Arc;
 

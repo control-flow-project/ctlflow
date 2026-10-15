@@ -12,6 +12,7 @@ pub struct Room {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {
     pub active: bool,
+    pub mode: crossfire_domain::identity::WakeMode,
     pub rooms: BTreeMap<String, Room>,
     pub senders: BTreeSet<String>,
     pub max_message_bytes: usize,

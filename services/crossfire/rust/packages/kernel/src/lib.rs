@@ -1,3 +1,5 @@
+pub mod bytes;
+pub mod data;
 pub mod failure;
 pub mod identity;
 pub mod secret;

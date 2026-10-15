@@ -1,6 +1,6 @@
 use crossfire_adapter_http::NativeHttp;
 use crossfire_adapter_matrix::account::{Authority, Configuration};
-use crossfire_adapter_runtime::room_operations::Operations;
+use crossfire_adapter_matrix::room_operations::Operations;
 use crossfire_adapter_sqlite::store::{SharedStore, Store};
 use crossfire_contracts::{enrollment::Digest, identity::IntentHash};
 use crossfire_domain::{

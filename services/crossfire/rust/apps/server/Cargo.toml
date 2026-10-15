@@ -1,0 +1,41 @@
+[package]
+name = "crossfire-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "crossfire"
+path = "src/main.rs"
+
+[dependencies]
+crossfire-kernel.workspace = true
+crossfire-domain.workspace = true
+crossfire-contracts.workspace = true
+crossfire-adapter-filesystem.workspace = true
+crossfire-adapter-sqlite.workspace = true
+crossfire-adapter-matrix.workspace = true
+crossfire-adapter-http.workspace = true
+crossfire-adapter-schedule.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+url.workspace = true
+bytes.workspace = true
+base64.workspace = true
+hyper.workspace = true
+http-body-util.workspace = true
+futures-util.workspace = true
+percent-encoding.workspace = true
+
+[dev-dependencies]
+crossfire-test-support.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

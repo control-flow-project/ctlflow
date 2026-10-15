@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+  "services/crossfire/rust/apps/server",
   "services/crossfire/rust/packages/kernel",
   "services/crossfire/rust/packages/domain",
   "services/crossfire/rust/packages/contracts",
@@ -15,10 +16,13 @@ members = [
   "services/crossfire/rust/packages/adapter-process",
   "services/crossfire/rust/packages/adapter-toml",
   "services/crossfire/rust/packages/adapter-pi",
+  "services/crossfire/rust/packages/adapter-crossfire",
   "services/crossfire/rust/tests/support",
   "services/fleetd/rust/packages/domain",
   "services/fleetd/rust/packages/contracts",
   "services/fleetd/rust/packages/storage",
+  "services/fleetd/rust/packages/adapter-execution",
+  "services/fleet/rust/packages/daemon-client",
 ]
 
 [workspace.package]
@@ -44,10 +48,13 @@ crossfire-adapter-runtime = { path = "services/crossfire/rust/packages/adapter-r
 crossfire-adapter-process = { path = "services/crossfire/rust/packages/adapter-process" }
 crossfire-adapter-toml = { path = "services/crossfire/rust/packages/adapter-toml" }
 crossfire-adapter-pi = { path = "services/crossfire/rust/packages/adapter-pi" }
+crossfire-adapter-crossfire = { path = "services/crossfire/rust/packages/adapter-crossfire" }
 crossfire-test-support = { path = "services/crossfire/rust/tests/support" }
 fleetd-domain = { path = "services/fleetd/rust/packages/domain" }
 fleetd-contracts = { path = "services/fleetd/rust/packages/contracts" }
 fleetd-storage = { path = "services/fleetd/rust/packages/storage" }
+fleetd-adapter-execution = { path = "services/fleetd/rust/packages/adapter-execution" }
+fleet-daemon-client = { path = "services/fleet/rust/packages/daemon-client" }
 base64 = "=0.22.1"
 diesel = { version = "=2.3.14", default-features = false, features = ["sqlite", "32-column-tables", "returning_clauses_for_sqlite_3_35"] }
 libsqlite3-sys = { version = "=0.37.0", features = ["bundled"] }
@@ -60,12 +67,12 @@ tempfile = "=3.27.0"
 uuid = { version = "=1.24.0", features = ["v4"] }
 zeroize = "=1.9.1"
 hmac = "=0.12.1"
-reqwest = { version = "=0.13.4", default-features = false, features = ["rustls", "json"] }
+reqwest = { version = "=0.13.4", default-features = false, features = ["rustls", "json", "stream"] }
 tokio = { version = "=1.53.3", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "process", "signal", "fs"] }
 tokio-util = { version = "=0.7.20", features = ["rt"] }
 url = "=2.5.8"
 chrono = { version = "=0.4.45", default-features = false, features = ["std"] }
-chrono-tz = { version = "=0.10.4", default-features = false, features = ["std"] }
+tz = { package = "tz-rs", version = "=0.7.3", default-features = false, features = ["std"] }
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
 futures-util = { version = "=0.3.34", default-features = false, features = ["sink", "std", "async-await"] }
 async-io = "=2.6.0"
@@ -75,6 +82,7 @@ bytes = "=1.12.1"
 hyper = { version = "=1.12.0", default-features = false, features = ["server", "http1"] }
 hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
 http-body-util = "=0.1.5"
+percent-encoding = "=2.3.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

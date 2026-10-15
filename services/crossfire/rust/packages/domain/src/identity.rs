@@ -17,6 +17,15 @@ pub enum WakeMode {
     Everyone,
     Selected,
 }
+impl WakeMode {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Humans => "humans",
+            Self::Everyone => "everyone",
+            Self::Selected => "selected",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Role {

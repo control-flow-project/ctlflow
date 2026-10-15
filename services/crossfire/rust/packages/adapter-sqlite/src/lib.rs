@@ -9,6 +9,7 @@ mod enrollment;
 mod error;
 mod expression;
 mod fleet;
+mod fleet_manage;
 mod fleet_message;
 mod fleet_runtime;
 mod grouping;

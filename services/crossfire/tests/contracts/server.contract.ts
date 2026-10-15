@@ -25,7 +25,8 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
   await scope.test('invitation registration is explicit and works without an Origin on its GET review', async () => {
     const outsider = await fixture.member('contract-outsider'); const page = await fixture.operation(operations.agents, {}, undefined, outsider); assert.equal(list(page.data).length, 0);
     const response = await fixture.raw('/_matrix/client/v3/user_directory/search', 'POST', { search_term: '', limit: 1 }, { Authorization: 'Bearer ' + outsider.nativeToken }); assert.equal(response.status, 200); assert.equal(list(record(response.body).results).length, 1);
-    const hidden = await fixture.raw('/api/instance-policy', 'GET', undefined, fixture.headers(outsider)); assert.equal(hidden.status, 403);
+    await fixture.operation(operations.policy, {}, undefined, outsider);
+    const hidden = await fixture.raw('/api/members', 'GET', undefined, fixture.headers(outsider)); assert.equal(hidden.status, 403);
   });
   const agent = await fixture.agent(); const params = { agentId: agent.id }, fleetParams = { fleetId: agent.fleetId };
   await scope.test('enrollment identities, collisions, owner directory and scoped grants', async () => {
@@ -51,9 +52,10 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     await fixture.operation(operations.reportListener, { ...params, runId }, { release: fixture.release.release.manifest.release, messagesDelivered: 1, stopped: true, statistics: null, controller }, agent.token); await fixture.operation(operations.recordFleetNativeStop, { ...fleetParams, agentId: agent.id }, { connectionId: agent.connectionId, runId, receiptId: randomUUID() }, agent.credential);
   });
   await scope.test('static publications are separate-origin, immutable, readable by link and owner-deletable', async () => {
+    const runId = randomUUID(); await fixture.operation(operations.reportListener, { ...params, runId }, { release: fixture.release.release.manifest.release, messagesDelivered: 0, stopped: false, statistics: null, controller: { fleetId: agent.fleetId, connectionId: agent.connectionId, credential: agent.credential } }, agent.token);
     const bytes = Buffer.from('<!doctype html><script>document.body.dataset.report="ready"</script><body>Shared report</body>'); const publication = await fixture.data(operations.createPublication, {}, { title: 'Shared report', files: [{ path: 'index.html', bytes: bytes.length, mediaType: 'text/html', sha256: createHash('sha256').update(bytes).digest('hex') }] }, agent.token);
     const publicationId = text(publication.id); const file = record(list(publication.files)[0]); await fixture.operation(operations.uploadPublicationFile, { publicationId, fileId: text(file.id) }, bytes, agent.token); const committed = await fixture.data(operations.commitPublication, { publicationId }, { expectedRevision: integer(publication.revision) }, agent.token); const url = new URL(text(committed.url)); assert.equal(url.origin, fixture.contentOrigin);
-    const published = await contractHttp(fixture.contentOrigin, 'GET', url.pathname); assert.equal(published.status, 200); assert.equal(published.headers['set-cookie'], undefined); assert.equal(published.headers['access-control-allow-origin'], undefined); assert.match(text(published.headers['content-security-policy']), /sandbox/u);
+    const published = await contractHttp(fixture.contentOrigin, 'GET', url.pathname); assert.equal(published.status, 200); assert.equal(published.headers['set-cookie'], undefined); assert.equal(published.headers['access-control-allow-origin'], '*'); assert.equal(published.headers['access-control-allow-credentials'], undefined); assert.match(text(published.headers['content-security-policy']), /sandbox allow-scripts/u); assert(!text(published.headers['content-security-policy']).includes('allow-same-origin'));
     await fixture.operation(operations.deletePublication, { publicationId }, { expectedRevision: integer(committed.revision) }); assert.equal((await contractHttp(fixture.contentOrigin, 'GET', url.pathname)).status, 404);
   });
   await scope.test('every backend resumes the exact same SQLite file and canonical identities', async () => {

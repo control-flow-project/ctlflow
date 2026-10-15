@@ -1,13 +1,13 @@
 use bytes::Bytes;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
-use http_body_util::{BodyExt, Full, Limited, combinators::BoxBody};
+use http_body_util::{BodyExt, Full, Limited, combinators::UnsyncBoxBody};
 use hyper::body::Incoming;
 use serde_json::Value;
-pub type Body = BoxBody<Bytes, Failure>;
+pub type Body = UnsyncBoxBody<Bytes, Failure>;
 pub fn full(value: impl Into<Bytes>) -> Body {
     Full::new(value.into())
         .map_err(|never| match never {})
-        .boxed()
+        .boxed_unsync()
 }
 pub fn empty() -> Body {
     full(Bytes::new())

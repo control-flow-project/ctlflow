@@ -396,7 +396,7 @@ async fn authority_changes_during_native_room_reads_roll_back_without_holding_th
 #[tokio::test]
 async fn native_reconciliation_preserves_a_manual_departure_instead_of_silently_joining_again()
 -> Result<(), Box<dyn std::error::Error>> {
-    use crossfire_adapter_runtime::room_operations::Operations;
+    use crossfire_adapter_matrix::room_operations::Operations;
     use crossfire_domain::room_access::reconcile;
     let mut scenario = Scenario::create()?;
     let _guest = scenario.add_human("@guest:example.test")?;

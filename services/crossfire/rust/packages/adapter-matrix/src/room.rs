@@ -1,5 +1,6 @@
 use crate::account::{API, Authority};
-use crossfire_adapter_http::{MAX_JSON_BYTES, segment};
+use crossfire_adapter_http::JsonLimits;
+use crossfire_contracts::origin::segment;
 use crossfire_contracts::{
     matrix_room::{self, StateEvent},
     validation,
@@ -7,7 +8,6 @@ use crossfire_contracts::{
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
 use reqwest::Method;
 use serde_json::{Value, json};
-use std::time::Duration;
 
 impl Authority {
     pub async fn state(&self, user: &str, room: &str) -> Result<Vec<StateEvent>> {
@@ -29,8 +29,7 @@ impl Authority {
                 Method::GET,
                 &format!("{API}/rooms/{}/state", segment(room)),
                 None,
-                MAX_JSON_BYTES,
-                Duration::from_secs(15),
+                JsonLimits::default(),
             )
             .await?;
         if response.status != 200 {

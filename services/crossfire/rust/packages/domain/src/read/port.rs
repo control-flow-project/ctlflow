@@ -19,6 +19,10 @@ pub trait ReadRepository:
         filter: &DiscoveryFilter<'_>,
     ) -> Result<Page<crate::identity::PrincipalSummary>>;
     fn identities(&mut self, matrix_ids: &[String]) -> Result<Vec<PrincipalIdentity>>;
+    fn wake_senders_many(
+        &mut self,
+        agent_ids: &[String],
+    ) -> Result<BTreeMap<String, Vec<crate::wake::Sender>>>;
     fn catalog_roles(&mut self, kind: PrincipalKind) -> Result<Vec<CatalogRole>>;
     fn catalog_permissions(&mut self) -> Result<Vec<CatalogPermission>>;
     fn agents_page(

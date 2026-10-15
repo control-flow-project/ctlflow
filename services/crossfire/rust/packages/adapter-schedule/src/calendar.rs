@@ -1,40 +1,12 @@
+use crate::time_zone::{Zone, zone};
 use crate::{
     fields::{Calendar, contains},
     invalid,
 };
-use chrono::{DateTime, Datelike, LocalResult, NaiveDateTime, Offset, TimeDelta, TimeZone, Utc};
-use chrono_tz::{TZ_VARIANTS, Tz};
+use chrono::{DateTime, Datelike, FixedOffset, LocalResult, NaiveDateTime, Offset, TimeDelta, Utc};
 use crossfire_kernel::Result;
 
-fn zone(source: &str) -> Result<Tz> {
-    if source.len() > 100 || source.is_empty() {
-        return Err(invalid("Choose an IANA time zone"));
-    }
-    let mut parts = source.split('/');
-    let first = parts
-        .next()
-        .ok_or_else(|| invalid("Choose an IANA time zone"))?;
-    if first.is_empty()
-        || !first
-            .bytes()
-            .all(|value| value.is_ascii_alphabetic() || value == b'_')
-        || parts.any(|part| {
-            part.is_empty()
-                || !part.bytes().all(|value| {
-                    value.is_ascii_alphanumeric() || matches!(value, b'_' | b'+' | b'-')
-                })
-        })
-    {
-        return Err(invalid("Choose an IANA time zone"));
-    }
-    TZ_VARIANTS
-        .iter()
-        .copied()
-        .find(|zone| zone.name().eq_ignore_ascii_case(source))
-        .ok_or_else(|| invalid("Unknown IANA time zone"))
-}
-
-fn earliest(value: LocalResult<DateTime<Tz>>) -> Option<DateTime<Tz>> {
+fn earliest(value: LocalResult<DateTime<FixedOffset>>) -> Option<DateTime<FixedOffset>> {
     match value {
         LocalResult::Single(value) => Some(value),
         LocalResult::Ambiguous(first, second) => Some(first.min(second)),
@@ -42,8 +14,8 @@ fn earliest(value: LocalResult<DateTime<Tz>>) -> Option<DateTime<Tz>> {
     }
 }
 
-fn resolve(zone: Tz, local: NaiveDateTime) -> Result<DateTime<Tz>> {
-    if let Some(value) = earliest(zone.from_local_datetime(&local)) {
+fn resolve(zone: &Zone, local: NaiveDateTime) -> Result<DateTime<FixedOffset>> {
+    if let Some(value) = earliest(zone.local(local)?) {
         return Ok(value);
     }
     let mut before = None;
@@ -52,12 +24,16 @@ fn resolve(zone: Tz, local: NaiveDateTime) -> Result<DateTime<Tz>> {
         if before.is_none() {
             before = local
                 .checked_sub_signed(TimeDelta::hours(hours))
-                .and_then(|time| earliest(zone.from_local_datetime(&time)));
+                .map(|time| zone.local(time).map(earliest))
+                .transpose()?
+                .flatten();
         }
         if after.is_none() {
             after = local
                 .checked_add_signed(TimeDelta::hours(hours))
-                .and_then(|time| earliest(zone.from_local_datetime(&time)));
+                .map(|time| zone.local(time).map(earliest))
+                .transpose()?
+                .flatten();
         }
         if before.is_some() && after.is_some() {
             break;
@@ -70,7 +46,9 @@ fn resolve(zone: Tz, local: NaiveDateTime) -> Result<DateTime<Tz>> {
         - i64::from(before.offset().fix().local_minus_utc());
     local
         .checked_add_signed(TimeDelta::seconds(difference))
-        .and_then(|time| earliest(zone.from_local_datetime(&time)))
+        .map(|time| zone.local(time).map(earliest))
+        .transpose()?
+        .flatten()
         .ok_or_else(|| invalid("Calendar time-zone gap cannot be resolved"))
 }
 
@@ -83,7 +61,7 @@ pub(crate) fn next(expression: &str, time_zone: &str, after: i64) -> Result<i64>
     let zone = zone(time_zone)?;
     let instant = DateTime::<Utc>::from_timestamp_millis(after)
         .ok_or_else(|| invalid("Invalid scheduling time"))?;
-    let zoned = instant.with_timezone(&zone);
+    let zoned = zone.at(instant)?;
     let local = zoned.naive_local();
     let mut day = local.date();
     let end_year = day
@@ -104,14 +82,14 @@ pub(crate) fn next(expression: &str, time_zone: &str, after: i64) -> Result<i64>
                     let candidate = day
                         .and_hms_opt(hour, minute, 0)
                         .ok_or_else(|| invalid("Invalid calendar date"))?;
-                    let mapped = zone.from_local_datetime(&candidate);
+                    let mapped = zone.local(candidate)?;
                     let ambiguous = matches!(mapped, LocalResult::Ambiguous(_, _));
                     let every_hour = calendar.hour.mask == 0xff_ffff;
                     if candidate < local && !(ambiguous && every_hour) {
                         continue;
                     }
-                    let mut value = resolve(zone, candidate)?;
-                    let repeated_local = match zone.from_local_datetime(&local) {
+                    let mut value = resolve(&zone, candidate)?;
+                    let repeated_local = match zone.local(local)? {
                         LocalResult::Ambiguous(first, second) => zoned == first.max(second),
                         _ => false,
                     };

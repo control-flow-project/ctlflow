@@ -8,6 +8,51 @@ impl<F: Fn() -> Result<i64>> Clock for F {
     }
 }
 pub const MAX_TIMESTAMP: i64 = 8_640_000_000_000_000;
+pub fn parse_iso_timestamp(value: &str) -> Result<i64> {
+    let invalid = || {
+        Failure::new(
+            ErrorCode::Invalid,
+            "Timestamp is not in the canonical shared calendar format",
+        )
+    };
+    let (date, time) = value.split_once('T').ok_or_else(invalid)?;
+    let (month_year, day) = date.rsplit_once('-').ok_or_else(invalid)?;
+    let (year, month) = month_year.rsplit_once('-').ok_or_else(invalid)?;
+    let number = |text: &str| text.parse::<i64>().map_err(|_| invalid());
+    let year = number(year)?;
+    let month = number(month)?;
+    let day = number(day)?;
+    if !(-271821..=275760).contains(&year)
+        || !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || time.len() != 13
+        || !time.is_ascii()
+        || &time[2..3] != ":"
+        || &time[5..6] != ":"
+        || &time[8..9] != "."
+        || &time[12..] != "Z"
+    {
+        return Err(invalid());
+    }
+    let hour = number(&time[..2])?;
+    let minute = number(&time[3..5])?;
+    let second = number(&time[6..8])?;
+    let millis = number(&time[9..12])?;
+    if hour > 23 || minute > 59 || second > 59 {
+        return Err(invalid());
+    }
+    let year = year - i64::from(month <= 2);
+    let era = year.div_euclid(400);
+    let era_year = year - era * 400;
+    let phase = month + if month > 2 { -3 } else { 9 };
+    let day_year = (153 * phase + 2) / 5 + day - 1;
+    let days = era * 146097 + era_year * 365 + era_year / 4 - era_year / 100 + day_year - 719468;
+    let result = days * 86400000 + hour * 3600000 + minute * 60000 + second * 1000 + millis;
+    if iso_timestamp(result)? != value {
+        return Err(invalid());
+    }
+    Ok(result)
+}
 pub fn iso_timestamp(milliseconds: i64) -> Result<String> {
     if !(-MAX_TIMESTAMP..=MAX_TIMESTAMP).contains(&milliseconds) {
         return Err(Failure::new(

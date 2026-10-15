@@ -51,8 +51,8 @@ ${definitions.map(([name]) => `    ${variant(name)},`).join('\n')}
 }
 
 #[derive(Debug)]
-pub struct Operation {
-    pub id: OperationId,
+pub struct Operation<Id = OperationId> {
+    pub id: Id,
     pub name: &'static str,
     pub method: Method,
     pub path: &'static str,

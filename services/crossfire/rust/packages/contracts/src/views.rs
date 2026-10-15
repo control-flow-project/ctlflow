@@ -59,15 +59,16 @@ pub fn agent(value: &AgentDetails) -> Value {
         "canRetire":value.can_retire,"allowedActions":value.allowed_actions})
 }
 pub fn connection(value: crossfire_domain::fleet::control::ConnectionView) -> Value {
-    json!({"online":value.online,"lastSeenAt":value.last_seen_at})
+    json!({"status":if value.online {"online"} else {"offline"},"lastSeenAt":value.last_seen_at})
 }
 pub fn control(value: &crossfire_domain::fleet::control::ControlView) -> Value {
     json!({"fleetId":value.fleet_id,"revision":value.revision,"deliveryEnabled":value.delivery_enabled,"connection":connection(value.connection)})
 }
 pub fn fleet(value: &FleetDetails) -> Value {
     let fleet = &value.fleet;
-    json!({"fleetId":fleet.id,"fleetKey":fleet.fleet_key,"ownerId":fleet.owner_id,"label":fleet.label,"controllerName":fleet.controller_name,
-    "metadata":value.metadata,"owner":PrincipalView(&value.owner),"connection":connection(value.connection),"deliveryEnabled":fleet.delivery_enabled,"revision":fleet.revision,"updatedAt":fleet.updated_at,"createdAt":fleet.created_at,"canArchive":value.can_archive,"allowedActions":value.allowed_actions})
+    json!({"fleetId":fleet.id,"fleetKey":fleet.fleet_key,"label":fleet.label,"controller":{"name":fleet.controller_name,"metadata":value.metadata},
+    "owner":PrincipalView(&value.owner),"delivery":control(&crossfire_domain::fleet::control::ControlView { fleet_id:fleet.id.clone(),revision:fleet.revision,delivery_enabled:fleet.delivery_enabled,connection:value.connection }),
+    "revision":fleet.revision,"updatedAt":fleet.updated_at,"createdAt":fleet.created_at,"canArchive":value.can_archive,"allowedActions":value.allowed_actions})
 }
 pub fn policy(value: &InstancePolicy) -> Value {
     json!({"revision":value.revision,"maxOwnerAgents":value.max_owner_agents,"maxAgents":value.max_agents,"maxPending":value.max_pending,"enrollmentSeconds":value.enrollment_seconds,"reconcileSeconds":value.reconcile_seconds,

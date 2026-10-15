@@ -1,5 +1,10 @@
 use super::{port::IncidentRepository, values::*};
-use crate::{identity::Status, listener::HEARTBEAT_EXPIRY_MS, matrix::MatrixAuthority};
+use crate::{
+    identity::Status,
+    listener::HEARTBEAT_EXPIRY_MS,
+    matrix::MatrixAuthority,
+    port::{AuthorizationRepository, UnitOfWork},
+};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 
 pub struct NoticeContext<'a> {
@@ -15,6 +20,65 @@ pub struct IncidentInput<'a> {
     pub session_id: Option<&'a str>,
     pub kind: IncidentKind,
     pub message: &'a str,
+}
+
+pub struct FailureReport<'a> {
+    pub episode_id: &'a str,
+    pub agent_id: &'a str,
+    pub session_id: Option<&'a str>,
+    pub message: &'a str,
+}
+pub fn report(
+    repo: &mut impl IncidentRepository,
+    actor: &crate::fleet::values::FleetActor,
+    fleet_id: &str,
+    input: FailureReport<'_>,
+    context: &NoticeContext<'_>,
+    now: i64,
+) -> Result<()> {
+    repo.transaction(|repo| {
+        let fleet = crate::fleet::control::authorized_fleet(repo, actor, fleet_id, true, now)?;
+        if !matches!(actor, crate::fleet::values::FleetActor::Controller { .. }) {
+            return Err(Failure::new(
+                ErrorCode::Forbidden,
+                "An authenticated fleet controller is required",
+            ));
+        }
+        let binding = repo
+            .fleet_instance_by_agent(input.agent_id)?
+            .filter(|binding| {
+                binding.retired_at.is_none()
+                    && binding.owner_id == fleet.owner_id
+                    && binding.fleet_key == fleet.fleet_key
+            })
+            .ok_or_else(|| Failure::new(ErrorCode::Missing, "Fleet instance not found"))?;
+        let agent = repo
+            .agent_view(&binding.agent_id)?
+            .filter(|agent| agent.agent.owner_id == fleet.owner_id)
+            .ok_or_else(|| Failure::new(ErrorCode::Missing, "Fleet instance not found"))?;
+        let name = repo
+            .agent_name(&binding.agent_id)?
+            .ok_or_else(|| Failure::new(ErrorCode::Unavailable, "Agent name is missing"))?;
+        let message = format!(
+            "{name} ({}) failed: {}",
+            agent.owner_member.display_name, input.message
+        );
+        open(
+            repo,
+            &IncidentInput {
+                owner_id: &fleet.owner_id,
+                agent_id: Some(input.agent_id),
+                fleet_id: None,
+                run_id: None,
+                session_id: input.session_id,
+                kind: IncidentKind::Failure,
+                message: &message,
+            },
+            Some(input.episode_id),
+            context,
+            now,
+        )
+    })
 }
 
 pub fn open(
@@ -160,71 +224,100 @@ pub fn watch(
     })
 }
 
-pub async fn publish(
-    repo: &mut impl IncidentRepository,
-    matrix: &impl MatrixAuthority,
+pub async fn publish<
+    A: crate::port::RepositoryAccess,
+    M: MatrixAuthority,
+    C: crossfire_kernel::time::Clock,
+>(
+    repository: &A,
+    matrix: &M,
     service_user: &str,
-    now: impl Fn() -> Result<i64>,
+    clock: &C,
     stopped: impl Fn() -> bool,
-) -> Result<()> {
-    let pending = repo.notifications(now()?)?;
+) -> Result<()>
+where
+    A::Repository: IncidentRepository,
+{
+    let pending = repository.with(|repo| repo.notifications(clock.now()?))?;
     for mut notice in pending {
         if stopped() {
             break;
         }
-        if notice.phase == NotificationPhase::Recovery
-            && repo
-                .notification(&notice.incident_id, NotificationPhase::Initial)?
-                .is_none_or(|value| value.event_id.is_none())
-        {
-            continue;
-        }
-        let incident = repo
-            .incident(&notice.incident_id)?
-            .ok_or_else(|| Failure::new(ErrorCode::Missing, "Incident not found"))?;
-        let Some(owner) = repo
-            .principal(&incident.owner_id)?
-            .filter(|owner| owner.status == Status::Active)
-        else {
+        let captured = repository.with(|repo| {
+            if notice.phase == NotificationPhase::Recovery
+                && repo
+                    .notification(&notice.incident_id, NotificationPhase::Initial)?
+                    .is_none_or(|value| value.event_id.is_none())
+            {
+                return Ok(None);
+            }
+            let incident = repo
+                .incident(&notice.incident_id)?
+                .ok_or_else(|| Failure::new(ErrorCode::Missing, "Incident not found"))?;
+            let Some(owner) = repo
+                .principal(&incident.owner_id)?
+                .filter(|owner| owner.status == Status::Active)
+            else {
+                return Ok(None);
+            };
+            let previous = repo.management_conversation(&owner.id)?;
+            Ok(Some((owner, previous)))
+        })?;
+        let Some((owner, previous)) = captured else {
             continue;
         };
-        let previous = repo.management_conversation(&owner.id)?;
-        if previous.is_none()
-            && matrix
-                .set_display_name(service_user, "Crossfire")
+        let prepared = async {
+            if previous.is_none() {
+                matrix.set_display_name(service_user, "Crossfire").await?;
+            }
+            matrix
+                .owner_conversation(
+                    &owner.matrix_user_id,
+                    service_user,
+                    previous.as_ref().map(|value| value.room_id.as_str()),
+                    None,
+                )
                 .await
-                .is_err()
-        {
-            continue;
         }
-        let room = matrix
-            .owner_conversation(
-                &owner.matrix_user_id,
-                service_user,
-                previous.as_ref().map(|value| value.room_id.as_str()),
-                None,
-            )
-            .await;
-        let room = match room {
+        .await;
+        let room = match prepared {
             Ok(room) => room,
             Err(_) => {
-                notice.next_attempt_at = now()?.saturating_add(30_000);
-                repo.transaction(|repo| repo.save_notification(&notice))?;
+                notice.next_attempt_at = clock.now()?.saturating_add(30_000);
+                repository.with(|repo| repo.transaction(|repo| repo.save_notification(&notice)))?;
                 continue;
             }
         };
-        if previous.is_none() {
-            let conversation = ManagementConversation {
-                owner_id: owner.id,
-                room_id: room.clone(),
-                created_at: now()?,
-            };
-            if repo
-                .transaction(|repo| repo.insert_management_conversation(&conversation))
-                .is_err()
-            {
-                continue;
-            }
+        let authorized = repository.with(|repo| {
+            repo.transaction(|repo| {
+                if repo.principal(&owner.id)?.as_ref() != Some(&owner) {
+                    return Ok(false);
+                }
+                if repo
+                    .notification(&notice.incident_id, notice.phase)?
+                    .is_none_or(|value| value.event_id.is_some() || value.body != notice.body)
+                {
+                    return Ok(false);
+                }
+                if let Some(present) = repo.management_conversation(&owner.id)? {
+                    if present.room_id != room {
+                        return Err(Failure::new(
+                            ErrorCode::Conflict,
+                            "Management conversation changed",
+                        ));
+                    }
+                } else {
+                    repo.insert_management_conversation(&ManagementConversation {
+                        owner_id: owner.id.clone(),
+                        room_id: room.clone(),
+                        created_at: clock.now()?,
+                    })?;
+                }
+                Ok(true)
+            })
+        })?;
+        if !authorized || stopped() {
+            continue;
         }
         let transaction_id = format!("incident-{}-{}", notice.incident_id, notice.phase.code());
         let sent = matrix
@@ -236,9 +329,20 @@ pub async fn publish(
                 &owner.matrix_user_id,
             )
             .await;
-        notice.next_attempt_at = now()?.saturating_add(30_000);
+        notice.next_attempt_at = clock.now()?.saturating_add(30_000);
         notice.event_id = sent.ok();
-        repo.transaction(|repo| repo.save_notification(&notice))?;
+        repository.with(|repo| {
+            repo.transaction(|repo| {
+                if repo.principal(&owner.id)?.as_ref() == Some(&owner)
+                    && repo
+                        .notification(&notice.incident_id, notice.phase)?
+                        .is_some_and(|value| value.event_id.is_none() && value.body == notice.body)
+                {
+                    repo.save_notification(&notice)?;
+                }
+                Ok(())
+            })
+        })?;
     }
     Ok(())
 }
