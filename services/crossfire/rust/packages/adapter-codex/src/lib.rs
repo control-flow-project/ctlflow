@@ -2,6 +2,7 @@ pub mod admission;
 pub mod callbacks;
 pub mod capability;
 pub mod connection;
+pub mod context_migration;
 pub mod context_state;
 pub mod control;
 pub mod decisions;

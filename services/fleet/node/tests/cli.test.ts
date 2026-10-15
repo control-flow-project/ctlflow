@@ -19,7 +19,7 @@ function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fai
 const entry = fileURLToPath(new URL('../apps/cli/src/main.js', import.meta.url));
 
 test('CLI manages a private named daemon through its typed Unix API and survives CLI disconnect', { timeout: 40000 }, async scope => {
-  const directory = mkdtempSync(join(tmpdir(), 'fleet-cli-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
+  const directory = mkdtempSync(join(tmpdir(), 'fc-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const binaryDirectory = join(directory, 'bin'); mkdirSync(binaryDirectory, { mode: 0o700 });
   const installed = join(binaryDirectory, 'fleet'); symlinkSync(entry, installed);

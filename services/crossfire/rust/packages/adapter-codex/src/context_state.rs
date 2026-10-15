@@ -7,7 +7,7 @@ use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     path::{Path, PathBuf},
 };
 
@@ -100,88 +100,11 @@ pub fn receipt(home: &Path, context: &str) -> PathBuf {
     home.join(format!("{REGISTRY}.{}.receipt", journal::digest(context)))
 }
 
-fn obsolete(name: &str) -> bool {
+pub(crate) fn obsolete(name: &str) -> bool {
     name == "crossfire-session.json"
         || name.starts_with("crossfire-session.json.")
         || name == "crossfire-contexts.json"
         || name.starts_with("crossfire-contexts.json.")
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Migration {
-    phase: String,
-    registry: Registry,
-    files: Vec<MigratedFile>,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct MigratedFile {
-    name: String,
-    digest: String,
-    target: Option<String>,
-}
-
-fn completed_migration(home: &Path) -> Result<()> {
-    let marker = home.join("crossfire-migrations/context-registry/manifest.json");
-    if !crossfire_adapter_filesystem::owned::OwnedFile::open(&marker, MAXIMUM_BYTES)?.is_some() {
-        return Ok(());
-    }
-    let directory = PrivateDirectory::open(
-        marker
-            .parent()
-            .ok_or_else(|| invalid("Invalid context migration location"))?,
-        false,
-    )?;
-    let bytes = directory.read("manifest.json", MAXIMUM_BYTES)?;
-    let migrated: Migration =
-        serde_json::from_slice(&bytes).map_err(|_| invalid("Invalid native context migration"))?;
-    if migrated.phase != "complete" || migrated.files.len() > 8010 {
-        return Err(invalid(
-            "Native context migration is incomplete; complete the explicit migration before resume",
-        ));
-    }
-    migrated.registry.validate()?;
-    let mut expected = BTreeMap::from([
-        ("crossfire-session.json".to_owned(), None),
-        ("crossfire-contexts.json".to_owned(), None),
-    ]);
-    for binding in &migrated.registry.bindings {
-        let suffix = journal::digest(&binding.context) + ".receipt";
-        let source = if binding.context == "shared" {
-            "crossfire-session.json.receipt".to_owned()
-        } else {
-            "crossfire-contexts.json.".to_owned() + &suffix
-        };
-        for extension in ["", ".instructions"] {
-            expected.insert(
-                source.clone() + extension,
-                Some(format!("{REGISTRY}.{suffix}{extension}")),
-            );
-            expected.insert(source.clone() + extension + ".lock", None);
-        }
-    }
-    let mut names = HashSet::new();
-    let mut targets = HashSet::new();
-    for file in &migrated.files {
-        if file.digest.len() != 64
-            || !file
-                .digest
-                .bytes()
-                .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
-            || expected.get(&file.name) != Some(&file.target)
-            || !names.insert(&file.name)
-            || file
-                .target
-                .as_ref()
-                .is_some_and(|target| !targets.insert(target))
-        {
-            return Err(invalid(
-                "Native context migration has unexpected files, receipt targets or duplicate evidence",
-            ));
-        }
-    }
-    Ok(())
 }
 
 pub fn load(home: &Path) -> Result<(Registry, bool)> {
@@ -191,7 +114,7 @@ pub fn load(home: &Path) -> Result<(Registry, bool)> {
             "Native context metadata requires the explicit fleetd context migration before resume",
         ));
     }
-    completed_migration(home)?;
+    crate::context_migration::validate_completed(home)?;
     let bytes = directory.read_optional(REGISTRY, MAXIMUM_BYTES)?;
     let exists = bytes.is_some();
     let registry = match bytes {

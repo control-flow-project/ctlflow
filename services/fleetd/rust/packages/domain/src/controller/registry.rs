@@ -259,6 +259,10 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
                 instance.definition = definition;
             }
         }
+        let preview = self
+            .registry
+            .preview_roster(&configuration, &configuration.roster)?;
+        self.execution.validate(&preview)?;
         let changed = self
             .registry
             .write_roster(&configuration, &configuration.roster)?;

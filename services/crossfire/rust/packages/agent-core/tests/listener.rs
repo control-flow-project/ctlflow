@@ -317,6 +317,7 @@ async fn verify(prepared_query: bool) -> std::result::Result<(), Box<dyn std::er
         budget: Arc::new(Budget::default()),
         clock: now as fn() -> Result<i64>,
         ready: Some(ready),
+        diagnostic: Arc::new(|error| eprintln!("{}: {}", error.code.as_str(), error.message)),
     };
     let stop = CancellationToken::new();
     let selected = stop.clone();

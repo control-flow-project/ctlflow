@@ -248,7 +248,7 @@ impl<C: Coordination + 'static, E: Executor + 'static> Fleet<C, E> {
     }
     async fn run(self: &Arc<Self>) -> Result<()> {
         let mut deadline = Instant::now() + Duration::from_secs(15);
-        while !self.stop.is_cancelled() {
+        'polling: while !self.stop.is_cancelled() {
             let rotate = self
                 .state
                 .lock()
@@ -301,16 +301,21 @@ impl<C: Coordination + 'static, E: Executor + 'static> Fleet<C, E> {
                                 })?;
                                 state.listeners.contains_key(agent)
                                     && snapshot.agents.contains(agent)
+                                    || state
+                                        .completed
+                                        .contains(&(message.id.clone(), agent.clone()))
                             };
-                            if !exists {
-                                self.receipt(
+                            if !exists
+                                && self.receipt(
                                     &message.id,
                                     agent,
                                     "skipped",
                                     Some("No eligible running fleet-bound listener for this agent"),
                                     scope.clone(),
                                 )
-                                .await?;
+                                .await.is_err() {
+                                    if !self.retry().await { break 'polling; }
+                                    continue 'polling;
                             }
                         }
                     }

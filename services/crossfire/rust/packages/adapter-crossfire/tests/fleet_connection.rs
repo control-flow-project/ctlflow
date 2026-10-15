@@ -22,6 +22,7 @@ struct Network {
     message: String,
     with_message: bool,
     blocked: AtomicBool,
+    fail_receipt: AtomicBool,
     changed: Notify,
     calls: Mutex<Vec<(OperationId, Option<Value>)>>,
 }
@@ -48,7 +49,12 @@ impl Coordination for Network {
                     json!({"fleetId":self.fleet,"revision":1,"deliveryEnabled":true,"connection":{"status":"online"},"agentIds":[self.agent],"messages":if self.with_message {vec![json!({"messageId":self.message,"fleetId":self.fleet,"body":"review current instructions","createdAt":1,"expiresAt":60000,"sender":{"kind":"human","matrixUserId":"@owner:example.test"},"agentIds":[self.agent]})]} else {vec![]},"runtimeOperations":[]}),
                 )
             }
-            OperationId::AcknowledgeFleetMessage => Ok(json!({"recorded":true})),
+            OperationId::AcknowledgeFleetMessage => {
+                if self.fail_receipt.swap(false, Ordering::SeqCst) {
+                    return Err(error());
+                }
+                Ok(json!({"recorded":true}))
+            }
             _ => Err(error()),
         }
     }
@@ -81,9 +87,67 @@ fn network(with_message: bool) -> Arc<Network> {
         message: identity::id(),
         with_message,
         blocked: AtomicBool::new(false),
+        fail_receipt: AtomicBool::new(false),
         changed: Notify::new(),
         calls: Mutex::new(Vec::new()),
     })
+}
+#[tokio::test(start_paused = true)]
+async fn transient_skipped_receipt_failure_reconnects_without_killing_the_controller_loop()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let network = network(true);
+    network.fail_receipt.store(true, Ordering::SeqCst);
+    let fleet = Fleet::open(
+        network.clone(),
+        &network.fleet,
+        Secret::new("private".to_owned()),
+        "@owner:example.test",
+        Arc::new(Operations),
+        CancellationToken::new(),
+    )?;
+    fleet.start().await?;
+    observe(|| {
+        Ok(network
+            .calls
+            .lock()
+            .map_err(|_| error())?
+            .iter()
+            .filter(|(operation, _)| *operation == OperationId::AcknowledgeFleetMessage)
+            .count()
+            == 1)
+    })
+    .await?;
+    assert!(!fleet.status()?.connected);
+    tokio::time::advance(Duration::from_secs(1)).await;
+    observe(|| Ok(fleet.status()?.connected)).await?;
+    observe(|| {
+        Ok(network
+            .calls
+            .lock()
+            .map_err(|_| error())?
+            .iter()
+            .filter(|(operation, _)| *operation == OperationId::AcknowledgeFleetMessage)
+            .count()
+            == 2)
+    })
+    .await?;
+    tokio::time::advance(Duration::from_secs(1)).await;
+    for _ in 0..16 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(
+        network
+            .calls
+            .lock()
+            .map_err(|_| error())?
+            .iter()
+            .filter(|(operation, _)| *operation == OperationId::AcknowledgeFleetMessage)
+            .count(),
+        2,
+        "An acknowledged skip is not sent again on every poll"
+    );
+    fleet.close().await?;
+    Ok(())
 }
 #[tokio::test(start_paused = true)]
 async fn a_stalled_connection_expires_delivery_at_fifteen_seconds_and_changes_generation_before_reactivation()

@@ -2,6 +2,7 @@ use crossfire_adapter_http::operation::Client;
 pub mod agent_software;
 pub mod fleet_connection;
 pub mod fleet_snapshot;
+pub mod listener_client;
 pub mod listener_host;
 use crossfire_agent_core::{coordination::Coordination, profile::Profile};
 use crossfire_contracts::{call::Call, origin};

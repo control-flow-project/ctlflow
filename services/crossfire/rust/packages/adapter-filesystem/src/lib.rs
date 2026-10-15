@@ -84,6 +84,25 @@ impl PrivateDirectory {
         rustix::fs::unlinkat(&self.descriptor, name, AtFlags::REMOVEDIR).map_err(|_| denied())?;
         self.sync()
     }
+    pub fn publish_file(&self, source: &str, target: &str) -> Result<()> {
+        Self::leaf(source)?;
+        Self::leaf(target)?;
+        self.open_private(source, false)?;
+        rustix::fs::renameat_with(
+            &self.descriptor,
+            source,
+            &self.descriptor,
+            target,
+            rustix::fs::RenameFlags::NOREPLACE,
+        )
+        .map_err(|_| {
+            Failure::new(
+                ErrorCode::Conflict,
+                "A published private file cannot replace another owner",
+            )
+        })?;
+        self.sync()
+    }
     pub fn replace_file(&self, source: &str, target: &str) -> Result<()> {
         Self::leaf(source)?;
         Self::leaf(target)?;

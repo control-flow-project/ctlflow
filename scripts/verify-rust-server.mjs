@@ -14,7 +14,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const temporary = join(root, '.temp'); mkdirSync(temporary, {recursive:true, mode:0o700});
 process.env.TMPDIR = temporary; process.env.TMP = temporary; process.env.TEMP = temporary;
 const executable = join(root, 'target/debug/crossfire'); accessSync(executable, constants.X_OK);
-const target = {name:'rust', implementation:'rust', server:{binary:executable, arguments:[]}};
+const target = {name:'rust', implementation:'rust', server:{binary:executable, arguments:[]}, daemon:{binary:join(root,'target/debug/fleetd'),arguments:[]},cli:{binary:join(root,'target/debug/fleet'),arguments:[]}};
 process.chdir(join(root, 'services/crossfire'));
 test('Rust server: unchanged shared executable contracts', {timeout:240000}, async scope => {
   const fixture = await contractStack(scope, target, [target]);

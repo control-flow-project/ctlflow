@@ -28,7 +28,6 @@ pub struct Tracker<H, W, T> {
     pub activity: AtomicI64,
     pub recording: AtomicBool,
     pub generation: AtomicU64,
-    pub failed: AtomicBool,
     settings: Mutex<BTreeMap<String, (State, Vec<Setting>)>>,
     error: Mutex<Option<Failure>>,
     stop: CancellationToken,
@@ -54,7 +53,6 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
             activity: AtomicI64::new(now),
             recording: AtomicBool::new(false),
             generation: AtomicU64::new(0),
-            failed: AtomicBool::new(false),
             settings: Mutex::new(BTreeMap::new()),
             error: Mutex::new(None),
             stop,
@@ -135,9 +133,6 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
                         })
                 {
                     self.touch()?;
-                }
-                if matches!(state, State::Failed | State::Unavailable) {
-                    self.failed.store(true, Ordering::Release);
                 }
                 if self.recording.load(Ordering::Acquire) {
                     if working {

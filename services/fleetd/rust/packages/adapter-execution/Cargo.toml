@@ -17,6 +17,8 @@ crossfire-adapter-pi.workspace = true
 crossfire-adapter-runtime.workspace = true
 crossfire-adapter-crossfire.workspace = true
 crossfire-adapter-filesystem.workspace = true
+crossfire-adapter-http.workspace = true
+crossfire-adapter-process.workspace = true
 crossfire-adapter-matrix.workspace = true
 fleetd-domain.workspace = true
 fleetd-contracts.workspace = true
@@ -28,3 +30,6 @@ tokio-util.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

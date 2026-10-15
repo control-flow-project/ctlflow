@@ -40,6 +40,11 @@ services/
       build/
       scripts/
       Dockerfile
+    rust/
+      apps/server/
+      packages/
+      tests/
+      Dockerfile
     database/<database>/<backend>/migrations/
     database/<database>/<backend>/seeds/
     knexfile.<database>.mjs
@@ -57,6 +62,9 @@ services/
       apps/Fleetd.Daemon/
       packages/
       tests/
+    rust/
+      apps/daemon/
+      packages/
     tests/contracts/
   fleet/
     node/
@@ -67,17 +75,20 @@ services/
     csharp/
       apps/Fleet.Cli/
       packages/
+    rust/
+      apps/cli/
+      packages/
     tests/contracts/
 ```
 
 Every product owns its applications, packages, tests and product-specific assets.
-Node and C# implementations use matching language-local apps/packages/tests
+Node, C# and Rust implementations use matching language-local apps/packages/tests
 ownership. C# project and file names follow .NET conventions; native libraries,
 EF build-time compilation and generated output retain their actual framework
 owners rather than artificial copies. Product-level database assets, documentation,
 the single React project and external contract assertions remain shared.
 Fleetd's concrete execution composition is a language-local adapter package in
-both implementations. It owns enrollment, native lifecycle wiring, reporting,
+all implementations. It owns enrollment, native lifecycle wiring, reporting,
 stop receipts and reset execution; the daemon application wires that adapter to
 its domain and private API. Architecture verification checks semantic package
 pairs and rejects execution source reintroduced into the daemon application.
@@ -87,7 +98,8 @@ Automatic Docker removal must not compete with the operator's explicit cleanup.
 Docker client processes have isolated owned process groups, so foreground-group
 signals reach the operator before it deliberately stops its owned containers.
 The root product npm manifest owns the public Node archive and its service-local
-dist output; .NET projects own managed/NativeAOT output. Those build conventions
+dist output; .NET projects own managed/NativeAOT output and Cargo owns native Rust
+output. Those build conventions
 do not create alternate source readers or backend fallbacks. The browser project
 uses the root compiler policy, not either backend's project configuration.
 The root contains workspace/build coordination, repository instructions,
@@ -103,8 +115,9 @@ before release.
 Enrollment roster digests use explicit English (`en-US`) collation for metadata
 keys, instance keys and sender identities, stable ties, ordinal permission order
 and compact well-formed JSON bytes. Host locale must not change an enrollment's
-identity. Native implementations preserve the same bytes, including Unicode and
-escaped unpaired UTF-16 surrogates.
+identity. Native implementations preserve the same valid Unicode and escaped
+control bytes. API strings and property names reject unpaired UTF-16 surrogates
+on every target rather than silently substituting replacement characters.
 The C# target is .NET 11 NativeAOT with EF Core and SQLite. This is an explicit
 language-selection exception, not permission for legacy interfaces or runtime
 fallbacks. One shared React management project remains authoritative. API routes,
@@ -779,7 +792,7 @@ no placeholder alternative backend.
 | --- | --- |
 | Domain | Identity, role/permission evaluation, enrollment, name allocation, desired room access, invitation provenance, chat wake policy, scheduled Wake-up rules/claims, listener activity, notices, policy and audit intent. |
 | Database assets | Knex schema creation, versioned forward conversions and reference data; backend-specific nesting and one migration container for all language implementations. |
-| SQLite adapter | Existing-schema validation, Tinqer or EF repositories, row mapping, indexed queries, transactions and page-wide projections; no runtime schema creation/migration. |
+| SQLite adapter | Existing-schema validation, Tinqer/EF/Diesel repositories, row mapping, indexed queries, transactions and page-wide projections; no runtime schema creation/migration. |
 | Matrix adapter | Native account, room, power, membership, media and event operations; map native facts/failures into domain ports. |
 | Calendar adapter | Validate interval/calendar schedules and calculate the next occurrence through the domain's schedule port, with one pinned parser and explicit time-zone semantics. |
 | Server | Configuration, composition, authentication boundary, routing and worker scheduling. |
@@ -3037,7 +3050,8 @@ bypass is justified merely by the proposal.
 
 ### Storage and runtime safety
 
-Tinqer owns Node application reads/writes and EF owns C# application reads/writes.
+Tinqer owns Node application reads/writes, EF owns C# reads/writes and Diesel owns
+Rust reads/writes.
 Knex owns all schema creation/conversion and migration reference-data changes.
 Raw SQL is restricted to migration schema/conversion, configuration and
 metadata/query-plan inspection. Private store creation by the migrator and

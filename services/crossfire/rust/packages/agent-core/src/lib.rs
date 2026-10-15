@@ -27,6 +27,7 @@ pub mod receive_snapshots;
 pub mod receive_state;
 pub mod receiver_gate;
 pub mod release_notices;
+pub mod reset_history;
 pub mod runtime;
 pub mod scheduled;
 pub mod source_control;

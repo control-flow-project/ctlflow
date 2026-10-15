@@ -80,11 +80,11 @@ impl<
         if stop.is_cancelled() {
             return Err(unavailable("Native input cancelled before admission"));
         }
-        let native = self.owner.ensure().await?;
         let admission = priority.map(|priority| Admission {
             priority,
             cancellation: stop.clone(),
         });
+        let native = self.owner.ensure(admission.as_ref()).await?;
         let selected = self.select(native.as_ref(), admission.as_ref()).await?;
         selected
             .as_ref()
@@ -106,7 +106,7 @@ impl<
         {
             return Ok(false);
         }
-        let native = self.owner.ensure().await?;
+        let native = self.owner.ensure(None).await?;
         let selected = self.select(native.as_ref(), None).await?;
         selected
             .as_ref()
@@ -117,7 +117,7 @@ impl<
     async fn recover(&self, text: &str, message: &str, stop: CancellationToken) -> Result<bool> {
         let _call = self.entered();
         self.owner.touch(Some(message))?;
-        let native = self.owner.ensure().await?;
+        let native = self.owner.ensure(None).await?;
         let selected = self.select(native.as_ref(), None).await?;
         let received = selected
             .as_ref()
@@ -157,7 +157,7 @@ impl<
     }
     async fn conversation(&self, room: &str, admission: Option<&Admission>) -> Result<Self> {
         let _call = self.entered();
-        let native = self.owner.ensure().await?;
+        let native = self.owner.ensure(admission).await?;
         let selected = native.conversation(room, admission).await?;
         let contexts = self.owner.contexts().await?;
         self.owner.state.lock().map_err(|_| ownership())?.contexts = contexts;
@@ -185,7 +185,7 @@ impl<
     ) -> Result<Option<String>> {
         let _call = self.entered();
         let native = if admission.is_some() {
-            Some(self.owner.ensure().await?)
+            Some(self.owner.ensure(admission).await?)
         } else {
             self.owner
                 .state
@@ -210,7 +210,7 @@ impl<
         admission: Option<&Admission>,
     ) -> Result<InterruptResult> {
         let _call = self.entered();
-        let native = self.owner.ensure().await?;
+        let native = self.owner.ensure(admission).await?;
         native.interrupt(turn, recovery, admission).await
     }
 }

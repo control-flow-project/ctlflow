@@ -16,6 +16,7 @@ function fixture(scope) {
     }
     for (const [node, csharp] of Object.entries(implementationPackages[service])) {
       mkdirSync(join(directory, 'node/packages', node)); mkdirSync(join(directory, 'csharp/packages', csharp));
+      mkdirSync(join(directory, 'rust/packages', node === 'client' ? 'adapter-http' : node));
     }
     mkdirSync(join(directory, 'tests/contracts'), { recursive: true });
   }
@@ -23,11 +24,11 @@ function fixture(scope) {
   return root;
 }
 
-test('Node and C# use matching service boundaries while the UI and external assertions stay common', scope => {
+test('Node, C# and Rust use matching service boundaries while the UI and external assertions stay common', scope => {
   verifyImplementationLayout(fixture(scope));
 });
 
-for (const path of ['fleet/packages', 'fleetd/apps/daemon', 'crossfire/tests/alternate-contracts', 'crossfire/csharp/apps/Duplicate', 'fleetd/node/apps/daemon/src/execution.ts']) {
+for (const path of ['fleet/packages', 'fleetd/apps/daemon', 'crossfire/tests/alternate-contracts', 'crossfire/csharp/apps/Duplicate', 'crossfire/rust/apps/Duplicate', 'fleetd/node/apps/daemon/src/execution.ts']) {
   test('superseded or competing source ownership is rejected: ' + path, scope => {
     const root = fixture(scope);
     mkdirSync(join(root, 'services', path), { recursive: true });
@@ -35,7 +36,7 @@ for (const path of ['fleet/packages', 'fleetd/apps/daemon', 'crossfire/tests/alt
   });
 }
 
-for (const path of ['fleetd/node/packages/adapter-execution', 'crossfire/csharp/packages/Crossfire.AdapterMatrix']) {
+for (const path of ['fleetd/node/packages/adapter-execution', 'crossfire/csharp/packages/Crossfire.AdapterMatrix', 'fleetd/rust/packages/adapter-execution']) {
   test('a missing semantic package owner is rejected: ' + path, scope => {
     const root = fixture(scope); rmSync(join(root, 'services', path), { recursive: true });
     assert.throws(() => verifyImplementationLayout(root), /Matching semantic package ownership/u);

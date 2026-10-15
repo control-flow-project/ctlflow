@@ -408,6 +408,7 @@ impl<
             };
             let result: Result<()> = cycle.await;
             if let Err(error) = result {
+                (self.resources.diagnostic)(&error);
                 if matches!(
                     error.code,
                     ErrorCode::Native | ErrorCode::Unavailable | ErrorCode::BodyTooLarge

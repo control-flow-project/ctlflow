@@ -5,7 +5,7 @@ struct RecoveryTarget<'a> {
     instance: &'a Instance,
 }
 
-fn recoverable(error: &Failure) -> bool {
+pub(super) fn recoverable(error: &Failure) -> bool {
     matches!(
         error.code,
         ErrorCode::Native | ErrorCode::Unavailable | ErrorCode::BodyTooLarge
@@ -156,6 +156,9 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
             done.send_replace(true);
             controller.signal();
         });
+        if !immediate {
+            return Ok(());
+        }
         let first = Work {
             id: String::new(),
             stop: CancellationToken::new(),
@@ -439,7 +442,9 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
             }
         }
         let result = error.map_or(Ok(()), Err);
-        *close = Some(result.clone());
+        if result.is_ok() {
+            *close = Some(Ok(()));
+        }
         result
     }
 }

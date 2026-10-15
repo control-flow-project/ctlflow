@@ -71,6 +71,37 @@ pub fn instance(value: &Value) -> Result<Instance> {
         runtime_options: value.get("runtime_options").map(options).transpose()?,
     })
 }
+pub fn api_instance(value: &Value) -> Result<Instance> {
+    let source = check::object(
+        value,
+        &["key", "name", "definition", "workarea"],
+        &["workspace", "listenerOptions", "runtimeOptions"],
+    )?;
+    let mut canonical = source.clone();
+    if let Some(options) = canonical.remove("runtimeOptions") {
+        canonical.insert("runtime_options".to_owned(), options);
+    }
+    if let Some(options) = canonical.remove("listenerOptions") {
+        let options = check::object(&options, &[], &["historyMode"])?;
+        canonical.insert(
+            "listener_options".to_owned(),
+            options
+                .iter()
+                .map(|(key, value)| {
+                    (
+                        if key == "historyMode" {
+                            "history_mode".to_owned()
+                        } else {
+                            key.clone()
+                        },
+                        value.clone(),
+                    )
+                })
+                .collect(),
+        );
+    }
+    instance(&Value::Object(canonical))
+}
 pub fn roster(value: &Value) -> Result<Roster> {
     let value = check::object(value, &["fleet", "coordination", "instances"], &[])?;
     let coordination = check::object(&value["coordination"], &["adapter", "server", "owner"], &[])?;

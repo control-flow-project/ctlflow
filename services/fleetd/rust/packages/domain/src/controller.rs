@@ -528,6 +528,21 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
 impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sync + 'static>
     RemoteOperations for Controller<R, E, T>
 {
+    fn target(&self, directory: &std::path::Path, instance: Option<&str>) -> Result<Target> {
+        let state = self.lock()?;
+        let fleet = state
+            .records
+            .iter()
+            .find(|record| record.directory == directory)
+            .ok_or_else(|| missing("Remote operation has no registered fleet directory"))?;
+        Ok(match instance {
+            Some(instance) => Target::Agent {
+                fleet: fleet.fleet_id.clone(),
+                instance: instance.to_owned(),
+            },
+            None => Target::Fleet(fleet.fleet_id.clone()),
+        })
+    }
     fn execute(self: Arc<Self>, request: OperationRequest) -> Response<'static, Operation> {
         Box::pin(async move { self.execute_remote(request).await })
     }

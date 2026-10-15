@@ -57,6 +57,43 @@ impl NativeHttp {
             .no_proxy()
             .pool_max_idle_per_host(16)
             .connect_timeout(Duration::from_secs(10));
+        if let Some(bundle) = std::env::var_os("SSL_CERT_FILE") {
+            let path = std::fs::canonicalize(bundle).map_err(|_| {
+                Failure::new(
+                    ErrorCode::Invalid,
+                    "Configured TLS authority bundle is unavailable",
+                )
+            })?;
+            let directory =
+                crossfire_adapter_filesystem::assets::Directory::open(path.parent().ok_or_else(
+                    || Failure::new(ErrorCode::Invalid, "Invalid TLS authority bundle"),
+                )?)?;
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| {
+                    Failure::new(ErrorCode::Invalid, "Invalid TLS authority bundle path")
+                })?;
+            let file = directory.file(name, 1048576)?.ok_or_else(|| {
+                Failure::new(
+                    ErrorCode::Invalid,
+                    "Configured TLS authority bundle is missing",
+                )
+            })?;
+            let certificates = reqwest::Certificate::from_pem_bundle(&file.read(1048576)?)
+                .map_err(|_| {
+                    Failure::new(ErrorCode::Invalid, "Invalid TLS PEM authority bundle")
+                })?;
+            if certificates.is_empty() {
+                return Err(Failure::new(
+                    ErrorCode::Invalid,
+                    "TLS authority bundle contains no certificates",
+                ));
+            }
+            for certificate in certificates {
+                builder = builder.add_root_certificate(certificate);
+            }
+        }
         if let Some(socket) = &socket {
             builder = builder.unix_socket(socket.endpoint());
         }
@@ -161,7 +198,7 @@ impl NativeHttp {
         let opened = tokio::select! {
             biased;
             _ = self.cancellation.cancelled() => return Err(Failure::new(ErrorCode::Native, "HTTP request failed or exceeded its deadline")),
-            response = request.send() => response.map_err(|_| Failure::new(ErrorCode::Native, "HTTP request failed or exceeded its deadline"))?,
+            response = request.send() => response.map_err(transport_failure)?,
         };
         if opened.status().is_redirection() {
             return Err(Failure::new(
@@ -264,6 +301,27 @@ impl NativeHttp {
     }
 }
 
+fn transport_failure(error: reqwest::Error) -> Failure {
+    use std::error::Error;
+    let error = error.without_url();
+    let mut details = error.to_string();
+    let mut source = error.source();
+    for _ in 0..4 {
+        let Some(error) = source else {
+            break;
+        };
+        details.push_str(": ");
+        details.push_str(&error.to_string());
+        source = error.source();
+    }
+    Failure::new(
+        ErrorCode::Native,
+        format!(
+            "HTTP transport failed: {}",
+            crossfire_contracts::validation::truncate_utf16(&details, 512)
+        ),
+    )
+}
 pub fn validate_json(value: &Value) -> Result<()> {
     fn visit(value: &Value, depth: usize) -> Result<()> {
         if depth > 64 {

@@ -21,6 +21,23 @@ fn flags() -> OFlags {
     OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC
 }
 impl Directory {
+    pub fn names(&self, maximum: usize) -> Result<Vec<String>> {
+        let mut names = Vec::new();
+        for entry in rustix::fs::Dir::read_from(&self.0).map_err(|_| failed())? {
+            let entry = entry.map_err(|_| failed())?;
+            let name = entry.file_name().to_str().map_err(|_| failed())?;
+            if [".", ".."].contains(&name) {
+                continue;
+            }
+            if names.len() >= maximum || name.starts_with('.') || name.chars().any(char::is_control)
+            {
+                return Err(failed());
+            }
+            names.push(name.to_owned());
+        }
+        names.sort_unstable();
+        Ok(names)
+    }
     pub fn open(path: &Path) -> Result<Self> {
         if !path.is_absolute() {
             return Err(failed());

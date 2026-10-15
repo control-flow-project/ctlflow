@@ -8,7 +8,7 @@ import { cleanup } from './cleanup.js';
 
 export type ContractCommand = { binary: string; arguments: string[] };
 export type ContractTarget = { name: string; implementation: 'node' | 'csharp' | 'rust'; server: ContractCommand; daemon: ContractCommand; cli: ContractCommand };
-export type ContractProcess = { child: ChildProcess; ended: Promise<number | null>; alive(): boolean; output(): string; errors(): string; close(): Promise<void> };
+export type ContractProcess = { child: ChildProcess; ended: Promise<number | null>; alive(): boolean; output(): string; errors(): string; close(milliseconds?: number): Promise<void> };
 export async function freePorts(): Promise<[number, number]> {
   const servers = [createServer(), createServer()];
   try { for (const server of servers) { server.listen(0, '127.0.0.1'); await once(server, 'listening'); } return servers.map(server => { const address = server.address(); assert(address && typeof address !== 'string'); return address.port; }) as [number, number]; }
@@ -34,6 +34,9 @@ export function contractProcess(context: TestContext, command: ContractCommand, 
   child.stdout?.on('data', (bytes: Buffer) => { output = (output + bytes.toString('utf8')).slice(-65536); }); child.stderr?.on('data', (bytes: Buffer) => { errors = (errors + bytes.toString('utf8')).slice(-65536); }); child.once('error', error => { failed = error; });
   const ended = new Promise<number | null>(resolveExit => child.once('close', code => { exited = true; resolveExit(code); }));
   function signal(signal: NodeJS.Signals): void { if (child.pid !== undefined) try { process.kill(-child.pid, signal); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; } }
-  const close = () => closing ??= (async () => { if (!exited) { signal('SIGTERM'); const timer = setTimeout(() => { signal('SIGKILL'); child.stdout?.destroy(); child.stderr?.destroy(); }, 10000); try { await ended; } finally { clearTimeout(timer); } } if (failed) throw failed; })(); cleanup(context, close);
+  const close = (milliseconds = 10000) => {
+    assert(Number.isSafeInteger(milliseconds) && milliseconds >= 100 && milliseconds <= 120000, 'Use a finite owned-process cleanup deadline');
+    return closing ??= (async () => { if (!exited) { signal('SIGTERM'); const timer = setTimeout(() => { signal('SIGKILL'); child.stdout?.destroy(); child.stderr?.destroy(); }, milliseconds); try { await ended; } finally { clearTimeout(timer); } } if (failed) throw failed; })();
+  }; cleanup(context, close);
   return { child, ended, alive: () => !exited && failed === undefined && child.exitCode === null && child.signalCode === null, output: () => output, errors: () => failed?.message ?? errors, close };
 }

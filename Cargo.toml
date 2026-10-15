@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
+  "services/fleetd/rust/apps/daemon",
+  "services/fleet/rust/apps/cli",
+  "services/fleet/rust/packages/ssh-transport",
   "services/crossfire/rust/apps/server",
   "services/crossfire/rust/packages/kernel",
   "services/crossfire/rust/packages/domain",
@@ -55,10 +58,11 @@ fleetd-contracts = { path = "services/fleetd/rust/packages/contracts" }
 fleetd-storage = { path = "services/fleetd/rust/packages/storage" }
 fleetd-adapter-execution = { path = "services/fleetd/rust/packages/adapter-execution" }
 fleet-daemon-client = { path = "services/fleet/rust/packages/daemon-client" }
+fleet-ssh-transport = { path = "services/fleet/rust/packages/ssh-transport" }
 base64 = "=0.22.1"
 diesel = { version = "=2.3.14", default-features = false, features = ["sqlite", "32-column-tables", "returning_clauses_for_sqlite_3_35"] }
 libsqlite3-sys = { version = "=0.37.0", features = ["bundled"] }
-rustix = { version = "=1.1.4", features = ["fs", "process", "rand"] }
+rustix = { version = "=1.1.4", features = ["fs", "process", "rand", "stdio"] }
 serde = { version = "=1.0.229", features = ["derive", "rc"] }
 serde_json = "=1.0.154"
 sha2 = "=0.10.9"
@@ -68,7 +72,7 @@ uuid = { version = "=1.24.0", features = ["v4"] }
 zeroize = "=1.9.1"
 hmac = "=0.12.1"
 reqwest = { version = "=0.13.4", default-features = false, features = ["rustls", "json", "stream"] }
-tokio = { version = "=1.53.3", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "process", "signal", "fs"] }
+tokio = { version = "=1.53.3", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util", "io-std", "process", "signal", "fs"] }
 tokio-util = { version = "=0.7.20", features = ["rt"] }
 url = "=2.5.8"
 chrono = { version = "=0.4.45", default-features = false, features = ["std"] }

@@ -4,6 +4,65 @@ use crossfire_kernel::failure::ErrorCode;
 use crossfire_server::request::{self, Query};
 
 #[test]
+fn well_formed_forbidden_paths_are_missing_without_weakening_encoding_checks()
+-> Result<(), Box<dyn std::error::Error>> {
+    for target in [
+        "/manage/assets/%2e%2e%2fpackage.json",
+        "/manage/../bootstrap.json",
+        "/%2e/private",
+    ] {
+        let input = Request::builder().uri(target).body(())?;
+        assert_eq!(
+            request::path(&input).err().map(|error| error.code),
+            Some(ErrorCode::Missing)
+        );
+    }
+    for target in [
+        "/api/rooms/%",
+        "/api/rooms/%ff",
+        "/api/rooms/%00",
+        "/api/rooms/%5c",
+    ] {
+        let input = Request::builder().uri(target).body(())?;
+        assert_eq!(
+            request::path(&input).err().map(|error| error.code),
+            Some(ErrorCode::Invalid)
+        );
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn unsafe_or_missing_public_assets_are_not_disclosed()
+-> Result<(), Box<dyn std::error::Error>> {
+    use crossfire_adapter_filesystem::assets::Directory;
+    use crossfire_server::assets;
+    use tokio_util::sync::CancellationToken;
+    let root = tempfile::tempdir()?;
+    std::fs::write(root.path().join("index.html"), b"public")?;
+    std::os::unix::fs::symlink(
+        root.path().join("index.html"),
+        root.path().join("linked.html"),
+    )?;
+    let directory = Directory::open(root.path())?;
+    for path in ["/../private", "/.private", "/linked.html", "/missing.json"] {
+        assert_eq!(
+            assets::serve(&directory, path, false, CancellationToken::new())
+                .err()
+                .map(|error| error.code),
+            Some(ErrorCode::Missing)
+        );
+    }
+    assert_eq!(
+        assets::serve(&directory, "/", false, CancellationToken::new())?
+            .status()
+            .as_u16(),
+        200
+    );
+    Ok(())
+}
+
+#[test]
 fn routes_accept_only_current_declared_resources_and_unambiguous_queries()
 -> Result<(), Box<dyn std::error::Error>> {
     let selected = request::select(&Method::GET, "/api/sessions/current")?;

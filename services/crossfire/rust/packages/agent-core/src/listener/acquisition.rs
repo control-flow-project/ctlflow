@@ -287,6 +287,7 @@ impl<
                 .controlling = false;
             self.changed()?;
             if let Err(error) = result {
+                (self.resources.diagnostic)(&error);
                 if self.controls.interrupting()? {
                     return Err(error);
                 }

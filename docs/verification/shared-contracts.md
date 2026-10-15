@@ -105,17 +105,17 @@ distribution metadata, not its descriptive target label. There are no alternate
 expected values or backend-specific skips. Containers retain production read-only
 roots, dropped capabilities, explicit loopback ports and a finite aggregate slice.
 
-For the complete Node/C# gate, use an existing parent and a new evidence directory:
+For the complete Node/C#/Rust gate, use an existing parent and a new evidence directory:
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=32G --property=MemorySwapMax=0 --property=TasksMax=8192 \
+  --property=MemoryMax=16G --property=MemorySwapMax=0 --property=TasksMax=2048 \
   --working-directory=/absolute/path/to/crossfire \
   npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
-This serializes architecture, all Node tests, C# core/native acceptance, both
-complete standalone distributions, shared executable contracts, actual containers
+This serializes architecture, all Node tests, C# core/native acceptance, Rust
+internal/native tests, all three native distributions, shared executable contracts, actual containers
 and migration-container acceptance. It retains bounded logs and scalar results;
 its temporary distributions are removed after successful verification. Failed-gate
 distributions remain only for immediate bounded diagnosis and must be removed

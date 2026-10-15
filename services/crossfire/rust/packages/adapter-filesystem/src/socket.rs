@@ -9,7 +9,114 @@ pub struct Socket {
     directory: PrivateDirectory,
     name: String,
 }
+pub struct Ownership {
+    socket: Socket,
+    device: u64,
+    inode: u64,
+}
+impl Ownership {
+    pub fn remove(self) -> Result<()> {
+        self.socket.remove_exact(self.device, self.inode)
+    }
+}
+impl Drop for Ownership {
+    fn drop(&mut self) {
+        let _removed = self.socket.remove_exact(self.device, self.inode);
+    }
+}
 impl Socket {
+    fn information(&self) -> Result<rustix::fs::Stat> {
+        self.validate()?;
+        rustix::fs::statat(
+            &self.directory.descriptor,
+            &self.name,
+            rustix::fs::AtFlags::SYMLINK_NOFOLLOW,
+        )
+        .map_err(|_| {
+            Failure::new(
+                ErrorCode::Unavailable,
+                "Private socket identity is unavailable",
+            )
+        })
+    }
+    fn remove_exact(&self, device: u64, inode: u64) -> Result<()> {
+        let info = match rustix::fs::statat(
+            &self.directory.descriptor,
+            &self.name,
+            rustix::fs::AtFlags::SYMLINK_NOFOLLOW,
+        ) {
+            Ok(info) => info,
+            Err(rustix::io::Errno::NOENT) => return Ok(()),
+            Err(_) => {
+                return Err(Failure::new(
+                    ErrorCode::Unavailable,
+                    "Cannot verify private socket retirement",
+                ));
+            }
+        };
+        if info.st_dev != device || info.st_ino != inode {
+            return Err(Failure::new(
+                ErrorCode::Conflict,
+                "Private socket changed; replacement was not removed",
+            ));
+        }
+        self.validate()?;
+        rustix::fs::unlinkat(
+            &self.directory.descriptor,
+            &self.name,
+            rustix::fs::AtFlags::empty(),
+        )
+        .map_err(|_| {
+            Failure::new(
+                ErrorCode::Unavailable,
+                "Cannot retire the exact owned socket",
+            )
+        })?;
+        self.directory.sync()
+    }
+    pub async fn remove_stale(&self) -> Result<()> {
+        match rustix::fs::statat(
+            &self.directory.descriptor,
+            &self.name,
+            rustix::fs::AtFlags::SYMLINK_NOFOLLOW,
+        ) {
+            Err(rustix::io::Errno::NOENT) => return Ok(()),
+            Ok(_) => {}
+            Err(_) => {
+                return Err(Failure::new(
+                    ErrorCode::Unavailable,
+                    "Cannot inspect private controller socket",
+                ));
+            }
+        }
+        let before = self.information()?;
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            tokio::net::UnixStream::connect(self.endpoint()),
+        )
+        .await
+        {
+            Ok(Err(error)) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+                self.remove_exact(before.st_dev, before.st_ino)
+            }
+            Ok(Ok(_)) => Err(Failure::new(
+                ErrorCode::Conflict,
+                "Controller is already running",
+            )),
+            _ => Err(Failure::new(
+                ErrorCode::Unavailable,
+                "Existing controller socket could not be proved inactive",
+            )),
+        }
+    }
+    pub fn claim(self) -> Result<Ownership> {
+        let info = self.information()?;
+        Ok(Ownership {
+            socket: self,
+            device: info.st_dev,
+            inode: info.st_ino,
+        })
+    }
     pub fn open(path: &Path) -> Result<Self> {
         let socket = Self::prepare(path)?;
         socket.validate()?;

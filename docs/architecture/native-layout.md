@@ -1,192 +1,146 @@
-# Native implementation structure
+# Implementation structure and ownership
 
-Node, C# and Rust implement the same three products with the same ownership
-boundaries. Language selection changes the implementation, not the UI, API,
-database model or responsibility of a service. This review covers the parallel
-C# and Rust tracks as inspected on 14 October 2026; neither inspection nor a
-shared directory shape establishes complete product parity.
+Node, C# and Rust implement the same three products. Selecting an implementation
+does not change the UI, wire contracts, database or product responsibilities.
+This document describes the current model, not historical unfinished checkouts.
+Verification evidence is recorded separately in the implementation reviews.
 
-## Common product layout
+## Source tree
 
 ```text
 services/
   crossfire/
-    apps/
-      server/                       Node composition
-      web/                          The only React management UI
-    packages/                       Node libraries and adapters
+    apps/web/                         one React application
     database/
-      management/
-        sqlite/
-          migrations/               Shared Knex owner
-          seeds/
+      management/sqlite/
+        migrations/                   Knex only
+        seeds/
     knexfile.management.mjs
+    node/
+      apps/server/
+      packages/
+      tests/
+      scripts/
+      tools/
+      Dockerfile
     csharp/
       apps/Crossfire.Server/
       packages/
-        Crossfire.Kernel/
-        Crossfire.Domain/
-        Crossfire.Contracts/
-        Crossfire.AdapterFilesystem/
-        Crossfire.AdapterHttp/
-        Crossfire.AdapterMatrix/
-        Crossfire.AdapterSqlite/
-        Crossfire.AdapterSchedule/
-        Crossfire.AgentCore/
-        Crossfire.AdapterRuntime/
-        Crossfire.AdapterCodex/
-        Crossfire.AdapterProcess/
-        Crossfire.AdapterToml/
-      build/
-        Crossfire.EfCompiler/        EF query generation only
-        Crossfire.EfHost/            Design-time compiler host only
       tests/
+      build/
+        Crossfire.EfCompiler/          design-time query generation
+        Crossfire.EfHost/              design-time host
+      scripts/
+      Dockerfile
     rust/
       apps/server/
       packages/
-        kernel/
-        domain/
-        contracts/
-        adapter-filesystem/
-        adapter-http/
-        adapter-matrix/
-        adapter-sqlite/
-        adapter-schedule/
-        agent-core/
-        adapter-runtime/
-        adapter-codex/
-        adapter-process/
-        adapter-toml/
       tests/
+      Dockerfile
+    tests/contracts/                  implementation-independent assertions
+    scripts/                          shared asset/schema generators
   fleetd/
-    apps/daemon/                    Node composition
-    packages/                       Node domain, contracts and file storage
-    csharp/
-      apps/Fleetd.Daemon/
-      packages/
-      tests/
-    rust/
-      apps/daemon/
-      packages/
-      tests/
+    node/{apps/daemon,packages,tests,scripts,tools}/
+    csharp/{apps/Fleetd.Daemon,packages,tests}/
+    rust/{apps/daemon,packages}/
+    tests/contracts/
   fleet/
-    apps/cli/                       Node composition
-    packages/                       Node daemon client and SSH transport
-    csharp/
-      apps/Fleet.Cli/
-      packages/
-      tests/
-    rust/
-      apps/cli/
-      packages/
-      tests/
+    node/{apps/cli,packages,tests,scripts}/
+    csharp/{apps/Fleet.Cli,packages}/
+    rust/{apps/cli,packages}/
+    tests/contracts/
+scripts/                              workspace/build/verification only
 ```
 
-This is the final responsibility map, not an inventory of completed modules.
-Only implemented capabilities receive directories and manifests. Native listener,
-client, Codex and Pi packages follow their existing Crossfire service owners;
-fleetd consumes those packages rather than creating another listener or runtime
-integration. Fleet talks to fleetd even locally and owns neither native processes
-nor private daemon state.
+Only implemented owners receive directories. Rust integration tests belong to
+their crates; there is no empty service test directory added for visual symmetry.
+Node TypeScript and Rust modules use their language conventions; C# uses .NET
+project/namespace/file conventions. Semantic ownership, rather than matching
+class names or artificial files, is authoritative.
 
-## Equivalent boundaries
+## Semantic package map
 
 | Responsibility | Node | C# | Rust |
 | --- | --- | --- | --- |
-| Primitive results and identities | `kernel` | `Crossfire.Kernel` | `kernel` |
-| Rules and pure ports | `domain` | `Crossfire.Domain` | `domain` |
-| Wire validation and views | `contracts` | `Crossfire.Contracts` | `contracts` |
-| Filesystem authority | `adapter-filesystem` | `Crossfire.AdapterFilesystem` | `adapter-filesystem` |
-| Native Matrix authority | `adapter-matrix` | `Crossfire.AdapterMatrix` | `adapter-matrix` |
-| Connection, schema validation, transactions and queries | `adapter-sqlite` | `Crossfire.AdapterSqlite` | `adapter-sqlite` |
-| Calendar schedules | `adapter-schedule` | `Crossfire.AdapterSchedule` | `adapter-schedule` |
-| Listener/runtime pure ports | `agent-core` | `Crossfire.AgentCore` | `agent-core` |
-| Journals, receipts and restart context | `adapter-runtime` | `Crossfire.AdapterRuntime` | `adapter-runtime` |
-| Codex native integration | `adapter-codex` | `Crossfire.AdapterCodex` | `adapter-codex` |
-| Owned process primitives | Native platform API | `Crossfire.AdapterProcess` | `adapter-process` |
-| Native configuration parsing | Native TOML dependency | `Crossfire.AdapterToml` | `adapter-toml` |
-| Application composition | `apps/server` | `apps/Crossfire.Server` | `apps/server` |
-| Database creation and upgrades | Shared Knex `database` | Same owner | Same owner |
-| Browser application | Shared `apps/web` | Same UI build | Same UI build |
+| Primitive results, identity and time | kernel | Crossfire.Kernel | kernel |
+| Rules and repository ports | domain | Crossfire.Domain | domain |
+| Wire validation and views | contracts | Crossfire.Contracts | contracts |
+| Filesystem authority | adapter-filesystem | Crossfire.AdapterFilesystem | adapter-filesystem |
+| REST client and transport | client + native HTTP | Crossfire.AdapterHttp | adapter-http |
+| Native Matrix authority | adapter-matrix | Crossfire.AdapterMatrix | adapter-matrix |
+| SQLite connections, query metadata and transactions | adapter-sqlite | Crossfire.AdapterSqlite | adapter-sqlite |
+| Calendar scheduling | adapter-schedule | Crossfire.AdapterSchedule | adapter-schedule |
+| Pure listener/runtime coordination | agent-core | Crossfire.AgentCore | agent-core |
+| Journals, exact receipts and restart state | adapter-runtime | Crossfire.AdapterRuntime | adapter-runtime |
+| Codex integration | adapter-codex | Crossfire.AdapterCodex | adapter-codex |
+| Earendil Pi integration | adapter-pi | Crossfire.AdapterPi | adapter-pi |
+| Enrollment, fleet connection and private listener host | adapter-crossfire | Crossfire.AdapterCrossfire | adapter-crossfire |
+| Fleet lifecycle and pure ports | fleetd/domain | Fleetd.Domain | fleetd/domain |
+| Fleet configuration and API contracts | fleetd/contracts | Fleetd.Contracts | fleetd/contracts |
+| Fleet private persisted state | fleetd/storage | Fleetd.Storage | fleetd/storage |
+| Concrete runtime/listener composition | fleetd/adapter-execution | Fleetd.AdapterExecution | fleetd/adapter-execution |
+| Daemon client | fleet/daemon-client | Fleet.DaemonClient | fleet/daemon-client |
+| Strict SSH transport | fleet/ssh-transport | Fleet.SshTransport | fleet/ssh-transport |
 
-Domain rules depend on kernel values and declared pure ports, never concrete
-transport, persistence, native-process or UI modules. Adapters implement the
-ports; composition roots select and assemble them. Applications are not reusable
-dependencies. Test fixtures are never product dependencies.
+Domain code depends on kernel values and declared pure ports, never concrete
+transport, SQLite, runtime, filesystem or UI implementations. Composition roots
+assemble adapters. Applications are not reusable dependencies and product
+dependencies cannot reference test fixtures or build tooling.
 
-Knex alone owns schema creation, reference initialization and forward migrations.
-Application adapters validate and open an already prepared store. Generated
-Diesel table types and EF entities are query metadata inside the SQLite adapter,
-not separate database engines or migration owners. The parallel C# track owns
-the shared Knex hierarchy and containers; Rust consumes its coordinated change.
+Fleetd owns one shared listener host and native lifecycle. Its daemon application
+owns the user-scoped private API, configuration, signals and composition only.
+Fleet uses that API even locally; SSH wraps the same private API remotely.
+Crossfire coordinates leases, authorization, activity and receipts but never
+launches an agent. Native adapters encapsulate engine-specific protocols.
 
-## Language specific structure
+Knex alone creates and migrates databases. Tinqer, EF and Diesel own their
+respective application queries over the exact same schema. Generated entities,
+tables and precompiled queries remain inside the SQLite adapter. No native ORM
+creates a schema or silently migrates on startup. The shared one-shot migration
+container runs after writers stop and a required backup is verified.
+Filesystem-state conversions are explicit operations, not alternate runtime
+readers, SQL migration owners or permission to reset a database.
 
-Rust uses Cargo crates, snake_case modules, typed Diesel query expressions,
-ownership and `Result`. C# uses projects, namespaces, EF entities and the
-required DbContext/resource classes. Neither target imitates the other's syntax
-or creates duplicate classes to manufacture file-by-file symmetry.
+## Required target differences
 
-EF's build-only compiler is a .NET requirement, not another runtime service.
-Rust does not need a corresponding compiler project. Both targets use the same
-schema; generated-file organization differs to match their compilers. Rust's
-per-crate integration tests are ordinary Cargo targets within
-the service; C#'s acceptance executable is an ordinary test project. These
-differences do not change product responsibility or persisted state.
+- C# owns its EF design-time compiler projects; Rust uses generated Diesel table
+  metadata and typed native query expressions. Neither creates imitation packages
+  for a compiler mechanism it does not use.
+- Native targets own process and TOML libraries because those runtimes require
+  them. Node uses its platform process/HTTP APIs and pinned TOML dependency.
+- Rust domain orchestration uses Tokio concurrency and serde_json values as
+  native primitives, equivalent to Promise/Task and native JSON values in the
+  other targets. The graph names these dependencies explicitly; unknown external
+  libraries and concrete Tokio/std filesystem, transport and process operations
+  remain rejected. No facade hides such operations behind a purported pure port.
+- Rust owns a Linux pidfd-based readiness reactor and native process-group guard.
+  The guard is a process-adapter executable, not another product, listener or
+  service. It runs only with an active engine, holds an exact private lock and
+  terminates the owned native group if fleetd exits, including SIGKILL.
+  No terminal scraping, history rewriting, global service or unsafe first-party
+  Rust is introduced.
+- Native distributions select the shared pinned IANA timezone data explicitly;
+  there is no silent host-timezone fallback. Browser assets, Element, Conduit and
+  onboarding releases are shared build inputs, not separately maintained copies.
+- Managed and NativeAOT outputs use one C# implementation. Rust uses one
+  ahead-of-time native implementation. None falls back to another backend.
 
-Native HTTP is an adapter boundary in both native targets. Node's Matrix adapter
-uses its platform HTTP API directly. No artificial Node HTTP package is needed
-solely to match a target-specific HTTP library.
+Credential refresh copies only the selected model/provider configuration and
+login, never unrelated MCP servers, profiles or host permission overrides.
+Every native activation refreshes that login; removing host login removes the
+stale native copy. Corrupt/public/hard-linked/symlinked private state fails closed.
+Native HTTP/WebSocket transports explicitly avoid proxy-mediated private traffic.
 
-## Inspection and correction
+## Architecture and verification gates
 
-The inspected C# worktree contains kernel, domain, contracts, filesystem, HTTP,
-Matrix, SQLite and schedule packages, plus server composition and acceptance
-tests. Its native fleetd, fleet CLI and full runtime parity remain unfinished.
-Its test results are owned by that track; this review does not rerun or certify
-them.
+`scripts/verify-implementation-layout.mjs` checks every product/application and
+19 semantic package pairs, rejects superseded service-level source owners and
+keeps one UI and one common assertion bank. `scripts/native-architecture.mjs`
+checks the Cargo/.NET graphs, pure-domain boundaries, build/dev edges and
+application reach-through. Negative fixtures prove that violations are rejected.
 
-Rust's fourteen Crossfire package boundaries and three fleetd package boundaries
-follow the same service/layer ownership. Its unnecessary separate
-database runtime crate has been removed: connection, configuration, generated
-schema, transactions and repositories now have one SQLite adapter owner. No
-alias, transitional facade or second read/write path remains. Rust's server
-and native fleet products remain completion work rather than empty
-directories advertising unsupported features.
-
-Rust now implements calendar scheduling, wake-up rules/storage/contracts and
-native runtime foundations behind these owners. Its real Codex check starts an
-authenticated app-server, verifies capabilities, injects receipt-confirmed native
-instructions without model inference, closes it and resumes the exact saved
-history. Generic journals and ownership locks preserve Node's on-disk format.
-Both runtime adapters now use the same owned-runtime ports. Verified native
-Pi 1.0.0 acceptance covers saved histories, receipts, instructions, observations,
-token counters, per-room contexts, hard interruption and owner questions using
-an inert loopback provider. These checks are not cloud-provider or complete
-listener/controller/server certification.
-
-The managed native home copies only model/provider settings and the selected
-profile, not host permission overrides, MCP servers, unrelated profiles or
-other host integrations. Authentication refresh replaces the private native
-login on every invocation and removes stale native login when host login is
-removed. Corrupt, public, hard-linked or symlinked credentials are rejected
-without replacing the previous login or exposing contents in errors.
-
-The Rust process adapter uses Linux pidfd readiness before reaping its owned
-process-group leader, then terminates remaining group members. This prevents
-abandoned subprocesses and avoids signalling a recycled leader identity. A
-safe `AsFd`-based readiness adapter owns those descriptors; first-party unsafe
-code remains forbidden. It has one shared readiness reactor, not one blocked
-thread per agent. This is a native implementation detail, not another product.
-
-The inspected C# WebSocket transport currently constructs `SocketsHttpHandler`
-without explicitly disabling proxies, unlike its HTTP adapter and Rust's direct
-loopback socket transport. This is an outstanding peer-track security review
-item, not an approved symmetry exception. The peer worktree remains untouched.
-
-`scripts/native-architecture.mjs` validates selected native dependency graphs,
-rejects application reach-through, production fixture dependencies, concrete
-domain dependencies, duplicate owners, another UI and a separate database
-runtime owner. Its explicit `--csharp-root` argument can inspect the other
-worktree read-only and report shared and target-only boundaries. Structural
-coverage is distinct from the full capability and verification gates.
+`npm run verify:parity -- /absolute/new-evidence-directory` builds and exercises
+Node, managed C#, NativeAOT C# and Rust. The same installed-product assertions run
+against all selected products; native unit/adapter tests remain language-owned.
+Container, exact same-file SQLite and shared Knex migration proofs are additional
+gates, not inferred from directory shape or focused fixture success.

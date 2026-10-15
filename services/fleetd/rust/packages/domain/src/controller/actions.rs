@@ -308,7 +308,13 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
                 }
             }
             Err(error) => {
+                let retry = recovery::recoverable(&error) && !stop.is_cancelled();
+                let cause = error.clone();
                 self.record_error(fleet, errors, Some(instance), error)?;
+                if retry {
+                    self.recover(fleet, configuration, instance, cause, None, false)
+                        .await?;
+                }
             }
         }
         Ok(())

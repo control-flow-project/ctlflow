@@ -357,6 +357,7 @@ name = "crossfire-adapter-process"
 version = "0.1.20"
 dependencies = [
  "async-io",
+ "crossfire-adapter-filesystem",
  "crossfire-kernel",
  "rustix",
  "tempfile",
@@ -482,6 +483,7 @@ dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-adapter-http",
  "crossfire-adapter-matrix",
+ "crossfire-adapter-process",
  "crossfire-adapter-schedule",
  "crossfire-adapter-sqlite",
  "crossfire-contracts",
@@ -710,6 +712,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
 
 [[package]]
+name = "fleet-cli"
+version = "0.1.20"
+dependencies = [
+ "crossfire-adapter-codex",
+ "crossfire-adapter-filesystem",
+ "crossfire-adapter-http",
+ "crossfire-adapter-toml",
+ "crossfire-agent-core",
+ "crossfire-contracts",
+ "crossfire-domain",
+ "crossfire-kernel",
+ "fleet-daemon-client",
+ "fleet-ssh-transport",
+ "fleetd-contracts",
+ "fleetd-domain",
+ "reqwest",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "url",
+]
+
+[[package]]
 name = "fleet-daemon-client"
 version = "0.1.20"
 dependencies = [
@@ -725,14 +752,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleet-ssh-transport"
+version = "0.1.20"
+dependencies = [
+ "crossfire-adapter-filesystem",
+ "crossfire-adapter-process",
+ "crossfire-kernel",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "fleetd-adapter-execution"
 version = "0.1.20"
 dependencies = [
  "crossfire-adapter-codex",
  "crossfire-adapter-crossfire",
  "crossfire-adapter-filesystem",
+ "crossfire-adapter-http",
  "crossfire-adapter-matrix",
  "crossfire-adapter-pi",
+ "crossfire-adapter-process",
  "crossfire-adapter-runtime",
  "crossfire-agent-core",
  "crossfire-contracts",
@@ -743,6 +784,7 @@ dependencies = [
  "fleetd-storage",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-util",
 ]
@@ -757,6 +799,30 @@ dependencies = [
  "crossfire-kernel",
  "fleetd-domain",
  "serde_json",
+ "url",
+]
+
+[[package]]
+name = "fleetd-daemon"
+version = "0.1.20"
+dependencies = [
+ "crossfire-adapter-codex",
+ "crossfire-adapter-filesystem",
+ "crossfire-adapter-http",
+ "crossfire-adapter-pi",
+ "crossfire-adapter-process",
+ "crossfire-agent-core",
+ "crossfire-contracts",
+ "crossfire-domain",
+ "crossfire-kernel",
+ "fleetd-adapter-execution",
+ "fleetd-contracts",
+ "fleetd-domain",
+ "fleetd-storage",
+ "rustix",
+ "serde_json",
+ "tokio",
+ "tokio-util",
  "url",
 ]
 

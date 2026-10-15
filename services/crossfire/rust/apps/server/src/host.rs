@@ -87,7 +87,17 @@ pub fn arguments(values: &[String]) -> Result<Input> {
         content: (Ipv4Addr::LOCALHOST, content).into(),
     })
 }
-pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
+pub fn diagnostics(directory: &std::path::Path) -> Result<Arc<logging::Store>> {
+    Ok(Arc::new(logging::Store::new(
+        &directory.join("management.sqlite.logs"),
+        configuration::load(directory)?.logging_retention_days,
+    )?))
+}
+pub async fn run(
+    input: Input,
+    stop: CancellationToken,
+    diagnostics: Arc<logging::Store>,
+) -> Result<()> {
     let directory = PrivateDirectory::open(&input.directory, false)?;
     let _ownership = StateLock::acquire(&input.directory.join("management.sqlite.owner"))?;
     directory.prepared_database("management.sqlite")?;
@@ -130,10 +140,7 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
             configuration.publication_budget.uploads,
         )?,
         public_reads: Arc::new(Semaphore::new(32)),
-        diagnostics: logging::Store::new(
-            &input.directory.join("management.sqlite.logs"),
-            configuration.logging_retention_days,
-        )?,
+        diagnostics,
         configuration,
         repository,
         matrix,
@@ -194,7 +201,6 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
             );
         }
     }
-    state.diagnostics.close();
     outcome
 }
 pub async fn signals(stop: CancellationToken) -> Result<()> {

@@ -178,28 +178,37 @@ impl Rpc {
             include_bytes!("../../assets/crossfire-extension.mjs"),
         )?;
         directory.write_atomic("crossfire-instructions.txt", input.instructions.as_bytes())?;
-        let mut native = NativeProcess::start(&NativeCommand {
-            binary: input.binary.to_owned(),
-            workspace: input.workspace.to_owned(),
-            environment,
-            input: true,
-            arguments: vec![
-                "--mode".into(),
-                "rpc".into(),
-                "--offline".into(),
-                "--no-extensions".into(),
-                "--no-skills".into(),
-                "--no-prompt-templates".into(),
-                "--no-themes".into(),
-                "--no-approve".into(),
-                "--session".into(),
-                input.history.as_os_str().to_owned(),
-                "--append-system-prompt".into(),
-                instructions.into_os_string(),
-                "--extension".into(),
-                extension.into_os_string(),
-            ],
-        })?;
+        let mut native = NativeProcess::guarded(
+            &NativeCommand {
+                binary: input.binary.to_owned(),
+                workspace: input.workspace.to_owned(),
+                environment,
+                input: true,
+                arguments: vec![
+                    "--mode".into(),
+                    "rpc".into(),
+                    "--offline".into(),
+                    "--no-extensions".into(),
+                    "--no-skills".into(),
+                    "--no-prompt-templates".into(),
+                    "--no-themes".into(),
+                    "--no-approve".into(),
+                    "--session".into(),
+                    input.history.as_os_str().to_owned(),
+                    "--append-system-prompt".into(),
+                    instructions.into_os_string(),
+                    "--extension".into(),
+                    extension.into_os_string(),
+                ],
+            },
+            input.home,
+            &identity::hash(
+                input
+                    .history
+                    .to_str()
+                    .ok_or_else(|| error("Native Pi history must use a valid Unicode path"))?,
+            ),
+        )?;
         let input = native.input()?;
         let output = native.output()?;
         let errors = native.errors()?;

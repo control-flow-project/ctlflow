@@ -1,6 +1,7 @@
 use crate::native::Adapter;
 use crossfire_agent_core::{
     listener::Factory,
+    listener_budget::Budget,
     owned_runtime::{Input, OwnedAdapter},
     runtime::{Hooks, Lifecycle},
 };
@@ -39,6 +40,7 @@ pub struct RuntimeStart<
     pub work: Arc<W>,
     pub clock: T,
     owner: OwnerSlot<H, W, T>,
+    budget: Arc<Budget>,
 }
 impl<
     H: Hooks + 'static,
@@ -53,6 +55,7 @@ impl<
             work: self.work.clone(),
             clock: self.clock.clone(),
             owner: self.owner.clone(),
+            budget: self.budget.clone(),
         }
     }
 }
@@ -62,7 +65,13 @@ impl<
     T: Clock + Clone + Send + Sync + 'static,
 > RuntimeStart<H, W, T>
 {
-    pub fn new(adapter: Arc<Adapter>, template: Template, work: Arc<W>, clock: T) -> Result<Self> {
+    pub fn new(
+        adapter: Arc<Adapter>,
+        template: Template,
+        work: Arc<W>,
+        clock: T,
+        budget: Arc<Budget>,
+    ) -> Result<Self> {
         <Adapter as OwnedAdapter<H>>::validate(adapter.as_ref(), &template.options)?;
         if template.profile.is_empty()
             || template.name.is_empty()
@@ -80,6 +89,7 @@ impl<
             work,
             clock,
             owner: Arc::new(Mutex::new(None)),
+            budget,
         })
     }
     pub async fn maintain(&self) -> Result<()> {
@@ -146,6 +156,7 @@ impl<
             self.clock.clone(),
             template.initial,
             stop,
+            self.budget.clone(),
         )
         .await?;
         let native = match owner.runtime() {

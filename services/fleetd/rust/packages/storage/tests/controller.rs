@@ -22,6 +22,79 @@ impl Clock for Time {
     }
 }
 type ControllerUnderTest = Controller<Registry, Host, Time>;
+#[tokio::test(start_paused = true)]
+async fn transient_initial_start_failure_recovers_the_requested_identity_without_another_request()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let (_root, registry, host, directory) = setup()?;
+    let current = controller(registry, host.clone())?;
+    current.ready().await?;
+    let fleet = current.add(&directory)?.registration.fleet_id;
+    host.0.start_fails_once.store(true, Ordering::SeqCst);
+    let result = operate(
+        &current,
+        Target::Agent {
+            fleet: fleet.clone(),
+            instance: "alpha".to_owned(),
+        },
+        Action::Start,
+    )
+    .await?;
+    assert_eq!(
+        result.status,
+        OperationStatus::Failed,
+        "The original failed operation is never falsely reported successful"
+    );
+    for _ in 0..256 {
+        tokio::time::advance(Duration::from_millis(100)).await;
+        if current.view(&fleet)?.instances.iter().any(|instance| {
+            instance.instance.key == "alpha" && instance.phase == InstancePhase::Running
+        }) {
+            break;
+        }
+        tokio::task::yield_now().await;
+    }
+    let view = current.view(&fleet)?;
+    let alpha = view
+        .instances
+        .iter()
+        .find(|instance| instance.instance.key == "alpha")
+        .ok_or("Requested identity")?;
+    assert_eq!(alpha.phase, InstancePhase::Running);
+    assert_eq!(alpha.session_id.as_deref(), Some("saved-alpha"));
+    assert!(alpha.desired_active);
+    assert_eq!(host.0.starts.load(Ordering::SeqCst), 2);
+    current.close().await?;
+    Ok(())
+}
+#[tokio::test]
+async fn failed_controller_shutdown_keeps_cleanup_retryable_without_starting_replacements()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let (_root, registry, host, directory) = setup()?;
+    let current = controller(registry, host.clone())?;
+    current.ready().await?;
+    let fleet = current.add(&directory)?.registration.fleet_id;
+    assert_eq!(
+        operate(
+            &current,
+            Target::Agent {
+                fleet,
+                instance: "alpha".to_owned()
+            },
+            Action::Start
+        )
+        .await?
+        .status,
+        OperationStatus::Succeeded
+    );
+    host.0.close_fails.store(true, Ordering::SeqCst);
+    assert!(current.close().await.is_err());
+    host.0.close_fails.store(false, Ordering::SeqCst);
+    current.close().await?;
+    current.close().await?;
+    assert_eq!(host.0.starts.load(Ordering::SeqCst), 1);
+    assert_eq!(host.0.closes.load(Ordering::SeqCst), 1);
+    Ok(())
+}
 type Fixture = (
     tempfile::TempDir,
     Arc<Registry>,

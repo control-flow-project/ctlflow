@@ -123,6 +123,7 @@ async fn one_actual_private_http_host_dispatches_isolated_bindings_and_rejects_o
         .await?;
     assert_eq!(malformed.status().as_u16(), 400);
     assert!(!stop.is_cancelled());
+    assert!(!binding.deliberately_stopped());
     let stopping = client
         .post(&url)
         .bearer_auth(secret)
@@ -131,9 +132,11 @@ async fn one_actual_private_http_host_dispatches_isolated_bindings_and_rejects_o
         .await?;
     assert_eq!(stopping.status().as_u16(), 200);
     assert!(stop.is_cancelled());
+    assert!(binding.deliberately_stopped());
     binding.close()?;
     assert!(storage.read("analyst/listener.json", 65536)?.is_none());
     let replacement = host.bind(options("analyst", CancellationToken::new()))?;
+    assert!(!replacement.deliberately_stopped());
     let stale = client
         .post(&url)
         .bearer_auth(secret)

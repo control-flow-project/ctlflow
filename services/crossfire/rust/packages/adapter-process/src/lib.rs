@@ -1,4 +1,6 @@
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
+pub mod background;
+mod guarded;
 use rustix::process::{Pid, PidfdFlags, Signal};
 use std::{
     collections::BTreeMap,

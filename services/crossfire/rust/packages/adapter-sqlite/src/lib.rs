@@ -28,4 +28,5 @@ pub mod schema;
 mod statistics;
 pub mod store;
 pub mod tables;
+pub mod upgrade;
 mod wake_up;

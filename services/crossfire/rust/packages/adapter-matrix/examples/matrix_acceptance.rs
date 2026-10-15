@@ -175,6 +175,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         quote.mentions.is_empty() && !quote.control,
         "quoted text alone never becomes a directed control",
     )?;
+    let tail = http
+        .ok(
+            Some(&token),
+            Method::GET,
+            &format!("{API}/rooms/{}/messages?dir=b&limit=1", segment(&room)),
+            None,
+        )
+        .await?;
+    let after = http
+        .ok(
+            Some(&token),
+            Method::GET,
+            &format!(
+                "{API}/rooms/{}/messages?dir=f&limit=100&from={}",
+                segment(&room),
+                segment(&field(&tail, "end")?)
+            ),
+            None,
+        )
+        .await?;
+    checks.require(
+        !after["chunk"]
+            .as_array()
+            .ok_or("Forward history chunk")?
+            .iter()
+            .any(|event| event["event_id"] == tail["chunk"][0]["event_id"]),
+        "A reset boundary excludes the already exported newest native event",
+    )?;
     let group = http
         .ok(
             Some(&token),

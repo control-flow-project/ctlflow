@@ -47,7 +47,8 @@ export function validateNativeGraph(nodes) {
       }
       if (node.layer !== 'packages') continue;
       if (node.role === 'domain') {
-        assert(dependency?.layer === 'packages' && ['kernel', 'domain', 'agent-core'].includes(dependency.role), 'Domain rules may depend only on declared pure library owners');
+        const primitive = node.language === 'rust' && !edge.manifest && ['serde_json', 'tokio'].includes(edge.library);
+        assert(primitive || dependency?.layer === 'packages' && ['kernel', 'domain', 'agent-core'].includes(dependency.role), 'Domain rules may depend only on declared pure library owners or explicit native value/concurrency primitives');
       }
       if (node.role === 'kernel') assert(!dependency, 'The kernel cannot depend on another product layer');
       if (node.role === 'contracts' && dependency) {
@@ -63,7 +64,7 @@ export function rustGraph(metadata, root) {
   return metadata.packages.map(item => ({
     ...nativeOwner(root, item.manifest_path, 'rust'), manifest: item.manifest_path,
     edges: item.dependencies.map(dependency => ({
-      kind: dependency.kind ?? 'runtime', manifest: dependency.path ? join(dependency.path, 'Cargo.toml') : null,
+      kind: dependency.kind ?? 'runtime', manifest: dependency.path ? join(dependency.path, 'Cargo.toml') : null, library: dependency.path ? null : dependency.name,
     })),
   }));
 }
@@ -114,8 +115,16 @@ function main() {
   assert(arguments_.length === 0 || (arguments_.length === 2 && arguments_[0] === '--csharp-root' && isAbsolute(arguments_[1])), 'Use optional --csharp-root /absolute/checkout');
   const metadata = JSON.parse(execFileSync('cargo', ['metadata', '--no-deps', '--locked', '--format-version', '1'], { cwd: repository, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 30_000 }));
   const rust = validateNativeGraph(rustGraph(metadata, repository));
+  for (const item of metadata.packages.filter(item => nativeOwner(repository, item.manifest_path, 'rust').role === 'domain')) {
+    const source = join(dirname(item.manifest_path), 'src');
+    for (const file of readdirSync(source, {recursive:true}).filter(file => file.endsWith('.rs'))) verifyDomainPrimitives(readFileSync(join(source,file),'utf8'));
+  }
   const csharp = validateNativeGraph(csharpGraph(arguments_[1] ?? repository));
   process.stdout.write(JSON.stringify({ status: 'passed', rustOwners: rust.length, csharpOwners: csharp.length, ...compareStructure(rust, csharp), scope: 'ownership and dependency structure; not capability completeness' }) + '\n');
+}
+export function verifyDomainPrimitives(source) {
+  assert(!/\b(?:tokio|std)\s*::\s*(?:fs|net|process|signal|io)\b/u.test(source), 'Domain concurrency primitives must not introduce concrete filesystem, transport or process operations');
+  for (const [, imports] of source.matchAll(/\buse\s+(?:tokio|std)\s*::([\s\S]*?);/gu)) assert(!/\b(?:fs|net|process|signal|io)\b/u.test(imports), 'Grouped domain imports must not introduce concrete filesystem, transport or process operations');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();

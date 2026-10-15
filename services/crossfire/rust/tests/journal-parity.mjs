@@ -3,9 +3,9 @@ import { spawn, execFileSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, isAbsolute } from 'node:path';
-import { acquireFileLock } from '../../packages/adapter-filesystem/dist/lock.js';
-import { deliveryJournal } from '../../packages/adapter-runtime/dist/journal.js';
-import * as check from '../../packages/contracts/dist/schema/validation.js';
+import { acquireFileLock } from '../../node/packages/adapter-filesystem/dist/lock.js';
+import { deliveryJournal } from '../../node/packages/adapter-runtime/dist/journal.js';
+import * as check from '../../node/packages/contracts/dist/schema/validation.js';
 
 const [binary] = process.argv.slice(2);
 assert(binary && isAbsolute(binary), 'Use the compiled native journal proof');

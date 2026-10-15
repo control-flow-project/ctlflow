@@ -61,6 +61,7 @@ impl Hooks for Observer {
 }
 #[derive(Default)]
 struct Work(Mutex<Vec<ResumeWork>>);
+type Observers = Vec<Arc<dyn Fn(ObservationEvent) + Send + Sync>>;
 impl WorkStore for Work {
     fn work(&self) -> Result<Vec<ResumeWork>> {
         Ok(self.0.lock().map_err(|_| failed())?.clone())
@@ -80,7 +81,7 @@ struct State {
     native_stop: Mutex<Option<CancellationToken>>,
     contexts: Mutex<Vec<SavedContext>>,
     deliveries: Mutex<Vec<(String, String)>>,
-    observations: Mutex<Vec<Arc<dyn Fn(ObservationEvent) + Send + Sync>>>,
+    observations: Mutex<Observers>,
 }
 struct Adapter(Arc<State>);
 struct Native {
@@ -144,6 +145,46 @@ impl<H: Hooks + 'static> OwnedAdapter<H> for Adapter {
 }
 
 #[tokio::test]
+async fn failed_or_unloaded_thread_observations_do_not_replace_a_live_native_process()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let state = Arc::new(State::default());
+    let work = Arc::new(Work::default());
+    let owner = Owner::open(
+        Arc::new(Adapter(state.clone())),
+        input(),
+        work,
+        Time(Arc::new(AtomicI64::new(1))),
+        Initial::Start,
+        CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
+    )
+    .await?;
+    let observers = state.observations.lock().map_err(|_| failed())?.clone();
+    for status in [NativeState::Unavailable, NativeState::Failed] {
+        for observer in &observers {
+            observer(ObservationEvent::State {
+                runtime: Runtime::Codex,
+                session_id: "saved".to_owned(),
+                room_id: None,
+                state: status,
+                observed_at: 1,
+                settings: Vec::new(),
+                error_message: None,
+            });
+        }
+        owner.maintain().await?;
+        assert_eq!(owner.current()?.phase, Phase::Running);
+        assert_eq!(
+            state.starts.load(Ordering::SeqCst),
+            1,
+            "Only a disconnected native lifetime can authorize automatic process replacement"
+        );
+        assert_eq!(state.closes.load(Ordering::SeqCst), 0);
+    }
+    owner.close().await?;
+    Ok(())
+}
+#[tokio::test]
 async fn observations_checkpoint_work_before_a_crash_and_ignore_a_replaced_process_generation()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(State::default());
@@ -156,6 +197,7 @@ async fn observations_checkpoint_work_before_a_crash_and_ignore_a_replaced_proce
         Time(clock.clone()),
         Initial::Start,
         CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
     let observation = state
@@ -337,6 +379,7 @@ async fn exact_history_sleeps_at_thirty_minutes_and_wakes_on_the_same_identity()
         Time(clock.clone()),
         Initial::Start,
         CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
     let logical = owner.runtime()?;
@@ -377,6 +420,7 @@ async fn active_work_is_not_slept_and_explicit_stop_resumes_with_a_checkpointed_
         Time(clock.clone()),
         Initial::Start,
         CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
     state.busy.store(true, Ordering::SeqCst);
@@ -412,6 +456,7 @@ async fn crashed_native_process_is_closed_before_replacement_and_failed_close_bl
         Time(clock),
         Initial::Start,
         CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
     state
@@ -446,6 +491,7 @@ async fn missing_saved_sleeping_history_fails_without_a_process_or_replacement()
         Time(Arc::new(AtomicI64::new(1))),
         Initial::ResumeSleeping,
         CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await;
     assert_eq!(
@@ -453,5 +499,103 @@ async fn missing_saved_sleeping_history_fails_without_a_process_or_replacement()
         Some(ErrorCode::Missing)
     );
     assert_eq!(state.starts.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn saved_unfinished_work_wakes_during_recovery_without_waiting_for_another_message()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let state = Arc::new(State::default());
+    state
+        .contexts
+        .lock()
+        .map_err(|_| failed())?
+        .push(SavedContext {
+            context: "shared".into(),
+            runtime: "codex".into(),
+            session_id: "saved".into(),
+            workspace: "/fixture".into(),
+        });
+    let work = Arc::new(Work::default());
+    work.save_work(&[ResumeWork {
+        context: "shared".into(),
+        session_id: "saved".into(),
+        message_id: "resume-unfinished".into(),
+        checkpointed_at: 1,
+    }])?;
+    let owner = Owner::open(
+        Arc::new(Adapter(state.clone())),
+        input(),
+        work.clone(),
+        Time(Arc::new(AtomicI64::new(2))),
+        Initial::ResumeSleeping,
+        CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
+    )
+    .await?;
+    assert_eq!(state.starts.load(Ordering::SeqCst), 1);
+    assert!(work.work()?.is_empty());
+    assert_eq!(owner.current()?.phase, Phase::Running);
+    assert!(
+        state
+            .deliveries
+            .lock()
+            .map_err(|_| failed())?
+            .iter()
+            .any(|(_, text)| text.contains("re-read the applicable AGENTS.md"))
+    );
+    owner.close().await?;
+    Ok(())
+}
+#[tokio::test]
+async fn steering_never_waits_in_a_full_native_start_queue()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    use crossfire_agent_core::listener_budget::{Budget, Work as NativeWork};
+    let state = Arc::new(State::default());
+    state
+        .contexts
+        .lock()
+        .map_err(|_| failed())?
+        .push(SavedContext {
+            context: "shared".into(),
+            runtime: "codex".into(),
+            session_id: "saved".into(),
+            workspace: "/fixture".into(),
+        });
+    let budget = Arc::new(Budget::default());
+    let mut leases = vec![];
+    for _ in 0..4 {
+        leases.push(
+            budget
+                .acquire(NativeWork::NativeStart, CancellationToken::new(), false)
+                .await?,
+        );
+    }
+    let owner = Owner::open(
+        Arc::new(Adapter(state.clone())),
+        input(),
+        Arc::new(Work::default()),
+        Time(Arc::new(AtomicI64::new(1))),
+        Initial::ResumeSleeping,
+        CancellationToken::new(),
+        budget,
+    )
+    .await?;
+    let admission = Admission {
+        priority: InputPriority::Steering,
+        cancellation: CancellationToken::new(),
+    };
+    assert!(
+        owner
+            .runtime()?
+            .active_turn(None, Some(&admission))
+            .await
+            .is_err()
+    );
+    assert_eq!(state.starts.load(Ordering::SeqCst), 0);
+    drop(leases);
+    owner.resume().await?;
+    assert_eq!(state.starts.load(Ordering::SeqCst), 1);
+    owner.close().await?;
     Ok(())
 }

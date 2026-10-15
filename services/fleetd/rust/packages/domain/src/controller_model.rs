@@ -208,6 +208,7 @@ pub trait RunningAgent: Send + Sync {
     fn close(&self) -> Response<'_, ()>;
 }
 pub trait RemoteOperations: Send + Sync {
+    fn target(&self, directory: &std::path::Path, instance: Option<&str>) -> Result<Target>;
     fn execute(
         self: std::sync::Arc<Self>,
         request: OperationRequest,

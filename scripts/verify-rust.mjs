@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
+import { prepareTimezones } from '../services/crossfire/scripts/timezones.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 assert.equal(process.argv.length, 2, 'Rust verification has no runtime-selection or skip flags');
@@ -63,7 +64,8 @@ await execute('cargo', ['clippy','--workspace','--all-targets','--locked','--','
 await execute('npm', ['run','build']);
 const piBinary = JSON.parse(await execute('node', ['--input-type=module','-e', 'import {preparePi,piBinary} from "@ctlflow/crossfire-test-support/pi"; preparePi(); process.stdout.write(JSON.stringify(piBinary()));'], {timeout:360_000}));
 assert(typeof piBinary === 'string' && piBinary.startsWith('/'), 'Verified native Pi asset must have an exact absolute executable path');
-const nativeEnvironment = {...process.env, CROSSFIRE_TEST_PI_BINARY:piBinary};
+process.env.TZDIR=await prepareTimezones();
+const nativeEnvironment = {...process.env, CROSSFIRE_TEST_PI_BINARY:piBinary, CROSSFIRE_NATIVE_GUARD:join(prepared,'crossfire-native-guard')};
 await execute('node', ['services/crossfire/scripts/generate-rust-schema.mjs','--database',template,'--check']);
 await execute('node', ['services/crossfire/scripts/generate-rust-catalog.mjs','--check']);
 await execute('node', ['services/crossfire/scripts/generate-rust-operations.mjs','--check']);
@@ -72,11 +74,12 @@ await execute('node', ['services/fleetd/scripts/generate-rust-operations.mjs','-
 await execute('node', ['services/crossfire/scripts/generate-rust-timezones.mjs','--check']);
 await execute('node', ['services/crossfire/scripts/generate-rust-pi-extension.mjs']);
 const examples = new Map();
-await execute('cargo', ['build','--workspace','--examples','--locked','--message-format=json'], {line:text => {
+await execute('cargo', ['build','--workspace','--bins','--examples','--locked','--message-format=json'], {line:text => {
   const event = JSON.parse(text);
   if (event.reason === 'compiler-artifact' && event.target.kind.includes('example') && event.executable) examples.set(event.target.name,event.executable);
 }});
 const executables = new Map();
+copyFileSync(join(root,'target/debug/crossfire-native-guard'),nativeEnvironment.CROSSFIRE_NATIVE_GUARD); chmodSync(nativeEnvironment.CROSSFIRE_NATIVE_GUARD,0o755);
 await execute('cargo', ['test','--workspace','--all-targets','--locked','--no-run','--message-format=json'], {line:text => {
   const event = JSON.parse(text);
   if (event.reason === 'compiler-artifact' && event.profile?.test && event.executable) {

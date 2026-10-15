@@ -23,7 +23,7 @@ pub struct State {
     pub registration: crate::registration::Registration,
     pub changed: Notify,
     pub stop: CancellationToken,
-    pub diagnostics: crossfire_adapter_filesystem::logging::Store,
+    pub diagnostics: std::sync::Arc<crossfire_adapter_filesystem::logging::Store>,
 }
 impl State {
     pub fn publications(

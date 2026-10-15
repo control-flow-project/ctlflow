@@ -42,7 +42,10 @@ pub fn secret() -> Result<crate::secret::Secret> {
 }
 
 pub fn hash(value: &str) -> String {
-    format!("{:x}", Sha256::digest(value.as_bytes()))
+    hash_bytes(value.as_bytes())
+}
+pub fn hash_bytes(value: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(value))
 }
 
 pub fn matches(value: &str, digest: &str) -> bool {

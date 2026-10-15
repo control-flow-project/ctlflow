@@ -436,13 +436,13 @@ impl<S: LocalState, N: Connection, A: Artifacts> Publication<S, N, A> {
                 }
                 continue;
             }
+            if self.priority.is_some() {
+                target.settle(stop.clone()).await?;
+            }
             let step = &mut plan.steps[position];
             step.session = Some(target.session_id().to_owned());
             step.status = Status::Publishing;
             self.save(plan)?;
-            if self.priority.is_some() {
-                target.settle(stop.clone()).await?;
-            }
             let step = &plan.steps[position];
             target
                 .deliver(&step.text, &step.id, stop.clone(), self.priority)

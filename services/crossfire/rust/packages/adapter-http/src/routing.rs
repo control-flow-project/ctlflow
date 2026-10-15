@@ -39,18 +39,15 @@ pub fn path<Body>(request: &Request<Body>) -> Result<&str> {
         || path
             .chars()
             .any(|value| value <= '\u{20}' || value == '\u{7f}' || matches!(value, '\\' | '#'))
-        || path.split('/').any(|part| matches!(part, "." | ".."))
     {
         return Err(Failure::new(ErrorCode::Invalid, "Invalid request URL"));
     }
-    if decode(path)?
-        .split('/')
-        .any(|part| matches!(part, "." | ".."))
+    if path.split('/').any(|part| matches!(part, "." | ".."))
+        || decode(path)?
+            .split('/')
+            .any(|part| matches!(part, "." | ".."))
     {
-        return Err(Failure::new(
-            ErrorCode::Invalid,
-            "Invalid request path encoding",
-        ));
+        return Err(Failure::new(ErrorCode::Missing, "Route not found"));
     }
     Ok(path)
 }

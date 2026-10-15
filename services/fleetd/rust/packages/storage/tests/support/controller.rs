@@ -18,6 +18,7 @@ use std::{
 #[derive(Default)]
 pub struct Calls {
     pub starts: AtomicUsize,
+    pub start_fails_once: AtomicBool,
     pub closes: AtomicUsize,
     pub close_fails: AtomicBool,
     pub runtimes: Mutex<BTreeMap<String, Arc<Agent>>>,
@@ -146,6 +147,12 @@ impl Execution for Host {
         _stop: CancellationToken,
     ) -> Result<Arc<dyn RunningAgent>> {
         self.0.starts.fetch_add(1, Ordering::SeqCst);
+        if self.0.start_fails_once.swap(false, Ordering::SeqCst) {
+            return Err(Failure::new(
+                ErrorCode::Unavailable,
+                "Fixture transient startup failure",
+            ));
+        }
         let agent = Arc::new(Agent {
             session: format!("saved-{}", instance.key),
             stop: CancellationToken::new(),

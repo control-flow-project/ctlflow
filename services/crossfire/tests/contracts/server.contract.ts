@@ -21,6 +21,7 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     await fixture.failure(await fixture.raw('/api/member-invitations', 'POST', { roleCode: 'member', expiresSeconds: 600 }, { Cookie: fixture.owner.cookie, Origin: fixture.origin }), 403, 'forbidden');
     await fixture.failure(await fixture.raw('/api/agents?page=1&page=2', 'GET', undefined, fixture.headers()), 400, 'invalid'); await fixture.failure(await fixture.raw('/api/agents?after=removed', 'GET', undefined, fixture.headers()), 400, 'invalid');
     assert.equal((await fixture.raw('/_coord/health')).status, 404); assert.equal((await fixture.raw('/manage/fleets')).status, 200); assert.equal((await fixture.raw('/config.json')).status, 200);
+    for (const path of ['/config.json/../bootstrap.json', '/manage/assets/%2e%2e%2fpackage.json', '/_coord/install.mjs']) assert.equal((await fixture.raw(path)).status, 404, 'Unsafe or removed public asset: ' + path);
     const descriptor = await fixture.raw('/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(fixture.owner.matrixUserId), 'GET', undefined, fixture.headers()); assert.equal(descriptor.status, 200); assert.equal(record(descriptor.body).ownerMatrixId, fixture.owner.matrixUserId);
   });
   await scope.test('invitation registration is explicit and works without an Origin on its GET review', async () => {

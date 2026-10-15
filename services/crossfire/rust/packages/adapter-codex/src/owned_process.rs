@@ -304,7 +304,7 @@ impl OwnedProcess {
             OsString::from("--ws-token-file"),
             token_file.as_os_str().to_owned(),
         ];
-        let process = NativeProcess::start(&command(input, parameters))?;
+        let process = NativeProcess::guarded(&command(input, parameters), input.home, "codex")?;
         let pid = process.id();
         let state = Arc::new(State {
             close: CancellationToken::new(),

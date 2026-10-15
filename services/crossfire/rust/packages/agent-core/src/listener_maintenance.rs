@@ -173,7 +173,7 @@ impl<S: LocalState, C: Coordination, T: Clock + Send + Sync> Maintenance<S, C, T
         for room in selected {
             let mut request =
                 Call::agent(OperationId::AcceptRoomInvitation, &self.options.agent_id);
-            request.parameters.insert("roomId".to_owned(), room.clone());
+            request.body = Some(json!({"roomId":room}));
             let response = self.coordination.call(&request, stop.clone()).await;
             let accepted = match response {
                 Ok(value) => check::boolean(

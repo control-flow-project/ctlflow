@@ -15,7 +15,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 #[path = "support/artifacts.rs"]
@@ -28,6 +28,8 @@ use tokio_util::sync::CancellationToken;
 struct NativeState {
     deliveries: Mutex<Vec<(String, String)>>,
     uncertain: AtomicBool,
+    settlement_failure: AtomicBool,
+    recoveries: AtomicUsize,
     acknowledged: Mutex<Vec<String>>,
 }
 struct Native {
@@ -66,9 +68,14 @@ impl Connection for Native {
         }
     }
     async fn settle(&self, _stop: CancellationToken) -> Result<bool> {
-        Ok(false)
+        if self.state.settlement_failure.swap(false, Ordering::SeqCst) {
+            Err(failure())
+        } else {
+            Ok(false)
+        }
     }
     async fn recover(&self, text: &str, message: &str, _stop: CancellationToken) -> Result<bool> {
+        self.state.recoveries.fetch_add(1, Ordering::SeqCst);
         Ok(self
             .state
             .deliveries
@@ -130,6 +137,66 @@ fn identities() -> BTreeMap<String, PrincipalIdentity> {
             owner_display_name: None,
         },
     )])
+}
+
+#[tokio::test]
+async fn steering_remains_prepared_until_the_preceding_native_input_is_settled()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let storage = Arc::new(Memory::default());
+    let state = Arc::new(NativeState::default());
+    state.settlement_failure.store(true, Ordering::SeqCst);
+    let native = Arc::new(Native {
+        session: "saved".to_owned(),
+        state: state.clone(),
+    });
+    let open = || {
+        Publication::open(
+            storage.clone(),
+            native.clone(),
+            Arc::new(Inline),
+            settings(),
+            "steering",
+            HistoryMode::Shared,
+            Some(InputPriority::Steering),
+        )
+    };
+    let publication = open()?;
+    let batch = batch(&["!room:local"])?;
+    let rooms = batch.cursors.keys().cloned().collect();
+    publication.prepare(batch.clone(), batch.events.clone(), &identities(), 65536)?;
+    assert!(
+        publication
+            .publish(&rooms, 65536, |_| true, CancellationToken::new())
+            .await
+            .is_err()
+    );
+    assert!(
+        !publication.recovering()?,
+        "No steering input has reached the native runtime"
+    );
+    assert!(state.deliveries.lock().map_err(|_| failure())?.is_empty());
+    drop(publication);
+    let restored = open()?;
+    assert!(
+        restored
+            .recover(&rooms, CancellationToken::new())
+            .await?
+            .is_none()
+    );
+    assert_eq!(
+        state.recoveries.load(Ordering::SeqCst),
+        0,
+        "Never recover steering against its predecessor's native journal"
+    );
+    assert!(
+        restored
+            .publish(&rooms, 65536, |_| true, CancellationToken::new())
+            .await?
+            .is_some()
+    );
+    assert_eq!(state.deliveries.lock().map_err(|_| failure())?.len(), 1);
+    restored.acknowledge()?;
+    Ok(())
 }
 
 #[tokio::test]

@@ -11,52 +11,74 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 
 type Scope = Parameters<typeof cleanup>[0];
 
+const authority = `-----BEGIN CERTIFICATE-----
+MIIDTDCCAjSgAwIBAgIUC+eR9KTFssawf54jQl8A/6+hL2AwDQYJKoZIhvcNAQEL
+BQAwLDEqMCgGA1UEAwwhQ3Jvc3NmaXJlIGlzb2xhdGVkIHRlc3QgYXV0aG9yaXR5
+MB4XDTI2MTAxNTAxNTk1OFoXDTM2MTAxMjAxNTk1OFowLDEqMCgGA1UEAwwhQ3Jv
+c3NmaXJlIGlzb2xhdGVkIHRlc3QgYXV0aG9yaXR5MIIBIjANBgkqhkiG9w0BAQEF
+AAOCAQ8AMIIBCgKCAQEAmJ2S3lniPfz5ayPR6kUN92tMhKbEsLZfduIJf18NZLeb
+gmmEf59FbGtsHHhl/uuiwmabgIJHgCh064lt0oLC2zlaymuHZ7qwIOqUzmjQ4lz2
+MUOgOw7qsE4tInPhtQKcmOXgfX8lW/9IRYVtozwPzChXPrH933FMdFD8nwSviuaM
+5vbZX88LUYE0OfhID+Acuph2qz6txsbB4P8/Xp+aZwyBUU2NoHwY4vjZv+DLXxw2
+GwknuEMcCVp8upIJJmBSETGFimrn6YG+OZFVSfSU9tY4gfFtXwFk83R2yuUfCMsO
+qY/jNlphkAJKLmq7qkv2d5AYhXJ60owl6F29RKbWbwIDAQABo2YwZDAdBgNVHQ4E
+FgQUHPzTpvpEZ8eRw/r9gB6SmauTCc0wHwYDVR0jBBgwFoAUHPzTpvpEZ8eRw/r9
+gB6SmauTCc0wEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwDQYJ
+KoZIhvcNAQELBQADggEBAAPhNLMLKr02AYfRdwW1GIO8cTAA5rfXfjxkoTdO3VXm
+OU8xk/euUJudRG3H/z4mZ8ffjrzybwpQGJXZKCa6LuiXtOuHOyXzjUBJLbrQimWp
+NyXW0F6Mk5Z6LzhsrbkINQca9qcDumrHZ+GlQXzsX7Ao4pq98NZQXAK/+CnUGqBr
+ZoKfvOtqHTOmNdwUmdGcTmUfTpBRpZE9Hocu8cX3s+YHyqn62yxK/JcmAPpu898l
+HHtGIAYAJC1rVAnIL9oXYs8CIuFIylu2TKjgkiNeR1E3GrKDxszj77oOfB2Dp6Jj
+Y/Ergg9ZwC4HDXzDSz4eOaajzrAEIUF6arzC0IVc8lM=
+-----END CERTIFICATE-----`;
 const certificate = `-----BEGIN CERTIFICATE-----
-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
+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
+O7WVSTg=
 -----END CERTIFICATE-----`;
 const key = `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDb+71kFrZqWTOF
-p18udZdoSP4nVPGWfweeT99iIQx+3tPUUcw/SApxVjmmCb+aOFSofZsZPa2cKD+C
-mTxH71UQLHMrbe/kUf/6Obj6FTnJczDc7rF4nrr459PNGNnjR6zsCB/exyAhY1Iz
-tFe6m5v1rV2gZxeC15ntEXlUO+5IJSyd71dre/U7DnpR94+pGFdjMlEyDjCGwV50
-ia1FeXMhYmajOTxB5oNzaL2LLZJgo2baoLa+7SFIs7mPKDMKQfa230iEfsKsW6jy
-Xv9NV1BKkH5KlOuYmzd9LpH15hYYpXTjLfRhW4hRB65U95uU9seTdhIB/W+FxbQZ
-bgv9iybVAgMBAAECggEACyO4TMqJpOECJuZ5f2oc/KmVlSWhW4mbN9JmRsXS/X8I
-eFvxXShSFGMqutRg4M0Gxxwf2oCxEJNJLrKBHEjA+fdbmFC828b7O2STkAu7HWRj
-47bX7c+75WwijDmR7wcWI+2quiaYje2a9VtQhfaTSIw64tXVmZ6UANk9rPJL+AMx
-0Zm6K5OAIScguWO8VTWqmV0I8WFn/lupmQ18VtSN6f72pd+2cbswNOAWCcaoQHMK
-QhP+7STLDE0l3DC4pUreziyX4IZMKh2sXCvkuI3V4XJUMKifkn7EMCQSoD7ir5HZ
-0MG40j8cWBHtEVAZBkqXVY25eADF5dcTl0bfKxuaEQKBgQD8SSZvhBFd+mMuiBVp
-OoVV1W0JLNReyZHeKb7yCKpfgs+2Pqb29kiIEMbpiZMkV+doYSpHP8K6Sj+xWou4
-Ft+X+c3js7Qs5o+5++9zxh6MMICJ7Kp41T/WhlooTatX9JcWYfnSGSBZLFvXzzkm
-H5+JaXsJ12O4KhYiazFsafz/jwKBgQDfONgK+p+vebTsGIe2dJdXM7M1Axcno5oP
-Tg0RGFSFlsqXVcjCDAf58MB1i/03saxBI7cnuHnkfhQBubWDBgm0IOGdZq97TsHe
-XSp2TlpQWF/zUEbKxSF4tF3rOg+GNJLxLU/ISeHPqAtnMRv6KNkfgLTb6M6+j9wY
-wAvJFDdBWwKBgQCfkvFRxfpqNA76Bq9sUMy3nviJviZSEjNGj6csVljVcttJDdX0
-DZGRJvN6Ej/U1BkVx6fDS0wzIvWoi3ompakl6qbVKPyFDgzI+dbapuz5hVA4bU7i
-gRgQ7Agox//h8V6DlNM8lhIE9W7eUT93orb5ZpOhhPCZM12uxZiMV3nkdwKBgCBR
-CnYMcrHk3NyRcJRprL9jLL6wA9opRVSR6DJhY1szyYC/WqE9PKpiwHpEGhTGFDoa
-AZouivcZiav2RuEBLsZ1PDSdeSpQ7KBUvKEEFu8q3DlNlfIlOANRmYdEkJrNYbio
-5rQIfjiiC4SVB4fgAg8dgxGTUtsj2Kl8pDgoRRehAoGAOXOGKEtlVPxI8KQy9E8m
-Qg4G7ChcsXRaRnW2R4MGtB7wkMDNR2ZS4ywFTImdZO+P1bJxKYuH83qT6Bbo58ga
-iIc+bQiSEjwJnAF1rcf0zEINljQlDGy/PlwmEYnD+leq9YNo3JPjRXFAa+qlUh1z
-QN1/jAN6UBjpvW39ko7fEik=
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDTVaNz3SOLe+CD
+X6XcdDeOtF7xefJrMbKsbC03/0cEwFIi0hWMsv1XTW02oZMwM8utTNVrFhYZX/ed
+C7JDfkXfwoj5L1rCKtXts14JIrEqYZPOfUQBFg0494INYzRw5GznASA8v3hLKUlV
+cX4aa3keJ//BiMJHGs3CPb1tQex3NxKzac6Z5AAfDyxfzpxC8H223gWmjjGTVPk2
+cYcNBER4s0J6eEqJ2g8oa55MWqkowhFAiafVbh+uzV72yAQFouWD3HeVfcgGtcQ2
+SeJlDQ6ykCacD9DEhk49llbwEbNxZVlg40tmIX4M6C/srPgy5LRFhpXwIWhKT/0v
+JGjKzJ8JAgMBAAECggEAFs7aSinmqSoga+1JuEYurM8YpBUWLa16bBNsuetqHcAn
+3SwxOTMkFmT70XaUrRIZ/EUbj2gd0HVEAwX9Ij2hiumy4LnUoLoAxpuiHXhKCJnp
+WtK4ISnhGXHU7l7zjO+KNVAwy32anPoCuR77jhxlQPTuLFP3K7df14PUStNfkuoD
+SpWKBjLUm1jJGJkwss7XjeAVDTFbC+PeizdkAVaJkPLawTt9pkXl+7L20Nl+7SgA
+8bSoXNZDiYTED8sOytHLriWdWTSriEusvK8uKv3DPP9b+feds/+exP/+txWjd52H
+6mHOTmMFWq44bPpVxaz/TfGH05Li075GAwXixJVVgQKBgQD+GHGQ2f+wg/hZ+eYj
+4mr8H0hvIAeB7cTMa59AaKjBcy168ru9WHk2EZxNCMGw320JN711yV6ZapeHDWnH
+suJXH+DnNuQ9zSBr4U4YfzSlpvWSEKff4LvPvIdhp9ABBvbR3g8HLohhA2Pf5UGg
+Wuegxkq+4vl+Bj8QRc7YH5ZS0QKBgQDU6yU+l26mwSaopwwAgK2rHenQY8PhqGzx
+SUkXvpQWIetsPvEJfdYbcn23syLXQQKT70JUhaZUzBJQ7IyBrOPdCso/8/i9VQLL
+YS8UtF7mGqzSrYP3kD5cBmfTHL0ZMoxewoEj45R9brsIuDxMzdzT+o13Pf3zp05t
+iLx431PmuQKBgC0VUTEOPNuozqvINxku1yScuFFfMXXQJhbPEZZv+2E3el5SKxVR
+WVBKl5zjbNphCguUpDz92ZcG3pPLwXT5PEeRFGpxxtVgS9xYQW7/QuwRT4j3A5Ip
+YaleHfcpuzIzdh+OcsQncXMlEtdq6dX1yxsvk5uC0hmWKiJNAIJAOH/BAoGBAMEo
+vnYlLWYsrmSsf0/pbSRjE95Q08DhakwPfzcCVxgpF4nxI/zHYzktSe4gnogHW05X
+7aX+RaKCLE+r+eAet+2tP0R7kfo5qDpX5T10UO+R3Z2XerRZ8KjNyt0UIl08pWnG
+LSAg83JDxXwon9PRovfQQwydecjUzGrEdK93c4dJAoGAJ11p25eK5kspvavHeSK5
+wwPlzrcYrYLRbzn0aanakelwlZ+dd7UI+KBZ6tCmkd8VMqQdeFV2E0qKaAqCfeg8
+LiKVH9qjU/Fn0aFhb0lXuOrwJyfVJsEsfAlU9lR8B6rnDhZvIUdGSo7EvFNs0tpG
+dc+bfTVw3PnUnoM0Gykjy/M=
 -----END PRIVATE KEY-----`;
 const publicKey = new X509Certificate(certificate).publicKey.export({ type: 'spki', format: 'der' });
 
@@ -66,10 +88,10 @@ export const browserOptions = { executablePath: process.env.CROSSFIRE_BROWSER ??
 function trustCertificate(scope: Scope) {
   const previousFile = process.env.NODE_EXTRA_CA_CERTS, previousSslFile = process.env.SSL_CERT_FILE, authorities = getCACertificates('default');
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-test-tls-')), file = join(directory, 'authority.pem');
-  writeFileSync(file, certificate + '\n' + (previousFile ? readFileSync(previousFile, 'utf8') : ''), { mode: 0o600 });
+  writeFileSync(file, authority + '\n' + (previousFile ? readFileSync(previousFile, 'utf8') : ''), { mode: 0o600 });
   process.env.NODE_EXTRA_CA_CERTS = file;
   process.env.SSL_CERT_FILE = file;
-  if (!authorities.includes(certificate)) setDefaultCACertificates([...authorities, certificate]);
+  if (!authorities.includes(authority)) setDefaultCACertificates([...authorities, authority]);
   cleanup(scope, () => { setDefaultCACertificates(authorities);
     if (previousFile === undefined) delete process.env.NODE_EXTRA_CA_CERTS; else process.env.NODE_EXTRA_CA_CERTS = previousFile;
     if (previousSslFile === undefined) delete process.env.SSL_CERT_FILE; else process.env.SSL_CERT_FILE = previousSslFile;

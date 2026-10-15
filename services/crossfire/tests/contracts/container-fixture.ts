@@ -27,13 +27,16 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   let selected = initial, running: ContractProcess | undefined;
   async function close() {
     const owned = running; running = undefined; if (!owned) return;
-    try { await owned.close(); assert.equal(await owned.ended, 0, owned.errors() + '\n' + owned.output()); }
-    finally {
+    let failure: unknown;
+    try { await owned.close(120000); assert.equal(await owned.ended, 0, owned.errors() + '\n' + owned.output()); }
+    catch (error) { failure = error; }
+    try {
       if (spawnSync('docker', ['inspect', containerName], { stdio: 'ignore' }).status === 0) {
         execFileSync('docker', ['rm', '--force', containerName], { timeout: 30000 });
         assert.fail('Orderly operator shutdown must remove its exact owned container');
       }
-    }
+    } catch (error) { failure ??= error; }
+    if (failure !== undefined) throw failure;
   }
   cleanup(scope, close);
   async function start(target: ContractTarget) {
@@ -44,6 +47,7 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
       assert.equal(distribution.implementation, 'csharp'); assert(distribution.mode === 'managed' || distribution.mode === 'nativeaot');
       options.push('--source', repository, '--runtime', distribution.mode);
     }
+    if (target.implementation === 'rust') options.push('--source', repository);
     running = contractProcess(scope, target.server, ['start', '--directory', state, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!, ...options], repository);
     await observe(async () => {
       assert.equal(running?.alive(), true, 'Container operator must remain running\n' + running?.errors() + '\n' + running?.output());

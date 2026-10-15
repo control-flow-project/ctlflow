@@ -3,9 +3,9 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const implementationApplications = {
-  crossfire: { node: 'server', csharp: 'Crossfire.Server' },
-  fleetd: { node: 'daemon', csharp: 'Fleetd.Daemon' },
-  fleet: { node: 'cli', csharp: 'Fleet.Cli' },
+  crossfire: { node: 'server', csharp: 'Crossfire.Server', rust: 'server' },
+  fleetd: { node: 'daemon', csharp: 'Fleetd.Daemon', rust: 'daemon' },
+  fleet: { node: 'cli', csharp: 'Fleet.Cli', rust: 'cli' },
 };
 export const implementationPackages = {
   crossfire: { 'adapter-codex': 'Crossfire.AdapterCodex', 'adapter-crossfire': 'Crossfire.AdapterCrossfire', 'adapter-filesystem': 'Crossfire.AdapterFilesystem', 'adapter-matrix': 'Crossfire.AdapterMatrix', 'adapter-pi': 'Crossfire.AdapterPi', 'adapter-runtime': 'Crossfire.AdapterRuntime', 'adapter-schedule': 'Crossfire.AdapterSchedule', 'adapter-sqlite': 'Crossfire.AdapterSqlite', 'agent-core': 'Crossfire.AgentCore', contracts: 'Crossfire.Contracts', domain: 'Crossfire.Domain', kernel: 'Crossfire.Kernel', client: 'Crossfire.AdapterHttp' },
@@ -22,7 +22,7 @@ export function verifyImplementationLayout(root) {
       assert(existsSync(join(implementation, 'packages')), 'Implementation packages remain service-owned');
     }
     for (const [node, csharp] of Object.entries(implementationPackages[service])) {
-      for (const [language, name] of [['node', node], ['csharp', csharp]]) assert(existsSync(join(directory, language, 'packages', name)), 'Matching semantic package ownership: ' + service + '/' + language + '/' + name);
+      for (const [language, name] of [['node', node], ['csharp', csharp], ['rust',node === 'client' ? 'adapter-http' : node]]) assert(existsSync(join(directory, language, 'packages', name)), 'Matching semantic package ownership: ' + service + '/' + language + '/' + name);
     }
     if (service === 'fleetd') for (const file of ['execution', 'enrollment', 'failures', 'native-stops', 'reset']) assert(!existsSync(join(directory, 'node/apps/daemon/src', file + '.ts')), 'Native execution belongs to the execution adapter, not the daemon application');
     for (const name of ['packages', 'tools']) assert(!existsSync(join(directory, name)), 'Superseded service-level implementation path: ' + service + '/' + name);
@@ -30,5 +30,5 @@ export function verifyImplementationLayout(root) {
     const sharedApplications = join(directory, 'apps');
     assert.deepEqual(existsSync(sharedApplications) ? readdirSync(sharedApplications).sort() : [], service === 'crossfire' ? ['web'] : [], 'One common UI, no duplicate or old backend application');
   }
-  console.log('Implementation layout verified: symmetric Node/C# product owners; one common UI, database and external assertion bank.');
+  console.log('Implementation layout verified: symmetric Node/C#/Rust product owners; one common UI, database and external assertion bank.');
 }

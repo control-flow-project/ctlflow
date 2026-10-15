@@ -65,7 +65,15 @@ fn missing() -> Failure {
     Failure::new(ErrorCode::Missing, "Asset not found")
 }
 fn open(root: &Directory, name: &str) -> Result<Asset> {
-    root.file(name, 64 * 1024 * 1024)?.ok_or_else(missing)
+    root.file(name, 64 * 1024 * 1024)
+        .map_err(|error| {
+            if error.code == ErrorCode::Invalid {
+                missing()
+            } else {
+                error
+            }
+        })?
+        .ok_or_else(missing)
 }
 fn media_type(path: &str) -> &'static str {
     match path.rsplit('.').next().unwrap_or("") {

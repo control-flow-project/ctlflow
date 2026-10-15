@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { nativeOwner, validateNativeGraph, rustGraph, compareStructure, csharpProjectEdges } from './native-architecture.mjs';
+import { nativeOwner, validateNativeGraph, rustGraph, compareStructure, csharpProjectEdges, verifyDomainPrimitives } from './native-architecture.mjs';
 
 const root = '/test/checkout';
+test('native JSON values and asynchronous coordination are primitives, not transport or storage adapters', () => {
+  for (const library of ['serde_json', 'tokio']) assert.equal(validateNativeGraph([owner('domain', {edges:[{kind:'runtime',manifest:null,library}]})]).length,1);
+  for (const library of ['reqwest', 'diesel', 'unknown']) assert.throws(() => validateNativeGraph([owner('domain', {edges:[{kind:'runtime',manifest:null,library}]})]), /pure library owners/u);
+  verifyDomainPrimitives('use tokio::sync::Semaphore; tokio::task::JoinSet::new();');
+  for (const owner of ['tokio::fs', 'tokio::net', 'std::process', 'std::io']) assert.throws(() => verifyDomainPrimitives('use '+owner+'::Owned;'), /concrete filesystem/u);
+  assert.throws(() => verifyDomainPrimitives('use tokio::{sync::Mutex, net::TcpStream};'), /concrete filesystem/u);
+});
 function owner(role, { layer = 'packages', edges = [] } = {}) {
   const manifest = `${root}/services/crossfire/rust/${layer}/${role}/Cargo.toml`;
   return { ...nativeOwner(root, manifest, 'rust'), manifest, edges };

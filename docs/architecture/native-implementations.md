@@ -10,6 +10,9 @@ the platform/provider scope and explicit preview-framework risks below.**
 
 Production, credentials, saved native histories and fleet selections are unchanged.
 Rust is a separate worktree/PR, not an implementation certified by this report.
+The subsequent Rust integration and four-target evidence belong to
+[the Rust review](rust-review.md); this report retains the merged Node/C#
+baseline and its explicit NativeAOT diagnostic disposition.
 
 ## One architecture
 

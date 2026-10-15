@@ -24,9 +24,22 @@ fn database() -> Result<&'static Database> {
     if let Some(database) = DATABASE.get() {
         return Ok(database);
     }
-    let root = std::env::var_os("TZDIR")
-        .map_or_else(|| PathBuf::from("/usr/share/zoneinfo"), PathBuf::from);
+    let root = match std::env::var_os("TZDIR") {
+        Some(path) => PathBuf::from(path),
+        None => std::env::current_exe()
+            .map_err(|_| failed())?
+            .parent()
+            .ok_or_else(failed)?
+            .join("zoneinfo"),
+    };
     let directory = Directory::open(&root)?;
+    let version = directory
+        .file("version", 100)?
+        .ok_or_else(failed)?
+        .read(100)?;
+    if std::str::from_utf8(&version).map_err(|_| failed())?.trim() != zones::VERSION {
+        return Err(failed());
+    }
     let _ = DATABASE.set(Database {
         directory,
         loaded: Mutex::new(BTreeMap::new()),

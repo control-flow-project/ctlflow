@@ -52,7 +52,7 @@ implementation. Database assets use the Lesser/Snapped structure under their
 service: database/<database>/<backend>/migrations and seeds, with a per-database
 knexfile and one-shot migration container. Deployment verifies a backup, stops
 writers, runs the migration container and starts the selected implementation only
-after success. Node and C# validate existing databases; neither creates schemas,
+after success. Node, C# and Rust validate existing databases; none creates schemas,
 runs ORM migrations or silently migrates at startup. New databases follow the
 same nesting and owner. File state and Conduit's externally owned RocksDB are
 not SQL databases and are not converted into artificial Knex stores.
@@ -78,7 +78,7 @@ relative imports, Result for expected failures and boundary validation. Split
 modules by responsibility near 600 lines. Domain code imports neither transport
 nor concrete storage/adapter/UI modules. Composition roots wire implementations.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
-relations. Tinqer owns Node application queries; EF Core owns C# queries.
+relations. Tinqer owns Node queries, EF Core C# queries and Diesel Rust queries.
 Raw SQL is schema/metadata only.
 Expected transaction failures roll back. Native operations stay outside transactions.
 
@@ -138,7 +138,7 @@ build output and verification caches after their last required use. Check disk
 use periodically during long verification runs and retain concise evidence, not
 accumulated fixture trees. Never remove active resources, source worktrees,
 credentials, production state, research originals or saved user/native histories.
-Node and C# must keep symmetric service ownership and semantic source structure;
+Node, C# and Rust keep symmetric service ownership and semantic source structure;
 language/framework differences must be explicit and justified, not hidden paths.
 
 ## Git

@@ -12,7 +12,10 @@ use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     path::Path,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use subtle::ConstantTimeEq;
@@ -29,6 +32,7 @@ struct Entry {
     release: String,
     ready: watch::Receiver<Option<Arc<dyn ControlEndpoint>>>,
     stop: CancellationToken,
+    deliberate: AtomicBool,
 }
 struct Registry {
     bindings: BTreeMap<String, Arc<Entry>>,
@@ -155,6 +159,7 @@ impl<S: LocalState + 'static> Host<S> {
             release: options.release,
             ready: status,
             stop: options.stop,
+            deliberate: AtomicBool::new(false),
         });
         bindings
             .bindings
@@ -196,6 +201,9 @@ impl<S: LocalState + 'static> Host<S> {
     }
 }
 impl<S: LocalState> Binding<S> {
+    pub fn deliberately_stopped(&self) -> bool {
+        self.entry.deliberate.load(Ordering::Acquire)
+    }
     pub fn ready(&self) -> watch::Sender<Option<Arc<dyn ControlEndpoint>>> {
         self.ready.clone()
     }
@@ -354,6 +362,7 @@ async fn handle<S: LocalState>(
     }
     let mut status = json!({"release":entry.release,"binding":name,"session":endpoint.as_ref().map(|endpoint| endpoint.session()).unwrap_or(""),"ready":endpoint.is_some()});
     if action == "stop" {
+        entry.deliberate.store(true, Ordering::Release);
         entry.stop.cancel();
     }
     if action == "test" {

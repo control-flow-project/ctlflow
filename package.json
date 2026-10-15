@@ -30,6 +30,7 @@
     "verify:csharp:core": "node services/crossfire/csharp/scripts/verify.mjs",
     "verify:csharp:runtime": "node services/crossfire/csharp/scripts/verify-runtime.mjs",
     "publish:csharp": "node scripts/publish-csharp.mjs",
+    "publish:rust": "node scripts/publish-rust.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",
     "verify:parity": "node scripts/verify-parity.mjs"
   },

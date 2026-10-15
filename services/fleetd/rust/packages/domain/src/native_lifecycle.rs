@@ -6,11 +6,13 @@ use crate::{
 };
 use crossfire_agent_core::synchronization::{CancellationToken, Mutex as AsyncMutex};
 use crossfire_agent_core::{
+    listener_budget::{Budget, Work},
     owned_runtime::{Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, SavedContext},
     runtime::{
         Admission, Approval, Connection, Hooks, InputPriority, InterruptResult, Lifecycle,
         ObservationEvent, Phase, SessionState, TurnControl,
     },
+    synchronization::StartupScope,
 };
 use crossfire_domain::runtime::values::{HistoryMode, Runtime, State as NativeState};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::Clock};
@@ -51,6 +53,7 @@ pub struct Owner<
     calls: AtomicUsize,
     stop: CancellationToken,
     approval: Approval,
+    budget: Arc<Budget>,
 }
 pub struct Logical<
     A: OwnedAdapter<LifecycleHooks<H, W, T>>,
@@ -82,6 +85,7 @@ impl<
         clock: T,
         initial: Initial,
         stop: CancellationToken,
+        budget: Arc<Budget>,
     ) -> Result<Arc<Self>> {
         let approval = adapter.validate(&input.options)?.approval;
         let inspection = Inspection {
@@ -133,9 +137,12 @@ impl<
             calls: AtomicUsize::new(0),
             stop,
             approval,
+            budget,
         });
-        if (initial == Initial::Start || owner.input.hooks.pending_decisions())
-            && let Err(error) = owner.ensure().await
+        if (initial == Initial::Start
+            || owner.input.hooks.pending_decisions()
+            || !owner.work.work()?.is_empty())
+            && let Err(error) = owner.ensure(None).await
         {
             owner.close().await?;
             return Err(error);
@@ -161,7 +168,7 @@ impl<
             .await
     }
     pub async fn resume(&self) -> Result<()> {
-        self.ensure().await?;
+        self.ensure(None).await?;
         Ok(())
     }
     pub async fn attachment(&self, context: Option<&str>) -> Result<Attachment> {
@@ -212,29 +219,42 @@ impl<
             session,
         })
     }
-    async fn ensure(&self) -> Result<Arc<A::Connection>> {
+    async fn ensure(&self, admission: Option<&Admission>) -> Result<Arc<A::Connection>> {
         if self.stop.is_cancelled() {
             return Err(unavailable("Native lifecycle is stopped"));
         }
-        let _transition = self.transition.lock().await;
+        let caller = admission.map(|value| &value.cancellation);
+        let mut scope = StartupScope::new(&self.stop, caller);
+        let immediate = admission.is_some();
+        let _transition = if immediate {
+            self.transition.try_lock().map_err(|_| {
+                unavailable(
+                    "Native activation is already in progress; immediate input was not accepted",
+                )
+            })?
+        } else {
+            tokio::select! { biased; _=scope.cancellation.cancelled()=>return Err(unavailable("Native activation was cancelled")), value=self.transition.lock()=>value }
+        };
         let current = self.state.lock().map_err(|_| ownership())?.native.clone();
         if let Some(current) = current {
             if !current.lifetime().is_cancelled()
                 && self.state.lock().map_err(|_| ownership())?.phase == Phase::Running
-                && !self.tracker.failed.load(Ordering::Acquire)
             {
                 return Ok(current);
             }
             self.state.lock().map_err(|_| ownership())?.phase = Phase::Failed;
             self.discard(&current).await?;
         }
+        let _permit = self
+            .budget
+            .acquire(Work::NativeStart, scope.cancellation.clone(), immediate)
+            .await?;
         let original = self.state.lock().map_err(|_| ownership())?.session.clone();
         let mut input = self.input.clone();
         input.allow_new_history &= original.is_empty();
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Waking;
         self.observe(NativeState::Waking, None)?;
         self.tracker.recording.store(false, Ordering::Release);
-        self.tracker.failed.store(false, Ordering::Release);
         let generation = self
             .tracker
             .generation
@@ -254,7 +274,7 @@ impl<
             history_mode: input.history_mode,
             allow_new_history: input.allow_new_history,
         };
-        let connected = match self.adapter.start(input, CancellationToken::new()).await {
+        let connected = match self.adapter.start(input, scope.cancellation.clone()).await {
             Ok(native) => Arc::new(native),
             Err(error) => {
                 self.state.lock().map_err(|_| ownership())?.phase = Phase::Failed;
@@ -264,9 +284,7 @@ impl<
         };
         self.state.lock().map_err(|_| ownership())?.native = Some(connected.clone());
         let result = async {
-            if self.stop.is_cancelled() {
-                return Err(unavailable("Native activation was cancelled"));
-            }
+            scope.transfer(caller).await?;
             if !original.is_empty() && connected.session_id() != original {
                 return Err(Failure::new(
                     ErrorCode::Conflict,
@@ -343,16 +361,12 @@ impl<
         };
         let Some(native) = native else {
             if phase == Phase::Failed {
-                self.ensure().await?;
+                self.ensure(None).await?;
             }
             return Ok(());
         };
         if native.lifetime().is_cancelled() {
-            self.ensure().await?;
-            return Ok(());
-        }
-        if self.tracker.failed.load(Ordering::Acquire) {
-            self.ensure().await?;
+            self.ensure(None).await?;
             return Ok(());
         }
         let due = {
@@ -398,7 +412,7 @@ impl<
         let Some(native) = self.state.lock().map_err(|_| ownership())?.native.clone() else {
             return Ok(());
         };
-        if preserve_work {
+        if preserve_work && !native.lifetime().is_cancelled() {
             let contexts = self.contexts().await?;
             let uncertain = native.inspect().await.is_err();
             let mut interrupted = Vec::new();
@@ -444,11 +458,10 @@ impl<
         let state = self.state.lock().map_err(|_| ownership())?;
         Ok(SessionState {
             phase: if state.phase == Phase::Running
-                && (self.tracker.failed.load(Ordering::Acquire)
-                    || state
-                        .native
-                        .as_ref()
-                        .is_some_and(|native| native.lifetime().is_cancelled()))
+                && state
+                    .native
+                    .as_ref()
+                    .is_some_and(|native| native.lifetime().is_cancelled())
             {
                 Phase::Failed
             } else {

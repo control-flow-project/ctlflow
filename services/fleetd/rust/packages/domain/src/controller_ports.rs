@@ -18,6 +18,11 @@ pub trait Registry: SelectionStore + Send + Sync {
     fn save_operation(&self, value: &Operation) -> Result<()>;
     fn prune_operations(&self, cutoff: i64, maximum: usize) -> Result<bool>;
     fn load(&self, directory: &Path) -> Result<Configuration>;
+    fn preview_roster(
+        &self,
+        configuration: &Configuration,
+        roster: &Roster,
+    ) -> Result<Configuration>;
     fn write_roster(&self, configuration: &Configuration, roster: &Roster)
     -> Result<Configuration>;
     fn setup(&self, request: &SetupRequest) -> Result<SetupConfiguration>;

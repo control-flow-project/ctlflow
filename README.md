@@ -29,6 +29,7 @@ and history on repetition, and waits for the required human enrollment approval.
 - [Repository instructions](AGENTS.md)
 - [Language-independent Knex databases and migration containers](services/crossfire/database/README.md)
 - [C# products, distributions and verification](services/crossfire/csharp/README.md)
+- [Rust products, distributions and verification](services/crossfire/rust/README.md)
 - [Shared Node/C#/Rust contract suite](docs/verification/shared-contracts.md)
 
 ## Development
@@ -37,8 +38,8 @@ installation/build/test children inside one verified finite process-group scope:
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
-  --property=TasksMax=8192 /bin/bash -c \
+  --property=MemoryMax=16G --property=MemorySwapMax=0 \
+  --property=TasksMax=2048 /bin/bash -c \
   'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
@@ -50,14 +51,18 @@ The pinned SQLite package includes the verified Linux native binary; source
 compilation is required only on platforms without a usable bundled binary.
 Tests use disposable private state, Conduit and inert providers, not production
 credentials or paid models.
-The complete gate also requires the pinned .NET 11 SDK and native AOT toolchain.
-It builds managed and NativeAOT distributions and runs the same API, native-engine,
-CLI, browser, container and migration assertions against all three targets.
+The complete gate also requires the pinned .NET 11 SDK, native AOT toolchain and
+Rust toolchain. It builds managed, NativeAOT and Rust distributions and runs the
+same API, native-engine, CLI, browser, container and migration assertions against
+all four targets. Rust-only internal checks use a scope bounded to 16 GiB,
+no swap and 2,048 tasks; run that stricter scope for the combined gate as well.
 Implementations share one
 React UI, REST/daemon contracts and Knex-created SQLite representation; the
 shared contract suite accepts explicit backend executables. Source lives under
-each product's `node/` and `csharp/` owners; UI, database and external contracts
-remain shared. Current evidence and framework/provider limits are in
+each product's `node/`, `csharp/` and `rust/` owners; UI, database and external contracts
+remain shared. Current four-target evidence and scope limits are in the
+[Rust integration review](docs/architecture/rust-review.md); the merged C#
+preview-framework diagnostic disposition remains in
 [implementation readiness](docs/architecture/native-implementations.md).
 - [Test selection, prerequisites and evidence](docs/development.md)
 

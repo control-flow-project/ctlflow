@@ -94,6 +94,7 @@ pub struct Resources<S, C, M, A, T> {
     pub budget: Arc<Budget>,
     pub clock: T,
     pub ready: Option<tokio::sync::watch::Sender<Option<Arc<dyn ControlEndpoint>>>>,
+    pub diagnostic: Arc<dyn Fn(&Failure) + Send + Sync>,
 }
 pub type AgentQueries<S, C, M, T> = Queries<S, M, C, Store<S, T>, T>;
 struct State {

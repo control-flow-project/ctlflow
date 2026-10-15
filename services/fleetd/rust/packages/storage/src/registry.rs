@@ -208,6 +208,14 @@ impl fleetd_domain::controller_ports::Registry for Registry {
     fn load(&self, directory: &Path) -> Result<Configuration> {
         crate::configuration::load(directory, None)
     }
+    fn preview_roster(
+        &self,
+        configuration: &Configuration,
+        roster: &Roster,
+    ) -> Result<Configuration> {
+        let source = crate::configuration::format(&crate::configuration::roster_wire(roster))?;
+        crate::configuration::load(&configuration.directory, Some(&source))
+    }
     fn write_roster(
         &self,
         configuration: &Configuration,
