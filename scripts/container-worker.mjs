@@ -5,6 +5,7 @@ import { containerStack } from '../services/crossfire/dist/tests/contracts/conta
 import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
 import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';
 import { containerContracts } from '../services/crossfire/dist/tests/contracts/container.contract.js';
+import { containerRecoveryContracts } from '../services/crossfire/dist/tests/contracts/container-recovery.contract.js';
 import { verifyTestResources } from './test-resources.mjs';
 import { readContractMatrix } from './contract-targets.mjs';
 
@@ -18,6 +19,7 @@ test('shared container contracts', { timeout: 5400000 }, async scope => {
     await child.test('actual Element, artifacts and container contract', nested => containerContracts(nested, platform));
     await child.test('identical Crossfire API and same-file contracts', nested => serverContracts(nested, platform));
     await child.test('identical React contract', nested => browserContracts(nested, platform));
+    await child.test('exclusive operator and abandoned container recovery', nested => containerRecoveryContracts(nested, platform));
     await platform.close();
   });
 });

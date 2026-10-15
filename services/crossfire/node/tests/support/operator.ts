@@ -28,6 +28,6 @@ export async function operatorFixture(scope: TestContext) {
     if (failAgents && path === '/api/agents') { reply(503, { error: { code: 'native', message: 'PRIVATE_TOKEN_' + fixture.admin.token }, meta: { requestId: randomUUID() } }); return; }
     for (const listener of listeners) listener.call(backend.server, request, response);
   })().catch(() => { response.writeHead(500); response.end(); }); });
-  return { ...fixture, origin: backend.origin, release, requests, account: { matrixUserId: fixture.application.config.administrator, password: 'fixture-only' },
+  return { ...fixture, server: backend.server, origin: backend.origin, release, requests, account: { matrixUserId: fixture.application.config.administrator, password: 'fixture-only' },
     failAgents() { failAgents = true; }, wrongAccount() { wrongAccount = true; } };
 }

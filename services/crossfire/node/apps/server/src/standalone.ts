@@ -16,7 +16,7 @@ export async function standalone(args: string[]): Promise<void> {
   const application = await serve(state, release, 0, readElementPresentation(element, configured.value.publicOrigin), contentPort);
   const address = application.server.address(); if (!address || typeof address === 'string') { await application.close(); throw new Error('Private API did not bind'); }
   const router = publicRouter({ publicOrigin: configured.value.publicOrigin, matrixOrigin: configured.value.matrixOrigin,
-    serviceOrigin: 'http://127.0.0.1:' + address.port, web, element });
+    service: application.server, web, element });
   let closing: Promise<void> | undefined;
   const close = () => closing ??= (async () => { router.closeAllConnections(); if (router.listening) await new Promise<void>(resolveClose => router.close(() => resolveClose())); await application.close(); })();
   const stopped = new Promise<void>(resolveStop => {

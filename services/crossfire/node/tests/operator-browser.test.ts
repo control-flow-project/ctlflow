@@ -25,7 +25,7 @@ test('operator browser captures native login before navigation, checks real view
   const agent = await fixture.agent(fixture.admin.actor, 'helper');
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-operator-browser-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
-  const routes = { publicOrigin: 'http://127.0.0.1', matrixOrigin: fixture.origin, serviceOrigin: fixture.origin,
+  const routes = { publicOrigin: 'http://127.0.0.1', matrixOrigin: fixture.origin, service: fixture.server,
     web: join(process.cwd(), 'dist/web'), element: join(process.cwd(), 'dist/web') };
   const { origin } = await secureRouter(scope, publicRouter(routes));
   routes.publicOrigin = origin;

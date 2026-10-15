@@ -88,7 +88,9 @@ public static class ServerAcceptance
         Equal(resolved[1].GetProperty("kind").GetString(), "unknown", "unknown directory identities remain unknown, never inferred from a label");
         await Request("GET", "/api/roles", "roles");
         await Request("GET", "/api/permissions", "permissions");
-        await Request("GET", "/api/principals?page=0b1&pageSize=0o12&kind=human", "principals");
+        await Request("GET", "/api/principals?page=1&pageSize=10&kind=human", "principals");
+        await Request("GET", "/api/principals?page=0b1&pageSize=10&kind=human", null, failure: 400);
+        await Request("GET", "/api/principals?page=1&pageSize=0o12&kind=human", null, failure: 400);
         await Request("GET", "/api/principals?kind=unknown", null, failure: 400);
         await Request("GET", "/api/members?page=1&page=2", null, failure: 400);
         await Request("GET", "/api/sessions/current", null, bearer: ownerToken, failure: 400);

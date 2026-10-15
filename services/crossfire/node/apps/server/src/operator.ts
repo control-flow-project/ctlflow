@@ -3,11 +3,13 @@ import { resolve, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
-import { captureDocker, runDocker, ownedDocker, cgroupArguments, runArguments, migrationArguments } from './container-commands.js';
+import { captureDocker, runDocker, cgroupArguments, runArguments, migrationArguments } from './container-commands.js';
 import { config } from './config.js';
 import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { backupBeforeMigration, prepareDatabaseUpgrade } from './database-upgrade.js';
 import { standalone } from './standalone.js';
+import { acquireFileLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
+import { ownedDocker, reconcileContainers } from './container-lifecycle.js';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const repository = resolve(root, '../..');
@@ -66,6 +68,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Port must be 1024..65535');
   const contentPort = Number(parsed.values['content-port'] ?? '8082');
   if (!Number.isInteger(contentPort) || contentPort < 1024 || contentPort > 65535 || contentPort === port) throw new Error('Content port must be separate and within 1024..65535');
+  const releaseOwnership = acquireFileLock(join(directory, 'operator'));
   const stopping = new AbortController();
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
   const stop = () => stopping.abort();
@@ -78,14 +81,9 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
       const existing = parsed.values.compile ? undefined : await captureDocker(['image', 'inspect', tag!], stopping.signal);
       if (existing?.code !== 0) await runDocker(['build', ...resources, '--file', join(root, 'node/Dockerfile'), '--target', target!, '--tag', tag!, repository], stopping.signal);
     }
-    const options = runArguments(directory, image, port, contentPort, parsed.values['cgroup-parent']), name = options[options.indexOf('--name') + 1]!;
+    const options = runArguments(directory, image, port, contentPort, parsed.values['cgroup-parent']);
     await prepareDatabaseUpgrade({
-      async stopWriters() {
-        const running = await captureDocker(['container', 'inspect', '--format', '{{index .Config.Labels "org.crossfire.directory"}}', name], stopping.signal);
-        if (running.code !== 0) return;
-        if (running.output.trim() !== directory) throw new Error('Existing runtime container has different ownership; nothing was stopped');
-        await runDocker(['stop', '--timeout', '15', name], stopping.signal);
-      },
+      async stopWriters() { await reconcileContainers(directory, stopping.signal); },
       async backup() { stopping.signal.throwIfAborted(); await backupBeforeMigration(directory); },
       async migrate() { await ownedDocker(migrationArguments(directory, migrationImage, parsed.values['cgroup-parent']), stopping.signal); },
     });
@@ -94,5 +92,5 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     await ownedDocker(options, stopping.signal);
   } catch (error) {
     if (!(stopping.signal.aborted && error instanceof Error && error.name === 'AbortError')) throw error;
-  } finally { for (const signal of signals) process.removeListener(signal, stop); }
+  } finally { for (const signal of signals) process.removeListener(signal, stop); releaseOwnership(); }
 }

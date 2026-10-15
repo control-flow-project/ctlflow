@@ -76,6 +76,7 @@ try
     Equal(nested.IsSuccess, true, "outer transaction commits after handled nested failure");
     await DomainAcceptance.Verify(context, ownerId, matrixId);
     await ContainerCommandAcceptance.Verify();
+    PublicRequestBudgetAcceptance.Verify();
     await HttpAcceptance.Verify();
     await FleetChangesAcceptance.Verify();
     FilesystemAcceptance.Verify(directory);

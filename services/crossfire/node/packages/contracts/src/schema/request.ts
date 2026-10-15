@@ -50,8 +50,10 @@ export function listQuery(allowed: readonly string[]): Parser<URLSearchParams> {
   };
 }
 export function pagination(input: URLSearchParams) {
-  const page = Number(input.get('page') ?? 1), pageSize = Number(input.get('pageSize') ?? 20);
-  return Number.isSafeInteger(page) && page >= 1 && page <= 100000 && Number.isSafeInteger(pageSize) && pageSize >= 1 && pageSize <= 100
+  const pageText = input.get('page') ?? '1', sizeText = input.get('pageSize') ?? '20';
+  const page = Number(pageText), pageSize = Number(sizeText);
+  return /^[1-9][0-9]*$/u.test(pageText) && /^[1-9][0-9]*$/u.test(sizeText)
+    && Number.isSafeInteger(page) && page <= 100000 && Number.isSafeInteger(pageSize) && pageSize <= 100
     ? success({ page, pageSize }) : failure('invalid', 'Use page ≥ 1 and pageSize 1–100');
 }
 

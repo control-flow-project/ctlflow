@@ -16,7 +16,7 @@ export async function nativeServer(scope: TestContext, release: Release, present
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const address = server.address(); assert(address && typeof address !== 'string');
   const routes = { publicOrigin: fixture.application.config.publicOrigin, matrixOrigin: fixture.native.base,
-    serviceOrigin: 'http://127.0.0.1:' + address.port, web: join(process.cwd(), 'dist/web'), element: element ?? join(process.cwd(), 'dist/web') };
+    service: server, web: join(process.cwd(), 'dist/web'), element: element ?? join(process.cwd(), 'dist/web') };
   cleanup(scope, async () => { await worker.stop(); server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve())); });
   const { server: router, origin } = await secureRouter(scope, publicRouter(routes));

@@ -1,32 +1,37 @@
 # Documentation
 
-## Using the products
-- [Crossfire guide index](../services/crossfire/docs/README.md)
-- [Fleet guide index](../services/fleet/docs/README.md)
-- [Controller guide index](../services/fleetd/docs/README.md)
+## Installation and operation
+
+- [Crossfire service](../services/crossfire/README.md)
+- [Fleet CLI](../services/fleet/README.md)
+- [fleetd controller](../services/fleetd/README.md)
+- [Crossfire configuration](../services/crossfire/docs/configuration.md)
+- [Deployment, backup and recovery](../services/crossfire/docs/operations.md)
+- [Database migrations](../services/crossfire/database/README.md)
+- [Operator checks](operator-tools.md)
+
+## Product behavior
+
+- [Management UI](../services/crossfire/docs/management.md)
+- [Enrollment and software updates](../services/crossfire/docs/onboarding/README.md)
+- [History, unread positions and resets](../services/crossfire/docs/history.md)
+- [Native runtimes and decisions](../services/crossfire/docs/runtime.md)
+- [Earendil Pi](../services/fleet/docs/pi.md)
+- [Traffic and token statistics](../services/crossfire/docs/statistics.md)
+- [Public static reports](../services/crossfire/docs/publications.md)
+- [Logging retention](../services/crossfire/docs/logging.md)
+- [Matrix API tools](../services/crossfire/docs/matrix-api.md)
 
 ## Engineering
-- [Development and verification](development.md)
-- [Operator verification tools](operator-tools.md)
-- [Reusable operator check inventory](operator-script-inventory.md)
-- [Canonical specification](specification.md)
-- [Runtime approval diagnosis and native dependency evidence](runtime-approval-readiness.md)
-- [Native feasibility and verification boundaries](../services/crossfire/docs/architecture/feasibility.md)
 
-## Architecture evidence
-- [WCBUBWHB cleanup and exact native settings review](verification/20261009-canonical-cleanup.md)
-- [Listener, sleep and report-publication review](proposals/20261005-listener-and-publication-architecture.md)
-- [Universal fleet controller verification](verification/20261005-universal-fleet-controller.md)
-- [Preserving GAAP rollout verification](verification/20261006-gaap-preserving-rollout.md)
-- [Fleet stop and management navigation](verification/20261007-fleet-stop-management.md)
-- [High-first Agreements rollout verification](verification/20261006-high-first-agreements.md)
+- [Normative specification](specification.md)
+- [Implementation ownership and limits](architecture/native-implementations.md)
+- [Development commands](development.md)
+- [Shared executable test matrix](verification/shared-contracts.md)
+- [Native decision diagnosis](runtime-approval-readiness.md)
+- [Operator script inventory](operator-script-inventory.md)
 
-The review records the inspected baseline and the current managed design. It is
-not a second specification or proof of deployment. fleetd owns the shared listener;
-the default native idle-sleep timeout is 30 minutes.
-
-The specification owns architecture, schemas, authorization and REST contracts.
-Product guides describe operator and user workflows. Runtime defaults and
-overrides are documented in the fleet configuration guide. Every Crossfire agent
-is fleet-managed. The coding session performing setup remains independent and
-retains its own native settings.
+The specification defines required behavior. Code-owned schemas define exact
+wire fields and database structure. Product guides describe procedures.
+Dated files under `verification/`, `plans/` and `proposals/` are historical
+records, not current installation instructions or certification of later source.

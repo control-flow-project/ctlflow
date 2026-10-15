@@ -58,7 +58,7 @@ try {
   if (releases.length !== 1) throw new Error('Image must contain exactly one onboarding release');
   service = await serve(directory, join(artifacts, 'onboarding', releases[0]!), 8081, readElementPresentation('/app/element', parsed.value.publicOrigin), 8082, '0.0.0.0', diagnostics);
   router = publicRouter({ publicOrigin: parsed.value.publicOrigin, matrixOrigin: parsed.value.matrixOrigin,
-    serviceOrigin: 'http://127.0.0.1:8081', web: join(artifacts, 'web'), element: '/app/element' });
+    service: service.server, web: join(artifacts, 'web'), element: '/app/element' });
   router.listen(8080, '0.0.0.0');
   await once(router, 'listening');
   diagnostics.write('Crossfire ready: ' + parsed.value.publicOrigin + '/ | Management: ' + parsed.value.publicOrigin + '/manage/');

@@ -1,73 +1,68 @@
-# Native context storage
+# Controller and native storage
 
-The Codex adapter owns one private `.codex/crossfire-context-registry.json` per
-instance. It contains `mode` (`shared` or `per-room`) and `bindings`, each with a
-context (`shared`, `control` or an exact Matrix room ID) and a native session UUID.
-Contexts and UUIDs are unique. Shared/control/room histories use one admission,
-receipt and create/resume implementation. Native conversation files remain in
-Codex's own home; the registry does not copy or merge them.
+A controller root holds its descriptor, explicit fleet registry, desired intent,
+resume selections, operation files, diagnostics and private `fleetd.sock`.
+Registered fleets may live elsewhere. Private state is retained with its owning
+directory; a workarea does not move when native cwd changes.
 
-Pi owns one private `.pi/crossfire-contexts.json` with unique context/file/session
-bindings and native instruction digests. Histories are native Pi JSONL files under
-`.pi/histories`; an exclusive empty allocation is initialized by Pi itself before
-readiness. It never writes an invented native header or conversation entry.
-Shared and per-room contexts use the same adapter path. See
-[Pi native storage and receipts](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/pi.md).
+## Native registries
 
-Default Start, Resume, recovery and sleep/wake require exact retained histories.
-Only first enrollment, an explicit confirmed reset or an authorized new room/
-mode context may create a history. Corrupt registry, receipt, observation or
-decision state fails permanently with retained evidence for owner inspection.
-Transient transport errors retain bounded recovery. Never delete state or invent
-a fresh conversation to bypass an invalid binding or active native writer.
+| Runtime | Registry |
+| --- | --- |
+| Codex | `.codex/crossfire-context-registry.json` |
+| Pi | `.pi/crossfire-contexts.json` |
 
-## Explicit 0.1.15 conversion
+Bindings uniquely map shared/control/exact room contexts to native sessions.
+Pi additionally binds exact native files/instruction digests.
+Native conversation stores remain runtime-owned; registries do not copy or merge
+them. Shared/per-room modes use one admission/create/resume/receipt path.
 
-0.1.15 replaces split shared/control/room metadata. This is a forward storage
-migration, not a second runtime path. Ordinary readers reject obsolete metadata
-and incomplete conversion with an actionable message.
-This conversion inventories Codex instances only; Pi has no predecessor context
-schema and its histories are neither migrated nor rewritten by this command.
+Established histories cannot be silently replaced. First initialization,
+an authorized new room/mode context and explicit confirmed reset are the only
+creation cases. Corrupt registry, receipt, decision or observation state is
+retained for diagnosis, not treated as permission for a fresh context.
 
-1. Inventory the selected controller root and all its registered fleet directories.
-2. Use the old installed CLI to orderly-stop that controller, not Fleet Stop.
-   Normal controller shutdown preserves desired activation and stopped selections.
-3. Verify a complete private backup of controller state, registered fleet state,
-   credentials, native homes, histories, receipt journals and instruction receipts.
-4. Install the exact new public packages. While the old controller and its owned
-   native writers are stopped, run the new executable against the same root:
+## Private locks
+
+Lock files have no application tables. Node and C# use the same exclusive SQLite
+transaction and in-memory rollback-journal protocol.
+A live/suspended owner retains exclusion; process exit releases it.
+Do not delete the inode, use guessed PIDs or break another writer's lock.
+
+## Explicit context conversion
+
+The supported pre-registry Codex metadata has an offline forward conversion:
 
 ```sh
 fleetd --root /absolute/private/controller --migrate-contexts
 ```
 
-5. Verify the reported instance/context counts and preserved UUIDs, credentials,
-   native history bytes and receipts. Start the new controller with the same root
-   and descriptor. Explicitly update selected installed integration artifacts
-   through the normal `fleet update` workflow after authorized software consent.
-   Deliberately stopped instances remain stopped.
+1. Inventory the original controller and every registered fleet.
+2. Stop that controller normally, preserving desired intent.
+3. Verify a complete private backup, including native homes, credentials,
+   histories, delivery/instruction journals and stopped selections.
+4. Run the selected new executable against that same root.
+5. Verify exact context/session IDs, original hashes and outcomes before restart.
 
-Conversion acquires controller and receiver ownership before touching contexts.
-The adapter validates private owned files, unique UUIDs, exact receipt bindings
-and the finite complete manifest. It records a prepared plan, verifies and
-archives every original byte, publishes canonical receipts/registry, retires only
-the listed verified metadata, then fsyncs completion. Authentication, native
-conversation files and unrelated state are not migration inputs and are never
-retired. Unknown metadata and contradictory existing destinations fail closed.
+The conversion acquires controller/receiver locks, validates the complete plan,
+archives original bytes, publishes canonical records and durably records completion.
+Unknown metadata, changed destinations and live writers fail.
+Interrupted conversion reuses verified originals; completed conversion is
+idempotent. It never starts a native process or calls a model.
 
-Private SQLite lock files contain no application records. Their exclusive
-transactions use a verified in-memory rollback journal, not disk sidecars that
-could be mistaken for context metadata. Exclusion still uses native file locks
-and survives process suspension; process death releases ownership. Conversion
-does not ignore unknown metadata or bypass a live receipt owner.
+Pi has no predecessor context schema in this conversion.
+Credentials and native conversation files are not rewritten.
+Original Codex evidence remains under
+`.codex/crossfire-migrations/context-registry`.
 
-Originals and the interruption-recoverable manifest remain privately under
-`.codex/crossfire-migrations/context-registry`. A stopped partial conversion can
-repeat the same command using verified originals/archives without overwriting
-changed data. Completed conversion is idempotent. It never starts an engine,
-enrolls an identity, sends a prompt, approves a decision or makes a model call.
+## Other retained state
 
-Abruptly killing only fleetd can leave a native writer alive. Conversion refuses
-active ownership; it does not adopt, guess or terminate that writer. Resolve the
-confirmed owned process before retrying.
-- [Native lifetime limitation and restart](operations.md#abrupt-controller-death)
+Pending input, native confirmations, unfinished-work checkpoints and unacknowledged
+operation outcomes remain recovery state.
+Completed diagnostics/operation history use the logging age policy.
+The separate observation-journal conversion preserves pending output and records
+unknown historical metadata as null.
+
+- [Observation conversion tool](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
+- [Logging retention](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/logging.md)
+- [Abrupt controller death](operations.md#abrupt-controller-death)

@@ -105,3 +105,13 @@ public static class RestOperations
         ["health"] = new("health", "GET", "/api/health", "public", 200, false, 2097152, false),
     };
 }
+
+public static class HttpLimits
+{
+    public const int RequestBytes = 2097152;
+    public const int ResponseBytes = 33554432;
+    public const int RequestMilliseconds = 30000;
+    public const int PublicMutationsPerMinute = 120;
+    public const int PublicMutationsGlobalPerMinute = 4096;
+    public const int PublicMutationClients = 4096;
+}

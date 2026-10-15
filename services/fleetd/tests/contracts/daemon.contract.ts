@@ -15,6 +15,7 @@ import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { operations as coordinationOperations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
 import { messageContracts } from './messages.contract.js';
+import { paginationContracts } from '@ctlflow/crossfire-test-support/contract-pagination';
 
 type Declaration = { method: string; path: string; status: number; collection: boolean; output: Parser<unknown> };
 export async function daemonContracts(scope: TestContext, platform: ContractPlatform, selected: ContractTarget, runtime: 'codex' | 'pi'): Promise<void> {
@@ -25,6 +26,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     const path = operation.path.replace(/\{([A-Za-z]+)\}/gu, (_match, key: string) => encodeURIComponent(parameters[key] ?? assert.fail('Missing parameter ' + key))); const response = await raw(path + query, operation.method, operation.method === 'GET' ? undefined : body ?? {}); assert.equal(response.status, operation.status, operation.path + ': ' + JSON.stringify(response.body).slice(0, 2048)); const parsed = decodeResponse(response.body, operation.output, operation.collection); assert(parsed.ok, operation.path + ': ' + (parsed.ok ? '' : parsed.error.message)); return parsed.value;
   }
   await observe(async () => { assert.equal(daemon.alive(), true, daemon.errors()); try { return (await raw('/api/status')).status === 200; } catch { return false; } }, 'Private daemon must start');
+  await paginationContracts(scope, query => raw('/api/fleets' + query));
   cleanup(scope, async () => { try { await call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 }); } catch { await daemon.close(); } });
   const role = join(fleetDirectory, 'agents/analyst'); mkdirSync(role, { recursive: true, mode: 0o700 });
   const effort = runtime === 'codex' ? 'model_reasoning_effort' : 'thinking_level'; const defaults = runtime === 'codex' ? 'sandbox_mode = "read-only"\napproval_policy = "never"\n' : 'provider = "fixture"\nmodel = "fixture-model"\n';

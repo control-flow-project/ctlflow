@@ -45,8 +45,8 @@ public static class DaemonApi
     }
     private static DaemonReply Page(IReadOnlyList<JsonElement> items, IReadOnlyDictionary<string, string> query, string id)
     {
-        int Number(string name, int fallback, int maximum) { if (!query.TryGetValue(name, out var text)) return fallback; if (text.Length == 0 || text[0] == '0' || !int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value) || value < 1 || value > maximum) throw new RequestFailure(new("invalid", "Use canonical bounded pagination integers")); return value; }
-        var page = Number("page", 1, 100000); var size = Number("pageSize", 20, 100); return new(WireJson.Array(writer => { foreach (var item in items.Skip((page - 1) * size).Take(size)) item.WriteTo(writer); }), new(id, page, size, items.Count, (items.Count + size - 1) / size));
+        var bounds = Value(Pagination.Parse(query)); var page = bounds.Page; var size = bounds.PageSize;
+        return new(WireJson.Array(writer => { foreach (var item in items.Skip((page - 1) * size).Take(size)) item.WriteTo(writer); }), new(id, page, size, items.Count, Math.Max(1, (items.Count + size - 1) / size)));
     }
     private static async ValueTask<DaemonReply> Invoke(FleetController controller, string operation, IReadOnlyDictionary<string, string> parameters, IReadOnlyDictionary<string, string> query, JsonElement input, Func<(int Days, string? Error)> logging, string requestId, CancellationToken cancellation)
     {

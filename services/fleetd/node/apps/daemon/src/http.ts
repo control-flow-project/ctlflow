@@ -34,7 +34,7 @@ function bind<Params, Query, Input, Output>(operation: Operation<Params, Query, 
 function reply<Value>(result: Result<Value>): Result<Reply> { return result.ok ? success({ data: result.value }) : result; }
 function acknowledged(result: Result<unknown>): Result<Reply> { return result.ok ? success({ data: { accepted: true } }) : result; }
 function paged<Value>(result: Result<Value[]>, query: { page: number; pageSize: number }): Result<Reply> {
-  return result.ok ? success({ data: result.value.slice((query.page - 1) * query.pageSize, query.page * query.pageSize), pagination: { ...query, totalItems: result.value.length, totalPages: Math.ceil(result.value.length / query.pageSize) } }) : result;
+  return result.ok ? success({ data: result.value.slice((query.page - 1) * query.pageSize, query.page * query.pageSize), pagination: { ...query, totalItems: result.value.length, totalPages: Math.max(1, Math.ceil(result.value.length / query.pageSize)) } }) : result;
 }
 const statuses: Record<FailureCode, number> = { invalid: 400, unauthorized: 401, forbidden: 403, missing: 404, conflict: 409, stale_revision: 409,
   name_collision: 409, capacity: 409, limit: 413, body_too_large: 413, rate_limit: 429, method_not_allowed: 405, native: 502, unavailable: 503 };
